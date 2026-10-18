@@ -1,0 +1,84 @@
+{
+  "generated_on_utc": "2026-10-18T10:49:24Z",
+  "purpose": "SIG-11 / review question R6: provider-independence of HMAC-SHA-256 over RowHmac/v1 canonical bytes (Vault Transit vs HMACSHA256 vs published vectors).",
+  "vault": "hashicorp/vault:1.20.4 dev mode, throwaway container, key imported with `vault transit import ... type=hmac exportable=false`, key_version 1",
+  "key_source": "trust_authority/row-integrity-v1.test-vectors.json testHmacKeyHex \u2014 PUBLISHED TEST KEY, exists only to make vectors reproducible; no deployment key equals or derives from it",
+  "method": "POST transit/hmac/<key>/sha2-256 with input=base64(canonical bytes); the `vault:v1:` token is split and base64-decoded to 32 raw bytes exactly as VaultTransitHmacProvider.ExtractRawMac does",
+  "tamper_check": {
+    "case_id": "ROWV1-FORM-RECORD-USER-OWNED",
+    "last_byte_flipped_verify_valid": false
+  },
+  "cases": [
+    {
+      "case_id": "ROWV1-FORM-RECORD-USER-OWNED",
+      "canonical_byte_length": 334,
+      "canonical_payload_digest_hex": "8bc6b6da8e3f69a34e4ad88efd5a71cb1c9b8d0a0cd18988cdebb117fd3baa13",
+      "vault_hmac_token": "vault:v1:fHo1nkM+1iVS8UQ5QrEtE5Yed2NCwOa4DXYSK/7YFPc=",
+      "vault_hmac_hex": "7c7a359e433ed62552f1443942b12d13961e776342c0e6b80d76122bfed814f7",
+      "hmacsha256_local_hex": "7c7a359e433ed62552f1443942b12d13961e776342c0e6b80d76122bfed814f7",
+      "vector_row_signature_hex_with_test_key": "7c7a359e433ed62552f1443942b12d13961e776342c0e6b80d76122bfed814f7",
+      "all_three_agree": true
+    },
+    {
+      "case_id": "ROWV1-FORM-RECORD-TEAM-OWNED",
+      "canonical_byte_length": 334,
+      "canonical_payload_digest_hex": "693506509e81b4045135e1d389bebbdb0162372f6efad725fff7f8ab032bb7ca",
+      "vault_hmac_token": "vault:v1:Sx7M5RgjDRGhiRGgtGcL5zNUlk3ke1D55RK/1aK5BOY=",
+      "vault_hmac_hex": "4b1ecce518230d11a18911a0b4670be73354964de47b50f9e512bfd5a2b904e6",
+      "hmacsha256_local_hex": "4b1ecce518230d11a18911a0b4670be73354964de47b50f9e512bfd5a2b904e6",
+      "vector_row_signature_hex_with_test_key": "4b1ecce518230d11a18911a0b4670be73354964de47b50f9e512bfd5a2b904e6",
+      "all_three_agree": true
+    },
+    {
+      "case_id": "ROWV1-TYPES-ALL-PRESENT",
+      "canonical_byte_length": 369,
+      "canonical_payload_digest_hex": "0fc81b442f25b107a5077850fb99585a9b846b9bffae5a41d9db99663a008666",
+      "vault_hmac_token": "vault:v1:nea/U7VKGYMf/iqj6qWHXTPJMXLQWdq2bj5EwgYYkUo=",
+      "vault_hmac_hex": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+      "hmacsha256_local_hex": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+      "vector_row_signature_hex_with_test_key": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+      "all_three_agree": true
+    },
+    {
+      "case_id": "ROWV1-TYPES-NFC-EQUIVALENCE",
+      "canonical_byte_length": 369,
+      "canonical_payload_digest_hex": "0fc81b442f25b107a5077850fb99585a9b846b9bffae5a41d9db99663a008666",
+      "vault_hmac_token": "vault:v1:nea/U7VKGYMf/iqj6qWHXTPJMXLQWdq2bj5EwgYYkUo=",
+      "vault_hmac_hex": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+      "hmacsha256_local_hex": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+      "vector_row_signature_hex_with_test_key": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a",
+      "all_three_agree": true
+    },
+    {
+      "case_id": "ROWV1-TYPES-ALL-NULL",
+      "canonical_byte_length": 257,
+      "canonical_payload_digest_hex": "9299694425eafc67048e5c4f9907c7e88430256356b8528272eec3724eeb838d",
+      "vault_hmac_token": "vault:v1:y69O/1kYGgV64wqudbjyjmRW46VuJinI7rMQMiAj/U0=",
+      "vault_hmac_hex": "cbaf4eff59181a057ae30aae75b8f28e6456e3a56e2629c8eeb310322023fd4d",
+      "hmacsha256_local_hex": "cbaf4eff59181a057ae30aae75b8f28e6456e3a56e2629c8eeb310322023fd4d",
+      "vector_row_signature_hex_with_test_key": "cbaf4eff59181a057ae30aae75b8f28e6456e3a56e2629c8eeb310322023fd4d",
+      "all_three_agree": true
+    },
+    {
+      "case_id": "ROWV1-EMPTY-STRING-NOT-NULL",
+      "canonical_byte_length": 265,
+      "canonical_payload_digest_hex": "a6ee68278e4b987a0d0601be3aa24315bd3d694c4c53a7484625cd01919cd956",
+      "vault_hmac_token": "vault:v1:4d3XHDEpkXJXGJxNdqgaaZCfDaFl22WtSAj9UVzvP0g=",
+      "vault_hmac_hex": "e1ddd71c3129917257189c4d76a81a69909f0da165db65ad4808fd515cef3f48",
+      "hmacsha256_local_hex": "e1ddd71c3129917257189c4d76a81a69909f0da165db65ad4808fd515cef3f48",
+      "vector_row_signature_hex_with_test_key": "e1ddd71c3129917257189c4d76a81a69909f0da165db65ad4808fd515cef3f48",
+      "all_three_agree": true
+    },
+    {
+      "case_id": "ROWV1-DECIMAL-NORMALIZATION",
+      "canonical_byte_length": 300,
+      "canonical_payload_digest_hex": "ffa76bb01725400e18071df63b24c71dda2e1838deaf716de06a0de1aae33532",
+      "vault_hmac_token": "vault:v1:J7Qs952tXaGQvzwq5vsIsFdwq1/t0wD+cWABkIkX0/Y=",
+      "vault_hmac_hex": "27b42cf79dad5da190bf3c2ae6fb08b05770ab5fedd300fe716001908917d3f6",
+      "hmacsha256_local_hex": "27b42cf79dad5da190bf3c2ae6fb08b05770ab5fedd300fe716001908917d3f6",
+      "vector_row_signature_hex_with_test_key": "27b42cf79dad5da190bf3c2ae6fb08b05770ab5fedd300fe716001908917d3f6",
+      "all_three_agree": true
+    }
+  ],
+  "result": "PASS"
+}

@@ -1,3 +1,14 @@
+# STAGE A NOTE (2026-10-18): the compiled authority publishes the authoritative contract at
+# contracts/openapi/authorization-authority-internal-v1.json (snake_case JSON). Deviations from this reference, all
+# recorded in docs/STAGE_A_STATUS.md: (1) PrepareContentChange carries the full candidate snapshot as canonical
+# RowHmac/v1 bytes and returns the authority-issued signatures (the authority has no network path to BusinessDb, so the
+# business runtime pushes read-back evidence); (2) CommitContentChange carries the staged items read back from
+# BusinessDb; (3) /integrity/verify-record-projection replaces /integrity/verify-batch (CROSS_SYSTEM §10);
+# (4) /content-revisions/{organization_id}/{form_record_id}; (5) command kinds RegisterTeam/RegisterFormDefinition/
+# RegisterRecord added (invariant A7), UpdateShareScope/GrantSystemRole/RevokeSystemRole/UpdateMandatoryPolicy/
+# PublishFormSecurityRevision return COMMAND_KIND_NOT_IMPLEMENTED; (6) operator plane /operator/* with a separate
+# credential; (7) OperationStatus carries projection_gate_state and rejection_reason_code; (8) the delegated user
+# assertion travels in X-Delegated-User-Assertion. Error codes follow CROSS_SYSTEM §6.
 openapi: 3.1.0
 info:
   title: Dynamic Forms Internal Authorization Authority

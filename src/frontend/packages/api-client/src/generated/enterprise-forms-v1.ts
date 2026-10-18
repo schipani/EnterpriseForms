@@ -38,13 +38,306 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verified principal of the current assertion (projection maintenance only; confers no permission). */
+        get: operations["GetCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registers a form with the authority (designer role) and publishes a minimal v1 layout. Requires Idempotency-Key. */
+        post: operations["CreateFormDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registers the record with the authority, stages the signed candidate and commits the first accepted content revision. */
+        post: operations["CreateFormRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verified read: authority head → exact staged rows → complete manifest verification → authorized subset only. */
+        get: operations["GetFormRecord"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Optimistic (expected_content_revision) full-snapshot update staged as a new immutable candidate and committed by the authority. */
+        patch: operations["UpdateFormRecord"];
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/transfer-ownership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TransferRecordOwnership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explicit field allow-list share committed by the authority; no wildcard or future items. */
+        post: operations["CreateRecordShare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RevokeRecordShare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AddTeamMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/members/{userId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RemoveTeamMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CommandOutcome: {
+            /** Format: uuid */
+            commandId: string;
+            commandStatus: string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            effective: boolean;
+        };
+        CommandStatusResponse: {
+            command: components["schemas"]["CommandOutcome"];
+        };
+        CreateFieldRequest: {
+            fieldKey: string;
+            fieldDisplayName: string;
+        };
+        CreateFormDefinitionRequest: {
+            formDefinitionName: string;
+            formDefinitionDescription: string;
+            fields: components["schemas"]["CreateFieldRequest"][];
+            formUserUserIds: string[];
+            formUserTeamIds: string[];
+        };
+        CreateFormRecordRequest: {
+            values: {
+                [key: string]: string;
+            };
+            /** Format: uuid */
+            ownerTeamId?: null | string;
+        };
+        CreateShareRequest: {
+            /** Format: uuid */
+            recipientUserId: null | string;
+            /** Format: uuid */
+            recipientTeamId: null | string;
+            recipientRole: string;
+            fieldKeys: string[];
+        };
+        CreateTeamRequest: {
+            teamName: string;
+        };
+        CurrentUserResponse: {
+            /** Format: uuid */
+            organizationId: string;
+            issuerUri: string;
+            subjectIdentifier: string;
+            displayName: string;
+        };
+        FieldResponse: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            fieldKey: string;
+            fieldDisplayName: string;
+            fieldDataType: string;
+        };
+        FieldValueResponse: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            fieldKey: string;
+            /** Format: uuid */
+            fieldValueItemId: string;
+            stringValue: string;
+        };
+        FormDefinitionResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            /** Format: uuid */
+            organizationId: string;
+            formDefinitionName: string;
+            /** Format: uuid */
+            currentFormVersionId: string;
+            fields: components["schemas"]["FieldResponse"][];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            command: components["schemas"]["CommandOutcome"];
+        };
+        FormRecordResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            formDefinitionId: string;
+            recordStatus: string;
+            /** Format: int64 */
+            contentRevision: number | string;
+            /** Format: uuid */
+            committedOperationId: null | string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            isCompleteProjection: boolean;
+            values: components["schemas"]["FieldValueResponse"][];
+            integrityStatus: string;
+        };
         ProbeResponse: {
             probeStatus: string;
             serviceName: string;
+        };
+        ShareResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            recipientRole: string;
+            fieldValueItemIds: string[];
+            shareStatus: string;
+            command: components["schemas"]["CommandOutcome"];
+        };
+        TeamMemberRequest: {
+            /** Format: uuid */
+            userId: string;
+        };
+        TeamResponse: {
+            /** Format: uuid */
+            teamId: string;
+            teamName: string;
+            command: components["schemas"]["CommandOutcome"];
+        };
+        TransferOwnershipRequest: {
+            /** Format: uuid */
+            newOwnerUserId: null | string;
+            /** Format: uuid */
+            newOwnerTeamId: null | string;
+            transferReason: string;
+        };
+        UpdateFormRecordRequest: {
+            /** Format: int64 */
+            expectedContentRevision: number | string;
+            values: {
+                [key: string]: string;
+            };
         };
     };
     responses: never;
@@ -91,6 +384,272 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProbeResponse"];
+                };
+            };
+        };
+    };
+    GetCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+        };
+    };
+    CreateFormDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFormDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDefinitionResponse"];
+                };
+            };
+        };
+    };
+    CreateFormRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFormRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormRecordResponse"];
+                };
+            };
+        };
+    };
+    GetFormRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormRecordResponse"];
+                };
+            };
+        };
+    };
+    UpdateFormRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFormRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormRecordResponse"];
+                };
+            };
+        };
+    };
+    TransferRecordOwnership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferOwnershipRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    CreateRecordShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareResponse"];
+                };
+            };
+        };
+    };
+    RevokeRecordShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                recordShareId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    CreateTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTeamRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+        };
+    };
+    AddTeamMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamMemberRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    RemoveTeamMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandStatusResponse"];
                 };
             };
         };

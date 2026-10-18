@@ -1,7 +1,8 @@
-# Stage A security qualification gate (ADR-PB-003 Level A). STATUS: NOT YET SATISFIABLE.
-# This workflow brings up the disposable security-test stack and evaluates SEC-P01..SEC-P12 evidence.
-# Until the Stage A tests exist and produce artifacts/security/gate-a-evidence.json, the job fails with BLOCKED.
-# A failing or missing run never counts as PASS (SECURITY_VALIDATION_RUNBOOK.md §3). Manual/scheduled only.
+# Stage A security qualification gate (ADR-PB-003 Level A).
+# Brings up the disposable security-test stack (two PostgreSQL 18 clusters, SpiceDB, Vault Transit dev, Azurite archive
+# double, Authorization Authority, business API, attacker-sql) and runs SEC-P01..SEC-P12 against it, then validates the
+# evidence manifest. Zero discovered tests is a failed run (--minimum-expected-tests). A failing or missing run never
+# counts as PASS (SECURITY_VALIDATION_RUNBOOK.md §3). Manual/scheduled only; synthetic credentials only.
 name: security-gate-a
 
 on:
@@ -16,26 +17,49 @@ jobs:
   gate-a:
     name: SEC-P01..SEC-P12 against the isolated Docker stack
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
+      - name: Build the security test project (zero tests must never pass silently)
+        run: dotnet build tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj -c Release
       - name: Start disposable security-test stack (synthetic credentials)
         working-directory: infrastructure/docker
         run: |
           cp env.example .env
-          docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait business-db authority-db spicedb vault
-      - name: Run Stage A adversarial tests
-        run: |
-          if [ ! -d tests/security ]; then
-            echo "::error::Stage A tests (tests/security/**) are not implemented yet. Gate A = BLOCKED."
-            exit 1
-          fi
-          dotnet test tests/security --results-directory artifacts/security
+          docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait \
+            business-db authority-db spicedb vault vault-transit-init archive-store azurite authority-migrate authority business-migrate api attacker-sql
+          docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env ps
+      - name: Run Stage A adversarial tests (12 mandatory + harness guard; zero or fewer discovered tests fails)
+        run: >
+          dotnet test --project tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj
+          --no-build -c Release
+          --results-directory artifacts/security/test-results --report-xunit-trx
+          -- --minimum-expected-tests 13
       - name: Validate evidence manifest shape and digests (does not prove tests ran)
         run: python security_validation/validate_security_evidence.py artifacts/security/gate-a-evidence.json
+      - name: Collect service logs (sanitized by the services; no secrets are logged)
+        if: always()
+        working-directory: infrastructure/docker
+        run: |
+          mkdir -p ../../artifacts/security/logs
+          for s in authority api authority-migrate business-migrate spicedb vault archive-store; do
+            docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env logs --no-color $s > ../../artifacts/security/logs/$s.log 2>&1 || true
+          done
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with:
+          name: gate-a-evidence
+          path: artifacts/security
+          if-no-files-found: error
       - name: Tear down
         if: always()
         working-directory: infrastructure/docker

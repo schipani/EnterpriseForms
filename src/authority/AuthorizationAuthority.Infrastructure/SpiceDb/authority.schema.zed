@@ -1,0 +1,67 @@
+// Authorization Authority SpiceDB schema (Stage A). Derived from trust_authority/spicedb.schema.zed with the
+// projection-cursor marker required by CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md section 5 (marker CAS).
+// Object ids are RFC 4122 UUID strings issued by the authority; the business API never writes relationships.
+
+definition user {}
+
+// Cursor marker objects: "step-<organization uuid>-<revision>". Never a permission subject.
+definition projection_step {}
+
+definition team {
+    relation member: user
+    permission participant = member
+}
+
+definition organization {
+    relation organization_owner: user
+    relation system_administrator: user
+    relation designer: user
+    relation projection_cursor: projection_step
+    permission manage_configuration = organization_owner
+    permission administer_security = system_administrator
+    permission create_form = designer
+}
+
+definition form_definition {
+    relation organization: organization
+    relation designer: user | team#participant
+    relation form_user: user | team#participant
+    permission design = designer
+    permission create_record = form_user
+}
+
+definition record_share {
+    relation reader: user | team#participant
+    relation contributor: user | team#participant
+    relation manager: user | team#participant
+    permission read = reader + contributor + manager
+    permission edit = contributor + manager
+    permission delegate = manager
+}
+
+definition form_record {
+    relation organization: organization
+    relation owner: user | team#participant
+    relation shared_via: record_share
+    permission discover = owner + shared_via->read
+    permission read = owner
+    permission edit = owner
+    permission manage_access = owner + shared_via->delegate
+    permission transfer_ownership = owner
+}
+
+definition field_item {
+    relation parent_record: form_record
+    relation shared_via: record_share
+    permission read = parent_record->owner + shared_via->read
+    permission edit = parent_record->owner + shared_via->edit
+    permission delegate = parent_record->owner + shared_via->delegate
+}
+
+definition document_item {
+    relation parent_record: form_record
+    relation shared_via: record_share
+    permission read = parent_record->owner + shared_via->read
+    permission replace = parent_record->owner + shared_via->edit
+    permission delegate = parent_record->owner + shared_via->delegate
+}

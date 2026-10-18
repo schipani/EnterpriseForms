@@ -1,0 +1,104 @@
+{
+  "test_id": "SEC-P08",
+  "scenario": "Signing service outage: signing-required writes never commit as accepted; retries are idempotent after restoration; no insecure fallback",
+  "outcome": "PASS",
+  "commit_sha": "a9c0e744f57ede438e7cda9f222f20b190178984",
+  "image_fingerprint": "sha256:8cf5a87eb5bdd5ae2f7ce50e7b1e5415fe98e5caa31d612f8b6eca94ced7aac2 (api=sha256:6a2db921dffe868152c8ed02877a3376f6867d7a1ffce7990eafab234b376905;authority=sha256:2701e8e45f91b22ffebfa4f5fa8b627665fc0b37245d1d7379c176b06e8916bb)",
+  "started_at_utc": "2026-10-18T05:06:50.4198022\u002B00:00",
+  "executed_at_utc": "2026-10-18T05:07:08.1717438\u002B00:00",
+  "authority_revision": 4,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T05:06:50.4456616\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a14d67cbb37e73ae245a05e6b5bcb3-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:51.0910648\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "d68162a9-1a89-84a1-90bc-afc78b16df73",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:51.4716379\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "f29903e5-d8db-8acf-b0d8-bc468f1a37b8",
+        "contentRevision": "1",
+        "committedOperationId": "1923c76b-140f-816c-817f-dc348d93f4ba",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:57.4378692\u002B00:00",
+      "step": "create record while Vault paused",
+      "status": 503,
+      "error_code": "SIGNING_UNAVAILABLE",
+      "fields": {
+        "title": "SIGNING_UNAVAILABLE",
+        "detail": "Vault timeout"
+      }
+    },
+    {
+      "at": "2026-10-18T05:07:02.4630148\u002B00:00",
+      "step": "update existing record while Vault paused",
+      "status": 503,
+      "error_code": "SIGNING_UNAVAILABLE",
+      "fields": {
+        "title": "SIGNING_UNAVAILABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T05:07:07.4855496\u002B00:00",
+      "step": "owner read while Vault paused",
+      "status": 503,
+      "error_code": "SIGNING_UNAVAILABLE",
+      "fields": {
+        "title": "SIGNING_UNAVAILABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T05:07:07.7947723\u002B00:00",
+      "step": "retry with the same idempotency key after restoration",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "154f8b69-7189-8e54-8fa2-367beffc6a0d",
+        "contentRevision": "1",
+        "committedOperationId": "94ffe21c-e91d-893d-8f6e-5d5d74d95e5d"
+      }
+    },
+    {
+      "at": "2026-10-18T05:07:07.8214917\u002B00:00",
+      "step": "second retry (duplicate)",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "154f8b69-7189-8e54-8fa2-367beffc6a0d",
+        "contentRevision": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T05:07:08.1250785\u002B00:00",
+      "step": "staged header operations for the retried record",
+      "detail": {
+        "operations": "1"
+      }
+    }
+  ]
+}

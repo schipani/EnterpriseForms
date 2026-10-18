@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Enterprise Forms Authorization Authority (INTERNAL)",
-    "description": "Private contract. Reachable only over the authority network path with workload identity. Not part of the browser-facing API.",
+    "description": "Private contract. Reachable only over the authority network path with the workload credential and a delegated user assertion. Not part of the browser-facing API.",
     "version": "internal-v1"
   },
   "paths": {
@@ -31,6 +31,7 @@
         "tags": [
           "Health"
         ],
+        "summary": "Ready only when the signing provider, authority store, SpiceDB schema and independent archive are all usable.",
         "operationId": "GetAuthorityReadiness",
         "responses": {
           "200": {
@@ -45,22 +46,1307 @@
           }
         }
       }
+    },
+    "/internal/v1/authorization/check": {
+      "post": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Authoritative permission check at the authority-held projection token; fails closed while the organization gate is closed.",
+        "operationId": "CheckPermission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionDecision"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/authorization/check-batch": {
+      "post": {
+        "tags": [
+          "Authorization"
+        ],
+        "operationId": "CheckPermissionsBatch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionCheckBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionCheckBatchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/authorization/discover": {
+      "post": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Authority-sourced discoverable record ids (registered + discover permission); never derived from business tables.",
+        "operationId": "DiscoverRecords",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoverRecordsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/security-commands": {
+      "post": {
+        "tags": [
+          "SecurityCommands"
+        ],
+        "summary": "Validated, idempotent, revision-bound security mutation. 202 means committed, not effective; poll until Effective.",
+        "operationId": "SubmitSecurityCommand",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/security-commands/{commandId}": {
+      "get": {
+        "tags": [
+          "SecurityCommands"
+        ],
+        "operationId": "GetSecurityCommandStatus",
+        "parameters": [
+          {
+            "name": "commandId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/content-changes/prepare": {
+      "post": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Validates the exact candidate snapshot against the accepted head and the actor's edit scope, then signs it. Not a generic signing endpoint.",
+        "operationId": "PrepareContentChange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepareContentChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedContentOperation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/content-changes/{operationId}/commit": {
+      "post": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Proves the staged bytes equal the approved candidate and CAS-advances the trusted content head.",
+        "operationId": "CommitContentChange",
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitContentChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentRevision"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/content-revisions/{organizationId}/{formRecordId}": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "operationId": "GetCurrentContentRevision",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentRevision"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/integrity/verify-record-projection": {
+      "post": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Compares the observed staged items with the complete accepted leaf index, verifies every signature and the root, and returns the authorized subset.",
+        "operationId": "VerifyRecordProjection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRecordProjectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyRecordProjectionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Provisions organization state, identity bindings, organization roles and the organization integrity key (Stage A stand-in for the PIM/dual-control workflow).",
+        "operationId": "BootstrapOrganization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BootstrapOrganizationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/gate": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "operationId": "GetOrganizationGate",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationGateStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/fault-injection": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Testing only: arms a one-shot process crash at a named protocol transition (SEC-P09).",
+        "operationId": "ArmFaultInjection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaultInjectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FaultInjectionRequest"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
       "AuthorityProbeResponse": {
         "required": [
-          "probeStatus",
-          "serviceName"
+          "probe_status",
+          "service_name",
+          "detail"
         ],
         "type": "object",
         "properties": {
-          "probeStatus": {
+          "probe_status": {
             "type": "string"
           },
-          "serviceName": {
+          "service_name": {
             "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "BootstrapIdentity": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "organization_roles"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "organization_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "BootstrapOrganizationRequest": {
+        "required": [
+          "organization_id",
+          "organization_display_name",
+          "identities"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "identities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BootstrapIdentity"
+            }
+          }
+        }
+      },
+      "BootstrapOrganizationResponse": {
+        "required": [
+          "organization_id",
+          "authorization_revision",
+          "bootstrap_command_id",
+          "integrity_key_name",
+          "signing_key_version",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "bootstrap_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "integrity_key_name": {
+            "type": "string"
+          },
+          "signing_key_version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CandidateContentItem": {
+        "required": [
+          "item_kind",
+          "item_id",
+          "canonical_bytes_base64"
+        ],
+        "type": "object",
+        "properties": {
+          "item_kind": {
+            "$ref": "#/components/schemas/ManifestItemKind"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canonical_bytes_base64": {
+            "type": "string"
+          }
+        }
+      },
+      "CommandStatus": {
+        "enum": [
+          "Pending",
+          "CommittedAwaitingProjection",
+          "Effective",
+          "Rejected",
+          "FailedReconciliation"
+        ]
+      },
+      "CommitContentChangeRequest": {
+        "required": [
+          "organization_id",
+          "form_record_id",
+          "staged_items"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "staged_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
+            }
+          }
+        }
+      },
+      "ContentRevision": {
+        "required": [
+          "form_record_id",
+          "committed_content_revision",
+          "committed_operation_id",
+          "committed_manifest_root_base64",
+          "authorization_revision",
+          "integrity_key_version",
+          "current_signing_key_version",
+          "archive_state",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "committed_manifest_root_base64": {
+            "type": "string"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "integrity_key_version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "current_signing_key_version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "archive_state": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "DiscoverRecordsRequest": {
+        "required": [
+          "organization_id",
+          "page_size"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "page_size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "continuation_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DiscoverResponse": {
+        "required": [
+          "form_record_ids",
+          "authorization_revision",
+          "continuation_token"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "continuation_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "FaultInjectionRequest": {
+        "required": [
+          "fault_name"
+        ],
+        "type": "object",
+        "properties": {
+          "fault_name": {
+            "type": "string"
+          }
+        }
+      },
+      "JsonElement": { },
+      "ManifestItemKind": {
+        "enum": [
+          "RecordHeader",
+          "RepeatedGroup",
+          "FieldValue",
+          "FieldSelection",
+          "Attachment",
+          "AttachmentLifecycle"
+        ]
+      },
+      "OperationStatus": {
+        "required": [
+          "command_id",
+          "command_status",
+          "authorization_revision",
+          "projection_revision",
+          "projection_gate_state",
+          "rejection_reason_code",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "command_status": {
+            "$ref": "#/components/schemas/CommandStatus"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_gate_state": {
+            "$ref": "#/components/schemas/ProjectionGateState"
+          },
+          "rejection_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationGateStatus": {
+        "required": [
+          "organization_id",
+          "authorization_revision",
+          "projection_applied_revision",
+          "content_integrity_revision",
+          "projection_gate_state",
+          "pending_archive_entries",
+          "integrity_quarantine_enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_applied_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_gate_state": {
+            "$ref": "#/components/schemas/ProjectionGateState"
+          },
+          "pending_archive_entries": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "integrity_quarantine_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PermissionCheckBatchRequest": {
+        "required": [
+          "checks"
+        ],
+        "type": "object",
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PermissionCheckRequest"
+            }
+          }
+        }
+      },
+      "PermissionCheckBatchResponse": {
+        "required": [
+          "decisions"
+        ],
+        "type": "object",
+        "properties": {
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PermissionDecision"
+            }
+          }
+        }
+      },
+      "PermissionCheckRequest": {
+        "required": [
+          "organization_id",
+          "resource",
+          "requested_action"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "requested_action": {
+            "$ref": "#/components/schemas/RequestedAction"
+          },
+          "unlock_reference": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "minimum_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "PermissionDecision": {
+        "required": [
+          "allowed",
+          "denial_reason_code",
+          "authorization_revision",
+          "projection_revision",
+          "content_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "denial_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PrepareContentChangeRequest": {
+        "required": [
+          "organization_id",
+          "form_record_id",
+          "operation_id",
+          "expected_authorization_revision",
+          "expected_content_revision",
+          "expected_manifest_root_base64",
+          "candidate_items"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expected_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expected_manifest_root_base64": {
+            "type": "string"
+          },
+          "candidate_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CandidateContentItem"
+            }
+          }
+        }
+      },
+      "PreparedContentOperation": {
+        "required": [
+          "operation_id",
+          "candidate_content_revision",
+          "signature_key_version",
+          "candidate_manifest_root_base64",
+          "signed_items",
+          "operation_status",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "candidate_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "signature_key_version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "candidate_manifest_root_base64": {
+            "type": "string"
+          },
+          "signed_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignedCandidateItem"
+            }
+          },
+          "operation_status": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProjectionGateState": {
+        "enum": [
+          "Ready",
+          "AwaitingProjection",
+          "AwaitingArchive",
+          "Quarantined"
+        ]
+      },
+      "RequestedAction": {
+        "enum": [
+          "Discover",
+          "Read",
+          "Edit",
+          "Download",
+          "Replace",
+          "Delegate",
+          "ManageAccess",
+          "TransferOwnership",
+          "DesignForm",
+          "CreateRecord",
+          "ManageOrganization"
+        ]
+      },
+      "ResourceKind": {
+        "enum": [
+          "FormDefinition",
+          "FormRecord",
+          "FieldItem",
+          "DocumentItem",
+          "Team",
+          "Organization"
+        ]
+      },
+      "ResourceRef": {
+        "required": [
+          "resource_kind",
+          "resource_id"
+        ],
+        "type": "object",
+        "properties": {
+          "resource_kind": {
+            "$ref": "#/components/schemas/ResourceKind"
+          },
+          "resource_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityCommandKind": {
+        "enum": [
+          "RegisterTeam",
+          "AddTeamMember",
+          "RemoveTeamMember",
+          "RegisterFormDefinition",
+          "RegisterRecord",
+          "TransferOwnership",
+          "CreateShare",
+          "UpdateShareScope",
+          "RevokeShare",
+          "GrantSystemRole",
+          "RevokeSystemRole",
+          "UpdateMandatoryPolicy",
+          "PublishFormSecurityRevision"
+        ]
+      },
+      "SecurityCommandRequest": {
+        "required": [
+          "organization_id",
+          "command_kind",
+          "resource",
+          "expected_authorization_revision",
+          "command_payload"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "command_kind": {
+            "$ref": "#/components/schemas/SecurityCommandKind"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "expected_authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "command_payload": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "change_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approval_reference": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "SignedCandidateItem": {
+        "required": [
+          "item_kind",
+          "item_id",
+          "row_signature_base64",
+          "canonical_payload_digest_base64",
+          "mutation_kind"
+        ],
+        "type": "object",
+        "properties": {
+          "item_kind": {
+            "$ref": "#/components/schemas/ManifestItemKind"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "row_signature_base64": {
+            "type": "string"
+          },
+          "canonical_payload_digest_base64": {
+            "type": "string"
+          },
+          "mutation_kind": {
+            "type": "string"
+          }
+        }
+      },
+      "StagedContentItem": {
+        "required": [
+          "item_kind",
+          "item_id",
+          "canonical_bytes_base64",
+          "row_signature_base64"
+        ],
+        "type": "object",
+        "properties": {
+          "item_kind": {
+            "$ref": "#/components/schemas/ManifestItemKind"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "canonical_bytes_base64": {
+            "type": "string"
+          },
+          "row_signature_base64": {
+            "type": "string"
+          }
+        }
+      },
+      "VerifiedProjectionItem": {
+        "required": [
+          "item_kind",
+          "item_id"
+        ],
+        "type": "object",
+        "properties": {
+          "item_kind": {
+            "$ref": "#/components/schemas/ManifestItemKind"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VerifyRecordProjectionRequest": {
+        "required": [
+          "organization_id",
+          "form_record_id",
+          "requested_action",
+          "observed_items"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requested_action": {
+            "$ref": "#/components/schemas/RequestedAction"
+          },
+          "observed_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
+            }
+          }
+        }
+      },
+      "VerifyRecordProjectionResult": {
+        "required": [
+          "verified",
+          "failure_reason_code",
+          "committed_content_revision",
+          "committed_operation_id",
+          "authorization_revision",
+          "authorized_items",
+          "is_complete_projection",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean"
+          },
+          "failure_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorized_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerifiedProjectionItem"
+            }
+          },
+          "is_complete_projection": {
+            "type": "boolean"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       }
@@ -69,6 +1355,18 @@
   "tags": [
     {
       "name": "Health"
+    },
+    {
+      "name": "Authorization"
+    },
+    {
+      "name": "SecurityCommands"
+    },
+    {
+      "name": "Content"
+    },
+    {
+      "name": "Operator"
     }
   ]
 }

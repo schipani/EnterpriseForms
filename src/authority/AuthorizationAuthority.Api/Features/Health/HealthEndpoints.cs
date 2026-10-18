@@ -9,20 +9,21 @@ public static class HealthEndpoints
     {
         var group = endpoints.MapGroup(InternalApi.Prefix + "/health").WithTags("Health");
 
-        group.MapGet("/live", static () => TypedResults.Ok(new AuthorityProbeResponse("Live", "AuthorizationAuthority.Api")))
+        group.MapGet("/live", static () => TypedResults.Ok(new AuthorityProbeResponse("Live", "AuthorizationAuthority.Api", null)))
             .WithName("GetAuthorityLiveness");
 
-        group.MapGet("/ready", static async Task<Results<Ok<AuthorityProbeResponse>, ProblemHttpResult>> (SigningProviderReadiness readiness, CancellationToken cancellationToken) =>
+        group.MapGet("/ready", static async Task<Results<Ok<AuthorityProbeResponse>, ProblemHttpResult>> (AuthorityReadiness readiness, CancellationToken cancellationToken) =>
             {
                 var (ready, detail) = await readiness.CheckAsync(cancellationToken).ConfigureAwait(false);
                 return ready
-                    ? TypedResults.Ok(new AuthorityProbeResponse("Ready", "AuthorizationAuthority.Api"))
+                    ? TypedResults.Ok(new AuthorityProbeResponse("Ready", "AuthorizationAuthority.Api", detail))
                     : TypedResults.Problem(title: "Not ready", detail: detail, statusCode: StatusCodes.Status503ServiceUnavailable);
             })
-            .WithName("GetAuthorityReadiness");
+            .WithName("GetAuthorityReadiness")
+            .WithSummary("Ready only when the signing provider, authority store, SpiceDB schema and independent archive are all usable.");
 
         return endpoints;
     }
 }
 
-public sealed record AuthorityProbeResponse(string ProbeStatus, string ServiceName);
+public sealed record AuthorityProbeResponse(string ProbeStatus, string ServiceName, string? Detail);

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Stage A adversarial integration tests SEC-P01..SEC-P12 (ADR-PB-003 Level A) against the running
+    compose.security-test.yaml stack: real PostgreSQL ×2, SpiceDB, Vault Transit, Azurite archive double, the
+    Authorization Authority and the business API. The hostile DBA is the attacker-sql container (BusinessDb admin only).
+    Run: dotnet test tests/security - -minimum-expected-tests 12 (zero discovered tests is a failed run).
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <RootNamespace>EnterpriseForms.SecurityTests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Only the provider-free integrity library is referenced: the harness re-derives canonical bytes exactly like the business runtime. -->
+    <ProjectReference Include="../../../src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
+  </ItemGroup>
+</Project>

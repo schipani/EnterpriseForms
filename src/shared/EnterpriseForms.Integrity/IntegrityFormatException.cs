@@ -26,6 +26,7 @@ public enum IntegrityFormatErrorCode
     KeyVersionRange,
     RowRevisionRange,
     IdentifierTooLong,
+    UnknownSchemaVersion,
 }
 
 /// <summary>Thrown for any non-canonical input. Never caught to continue a protected operation.</summary>

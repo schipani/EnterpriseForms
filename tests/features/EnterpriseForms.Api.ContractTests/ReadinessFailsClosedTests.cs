@@ -8,7 +8,7 @@ using Xunit;
 
 namespace EnterpriseForms.Api.ContractTests;
 
-/// <summary>Readiness is tied to the independent Authority: unconfigured or unreachable authority ⇒ 503, reachable ⇒ 200.</summary>
+/// <summary>Readiness is tied to the independent Authority: unconfigured or unreachable authority ⇒ 503, reachable ⇒ 200. Protected routes require a user assertion.</summary>
 public sealed class ReadinessFailsClosedTests
 {
     [Fact]
@@ -69,5 +69,32 @@ public sealed class ReadinessFailsClosedTests
         using var client = api.CreateClient();
         var response = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ProtectedRoutesRequireAnAssertion()
+    {
+        using var api = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseEnvironment("Development"));
+        using var client = api.CreateClient();
+        var response = await client.GetAsync(new Uri("/api/v1/form-records/" + Guid.NewGuid().ToString("D"), UriKind.Relative), TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public void TestIdentityProviderIsRefusedInStaging()
+    {
+        using var api = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+        {
+            b.UseEnvironment("Staging");
+            b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["UserAuthentication:ProviderKind"] = "TestIdentityProvider",
+                ["UserAuthentication:Issuer"] = "https://test-idp.enterpriseforms.invalid",
+                ["UserAuthentication:Audience"] = "enterpriseforms",
+                ["UserAuthentication:SharedKeyBase64"] = "dGVzdC1pZHAtZGV2LW9ubHktc2lnbmluZy1rZXktMDAwMDAwMDAwMA==",
+            }));
+        });
+        var ex = Assert.ThrowsAny<Exception>(() => api.CreateClient());
+        Assert.Contains("not permitted in Staging", ex.Message + (ex.InnerException?.Message ?? string.Empty), StringComparison.Ordinal);
     }
 }

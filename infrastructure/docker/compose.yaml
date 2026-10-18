@@ -7,10 +7,13 @@
 # Copy env.example to .env first. Values in env.example are synthetic development credentials only.
 #
 # Trust boundaries emulated with separate networks and credentials (NOT equivalent to production isolation):
-#   business-net : business-db <-> api/worker
+#   business-net : business-db <-> api/worker (+ azurite document emulator)
 #   trust-edge   : api/worker  -> authority (private HTTP contract only)
-#   authority-net: authority <-> authority-db, spicedb, vault   (no business service is attached)
+#   authority-net: authority <-> authority-db, spicedb, vault, archive-store   (no business service is attached)
 #   web-net      : web -> api
+#
+# Least privilege: each database has an admin (migration) identity and a runtime identity. The api/authority containers
+# run with the runtime identities; one-shot *-migrate services apply EF migrations and grants with the admin identity.
 name: enterpriseforms
 
 networks:
@@ -30,11 +33,15 @@ services:
   business-db:
     image: postgres:18.0
     command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
-    volumes: ["./postgres/pg_hba.business.conf:/etc/postgresql/pg_hba.conf:ro"]
+    volumes:
+      - ./postgres/pg_hba.business.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/init-business-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
     environment:
       POSTGRES_DB: ${BUSINESS_DB_NAME:?set in .env}
       POSTGRES_USER: ${BUSINESS_DB_ADMIN_USER:?set in .env}
       POSTGRES_PASSWORD: ${BUSINESS_DB_ADMIN_PASSWORD:?set in .env}
+      BUSINESS_RUNTIME_USER: ${BUSINESS_RUNTIME_USER:?set in .env}
+      BUSINESS_RUNTIME_PASSWORD: ${BUSINESS_RUNTIME_PASSWORD:?set in .env}
     networks: [business-net]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -45,11 +52,15 @@ services:
   authority-db:
     image: postgres:18.0
     command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
-    volumes: ["./postgres/pg_hba.authority.conf:/etc/postgresql/pg_hba.conf:ro"]
+    volumes:
+      - ./postgres/pg_hba.authority.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/init-authority-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
     environment:
       POSTGRES_DB: ${AUTHORITY_DB_NAME:?set in .env}
       POSTGRES_USER: ${AUTHORITY_DB_ADMIN_USER:?set in .env}
       POSTGRES_PASSWORD: ${AUTHORITY_DB_ADMIN_PASSWORD:?set in .env}
+      AUTHORITY_RUNTIME_USER: ${AUTHORITY_RUNTIME_USER:?set in .env}
+      AUTHORITY_RUNTIME_PASSWORD: ${AUTHORITY_RUNTIME_PASSWORD:?set in .env}
     networks: [authority-net]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -106,11 +117,44 @@ services:
       timeout: 3s
       retries: 20
 
+  vault-transit-init:
+    # Enables the transit secrets engine once; per-organization HMAC keys are provisioned by the authority's operator workflow.
+    image: hashicorp/vault:1.20.4
+    entrypoint: ["sh", "-c", "vault secrets enable -address=http://vault:8200 transit || true"]
+    environment:
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN}
+    depends_on:
+      vault:
+        condition: service_healthy
+    networks: [authority-net]
+    restart: "no"
+
+  archive-store:
+    # TEST DOUBLE for the separately administered append-only security-event archive (G14). Azurite on authority-net:
+    # reachable only by the authority. Not Azure immutable storage / Confidential Ledger evidence (ADR-PB-003 Level A).
+    image: mcr.microsoft.com/azure-storage/azurite:3.9.0
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose"]
+    networks: [authority-net]
+
   azurite:
     # Blob emulator for the Documents feature (Phase 3A). Private container semantics are enforced by the API, not the emulator.
     image: mcr.microsoft.com/azure-storage/azurite:3.9.0
     command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose"]
     networks: [business-net]
+
+  authority-migrate:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.authority
+    command: ["dotnet", "AuthorizationAuthority.Api.dll", "--migrate"]
+    environment:
+      ConnectionStrings__AuthorityDbMigration: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=${AUTHORITY_DB_ADMIN_USER};Password=${AUTHORITY_DB_ADMIN_PASSWORD}
+      Database__RuntimeRoleName: ${AUTHORITY_RUNTIME_USER}
+    depends_on:
+      authority-db:
+        condition: service_healthy
+    networks: [authority-net]
+    restart: "no"
 
   authority:
     build:
@@ -121,21 +165,57 @@ services:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       Signing__Provider: VaultTransit
       Signing__VaultAddress: http://vault:8200
-      ConnectionStrings__AuthorityDb: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=${AUTHORITY_DB_ADMIN_USER};Password=${AUTHORITY_DB_ADMIN_PASSWORD}
+      Signing__VaultTransit__Token: ${VAULT_DEV_ROOT_TOKEN}
+      ConnectionStrings__AuthorityDb: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=${AUTHORITY_RUNTIME_USER};Password=${AUTHORITY_RUNTIME_PASSWORD}
       SpiceDb__Endpoint: spicedb:50051
+      SpiceDb__PresharedKey: ${SPICEDB_PRESHARED_KEY}
+      SecurityArchive__Provider: Blob
+      SecurityArchive__BlobServiceUri: http://archive-store:10000/${ARCHIVE_ACCOUNT_NAME}
+      SecurityArchive__AccountName: ${ARCHIVE_ACCOUNT_NAME}
+      SecurityArchive__AccountKey: ${ARCHIVE_ACCOUNT_KEY}
+      Identity__Workload__Issuer: ${WORKLOAD_ISSUER}
+      Identity__Workload__Audience: ${WORKLOAD_AUDIENCE}
+      Identity__Workload__SharedKeyBase64: ${WORKLOAD_SHARED_KEY_BASE64}
+      Identity__Operator__Issuer: ${OPERATOR_ISSUER}
+      Identity__Operator__Audience: ${OPERATOR_AUDIENCE}
+      Identity__Operator__SharedKeyBase64: ${OPERATOR_SHARED_KEY_BASE64}
+      Identity__UserAssertion__ProviderKind: TestIdentityProvider
+      Identity__UserAssertion__Issuer: ${TEST_IDP_ISSUER}
+      Identity__UserAssertion__Audience: ${TEST_IDP_AUDIENCE}
+      Identity__UserAssertion__SharedKeyBase64: ${TEST_IDP_SHARED_KEY_BASE64}
     depends_on:
       authority-db:
         condition: service_healthy
+      authority-migrate:
+        condition: service_completed_successfully
       spicedb:
         condition: service_healthy
       vault:
         condition: service_healthy
+      vault-transit-init:
+        condition: service_completed_successfully
+      archive-store:
+        condition: service_started
     networks: [authority-net, trust-edge]
     healthcheck:
-      test: ["CMD", "dotnet", "AuthorizationAuthority.Api.dll", "--probe", "http://127.0.0.1:8080/internal/v1/health/live"]
+      test: ["CMD", "dotnet", "AuthorizationAuthority.Api.dll", "--probe", "http://127.0.0.1:8080/internal/v1/health/ready"]
       interval: 5s
-      timeout: 3s
-      retries: 30
+      timeout: 4s
+      retries: 40
+
+  business-migrate:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.api
+    command: ["dotnet", "EnterpriseForms.Api.dll", "--migrate"]
+    environment:
+      ConnectionStrings__BusinessDbMigration: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_DB_ADMIN_USER};Password=${BUSINESS_DB_ADMIN_PASSWORD}
+      Database__RuntimeRoleName: ${BUSINESS_RUNTIME_USER}
+    depends_on:
+      business-db:
+        condition: service_healthy
+    networks: [business-net]
+    restart: "no"
 
   api:
     build:
@@ -145,11 +225,20 @@ services:
       ASPNETCORE_ENVIRONMENT: ${BUSINESS_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://0.0.0.0:8080
       TrustAuthority__BaseAddress: http://authority:8080
-      ConnectionStrings__BusinessDb: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_DB_ADMIN_USER};Password=${BUSINESS_DB_ADMIN_PASSWORD}
+      TrustAuthority__WorkloadIssuer: ${WORKLOAD_ISSUER}
+      TrustAuthority__WorkloadAudience: ${WORKLOAD_AUDIENCE}
+      TrustAuthority__WorkloadSharedKeyBase64: ${WORKLOAD_SHARED_KEY_BASE64}
+      UserAuthentication__ProviderKind: TestIdentityProvider
+      UserAuthentication__Issuer: ${TEST_IDP_ISSUER}
+      UserAuthentication__Audience: ${TEST_IDP_AUDIENCE}
+      UserAuthentication__SharedKeyBase64: ${TEST_IDP_SHARED_KEY_BASE64}
+      ConnectionStrings__BusinessDb: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_RUNTIME_USER};Password=${BUSINESS_RUNTIME_PASSWORD}
       Storage__BlobServiceUri: http://azurite:10000/devstoreaccount1
     depends_on:
       business-db:
         condition: service_healthy
+      business-migrate:
+        condition: service_completed_successfully
       authority:
         condition: service_healthy
     networks: [business-net, trust-edge, web-net]
@@ -166,7 +255,7 @@ services:
     environment:
       DOTNET_ENVIRONMENT: ${BUSINESS_ENVIRONMENT:-Development}
       Worker__TrustAuthorityBaseAddress: http://authority:8080
-      ConnectionStrings__BusinessDb: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_DB_ADMIN_USER};Password=${BUSINESS_DB_ADMIN_PASSWORD}
+      ConnectionStrings__BusinessDb: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_RUNTIME_USER};Password=${BUSINESS_RUNTIME_PASSWORD}
     depends_on:
       business-db:
         condition: service_healthy
