@@ -186,10 +186,121 @@ docker compose -f compose.yaml -f compose.dev.yaml --env-file .env down -v
 
 ## 9. Change inventory
 
-Uncommitted on branch `main` (one prior commit). New top-level entries: `.editorconfig`, `.github/`, `.gitignore`,
-`.vscode/`, `Directory.Build.props`, `Directory.Packages.props`, `EnterpriseForms.All.slnx`, `contracts/`,
-`global.json`, `infrastructure/`, `src/`, `tests/`, `scripts/integrity/`, `docs/dynamic-forms/`. Modified:
-`docs/PREBUILD_OPEN_ITEMS.md`, `docs/architecture/FEATURE_OWNERSHIP_MATRIX.md`, `spec-files.json`, `SHA256SUMS.txt`.
-No commit was made; review and commit are the owner's call.
+Phase 0 work was committed by the repository owner as `ef68115` ("Add row integrity test vectors for DynamicForms",
+141 files, +11672/-34) on `main` and pushed to `origin` (`github.com/schipani/EnterpriseForms`). The acceptance review
+in section 10 was performed against that commit; this document update is staged as a follow-up commit.
 
 **Phase 0 completion gate: reached.** Awaiting authorization to begin Stage A.
+
+## 10. Final Phase 0 acceptance review (2026-10-18)
+
+### 10.1 Change-set, dependency and security-sensitive file review (commit `ef68115`)
+
+| Check | Result |
+|---|---|
+| Forbidden content in the committed tree (`.env`, `bin/`, `obj/`, `node_modules/`, `dist/`, key or certificate files) | None. `infrastructure/docker/.env` is git-ignored and untracked; one lockfile (`src/frontend/package-lock.json`) is tracked as intended. |
+| Secret scan (private keys, cloud and API tokens, client secrets, literal connection-string passwords) over the committed tree | No findings. The only credential literals are the labelled synthetic values in `infrastructure/docker/env.example` and the pre-existing Vault dev token in the `trust_authority/` reference files, which are development-only by specification. |
+| NuGet additions | 11 packages, all centrally pinned in `Directory.Packages.props`; no per-project versions (enforced by test). Microsoft 10.0.13 line, Npgsql EF 10.0.3, xunit.v3 4.0.2, NetArchTest 1.3.2. |
+| npm additions | Exact versions; `npm audit` reports 0 vulnerabilities (production and all). |
+| GitHub workflows | `permissions: contents: read` only; no `id-token` or `attestations`; all actions pinned to full commit SHAs. |
+| Container images | Multi-stage; runtime `aspnet`/`runtime:10.0-noble-chiseled-extra` and `nginx-unprivileged`; `USER $APP_UID`; no privileged containers, no Docker socket mounts; only Vault adds `IPC_LOCK`. |
+| Committed configuration | `appsettings.json` ships `Signing:Provider=Unconfigured` and empty authority addresses (fail closed); Development overrides set `LocalDevelopment` and localhost only. |
+
+**Development shortcuts, all local-only and guarded (not deviations):** Vault dev mode and the `LocalDevelopment` and
+`VaultTransit` providers (permitted locally by ADR-PB-005 section 5; refused in Production by a tested host-start
+guard); SpiceDB datastore connection `sslmode=disable` and Azurite `--loose`/`--skipApiVersionCheck` inside Compose only;
+`AllowedHosts: *` behind the same-origin proxy. Each must be replaced by managed identity, TLS and Azure services in
+staging (PB-05, PB-10, PB-11).
+
+**ADR conformance:** no deviation found from ADR-PB-001 to ADR-PB-014 or ADR-ARCH-001. Decisions taken where the ADRs
+left a choice are logged (`PHASE0_DECISION_LOG.md` P0-01 to P0-18); none weakens a Level 2 requirement. Items
+deliberately not built (business features, Authority store, MAC providers, migrations) follow ADR-PB-002 sequencing.
+
+### 10.2 Verification from a clean Git checkout
+
+`git archive HEAD` of `ef68115` extracted to `C:\t\efclean` (232 files, no build output, no `.env`), plus a second
+export of the committable tree used for the Docker run:
+
+| Step | Result |
+|---|---|
+| `validate-specifications.py --strict` | PASS (107 tracked, 14 ADRs, 69 pages) |
+| Vector verification (Python, Node) | PASS, 34 checks each; regeneration produces no drift |
+| `dotnet restore` and `dotnet build -c Release` | 15 projects; Build succeeded, 0 warnings, 0 errors |
+| OpenAPI regenerated at build vs committed `contracts/openapi/*.json` | byte-identical (both documents) |
+| `dotnet test --solution ... -c Release` | **108 passed, 0 failed, 0 skipped** |
+| `npm ci --ignore-scripts`, client regeneration, `npm run check` | 240 packages; generated client identical; lint, typecheck, 7/7 tests, build pass |
+| `docker compose ... config` for all three override sets | PASS |
+| `docker compose ... up -d --build --wait` (all 10 services including web) | all healthy; `api /health/ready` 200, authority readiness 200, `web /` 200, `web /health/live` proxied 200 |
+
+Operational note: on Windows, a checkout under a very long path made the test runner fail with "filename or extension
+is too long" and report "Zero tests ran"; the binaries themselves pass. Clone into a short path or enable Windows long
+paths. Recorded so a zero-test result is never mistaken for success.
+
+### 10.3 Business services cannot access the Authority database or signing credentials
+
+Evidence from the clean-tree Docker run (`docker inspect` and in-container probes):
+
+- **Environment:** `api` and `worker` carry only `ConnectionStrings__BusinessDb` and the Authority HTTP base address;
+  no `AuthorityDb`, `Signing__*`, Vault address or token, or SpiceDB key. `web`, `azurite` and `business-db` carry none.
+  Only `authority` carries `ConnectionStrings__AuthorityDb`, `Signing__*` and `SpiceDb__Endpoint`.
+- **Mounts and permissions:** no secret files are mounted into business containers; the only bind mounts are the two
+  read-only `pg_hba.conf` files; no privileged containers; no Docker socket.
+- **Network:** business containers attach only to `business-net` (plus `trust-edge`/`web-net` for api and `trust-edge`
+  for worker); `authority-db`, `spicedb` and `vault` attach only to the internal `authority-net`. `business-db` to
+  `authority-db` with the correct authority password: exit 124 (no TCP path); `business-db` to `vault:8200`:
+  unreachable; `vault` not resolvable from the business plane. The authority-plane control connection succeeds.
+- **Code:** `IAuthorizationAuthorityClient` is an HTTP port; architecture tests forbid any business assembly from
+  referencing Authority assemblies.
+
+Limit: the Compose stack emulates the boundary with one Docker daemon and one developer identity. It cannot prove
+separate administrative scopes; that is PB-03 Level B and ADR-PB-005 section 4 evidence in Azure.
+
+### 10.4 Mandatory artifacts and the outstanding independent cryptographic review
+
+All mandatory Phase 0 artifacts exist and are tracked in the manifest: `docs/dynamic-forms/architecture.md`,
+`docs/dynamic-forms/row-integrity-format.md`, `trust_authority/merkle-v1.test-vectors.json`,
+`trust_authority/row-integrity-v1.test-vectors.json`, `docs/dynamic-forms/control-traceability.csv`,
+`docs/decisions/PHASE0_DECISION_LOG.md` and `docs/architecture/ADR-ARCH-001-feature-vertical-slices.md`.
+
+**Outstanding, and explicitly not satisfied by this author-performed review:**
+
+1. Independent cryptographic review of `RowHmac/v1` and the Merkle v1 framing by a reviewer who did not author them,
+   recorded outside the business database (`row-integrity-format.md` section 9). Machine agreement across Python, C#
+   and Node is evidence of implementation consistency, not of design soundness.
+2. Real HMAC vectors through Vault Transit compared with the local provider (SIG tests, Stage A).
+3. Signed-column registry entries for every protected table with a CI inventory test (Phase 1A1).
+4. Decision on JSON columns needing non-integer numbers (F-03).
+
+Per `README.md` Gate 0, these artifacts must exist, be reviewed and pass strict validation before Stage A is
+considered complete. Existence and strict validation are met; the review is a Stage A completion condition.
+
+### 10.5 Finding F-05 retained
+
+F-05 (cross-bridge IP reachability with gateway-masqueraded source on Docker Desktop) stays open as a documented
+risk. Mitigations in place and demonstrated: `authority-net` internal, pinned subnets, `pg_hba` gateway rejection.
+Residual risk: the daemon condition was not fully characterized (a plain-Docker reproduction did not show it), and a
+single Docker daemon and developer identity cannot represent separately administered planes. **Mandatory:** repeat
+the isolation, identity and key-custody tests in Azure staging with separate Entra identities, private networking,
+Managed HSM and Confidential Ledger (ADR-PB-003 Level B) before any Level 2 claim; keep the `pg_hba` restrictions as
+defense in depth there (G08).
+
+### 10.6 Outstanding Stage A work (not started)
+
+Authority store migrations from the reference SQL; security command journal, outbox and SpiceDB projection barrier;
+`IIntegrityMacProvider` implementations inside the Authority (Local, Vault, HSM) with no generic signing endpoint;
+record registry, content prepare/commit and manifest leaf index; business authority client adapter; Phase 1 business
+schema with the naming validator and signed-column registry; SEC-P01 to SEC-P12 against the security-test Compose
+stack with an evidence manifest; BUILD-00 repository protections and real CODEOWNERS teams; the PB-11 build, sign and
+promote pipeline.
+
+### 10.7 Formal assessment
+
+| Gate | Assessment |
+|---|---|
+| Phase 0 scope (discovery, Gate 0 artifacts, scaffold, reproducible verification) | **PASS** |
+| Gate 0 artifact existence and strict specification validation | **PASS** |
+| Gate 0 independent cryptographic review | **OPEN** (required before Stage A completion, not before Stage A start) |
+| Stage A (ADR-PB-002 and ADR-PB-003) | **NOT STARTED**; awaiting owner authorization |
+| Level 2 and production readiness | **BLOCKED** by design until Stage A, Stage B and Level B evidence exist |
+
+No production infrastructure was deployed. Stage A has not begun.
