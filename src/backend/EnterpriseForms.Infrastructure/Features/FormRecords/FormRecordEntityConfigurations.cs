@@ -118,6 +118,27 @@ public sealed class FieldDateValueConfiguration : IEntityTypeConfiguration<Field
     }
 }
 
+public sealed class FieldDateTimeValueConfiguration : IEntityTypeConfiguration<FieldDateTimeValue>
+{
+    public void Configure(EntityTypeBuilder<FieldDateTimeValue> builder)
+    {
+        FieldValueConfiguration.ConfigureValueRow(builder, "field_date_time_values", "field_date_time_values");
+        builder.HasKey(v => v.FieldDateTimeValueId);
+        builder.Property(v => v.DateTimeValue).HasColumnType("timestamptz");
+        builder.HasIndex(v => new { v.FieldDefinitionId, v.DateTimeValue, v.FormRecordId }).HasDatabaseName("ix_field_date_time_values_lookup");
+    }
+}
+
+public sealed class FieldGuidValueConfiguration : IEntityTypeConfiguration<FieldGuidValue>
+{
+    public void Configure(EntityTypeBuilder<FieldGuidValue> builder)
+    {
+        FieldValueConfiguration.ConfigureValueRow(builder, "field_guid_values", "field_guid_values");
+        builder.HasKey(v => v.FieldGuidValueId);
+        builder.HasIndex(v => new { v.FieldDefinitionId, v.GuidValue, v.FormRecordId }).HasDatabaseName("ix_field_guid_values_lookup");
+    }
+}
+
 public sealed class FieldBooleanValueConfiguration : IEntityTypeConfiguration<FieldBooleanValue>
 {
     public void Configure(EntityTypeBuilder<FieldBooleanValue> builder)

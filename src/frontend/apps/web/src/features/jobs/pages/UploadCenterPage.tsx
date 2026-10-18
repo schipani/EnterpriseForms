@@ -21,6 +21,7 @@ export function phaseTone(phase: UploadItem["phase"]): "info" | "success" | "war
     case "Failed":
       return "danger";
     case "Cancelled":
+    case "Paused":
       return "neutral";
     case "Processing":
     case "Committing":
@@ -69,7 +70,17 @@ export function UploadCenterPage() {
                     Retry
                   </Button>
                 ) : null}
+                {item.phase === "Paused" && item.hasBytes ? (
+                  <Button size="sm" variant="secondary" onClick={() => uploads.retry(item.clientUploadId)}>
+                    Resume
+                  </Button>
+                ) : null}
                 {item.phase === "Queued" || item.phase === "Starting" || item.phase === "Transferring" ? (
+                  <Button size="sm" variant="secondary" onClick={() => uploads.pause(item.clientUploadId)}>
+                    Pause
+                  </Button>
+                ) : null}
+                {item.phase === "Queued" || item.phase === "Starting" || item.phase === "Transferring" || item.phase === "Paused" ? (
                   <Button size="sm" variant="secondary" onClick={() => uploads.cancel(item.clientUploadId)}>
                     Cancel
                   </Button>

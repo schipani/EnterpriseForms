@@ -1422,6 +1422,36 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Shares of a record for its access managers (local projection; the authority decides every recipient's access).",
+        "operationId": "ListRecordShares",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordShareListResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke": {
@@ -3478,6 +3508,122 @@
           },
           "eTag": {
             "type": "string"
+          }
+        }
+      },
+      "RecordShareListResponse": {
+        "required": [
+          "items",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordShareSummaryResponse"
+            }
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "RecordShareSummaryResponse": {
+        "required": [
+          "recordShareId",
+          "formRecordId",
+          "sharedByUserId",
+          "sharedByDisplayName",
+          "recipientUserId",
+          "recipientDisplayName",
+          "recipientTeamId",
+          "recipientRole",
+          "shareScope",
+          "shareStatus",
+          "shareRevision",
+          "shareCreatedOn",
+          "shareRevokedOn",
+          "fieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sharedByUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sharedByDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recipientUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recipientTeamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "shareScope": {
+            "type": "string"
+          },
+          "shareStatus": {
+            "type": "string"
+          },
+          "shareRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "shareCreatedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shareRevokedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

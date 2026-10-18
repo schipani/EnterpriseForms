@@ -12,7 +12,8 @@ export interface DataTableColumn<T> {
 /** Semantic table that scrolls inside its own container on narrow viewports; the page never scrolls horizontally. */
 export function DataTable<T>({ caption, columns, rows, rowKey, emptyMessage = "Nothing to show." }: { caption: string; columns: DataTableColumn<T>[]; rows: T[]; rowKey: (row: T) => string; emptyMessage?: string }) {
   return (
-    <div className="w-full overflow-x-auto rounded border border-line">
+    // A horizontally scrollable region must be reachable by keyboard (WCAG 2.1.1 / axe scrollable-region-focusable).
+    <div role="region" aria-label={caption} tabIndex={0} className="w-full overflow-x-auto rounded border border-line focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
       <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-page">

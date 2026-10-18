@@ -18,12 +18,12 @@ public sealed class DesignerTests(StageBFixture fixture)
 
         var detail = await s.GetFormAsync(s.AccusedFormId);
         Assert.Equal(1, detail.GetProperty("summary").GetProperty("currentVersionNumber").GetInt32());
-        Assert.Equal(6, detail.GetProperty("fields").GetArrayLength());
+        Assert.Equal(8, detail.GetProperty("fields").GetArrayLength());
         Assert.Single(detail.GetProperty("relationships").EnumerateArray());
         var publishedKinds = Kinds(detail.GetProperty("currentVersion").GetProperty("layoutJson").GetString()!);
         Assert.Contains("relatedFormList", publishedKinds);
         Assert.Contains("documentCollection", publishedKinds);
-        Assert.Equal(5, publishedKinds.Count(k => k == "field"));
+        Assert.Equal(7, publishedKinds.Count(k => k == "field"));
         Assert.Equal(2, detail.GetProperty("currentVersion").GetProperty("layoutSchemaVersion").GetInt32());
 
         // Stale draft revision is rejected (optimistic concurrency), the fresh one is accepted.

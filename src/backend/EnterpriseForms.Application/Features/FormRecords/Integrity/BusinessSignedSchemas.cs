@@ -55,6 +55,10 @@ public static class BusinessSignedSchemas
 
     public static readonly RowSchemaDefinition FieldDateValuesV1 = ValueSchema("field_date_values", new RowSignedColumn("date_value", RowColumnType.Date, Nullable: false));
 
+    public static readonly RowSchemaDefinition FieldDateTimeValuesV1 = ValueSchema("field_date_time_values", new RowSignedColumn("date_time_value", RowColumnType.TimestampUtc, Nullable: false));
+
+    public static readonly RowSchemaDefinition FieldGuidValuesV1 = ValueSchema("field_guid_values", new RowSignedColumn("guid_value", RowColumnType.Uuid, Nullable: false));
+
     public static readonly RowSchemaDefinition FieldBooleanValuesV1 = ValueSchema("field_boolean_values", new RowSignedColumn("boolean_value", RowColumnType.Boolean, Nullable: false));
 
     public static readonly RowSchemaDefinition FieldOptionValuesV1 = ValueSchema("field_option_values", new RowSignedColumn("field_option_id", RowColumnType.Uuid, Nullable: false));
@@ -93,7 +97,7 @@ public static class BusinessSignedSchemas
     /// <summary>Current schema per entity kind (used for new candidates).</summary>
     public static IReadOnlyList<RowSchemaDefinition> All { get; } =
     [
-        FormRecordsV2, FormRecordsV3, FieldStringValuesV1, FieldIntegerValuesV1, FieldDecimalValuesV1, FieldDateValuesV1, FieldBooleanValuesV1, FieldOptionValuesV1, FileAttachmentVersionsV1,
+        FormRecordsV2, FormRecordsV3, FieldStringValuesV1, FieldIntegerValuesV1, FieldDecimalValuesV1, FieldDateValuesV1, FieldDateTimeValuesV1, FieldGuidValuesV1, FieldBooleanValuesV1, FieldOptionValuesV1, FileAttachmentVersionsV1,
     ];
 
     public static int CurrentSchemaVersion(ISignedContentRow row)
@@ -106,6 +110,8 @@ public static class BusinessSignedSchemas
             FieldIntegerValue => FieldIntegerValuesV1.SchemaVersion,
             FieldDecimalValue => FieldDecimalValuesV1.SchemaVersion,
             FieldDateValue => FieldDateValuesV1.SchemaVersion,
+            FieldDateTimeValue => FieldDateTimeValuesV1.SchemaVersion,
+            FieldGuidValue => FieldGuidValuesV1.SchemaVersion,
             FieldBooleanValue => FieldBooleanValuesV1.SchemaVersion,
             FieldOptionValue => FieldOptionValuesV1.SchemaVersion,
             FileAttachmentVersion => FileAttachmentVersionsV1.SchemaVersion,
@@ -125,6 +131,8 @@ public static class BusinessSignedSchemas
             FieldIntegerValue v => RowCanonicalizerV1.Encode(FieldIntegerValuesV1, context, ValueColumns(v, "integer_value", RowValue.Int64(v.IntegerValue))),
             FieldDecimalValue v => RowCanonicalizerV1.Encode(FieldDecimalValuesV1, context, ValueColumns(v, "decimal_value", RowValue.Decimal(v.DecimalValue))),
             FieldDateValue v => RowCanonicalizerV1.Encode(FieldDateValuesV1, context, ValueColumns(v, "date_value", RowValue.Date(v.DateValue))),
+            FieldDateTimeValue v => RowCanonicalizerV1.Encode(FieldDateTimeValuesV1, context, ValueColumns(v, "date_time_value", RowValue.Timestamp(v.DateTimeValue))),
+            FieldGuidValue v => RowCanonicalizerV1.Encode(FieldGuidValuesV1, context, ValueColumns(v, "guid_value", RowValue.Uuid(v.GuidValue))),
             FieldBooleanValue v => RowCanonicalizerV1.Encode(FieldBooleanValuesV1, context, ValueColumns(v, "boolean_value", RowValue.Boolean(v.BooleanValue))),
             FieldOptionValue v => RowCanonicalizerV1.Encode(FieldOptionValuesV1, context, ValueColumns(v, "field_option_id", RowValue.Uuid(v.FieldOptionId))),
             FileAttachmentVersion v => RowCanonicalizerV1.Encode(FileAttachmentVersionsV1, context, AttachmentColumns(v)),

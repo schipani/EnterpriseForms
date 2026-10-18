@@ -23,6 +23,8 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
   const queryClient = useQueryClient();
   const items = useUploadItems().filter((item) => item.formRecordId === formRecordId && item.fieldDefinitionId === fieldDefinitionId);
   const input = useRef<HTMLInputElement>(null);
+  const replaceInput = useRef<HTMLInputElement>(null);
+  const [replaceTarget, setReplaceTarget] = useState<DocumentSummaryResponse | null>(null);
   const [dragging, setDragging] = useState(false);
   const [rejected, setRejected] = useState<string[]>([]);
   const [removeTarget, setRemoveTarget] = useState<DocumentSummaryResponse | null>(null);
@@ -44,6 +46,19 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
     }
   }, [readyCount]);
 
+  /** Replace = a new immutable version of an existing document through the same upload pipeline (B-05). */
+  const acceptReplacement = (file: File, target: DocumentSummaryResponse) => {
+    if (file.size > maxBytes) {
+      setRejected([`${file.name}: larger than ${formatBytes(maxBytes)}`]);
+      return;
+    }
+    if (allowed.length > 0 && !allowed.includes(file.type)) {
+      setRejected([`${file.name}: type ${file.type || "unknown"} is not allowed`]);
+      return;
+    }
+    setRejected([]);
+    uploads.enqueue([file], { formRecordId, fieldDefinitionId, replacesFileAttachmentId: target.fileAttachmentId });
+  };
   const accept = (files: FileList | File[]) => {
     const list = [...files];
     const problems: string[] = [];
@@ -120,14 +135,19 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
           {items.map((item) => (
             <li key={item.clientUploadId} className="rounded border border-line p-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium">{item.fileName}</span>
+                <span className="font-medium">
+                  {item.fileName}
+                  {item.replacesFileAttachmentId ? <span className="ml-2 text-xs text-muted">(new version)</span> : null}
+                </span>
                 <Badge tone={phaseTone(item.phase)}>{item.phase === "Processing" ? `Scanning/encrypting (${item.processingStage ?? "queued"})` : item.phase}</Badge>
               </div>
               {item.phase !== "Ready" ? <ProgressBar label={`${item.fileName} transfer`} value={item.transferredBytes} max={item.sizeBytes} /> : null}
               {item.errorCode ? <p className="text-sm text-[#991b1b]">{item.errorCode}{item.errorDetail ? `: ${item.errorDetail}` : ""}</p> : null}
               <div className="mt-1 flex gap-2">
                 {item.phase === "Failed" && item.hasBytes ? <Button size="sm" variant="secondary" onClick={() => uploads.retry(item.clientUploadId)}>Retry</Button> : null}
-                {item.phase === "Queued" || item.phase === "Transferring" || item.phase === "Starting" ? <Button size="sm" variant="secondary" onClick={() => uploads.cancel(item.clientUploadId)}>Cancel</Button> : null}
+                {item.phase === "Paused" && item.hasBytes ? <Button size="sm" variant="secondary" onClick={() => uploads.retry(item.clientUploadId)}>Resume</Button> : null}
+                {item.phase === "Queued" || item.phase === "Transferring" || item.phase === "Starting" ? <Button size="sm" variant="secondary" onClick={() => uploads.pause(item.clientUploadId)}>Pause</Button> : null}
+                {item.phase === "Queued" || item.phase === "Transferring" || item.phase === "Starting" || item.phase === "Paused" ? <Button size="sm" variant="secondary" onClick={() => uploads.cancel(item.clientUploadId)}>Cancel</Button> : null}
                 {item.phase === "Ready" || item.phase === "Rejected" || item.phase === "Failed" || item.phase === "Cancelled" ? <Button size="sm" variant="ghost" onClick={() => uploads.dismiss(item.clientUploadId)}>Dismiss</Button> : null}
               </div>
             </li>
@@ -160,6 +180,18 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
                 <Button size="sm" variant="ghost" onClick={() => setHistoryTarget(row)}>
                   Versions
                 </Button>
+                {canEdit && row.attachmentLifecycleState === "Ready" ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setReplaceTarget(row);
+                      replaceInput.current?.click();
+                    }}
+                  >
+                    Replace
+                  </Button>
+                ) : null}
                 {canEdit ? (
                   <Button size="sm" variant="ghost" onClick={() => setRemoveTarget(row)}>
                     Remove
@@ -170,6 +202,23 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
           },
         ]}
       />
+      {canEdit ? (
+        <input
+          ref={replaceInput}
+          type="file"
+          className="sr-only"
+          aria-label={`Choose the replacement file for ${replaceTarget?.originalFileName ?? "the selected document"}`}
+          accept={allowed.join(",") || undefined}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file && replaceTarget) {
+              acceptReplacement(file, replaceTarget);
+            }
+            setReplaceTarget(null);
+          }}
+        />
+      ) : null}
       <Dialog
         open={removeTarget !== null}
         onOpenChange={(open) => (open ? undefined : setRemoveTarget(null))}

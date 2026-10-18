@@ -3,9 +3,10 @@ import { OperationError } from "@enterpriseforms/work-queue";
 import { describe, expect, it } from "vitest";
 import { UploadManager } from "./uploadManager";
 
-function fakeApi(script: { failChunk?: number; verdict?: "Clean" | "Infected"; conflictOnce?: boolean }) {
+function fakeApi(script: { failChunk?: number; verdict?: "Clean" | "Infected"; conflictOnce?: boolean; chunkDelayMs?: number }) {
   const calls: string[] = [];
-  const state = { received: new Set<number>(), state: "Open" as string, polls: 0, conflicted: false };
+  const beginRequests: unknown[] = [];
+  const state = { received: new Set<number>(), state: "Open" as string, polls: 0, conflicted: false, chunkDelayMs: script.chunkDelayMs ?? 0 };
   const session = (id: string, size: number): UploadSessionResponse => ({
     uploadSessionId: id,
     formRecordId: "rec",
@@ -26,12 +27,16 @@ function fakeApi(script: { failChunk?: number; verdict?: "Clean" | "Infected"; c
   });
   const api = {
     uploads: {
-      begin: async () => {
+      begin: async (request: unknown) => {
         calls.push("begin");
+        beginRequests.push(request);
         return { result: session("s1", 10), status: 201 };
       },
       chunk: async (_id: string, index: number) => {
         calls.push(`chunk${index}`);
+        if (state.chunkDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, state.chunkDelayMs));
+        }
         if (script.failChunk === index && !state.received.has(99)) {
           state.received.add(99);
           throw new Error("network");
@@ -65,7 +70,7 @@ function fakeApi(script: { failChunk?: number; verdict?: "Clean" | "Infected"; c
       mine: async () => ({ result: [], status: 200 }),
     },
   } as unknown as ApiClient;
-  return { api, calls, state };
+  return { api, calls, state, beginRequests };
 }
 
 async function waitFor(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
@@ -115,6 +120,33 @@ describe("UploadManager (ADR-PB-007 transfer ≠ commit)", () => {
     manager.enqueue([new File([new Uint8Array(10)], "a.bin")], { formRecordId: "rec", fieldDefinitionId: "fld" });
     await waitFor(() => manager.snapshot()[0]?.phase === "Ready");
     expect(calls.filter((c) => c === "commit")).toHaveLength(2);
+  });
+
+  it("pauses a transfer and resumes it without resending the chunks the server already holds", async () => {
+    const { api, calls } = fakeApi({ chunkDelayMs: 30 });
+    const manager = new UploadManager(api, { pollIntervalMs: 5 });
+    const [id] = manager.enqueue([new File([new Uint8Array(10)], "a.bin")], { formRecordId: "rec", fieldDefinitionId: "fld" });
+    await waitFor(() => calls.includes("chunk1"));
+    manager.pause(id!);
+    expect(manager.snapshot()[0]?.phase).toBe("Paused");
+    const chunkCallsWhilePaused = calls.filter((c) => c.startsWith("chunk")).length;
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(calls.filter((c) => c.startsWith("chunk")).length).toBeLessThanOrEqual(chunkCallsWhilePaused + 1); // at most the in-flight chunk lands
+    expect(manager.snapshot()[0]?.hasBytes).toBe(true);
+    manager.retry(id!);
+    await waitFor(() => manager.snapshot()[0]?.phase === "Ready");
+    expect(calls.filter((c) => c === "begin")).toHaveLength(1); // the same server session continues
+    expect(calls.filter((c) => c === "chunk0")).toHaveLength(1);
+    expect(calls).toContain("commit");
+  });
+
+  it("passes the replaced document id to the server so the upload becomes a new version (B-05)", async () => {
+    const { api, beginRequests } = fakeApi({});
+    const manager = new UploadManager(api, { pollIntervalMs: 5 });
+    manager.enqueue([new File([new Uint8Array(10)], "a.bin")], { formRecordId: "rec", fieldDefinitionId: "fld", replacesFileAttachmentId: "att-1" });
+    await waitFor(() => manager.snapshot()[0]?.phase === "Ready");
+    expect(beginRequests[0]).toMatchObject({ replacesFileAttachmentId: "att-1", formRecordId: "rec", fieldDefinitionId: "fld" });
+    expect(manager.snapshot()[0]?.replacesFileAttachmentId).toBe("att-1");
   });
 
   it("limits concurrency to two active transfers per user", async () => {

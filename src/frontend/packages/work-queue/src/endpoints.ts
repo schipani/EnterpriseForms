@@ -33,6 +33,7 @@ export const ENDPOINTS = {
   "related.list": { method: "GET", path: "/api/v1/form-records/{formRecordId}/related/{formRelationshipDefinitionId}" },
   "related.create": { method: "POST", path: "/api/v1/form-records/{formRecordId}/related" },
   "related.unlink": { method: "POST", path: "/api/v1/form-records/{formRecordId}/related/{childFormRecordId}/unlink" },
+  "shares.list": { method: "GET", path: "/api/v1/form-records/{formRecordId}/shares" },
   "shares.create": { method: "POST", path: "/api/v1/form-records/{formRecordId}/shares" },
   "shares.revoke": { method: "POST", path: "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke" },
   "uploads.begin": { method: "POST", path: "/api/v1/upload-sessions" },

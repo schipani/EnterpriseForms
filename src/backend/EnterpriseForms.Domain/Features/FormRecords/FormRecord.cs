@@ -183,6 +183,29 @@ public sealed class FieldDateValue : FieldValueRowBase
     public override Guid RowPrimaryKey => FieldDateValueId;
 }
 
+public sealed class FieldDateTimeValue : FieldValueRowBase
+{
+    public Guid FieldDateTimeValueId { get; set; }
+
+    /// <summary>Exact instant, UTC, second precision (the canonical timestamp encoding is second-exact).</summary>
+    public DateTimeOffset DateTimeValue { get; set; }
+
+    public override string EntityKind => "field_date_time_values";
+
+    public override Guid RowPrimaryKey => FieldDateTimeValueId;
+}
+
+public sealed class FieldGuidValue : FieldValueRowBase
+{
+    public Guid FieldGuidValueId { get; set; }
+
+    public Guid GuidValue { get; set; }
+
+    public override string EntityKind => "field_guid_values";
+
+    public override Guid RowPrimaryKey => FieldGuidValueId;
+}
+
 public sealed class FieldBooleanValue : FieldValueRowBase
 {
     public Guid FieldBooleanValueId { get; set; }

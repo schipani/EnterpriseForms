@@ -134,7 +134,7 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
 
     public static string Layout(string title, params string[] sections) => $$"""{"layoutSchemaVersion":2,"title":"{{title}}","sections":[{{string.Join(",", sections)}}]}""";
 
-    /// <summary>Accused (String/Date/Boolean/Option/File + related AccusedAddress list) and AccusedAddress (String/Option) forms, both published.</summary>
+    /// <summary>Accused (String/Date/DateTime/Guid/Boolean/Option/File + related AccusedAddress list) and AccusedAddress (String/Option) forms, both published.</summary>
     public async Task BuildAccusedWorkspaceAsync()
     {
         AddressFormId = await CreateFormAsync("AccusedAddress " + Name, Clerk).ConfigureAwait(false);
@@ -152,6 +152,8 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
         AccusedFields["family_name"] = await AddFieldAsync(AccusedFormId, "family_name", "Family name", "String").ConfigureAwait(false);
         AccusedFields["date_of_birth"] = await AddFieldAsync(AccusedFormId, "date_of_birth", "Date of birth", "Date").ConfigureAwait(false);
         AccusedFields["in_custody"] = await AddFieldAsync(AccusedFormId, "in_custody", "In custody", "Boolean").ConfigureAwait(false);
+        AccusedFields["arrest_time"] = await AddFieldAsync(AccusedFormId, "arrest_time", "Arrest time", "DateTime").ConfigureAwait(false);
+        AccusedFields["external_reference"] = await AddFieldAsync(AccusedFormId, "external_reference", "External reference", "Guid").ConfigureAwait(false);
         AccusedFields["case_status"] = await AddFieldAsync(AccusedFormId, "case_status", "Case status", "Option", ("open", "Open"), ("closed", "Closed")).ConfigureAwait(false);
         AccusedFields["case_documents"] = await AddFieldAsync(AccusedFormId, "case_documents", "Case documents", "File").ConfigureAwait(false);
         var relationship = await Fixture.Api.PostAsync($"/api/v1/form-definitions/{AccusedFormId:D}/relationships", Token(Designer), new { childFormDefinitionId = AddressFormId, relationshipDefinitionKey = "accused_address_list", relationshipDisplayName = "Addresses", minimumChildCount = 0, maximumChildCount = 10 }).ConfigureAwait(false);
@@ -167,7 +169,9 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
             Field(AccusedFields["family_name"], "text", "Family name", 2, required: true, validation: new { maxLength = 100 }),
             Field(AccusedFields["date_of_birth"], "date", "Date of birth", 1),
             Field(AccusedFields["in_custody"], "checkbox", "In custody", 1),
-            Field(AccusedFields["case_status"], "select", "Case status", 2)),
+            Field(AccusedFields["case_status"], "select", "Case status", 2),
+            Field(AccusedFields["arrest_time"], "dateTime", "Arrest time", 2, newRow: true),
+            Field(AccusedFields["external_reference"], "guid", "External reference", 2)),
         Section("related", "Related",
             JsonSerializer.Serialize(new { kind = "relatedFormList", formRelationshipDefinitionId = RelationshipId, label = "Addresses", layout = new { columnSpan = 4, startOnNewRow = true }, summaryFieldKeys = new[] { "street_address", "city_name" } }),
             JsonSerializer.Serialize(new { kind = "documentCollection", fieldDefinitionId = AccusedFields["case_documents"], label = "Case documents", layout = new { columnSpan = 4, startOnNewRow = true }, upload = new { allowMultiple = true, maxFiles, maxFileSizeBytes, allowedContentTypes = new[] { "application/pdf", "text/plain", "application/octet-stream" } } })));
@@ -181,6 +185,8 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
         ["date_of_birth"] = "1990-02-28",
         ["in_custody"] = "true",
         ["case_status"] = "open",
+        ["arrest_time"] = "2026-03-08T19:30:00-05:00",
+        ["external_reference"] = "0199a2b3-c4d5-7e6f-8123-456789abcdef",
     };
 
     public async Task<Guid> CreateAccusedAsync(TestUser user, Dictionary<string, string>? values = null)

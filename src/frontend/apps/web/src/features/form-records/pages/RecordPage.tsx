@@ -1,11 +1,12 @@
 import { useApi } from "@enterpriseforms/app-runtime";
 import { FormRenderer } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
+import { Badge, Button, Card, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { RecordActivity } from "../../audit";
 import { DocumentCollection } from "../../documents";
 import { ChildRecordList } from "../../related-forms";
+import { RecordAccessPanel } from "../../sharing";
 import { ErrorPanel } from "../../support";
 import { parseProjectionLayout, toRendererFields, toValueMap } from "../components/recordModel";
 
@@ -78,21 +79,7 @@ export function RecordPage() {
           {
             value: "access",
             label: "Access",
-            content: (
-              <Card title="Your permissions on this record">
-                <DescriptionList
-                  items={[
-                    { term: "Read", detail: data.permissions.canRead ? "Yes" : "No" },
-                    { term: "Edit", detail: data.permissions.canEdit ? "Yes" : "No" },
-                    { term: "Manage access", detail: data.permissions.canManageAccess ? "Yes" : "No" },
-                    { term: "Transfer ownership", detail: data.permissions.canTransferOwnership ? "Yes" : "No" },
-                    { term: "Authorization revision", detail: String(data.record.authorizationRevision) },
-                    { term: "Committed operation", detail: data.record.committedOperationId ?? "none" },
-                  ]}
-                />
-                <p className="text-sm text-muted">Permissions are decided by the independent authorization authority on every request; this list is informational.</p>
-              </Card>
-            ),
+            content: <RecordAccessPanel formRecordId={formRecordId} projection={data} />,
           },
           { value: "activity", label: "Activity", content: <Card title="Audit history"><RecordActivity formRecordId={formRecordId} /></Card> },
         ]}

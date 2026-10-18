@@ -2,6 +2,7 @@ using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
 using EnterpriseForms.Application.Features.Audit;
+using EnterpriseForms.Application.Features.FormDefinitions.Layout;
 using EnterpriseForms.Application.Features.FormRecords.Projection;
 using EnterpriseForms.Contracts.Features;
 using EnterpriseForms.Domain.Features.Audit;
@@ -56,19 +57,47 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             .Select(a => new DocumentSummaryResponse(a.FileAttachmentId, a.FieldDefinitionId, a.OriginalFileName, a.VersionNumber, a.DetectedContentType, a.PlaintextSizeBytes, a.ScanVerdict, attachmentNames.GetValueOrDefault(a.FileAttachmentId, "Ready"), a.UploadedOn, a.UploadedByUserId, true))
             .ToList();
 
+        // Authorized projection (CLAUDE.md §4H): a partial (share-scoped) read serializes only the field definitions,
+        // layout elements, sections and relationship metadata the caller may see. Labels of unshared fields, document
+        // collections and child lists are removed server-side, never merely hidden by the renderer.
+        var authorizedFieldIds = verified.IsComplete ? null : verified.AuthorizedValues.Select(v => v.FieldDefinitionId).ToHashSet();
+        var authorizedDocumentFieldIds = verified.IsComplete ? null : verified.AuthorizedAttachments.Select(a => a.FieldDefinitionId).ToHashSet();
+        var layout = verified.IsComplete ? verified.Layout : AuthorizedLayout(verified.Layout, authorizedFieldIds!, authorizedDocumentFieldIds!);
+        var visibleRelationshipIds = layout.Elements.Where(e => e.Kind == LayoutElementKinds.RelatedFormList && e.FormRelationshipDefinitionId is { } id).Select(e => e.FormRelationshipDefinitionId!.Value).ToHashSet();
         var options = verified.Options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive)).ToList());
-        var fields = verified.Fields.Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, options.GetValueOrDefault(f.FieldDefinitionId, []))).ToList();
+        var fields = verified.Fields
+            .Where(f => authorizedFieldIds is null || authorizedFieldIds.Contains(f.FieldDefinitionId) || authorizedDocumentFieldIds!.Contains(f.FieldDefinitionId))
+            .Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, options.GetValueOrDefault(f.FieldDefinitionId, [])))
+            .ToList();
         var version = verified.LayoutVersion;
         return new RecordProjectionResponse(
             verified.ToRecordResponse(context.OrganizationId),
             verified.Definition.FormDefinitionName,
-            new FormVersionResponse(version.FormVersionId, version.VersionNumber, version.LayoutSchemaVersion, version.LayoutJson, version.ChangeReason, version.RestoredFromFormVersionId, version.PublishedOn, version.PublishedByUserId),
+            new FormVersionResponse(version.FormVersionId, version.VersionNumber, version.LayoutSchemaVersion, verified.IsComplete ? version.LayoutJson : FormLayoutCodec.Serialize(layout), version.ChangeReason, version.RestoredFromFormVersionId, version.PublishedOn, version.PublishedByUserId),
             fields,
             documents,
-            relationships.Select(r => new RelationshipDefinitionResponse(r.FormRelationshipDefinitionId, r.ParentFormDefinitionId, r.ChildFormDefinitionId, formNames.GetValueOrDefault(r.ChildFormDefinitionId, string.Empty), r.RelationshipDefinitionKey, r.RelationshipDisplayName, r.MinimumChildCount, r.MaximumChildCount, r.LifecycleStatus)).ToList(),
+            relationships.Where(r => verified.IsComplete || visibleRelationshipIds.Contains(r.FormRelationshipDefinitionId)).Select(r => new RelationshipDefinitionResponse(r.FormRelationshipDefinitionId, r.ParentFormDefinitionId, r.ChildFormDefinitionId, formNames.GetValueOrDefault(r.ChildFormDefinitionId, string.Empty), r.RelationshipDefinitionKey, r.RelationshipDisplayName, r.MinimumChildCount, r.MaximumChildCount, r.LifecycleStatus)).ToList(),
             new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed, verified.IsComplete),
             verified.Header.ParentFormRecordId,
             verified.Header.FormRelationshipDefinitionId,
             verified.ETag);
+    }
+
+    /// <summary>Keeps field elements the caller may read, document collections with at least one authorized version, no child lists (a parent share never covers children, §4S.4), and drops sections left empty.</summary>
+    public static FormLayout AuthorizedLayout(FormLayout layout, IReadOnlySet<Guid> authorizedFieldIds, IReadOnlySet<Guid> authorizedDocumentFieldIds)
+    {
+        var sections = layout.Sections
+            .Select(section => section with
+            {
+                Elements = section.Elements.Where(e => e.Kind switch
+                {
+                    LayoutElementKinds.Field => e.FieldDefinitionId is { } id && authorizedFieldIds.Contains(id),
+                    LayoutElementKinds.DocumentCollection => e.FieldDefinitionId is { } id && authorizedDocumentFieldIds.Contains(id),
+                    _ => false,
+                }).ToList(),
+            })
+            .Where(section => section.Elements.Count > 0)
+            .ToList();
+        return layout with { Sections = sections };
     }
 }

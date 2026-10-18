@@ -79,6 +79,8 @@ test.describe.serial("Stage B Accused workflow", () => {
     await addField(page, "Family name", "String");
     await addField(page, "Date of birth", "Date");
     await addField(page, "In custody", "Boolean");
+    await addField(page, "Arrest time", "DateTime");
+    await addField(page, "External reference", "Guid");
     await addField(page, "Case documents", "File");
 
     await page.getByRole("tab", { name: /Related forms/ }).click();
@@ -95,6 +97,8 @@ test.describe.serial("Stage B Accused workflow", () => {
     await placeFromPicker(page, "Add field", /Family name/);
     await placeFromPicker(page, "Add field", /Date of birth/);
     await placeFromPicker(page, "Add field", /In custody/);
+    await placeFromPicker(page, "Add field", /Arrest time/);
+    await placeFromPicker(page, "Add field", /External reference/);
     await placeFromPicker(page, "Add related list", /Addresses/);
     await placeFromPicker(page, "Add document collection", /Case documents/);
     const documents = page.getByRole("listitem").filter({ hasText: "Documents: Case documents" });
@@ -125,8 +129,16 @@ test.describe.serial("Stage B Accused workflow", () => {
     await page.getByLabel(/Family name/).fill("Browser");
     await page.getByLabel(/Date of birth/).fill("1990-02-28");
     await page.getByRole("checkbox", { name: "In custody" }).click();
+    // DateTime is edited as local wall-clock time and stored as a UTC instant; Guid must be canonical.
+    await page.getByLabel(/External reference/).fill("not-a-uuid");
+    await page.getByRole("button", { name: "Create record" }).click();
+    await expect(page.getByRole("alert").first()).toContainText(/UUID/);
+    await page.getByLabel(/External reference/).fill("0199A2B3-C4D5-7E6F-8123-456789ABCDEF");
+    await page.getByLabel(/Arrest time/).fill("2026-03-08T19:30");
     await page.getByRole("button", { name: "Create record" }).click();
     await expect(page.getByText("Integrity: Verified")).toBeVisible();
+    await expect(page.getByText("0199a2b3-c4d5-7e6f-8123-456789abcdef")).toBeVisible();
+    await expect(page.getByText(/\(2026-03-0[89]T\d{2}:30:00Z\)/)).toBeVisible();
     const recordUrl = page.url();
 
     // Two addresses through the reusable child list.
@@ -191,7 +203,66 @@ test.describe.serial("Stage B Accused workflow", () => {
     // Undiscoverable records are concealed (404, rendered as a status), denied ones are alerts; either is correct here.
     await expect(page.getByText(/Not found|do not have permission/).first()).toBeVisible();
     await page.goto("/app/records");
-    await expect(page.getByText("No records are visible to you.")).toBeVisible();
+    // On a fresh stack the reader sees nothing at all; on a reused stack earlier runs may have left other shares,
+    // so the assertion is about this run's record only.
+    await expect(page.getByRole("heading", { level: 1, name: "Records" })).toBeVisible();
+    await expect(page.getByRole("row", { name: new RegExp(`Accused ${run}`) })).toHaveCount(0);
+    await signOut(page);
+
+    // The owner shares one field with the reader (ADR-PB-002 Stage B item 5).
+    await signIn(page, "clerk");
+    await page.goto(recordUrl);
+    await page.getByRole("tab", { name: "Access" }).click();
+    await expect(page.getByText("No shares. Only the owner can see this record.")).toBeVisible();
+    await page.getByRole("button", { name: "Share fields" }).click();
+    const shareDialog = page.getByRole("dialog", { name: "Share fields of this record" });
+    await shareDialog.getByRole("combobox", { name: /Person/ }).click();
+    await page.getByRole("option", { name: /Riley Reader/ }).click();
+    await shareDialog.getByRole("checkbox", { name: "Given name" }).check();
+    await shareDialog.getByRole("button", { name: "Share", exact: true }).click();
+    await expect(shareDialog).toBeHidden();
+    const shareRow = page.getByRole("row", { name: /Riley Reader/ });
+    await expect(shareRow).toContainText("given_name");
+    await expect(shareRow.getByText("Active")).toBeVisible();
+    await signOut(page);
+
+    // Effective access: the reader sees exactly the shared field; child addresses and documents stay invisible.
+    await signIn(page, "reader");
+    await expect(async () => {
+      await page.goto(recordUrl);
+      await expect(page.getByText("Partial view (shared fields only)")).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
+    await expect(page.getByText("Avery-Edited")).toBeVisible();
+    await expect(page.getByText("Date of birth")).toHaveCount(0);
+    await expect(page.getByText("Family name")).toHaveCount(0);
+    await expect(page.getByRole("rowheader", { name: /12 King Street W/ })).toHaveCount(0);
+    await expect(page.getByRole("rowheader", { name: "warrant.txt" })).toHaveCount(0);
+    await page.getByRole("tab", { name: "Access" }).click();
+    await expect(page.getByText("Shared fields only (1)")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Share fields" })).toHaveCount(0);
+    await page.goto("/app/records");
+    await expect(page.getByRole("row", { name: new RegExp(`Accused ${run}`) })).toHaveCount(1);
+    await signOut(page);
+
+    // Revocation takes effect immediately.
+    await signIn(page, "clerk");
+    await page.goto(recordUrl);
+    await page.getByRole("tab", { name: "Access" }).click();
+    await page.getByRole("row", { name: /Riley Reader/ }).getByRole("button", { name: "Revoke" }).click();
+    const revokeDialog = page.getByRole("dialog", { name: "Revoke this share?" });
+    await revokeDialog.getByRole("button", { name: "Revoke share" }).click();
+    await expect(revokeDialog).toBeHidden();
+    await expect(page.getByRole("row", { name: /Riley Reader/ }).getByText("Revoked")).toBeVisible();
+    await signOut(page);
+
+    await signIn(page, "reader");
+    await page.goto(recordUrl);
+    await expect(page.getByText(/Not found|do not have permission/).first()).toBeVisible();
+    await page.goto("/app/records");
+    // On a fresh stack the reader sees nothing at all; on a reused stack earlier runs may have left other shares,
+    // so the assertion is about this run's record only.
+    await expect(page.getByRole("heading", { level: 1, name: "Records" })).toBeVisible();
+    await expect(page.getByRole("row", { name: new RegExp(`Accused ${run}`) })).toHaveCount(0);
     await signOut(page);
   });
 });

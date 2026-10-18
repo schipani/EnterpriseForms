@@ -619,7 +619,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Shares of a record for its access managers (local projection; the authority decides every recipient's access). */
+        get: operations["ListRecordShares"];
         put?: never;
         /** Explicit field allow-list share committed by the authority; no wildcard or future items. */
         post: operations["CreateRecordShare"];
@@ -1246,6 +1247,35 @@ export interface components {
             /** Format: uuid */
             formRelationshipDefinitionId: null | string;
             eTag: string;
+        };
+        RecordShareListResponse: {
+            items: components["schemas"]["RecordShareSummaryResponse"][];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
+        RecordShareSummaryResponse: {
+            /** Format: uuid */
+            recordShareId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            /** Format: uuid */
+            sharedByUserId: string;
+            sharedByDisplayName: null | string;
+            /** Format: uuid */
+            recipientUserId: null | string;
+            recipientDisplayName: null | string;
+            /** Format: uuid */
+            recipientTeamId: null | string;
+            recipientRole: string;
+            shareScope: string;
+            shareStatus: string;
+            /** Format: int64 */
+            shareRevision: number | string;
+            /** Format: date-time */
+            shareCreatedOn: string;
+            /** Format: date-time */
+            shareRevokedOn: null | string;
+            fieldKeys: string[];
         };
         RelationshipDefinitionResponse: {
             /** Format: uuid */
@@ -2321,6 +2351,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormRecordResponse"];
+                };
+            };
+        };
+    };
+    ListRecordShares: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordShareListResponse"];
                 };
             };
         };

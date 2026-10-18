@@ -1,6 +1,6 @@
 import { useApi } from "@enterpriseforms/app-runtime";
 import { Badge, Button, Card, DataTable, LoadingBlock, PageHeader, Select } from "@enterpriseforms/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { ErrorPanel } from "../../support";
 
@@ -10,7 +10,14 @@ export function RecordsPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/app/records" });
   const forms = useQuery({ queryKey: ["forms"], queryFn: () => api.forms.list().then((r) => r.result) });
-  const records = useQuery({ queryKey: ["records", search.form ?? "all"], queryFn: () => api.records.list(search.form ? { formDefinitionId: search.form, pageSize: 50 } : { pageSize: 50 }).then((r) => r.result) });
+  // Opaque, authority-issued continuation tokens (ADR-PB-006): each page is a fresh discover lookup; "Load more" appends.
+  const records = useInfiniteQuery({
+    queryKey: ["records", search.form ?? "all"],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => api.records.list({ ...(search.form ? { formDefinitionId: search.form } : {}), pageSize: 50, ...(pageParam ? { continuationToken: pageParam } : {}) }).then((r) => r.result),
+    getNextPageParam: (last) => last.continuationToken ?? undefined,
+  });
+  const rows = records.data?.pages.flatMap((page) => page.items) ?? [];
   const selectedForm = forms.data?.find((form) => form.formDefinitionId === search.form);
   return (
     <>
@@ -40,7 +47,7 @@ export function RecordsPage() {
           <DataTable
             caption="Records"
             rowKey={(row) => row.formRecordId}
-            rows={records.data.items}
+            rows={rows}
             emptyMessage="No records are visible to you."
             columns={[
               { key: "form", header: "Form", isRowHeader: true, render: (row) => <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }} className="underline-offset-4 hover:underline">{row.formDefinitionName}</Link> },
@@ -51,6 +58,14 @@ export function RecordsPage() {
               { key: "verified", header: "Integrity", render: (row) => (row.projectionVerified ? <Badge tone="success">Verified</Badge> : <Badge tone="neutral">Verified on open</Badge>) },
             ]}
           />
+        ) : null}
+        {records.hasNextPage ? (
+          <div className="mt-3 flex items-center gap-3">
+            <Button variant="secondary" busy={records.isFetchingNextPage} onClick={() => void records.fetchNextPage()}>
+              Load more
+            </Button>
+            <span className="text-sm text-muted">{rows.length} shown</span>
+          </div>
         ) : null}
       </Card>
     </>

@@ -62,6 +62,21 @@ public sealed class StageBUnitTests
         Assert.Equal("1990-02-28", FieldValueCodec.Format(dt, byId));
         Assert.Equal("true", FieldValueCodec.Format(b, byId));
         Assert.Equal("active", FieldValueCodec.Format(o, byId));
+        var instant = FieldValueCodec.CreateRow(Field("arrest_time", FieldDataTypes.DateTime), null, options, "2026-03-08T19:30:00-05:00", Tenant, record, Guid.CreateVersion7(), now, Tenant);
+        Assert.Equal("2026-03-09T00:30:00Z", FieldValueCodec.Format(instant, byId)); // stored and signed as UTC
+        var reference = Guid.CreateVersion7();
+        var g = FieldValueCodec.CreateRow(Field("external_reference", FieldDataTypes.Guid), null, options, reference.ToString("D").ToUpperInvariant(), Tenant, record, Guid.CreateVersion7(), now, Tenant);
+        Assert.Equal(reference.ToString("D"), FieldValueCodec.Format(g, byId));
+        Assert.Equal(BusinessSignedSchemas.FieldDateTimeValuesV1.SchemaVersion, BusinessSignedSchemas.CurrentSchemaVersion(instant));
+        Assert.Equal(BusinessSignedSchemas.FieldGuidValuesV1.SchemaVersion, BusinessSignedSchemas.CurrentSchemaVersion(g));
+        instant.RowRevision = 1;
+        g.RowRevision = 1;
+        Assert.Equal("field_date_time_values", RowCanonicalHeader.Parse(BusinessSignedSchemas.Encode(instant, 1)).EntityKind);
+        Assert.Equal("field_guid_values", RowCanonicalHeader.Parse(BusinessSignedSchemas.Encode(g, 1)).EntityKind);
+        Assert.Throws<BusinessException>(() => FieldValueCodec.CreateRow(Field("arrest_time", FieldDataTypes.DateTime), null, options, "2026-03-08 19:30", Tenant, record, Guid.CreateVersion7(), now, Tenant)); // no offset
+        Assert.Throws<BusinessException>(() => FieldValueCodec.CreateRow(Field("arrest_time", FieldDataTypes.DateTime), null, options, "2026-03-08T19:30:00.123Z", Tenant, record, Guid.CreateVersion7(), now, Tenant)); // sub-second is not silently truncated
+        Assert.Throws<BusinessException>(() => FieldValueCodec.CreateRow(Field("external_reference", FieldDataTypes.Guid), null, options, "{" + reference.ToString("D") + "}", Tenant, record, Guid.CreateVersion7(), now, Tenant));
+        Assert.Throws<BusinessException>(() => FieldValueCodec.CreateRow(Field("external_reference", FieldDataTypes.Guid), null, options, Guid.Empty.ToString("D"), Tenant, record, Guid.CreateVersion7(), now, Tenant));
 
         Assert.Throws<BusinessException>(() => FieldValueCodec.CreateRow(Field("age", FieldDataTypes.Integer), null, options, "forty", Tenant, record, Guid.CreateVersion7(), now, Tenant));
         Assert.Throws<BusinessException>(() => FieldValueCodec.CreateRow(Field("dob", FieldDataTypes.Date), null, options, "02/28/1990", Tenant, record, Guid.CreateVersion7(), now, Tenant));
@@ -71,6 +86,30 @@ public sealed class StageBUnitTests
         var validation = new LayoutValidation(true, 2, 5, "[A-Z][a-z]+", null, null, null, null);
         var element = new LayoutElement("field", Guid.CreateVersion7(), null, "text", "x", null, new LayoutPlacement(4, false), validation, null, null);
         Assert.Throws<BusinessException>(() => FieldValueCodec.CreateRow(Field("given_name", FieldDataTypes.String), element, options, "avery", Tenant, record, Guid.CreateVersion7(), now, Tenant));
+    }
+
+    [Fact]
+    public void AuthorizedLayoutKeepsOnlySharedFieldsAndDropsChildListsEmptySectionsAndUnsharedDocuments()
+    {
+        var shared = Guid.CreateVersion7();
+        var hidden = Guid.CreateVersion7();
+        var documents = Guid.CreateVersion7();
+        var placement = new LayoutPlacement(4, false);
+        var validation = new LayoutValidation(false, null, null, null, null, null, null, null);
+        var layout = new FormLayout(2, "Accused",
+        [
+            new LayoutSection("identity", "Identity", 4, [new LayoutElement("field", shared, null, "text", "Given name", null, placement, validation, null, null), new LayoutElement("field", hidden, null, "date", "Date of birth", null, placement, validation, null, null)]),
+            new LayoutSection("related", "Related", 4, [new LayoutElement("relatedFormList", null, Guid.CreateVersion7(), null, "Addresses", null, placement, validation, null, ["street_address"]), new LayoutElement("documentCollection", documents, null, "fileUpload", "Case documents", null, placement, validation, new LayoutUploadPolicy(true, 5, 1024, ["text/plain"]), null)]),
+        ]);
+        var reduced = EnterpriseForms.Application.Features.FormRecords.GetFormRecord.GetRecordProjectionHandler.AuthorizedLayout(layout, new HashSet<Guid> { shared }, new HashSet<Guid>());
+        var element = Assert.Single(Assert.Single(reduced.Sections).Elements);
+        Assert.Equal(shared, element.FieldDefinitionId);
+        var json = FormLayoutCodec.Serialize(reduced);
+        Assert.DoesNotContain("Date of birth", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Addresses", json, StringComparison.Ordinal);
+        var withDocuments = EnterpriseForms.Application.Features.FormRecords.GetFormRecord.GetRecordProjectionHandler.AuthorizedLayout(layout, new HashSet<Guid> { shared }, new HashSet<Guid> { documents });
+        Assert.Equal(2, withDocuments.Sections.Count);
+        Assert.Equal("documentCollection", Assert.Single(withDocuments.Sections[1].Elements).Kind);
     }
 
     [Fact]

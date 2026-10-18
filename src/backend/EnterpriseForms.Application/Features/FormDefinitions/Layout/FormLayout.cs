@@ -50,7 +50,7 @@ public sealed record LayoutElement(
 public static class FormLayoutCodec
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = false, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
-    private static readonly HashSet<string> Controls = new(StringComparer.Ordinal) { "text", "textarea", "number", "decimal", "date", "checkbox", "select", "fileUpload" };
+    private static readonly HashSet<string> Controls = new(StringComparer.Ordinal) { "text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select", "fileUpload" };
     private static readonly HashSet<string> Spacing = new(StringComparer.Ordinal) { "none", "small", "medium", "large" };
 
     public static FormLayout Parse(string layoutJson)

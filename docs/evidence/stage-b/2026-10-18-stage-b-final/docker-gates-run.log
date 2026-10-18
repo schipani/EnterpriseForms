@@ -1,0 +1,40 @@
+### rebuild api+worker
+ Container enterpriseforms-sectest-business-migrate-1 Exited 
+ Container enterpriseforms-sectest-spicedb-db-1 Healthy 
+ Container enterpriseforms-sectest-api-1 Healthy 
+### build tests
+Build succeeded.
+### stage-b integration
+  total: 14
+  failed: 0
+  succeeded: 14
+  skipped: 0
+  duration: 1m 03s 286ms
+### frontend lint+vitest
+> eslint .
+
+ Test Files  9 passed (9)
+      Tests  37 passed (37)
+### playwright
+  ok 1 [chromium-desktop] › e2e\accused-workflow.spec.ts:56:3 › Stage B Accused workflow › designer publishes AccusedAddress and Accused with a related list and document collection (16.6s)
+  x  2 [chromium-desktop] › e2e\accused-workflow.spec.ts:118:3 › Stage B Accused workflow › clerk creates an Accused, adds addresses, uploads documents across navigation and reviews activity (37.6s)
+  ok 3 [chromium-desktop] › e2e\pb14-accessibility.spec.ts:49:3 › PB-14 automated accessibility and responsive validation › login, dashboard, records, record, uploads, gallery and designer pass axe WCAG 2.2 AA at every width (PB14-10..14, 22, 23, 32) (1.0m)
+  x  4 [chromium-desktop] › e2e\pb14-accessibility.spec.ts:95:3 › PB-14 automated accessibility and responsive validation › keyboard only: skip link, tabs, dialog focus trap and designer reorder (PB14-15, 25, 29) (5.7s)
+  ok 5 [chromium-desktop] › e2e\pb14-accessibility.spec.ts:157:3 › PB-14 automated accessibility and responsive validation › forced-colors and prefers-reduced-motion do not hide focus or state (PB14-30) (1.9s)
+  ok 6 [chromium-phone] › e2e\responsive.spec.ts:4:1 › gallery reflows at 320px without horizontal scroll and every control is keyboard reachable (2.3s)
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+    Error: element(s) not found
+    > 206 |     await expect(page.getByText("No records are visible to you.")).toBeVisible();
+    test-results\accused-workflow-Stage-B-A-87af3-gation-and-reviews-activity-chromium-desktop\test-failed-1.png
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)[22m
+    > 144 |     expect(before.length).toBeGreaterThan(1);
+    test-results\pb14-accessibility-PB-14-a-2be7b-gner-reorder-PB14-15-25-29--chromium-desktop\test-failed-1.png
+  2 failed
+  4 passed (2.3m)
+### sec-p
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 1m 59s 731ms
+### done

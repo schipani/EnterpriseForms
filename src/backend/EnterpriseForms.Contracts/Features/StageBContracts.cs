@@ -120,3 +120,8 @@ public sealed record DashboardWidgetDefinitionResponse(string WidgetIdentifier, 
 public sealed record DashboardResponse(IReadOnlyList<DashboardWidgetDefinitionResponse> Widgets, IReadOnlyList<string> Capabilities);
 
 public sealed record DashboardCountResponse(string WidgetIdentifier, long Count, DateTimeOffset ComputedOn, string Scope);
+
+/// <summary>One share of a record as projected locally; the authority remains the only permission source.</summary>
+public sealed record RecordShareSummaryResponse(Guid RecordShareId, Guid FormRecordId, Guid SharedByUserId, string? SharedByDisplayName, Guid? RecipientUserId, string? RecipientDisplayName, Guid? RecipientTeamId, string RecipientRole, string ShareScope, string ShareStatus, long ShareRevision, DateTimeOffset ShareCreatedOn, DateTimeOffset? ShareRevokedOn, IReadOnlyList<string> FieldKeys);
+
+public sealed record RecordShareListResponse(IReadOnlyList<RecordShareSummaryResponse> Items, long AuthorizationRevision);

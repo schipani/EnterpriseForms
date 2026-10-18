@@ -50,6 +50,10 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
 
     public DbSet<FieldDateValue> FieldDateValues => Set<FieldDateValue>();
 
+    public DbSet<FieldDateTimeValue> FieldDateTimeValues => Set<FieldDateTimeValue>();
+
+    public DbSet<FieldGuidValue> FieldGuidValues => Set<FieldGuidValue>();
+
     public DbSet<FieldBooleanValue> FieldBooleanValues => Set<FieldBooleanValue>();
 
     public DbSet<FieldOptionValue> FieldOptionValues => Set<FieldOptionValue>();

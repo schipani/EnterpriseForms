@@ -1,8 +1,8 @@
 # Stage B Status — Enterprise Forms Application (Accused vertical slice)
 
-**Date:** 2026-10-18 · **Branch:** `stage-b/accused-vertical-slice` (on top of Stage A `7e00680`) · **Scope executed:**
-ADR-PB-002 Stage B — the working Accused + AccusedAddress + document workflow from Form Designer to browser, on the
-unchanged Stage A Level 2 foundation.
+**Date:** 2026-10-18 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`) ·
+**Evidence commit:** `PR #10 head (the commit that introduces this document version; GitHub run links in §4.6)` · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
+workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundation.
 
 > **Stage A status (decision A-23, 2026-10-18):** ENGINEERING COMPLETE — **ACCEPTED FOR CONTINUED DEVELOPMENT** by the
 > project owner, whose personal review of the cryptographic implementation is recorded as an **owner review, not an
@@ -10,31 +10,39 @@ unchanged Stage A Level 2 foundation.
 > granted:** independent cryptographic attestation (A-F1), Azure Managed HSM, Confidential Ledger, Azure Level B
 > validation and enforced security-owner review remain outstanding and unwaived (`docs/STAGE_A_GATE_CLOSURE.md`).
 > Nothing below claims production readiness, Level 2 certification, or AODA/WCAG certification. Stage B is a feature
-> milestone (ADR-PB-002 §Boundary).
+> milestone (ADR-PB-002 §Release boundaries).
 
 ## Gate assessment
 
 | Gate | Assessment |
 |---|---|
-| Stage B functionality (requirements 2–8) | **DONE for the Accused slice** — designer-created Accused and AccusedAddress forms, typed values, 4/2/1 responsive layout, child-record lists, concurrent resumable uploads with real ClamAV verdicts and server-side AES-256-GCM, verified download, version history, audit timeline, role-based dashboard, branding/text size, component gallery. Details in §1–§3. |
-| Stage B tests (requirement 9) | **Executed, see §4.** .NET unit/architecture/contract **149/149**; frontend unit/component **35/35**; Stage B Docker integration **12/12** (designer persistence/versioning, parent-child, multi-document upload incl. EICAR rejection, authorization/cross-tenant, tamper regression); browser e2e: **see §4.4**; Stage A SEC-P01..P12 rerun on the same stack: **see §4.5**. |
-| Security foundation | **Unchanged.** No new authorization path: every Stage B read/write is decided by the independent Authority (child ownership derives from the parent, documents are leaves of the signed record manifest, designer writes require the form `design` permission). Defects found by the Stage B tests were fixed in code, never by weakening a test (§5). |
-| Entra ID sign-in (requirement 3) | **Not operable** (B-01). The BFF session, CSRF double-submit and provider abstraction exist; the Entra provider fails closed at startup. Development personas are the only sign-in and are refused outside Development/Testing by construction. |
-| **Stage B gate** | **Development: AUTHORIZED TO PROCEED (A-23); vertical slice demonstrated and evaluated.** Still required before the Stage B *feature milestone* is signed off: PB-14 human AT review + product/design sign-off, the `stage-b-integration` workflow green on a GitHub-hosted runner (needs the workflow on the default branch), and the open items in §6. Production requirements (§6 first bullet) are unchanged. |
+| **Mandatory Stage B functionality** (ADR-PB-002 §Stage B items 1–8, §2 below) | **Implemented and automatically tested** for the Accused slice: every item has a working UI path, backend slice, authority hook, audit behaviour and an executed test. |
+| **Automated test suites** (§4) | .NET unit/architecture/contract/authority **150 passed, 0 failed**; frontend lint/typecheck/vitest/build **37 vitest tests passed**; Stage B Docker integration **14 passed, 0 failed**; browser e2e **6 passed, 0 failed**; Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
+| **Security controls** | **Unchanged and re-tested.** No new authorization path: shares, child records, documents, discovery pages and the new value types all go through the independent Authority and the signed manifest; SEC-P01..P12 pass on the Stage B stack. No test was weakened (§5). |
+| **PB-14 design validation** | Automated part **executed** (axe WCAG 2.2 AA + reflow at 320/768/1440 px and 200%/400% zoom equivalents, keyboard-only flows, forced colours — §4.4, §6). **Human review PENDING for the owner/reviewers:** NVDA, VoiceOver, real browser zoom, product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. |
+| **Stage B feature milestone** | **Ready for owner acceptance review** once the human PB-14 items are recorded. Features intentionally deferred to later gates are listed in §7 and are not Stage B defects. Production requirements (§7 first row) are unchanged. |
 
-## 1. How to run it
+## 1. How to run it (exact local startup)
+
+Prerequisites: Docker Desktop (Linux containers, ≥ 8 GB for the stack), .NET 10 SDK, Node 22 + npm 10, Git Bash or
+PowerShell. Everything below uses synthetic credentials from `infrastructure/docker/env.example`; no real identity
+provider, key vault or customer data is involved.
 
 ### 1.1 Development stack (persistent volumes, API on 5080)
 
 ```bash
-cd infrastructure/docker && cp env.example .env            # synthetic credentials only
+git clone https://github.com/schipani/EnterpriseForms && cd EnterpriseForms
+git checkout stage-b/accused-vertical-slice
+cd infrastructure/docker && cp env.example .env
 docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d --build --wait
 #   services: business-db, authority-db, spicedb(+db), vault(+transit init), archive-store, azurite,
 #             clamav (≈60–90 s to become healthy), authority(-migrate), api, business-migrate, worker, dev-seed
-cd ../../src/frontend && npm ci && npm run dev -w apps/web   # Vite on http://localhost:5173, /api proxied to :5080
+#   first build ≈ 5–10 min; "--wait" returns when api is healthy and dev-seed has finished
+cd ../../src/frontend && npm ci && npm run dev -w apps/web      # Vite on http://localhost:5173, /api proxied to :5080
 ```
 
-Browser URL: **http://localhost:5173** → redirects to `/login`.
+Open **http://localhost:5173** → `/login`. To stop: `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env down`
+(add `-v` to discard data).
 
 ### 1.2 Development login (Development/Testing only)
 
@@ -45,8 +53,8 @@ organization "Northwind Crown Office (synthetic)":
 |---|---|---|
 | `owner` | organization_owner + designer | branding, text size, designing, everything an owner can do |
 | `designer` | designer | create forms, fields, relationships, publish, restore |
-| `clerk` | form user (granted per form by the designer) | create Accused records, addresses, upload documents |
-| `reader` | member with no grants | demonstrates default-deny: sees zero records |
+| `clerk` | form user (granted per form by the designer) | create Accused records, addresses, upload documents, share |
+| `reader` | member with no grants | demonstrates default-deny and the recipient side of a share |
 
 `POST /api/v1/session/development-login` mints a BFF session cookie for a seeded persona. It is served only when
 `DevelopmentIdentity:Enabled` **and** the identity provider is `TestIdentityProvider` **and** the environment is
@@ -59,31 +67,39 @@ development login, not a production bypass (B-01, verified by `AuthorizationAndT
 2. **Fields** tab → Add field: `Street address` (String), `City` (String), `Address kind` (Option: Home / Work).
 3. **Layout** tab → *Add field* each one; set widths (2 of 4 …), *Save draft* → **Publish…** with a change reason.
 4. **Forms → New form**: `Accused`, tick the clerk → Create. Add fields `Given name`, `Family name` (String),
-   `Date of birth` (Date), `In custody` (Boolean), `Case status` (Option), `Case documents` (**File**).
+   `Date of birth` (Date), `In custody` (Boolean), `Arrest time` (**DateTime**), `External reference` (**Guid**),
+   `Case status` (Option), `Case documents` (**File**).
 5. **Related forms** tab → *Add relationship*: child form `AccusedAddress`, list name `Addresses`.
 6. **Layout** tab → place the fields (Given/Family name at 2 of 4 on one row, required), *Add related list*
-   `Addresses`, *Add document collection* `Case documents`; use the phone/tablet/desktop preview; *Save draft* →
-   **Publish…**. **Versions** tab lists every immutable version; *Restore to draft* copies an older layout into the
-   draft for a new version (publishing an unchanged draft is refused, B-11).
+   `Addresses`, *Add document collection* `Case documents` (set allowed types, e.g. `application/pdf, text/plain`);
+   use the phone/tablet/desktop preview; *Save draft* → **Publish…**. **Versions** tab lists every immutable version;
+   *Restore to draft* copies an older layout into the draft for a new version (publishing an unchanged draft is refused).
 
-### 1.4 Records, addresses, documents (clerk persona)
+### 1.4 Records, addresses, documents, sharing (clerk persona, then reader)
 
-- **Forms → New record** on `Accused` (or Dashboard → Permitted Forms). Client validation mirrors the server rules;
-  the server re-validates typed values (`YYYY-MM-DD`, `true/false`, option keys, length/pattern/range).
+- **Forms → New record** on `Accused`. Client validation mirrors the server rules; the server re-validates typed values
+  (`YYYY-MM-DD`; ISO instant with offset for DateTime — the control edits local time and stores UTC; canonical UUID;
+  `true/false`; option keys; length/pattern/range).
 - The record page shows the **verified** projection (`Integrity: Verified`, content revision, layout version),
   **Addresses (n)** with *Add AccusedAddress* / View / Edit / Remove (unlink keeps the child and its history), the
-  **Case documents** collection, the **Access** tab (authority-decided permissions) and the **Activity** tab.
-- **Edit** uses `If-Match`/expected content revision; a concurrent change shows a conflict with a reload action.
-- **Documents**: drop or choose several files; each shows transfer progress, then *Processing (ScanPending…)*,
-  *Committing*, and **Ready** only after the server committed the signed version. Navigate anywhere (e.g.
-  **Uploads** = Upload Center) and back: uploads continue because the upload manager is owned by the app shell.
-  Download streams the server-decrypted bytes with `attachment` + `no-store`. **Versions** shows history; **Remove**
-  unlinks with a reason. An EICAR file is rejected by clamd and never becomes a document.
+  **Case documents** collection, the **Access** tab and the **Activity** tab.
+- **Edit** uses the expected content revision; a concurrent change shows a conflict with a reload action.
+- **Documents**: drop or choose several files; each shows transfer progress with **Pause/Resume/Cancel**, then
+  *Processing (ScanPending…)*, *Committing*, and **Ready** only after the server committed the signed version. Navigate
+  anywhere (e.g. **Uploads** = Upload Center) and back: uploads continue because the upload manager is owned by the app
+  shell. **Download** streams the server-decrypted bytes with `attachment` + `no-store`. **Replace** uploads a new
+  immutable version of the same document; **Versions** shows history; **Remove** unlinks with a reason. An EICAR file is
+  rejected by clamd and never becomes a document.
+- **Access tab → Share fields**: choose *Riley Reader*, a role, tick the fields → Share. The share is an explicit field
+  allow-list committed by the Authority; the table lists shares with **Revoke**. Sign in as `reader`: the record is
+  discoverable, shows *Partial view (shared fields only)*, no addresses, no documents, no Share button; after the
+  clerk revokes, the reader is denied again immediately.
+- **Records** list: **Load more** pages through the authority's opaque continuation tokens.
 
 ### 1.5 Tests
 
 ```bash
-# .NET unit / architecture / contract / authority (no Docker)
+# .NET unit / architecture / contract / authority (no Docker) — run from PowerShell or cmd, see note
 dotnet test --solution EnterpriseForms.All.slnx -c Debug -- --minimum-expected-tests 10
 
 # Frontend
@@ -93,151 +109,111 @@ cd src/frontend && npm run lint && npm run typecheck && npm run test && npm run 
 cd infrastructure/docker && docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait
 dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -- --minimum-expected-tests 10
 dotnet test --project tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj -- --minimum-expected-tests 13
-cd src/frontend && API_TARGET=http://127.0.0.1:5180 npx playwright test      # browser e2e (installs: npx playwright install chromium)
+cd src/frontend && npx playwright install chromium && API_TARGET=http://127.0.0.1:5180 npx playwright test
 ```
 
-## 2. What was built
+Note: under Git Bash on Windows, `dotnet test` reports "Zero tests ran" because MSYS rewrites the testing-platform
+arguments; use PowerShell/cmd (or run the test `.dll` directly). CI runs on Linux and is unaffected.
 
-### 2.1 Backend (feature-owned vertical slices, `/api/v1`, 49 operations in `contracts/openapi/enterprise-forms-v1.json`)
+## 2. Mandatory Stage B requirements (ADR-PB-002 §Stage B) — implementation and evidence
 
-- **Identity / BFF (B-01):** `Session` cookie scheme beside the bearer scheme, CSRF double-submit middleware,
-  `/session`, `/session/development-personas`, `/session/development-login`, `/session/logout`, `/bootstrap`
-  (user, capabilities, branding, preferences, authorization revision). `DevelopmentIdentityProvider` mints the
-  TestIdentityProvider assertion for seeded personas; `EnterpriseForms.DevSeed` tool + `dev-seed` container bootstrap
-  the organization through the operator plane (the API never holds operator credentials).
-- **FormDesigner (B-03):** `form_drafts` (revision CAS), `field_options` (stable ids, deactivate not delete),
-  immutable `form_versions` (layout schema v2: field / relatedFormList / documentCollection, 4-column placement,
-  validation rules, upload policy), publish with draft+version CAS and no-op refusal (B-11), restore-to-draft with
-  lineage, relationship definitions with cycle/capacity rules. Layout validation rejects foreign fields, control/type
-  mismatches, spans outside 1–4, non-4 grids, `<`/`>` in text, oversized upload policies.
-- **FormRecords (B-02):** typed signed value tables (`field_string/integer/decimal/date/boolean/option_values`,
-  RowHmac/v1), `form_records` header schema **v3** (parent binding), `FieldValueCodec` invariant wire values,
-  `CandidateBuilder` edit-scope rules, verified projection endpoint with ETag, authority-driven list (B-07).
-- **RelatedForms (B-04):** child creation under a parent (authority `RegisterRecord` with parent edge →
-  `effective_owner` in SpiceDB), per-child verified list, `UnlinkChildRecord` command (data preserved).
-- **Documents (B-05):** 4 MiB chunked upload sessions (bitmap inventory, idempotent chunks, complete/cancel),
-  Azure Block Blob staging (Azurite locally), durable leased processing job → **ClamAV clamd INSTREAM** verdict →
-  segmented AES-256-GCM with per-version DEK wrapped by the (development-only) KEK → processed version row →
-  **user-session commit** binds the signed `file_attachment_versions` leaf into the record manifest → Ready.
-  Download re-verifies the projection and decrypts server-side (`attachment`, `no-store`, `nosniff`). Version history,
-  remove (unlink with reason), `my-upload-jobs`. Worker runs the processing loop (in-process in Development).
-- **Audit (B-06):** `audit_events` local projection + `/form-records/{id}/activity`, `/my-activity` (trust note states it
-  is a projection, not the security journal).
-- **Organizations / UserPreferences (B-08):** branding (validated colour pairs, logo PNG, default text scale),
-  per-user text scale; **Dashboard:** capability-filtered widget definitions and per-widget counts.
-- **Integrity fix found by tests:** signed `scanned_on`/`uploaded_on` are truncated to microseconds before signing
-  (`SignedTimestamp`) — the system clock's 100 ns ticks would otherwise have been rejected by the canonicalizer on the
-  real commit path.
+| # | Requirement (abridged) | Implemented as | Evidence |
+|---|---|---|---|
+| 1 | Login, organization context, role-specific dashboard with independently loaded/refreshable cards | BFF session + CSRF + development personas (B-01); `/bootstrap` capabilities; dashboard widgets with per-card queries and Refresh | e2e sign-in/out per persona; `DashboardPage` cards; PB14-19 automated axe + manual item |
+| 2 | Designer defines/publishes `Accused` + reusable child `AccusedAddress` linked by a relationship; multiple children created/edited independently with correct inheritance/discovery/share | FormDesigner slice (drafts, options, publish/restore, relationship definitions, layout v2); RelatedForms slice (authority `parent` edge → `effective_owner`, unlink) | `DesignerTests` (3), `ParentChildTests` (2), e2e test 1 + test 2 (two addresses) |
+| 3 | Create/view/edit/save/audit an Accused record through the real UI/API/typed storage; immutable versions; concurrency | FormRecords slice: typed signed value tables String/Integer/Decimal/Date/**DateTime**/**Guid**/Boolean/Option (B-02, B-16), verified projection, expected-revision edits, audit projection | `DesignerTests.TypedValuesAreValidatedServerSideAndRoundTrip`, `StageBUnitTests` codec/schema tests, e2e test 2 (validation, create, edit → revision 2, activity) |
+| 4 | Multiple documents through the shared upload model; survive SPA transitions; progress, pause/cancel, interruption/resume, scanning, quarantine, encryption, signed metadata, authorization, safe download; no promise after all tabs close | Documents slice (B-05): chunked sessions → Azurite → leased worker → **real ClamAV** → segmented AES-256-GCM → user-session commit → verified download; upload manager with pause/resume/cancel/retry and **Replace** (B-19); Upload Center re-select-to-resume | `DocumentTests` (4: concurrent uploads, EICAR, interrupted resume, tamper), upload-manager vitest (7), e2e test 2 (navigate away/back, download, EICAR) |
+| 5 | Authorized share, effective access verification, revocation, one child-specific visibility case; another principal cannot discover unshared children or download their files | Sharing slice: create/list/revoke (B-17) + Access tab UI; recipient sees the explicit field allow-list only | `SharingTests.ShareListRevokeAndChildDocumentDenialFollowTheAuthority`, `ParentChildTests.ChildAccessFollowsTheAuthorityNotTheDatabaseLink`, e2e test 2 (share → partial view → revoke → denied) |
+| 6 | Tenant logo and validated WCAG 2.2 AA colours/typography, black default primary buttons, accessible checkboxes, responsive layouts, keyboard operation | Organizations branding (contrast floor on server and client), `packages/ui`/`design-tokens`, 4/2/1 renderer, keyboard designer | `AuthorizationAndTamperTests` (branding owner-only + contrast), `contrast.test.ts`, `pb14-accessibility.spec.ts`, `responsive.spec.ts` |
+| 7 | Every feature owns components, handlers, contracts, validation, persistence, authority hooks, tests, audit; no scaffolding of non-milestone pages | Feature-owned slices under `Features/<Name>` and `apps/web/src/features/<name>`; generated client from the compiled OpenAPI; lint/architecture fitness functions | `ArchitectureTests`, ESLint boundary rules, `OpenApiSnapshotTests`; no PG-### page beyond the three flows + gallery |
+| 8 | Navigation-during-upload, conflict handling, error/loading/empty states, independent widget refresh, recovery from interrupted transfers | As above; 409 conflict UI with reload; empty/loading/error states on every list; interrupted-upload resume; commit-race retry (B-12) | e2e test 2; `DocumentTests`; `uploadManager.test.ts` (resume after failed chunk, pause/resume, commit retry) |
 
-### 2.2 Frontend (`src/frontend`, React 19 + TypeScript + Vite 8 + Tailwind 4 + Radix)
+## 3. What was built (changes since the first Stage B report in bold)
 
-- **Packages:** `work-queue` (Dedicated Web Worker request coordinator: lane budgets, per-resource write
-  serialization, aging, backpressure, retry policy, CSRF/If-Match/Idempotency headers, compiled endpoint registry —
-  no arbitrary URLs; main-thread adapter with identical semantics), `api-client` (generated OpenAPI types + typed
-  client over the coordinator only), `upload-manager` (tab-durable multi-upload orchestration, resume from the
-  server chunk inventory, commit retry on revision conflict, 2 concurrent per user), `form-renderer` (zod mirror of
-  layout schema v2, deterministic 4/2/1 packer, controls, client validation mirroring server rules),
-  `form-designer` (canvas: spans, row breaks, keyboard move up/down, required/label/control, live preview at 320/768/
-  desktop), `ui` (black `#111111` primary buttons, Radix checkbox with obvious checked state, select, dialog, tabs,
-  table, status messages that never rely on colour alone), `app-runtime` (runtime context, BFF session lifecycle,
-  branding → validated CSS tokens, Problem Details presentation), `design-tokens` (unchanged).
-- **App shell:** logo top-left (or initials), organization name, role-based primary navigation from server
-  capabilities, account menu, skip link, session-expired handling (queue cleared, re-sign-in prompt), 503-only query
-  retry while an archive receipt is pending.
-- **Features (one owner per page, public `index.ts` only):** identity (login), dashboard (independent cards with
-  per-card refresh), form-catalog, form-designer, form-records (list / create / verified view / edit with conflict
-  handling), related-forms (child list + child creation), documents (collection), jobs (Upload Center with
-  re-select-to-resume), audit (timelines), organizations (branding), user-preferences (text size), support (gallery
-  PG-069, not-found, no-permission, error panel).
+### 3.1 Backend (feature-owned vertical slices, `/api/v1`, 56 operations in `contracts/openapi/enterprise-forms-v1.json`)
+
+- **Identity / BFF (B-01):** session cookie scheme beside the bearer scheme, CSRF double-submit, `/session`,
+  `/session/development-personas`, `/session/development-login`, `/session/logout`, `/bootstrap`. Entra provider
+  registered but fails closed (no tenant, no authority validator) — see §7.
+- **FormDesigner (B-03, B-11):** drafts with revision CAS, stable options, immutable versions (layout schema v2),
+  publish/restore, relationships, no-op publish refusal. **Controls `dateTime` and `guid` accepted for the new types.**
+- **FormRecords (B-02, B-07, B-16, B-18):** typed signed value tables — **`field_date_time_values` v1 and
+  `field_guid_values` v1 added** (EF migration `20261018184528_StageBDateTimeGuidValues`, registry entries, insert-only
+  runtime grants, authority allow-list already present) — header schema v3, `FieldValueCodec` invariant wire values,
+  verified projection, authority-driven discovery with **continuation-token paging**.
+- **RelatedForms (B-04):** child creation under a parent, per-child verified list (unauthorized children omitted without
+  a count), unlink.
+- **Documents (B-05, B-12, B-13):** chunked sessions, Azurite staging, leased worker, ClamAV INSTREAM verdicts,
+  AES-256-GCM segments with per-version DEK, user-session commit, verified download, versions, remove, replace.
+- **Sharing (B-17):** `POST /form-records/{id}/shares`, **`GET /form-records/{id}/shares` (new; manage-access only,
+  concealment-safe 404 otherwise)**, `POST …/shares/{shareId}/revoke`.
+- **Audit (B-06), Organizations/UserPreferences (B-08), Dashboard:** unchanged.
+
+### 3.2 Frontend (`src/frontend`, React 19 + TypeScript + Vite 8 + Tailwind 4 + Radix)
+
+- Packages: `work-queue`, `api-client` (regenerated: `shares.list`, new types), `upload-manager` (**pause/resume,
+  replace**), `form-renderer` (**DateTime control editing local time → UTC instant, Guid control, validation**),
+  `form-designer`, `ui`, `app-runtime`, `design-tokens`.
+- Features: identity, dashboard, form-catalog, form-designer, form-records (**Load more paging**), related-forms,
+  documents (**Replace, Pause/Resume**), jobs (Upload Center with **Pause/Resume**), audit, organizations,
+  user-preferences, support, **sharing (new: `RecordAccessPanel` on the record's Access tab)**.
 - Lint fitness functions pass: no `fetch` in features/packages, no cross-feature internals, UI packages free of
   business/API imports.
 
-### 2.3 Infrastructure
+### 3.3 Infrastructure / CI
 
-`compose.yaml`: `clamav` (clamav/clamav:1.4, 600 MiB stream limit, healthcheck), `dev-seed` (one-shot, operator key only
-in that container; fixed: the seed volume is now owned by the non-root runtime user), API/worker environment for Storage
-(Azurite documents account), MalwareScanner (clamd), Encryption (LocalDevelopment KEK, Development/Testing only),
-DevelopmentIdentity. `compose.dev.yaml`: clamd on 127.0.0.1:3310, Azurite on 10010. New workflow
-`.github/workflows/stage-b-integration.yml` (Docker integration tests + Playwright); `ci.yml` compiles the Stage B test
-project and runs the frontend suite.
+`compose.yaml` (clamav, dev-seed, worker, Azurite), `compose.dev.yaml`, `compose.security-test.yaml` unchanged.
+`.github/workflows/stage-b-integration.yml` now also runs on **pull requests targeting
+`stage-a/level2-security-foundation` and `main`** (Docker integration tests + Playwright on a hosted runner);
+`ci.yml` compiles the Stage B test project and runs the frontend suite.
 
-## 3. Representative screens (ADR-PB-014)
-
-| Flow | Pages | Status |
-|---|---|---|
-| Role-based dashboard | PG-006 | Working against real endpoints; cards load/refresh independently; widgets filtered by server capabilities. |
-| Accused workspace | PG-010/014/016/017/018/019/020/021/025 | Working: list, create, verified view, edit, addresses, documents, Upload Center, activity. |
-| Form Designer | PG-029/033/037 | Working: catalog, canvas with preview, versions/restore. |
-| Component gallery | PG-069 | Internal, synthetic data only. |
-
-Automated accessibility checks executed: 320 px reflow without horizontal scroll, keyboard reachability and visible focus
-on the gallery (Playwright), labelled controls/aria wiring in component tests, contrast validation of every branding
-pair on client and server. **Not done:** NVDA/VoiceOver review, 200%/400% zoom review by a human, product/design
-sign-off — PB-14 remains open.
-
-## 4. Test evidence (actual results, this machine, 2026-10-18)
+## 4. Test evidence (actual results, commit `PR #10 head (the commit that introduces this document version; GitHub run links in §4.6)`, 2026-10-18)
 
 ### 4.1 .NET unit / architecture / contract / authority — `dotnet test --solution EnterpriseForms.All.slnx`
 
-**149 passed, 0 failed** (4 executables; includes the OpenAPI snapshot, signed-column registry with the new value and
-attachment tables, SpiceDB schema `effective_owner` assertions, child-record planner, layout/codec/AES-GCM/ClamAV
-parser/contrast unit tests). Earlier in the session the same suite failed on two real defects that were fixed in code
-(microsecond truncation of signed timestamps; `AuthenticationTagMismatchException` assertion).
+**150 passed, 0 failed** (4 executables; includes the OpenAPI snapshot, the signed-column registry now covering
+`field_date_time_values`/`field_guid_values`, SpiceDB schema assertions, child-record planner, layout/codec (incl.
+DateTime offset normalization, sub-second rejection, Guid canonical form)/AES-GCM/ClamAV parser/contrast tests).
 
 ### 4.2 Frontend — `npm run lint && npm run typecheck && npm run test && npm run build`
 
-Lint clean, typecheck clean, **35 vitest tests passed** (scheduler fairness/budgets/backpressure, executor transport
-policy incl. unregistered-endpoint refusal and CSRF/If-Match headers, upload manager chunk/resume/EICAR/commit-retry/
-concurrency, packer, validation, FormRenderer component, designer edits, branding fallback), production build OK
-(lazy route chunks per feature).
+Lint clean, typecheck clean, **37 vitest tests passed** (adds pause/resume and replace tests for the upload manager), production
+build OK (lazy route chunks per feature).
 
-### 4.3 Stage B Docker integration — `tests/integration/EnterpriseForms.StageBTests` (12 tests)
+### 4.3 Stage B Docker integration — `tests/integration/EnterpriseForms.StageBTests` (14 tests)
 
-**12 passed, 0 failed** (final run, TRX in `artifacts/stage-b/test-results/`; the three earlier failing iterations are
-kept in `iterations/`). Coverage: draft revision CAS, layout rejection (foreign field, script text), publish v1→v2→
-restore→v3 with lineage and unchanged history, no-op publish refusal, stable option ids with deactivation blocking new
-selection only, typed-value validation and round trip, If-Match edit conflict, audit events; two addresses as
-independent child records with verified summaries, child projection parent binding, includeChildren listing, unlink,
-capacity bound, reader default-deny, parent share ≠ child access, forged link row never listed; three concurrent clean
-uploads (64 KiB, 9 MiB = 3 chunks, text) → Processed → serialized commits → Ready with `inAcceptedManifest`, download
-byte-equality and headers, ciphertext ≠ plaintext digest in the DB, version history, non-owner/reader denial, size and
-content-type limits, removal; concurrent commit race → clean 409 + retry; **EICAR → `Rejected`/`MALWARE_DETECTED`/
-`Infected` from the real clamd**, not committable, no version row; interrupted upload resumed from the server inventory
-with an early `complete` refused; cross-tenant outsider denied on every surface; clerk cannot design; designer cannot
-read record content; branding owner-only with contrast floor; development login refuses unknown personas; hostile SQL
-on `field_date_values`, `file_attachment_versions.ciphertext_sha256` and `field_boolean_values` → `423
-INTEGRITY_VERIFICATION_FAILED` / failed-closed downloads with no plaintext.
+**14 passed, 0 failed** (TRX in `docs/evidence/stage-b/2026-10-18-stage-b-final/`). Coverage as before (designer CAS/publish/restore,
+typed values, parent-child, documents incl. EICAR and tamper, authorization/cross-tenant) **plus**: the Accused form now
+carries `arrest_time` (DateTime) and `external_reference` (Guid) through create, sign, manifest, verify and edit;
+`SharingTests` — share list empty → create → listed with field keys → recipient sees exactly the shared fields, no
+documents, cannot list shares/open the child/download/re-share → revoke → denied and undiscoverable; records list pages
+with `pageSize=1` over three records with no duplicates and rejects a forged continuation token.
 
 ### 4.4 Browser end-to-end (Playwright, Chromium) — `src/frontend/e2e`
 
-**3 passed, 0 failed** (Chromium; `docs/evidence/stage-b/2026-10-18-local-stage-b/playwright-junit.xml`, run log alongside).
-1. *Designer* signs in with the development persona, creates `AccusedAddress` (3 fields, option list), places and
-   publishes it; creates `Accused` (5 fields incl. File), adds the `Addresses` relationship, places fields with 2-of-4
-   spans and required flags, the related list and the document collection (allowed types edited), saves the draft,
-   publishes, signs out.
-2. *Clerk* signs in, creates an Accused (client validation blocks first, then real create → `Integrity: Verified`),
-   adds two addresses through the child list, edits the record (revision 2), uploads two documents, navigates to the
-   Upload Center and back through the SPA (uploads continue), sees both documents **Ready/Clean**, downloads one
-   (browser download event, original filename), uploads EICAR → `MALWARE_DETECTED` shown and no document row, reads
-   the Activity tab (record created / updated), signs out. *Reader* cannot open the record (concealed) and sees zero
-   records.
-3. *Phone project (320 px):* gallery renders without horizontal scroll, the renderer is in its one-column breakpoint,
-   Tab reaches the skip link and every control, the focused checkbox shows an outline and toggles with Space.
+**6 passed, 0 failed** (`docs/evidence/stage-b/2026-10-18-stage-b-final/playwright-junit.xml`, run log alongside).
+1. *Designer* publishes `AccusedAddress` and `Accused` (now 7 placed fields incl. DateTime and Guid, plus the related
+   list and the document collection).
+2. *Clerk* creates an Accused (client validation incl. UUID format, DateTime stored as UTC and displayed with the
+   instant), two addresses, edit → revision 2, two uploads across SPA navigation → Ready/Clean, download, EICAR
+   rejected, activity; *Reader* denied; **clerk shares `Given name` with the reader → reader sees the partial view
+   only (no DOB/family name/addresses/documents, no Share button, one record in the list) → clerk revokes → reader
+   denied and sees zero records.**
+3. *PB-14 automated:* axe WCAG 2.2 AA (+best-practice) with zero violations and no horizontal overflow at
+   320/768/1440 px and at the 200%/400% zoom equivalents on login, dashboard, records, record details/access, Upload
+   Center, gallery, designer fields/layout; keyboard-only: skip link, record tabs by arrow keys, designer Add-field
+   dialog focus trap + Escape returns focus, keyboard reorder; forced-colours/reduced-motion focus visibility.
+4. *Phone project (320 px):* gallery reflow, tab order, visible focus, checkbox toggles with Space.
 
-Seven earlier runs failed and were fixed in product code or test selectors (dev-seed volume ownership, user directory
-projection, duplicate heading/text selectors, document type policy, full-reload vs SPA navigation, concealed 404 rendered
-as a status) — see §5.
+### 4.5 Stage A SEC-P01..SEC-P12 regression on the same stack
 
-### 4.5 Stage A SEC-P01..SEC-P12 rerun on the same stack
+**13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)** on the identical stack (same images with ClamAV, worker and dev-seed) that ran §4.3/§4.4.
+Evidence: `docs/evidence/stage-b/2026-10-18-stage-b-final/sec-p-rerun/`. This is a regression run on the committed code; the
+binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Stage A gate is not reopened.
 
-**13 passed, 0 failed** (SEC-P01..SEC-P12 + harness guard, 2 min 13 s) on the identical stack that ran the Stage B
-integration tests and the browser e2e — the same images with ClamAV, worker and dev-seed added. Evidence manifest
-validated (`validate_security_evidence.py`: structure/digests PASS, which is not a security attestation):
-`docs/evidence/stage-b/2026-10-18-local-stage-b/sec-p-rerun/`. **Provenance caveat:** this is a *provisional* local run
-on a dirty worktree whose HEAD was Stage A `7e00680`. **Binding run:** GitHub `security-gate-a` dispatched on this branch at commit `2311e6b` →
-**success** (https://github.com/schipani/EnterpriseForms/actions/runs/39135823037, 12/12 + guard on a hosted runner).
-`stage-b-integration` cannot be dispatched until the workflow file exists on the default branch. The Stage A evidence
-bound to `e6df484`/`7e00680` is unaffected.
+### 4.6 GitHub-hosted runs
+
+`security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074). For the PR #10 head after this change set, the `ci` and `stage-b-integration` (Docker integration + Playwright) runs are linked from the pull request checks; the first attempt at `4489b8c` failed only on an out-of-sync lockfile (`fsevents`), fixed here.
 
 ## 5. Defects found and fixed during Stage B (none fixed by weakening a test)
 
@@ -251,30 +227,33 @@ bound to `e6df484`/`7e00680` is unaffected.
 | Reads right after a commit are 503 until the archive receipt lands | integration test | clients wait/retry only on 503 (B-12) |
 | Republishing an unchanged draft created duplicate versions | integration test | `409 NO_DRAFT_CHANGES` (B-11) |
 | `dev-seed` could not write the personas file (root-owned named volume vs non-root runtime user) | browser e2e | seed directory ownership baked into the image |
-| User directory listed only principals who had already signed in, so a designer could not grant form use to the clerk | browser e2e | development login projects every seeded persona of the organization (display data only; Development/Testing path) |
+| User directory listed only principals who had already signed in | browser e2e | development login projects every seeded persona (display data only; Development/Testing path) |
 | rolldown/lightningcss native bindings dropped by npm (optional-dependency bug) | frontend CI | platform bindings pinned as optional dependencies |
+| **This round, found by the new browser/axe tests and fixed in product code:** (1) a share-scoped (partial) projection returned the full layout and field catalog, so a recipient saw the labels of unshared fields, the address list and the document collection as empty placeholders — the server now serializes only authorized field definitions, layout elements, non-empty sections and relationship metadata (§4H), with a unit test and an integration assertion; (2) the table scroll container was not keyboard focusable (axe `scrollable-region-focusable` at 320 px) — now a labelled, focusable region; (3) dialogs opened from state did not return focus to their opener on close — the shared Dialog now records and restores the opener. Test-only corrections: field counts in `DesignerTests` after adding two fields, a unit test building signed rows with `row_revision = 0`, and `SharingTests` initially expecting the child list to be denied where the documented behaviour is an empty, count-free list for a parent-only recipient (B-04) | | |
 
-## 6. Unresolved findings, limitations and deferred items
+## 6. Representative screens (ADR-PB-014)
 
-- **Production Level 2 certification not granted** (decision A-23 accepted Stage A for development only): independent
-  cryptographic attestation, Azure Managed HSM, Confidential Ledger, Azure Level B validation and enforced security-owner
-  review remain outstanding. Stage B cannot close any of them.
-- **Entra ID sign-in not operable** (B-01); only development personas can sign in. PB-08 Conditional Access/FIDO2
-  verification untouched.
-- **Field types:** DateTime, Guid and application-encrypted (`field_encrypted_values`) values are not implemented;
-  repeating groups (`form_record_groups`) are not implemented. All Stage B fields are `Internal`; documents are
-  `Confidential` (encrypted) by the organization floor.
-- **Documents:** the KEK is a local development key (`LocalDevelopmentKeyProvider`); Azure Key Vault / Managed HSM
-  providers are not implemented (startup guard forbids the local provider outside Development/Testing). No malware
-  signature refresh (`CLAMAV_NO_FRESHCLAMD`), no replace-version UI (API supports `replacesFileAttachmentId`), no
-  retention/purge workflow, logo stored as uploaded PNG without re-encoding.
-- **Search** is not implemented (G06); the records list is authority-driven discovery with unverified rows (B-07).
-- **Lists** are not paginated in the UI beyond the first page (API supports continuation tokens).
-- **Accessibility:** automated checks only; human NVDA/VoiceOver, 200%/400% zoom review and product sign-off are
-  outstanding (PB-14). Dark mode is not offered (Light only).
-- **Audit** is a local projection (B-06): no canonical event catalog, outbox to immutable archive, or SIEM delivery
-  (Phase 1C).
-- **CI:** `security-gate-a` passed on a GitHub-hosted runner for `2311e6b`; the `stage-b-integration` workflow (Docker
-  integration + Playwright) cannot be dispatched until merged to the default branch, so its evidence in §4.3/§4.4 is from
-  this developer machine on the committed code.
-- **Performance:** no PB-09 benchmark was executed.
+| Flow | Pages | Status |
+|---|---|---|
+| Role-based dashboard | PG-006 | Working against real endpoints; cards load/refresh independently; widgets filtered by server capabilities. |
+| Accused workspace | PG-010/014/016/017/018/019/020/021/025 | Working: list (paged), create, verified view, edit, addresses, documents (replace/pause), Access tab sharing, Upload Center, activity. |
+| Form Designer | PG-029/033/037 | Working: catalog, canvas with preview, versions/restore; DateTime/Guid controls. |
+| Component gallery | PG-069 | Internal, synthetic data only. |
+
+Automated PB-14 evidence: §4.4 items 3–4 (register rows PB14-10..15, 22, 23, 25, 28, 29, 30, 32). **Human review
+pending (owner/reviewers):** PB14-16 NVDA, PB14-17 VoiceOver, real-zoom PB14-13/14, PB14-07/09/19/20/24/26/27/31/33/34
+and the product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. Dark mode is not offered.
+
+## 7. Intentionally deferred (not Stage B defects) and open production requirements
+
+| Item | Why deferred from Stage B | Owning gate |
+|---|---|---|
+| **Production Level 2 certification** — independent cryptographic attestation, Azure Managed HSM, Confidential Ledger, Azure Level B validation, enforced security-owner review | Not a Stage B deliverable; A-23 accepted Stage A for development only | PB-03 Azure staging, PB-12 evidence governance, `docs/STAGE_A_GATE_CLOSURE.md` |
+| **Operable Entra ID sign-in** (BFF, CSRF, provider abstraction exist; Entra fails closed) | Requires an Entra tenant, Conditional Access authentication-strength policy and an authority assertion validator — "Pilot requires separately agreed identity" (ADR-PB-002) | PB-08 Azure staging |
+| **Application-encrypted field values** (`field_encrypted_values`) | Needs the managed KEK provider and key lifecycle before any ciphertext is persisted; the authority allow-list and schema slot exist | Phase 1B / PB-05 key custody |
+| **Repeating groups** (`form_record_groups`) | Stage B models multiplicity as independent child records per ADR-PB-002; same-record repeating occurrences are a Phase 3 slice | Phase 3 |
+| **Trusted search** (field predicates, global text) | V1 bounded verified search is a separate gate with 18 `ENC-SR-##` tests; the list remains authority-driven discovery (B-07) | Phase 4 / G06 / ADR-PB-004 |
+| **Team recipients in the share UI**, delegation lineage views | API accepts teams; Teams feature UI is not part of the Accused slice | Sharing/Teams features |
+| **Azure Key Vault / Managed HSM KEK**, retention/purge, signature refresh (`freshclam`) | Production trust services; local provider is refused outside Development/Testing | PB-05 / PB-10 |
+| **Canonical audit catalog, outbox to immutable archive, SIEM** | `audit_events` is a projection (B-06) | Phase 1C |
+| **PB-09 benchmarks**, dark mode, 69-screen backlog | Out of Stage B scope by ADR-PB-002 §Explicit deferrals | PB-09 / PB-14 follow-on |

@@ -343,6 +343,8 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             FieldIntegerValue i => new FieldIntegerValue { FieldIntegerValueId = Guid.CreateVersion7(), IntegerValue = i.IntegerValue },
             FieldDecimalValue d => new FieldDecimalValue { FieldDecimalValueId = Guid.CreateVersion7(), DecimalValue = d.DecimalValue },
             FieldDateValue d => new FieldDateValue { FieldDateValueId = Guid.CreateVersion7(), DateValue = d.DateValue },
+            FieldDateTimeValue dt => new FieldDateTimeValue { FieldDateTimeValueId = Guid.CreateVersion7(), DateTimeValue = dt.DateTimeValue },
+            FieldGuidValue g => new FieldGuidValue { FieldGuidValueId = Guid.CreateVersion7(), GuidValue = g.GuidValue },
             FieldBooleanValue b => new FieldBooleanValue { FieldBooleanValueId = Guid.CreateVersion7(), BooleanValue = b.BooleanValue },
             FieldOptionValue o => new FieldOptionValue { FieldOptionValueId = Guid.CreateVersion7(), FieldOptionId = o.FieldOptionId },
             _ => throw new InvalidOperationException("unsupported value row " + v.GetType().Name),

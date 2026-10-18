@@ -69,8 +69,8 @@
     },
     {
       "path": "docs/STAGE_B_STATUS.md",
-      "sha256": "c605c4b1280687c5f934803d4c73ec5de74c101b54efec7a94bbb478d88114d9",
-      "bytes": 24067
+      "sha256": "8d03c74c89e1c8de678e420a6091804c42e3e648650d22bb1c6052828ab825ed",
+      "bytes": 25970
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -184,8 +184,8 @@
     },
     {
       "path": "docs/decisions/STAGE_B_DECISION_LOG.md",
-      "sha256": "a5c5e1183d93dacd1a16e71e88a97b153517183f26cb24817e7fbf924c3d4161",
-      "bytes": 11183
+      "sha256": "ffcedc04a4ef44626d3f6c19451d13ad42fce110d9b2a0fef7a9a7373a16957a",
+      "bytes": 15037
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
@@ -316,6 +316,11 @@
       "path": "docs/ui/PB14_ENTERPRISE_DESIGN_VALIDATION_STANDARD.md",
       "sha256": "58323f8071182549f38e039ee09cf403397323a60ff603681d1ba1b7311e52eb",
       "bytes": 5991
+    },
+    {
+      "path": "docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md",
+      "sha256": "ebc578c2cef66b637bfacd0fbce2cf7774db183aa300b47e41bcb9e3d8a3d96b",
+      "bytes": 6547
     },
     {
       "path": "docs/ui/PB14_REPRESENTATIVE_SCREEN_CONTRACTS.md",

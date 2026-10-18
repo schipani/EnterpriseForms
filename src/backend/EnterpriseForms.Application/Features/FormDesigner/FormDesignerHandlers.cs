@@ -532,6 +532,8 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                     FieldDataTypes.Integer => ["number"],
                     FieldDataTypes.Decimal => ["decimal"],
                     FieldDataTypes.Date => ["date"],
+                    FieldDataTypes.DateTime => ["dateTime"],
+                    FieldDataTypes.Guid => ["guid"],
                     FieldDataTypes.Boolean => ["checkbox"],
                     FieldDataTypes.Option => ["select"],
                     _ => ["fileUpload"],

@@ -32,7 +32,7 @@ const fieldElement = z
   .object({
     kind: z.literal("field"),
     fieldDefinitionId: z.string().uuid(),
-    control: z.enum(["text", "textarea", "number", "decimal", "date", "checkbox", "select"]).default("text"),
+    control: z.enum(["text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select"]).default("text"),
     label: safeText(200).default(""),
     helpText: safeText(1000).optional(),
     required: z.boolean().default(false),
@@ -117,7 +117,7 @@ export function emptyLayout(title: string): FormLayout {
   return { layoutSchemaVersion: 2, title, sections: [{ sectionKey: "main", title, gridColumns: 4, elements: [] }] };
 }
 
-export const FIELD_DATA_TYPES = ["String", "Integer", "Decimal", "Date", "Boolean", "Option", "File"] as const;
+export const FIELD_DATA_TYPES = ["String", "Integer", "Decimal", "Date", "DateTime", "Guid", "Boolean", "Option", "File"] as const;
 export type FieldDataType = (typeof FIELD_DATA_TYPES)[number];
 
 /** Controls permitted per storage type (server rule in FormDesignerHandlers.ValidateLayout). */
@@ -126,6 +126,8 @@ export const CONTROLS_BY_TYPE: Record<FieldDataType, FieldElement["control"][]> 
   Integer: ["number"],
   Decimal: ["decimal"],
   Date: ["date"],
+  DateTime: ["dateTime"],
+  Guid: ["guid"],
   Boolean: ["checkbox"],
   Option: ["select"],
   File: [],

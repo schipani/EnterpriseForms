@@ -112,6 +112,11 @@ export function FieldControl({ element, field, value, error, onChange, readOnly 
       return <TextInput {...common} type="text" inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} />;
     case "Date":
       return <TextInput {...common} type="date" value={value} min={element.validation?.minDate} max={element.validation?.maxDate} onChange={(event) => onChange(event.target.value)} />;
+    case "DateTime":
+      // The control edits local wall-clock time; the value sent and stored is the UTC instant (second precision).
+      return <TextInput {...common} type="datetime-local" step={60} value={toLocalDateTimeInput(value)} onChange={(event) => onChange(fromLocalDateTimeInput(event.target.value))} />;
+    case "Guid":
+      return <TextInput {...common} type="text" inputMode="text" autoComplete="off" spellCheck={false} placeholder="0199a2b3-c4d5-7e6f-8123-456789abcdef" value={value} maxLength={36} onChange={(event) => onChange(event.target.value.trim().toLowerCase())} />;
     case "Boolean":
       return <Checkbox {...common} checked={value === "true"} onCheckedChange={(checked) => onChange(checked ? "true" : "false")} />;
     case "Option": {
@@ -137,11 +142,41 @@ export function displayValue(field: RendererField, value: string | undefined): s
   if (field.fieldDataType === "Boolean") {
     return value === "true" ? "Yes" : "No";
   }
+  if (field.fieldDataType === "DateTime") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? value : `${new Date(parsed).toLocaleString()} (${value})`;
+  }
   if (field.fieldDataType === "Option") {
     const option = field.options.find((candidate) => candidate.optionKey === value);
     return option ? (option.isActive ? option.optionDisplayText : `${option.optionDisplayText} (no longer available)`) : value;
   }
   return value;
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** UTC instant (wire) → value of an <input type="datetime-local"> in the viewer's zone; empty/invalid → "". */
+export function toLocalDateTimeInput(wire: string): string {
+  if (!wire) {
+    return "";
+  }
+  const parsed = new Date(wire);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+}
+
+/** datetime-local value (viewer's zone) → UTC instant at second precision; empty → "". */
+export function fromLocalDateTimeInput(local: string): string {
+  if (!local) {
+    return "";
+  }
+  const parsed = new Date(local);
+  if (Number.isNaN(parsed.getTime())) {
+    return local;
+  }
+  return parsed.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 export function ReadOnlyValue({ label, value, helpText }: { label: string; value: string; helpText?: string | undefined }) {

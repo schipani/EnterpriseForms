@@ -73,6 +73,28 @@ public sealed class SignedColumnRegistryTests
             "created_on:audit timestamp of the physical copy",
             "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
         }),
+        ["field_date_time_values"] = (BusinessSignedSchemas.FieldDateTimeValuesV1, "field_date_time_values", new[]
+        {
+            "field_date_time_value_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
+        ["field_guid_values"] = (BusinessSignedSchemas.FieldGuidValuesV1, "field_guid_values", new[]
+        {
+            "field_guid_value_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
         ["field_boolean_values"] = (BusinessSignedSchemas.FieldBooleanValuesV1, "field_boolean_values", new[]
         {
             "field_boolean_value_id:bound as the canonical primary key",

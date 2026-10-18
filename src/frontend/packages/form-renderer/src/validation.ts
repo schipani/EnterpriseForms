@@ -12,6 +12,9 @@ export type ValueMap = Record<string, string>;
 export type ErrorMap = Record<string, string>;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Wire form of a DateTime value: ISO 8601 instant in UTC at second precision (the server rejects sub-second input). */
+const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$/;
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const INTEGER = /^-?\d{1,18}$/;
 const DECIMAL = /^-?\d{1,15}(\.\d{1,4})?$/;
 
@@ -112,6 +115,21 @@ function validateOne(element: FieldElement, field: RendererField, raw: string): 
       }
       return undefined;
     }
+    case "DateTime": {
+      if (!DATE_TIME.test(raw) || Number.isNaN(Date.parse(raw))) {
+        return `${label} must be a date and time`;
+      }
+      const day = raw.slice(0, 10);
+      if (rules.minDate && day < rules.minDate) {
+        return `${label} must be on or after ${rules.minDate}`;
+      }
+      if (rules.maxDate && day > rules.maxDate) {
+        return `${label} must be on or before ${rules.maxDate}`;
+      }
+      return undefined;
+    }
+    case "Guid":
+      return GUID.test(raw) && raw !== "00000000-0000-0000-0000-000000000000" ? undefined : `${label} must be a UUID such as 0199a2b3-c4d5-7e6f-8123-456789abcdef`;
     case "Boolean":
       return raw === "true" || raw === "false" ? undefined : `${label} must be checked or unchecked`;
     case "Option": {

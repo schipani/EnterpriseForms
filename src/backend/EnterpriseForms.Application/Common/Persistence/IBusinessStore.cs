@@ -114,6 +114,8 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<List<RecordShare>> GetSharesOfRecordAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken);
 
+    Task<List<RecordShareField>> GetShareFieldsOfRecordAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken);
+
     // Teams projections
     void AddTeamProjection(Team team);
 

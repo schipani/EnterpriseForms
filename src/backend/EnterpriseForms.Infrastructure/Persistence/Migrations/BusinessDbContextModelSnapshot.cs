@@ -984,6 +984,94 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldDateTimeValue", b =>
+                {
+                    b.Property<Guid>("FieldDateTimeValueId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_date_time_value_id");
+
+                    b.Property<Guid>("ContentChangeOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("content_change_operation_id");
+
+                    b.Property<long>("ContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("content_revision");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<DateTimeOffset>("DateTimeValue")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("date_time_value");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldValueItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_value_item_id");
+
+                    b.Property<Guid?>("FormRecordGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_group_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<long>("RowRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_revision");
+
+                    b.Property<byte[]>("RowSignature")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("row_signature");
+
+                    b.Property<int>("RowSignatureKeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_signature_key_version");
+
+                    b.Property<int>("RowSignatureSchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_signature_schema_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("FieldDateTimeValueId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("FormRecordId", "ContentChangeOperationId")
+                        .HasDatabaseName("ix_field_date_time_values_record_operation");
+
+                    b.HasIndex("FieldDefinitionId", "DateTimeValue", "FormRecordId")
+                        .HasDatabaseName("ix_field_date_time_values_lookup");
+
+                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_field_date_time_values_occurrence");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId"), false);
+
+                    b.ToTable("field_date_time_values", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_field_date_time_values_signature_length", "octet_length(row_signature) = 32");
+
+                            t.HasCheckConstraint("ck_field_date_time_values_versions_positive", "row_revision >= 1 AND row_signature_key_version >= 1 AND row_signature_schema_version >= 1 AND content_revision >= 1");
+                        });
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldDateValue", b =>
                 {
                     b.Property<Guid>("FieldDateValueId")
@@ -1157,6 +1245,94 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_field_decimal_values_signature_length", "octet_length(row_signature) = 32");
 
                             t.HasCheckConstraint("ck_field_decimal_values_versions_positive", "row_revision >= 1 AND row_signature_key_version >= 1 AND row_signature_schema_version >= 1 AND content_revision >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldGuidValue", b =>
+                {
+                    b.Property<Guid>("FieldGuidValueId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_guid_value_id");
+
+                    b.Property<Guid>("ContentChangeOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("content_change_operation_id");
+
+                    b.Property<long>("ContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("content_revision");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldValueItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_value_item_id");
+
+                    b.Property<Guid?>("FormRecordGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_group_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("GuidValue")
+                        .HasColumnType("uuid")
+                        .HasColumnName("guid_value");
+
+                    b.Property<long>("RowRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_revision");
+
+                    b.Property<byte[]>("RowSignature")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("row_signature");
+
+                    b.Property<int>("RowSignatureKeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_signature_key_version");
+
+                    b.Property<int>("RowSignatureSchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_signature_schema_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("FieldGuidValueId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("FormRecordId", "ContentChangeOperationId")
+                        .HasDatabaseName("ix_field_guid_values_record_operation");
+
+                    b.HasIndex("FieldDefinitionId", "GuidValue", "FormRecordId")
+                        .HasDatabaseName("ix_field_guid_values_lookup");
+
+                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_field_guid_values_occurrence");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId"), false);
+
+                    b.ToTable("field_guid_values", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_field_guid_values_signature_length", "octet_length(row_signature) = 32");
+
+                            t.HasCheckConstraint("ck_field_guid_values_versions_positive", "row_revision >= 1 AND row_signature_key_version >= 1 AND row_signature_schema_version >= 1 AND content_revision >= 1");
                         });
                 });
 
@@ -2438,6 +2614,30 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_field_boolean_values_tenant");
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldDateTimeValue", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FieldDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_date_time_values_field");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormRecords.FormRecord", null)
+                        .WithMany()
+                        .HasForeignKey("FormRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_date_time_values_record");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_date_time_values_tenant");
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldDateValue", b =>
                 {
                     b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldDefinition", null)
@@ -2484,6 +2684,30 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_field_decimal_values_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldGuidValue", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FieldDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_guid_values_field");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormRecords.FormRecord", null)
+                        .WithMany()
+                        .HasForeignKey("FormRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_guid_values_record");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_guid_values_tenant");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldIntegerValue", b =>

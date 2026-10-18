@@ -1,7 +1,7 @@
 import type { ApiClient, UploadSessionResponse } from "@enterpriseforms/api-client";
 import { OperationError } from "@enterpriseforms/work-queue";
 
-export type UploadPhase = "Queued" | "Starting" | "Transferring" | "Finalizing" | "Processing" | "Committing" | "Ready" | "Rejected" | "Failed" | "Cancelled";
+export type UploadPhase = "Queued" | "Starting" | "Transferring" | "Paused" | "Finalizing" | "Processing" | "Committing" | "Ready" | "Rejected" | "Failed" | "Cancelled";
 
 export interface UploadItem {
   /** Client identity; stable across session resumption. */
@@ -9,6 +9,8 @@ export interface UploadItem {
   uploadSessionId: string | null;
   formRecordId: string;
   fieldDefinitionId: string;
+  /** Set when this upload becomes a new immutable version of an existing document (B-05 replace). */
+  replacesFileAttachmentId: string | null;
   fileName: string;
   sizeBytes: number;
   contentType: string;
@@ -106,7 +108,7 @@ export class UploadManager {
     return this.snapshot().filter((item) => item.formRecordId === formRecordId);
   }
 
-  enqueue(files: readonly File[], target: { formRecordId: string; fieldDefinitionId: string }): string[] {
+  enqueue(files: readonly File[], target: { formRecordId: string; fieldDefinitionId: string; replacesFileAttachmentId?: string | null }): string[] {
     const ids: string[] = [];
     for (const file of files) {
       const clientUploadId = crypto.randomUUID();
@@ -116,6 +118,7 @@ export class UploadManager {
         uploadSessionId: null,
         formRecordId: target.formRecordId,
         fieldDefinitionId: target.fieldDefinitionId,
+        replacesFileAttachmentId: target.replacesFileAttachmentId ?? null,
         fileName: file.name,
         sizeBytes: file.size,
         contentType: file.type || "application/octet-stream",
@@ -153,6 +156,17 @@ export class UploadManager {
     return clientUploadId;
   }
 
+  /** Stop sending chunks but keep the file and the server session; `retry` resumes from the chunks the server holds. */
+  pause(clientUploadId: string): void {
+    const item = this.items.get(clientUploadId);
+    if (!item || !(item.phase === "Queued" || item.phase === "Starting" || item.phase === "Transferring")) {
+      return;
+    }
+    this.controllers.get(clientUploadId)?.abort();
+    this.patch(clientUploadId, { phase: "Paused" });
+    void this.pump();
+  }
+
   cancel(clientUploadId: string): void {
     const item = this.items.get(clientUploadId);
     if (!item) {
@@ -167,9 +181,10 @@ export class UploadManager {
     void this.pump();
   }
 
+  /** Re-queue a Failed or Paused upload; the run re-reads the server session so received chunks are never resent. */
   retry(clientUploadId: string): void {
     const item = this.items.get(clientUploadId);
-    if (!item || !this.files.has(clientUploadId)) {
+    if (!item || !this.files.has(clientUploadId) || !(item.phase === "Failed" || item.phase === "Paused")) {
       return;
     }
     this.patch(clientUploadId, { phase: "Queued", errorCode: null, errorDetail: null });
@@ -213,7 +228,7 @@ export class UploadManager {
       if (item.uploadSessionId) {
         session = (await this.api.uploads.get(item.uploadSessionId)).result;
       } else {
-        session = (await this.api.uploads.begin({ formRecordId: item.formRecordId, fieldDefinitionId: item.fieldDefinitionId, originalFileName: file.name, contentType: item.contentType, sizeBytes: file.size, replacesFileAttachmentId: null })).result;
+        session = (await this.api.uploads.begin({ formRecordId: item.formRecordId, fieldDefinitionId: item.fieldDefinitionId, originalFileName: file.name, contentType: item.contentType, sizeBytes: file.size, replacesFileAttachmentId: item.replacesFileAttachmentId })).result;
       }
       this.patch(clientUploadId, { uploadSessionId: session.uploadSessionId, chunkCount: n(session.expectedChunkCount), receivedChunks: session.receivedChunkIndexes.length, transferredBytes: n(session.receivedBytes), phase: "Transferring" });
 
@@ -317,6 +332,7 @@ export class UploadManager {
       uploadSessionId: session.uploadSessionId,
       formRecordId: session.formRecordId,
       fieldDefinitionId: session.fieldDefinitionId,
+      replacesFileAttachmentId: null,
       fileName: session.originalFileName,
       sizeBytes: n(session.declaredSizeBytes),
       contentType: "application/octet-stream",

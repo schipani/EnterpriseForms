@@ -125,6 +125,8 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                     case FieldIntegerValue v: context.FieldIntegerValues.Add(v); break;
                     case FieldDecimalValue v: context.FieldDecimalValues.Add(v); break;
                     case FieldDateValue v: context.FieldDateValues.Add(v); break;
+                    case FieldDateTimeValue v: context.FieldDateTimeValues.Add(v); break;
+                    case FieldGuidValue v: context.FieldGuidValues.Add(v); break;
                     case FieldBooleanValue v: context.FieldBooleanValues.Add(v); break;
                     case FieldOptionValue v: context.FieldOptionValues.Add(v); break;
                     case FileAttachmentVersion v: context.FileAttachmentVersions.Add(v); break; // per-operation immutable copy (B-05)
@@ -143,6 +145,8 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             rows.AddRange(await context.FieldIntegerValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldDecimalValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldDateValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
+            rows.AddRange(await context.FieldDateTimeValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
+            rows.AddRange(await context.FieldGuidValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldBooleanValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldOptionValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FileAttachmentVersions.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
@@ -211,6 +215,9 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public Task<List<RecordShare>> GetSharesOfRecordAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken) =>
             context.RecordShares.AsNoTracking().Where(s => s.TenantId == tenantId && s.FormRecordId == formRecordId).OrderBy(s => s.ShareCreatedOn).ToListAsync(cancellationToken);
+
+        public Task<List<RecordShareField>> GetShareFieldsOfRecordAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken) =>
+            context.RecordShareFields.AsNoTracking().Where(f => f.TenantId == tenantId && context.RecordShares.Any(s => s.RecordShareId == f.RecordShareId && s.FormRecordId == formRecordId)).ToListAsync(cancellationToken);
 
         public void AddTeamProjection(Team team) => context.Teams.Add(team);
 

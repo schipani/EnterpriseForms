@@ -1,6 +1,7 @@
 using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Api.Features.FormDefinitions;
 using EnterpriseForms.Application.Features.Sharing.CreateShare;
+using EnterpriseForms.Application.Features.Sharing.ListShares;
 using EnterpriseForms.Application.Features.Sharing.RevokeShare;
 using EnterpriseForms.Contracts.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -23,6 +24,14 @@ public static class SharingEndpoints
             })
             .WithName("CreateRecordShare")
             .WithSummary("Explicit field allow-list share committed by the authority; no wildcard or future items.");
+
+        group.MapGet("/", static async Task<Ok<RecordShareListResponse>> (Guid formRecordId, HttpContext http, ListSharesHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                return TypedResults.Ok(await handler.HandleAsync(context, formRecordId, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("ListRecordShares")
+            .WithSummary("Shares of a record for its access managers (local projection; the authority decides every recipient's access).");
 
         group.MapPost("/{recordShareId:guid}/revoke", static async Task<Ok<CommandStatusResponse>> (Guid formRecordId, Guid recordShareId, HttpContext http, RevokeShareHandler handler, CancellationToken cancellationToken) =>
             {

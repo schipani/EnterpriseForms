@@ -14,11 +14,13 @@ public static class FieldDataTypes
     public const string Integer = "Integer";
     public const string Decimal = "Decimal";
     public const string Date = "Date";
+    public const string DateTime = "DateTime";
+    public const string Guid = "Guid";
     public const string Boolean = "Boolean";
     public const string Option = "Option";
     public const string File = "File";
 
-    public static readonly IReadOnlySet<string> StageB = new HashSet<string>(StringComparer.Ordinal) { String, Integer, Decimal, Date, Boolean, Option, File };
+    public static readonly IReadOnlySet<string> StageB = new HashSet<string>(StringComparer.Ordinal) { String, Integer, Decimal, Date, DateTime, Guid, Boolean, Option, File };
 }
 
 /// <summary>
@@ -40,6 +42,8 @@ public static class FieldValueCodec
             FieldDataTypes.Integer => new FieldIntegerValue { FieldIntegerValueId = Guid.CreateVersion7(), IntegerValue = ValidateInteger(field, validation, wireValue) },
             FieldDataTypes.Decimal => new FieldDecimalValue { FieldDecimalValueId = Guid.CreateVersion7(), DecimalValue = ValidateDecimal(field, validation, wireValue) },
             FieldDataTypes.Date => new FieldDateValue { FieldDateValueId = Guid.CreateVersion7(), DateValue = ValidateDate(field, validation, wireValue) },
+            FieldDataTypes.DateTime => new FieldDateTimeValue { FieldDateTimeValueId = Guid.CreateVersion7(), DateTimeValue = ValidateDateTime(field, validation, wireValue) },
+            FieldDataTypes.Guid => new FieldGuidValue { FieldGuidValueId = Guid.CreateVersion7(), GuidValue = ValidateGuid(field, wireValue) },
             FieldDataTypes.Boolean => new FieldBooleanValue { FieldBooleanValueId = Guid.CreateVersion7(), BooleanValue = ValidateBoolean(field, wireValue) },
             FieldDataTypes.Option => new FieldOptionValue { FieldOptionValueId = Guid.CreateVersion7(), FieldOptionId = ValidateOption(field, options, wireValue) },
             _ => throw new BusinessException("INVALID_REQUEST", 422, $"field '{field.FieldKey}' of type {field.FieldDataType} does not accept values"),
@@ -64,6 +68,8 @@ public static class FieldValueCodec
             FieldIntegerValue v => v.IntegerValue.ToString(CultureInfo.InvariantCulture),
             FieldDecimalValue v => v.DecimalValue.ToString(CultureInfo.InvariantCulture),
             FieldDateValue v => v.DateValue.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            FieldDateTimeValue v => v.DateTimeValue.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
+            FieldGuidValue v => v.GuidValue.ToString("D"),
             FieldBooleanValue v => v.BooleanValue ? "true" : "false",
             FieldOptionValue v => optionsById.TryGetValue(v.FieldOptionId, out var option) ? option.OptionKey : v.FieldOptionId.ToString("D"),
             _ => string.Empty,
@@ -142,6 +148,33 @@ public static class FieldValueCodec
         if (parsed < (v.MinDate ?? DateOnly.MinValue) || parsed > (v.MaxDate ?? DateOnly.MaxValue))
         {
             throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside the permitted date range");
+        }
+
+        return parsed;
+    }
+
+    /// <summary>ISO 8601 instant with an explicit offset or Z; stored and signed as UTC at second precision (the canonical timestamp encoding is second-exact, so sub-second input is rejected rather than silently truncated).</summary>
+    private static DateTimeOffset ValidateDateTime(FieldDefinition field, LayoutValidation v, string value)
+    {
+        if (!DateTimeOffset.TryParseExact(value, ["yyyy-MM-dd'T'HH:mm:ssK", "yyyy-MM-dd'T'HH:mmK"], CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsed))
+        {
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be an ISO 8601 instant with offset (yyyy-MM-ddTHH:mm:ssZ)");
+        }
+
+        var date = DateOnly.FromDateTime(parsed.UtcDateTime);
+        if (date < (v.MinDate ?? DateOnly.MinValue) || date > (v.MaxDate ?? DateOnly.MaxValue))
+        {
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside the permitted date range");
+        }
+
+        return new DateTimeOffset(parsed.UtcDateTime, TimeSpan.Zero);
+    }
+
+    private static Guid ValidateGuid(FieldDefinition field, string value)
+    {
+        if (!Guid.TryParseExact(value, "D", out var parsed) || parsed == Guid.Empty)
+        {
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be a non-empty UUID in canonical form");
         }
 
         return parsed;

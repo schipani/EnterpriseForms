@@ -58,6 +58,8 @@ export type RemoveDocumentRequest = S["RemoveDocumentRequest"];
 export type DirectoryUserResponse = S["DirectoryUserResponse"];
 export type CreateShareRequest = S["CreateShareRequest"];
 export type ShareResponse = S["ShareResponse"];
+export type RecordShareListResponse = S["RecordShareListResponse"];
+export type RecordShareSummaryResponse = S["RecordShareSummaryResponse"];
 
 export type ApiResult<T> = { result: T; etag?: string; status: number };
 
@@ -122,6 +124,7 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       unlink: (formRecordId: string, childFormRecordId: string, request: UnlinkChildRecordRequest) => write<CommandStatusResponse>("POST", "related.unlink", { formRecordId, childFormRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
     },
     shares: {
+      list: (formRecordId: string, signal?: AbortSignal) => read<RecordShareListResponse>("shares.list", { formRecordId }, undefined, "interactive-read", signal),
       create: (formRecordId: string, request: CreateShareRequest) => write<ShareResponse>("POST", "shares.create", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
       revoke: (formRecordId: string, recordShareId: string) => write<CommandStatusResponse>("POST", "shares.revoke", { formRecordId, recordShareId }, {}, { idempotent: true, resourceKey: `record:${formRecordId}` }),
     },
