@@ -1,7 +1,7 @@
 # Stage B Status — Enterprise Forms Application (Accused vertical slice)
 
 **Date:** 2026-10-18 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`) ·
-**Evidence commit:** recorded in §4.6 with the hosted run links · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
+**Evidence commit:** `5d7da9f` (hosted run links in §4.6) · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
 workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundation.
 
 > **Stage A status (decision A-23, 2026-10-18):** ENGINEERING COMPLETE — **ACCEPTED FOR CONTINUED DEVELOPMENT** by the
@@ -251,7 +251,7 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 
 ### 4.6 GitHub-hosted runs
 
-`ci` **success** (run 39170555542) and `stage-b-integration` — Docker integration tests + Playwright on a GitHub-hosted runner — **success** (run 39170555532) for head `d3f144c`: https://github.com/schipani/EnterpriseForms/actions/runs/39170555542 and https://github.com/schipani/EnterpriseForms/actions/runs/39170555532. Earlier heads: `14900b9` (39160072571 / 39160072502) and `3f96e24` (39164449381 / 39164449402) green; the first hosted integration run on `c349d84` caught a 320 px overflow that was fixed. `security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074); the SEC-P regression for this change set is the local run in §4.5 on the identical images.
+`ci` **success** (run 39175837148) and `stage-b-integration` — Docker integration tests (21) + Playwright (10) on a GitHub-hosted runner — **success** (run 39175837149) for head `5d7da9f`: https://github.com/schipani/EnterpriseForms/actions/runs/39175837148 and https://github.com/schipani/EnterpriseForms/actions/runs/39175837149. Earlier heads green: `d3f144c` (39170555542 / 39170555532), `14900b9` (39160072571 / 39160072502). `security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074); the SEC-P regression for this change set is the local run in §4.5 on the identical images.
 
 ## 5. Defects found and fixed during Stage B (none fixed by weakening a test)
 
