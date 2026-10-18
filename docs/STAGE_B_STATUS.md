@@ -41,7 +41,7 @@ docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d --build
 cd ../../src/frontend && npm ci && npm run dev -w apps/web      # Vite on http://localhost:5173, /api proxied to :5080
 ```
 
-Open **http://localhost:5173** → `/login`. To stop: `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env down`
+Open **http://localhost:5173** → `/login`. If the Vite terminal shows `http proxy error: /api/v1/session … ECONNREFUSED`, the API on port 5080 is not running yet: wait for the compose command above to finish (or, to use an already running security-test stack on 5180, start Vite with `API_TARGET=http://127.0.0.1:5180 npm run dev -w apps/web`). To stop: `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env down`
 (add `-v` to discard data).
 
 ### 1.2 Development login (Development/Testing only)
