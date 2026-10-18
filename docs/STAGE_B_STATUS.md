@@ -31,6 +31,7 @@ provider, key vault or customer data is involved.
 ### 1.1 Development stack (persistent volumes, API on 5080)
 
 ```bash
+# From an existing checkout, skip the clone (do not clone inside the repository folder).
 git clone https://github.com/schipani/EnterpriseForms && cd EnterpriseForms
 git checkout stage-b/accused-vertical-slice
 cd infrastructure/docker && cp env.example .env
