@@ -231,8 +231,9 @@ as a status) — see §5.
 integration tests and the browser e2e — the same images with ClamAV, worker and dev-seed added. Evidence manifest
 validated (`validate_security_evidence.py`: structure/digests PASS, which is not a security attestation):
 `docs/evidence/stage-b/2026-10-18-local-stage-b/sec-p-rerun/`. **Provenance caveat:** this is a *provisional* local run
-on a dirty worktree whose HEAD was Stage A `7e00680`; the binding run for the Stage B commit is the GitHub
-`security-gate-a` / `stage-b-integration` workflow, which has not yet executed for this branch. The Stage A evidence
+on a dirty worktree whose HEAD was Stage A `7e00680`. **Binding run:** GitHub `security-gate-a` dispatched on this branch at commit `2311e6b` →
+**success** (https://github.com/schipani/EnterpriseForms/actions/runs/39135823037, 12/12 + guard on a hosted runner).
+`stage-b-integration` cannot be dispatched until the workflow file exists on the default branch. The Stage A evidence
 bound to `e6df484`/`7e00680` is unaffected.
 
 ## 5. Defects found and fixed during Stage B (none fixed by weakening a test)
@@ -269,6 +270,7 @@ bound to `e6df484`/`7e00680` is unaffected.
   outstanding (PB-14). Dark mode is not offered (Light only).
 - **Audit** is a local projection (B-06): no canonical event catalog, outbox to immutable archive, or SIEM delivery
   (Phase 1C).
-- **CI:** the `stage-b-integration` workflow has not yet run on a GitHub-hosted runner; the evidence in §4 is from this
-  developer machine on the committed code.
+- **CI:** `security-gate-a` passed on a GitHub-hosted runner for `2311e6b`; the `stage-b-integration` workflow (Docker
+  integration + Playwright) cannot be dispatched until merged to the default branch, so its evidence in §4.3/§4.4 is from
+  this developer machine on the committed code.
 - **Performance:** no PB-09 benchmark was executed.
