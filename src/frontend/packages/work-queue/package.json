@@ -1,0 +1,14 @@
+{
+  "name": "@enterpriseforms/work-queue",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "App-shell request coordinator (ADR-PB-007): one logical queue with bounded priority lanes executed in a Dedicated Web Worker (main-thread adapter when workers are unavailable). Workers schedule; they never authorize.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/coordinator.worker.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

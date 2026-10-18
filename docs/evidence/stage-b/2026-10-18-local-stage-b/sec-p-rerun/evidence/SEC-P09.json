@@ -1,0 +1,107 @@
+{
+  "test_id": "SEC-P09",
+  "scenario": "Command crash and retry: crash after journal commit and after the external projection write; recovery yields exactly-once effective security semantics",
+  "outcome": "PASS",
+  "commit_sha": "7e006809c977e9332c74910eb131ed73af52a63e",
+  "image_fingerprint": "sha256:000fc1b4161dcb8cad2da1ae1c17e471a3aa18d1142252fa46c01e46c35b4d8f (api=sha256:60c445fb839e1ab18813b3fc7f3d2cd630c09418cb023314ada23452d0922314;authority=sha256:da726cadf76db6c726b2e0801e5685fde89da1356b92726a3b57f918c9382a41)",
+  "started_at_utc": "2026-10-18T14:22:06.5627109\u002B00:00",
+  "executed_at_utc": "2026-10-18T14:22:17.3049581\u002B00:00",
+  "authority_revision": 5,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T14:22:06.5847283\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a14f6428e27b55aa8d7704e8eec3f1-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:07.1558133\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "1d6dc457-8c33-8cab-b596-107c48afaf1b",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:07.5522887\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "85522ab7-d0ec-8559-9933-e5a83af16b22",
+        "contentRevision": "1",
+        "committedOperationId": "81d6b58e-af9b-8912-85d7-913c1531fd42",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:08.0085855\u002B00:00",
+      "step": "share request during CrashAfterJournalCommit",
+      "status": 503,
+      "error_code": "AUTHORITY_UNAVAILABLE",
+      "fields": {
+        "title": "AUTHORITY_UNAVAILABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:12.4270662\u002B00:00",
+      "step": "authority restarted and recovered the committed command on its own (journal -\u003E archive -\u003E projection)",
+      "detail": "{\u0022organization_id\u0022:\u002201a14f64-28e2-7b55-aa8d-7704e8eec3f1\u0022,\u0022authorization_revision\u0022:4,\u0022projection_applied_revision\u0022:4,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022Ready\u0022,\u0022pending_archive_entries\u0022:0,\u0022integrity_quarantine_enabled\u0022:false}"
+    },
+    {
+      "at": "2026-10-18T14:22:12.6306269\u002B00:00",
+      "step": "same-key retry after restart",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "recordShareId": "25bd4f62-7f75-8ba1-b229-4f7d0281f651",
+        "shareStatus": "Active"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:12.6396370\u002B00:00",
+      "step": "gate after recovery 1",
+      "detail": "{\u0022organization_id\u0022:\u002201a14f64-28e2-7b55-aa8d-7704e8eec3f1\u0022,\u0022authorization_revision\u0022:4,\u0022projection_applied_revision\u0022:4,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022Ready\u0022,\u0022pending_archive_entries\u0022:0,\u0022integrity_quarantine_enabled\u0022:false}"
+    },
+    {
+      "at": "2026-10-18T14:22:12.9868224\u002B00:00",
+      "step": "revoke during CrashAfterProjectionWrite",
+      "status": 503,
+      "error_code": "AUTHORITY_UNAVAILABLE",
+      "fields": {
+        "title": "AUTHORITY_UNAVAILABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:17.0901112\u002B00:00",
+      "step": "gate after recovery 2 (ambiguous external write reconciled)",
+      "detail": "{\u0022organization_id\u0022:\u002201a14f64-28e2-7b55-aa8d-7704e8eec3f1\u0022,\u0022authorization_revision\u0022:5,\u0022projection_applied_revision\u0022:5,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022Ready\u0022,\u0022pending_archive_entries\u0022:0,\u0022integrity_quarantine_enabled\u0022:false}"
+    },
+    {
+      "at": "2026-10-18T14:22:17.2674327\u002B00:00",
+      "step": "revoke retry with same key",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "command": "{\u0022commandId\u0022:\u002201a14f64-4141-707a-b901-ea2e8f7624c3\u0022,\u0022commandStatus\u0022:\u0022Effective\u0022,\u0022authorizationRevision\u0022:5,\u0022effective\u0022:true}"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:17.3047737\u002B00:00",
+      "step": "reader after recovered revocation",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    }
+  ]
+}

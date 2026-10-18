@@ -47,6 +47,7 @@ public enum SecurityCommandKind
     RevokeSystemRole,
     UpdateMandatoryPolicy,
     PublishFormSecurityRevision,
+    UnlinkChildRecord,
 }
 
 public enum SecurityCommandStatus

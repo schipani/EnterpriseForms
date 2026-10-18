@@ -55,7 +55,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/form-definitions": {
+    "/api/v1/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current browser session (no secrets): authenticated flag, organization, CSRF token for mutations. */
+        get: operations["GetSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session/development-personas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Synthetic personas seeded through the authority operator plane. 404 outside Development/Testing. */
+        get: operations["ListDevelopmentPersonas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session/development-login": {
         parameters: {
             query?: never;
             header?: never;
@@ -64,8 +98,210 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Development/Testing only: starts a BFF session for a seeded persona. Refused elsewhere by construction. */
+        post: operations["DevelopmentLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authenticated bootstrap: user, capabilities, safe branding, UI preferences and current authorization revision (no record counts). */
+        get: operations["GetBootstrap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Forms the caller may design or use (authority-filtered; no other forms are disclosed). */
+        get: operations["ListFormDefinitions"];
+        put?: never;
         /** Registers a form with the authority (designer role) and publishes a minimal v1 layout. Requires Idempotency-Key. */
         post: operations["CreateFormDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetFormDefinition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/designer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Registers a new form with the authority and opens an empty draft (no published version yet). Requires Idempotency-Key. */
+        post: operations["CreateFormDefinitionDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adds a stable field identity (storage type immutable after creation). */
+        post: operations["AddFieldDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Adds, relabels, reorders or deactivates options; keys and ids are stable, nothing is deleted. */
+        put: operations["UpdateFieldOptions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Saves the draft layout (schema v2, validated) with draft-revision CAS. */
+        put: operations["SaveFormDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Atomically publishes the draft as an immutable version and advances the current pointer (expected draft revision + current version number). */
+        post: operations["PublishFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/restore-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copies a published version into the draft; publishing creates a NEW version (history is never rewritten). */
+        post: operations["RestoreVersionToDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListFormVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/relationships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Defines a reusable related-form list (e.g. AccusedAddressList): parent → child form, bounds, cycle-checked. */
+        post: operations["CreateRelationshipDefinition"];
         delete?: never;
         options?: never;
         head?: never;
@@ -81,8 +317,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Registers the record with the authority, stages the signed candidate and commits the first accepted content revision. */
+        /** Registers the record with the authority, validates typed values against the published layout, stages the signed candidate and commits the first accepted content revision. */
         post: operations["CreateFormRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authority-discoverable records with unverified local metadata; open a record for the verified projection. */
+        get: operations["ListFormRecords"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -103,8 +356,25 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Optimistic (expected_content_revision) full-snapshot update staged as a new immutable candidate and committed by the authority. */
+        /** Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority. */
         patch: operations["UpdateFormRecord"];
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/projection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag. */
+        get: operations["GetRecordProjection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/form-records/{formRecordId}/transfer-ownership": {
@@ -117,6 +387,225 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["TransferRecordOwnership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/related/{formRelationshipDefinitionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authorized, verified child records of a related-form list (no hidden counts). */
+        get: operations["ListChildRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates a child record linked to the parent through the authority (parent edge, signed header binding). Requires Idempotency-Key. */
+        post: operations["CreateChildRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/related/{childFormRecordId}/unlink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Authority UnlinkChildRecord command: removes the parent edge, keeps the data, remover becomes owner. */
+        post: operations["UnlinkChildRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/upload-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Opens an authorized, idempotent chunked upload session bound to a record's document collection field. */
+        post: operations["BeginUploadSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/upload-sessions/{uploadSessionId}/chunks/{chunkIndex}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Streams one exact-size chunk (4 MiB; last chunk remainder) into quarantine; acknowledged ranges are server truth. */
+        put: operations["UploadChunk"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/upload-sessions/{uploadSessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetUploadSession"];
+        put?: never;
+        post?: never;
+        delete: operations["CancelUploadSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/upload-sessions/{uploadSessionId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Idempotent finalize: assembles quarantined chunks and queues durable scan/encrypt processing. 202 = queued, not Ready. */
+        post: operations["CompleteUploadSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/upload-sessions/{uploadSessionId}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Binds the processed (clean, encrypted) version into the record's signed manifest through the caller's authority context; the document becomes Ready. */
+        post: operations["CommitUploadSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/my-upload-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own upload sessions and their authoritative processing stage. */
+        get: operations["ListMyUploadJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Documents whose version leaf is in the accepted manifest and authorized for the caller. */
+        get: operations["ListRecordDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/documents/{fileAttachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetRecordDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/documents/{fileAttachmentId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authorized download: re-verifies the record projection, decrypts server-side, streams with no-store and attachment disposition. */
+        get: operations["DownloadRecordDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/documents/{fileAttachmentId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Removes the document from the accepted content by committing a new revision without its leaf; bytes and history are retained. */
+        post: operations["RemoveRecordDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -204,10 +693,220 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authorized widget descriptors from the static catalog; no inline data, no arbitrary endpoints. */
+        get: operations["GetDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/widgets/{widgetIdentifier}/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Counts computed only over resources discoverable by the caller. */
+        get: operations["GetDashboardWidgetCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/my-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetMyActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Record activity timeline (local audit projection; authority Read permission required). */
+        get: operations["GetRecordActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/branding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetOrganizationBranding"];
+        /** OrganizationOwner only; WCAG pairwise contrast validated server-side; revision CAS. */
+        put: operations["UpdateOrganizationBranding"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/branding/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetOrganizationLogo"];
+        put?: never;
+        post: operations["UploadOrganizationLogo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/ui-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetUiPreferences"];
+        put: operations["UpdateUiPreferences"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Display-name directory of users seen in this organization (projection; confers nothing). */
+        get: operations["ListOrganizationUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AddFieldDefinitionRequest: {
+            fieldKey: string;
+            fieldDisplayName: string;
+            fieldDescription: string;
+            fieldDataType: string;
+            options: null | components["schemas"]["CreateFieldOptionRequest"][];
+        };
+        AuditEventResponse: {
+            /** Format: uuid */
+            auditEventId: string;
+            /** Format: date-time */
+            eventOccurredOn: string;
+            eventCategory: string;
+            eventAction: string;
+            eventOutcome: string;
+            /** Format: uuid */
+            actorUserId: null | string;
+            actorDisplayName: null | string;
+            eventDescription: string;
+            /** Format: uuid */
+            correlationIdentifier: string;
+            /** Format: uuid */
+            fileAttachmentId: null | string;
+            /** Format: uuid */
+            targetEntityId: null | string;
+        };
+        BeginUploadRequest: {
+            /** Format: uuid */
+            formRecordId: string;
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            originalFileName: string;
+            contentType: string;
+            /** Format: int64 */
+            sizeBytes: number | string;
+            /** Format: uuid */
+            replacesFileAttachmentId?: null | string;
+        };
+        BootstrapResponse: {
+            session: components["schemas"]["SessionResponse"];
+            branding: components["schemas"]["BrandingResponse"];
+            preferences: components["schemas"]["UiPreferenceResponse"];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
+        BrandingResponse: {
+            organizationDisplayName: string;
+            hasLogo: boolean;
+            logoAlternativeText: null | string;
+            primaryButtonBackgroundColor: string;
+            primaryButtonForegroundColor: string;
+            secondaryButtonBackgroundColor: string;
+            secondaryButtonForegroundColor: string;
+            secondaryButtonBorderColor: string;
+            /** Format: double */
+            organizationDefaultTextScalePercent: number | string;
+            organizationColorMode: string;
+            /** Format: int64 */
+            brandingRevision: number | string;
+        };
+        ChildRecordListResponse: {
+            relationship: components["schemas"]["RelationshipDefinitionResponse"];
+            items: components["schemas"]["ChildRecordSummaryResponse"][];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
+        ChildRecordSummaryResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            /** Format: int64 */
+            listSortOrder: number | string;
+            recordStatus: string;
+            /** Format: int64 */
+            contentRevision: number | string;
+            summaryValues: components["schemas"]["FieldValueResponse"][];
+            integrityStatus: string;
+        };
         CommandOutcome: {
             /** Format: uuid */
             commandId: string;
@@ -218,6 +917,17 @@ export interface components {
         };
         CommandStatusResponse: {
             command: components["schemas"]["CommandOutcome"];
+        };
+        CreateChildRecordRequest: {
+            /** Format: uuid */
+            formRelationshipDefinitionId: string;
+            values: {
+                [key: string]: string;
+            };
+        };
+        CreateFieldOptionRequest: {
+            optionKey: string;
+            optionDisplayText: string;
         };
         CreateFieldRequest: {
             fieldKey: string;
@@ -230,12 +940,28 @@ export interface components {
             formUserUserIds: string[];
             formUserTeamIds: string[];
         };
+        CreateFormDefinitionV2Request: {
+            formDefinitionName: string;
+            formDefinitionDescription: string;
+            formUserUserIds: string[];
+            formUserTeamIds: string[];
+        };
         CreateFormRecordRequest: {
             values: {
                 [key: string]: string;
             };
             /** Format: uuid */
             ownerTeamId?: null | string;
+        };
+        CreateRelationshipDefinitionRequest: {
+            /** Format: uuid */
+            childFormDefinitionId: string;
+            relationshipDefinitionKey: string;
+            relationshipDisplayName: string;
+            /** Format: int32 */
+            minimumChildCount: number | string;
+            /** Format: int32 */
+            maximumChildCount: number | string;
         };
         CreateShareRequest: {
             /** Format: uuid */
@@ -255,6 +981,113 @@ export interface components {
             subjectIdentifier: string;
             displayName: string;
         };
+        DashboardCountResponse: {
+            widgetIdentifier: string;
+            /** Format: int64 */
+            count: number | string;
+            /** Format: date-time */
+            computedOn: string;
+            scope: string;
+        };
+        DashboardResponse: {
+            widgets: components["schemas"]["DashboardWidgetDefinitionResponse"][];
+            capabilities: string[];
+        };
+        DashboardWidgetDefinitionResponse: {
+            widgetIdentifier: string;
+            widgetTitle: string;
+            widgetType: string;
+            /** Format: int32 */
+            minimumColumnSpan: number | string;
+            dataEndpointKey: string;
+        };
+        DevelopmentLoginRequest: {
+            personaKey: string;
+        };
+        DevelopmentPersonaResponse: {
+            personaKey: string;
+            displayName: string;
+            /** Format: uuid */
+            organizationId: string;
+            organizationDisplayName: string;
+            organizationRoles: string[];
+        };
+        DirectoryUserResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+        };
+        DocumentDetailResponse: {
+            document: components["schemas"]["DocumentSummaryResponse"];
+            versions: components["schemas"]["DocumentVersionResponse"][];
+        };
+        DocumentSummaryResponse: {
+            /** Format: uuid */
+            fileAttachmentId: string;
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            originalFileName: string;
+            /** Format: int32 */
+            currentVersionNumber: number | string;
+            detectedContentType: string;
+            /** Format: int64 */
+            plaintextSizeBytes: number | string;
+            scanVerdict: string;
+            attachmentLifecycleState: string;
+            /** Format: date-time */
+            uploadedOn: string;
+            /** Format: uuid */
+            uploadedByUserId: string;
+            inAcceptedManifest: boolean;
+        };
+        DocumentVersionResponse: {
+            /** Format: uuid */
+            fileAttachmentVersionId: string;
+            /** Format: int32 */
+            versionNumber: number | string;
+            originalFileName: string;
+            detectedContentType: string;
+            /** Format: int64 */
+            plaintextSizeBytes: number | string;
+            scanVerdict: string;
+            scannerName: string;
+            /** Format: date-time */
+            uploadedOn: string;
+            /** Format: uuid */
+            uploadedByUserId: string;
+            versionState: string;
+            /** Format: int64 */
+            contentRevision: null | number | string;
+        };
+        FieldDefinitionResponse: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            fieldKey: string;
+            fieldDisplayName: string;
+            fieldDescription: string;
+            fieldDataType: string;
+            fieldClassification: string;
+            lifecycleStatus: string;
+            options: components["schemas"]["FieldOptionResponse"][];
+        };
+        FieldOptionChange: {
+            /** Format: uuid */
+            fieldOptionId: null | string;
+            optionKey: string;
+            optionDisplayText: string;
+            /** Format: int32 */
+            optionSortOrder: number | string;
+            isActive: boolean;
+        };
+        FieldOptionResponse: {
+            /** Format: uuid */
+            fieldOptionId: string;
+            optionKey: string;
+            optionDisplayText: string;
+            /** Format: int32 */
+            optionSortOrder: number | string;
+            isActive: boolean;
+        };
         FieldResponse: {
             /** Format: uuid */
             fieldDefinitionId: string;
@@ -269,6 +1102,15 @@ export interface components {
             /** Format: uuid */
             fieldValueItemId: string;
             stringValue: string;
+            /** @default String */
+            fieldDataType: string;
+        };
+        FormDefinitionDetailResponse: {
+            summary: components["schemas"]["FormDefinitionSummaryResponse"];
+            fields: components["schemas"]["FieldDefinitionResponse"][];
+            currentVersion: null | components["schemas"]["FormVersionResponse"];
+            draft: null | components["schemas"]["FormDraftResponse"];
+            relationships: components["schemas"]["RelationshipDefinitionResponse"][];
         };
         FormDefinitionResponse: {
             /** Format: uuid */
@@ -282,6 +1124,35 @@ export interface components {
             /** Format: int64 */
             authorizationRevision: number | string;
             command: components["schemas"]["CommandOutcome"];
+        };
+        FormDefinitionSummaryResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            formDefinitionName: string;
+            formDefinitionDescription: string;
+            lifecycleStatus: string;
+            /** Format: int32 */
+            currentVersionNumber: null | number | string;
+            /** Format: uuid */
+            currentFormVersionId: null | string;
+            hasDraft: boolean;
+            canDesign: boolean;
+            canCreateRecord: boolean;
+            /** Format: date-time */
+            modifiedOn: string;
+        };
+        FormDraftResponse: {
+            /** Format: uuid */
+            formDraftId: string;
+            /** Format: uuid */
+            basedOnFormVersionId: null | string;
+            /** Format: int32 */
+            layoutSchemaVersion: number | string;
+            layoutJson: string;
+            /** Format: int64 */
+            draftRevision: number | string;
+            /** Format: date-time */
+            updatedOn: string;
         };
         FormRecordResponse: {
             /** Format: uuid */
@@ -301,9 +1172,124 @@ export interface components {
             values: components["schemas"]["FieldValueResponse"][];
             integrityStatus: string;
         };
+        FormVersionResponse: {
+            /** Format: uuid */
+            formVersionId: string;
+            /** Format: int32 */
+            versionNumber: number | string;
+            /** Format: int32 */
+            layoutSchemaVersion: number | string;
+            layoutJson: string;
+            changeReason: string;
+            /** Format: uuid */
+            restoredFromFormVersionId: null | string;
+            /** Format: date-time */
+            publishedOn: string;
+            /** Format: uuid */
+            publishedByUserId: string;
+        };
         ProbeResponse: {
             probeStatus: string;
             serviceName: string;
+        };
+        PublishFormRequest: {
+            /** Format: int64 */
+            expectedDraftRevision: number | string;
+            /** Format: int32 */
+            expectedCurrentVersionNumber: number | string;
+            changeReason: string;
+        };
+        RecordActivityResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            events: components["schemas"]["AuditEventResponse"][];
+            trustNote: string;
+        };
+        RecordListItemResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            /** Format: uuid */
+            formDefinitionId: string;
+            formDefinitionName: string;
+            recordStatus: string;
+            /** Format: date-time */
+            createdOn: string;
+            /** Format: date-time */
+            modifiedOn: string;
+            /** Format: uuid */
+            parentFormRecordId: null | string;
+            projectionVerified: boolean;
+        };
+        RecordListResponse: {
+            items: components["schemas"]["RecordListItemResponse"][];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            continuationToken: null | string;
+        };
+        RecordPermissionsResponse: {
+            canRead: boolean;
+            canEdit: boolean;
+            canManageAccess: boolean;
+            canTransferOwnership: boolean;
+            isCompleteProjection: boolean;
+        };
+        RecordProjectionResponse: {
+            record: components["schemas"]["FormRecordResponse"];
+            formDefinitionName: string;
+            layoutVersion: components["schemas"]["FormVersionResponse"];
+            fields: components["schemas"]["FieldDefinitionResponse"][];
+            documents: components["schemas"]["DocumentSummaryResponse"][];
+            relationships: components["schemas"]["RelationshipDefinitionResponse"][];
+            permissions: components["schemas"]["RecordPermissionsResponse"];
+            /** Format: uuid */
+            parentFormRecordId: null | string;
+            /** Format: uuid */
+            formRelationshipDefinitionId: null | string;
+            eTag: string;
+        };
+        RelationshipDefinitionResponse: {
+            /** Format: uuid */
+            formRelationshipDefinitionId: string;
+            /** Format: uuid */
+            parentFormDefinitionId: string;
+            /** Format: uuid */
+            childFormDefinitionId: string;
+            childFormDefinitionName: string;
+            relationshipDefinitionKey: string;
+            relationshipDisplayName: string;
+            /** Format: int32 */
+            minimumChildCount: number | string;
+            /** Format: int32 */
+            maximumChildCount: number | string;
+            lifecycleStatus: string;
+        };
+        RemoveDocumentRequest: {
+            /** Format: int64 */
+            expectedContentRevision: number | string;
+            removalReason: string;
+        };
+        RestoreVersionRequest: {
+            /** Format: uuid */
+            fromFormVersionId: string;
+        };
+        SaveDraftRequest: {
+            /** Format: int64 */
+            expectedDraftRevision: number | string;
+            layoutJson: string;
+        };
+        SessionResponse: {
+            authenticated: boolean;
+            /** Format: uuid */
+            organizationId: null | string;
+            organizationDisplayName: null | string;
+            /** Format: uuid */
+            userId: null | string;
+            displayName: null | string;
+            capabilities: string[];
+            csrfToken: string;
+            /** Format: date-time */
+            expiresOn: null | string;
+            identityProviderKind: string;
         };
         ShareResponse: {
             /** Format: uuid */
@@ -315,6 +1301,8 @@ export interface components {
             shareStatus: string;
             command: components["schemas"]["CommandOutcome"];
         };
+        /** Format: binary */
+        Stream: string;
         TeamMemberRequest: {
             /** Format: uuid */
             userId: string;
@@ -332,12 +1320,84 @@ export interface components {
             newOwnerTeamId: null | string;
             transferReason: string;
         };
+        UiPreferenceResponse: {
+            textScalePreferenceMode: string;
+            /** Format: double */
+            explicitTextScalePercent: null | number | string;
+            /** Format: double */
+            effectiveTextScalePercent: number | string;
+            /** Format: int64 */
+            preferenceRevision: number | string;
+        };
+        UnlinkChildRecordRequest: {
+            removalReason: string;
+        };
+        UpdateBrandingRequest: {
+            /** Format: int64 */
+            expectedBrandingRevision: number | string;
+            organizationDisplayName: string;
+            logoAlternativeText: null | string;
+            primaryButtonBackgroundColor: string;
+            primaryButtonForegroundColor: string;
+            secondaryButtonBackgroundColor: string;
+            secondaryButtonForegroundColor: string;
+            secondaryButtonBorderColor: string;
+            /** Format: double */
+            organizationDefaultTextScalePercent: number | string;
+            organizationColorMode: string;
+        };
+        UpdateFieldOptionsRequest: {
+            changes: components["schemas"]["FieldOptionChange"][];
+        };
         UpdateFormRecordRequest: {
             /** Format: int64 */
             expectedContentRevision: number | string;
             values: {
                 [key: string]: string;
             };
+        };
+        UpdateUiPreferenceRequest: {
+            textScalePreferenceMode: string;
+            /** Format: double */
+            explicitTextScalePercent: null | number | string;
+        };
+        UploadChunkReceiptResponse: {
+            /** Format: uuid */
+            uploadSessionId: string;
+            /** Format: int32 */
+            chunkIndex: number | string;
+            /** Format: int64 */
+            receivedBytes: number | string;
+            receivedChunkIndexes: (number | string)[];
+            complete: boolean;
+        };
+        UploadSessionResponse: {
+            /** Format: uuid */
+            uploadSessionId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            originalFileName: string;
+            /** Format: int64 */
+            declaredSizeBytes: number | string;
+            /** Format: int32 */
+            chunkSizeBytes: number | string;
+            /** Format: int32 */
+            expectedChunkCount: number | string;
+            receivedChunkIndexes: (number | string)[];
+            /** Format: int64 */
+            receivedBytes: number | string;
+            sessionState: string;
+            failureReasonCode: null | string;
+            processingStage: string;
+            /** Format: date-time */
+            sessionExpiresOn: string;
+            /** Format: uuid */
+            fileAttachmentId: null | string;
+            /** Format: int32 */
+            versionNumber: null | number | string;
+            scanVerdict: null | string;
         };
     };
     responses: never;
@@ -408,6 +1468,135 @@ export interface operations {
             };
         };
     };
+    GetSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+        };
+    };
+    ListDevelopmentPersonas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevelopmentPersonaResponse"][];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DevelopmentLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevelopmentLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+        };
+    };
+    Logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetBootstrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BootstrapResponse"];
+                };
+            };
+        };
+    };
+    ListFormDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDefinitionSummaryResponse"][];
+                };
+            };
+        };
+    };
     CreateFormDefinition: {
         parameters: {
             query?: never;
@@ -428,6 +1617,231 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormDefinitionResponse"];
+                };
+            };
+        };
+    };
+    GetFormDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDefinitionDetailResponse"];
+                };
+            };
+        };
+    };
+    CreateFormDefinitionDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFormDefinitionV2Request"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDefinitionDetailResponse"];
+                };
+            };
+        };
+    };
+    AddFieldDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddFieldDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldDefinitionResponse"];
+                };
+            };
+        };
+    };
+    UpdateFieldOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFieldOptionsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldDefinitionResponse"];
+                };
+            };
+        };
+    };
+    SaveFormDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDraftResponse"];
+                };
+            };
+        };
+    };
+    PublishFormVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishFormRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersionResponse"];
+                };
+            };
+        };
+    };
+    RestoreVersionToDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDraftResponse"];
+                };
+            };
+        };
+    };
+    ListFormVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersionResponse"][];
+                };
+            };
+        };
+    };
+    CreateRelationshipDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRelationshipDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipDefinitionResponse"];
                 };
             };
         };
@@ -454,6 +1868,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormRecordResponse"];
+                };
+            };
+        };
+    };
+    ListFormRecords: {
+        parameters: {
+            query?: {
+                formDefinitionId?: string;
+                includeChildren?: boolean;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordListResponse"];
                 };
             };
         };
@@ -506,6 +1945,28 @@ export interface operations {
             };
         };
     };
+    GetRecordProjection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordProjectionResponse"];
+                };
+            };
+        };
+    };
     TransferRecordOwnership: {
         parameters: {
             query?: never;
@@ -528,6 +1989,338 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    ListChildRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                formRelationshipDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChildRecordListResponse"];
+                };
+            };
+        };
+    };
+    CreateChildRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateChildRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormRecordResponse"];
+                };
+            };
+        };
+    };
+    UnlinkChildRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                childFormRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnlinkChildRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    BeginUploadSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BeginUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSessionResponse"];
+                };
+            };
+        };
+    };
+    UploadChunk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadSessionId: string;
+                chunkIndex: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": components["schemas"]["Stream"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadChunkReceiptResponse"];
+                };
+            };
+        };
+    };
+    GetUploadSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadSessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSessionResponse"];
+                };
+            };
+        };
+    };
+    CancelUploadSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadSessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSessionResponse"];
+                };
+            };
+        };
+    };
+    CompleteUploadSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadSessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSessionResponse"];
+                };
+            };
+        };
+    };
+    CommitUploadSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uploadSessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSessionResponse"];
+                };
+            };
+        };
+    };
+    ListMyUploadJobs: {
+        parameters: {
+            query?: {
+                states?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSessionResponse"][];
+                };
+            };
+        };
+    };
+    ListRecordDocuments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSummaryResponse"][];
+                };
+            };
+        };
+    };
+    GetRecordDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                fileAttachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetailResponse"];
+                };
+            };
+        };
+    };
+    DownloadRecordDocument: {
+        parameters: {
+            query?: {
+                versionNumber?: number | string;
+            };
+            header?: never;
+            path: {
+                formRecordId: string;
+                fileAttachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RemoveRecordDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                fileAttachmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveDocumentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormRecordResponse"];
                 };
             };
         };
@@ -650,6 +2443,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    GetDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
+                };
+            };
+        };
+    };
+    GetDashboardWidgetCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widgetIdentifier: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardCountResponse"];
+                };
+            };
+        };
+    };
+    GetMyActivity: {
+        parameters: {
+            query?: {
+                limit?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEventResponse"][];
+                };
+            };
+        };
+    };
+    GetRecordActivity: {
+        parameters: {
+            query?: {
+                limit?: number | string;
+            };
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordActivityResponse"];
+                };
+            };
+        };
+    };
+    GetOrganizationBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandingResponse"];
+                };
+            };
+        };
+    };
+    UpdateOrganizationBranding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBrandingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandingResponse"];
+                };
+            };
+        };
+    };
+    GetOrganizationLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UploadOrganizationLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "image/png": components["schemas"]["Stream"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandingResponse"];
+                };
+            };
+        };
+    };
+    GetUiPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiPreferenceResponse"];
+                };
+            };
+        };
+    };
+    UpdateUiPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUiPreferenceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiPreferenceResponse"];
+                };
+            };
+        };
+    };
+    ListOrganizationUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryUserResponse"][];
                 };
             };
         };

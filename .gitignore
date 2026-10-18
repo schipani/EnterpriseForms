@@ -33,3 +33,7 @@ Thumbs.db
 __pycache__/
 *.pyc
 .venv/
+
+# Playwright local output (CI uploads artifacts/ instead)
+src/frontend/test-results/
+src/frontend/playwright-report/

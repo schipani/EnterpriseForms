@@ -48,6 +48,7 @@ public static class CommandPlanner
             SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.UnlinkChildRecord => await UnlinkChildRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             _ => throw new AuthorityException(AuthorityErrorCodes.CommandKindNotImplemented, 422, false, $"command kind {request.CommandKind} is not implemented in Stage A"),
         };
     }
@@ -167,6 +168,34 @@ public static class CommandPlanner
         var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
         plan.RegisterResources.Add(NewResource(organizationId, ResourceTypeNames.FormRecord, payload.FormRecordId, payload.FormDefinitionId));
         plan.AddEdges.Add((ResourceTypeNames.FormRecord, payload.FormRecordId, "organization", ResourceTypeNames.Organization, organizationId, string.Empty));
+        if ((payload.ParentFormRecordId is null) != (payload.FormRelationshipDefinitionId is null))
+        {
+            throw AuthorityException.Invalid("parent_form_record_id and form_relationship_definition_id must be provided together");
+        }
+
+        if (payload.ParentFormRecordId is { } parentId)
+        {
+            // Child record (B-04): the actor must be the parent's effective owner; the child gets a parent edge instead of an owner edge.
+            if (payload.OwnerTeamId is not null)
+            {
+                throw AuthorityException.Invalid("a child record cannot name an owner team; ownership derives from the parent");
+            }
+
+            if (parentId == payload.FormRecordId)
+            {
+                throw AuthorityException.Invalid("a record cannot be its own parent");
+            }
+
+            await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormRecord, parentId, cancellationToken).ConfigureAwait(false);
+            if (!graph.IsRecordOwner(actor.AuthorityUserId, parentId))
+            {
+                throw AuthorityException.Forbidden("creating a child record requires effective ownership of the parent");
+            }
+
+            plan.AddEdges.Add((ResourceTypeNames.FormRecord, payload.FormRecordId, "parent", ResourceTypeNames.FormRecord, parentId, string.Empty));
+            return plan;
+        }
+
         if (payload.OwnerTeamId is { } teamId)
         {
             await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, teamId, cancellationToken).ConfigureAwait(false);
@@ -182,6 +211,29 @@ public static class CommandPlanner
             plan.AddEdges.Add((ResourceTypeNames.FormRecord, payload.FormRecordId, "owner", ResourceTypeNames.User, actor.AuthorityUserId, string.Empty));
         }
 
+        return plan;
+    }
+
+    private static async Task<CommandPlan> UnlinkChildRecordAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    {
+        var payload = CanonicalJson.Deserialize<UnlinkChildRecordPayload>(request.CommandPayload);
+        RequireResource(request, ResourceKind.FormRecord, payload.FormRecordId);
+        await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormRecord, payload.FormRecordId, cancellationToken).ConfigureAwait(false);
+        var parentEdges = graph.EdgesOf(ResourceTypeNames.FormRecord, payload.FormRecordId, "parent").Where(e => e.SubjectTypeName == ResourceTypeNames.FormRecord && e.SubjectEntityId == payload.ParentFormRecordId).ToList();
+        if (parentEdges.Count == 0)
+        {
+            throw AuthorityException.Invalid("record is not linked to that parent");
+        }
+
+        if (!graph.IsRecordOwner(actor.AuthorityUserId, payload.ParentFormRecordId))
+        {
+            throw AuthorityException.Forbidden("unlinking a child record requires effective ownership of the parent");
+        }
+
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        plan.RemoveEdges.AddRange(parentEdges);
+        // Data is preserved (no cascade delete); the acting user becomes the owner so the record stays reachable and auditable.
+        plan.AddEdges.Add((ResourceTypeNames.FormRecord, payload.FormRecordId, "owner", ResourceTypeNames.User, actor.AuthorityUserId, string.Empty));
         return plan;
     }
 

@@ -13,6 +13,8 @@ services:
   azurite:
     ports: ["127.0.0.1:10010:10000"]   # 10000 is commonly taken by other local Azurite instances
     volumes: [azurite-data:/data]
+  clamav:
+    ports: ["127.0.0.1:3310:3310"]
   authority:
     ports: ["127.0.0.1:5090:8080"]
   api:

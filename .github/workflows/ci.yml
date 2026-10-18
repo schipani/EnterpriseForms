@@ -53,12 +53,15 @@ jobs:
         run: |
           dotnet restore EnterpriseForms.All.slnx
           dotnet restore tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj
+          dotnet restore tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj
       - name: Build (warnings are errors; OpenAPI generated from compiled endpoints)
         run: dotnet build EnterpriseForms.All.slnx --no-restore -c Release
       - name: Generated OpenAPI contracts must equal committed contracts (ADR-PB-006)
         run: git diff --exit-code -- contracts/openapi
       - name: Build the Stage A security test project (compiles only; runs in security-gate-a against the Docker stack)
         run: dotnet build tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj --no-restore -c Release
+      - name: Build the Stage B integration test project (compiles only; runs in stage-b-integration against the Docker stack)
+        run: dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release
       - name: Test (integrity vectors, architecture fitness functions, API contracts, authority unit tests; zero discovered tests fails)
         run: dotnet test --solution EnterpriseForms.All.slnx --no-build -c Release --results-directory artifacts/test-results --report-xunit-trx -- --minimum-expected-tests 10
       - name: Solution-wide test floor (per-executable minimum cannot express it; sums the TRX files, fails on <130 executed or any non-pass)

@@ -17,6 +17,7 @@ public sealed class ProjectReferenceGraphTests
         ["EnterpriseForms.Api"] = ["EnterpriseForms.Application", "EnterpriseForms.Infrastructure", "EnterpriseForms.Contracts"],
         ["EnterpriseForms.Worker"] = ["EnterpriseForms.Application", "EnterpriseForms.Infrastructure"],
         ["EnterpriseForms.Integrity"] = [],
+        ["EnterpriseForms.DevSeed"] = [], // one-shot development seed tool (B-01): no project references, never deployed
         ["AuthorizationAuthority.Domain"] = [],
         ["AuthorizationAuthority.Contracts"] = [],
         ["AuthorizationAuthority.Application"] = ["AuthorizationAuthority.Domain", "AuthorizationAuthority.Contracts", "EnterpriseForms.Integrity"],

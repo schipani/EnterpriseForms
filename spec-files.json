@@ -24,8 +24,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "0bb02979fdba86f7a52450bd4fbedbacdcbe038e6e65d1e0f55d2bb71e81b969",
-      "bytes": 4839
+      "sha256": "d41e73764c5cc75f1b67877d8df4d6998bc24ee100ab0581781a126c77a87a29",
+      "bytes": 5896
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
@@ -68,6 +68,11 @@
       "bytes": 16884
     },
     {
+      "path": "docs/STAGE_B_STATUS.md",
+      "sha256": "f7f672032838cf2ef888b90d36e5ecc87b194b6ca4193206abe541a1af796aa6",
+      "bytes": 23175
+    },
+    {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
       "sha256": "2bf4738113e263f7c8dae715dc8e95900ef3c799d55a89d67d697d43a4153828",
       "bytes": 5405
@@ -79,8 +84,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "5cfab96eebcfad8c30dccc536a1e7faa16f9377c5a309f51f10a0bf0530d4ee0",
-      "bytes": 6417
+      "sha256": "5351b8f54b8de25302113fc63399394d9a413bddbcc0cb13eb36d6f6d1fc3cae",
+      "bytes": 7824
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -174,8 +179,13 @@
     },
     {
       "path": "docs/decisions/STAGE_A_DECISION_LOG.md",
-      "sha256": "49bd741a2c34814a7db61c73b2b70fb284d2b57b213935cb4f20dbde939d656b",
-      "bytes": 11781
+      "sha256": "61726c4fca02869f8c740919b3910fecfc54f65c25c9628d7758861396056f0d",
+      "bytes": 12282
+    },
+    {
+      "path": "docs/decisions/STAGE_B_DECISION_LOG.md",
+      "sha256": "a5c5e1183d93dacd1a16e71e88a97b153517183f26cb24817e7fbf924c3d4161",
+      "bytes": 11183
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",

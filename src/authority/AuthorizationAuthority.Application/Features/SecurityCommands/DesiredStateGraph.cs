@@ -34,8 +34,31 @@ public sealed class DesiredStateGraph(IReadOnlyList<AuthorityRelationshipEdge> a
         (edge.SubjectTypeName == ResourceTypeNames.User && edge.SubjectEntityId == userId)
         || (edge.SubjectTypeName == ResourceTypeNames.Team && edge.SubjectRelationName == "participant" && IsTeamMember(userId, edge.SubjectEntityId));
 
-    public bool IsRecordOwner(Guid userId, Guid formRecordId) =>
+    /// <summary>Direct owner edge of the record itself (no parent derivation).</summary>
+    public bool IsDirectRecordOwner(Guid userId, Guid formRecordId) =>
         EdgesOf(ResourceTypeNames.FormRecord, formRecordId, "owner").Any(e => SubjectIncludesUser(e, userId));
+
+    /// <summary>Parent record of a child record (B-04), or null for top-level records.</summary>
+    public Guid? ParentRecordOf(Guid formRecordId) =>
+        EdgesOf(ResourceTypeNames.FormRecord, formRecordId, "parent").Where(e => e.SubjectTypeName == ResourceTypeNames.FormRecord).Select(e => (Guid?)e.SubjectEntityId).FirstOrDefault();
+
+    /// <summary>Effective ownership: a direct owner edge on the record or on any ancestor through parent edges (bounded depth, cycle-safe).</summary>
+    public bool IsRecordOwner(Guid userId, Guid formRecordId)
+    {
+        var current = (Guid?)formRecordId;
+        var visited = new HashSet<Guid>();
+        for (var depth = 0; current is { } id && depth < 8 && visited.Add(id); depth++)
+        {
+            if (IsDirectRecordOwner(userId, id))
+            {
+                return true;
+            }
+
+            current = ParentRecordOf(id);
+        }
+
+        return false;
+    }
 
     public bool CanCreateRecord(Guid userId, Guid formDefinitionId) =>
         EdgesOf(ResourceTypeNames.FormDefinition, formDefinitionId, "form_user").Any(e => SubjectIncludesUser(e, userId));

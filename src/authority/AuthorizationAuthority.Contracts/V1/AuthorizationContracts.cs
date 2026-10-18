@@ -71,6 +71,7 @@ public enum SecurityCommandKind
     RevokeSystemRole,
     UpdateMandatoryPolicy,
     PublishFormSecurityRevision,
+    UnlinkChildRecord,
 }
 
 /// <summary>command_payload is validated against the exact command-specific schema in the authority; unknown fields are rejected.</summary>
@@ -117,7 +118,11 @@ public sealed record TeamMemberPayload(Guid TeamId, Guid MemberUserId);
 
 public sealed record RegisterFormDefinitionPayload(Guid FormDefinitionId, IReadOnlyList<Guid> FormUserUserIds, IReadOnlyList<Guid> FormUserTeamIds);
 
-public sealed record RegisterRecordPayload(Guid FormRecordId, Guid FormDefinitionId, Guid? OwnerTeamId = null);
+/// <summary>Top-level record: owner = actor or an eligible team. Child record (B-04): parent + relationship definition set, no owner edge; permissions derive from the parent.</summary>
+public sealed record RegisterRecordPayload(Guid FormRecordId, Guid FormDefinitionId, Guid? OwnerTeamId = null, Guid? ParentFormRecordId = null, Guid? FormRelationshipDefinitionId = null);
+
+/// <summary>Removes the parent edge of a child record; the acting user becomes its owner (data preserved, no cascade delete).</summary>
+public sealed record UnlinkChildRecordPayload(Guid FormRecordId, Guid ParentFormRecordId);
 
 public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerUserId, Guid? NewOwnerTeamId);
 

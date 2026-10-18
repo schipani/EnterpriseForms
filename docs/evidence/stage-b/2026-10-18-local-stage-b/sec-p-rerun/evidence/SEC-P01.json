@@ -1,0 +1,96 @@
+{
+  "test_id": "SEC-P01",
+  "scenario": "Direct SQL owner change: forged owner in BusinessDb remains unauthorized; authority owner unchanged; record read denied",
+  "outcome": "PASS",
+  "commit_sha": "7e006809c977e9332c74910eb131ed73af52a63e",
+  "image_fingerprint": "sha256:000fc1b4161dcb8cad2da1ae1c17e471a3aa18d1142252fa46c01e46c35b4d8f (api=sha256:60c445fb839e1ab18813b3fc7f3d2cd630c09418cb023314ada23452d0922314;authority=sha256:da726cadf76db6c726b2e0801e5685fde89da1356b92726a3b57f918c9382a41)",
+  "started_at_utc": "2026-10-18T14:22:31.0573935\u002B00:00",
+  "executed_at_utc": "2026-10-18T14:22:32.9267526\u002B00:00",
+  "authority_revision": 3,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T14:22:31.0873248\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a14f64889173bab78e3f4a13554798-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:31.6777147\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "31eb6a9f-d6dc-808c-b9ef-9cd267cdc87e",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:32.0919876\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "46fad387-0ee3-8ebf-970f-64279f69ef07",
+        "contentRevision": "1",
+        "committedOperationId": "34e45e55-bb5f-8e91-9bfd-d8ea3fa4c238",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:32.4325147\u002B00:00",
+      "step": "gate before attack",
+      "detail": "{\u0022organization_id\u0022:\u002201a14f64-8891-73ba-b78e-3f4a13554798\u0022,\u0022authorization_revision\u0022:3,\u0022projection_applied_revision\u0022:3,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022Ready\u0022,\u0022pending_archive_entries\u0022:0,\u0022integrity_quarantine_enabled\u0022:false}"
+    },
+    {
+      "at": "2026-10-18T14:22:32.4455755\u002B00:00",
+      "step": "attacker read before tampering",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T14:22:32.8203959\u002B00:00",
+      "step": "hostile UPDATE form_records.owner_user_id",
+      "detail": {
+        "result": "01a14f64-8891-7d5d-800f-f5a48fc99286"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:32.8330187\u002B00:00",
+      "step": "attacker read after tampering",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T14:22:32.8763047\u002B00:00",
+      "step": "attacker transfer-ownership attempt",
+      "status": 403,
+      "error_code": "FORBIDDEN",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T14:22:32.9203132\u002B00:00",
+      "step": "legitimate owner read after tampering",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "isCompleteProjection": "true",
+        "contentRevision": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:32.9266036\u002B00:00",
+      "step": "gate after attack",
+      "detail": "{\u0022organization_id\u0022:\u002201a14f64-8891-73ba-b78e-3f4a13554798\u0022,\u0022authorization_revision\u0022:3,\u0022projection_applied_revision\u0022:3,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022Ready\u0022,\u0022pending_archive_entries\u0022:0,\u0022integrity_quarantine_enabled\u0022:false}"
+    }
+  ]
+}

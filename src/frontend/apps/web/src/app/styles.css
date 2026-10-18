@@ -5,13 +5,22 @@
 @theme {
   --color-primary: var(--ui-primary-bg);
   --color-primary-foreground: var(--ui-primary-fg);
+  --color-secondary: var(--ui-secondary-bg);
+  --color-secondary-foreground: var(--ui-secondary-fg);
+  --color-secondary-border: var(--ui-secondary-border);
   --color-page: var(--ui-page);
   --color-surface: var(--ui-surface);
   --color-body: var(--ui-body-text);
   --color-muted: var(--ui-muted-text);
   --color-line: var(--ui-border);
+  --color-input: var(--ui-input-border);
   --color-focus: var(--ui-focus);
 }
+
+/* Packages ship no CSS of their own; their class names resolve through this single Tailwind source. */
+@source "../../../../packages/ui/src";
+@source "../../../../packages/form-renderer/src";
+@source "../../../../packages/form-designer/src";
 
 html {
   font-size: calc(100% * var(--ui-font-scale));
@@ -22,9 +31,24 @@ body {
   background: var(--ui-page);
   color: var(--ui-body-text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
 }
 
 :focus-visible {
   outline: 3px solid var(--ui-focus);
   outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  button,
+  [role="button"] {
+    border: 1px solid ButtonText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

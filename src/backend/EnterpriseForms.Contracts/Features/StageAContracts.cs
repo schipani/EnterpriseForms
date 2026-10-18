@@ -32,7 +32,8 @@ public sealed record FormRecordResponse(
     IReadOnlyList<FieldValueResponse> Values,
     string IntegrityStatus);
 
-public sealed record FieldValueResponse(Guid FieldDefinitionId, string FieldKey, Guid FieldValueItemId, string StringValue);
+/// <summary>Invariant wire value: text, integer/decimal literal, ISO date, true/false or option key (Stage B typed values, B-02).</summary>
+public sealed record FieldValueResponse(Guid FieldDefinitionId, string FieldKey, Guid FieldValueItemId, string StringValue, string FieldDataType = "String");
 
 public sealed record CreateShareRequest(Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<string> FieldKeys);
 

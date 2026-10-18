@@ -17,7 +17,7 @@ public sealed class SignedColumnRegistryTests
     /// <summary>Protected table → registry entry; the authority signs under these entity kinds only (ContentService.AllowedEntityKinds).</summary>
     private static readonly Dictionary<string, (RowSchemaDefinition Schema, string EfTable, string[] UnsignedWithReason)> Protected = new(StringComparer.Ordinal)
     {
-        ["form_records"] = (BusinessSignedSchemas.FormRecordsV2, "form_record_revisions", new[]
+        ["form_records"] = (BusinessSignedSchemas.FormRecordsV3, "form_record_revisions", new[]
         {
             "form_record_revision_id:physical surrogate of the staged copy; the canonical pk is form_record_id",
             "form_record_id:bound as the canonical primary key",
@@ -40,6 +40,71 @@ public sealed class SignedColumnRegistryTests
             "created_on:audit timestamp of the physical copy",
             "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
         }),
+        ["field_integer_values"] = (BusinessSignedSchemas.FieldIntegerValuesV1, "field_integer_values", new[]
+        {
+            "field_integer_value_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
+        ["field_decimal_values"] = (BusinessSignedSchemas.FieldDecimalValuesV1, "field_decimal_values", new[]
+        {
+            "field_decimal_value_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
+        ["field_date_values"] = (BusinessSignedSchemas.FieldDateValuesV1, "field_date_values", new[]
+        {
+            "field_date_value_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
+        ["field_boolean_values"] = (BusinessSignedSchemas.FieldBooleanValuesV1, "field_boolean_values", new[]
+        {
+            "field_boolean_value_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
+        ["field_option_values"] = (BusinessSignedSchemas.FieldOptionValuesV1, "field_option_values", new[]
+        {
+            "field_option_value_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
+        ["file_attachment_versions"] = (BusinessSignedSchemas.FileAttachmentVersionsV1, "file_attachment_versions", new[]
+        {
+            "file_attachment_version_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "version_state:local untrusted hint; the authority manifest decides which version is current",
+        }),
     };
 
     [Fact]
@@ -50,6 +115,10 @@ public sealed class SignedColumnRegistryTests
             Assert.True(schema.Columns.Select(c => c.ColumnName).SequenceEqual(schema.Columns.Select(c => c.ColumnName).OrderBy(c => c, StringComparer.Ordinal)), schema.EntityKind + " registry is not ordinal-sorted");
             Assert.True(Protected.ContainsKey(schema.EntityKind), schema.EntityKind + " must be in the protected-table inventory");
         }
+
+        // Historical schema versions stay registered so Stage A rows keep verifying (row-integrity-format.md §3.1).
+        Assert.Contains(BusinessSignedSchemas.All, s => s.EntityKind == "form_records" && s.SchemaVersion == 2);
+        Assert.Contains(BusinessSignedSchemas.All, s => s.EntityKind == "form_records" && s.SchemaVersion == 3);
     }
 
     [Fact]

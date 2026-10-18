@@ -8,12 +8,13 @@ namespace EnterpriseForms.Application.Features.FormRecords.Staging;
 
 /// <summary>
 /// Shared prepare → stage → read-back → commit sequence (CROSS_SYSTEM §3). The business runtime canonicalizes the full
-/// candidate snapshot, the authority signs it, the rows are staged immutably under the operation id, re-read from the
-/// untrusted store and submitted as commit evidence. Local candidate state is a hint only.
+/// candidate snapshot (header, every typed value row, every attachment version), the authority signs it, the rows are
+/// staged immutably under the operation id, re-read from the untrusted store and submitted as commit evidence. Local
+/// candidate state is a hint only.
 /// </summary>
 public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAuthorityClient authority, TimeProvider clock)
 {
-    public sealed record CandidateInput(FormRecordRevision Header, IReadOnlyList<FieldStringValue> Values);
+    public sealed record CandidateInput(FormRecordRevision Header, IReadOnlyList<ISignedContentRow> Rows);
 
     public async Task<AcceptedContentRevision> StageAndCommitAsync(RequestContext context, AcceptedContentRevision head, CandidateInput candidate, string idempotencyKey, CancellationToken cancellationToken)
     {
@@ -35,26 +36,18 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
         }
 
         var candidateRevision = head.CommittedContentRevision + 1;
-        candidate.Header.ContentChangeOperationId = operationId;
-        candidate.Header.ContentRevision = candidateRevision;
-        candidate.Header.RowRevision = candidateRevision;
-        candidate.Header.RowSignatureKeyVersion = (int)keyVersion;
-        candidate.Header.RowSignatureSchemaVersion = BusinessSignedSchemas.FormRecordsV2.SchemaVersion;
-        foreach (var value in candidate.Values)
+        var allRows = new List<ISignedContentRow>(candidate.Rows.Count + 1) { candidate.Header };
+        allRows.AddRange(candidate.Rows);
+        foreach (var row in allRows)
         {
-            value.ContentChangeOperationId = operationId;
-            value.ContentRevision = candidateRevision;
-            value.RowRevision = candidateRevision;
-            value.RowSignatureKeyVersion = (int)keyVersion;
-            value.RowSignatureSchemaVersion = BusinessSignedSchemas.FieldStringValuesV1.SchemaVersion;
+            row.ContentChangeOperationId = operationId;
+            row.ContentRevision = candidateRevision;
+            row.RowRevision = candidateRevision;
+            row.RowSignatureKeyVersion = (int)keyVersion;
+            row.RowSignatureSchemaVersion = BusinessSignedSchemas.CurrentSchemaVersion(row);
         }
 
-        var items = new List<CandidateContentItem>
-        {
-            new(ManifestItemKind.RecordHeader, candidate.Header.FormRecordId, Convert.ToBase64String(BusinessSignedSchemas.EncodeHeader(candidate.Header, keyVersion))),
-        };
-        items.AddRange(candidate.Values.Select(v => new CandidateContentItem(ManifestItemKind.FieldValue, v.FieldValueItemId, Convert.ToBase64String(BusinessSignedSchemas.EncodeStringValue(v, keyVersion)))));
-
+        var items = allRows.Select(r => new CandidateContentItem((ManifestItemKind)r.ItemKindCode, r.ItemId, Convert.ToBase64String(BusinessSignedSchemas.Encode(r, keyVersion)))).ToList();
         var prepared = await authority.PrepareContentChangeAsync(context.ToDelegatedUser(), new PrepareContentChangeRequest(
             context.OrganizationId, candidate.Header.FormRecordId, operationId, head.AuthorizationRevision, head.CommittedContentRevision, head.CommittedManifestRootBase64, items),
             "content:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
@@ -64,46 +57,48 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
         }
 
         // 2. Stage immutably with the authority-issued signatures.
-        var signatures = prepared.SignedItems.ToDictionary(s => (s.ItemKind, s.ItemId), s => Convert.FromBase64String(s.RowSignatureBase64));
-        candidate.Header.RowSignature = signatures[(ManifestItemKind.RecordHeader, candidate.Header.FormRecordId)];
-        candidate.Header.StagedOn = clock.GetUtcNow();
-        candidate.Header.CandidateState = "Staged";
-        foreach (var value in candidate.Values)
+        var signatures = prepared.SignedItems.ToDictionary(s => ((byte)s.ItemKind, s.ItemId), s => Convert.FromBase64String(s.RowSignatureBase64));
+        foreach (var row in allRows)
         {
-            value.RowSignature = signatures[(ManifestItemKind.FieldValue, value.FieldValueItemId)];
+            row.RowSignature = signatures[(row.ItemKindCode, row.ItemId)];
         }
 
+        candidate.Header.StagedOn = clock.GetUtcNow();
+        candidate.Header.CandidateState = "Staged";
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             if (await scope.FindStagedHeaderAsync(candidate.Header.FormRecordId, operationId, cancellationToken).ConfigureAwait(false) is null)
             {
-                scope.StageCandidate(candidate.Header, candidate.Values);
+                scope.StageCandidate(candidate.Header, candidate.Rows);
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
         // 3. Read back from the untrusted store and submit as commit evidence.
-        var staged = await ReadStagedAsync(candidate.Header.FormRecordId, operationId, keyVersion, cancellationToken).ConfigureAwait(false);
-        var accepted = await authority.CommitContentChangeAsync(context.ToDelegatedUser(), operationId, new CommitContentChangeRequest(context.OrganizationId, candidate.Header.FormRecordId, staged), cancellationToken).ConfigureAwait(false);
-        return accepted;
+        var staged = await ReadStagedAsync(candidate.Header.FormRecordId, operationId, cancellationToken).ConfigureAwait(false);
+        return await authority.CommitContentChangeAsync(context.ToDelegatedUser(), operationId, new CommitContentChangeRequest(context.OrganizationId, candidate.Header.FormRecordId, staged.Items), cancellationToken).ConfigureAwait(false);
     }
 
+    public sealed record StagedSnapshot(FormRecordRevision? Header, IReadOnlyList<ISignedContentRow> Rows, IReadOnlyList<StagedContentItem> Items);
+
     /// <summary>Reads the staged rows for an operation and canonicalizes them exactly as they are stored.</summary>
-    public async Task<List<StagedContentItem>> ReadStagedAsync(Guid formRecordId, Guid operationId, uint keyVersion, CancellationToken cancellationToken)
+    public async Task<StagedSnapshot> ReadStagedAsync(Guid formRecordId, Guid operationId, CancellationToken cancellationToken)
     {
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var header = await scope.FindStagedHeaderAsync(formRecordId, operationId, cancellationToken).ConfigureAwait(false);
-        var values = await scope.GetStagedValuesAsync(formRecordId, operationId, cancellationToken).ConfigureAwait(false);
-        var staged = new List<StagedContentItem>();
+        var rows = await scope.GetStagedRowsAsync(formRecordId, operationId, cancellationToken).ConfigureAwait(false);
+        var items = new List<StagedContentItem>();
         if (header is not null)
         {
-            staged.Add(new StagedContentItem(ManifestItemKind.RecordHeader, header.FormRecordId, Convert.ToBase64String(BusinessSignedSchemas.EncodeHeader(header, (uint)header.RowSignatureKeyVersion)), Convert.ToBase64String(header.RowSignature)));
+            items.Add(ToStaged(header));
         }
 
-        staged.AddRange(values.Select(v => new StagedContentItem(ManifestItemKind.FieldValue, v.FieldValueItemId, Convert.ToBase64String(BusinessSignedSchemas.EncodeStringValue(v, (uint)v.RowSignatureKeyVersion)), Convert.ToBase64String(v.RowSignature))));
-        _ = keyVersion;
-        return staged;
+        items.AddRange(rows.Select(ToStaged));
+        return new StagedSnapshot(header, rows, items);
     }
+
+    private static StagedContentItem ToStaged(ISignedContentRow row) =>
+        new((ManifestItemKind)row.ItemKindCode, row.ItemId, Convert.ToBase64String(BusinessSignedSchemas.Encode(row, (uint)row.RowSignatureKeyVersion)), Convert.ToBase64String(row.RowSignature));
 
     /// <summary>Deterministic operation id from (organization, record, idempotency key): retries re-derive the same id and the authority's idempotency check returns the same prepared operation.</summary>
     internal static Guid DeriveOperationId(Guid organizationId, Guid formRecordId, string idempotencyKey)

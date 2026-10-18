@@ -41,7 +41,7 @@ public static class SnakeCaseNaming
         foreach (var property in typeof(TEntity).GetProperties().Where(p => p.CanWrite && p.GetMethod?.IsPublic == true))
         {
             var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-            if (type.IsPrimitive || type == typeof(string) || type == typeof(Guid) || type == typeof(DateTimeOffset) || type == typeof(byte[]) || type == typeof(decimal))
+            if (type.IsPrimitive || type == typeof(string) || type == typeof(Guid) || type == typeof(DateTimeOffset) || type == typeof(DateOnly) || type == typeof(TimeOnly) || type == typeof(byte[]) || type == typeof(decimal))
             {
                 builder.Property(property.Name).HasColumnName(ToSnakeCase(property.Name));
             }

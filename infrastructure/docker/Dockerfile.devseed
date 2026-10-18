@@ -1,0 +1,19 @@
+# Development seed tool (B-01): one-shot container that bootstraps the synthetic organization through the authority
+# operator plane. Never deployed; holds the operator key only for the duration of the run.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY src/tools/EnterpriseForms.DevSeed/EnterpriseForms.DevSeed.csproj src/tools/EnterpriseForms.DevSeed/
+RUN dotnet restore src/tools/EnterpriseForms.DevSeed/EnterpriseForms.DevSeed.csproj
+COPY src/tools/ src/tools/
+RUN dotnet publish src/tools/EnterpriseForms.DevSeed/EnterpriseForms.DevSeed.csproj -c Release -o /app/publish --no-restore
+RUN mkdir -p /seed-init
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0-noble-chiseled-extra AS runtime
+WORKDIR /app
+COPY --from=build /app/publish ./
+# The personas file lands in the shared dev-seed volume. A new named volume inherits this directory's ownership, so the
+# non-root runtime user can write it (the chiseled image has no shell for a chown at run time).
+COPY --from=build --chown=$APP_UID:$APP_UID /seed-init /seed
+USER $APP_UID
+ENTRYPOINT ["dotnet", "EnterpriseForms.DevSeed.dll"]

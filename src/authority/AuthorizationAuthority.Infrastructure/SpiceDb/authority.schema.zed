@@ -39,29 +39,34 @@ definition record_share {
     permission delegate = manager
 }
 
+// Child records (Stage B, B-04) carry a parent edge instead of an owner edge: every permission derives from the
+// parent's corresponding permission, so revoking the parent revokes the child and a parent share does NOT reach
+// child fields (field_item/document_item consult the child's own owner/parent chain, never the parent's shares).
 definition form_record {
     relation organization: organization
     relation owner: user | team#participant
+    relation parent: form_record
     relation shared_via: record_share
-    permission discover = owner + shared_via->read
-    permission read = owner
-    permission edit = owner
-    permission manage_access = owner + shared_via->delegate
+    permission effective_owner = owner + parent->effective_owner
+    permission discover = effective_owner + shared_via->read
+    permission read = effective_owner
+    permission edit = effective_owner
+    permission manage_access = effective_owner + shared_via->delegate
     permission transfer_ownership = owner
 }
 
 definition field_item {
     relation parent_record: form_record
     relation shared_via: record_share
-    permission read = parent_record->owner + shared_via->read
-    permission edit = parent_record->owner + shared_via->edit
-    permission delegate = parent_record->owner + shared_via->delegate
+    permission read = parent_record->effective_owner + shared_via->read
+    permission edit = parent_record->effective_owner + shared_via->edit
+    permission delegate = parent_record->effective_owner + shared_via->delegate
 }
 
 definition document_item {
     relation parent_record: form_record
     relation shared_via: record_share
-    permission read = parent_record->owner + shared_via->read
-    permission replace = parent_record->owner + shared_via->edit
-    permission delegate = parent_record->owner + shared_via->delegate
+    permission read = parent_record->effective_owner + shared_via->read
+    permission replace = parent_record->effective_owner + shared_via->edit
+    permission delegate = parent_record->effective_owner + shared_via->delegate
 }

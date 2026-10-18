@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Development seed tool (B-01). Bootstraps a synthetic organization and personas through the Authorization Authority
+    OPERATOR plane and writes dev-personas.json for the business API's development login. It is the only business-side
+    component that holds the operator credential, runs once, and is never part of a deployable application image.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>EnterpriseForms.DevSeed</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+</Project>

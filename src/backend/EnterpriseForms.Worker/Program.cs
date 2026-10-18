@@ -1,8 +1,10 @@
+using EnterpriseForms.Infrastructure;
 using EnterpriseForms.Worker.Composition;
+using EnterpriseForms.Worker.Features.Documents;
 
 namespace EnterpriseForms.Worker;
 
-/// <summary>Durable background host. Feature handlers register under Features/&lt;Owner&gt; in later phases.</summary>
+/// <summary>Durable background host: document processing (scan → encrypt → store). Same application abstractions as the API, separate deployable image.</summary>
 public sealed class Program
 {
     private Program()
@@ -15,6 +17,8 @@ public sealed class Program
         builder.Services.AddOptions<WorkerStartupOptions>()
             .Bind(builder.Configuration.GetSection(WorkerStartupOptions.SectionName));
         builder.Services.AddHostedService<StartupConfigurationGuard>();
+        builder.Services.AddBusinessInfrastructure(builder.Configuration);
+        builder.Services.AddHostedService<DocumentProcessingWorker>();
         builder.Build().Run();
     }
 }
