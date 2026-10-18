@@ -142,7 +142,7 @@ export class OperationExecutor {
     }
     let body: BodyInit | undefined;
     if (operation.binaryPayload !== undefined) {
-      headers["Content-Type"] = "application/octet-stream";
+      headers["Content-Type"] = operation.binaryContentType ?? "application/octet-stream";
       body = operation.binaryPayload;
     } else if (operation.payload !== undefined) {
       headers["Content-Type"] = "application/json";

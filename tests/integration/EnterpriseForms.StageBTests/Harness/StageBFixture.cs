@@ -50,12 +50,15 @@ public sealed class StageBFixture : IAsyncLifetime
     }
 
     /// <summary>PUT raw bytes (upload chunk) with the user's bearer token.</summary>
-    public async Task<HttpResult> PutBytesAsync(string path, string token, byte[] bytes)
+    public Task<HttpResult> PutBytesAsync(string path, string token, byte[] bytes) => SendBytesAsync(HttpMethod.Put, path, token, bytes, "application/octet-stream");
+
+    /// <summary>Raw body with an explicit media type (logo upload is image/png; the server refuses anything else with 415).</summary>
+    public async Task<HttpResult> SendBytesAsync(HttpMethod method, string path, string token, byte[] bytes, string contentType)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Put, path);
+        using var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Content = new ByteArrayContent(bytes);
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         using var response = await raw.SendAsync(request).ConfigureAwait(false);
         var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         System.Text.Json.JsonDocument? json = null;

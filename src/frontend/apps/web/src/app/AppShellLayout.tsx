@@ -17,7 +17,7 @@ export function AppShellLayout({ children }: PropsWithChildren) {
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-2">
           <Link to={session.status === "authenticated" ? "/app/dashboard" : "/"} className="flex min-h-11 items-center gap-3 rounded">
             {branding?.hasLogo ? (
-              <img src={LOGO_PATH} alt={branding.logoAlternativeText ?? `${branding.organizationDisplayName} logo`} className="h-9 w-auto max-w-40 object-contain" />
+              <img src={LOGO_PATH} alt={branding.logoAlternativeText || `${branding.organizationDisplayName} logo`} className="h-9 w-auto max-w-40 object-contain" />
             ) : (
               <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded bg-primary text-primary-foreground font-bold">
                 {(branding?.organizationDisplayName ?? "EF").slice(0, 2).toUpperCase()}

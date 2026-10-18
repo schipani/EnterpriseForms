@@ -71,10 +71,14 @@ development login, not a production bypass (B-01, verified by `AuthorizationAndT
 3. **Layout** tab → *Add field* each one; set widths (2 of 4 …), *Save draft* → **Publish…** with a change reason.
 4. **Forms → New form**: `Accused`, tick the clerk → Create. Add fields `Given name`, `Family name` (String),
    `Date of birth` (Date), `In custody` (Boolean), `Arrest time` (**DateTime**), `External reference` (**Guid**),
-   `Case status` (Option), `Case documents` (**File**).
+   `Case status` (Option). Then **Add document collection** (the second button in the Field catalog) named
+   `Case documents` — this creates the `File` field behind the collection; the same storage type is also listed last
+   in the *Add field* dialog as "File (document collection)".
 5. **Related forms** tab → *Add relationship*: child form `AccusedAddress`, list name `Addresses`.
 6. **Layout** tab → place the fields (Given/Family name at 2 of 4 on one row, required), *Add related list*
-   `Addresses`, *Add document collection* `Case documents` (set allowed types, e.g. `application/pdf, text/plain`);
+   `Addresses`, *Add document collection* `Case documents`, then set its upload restrictions on the placed element:
+   **Maximum files**, **Maximum file size (MB)** and **Allowed content types** (e.g. `application/pdf, text/plain`;
+   empty allows any type the server accepts);
    use the phone/tablet/desktop preview; *Save draft* → **Publish…**. **Versions** tab lists every immutable version;
    *Restore to draft* copies an older layout into the draft for a new version (publishing an unchanged draft is refused).
 

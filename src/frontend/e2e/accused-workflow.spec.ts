@@ -81,7 +81,22 @@ test.describe.serial("Stage B Accused workflow", () => {
     await addField(page, "In custody", "Boolean");
     await addField(page, "Arrest time", "DateTime");
     await addField(page, "External reference", "Guid");
-    await addField(page, "Case documents", "File");
+    // "File" is listed in the generic Add field dialog…
+    await page.getByRole("button", { name: "Add field" }).first().click();
+    const generic = page.getByRole("dialog", { name: "Add field" });
+    await generic.getByLabel("Storage type").click();
+    await expect(page.getByRole("option", { name: "File (document collection)" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await generic.getByRole("button", { name: "Cancel" }).click();
+    await expect(generic).toBeHidden();
+    // …and the dedicated button creates the document collection's File field directly.
+    await page.getByRole("button", { name: "Add document collection" }).click();
+    const documentsDialog = page.getByRole("dialog", { name: "Add document collection" });
+    await documentsDialog.getByLabel("Display name").fill("Case documents");
+    await expect(documentsDialog.getByLabel("Storage type")).toHaveValue("File (document collection)");
+    await documentsDialog.getByRole("button", { name: "Add document collection" }).click();
+    await expect(documentsDialog).toBeHidden();
+    await expect(page.getByRole("row", { name: /Case documents/ })).toContainText("File");
 
     await page.getByRole("tab", { name: /Related forms/ }).click();
     await page.getByRole("button", { name: "Add relationship" }).click();
@@ -102,6 +117,8 @@ test.describe.serial("Stage B Accused workflow", () => {
     await placeFromPicker(page, "Add related list", /Addresses/);
     await placeFromPicker(page, "Add document collection", /Case documents/);
     const documents = page.getByRole("listitem").filter({ hasText: "Documents: Case documents" });
+    await documents.getByLabel("Maximum files").fill("10");
+    await documents.getByLabel("Maximum file size (MB)").fill("20");
     await documents.getByLabel("Allowed content types").fill("application/pdf, text/plain");
     // Two half-width name fields on one row, required.
     const given = page.getByRole("listitem").filter({ hasText: "Field: Given name" });
@@ -163,6 +180,9 @@ test.describe.serial("Stage B Accused workflow", () => {
     await expect(page.getByText("Avery-Edited")).toBeVisible();
     await expect(page.getByText("Revision 2")).toBeVisible();
 
+    // The published collection is visible on the record with the designer's limits.
+    await expect(page.getByRole("heading", { name: /Case documents \(0 of 10\)/ })).toBeVisible();
+    await expect(page.getByText(/Up to 10 files, 20\.0 MB each; types: application\/pdf, text\/plain/)).toBeVisible();
     // Upload two documents concurrently, navigate away mid-flight, come back: the shell-owned manager finished them.
     const input = page.getByLabel(/Choose files for Case documents/);
     await input.setInputFiles([

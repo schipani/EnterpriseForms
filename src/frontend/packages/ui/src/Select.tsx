@@ -40,7 +40,7 @@ export function Select({ label, value, onValueChange, options, placeholder = "Se
             </RadixSelect.Icon>
           </RadixSelect.Trigger>
           <RadixSelect.Portal>
-            <RadixSelect.Content position="popper" sideOffset={4} className="z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-auto rounded border border-input bg-surface p-1 shadow-lg">
+            <RadixSelect.Content position="popper" sideOffset={4} className="z-50 max-h-96 min-w-[var(--radix-select-trigger-width)] overflow-auto rounded border border-input bg-surface p-1 shadow-lg">
               <RadixSelect.Viewport>
                 {options.map((option) => (
                   <RadixSelect.Item key={option.value} value={option.value} {...(option.disabled !== undefined ? { disabled: option.disabled } : {})} className="flex min-h-10 cursor-default select-none items-center rounded px-3 py-2 text-base text-body outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground">

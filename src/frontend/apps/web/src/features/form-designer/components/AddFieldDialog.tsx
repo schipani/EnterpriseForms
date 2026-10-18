@@ -15,12 +15,17 @@ export function toKey(text: string): string {
     .slice(0, 64);
 }
 
-/** Adds a stable field identity (storage type is immutable after creation). Option fields need at least one option. */
-export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error }: { open: boolean; onOpenChange: (open: boolean) => void; onSubmit: (request: AddFieldDefinitionRequest) => void; pending: boolean; error: unknown }) {
+/**
+ * Adds a stable field identity (storage type is immutable after creation). Option fields need at least one option.
+ * `kind="documents"` adds a File field — the identity behind a document collection; its upload limits are set on the
+ * `documentCollection` element in the Layout tab (immutable per published version).
+ */
+export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error, kind = "field" }: { open: boolean; onOpenChange: (open: boolean) => void; onSubmit: (request: AddFieldDefinitionRequest) => void; pending: boolean; error: unknown; kind?: "field" | "documents" }) {
+  const documents = kind === "documents";
   const [displayName, setDisplayName] = useState("");
   const [key, setKey] = useState("");
   const [keyTouched, setKeyTouched] = useState(false);
-  const [dataType, setDataType] = useState<string>("String");
+  const [dataType, setDataType] = useState<string>(documents ? "File" : "String");
   const [description, setDescription] = useState("");
   const [optionsText, setOptionsText] = useState("");
   const effectiveKey = keyTouched ? key : toKey(displayName);
@@ -34,23 +39,27 @@ export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error }:
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Add field"
-      description="A field is a stable identity with an immutable storage type. Its label, width and validation are set per layout version."
+      title={documents ? "Add document collection" : "Add field"}
+      description={documents ? "A document collection is a File field: a stable identity whose uploads are scanned, encrypted and bound to the record. Allowed types, maximum files and size are set when you place it in the Layout tab." : "A field is a stable identity with an immutable storage type. Its label, width and validation are set per layout version."}
       locked={pending}
       footer={
         <>
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
-          <Button busy={pending} disabled={!valid} onClick={() => onSubmit({ fieldKey: effectiveKey, fieldDisplayName: displayName.trim(), fieldDescription: description.trim(), fieldDataType: dataType, options: dataType === "Option" ? options : null })}>
-            Add field
+          <Button busy={pending} disabled={!valid} onClick={() => onSubmit({ fieldKey: effectiveKey, fieldDisplayName: displayName.trim(), fieldDescription: description.trim(), fieldDataType: documents ? "File" : dataType, options: dataType === "Option" ? options : null })}>
+            {documents ? "Add document collection" : "Add field"}
           </Button>
         </>
       }
     >
       <TextInput label="Display name" value={displayName} required maxLength={200} onChange={(event) => setDisplayName(event.target.value)} />
       <TextInput label="Field key" value={effectiveKey} required helpText="snake_case, immutable, unique within the form" error={effectiveKey && !KEY.test(effectiveKey) ? "Use lowercase letters, digits and underscores, starting with a letter" : undefined} onChange={(event) => { setKeyTouched(true); setKey(event.target.value); }} />
-      <Select label="Storage type" value={dataType} required options={FIELD_DATA_TYPES.map((type) => ({ value: type, label: type === "File" ? "File (document collection)" : type }))} onValueChange={setDataType} />
+      {documents ? (
+        <TextInput label="Storage type" value="File (document collection)" readOnly helpText="Documents are attachment references, never file bytes in the record." />
+      ) : (
+        <Select label="Storage type" value={dataType} required options={FIELD_DATA_TYPES.map((type) => ({ value: type, label: type === "File" ? "File (document collection)" : type }))} onValueChange={setDataType} />
+      )}
       <TextArea label="Description" value={description} maxLength={1000} rows={2} onChange={(event) => setDescription(event.target.value)} />
       {dataType === "Option" ? <TextArea label="Options (one per line)" value={optionsText} required helpText="Display text per line; keys are derived and stay stable." onChange={(event) => setOptionsText(event.target.value)} /> : null}
       {error ? <ErrorPanel error={error} /> : null}

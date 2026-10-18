@@ -19,6 +19,8 @@ export type ApiOperation = {
   /** JSON payload (structured-clone safe) or raw bytes for chunk uploads. */
   payload?: unknown;
   binaryPayload?: ArrayBuffer;
+  /** Media type sent with binaryPayload (default application/octet-stream); endpoints such as the PNG logo require their own. */
+  binaryContentType?: string;
   expectedRevision?: string;
   idempotencyKey?: string;
   /** Serializes writes per resource (one interactive-write at a time per key). */

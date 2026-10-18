@@ -24,6 +24,7 @@ export function DesignerPage() {
   const [baseJson, setBaseJson] = useState<string>("");
   const [parseError, setParseError] = useState<string | null>(null);
   const [addField, setAddField] = useState(false);
+  const [addDocuments, setAddDocuments] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [changeReason, setChangeReason] = useState("");
   const [relationshipOpen, setRelationshipOpen] = useState(false);
@@ -52,7 +53,7 @@ export function DesignerPage() {
   }, [detail.data, layout]);
 
   const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId] }), queryClient.invalidateQueries({ queryKey: ["forms"] })]);
-  const addFieldMutation = useMutation({ mutationFn: (request: Parameters<typeof api.forms.addField>[1]) => api.forms.addField(formDefinitionId, request).then((r) => r.result), onSuccess: async () => { setAddField(false); await invalidate(); } });
+  const addFieldMutation = useMutation({ mutationFn: (request: Parameters<typeof api.forms.addField>[1]) => api.forms.addField(formDefinitionId, request).then((r) => r.result), onSuccess: async () => { setAddField(false); setAddDocuments(false); await invalidate(); } });
   const saveDraft = useMutation({
     mutationFn: (current: FormLayout) => api.forms.saveDraft(formDefinitionId, { expectedDraftRevision: Number(detail.data?.draft?.draftRevision ?? 0), layoutJson: serializeLayout(current) }).then((r) => r.result),
     onSuccess: async (draft) => {
@@ -142,7 +143,21 @@ export function DesignerPage() {
             value: "fields",
             label: `Fields (${form.fields.length})`,
             content: (
-              <Card title="Field catalog" actions={form.summary.canDesign ? <Button size="sm" onClick={() => setAddField(true)}>Add field</Button> : null}>
+              <Card
+                title="Field catalog"
+                actions={
+                  form.summary.canDesign ? (
+                    <>
+                      <Button size="sm" variant="secondary" onClick={() => setAddDocuments(true)}>
+                        Add document collection
+                      </Button>
+                      <Button size="sm" onClick={() => setAddField(true)}>
+                        Add field
+                      </Button>
+                    </>
+                  ) : null
+                }
+              >
                 <DataTable
                   caption="Fields"
                   rowKey={(row) => row.fieldDefinitionId}
@@ -209,6 +224,7 @@ export function DesignerPage() {
       />
 
       <AddFieldDialog open={addField} onOpenChange={setAddField} pending={addFieldMutation.isPending} error={addFieldMutation.error} onSubmit={(request) => addFieldMutation.mutate(request)} />
+      {addDocuments ? <AddFieldDialog kind="documents" open onOpenChange={setAddDocuments} pending={addFieldMutation.isPending} error={addFieldMutation.error} onSubmit={(request) => addFieldMutation.mutate(request)} /> : null}
 
       <Dialog
         open={publishOpen}
