@@ -488,7 +488,7 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("JournalEventBodyJson")
                         .IsRequired()
-                        .HasColumnType("jsonb")
+                        .HasColumnType("text")
                         .HasColumnName("journal_event_body_json");
 
                     b.Property<byte[]>("JournalEventDigest")

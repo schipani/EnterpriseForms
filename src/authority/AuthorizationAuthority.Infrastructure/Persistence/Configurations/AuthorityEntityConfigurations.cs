@@ -119,7 +119,9 @@ public sealed class SecurityJournalEntryConfiguration : IEntityTypeConfiguration
         builder.HasKey(e => e.SecurityJournalEntryId);
         builder.Property(e => e.JournalStreamName).HasMaxLength(30);
         builder.Property(e => e.JournalEventKind).HasMaxLength(60);
-        builder.Property(e => e.JournalEventBodyJson).HasColumnType("jsonb");
+        // text, NOT jsonb: PostgreSQL normalizes jsonb (key order, whitespace, numbers), which silently broke the
+        // byte-exact body <-> JournalEventDigest binding that the archive and replay verification depend on (A-F12).
+        builder.Property(e => e.JournalEventBodyJson).HasColumnType("text");
         builder.Property(e => e.ArchiveDeliveryState).HasMaxLength(30);
         builder.Property(e => e.ArchiveReceiptReference).HasMaxLength(512);
         builder.Property(e => e.LastArchiveErrorCode).HasMaxLength(100);

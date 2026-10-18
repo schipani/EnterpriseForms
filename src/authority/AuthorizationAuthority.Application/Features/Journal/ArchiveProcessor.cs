@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Domain.Features.Journal;
 
@@ -24,9 +25,20 @@ public sealed class ArchiveProcessor(IAuthorityStore store, ISecurityEventArchiv
         foreach (var entry in pending.OrderBy(e => e.JournalStreamName, StringComparer.Ordinal).ThenBy(e => e.JournalStreamRevision))
         {
             entry.ArchiveAttemptCount++;
+            var body = System.Text.Encoding.UTF8.GetBytes(entry.JournalEventBodyJson);
+            if (!CanonicalJson.Digest(body).AsSpan().SequenceEqual(entry.JournalEventDigest))
+            {
+                // The stored body no longer matches the digest recorded (and chained) at commit time: tampering or a
+                // non-canonical storage path. Never deliver unverifiable evidence; quarantine instead of repairing.
+                entry.ArchiveDeliveryState = ArchiveDeliveryStates.VerificationFailed;
+                entry.LastArchiveErrorCode = JournalBodyDigestMismatch;
+                state.IntegrityQuarantineEnabled = true;
+                state.IntegrityQuarantineReasonCode = JournalBodyDigestMismatch;
+                break;
+            }
+
             try
             {
-                var body = System.Text.Encoding.UTF8.GetBytes(entry.JournalEventBodyJson);
                 var receipt = await archive.AppendAsync(organizationId, entry.JournalStreamName, entry.JournalStreamRevision, body, entry.JournalEventDigest, cancellationToken).ConfigureAwait(false);
                 entry.ArchiveDeliveryState = ArchiveDeliveryStates.Anchored;
                 entry.ArchiveReceiptReference = receipt.ReceiptReference;
@@ -53,6 +65,8 @@ public sealed class ArchiveProcessor(IAuthorityStore store, ISecurityEventArchiv
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return archived;
     }
+
+    public const string JournalBodyDigestMismatch = "JOURNAL_BODY_DIGEST_MISMATCH";
 
     private static string Truncate(string text) => text.Length <= 100 ? text : text[..100];
 }

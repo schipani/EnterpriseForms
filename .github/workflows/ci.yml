@@ -60,7 +60,9 @@ jobs:
       - name: Build the Stage A security test project (compiles only; runs in security-gate-a against the Docker stack)
         run: dotnet build tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj --no-restore -c Release
       - name: Test (integrity vectors, architecture fitness functions, API contracts, authority unit tests; zero discovered tests fails)
-        run: dotnet test --solution EnterpriseForms.All.slnx --no-build -c Release --results-directory artifacts/test-results --report-xunit-trx -- --minimum-expected-tests 100
+        run: dotnet test --solution EnterpriseForms.All.slnx --no-build -c Release --results-directory artifacts/test-results --report-xunit-trx -- --minimum-expected-tests 10
+      - name: Solution-wide test floor (per-executable minimum cannot express it; sums the TRX files, fails on <130 executed or any non-pass)
+        run: python scripts/ci/assert_test_totals.py artifacts/test-results --min-total 130 --min-files 4
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: always()
         with:
