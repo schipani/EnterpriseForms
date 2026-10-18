@@ -2,7 +2,9 @@
 
 **Date:** 2026-10-18 · **Scope executed:** ADR-PB-002 Stage A (independent Authorization Authority, signing provider,
 security command journal, signed row integrity and Merkle manifests, minimal authenticated record workflow, SEC-P01..SEC-P12
-Level A adversarial tests, evidence). **Stage B has not started.**
+Level A adversarial tests, evidence). **Decision A-23 (2026-10-18): Stage A ENGINEERING COMPLETE — ACCEPTED FOR
+CONTINUED DEVELOPMENT by the project owner; production Level 2 certification NOT GRANTED; Stage B AUTHORIZED TO PROCEED**
+(`stage-b/accused-vertical-slice`, `docs/STAGE_B_STATUS.md`).
 
 ## Gate assessment
 
@@ -13,7 +15,7 @@ Level A adversarial tests, evidence). **Stage B has not started.**
 | BUILD-00 repository protection (requirement 9) | **Applied for the public-repository scope (decision A-21)** — rulesets, required checks, PR controls, signed commits, Actions hardening and scanning verified read-only (17 PASS, 0 FAIL, 6 DEFERRED). Public visibility is intentional during development; private Azure DevOps is the deferred production milestone. **Deferred, not implemented:** enforceable CODEOWNERS review, segregated environments, Entra federation (`docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §4). |
 | F-05 Docker isolation (requirement 10) | **OPEN as Azure Level B** — Docker network isolation is demonstrated (SEC-P11) but is not Level 2 proof. |
 | Evidence provenance (ADR-PB-012) | **Bound to `e6df484`** — GitHub `security-gate-a` run 39121925152 and a clean local worktree run, both 12/12 with image fingerprints; copies under `docs/evidence/stage-a/`. PB-12 immutable storage not provisioned. |
-| **Stage A gate** | **BLOCKED** (independent review A-F1 mandatory; manual security-owner review A-F14; PR approval). Full requirement table and findings: `docs/STAGE_A_GATE_CLOSURE.md`. No Level 2 or production claim is made. |
+| **Stage A gate** | **Development: ENGINEERING COMPLETE — ACCEPTED FOR CONTINUED DEVELOPMENT** (project-owner decision A-23; owner review of the cryptographic implementation recorded, explicitly *not* an independent review; remaining development-stage risks accepted by the owner). **Production Level 2 certification: NOT GRANTED** — independent cryptographic attestation, Azure Managed HSM, Confidential Ledger, Azure Level B validation and enforced security-owner review remain outstanding and are not waived. Full requirement table and findings: `docs/STAGE_A_GATE_CLOSURE.md`. |
 
 ## 1. What was built
 
@@ -151,5 +153,6 @@ cd infrastructure/docker && docker compose -f compose.yaml -f compose.security-t
 Windows: the .NET 10 SDK requires `--project` for a single test project; a checkout under a very long path can make
 the runner report zero tests — `--minimum-expected-tests` turns that into a failure instead of a silent pass.
 
-**Stop point:** Stage A implementation and Level A validation are complete on `e6df484`; the gate is BLOCKED pending
-`docs/STAGE_A_GATE_CLOSURE.md` §9. Stage B is not started and requires explicit approval.
+**Stop point:** Stage A implementation and Level A validation are complete on `e6df484`; development acceptance was
+granted by decision A-23; production Level 2 certification remains pending `docs/STAGE_A_GATE_CLOSURE.md` §9. Stage B is
+authorized and in progress on `stage-b/accused-vertical-slice`.

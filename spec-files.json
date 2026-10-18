@@ -9,8 +9,8 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "ce700280dbe9fd332f9b3700aa183a82d218581f1c1dc7335d63688e1d57e652",
-      "bytes": 286243
+      "sha256": "49d12d18b59a004f4c4b3ed0273fae8df501daf925da20fff083ea1fcb0cc6ac",
+      "bytes": 286580
     },
     {
       "path": "ENTERPRISE_SECURITY_REDUNDANCY_AUDIT.md",
@@ -59,13 +59,13 @@
     },
     {
       "path": "docs/STAGE_A_GATE_CLOSURE.md",
-      "sha256": "38afe6f61fb2860fb7692492068a29ed36e2dba95f689782e977cd1268650404",
-      "bytes": 27568
+      "sha256": "60ac71258fadf47af8a628fca8b3e684b2f1996ec075fe7909cc4c6f1546db14",
+      "bytes": 29496
     },
     {
       "path": "docs/STAGE_A_STATUS.md",
-      "sha256": "aa65433750dccb4a82a2012b87c91f2dd55c084c80b478971b04746915555a23",
-      "bytes": 16201
+      "sha256": "a2750d6002a2870a89551314bc8e1348c3034af94a0c47735f2259642d79c33a",
+      "bytes": 16884
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -99,13 +99,13 @@
     },
     {
       "path": "docs/decisions/ADR-PB-002-SECURITY-FIRST-ACCUSED-VERTICAL-SLICE.md",
-      "sha256": "debb88c87f3b34b5e62bf978e48c57b5e4300e3159bb0ad47cb835afb7309ed0",
-      "bytes": 6617
+      "sha256": "3011da888a1df84f2e95acb8562175e86b5cc533ed67cd53a6d356e8baa23bdc",
+      "bytes": 7634
     },
     {
       "path": "docs/decisions/ADR-PB-003-MANDATORY-ADVERSARIAL-SECURITY-VALIDATION.md",
-      "sha256": "57bf99219ec364dc4884ff59d1094cd20aa4c927b93156f4e0560d59313de724",
-      "bytes": 7517
+      "sha256": "224df1c5605a0b57e4efda4c3d98c19be193a67826429e69df330d9a2aadb6e9",
+      "bytes": 8078
     },
     {
       "path": "docs/decisions/ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md",
@@ -144,8 +144,8 @@
     },
     {
       "path": "docs/decisions/ADR-PB-011-GITHUB-ACTIONS-SECURE-DELIVERY.md",
-      "sha256": "8998d2d93a97da8c32bbca0ca6d680b67ce7a4d0f8deef91942e42c0ef280733",
-      "bytes": 8809
+      "sha256": "ab9afb82f5144a01a7dc35b13aeaa73a07ed112eb9be349f81c87eeef9bc2f17",
+      "bytes": 9276
     },
     {
       "path": "docs/decisions/ADR-PB-012-SECURITY-EVIDENCE-RELEASE-GOVERNANCE.md",
@@ -169,13 +169,13 @@
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
-      "sha256": "cc31e0eb0c3efb9eecdc88c92d62b469ced2353cd825e29e6a62c2830ea25e8a",
-      "bytes": 6777
+      "sha256": "ef84c4841db084c531258495072973deb28edc4ebc8753a17a2f0b5b6ec4ee89",
+      "bytes": 7231
     },
     {
       "path": "docs/decisions/STAGE_A_DECISION_LOG.md",
-      "sha256": "7990cb5dab7ce28a4a6cb366b3d95eaf0950fb49d73374073fa21cb15732beb7",
-      "bytes": 9948
+      "sha256": "49bd741a2c34814a7db61c73b2b70fb284d2b57b213935cb4f20dbde939d656b",
+      "bytes": 11781
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",

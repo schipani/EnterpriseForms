@@ -51,3 +51,15 @@ All 69 PG-numbered screens remain in the product backlog and feature ownership m
 ## Ownership, evidence and follow-up
 
 Track Stage A and B in the build backlog with explicit test/evidence links, feature owner and completion status. Do not claim the components are implemented until reproducible builds, migrations and tests run. PB-03 separately decides the **specific security proof criteria**; those criteria may strengthen Stage A without reversing this sequencing decision. PB-04 and PB-10 separately decide search behavior and data residency before applicable releases.
+
+## Amendment A-23 (2026-10-18, project-owner decision)
+
+Stage A is declared **ENGINEERING COMPLETE** and **ACCEPTED FOR CONTINUED DEVELOPMENT** by the project owner, who
+personally reviewed the Stage A cryptographic implementation (recorded as an **owner review, not an independent
+third-party cryptographic review**) and explicitly accepted the remaining development-stage risks. **Stage B is
+AUTHORIZED TO PROCEED.** This amendment distinguishes *development acceptance* from *production Level 2 certification*:
+the latter is **not granted** and still requires the independent cryptographic attestation, the Azure Managed HSM
+signing provider, Azure Confidential Ledger anchoring, Azure Level B validation and enforced independent security-owner
+review. None of those is waived or marked passed by this amendment. Stage A development blockers are not reopened unless
+a new material security defect is discovered. Record: `docs/decisions/STAGE_A_DECISION_LOG.md` A-23,
+`docs/STAGE_A_GATE_CLOSURE.md` §Gate result.

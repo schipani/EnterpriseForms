@@ -58,3 +58,10 @@ The binding decision's "private GitHub repository" is amended as follows:
 - [GitHub Docs: OIDC in Azure](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-azure)
 - [GitHub Docs: artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
 - [Microsoft: OCI image signature with Notation and Artifact Signing](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-tutorial-sign-verify-notation-artifact-signing)
+
+## Reaffirmation A-23 (2026-10-18)
+
+The project owner reaffirmed amendment A-21 as part of the Stage A development acceptance: the repository remains
+public on GitHub during development with every protection the platform supports, and migrates to a private Azure
+DevOps project before production. Enforceable independent security-owner review (CODEOWNERS equivalent) remains a
+production prerequisite delivered by that migration; it is not described as implemented.

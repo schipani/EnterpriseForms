@@ -3,15 +3,20 @@
 **Date:** 2026-10-18 · **Branch:** `stage-a/level2-security-foundation` · **PR:** #9 · **Code commit under evidence:**
 `e6df484b2ee35ed822cd011a06f41b3615ec10c8` (commits after it are documentation/manifest only; see §8).
 
-## Gate result: **BLOCKED**
+## Gate result
 
-Stage A is implemented, reproducibly tested in a clean checkout and on a GitHub-hosted runner, and all twelve mandatory
-adversarial tests pass against the committed code. The gate stays **BLOCKED** because three acceptance criteria are not
-satisfied: the independent cryptographic review has not been performed (mandatory), independently authorized
-CODEOWNERS review is not enforceable on the public user-owned repository (deferred to the Azure DevOps milestone by
-decision A-21; the repository intentionally stays public during development), and the Azure Level B validation has not
-started. Nothing in this
-document waives a mandatory control, and Stage B has not begun.
+| Gate | Result (2026-10-18) |
+|---|---|
+| **Development acceptance** (project-owner decision A-23) | **ENGINEERING COMPLETE — ACCEPTED FOR CONTINUED DEVELOPMENT.** Stage A is implemented, reproducibly tested in a clean checkout and on a GitHub-hosted runner, and all twelve mandatory adversarial tests pass against the committed code. The project owner personally reviewed the cryptographic implementation and found no defects (**owner review — not an independent third-party review**), explicitly accepted the remaining development-stage risks listed in §4 (A-F1, A-F6, A-F10, A-F14, A-F16), and authorized Stage B to proceed. |
+| **Production Level 2 certification** | **NOT GRANTED — outstanding requirements, none waived, none marked passed:** independent cryptographic attestation (§3a, state must reach *Completed — attested*), Azure Managed HSM signing provider, Azure Confidential Ledger anchoring, Azure Level B validation (§6), enforced independent security-owner review (A-F14, Azure DevOps milestone), PB-12 immutable evidence storage. |
+
+The earlier formal result **BLOCKED** described both gates together; decision A-23 separates them. The three criteria that
+blocked the combined gate are unchanged in substance: the independent cryptographic review has not been performed (now
+recorded as an owner review plus an outstanding production requirement), independently authorized CODEOWNERS review is
+not enforceable on the public user-owned repository (deferred to the Azure DevOps milestone by decision A-21; the
+repository intentionally stays public during development, reaffirmed by A-23), and the Azure Level B validation has not
+started. Nothing in this document waives a mandatory production control. Stage B proceeds on
+`stage-b/accused-vertical-slice` (`docs/STAGE_B_STATUS.md`).
 
 ## 1. Requirement-by-requirement assessment
 
@@ -27,7 +32,7 @@ document waives a mandatory control, and Stage B has not begun.
 | 8 | Zero discovered tests = failed run; Windows path-length reliability | **PASS** | `--minimum-expected-tests 10` per executable + `assert_test_totals.py` (≥130/4 files); Gate A `13`; A-19 | — |
 | 9 | BUILD-00 repository protection / CODEOWNERS advanced; what cannot be done from code documented | **PASS for the public-repository scope; deferred controls OPEN** | `verify_repository_protection.py` 2026-10-18 (after A-21): 17 PASS, 0 FAIL, 6 DEFERRED. Applied: rulesets on `main` and `v*`, required checks, PR controls, signed commits, restricted + SHA-pinned Actions, secret/dependency/code scanning. DEFERRED, not implemented: private visibility, organization teams and therefore enforceable CODEOWNERS review, segregated environments, Entra federation | §5; Azure DevOps milestone (`BUILD00_REPOSITORY_PROTECTION.md` §5) |
 | 10 | F-05 kept open as Azure Level B; Docker isolation not Level 2 proof | **PENDING (Azure Level B)** | `docs/PREBUILD_OPEN_ITEMS.md`; SEC-P11 is Level A only | Azure staging validation (Managed HSM, Confidential Ledger, private networking, F-05) |
-| 11 | Independent cryptographic review package; self-generated vectors do not count; Stage A BLOCKED until reviewed | **BLOCKED — review NOT PERFORMED** (§3a) | Package `docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md` and attestation template exist; no findings, no reviewer, no external record (verified: 0 PR reviews/comments, no document) | Named reviewer independent of authorship delivers R1–R9 findings for `e6df484`, then completes the attestation outside the repository |
+| 11 | Independent cryptographic review package; self-generated vectors do not count; Stage A BLOCKED until reviewed | **Owner review recorded (A-23); independent review NOT PERFORMED — outstanding production requirement** (§3a) | Package `docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md` and attestation template exist; no findings, no reviewer, no external record (verified: 0 PR reviews/comments, no document) | Named reviewer independent of authorship delivers R1–R9 findings for `e6df484`, then completes the attestation outside the repository |
 | 12 | Evidence tied to tests, commits, image digests, config versions (ADR-PB-012) | **PASS (provisional storage)** | `docs/evidence/stage-a/2026-10-18-github-run-39121925152`, `…/2026-10-18-local-e6df484`; each `SEC-P*.json` carries `commit_sha` and `image_fingerprint` | PB-12 immutable Canadian evidence storage not provisioned (BUILD-00 3.9) |
 
 Legend: PASS = demonstrated for the Stage A (Level A, Docker) scope; BLOCKED = acceptance criterion unmet; PENDING =
@@ -89,7 +94,11 @@ exercised only by the timing-dependent Docker path. A deterministic Docker test 
 
 ## 3a. Independent cryptographic review — actual status (requirement 11)
 
-**Status on 2026-10-18: NOT PERFORMED.** Verified by inspection of every place a review could have left a trace:
+**Status on 2026-10-18: independent review NOT PERFORMED; OWNER REVIEW recorded (A-23).** The project owner stated
+that they personally reviewed the Stage A cryptographic implementation and found no defects. That statement is recorded
+here exactly as given: it is an **owner review by the party that commissioned and accepted the work, not an independent
+third-party cryptographic review**, so it does not change the requirement-11 state machine below. Verified by inspection
+of every place an independent review could have left a trace:
 
 | Checked | Result |
 |---|---|
@@ -113,7 +122,7 @@ State machine used by this report (criteria in the attestation template):
 
 | State | Meaning | Satisfies requirement 11? |
 |---|---|---|
-| **NOT PERFORMED** (current) | No independent findings for R1–R9 exist on a named commit | No |
+| **NOT PERFORMED** (current; owner review A-23 recorded separately) | No independent findings for R1–R9 exist on a named commit | No |
 | Completed — evidence pending | A named independent reviewer has delivered R1–R9 findings for a named commit, but the attestation form is not yet completed and stored outside the repository | No (gate stays BLOCKED; findings are triaged meanwhile) |
 | Completed — attested | Attestation complete, signed, stored outside the repository and cited here; conditions closed | Yes |
 
@@ -244,7 +253,9 @@ the Gate A images nor part of the SEC-P01..P12 suite, so the Gate A evidence on 
 be cited. The a9c0e74 provisional copy no longer validates (its bytes were renormalized before the attribute existed); it
 is retained as a historical record only.
 
-## 9. What would move the gate from BLOCKED to PASS
+## 9. What would move production Level 2 certification from NOT GRANTED to GRANTED
+
+Development acceptance was granted by decision A-23 (§Gate result); the items below are production requirements.
 
 1. A-F1: review state reaches **Completed — attested** (§3a): a named independent reviewer's R1–R9 findings for the
    evidence commit, the attestation form complete and signed outside the repository, decision APPROVED (or APPROVED
@@ -256,4 +267,6 @@ is retained as a historical record only.
    but they remain Level 2 production prerequisites.
 4. No new Critical/High finding opened by the reviewer or by the CODEOWNERS review.
 
-Until then: **Stage A = BLOCKED. Stage B not started. No production infrastructure deployed. No control waived.**
+Until then: **Stage A = ENGINEERING COMPLETE, ACCEPTED FOR CONTINUED DEVELOPMENT (A-23); production Level 2
+certification NOT GRANTED. Stage B AUTHORIZED TO PROCEED. No production infrastructure deployed. No production control
+waived.**

@@ -58,3 +58,11 @@ Before **production Level 2 approval**, repeat the critical tests and expand the
 - Rely only on unit tests or mocked authorization provider: unable to prove distributed revision/race and privileged DB attacks.
 - Delay security validation until after 69 screens: creates unsafe, difficult-to-correct coupling and an illusory secure UI.
 - Substitute Vault Transit/local emulator results for Azure validation: does not attest managed identities, key custody, network separation, true ledger durability, or cloud DR.
+
+## Status note A-23 (2026-10-18)
+
+Level A (SEC-P01..SEC-P12 against the real Docker stack) has passed on the committed Stage A code, including on a
+GitHub-hosted runner; the project owner accepted Stage A for continued development (decision A-23) and authorized Stage
+B. Level B (Azure staging with real Entra, Managed HSM, Confidential Ledger, separate managed identities), the
+independent cryptographic review and the Level 2 production gates are **outstanding** and unchanged by A-23; evidence
+schema validation and owner review do not substitute for them.
