@@ -27,7 +27,7 @@ document waives a mandatory control, and Stage B has not begun.
 | 8 | Zero discovered tests = failed run; Windows path-length reliability | **PASS** | `--minimum-expected-tests 10` per executable + `assert_test_totals.py` (≥130/4 files); Gate A `13`; A-19 | — |
 | 9 | BUILD-00 repository protection / CODEOWNERS advanced; what cannot be done from code documented | **PASS for the public-repository scope; deferred controls OPEN** | `verify_repository_protection.py` 2026-10-18 (after A-21): 17 PASS, 0 FAIL, 6 DEFERRED. Applied: rulesets on `main` and `v*`, required checks, PR controls, signed commits, restricted + SHA-pinned Actions, secret/dependency/code scanning. DEFERRED, not implemented: private visibility, organization teams and therefore enforceable CODEOWNERS review, segregated environments, Entra federation | §5; Azure DevOps milestone (`BUILD00_REPOSITORY_PROTECTION.md` §5) |
 | 10 | F-05 kept open as Azure Level B; Docker isolation not Level 2 proof | **PENDING (Azure Level B)** | `docs/PREBUILD_OPEN_ITEMS.md`; SEC-P11 is Level A only | Azure staging validation (Managed HSM, Confidential Ledger, private networking, F-05) |
-| 11 | Independent cryptographic review package; self-generated vectors do not count; Stage A BLOCKED until reviewed | **BLOCKED** | `docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md` (exact SHA, digests, vectors, R1–R9, blank §7) | Security Owner engages a reviewer independent of authorship; record outside BusinessDb |
+| 11 | Independent cryptographic review package; self-generated vectors do not count; Stage A BLOCKED until reviewed | **BLOCKED — review NOT PERFORMED** (§3a) | Package `docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md` and attestation template exist; no findings, no reviewer, no external record (verified: 0 PR reviews/comments, no document) | Named reviewer independent of authorship delivers R1–R9 findings for `e6df484`, then completes the attestation outside the repository |
 | 12 | Evidence tied to tests, commits, image digests, config versions (ADR-PB-012) | **PASS (provisional storage)** | `docs/evidence/stage-a/2026-10-18-github-run-39121925152`, `…/2026-10-18-local-e6df484`; each `SEC-P*.json` carries `commit_sha` and `image_fingerprint` | PB-12 immutable Canadian evidence storage not provisioned (BUILD-00 3.9) |
 
 Legend: PASS = demonstrated for the Stage A (Level A, Docker) scope; BLOCKED = acceptance criterion unmet; PENDING =
@@ -87,6 +87,40 @@ where it correctly detected the mismatch. The digest-binding and conflict behavi
 deterministically by `ArchiveProcessorTests` (in-memory archive); the `BlobSecurityEventArchive` read-back code is
 exercised only by the timing-dependent Docker path. A deterministic Docker test for it is listed as A-F16.
 
+## 3a. Independent cryptographic review — actual status (requirement 11)
+
+**Status on 2026-10-18: NOT PERFORMED.** Verified by inspection of every place a review could have left a trace:
+
+| Checked | Result |
+|---|---|
+| Repository (`docs/security/`, any branch) | Only the author-written package `INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md` and the attestation template; no findings document, no signed record |
+| PR #9 reviews, review comments, issue comments | 0 / 0 / 0 |
+| Issues | None related to a review (only Dependabot PRs and PR #9 itself) |
+| External release/change system reference | None recorded anywhere in the repository |
+| Package §7 sign-off | Blank, by design |
+
+What has actually happened:
+
+- The implementation author assembled the review package (exact SHA `e6df484`, per-file digests, real Vault Transit
+  vectors, questions R1–R9) and an attestation template
+  (`docs/security/INDEPENDENT_CRYPTO_REVIEW_ATTESTATION_TEMPLATE.md`). **Author work is not review.**
+- The product owner stated the intention to use a language model (ChatGPT) to perform a review and received guidance
+  on what to submit and how to phrase the request. **No output of such a session has been provided to the repository,
+  the PR, or any cited external record**, so nothing about its scope or conclusions can be stated here.
+- No human reviewer independent of authorship has been named.
+
+State machine used by this report (criteria in the attestation template):
+
+| State | Meaning | Satisfies requirement 11? |
+|---|---|---|
+| **NOT PERFORMED** (current) | No independent findings for R1–R9 exist on a named commit | No |
+| Completed — evidence pending | A named independent reviewer has delivered R1–R9 findings for a named commit, but the attestation form is not yet completed and stored outside the repository | No (gate stays BLOCKED; findings are triaged meanwhile) |
+| Completed — attested | Attestation complete, signed, stored outside the repository and cited here; conditions closed | Yes |
+
+Rules that apply when the review happens: a model-assisted review is admissible only as an aid to a named human who
+reads, verifies and signs the attestation and lists the model under "tools used"; the author never fills in any part of
+the attestation; a review of a different commit than the one under evidence requires a statement of the diff reviewed.
+
 ## 4. Unresolved findings (requirement 7 of the closure request)
 
 Severity: Critical = blocks any Stage A claim; High = blocks Level 2 production; Medium = must be closed before Azure
@@ -94,7 +128,7 @@ staging sign-off; Low = tracked. Gate column: SA = Stage A gate, LB = Azure Leve
 
 | ID | Finding | Severity | Security impact | Owner | Gate | Remediation / status |
 |---|---|---|---|---|---|---|
-| A-F1 | Independent cryptographic review not performed | **Critical** | Format/protocol flaws (injectivity, replay, chain) would go undetected; author review is not independent | Security Owner | SA | Engage reviewer; record in release system; `INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md` §7 |
+| A-F1 | Independent cryptographic review **NOT PERFORMED** (no findings, no reviewer, no attestation — §3a) | **Critical** | Format/protocol flaws (injectivity, replay, chain) would go undetected; author review and author-written vectors are not independent | Security Owner | SA | Engage a named reviewer; findings for R1–R9 on `e6df484`; attestation per `INDEPENDENT_CRYPTO_REVIEW_ATTESTATION_TEMPLATE.md` stored outside the repository |
 | A-F2 | Evidence commit binding | Closed for `e6df484` | — | Maintainer | SA | R3 + R4 bound to `e6df484`; A-20 governs doc-only follow-ups |
 | A-F3 | BUILD-00 | Closed for the public-repository scope (A-21) | Remaining: deferred controls in `BUILD00_REPOSITORY_PROTECTION.md` §4 (not implemented) | Repository owner + Security Owner | Azure DevOps milestone | Rulesets, checks, PR controls, signatures, Actions hardening, scanning applied and verified; 0 FAIL |
 | A-F4 | Managed HSM provider and Confidential Ledger anchoring not implemented; Azurite archive is a test double | High | No production signer; no externally anchored anti-rollback receipts | Authority team | LB/L2 | Production refuses non-HSM providers (fails closed); implement G04/G11 providers before staging |
@@ -209,7 +243,9 @@ is retained as a historical record only.
 
 ## 9. What would move the gate from BLOCKED to PASS
 
-1. A-F1: independent review recorded with decision APPROVED (or APPROVED WITH CONDITIONS whose conditions are closed).
+1. A-F1: review state reaches **Completed — attested** (§3a): a named independent reviewer's R1–R9 findings for the
+   evidence commit, the attestation form complete and signed outside the repository, decision APPROVED (or APPROVED
+   WITH CONDITIONS with every condition closed). "Completed — evidence pending" does not open the gate.
 2. A-F14: a named security owner, independent of the author, reviews PR #9 and records the review (manual until Azure
    DevOps enforces it); the PR receives its required approval from a second maintainer account.
 3. `ci` and `security-gate-a` green on the protected merge commit of PR #9, evidence archived per PB-12.

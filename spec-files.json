@@ -59,13 +59,13 @@
     },
     {
       "path": "docs/STAGE_A_GATE_CLOSURE.md",
-      "sha256": "624aaaf68aa68cf2a3167d9c5fd86bf4ca9bd7b5bb615ef9dec331c019447680",
-      "bytes": 23702
+      "sha256": "3a036682c071a131e42d7d4ba2403b6366f0d95421688a96340f51fe38e0744d",
+      "bytes": 26611
     },
     {
       "path": "docs/STAGE_A_STATUS.md",
-      "sha256": "6c39f6ffadd057de5c7ea70004bf4ce6f15335c675a5e5c91f98945f90425211",
-      "bytes": 15931
+      "sha256": "aa65433750dccb4a82a2012b87c91f2dd55c084c80b478971b04746915555a23",
+      "bytes": 16201
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -248,9 +248,14 @@
       "bytes": 3348
     },
     {
+      "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_ATTESTATION_TEMPLATE.md",
+      "sha256": "60eb8d2f70d1f1a15ca8a8c1e17c290f3553a04b7490468e2b001b68b599afc6",
+      "bytes": 4142
+    },
+    {
       "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md",
-      "sha256": "6e41bf77908cc048bc3092f745058031de0b79741515b0c6512980ba647c1c4f",
-      "bytes": 17833
+      "sha256": "f98f40734275f986ffbe5d42400121e1c04b6535880d2a16888477c206d2c4f3",
+      "bytes": 18024
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",

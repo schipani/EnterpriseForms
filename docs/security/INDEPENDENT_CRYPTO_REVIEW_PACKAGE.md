@@ -125,7 +125,9 @@ published vector `row_signature` agree byte for byte; a last-byte flip of one ta
 
 ## 7. Sign-off record (to be completed by the reviewer, stored outside BusinessDb)
 
-Not completed. No reviewer has been engaged as of 2026-10-18. The author must not fill this in.
+Not completed. No reviewer has been engaged and no findings exist as of 2026-10-18 (`STAGE_A_GATE_CLOSURE.md` §3a).
+The author must not fill this in. Use `docs/security/INDEPENDENT_CRYPTO_REVIEW_ATTESTATION_TEMPLATE.md` for the full
+attestation; the block below is the minimum summary.
 
 ```
 Reviewer: ______________________  Organization/role: ______________________  Independent of authorship: [ ]
