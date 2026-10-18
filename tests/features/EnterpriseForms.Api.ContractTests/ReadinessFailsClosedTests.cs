@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace EnterpriseForms.Api.ContractTests;
@@ -81,8 +84,23 @@ public sealed class ReadinessFailsClosedTests
     }
 
     [Fact]
-    public void TestIdentityProviderIsRefusedInStaging()
+    public async Task TestIdentityProviderIsRefusedInStaging()
     {
+        // Deterministic check of the guard itself (A-F19: when the host fails to start, WebApplicationFactory may surface
+        // "Cannot access a disposed object" instead of the guard's message, so the message is asserted on the guard directly).
+        var guard = new UserAuthenticationStartupGuard(
+            Options.Create(new UserAuthenticationOptions
+            {
+                ProviderKind = "TestIdentityProvider",
+                Issuer = "https://test-idp.enterpriseforms.invalid",
+                Audience = "enterpriseforms",
+                SharedKeyBase64 = "dGVzdC1pZHAtZGV2LW9ubHktc2lnbmluZy1rZXktMDAwMDAwMDAwMA==",
+            }),
+            new FixedEnvironment("Staging"));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => guard.StartAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("not permitted in Staging", ex.Message, StringComparison.Ordinal);
+
+        // And the host as a whole refuses to start with that configuration (fail closed), whatever exception surfaces.
         using var api = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseEnvironment("Staging");
@@ -94,7 +112,32 @@ public sealed class ReadinessFailsClosedTests
                 ["UserAuthentication:SharedKeyBase64"] = "dGVzdC1pZHAtZGV2LW9ubHktc2lnbmluZy1rZXktMDAwMDAwMDAwMA==",
             }));
         });
-        var ex = Assert.ThrowsAny<Exception>(() => api.CreateClient());
-        Assert.Contains("not permitted in Staging", ex.Message + (ex.InnerException?.Message ?? string.Empty), StringComparison.Ordinal);
+        Assert.ThrowsAny<Exception>(() => api.CreateClient());
+    }
+
+    [Fact]
+    public async Task TestIdentityProviderIsAcceptedOnlyWhenConfiguredInDevelopmentOrTesting()
+    {
+        var configured = new UserAuthenticationOptions { ProviderKind = "TestIdentityProvider", Issuer = "https://test-idp.enterpriseforms.invalid", Audience = "enterpriseforms", SharedKeyBase64 = "dGVzdC1pZHAtZGV2LW9ubHktc2lnbmluZy1rZXktMDAwMDAwMDAwMA==" };
+        await new UserAuthenticationStartupGuard(Options.Create(configured), new FixedEnvironment("Development")).StartAsync(TestContext.Current.CancellationToken);
+        await new UserAuthenticationStartupGuard(Options.Create(configured), new FixedEnvironment("Testing")).StartAsync(TestContext.Current.CancellationToken);
+        foreach (var env in new[] { "Staging", "Production" })
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => new UserAuthenticationStartupGuard(Options.Create(configured), new FixedEnvironment(env)).StartAsync(TestContext.Current.CancellationToken));
+        }
+
+        var unconfigured = new UserAuthenticationOptions { ProviderKind = "TestIdentityProvider" };
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new UserAuthenticationStartupGuard(Options.Create(unconfigured), new FixedEnvironment("Development")).StartAsync(TestContext.Current.CancellationToken));
+    }
+
+    private sealed class FixedEnvironment(string name) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = name;
+
+        public string ApplicationName { get; set; } = "EnterpriseForms.Api";
+
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

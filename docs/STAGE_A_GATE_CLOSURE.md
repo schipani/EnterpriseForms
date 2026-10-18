@@ -146,6 +146,7 @@ staging sign-off; Low = tracked. Gate column: SA = Stage A gate, LB = Azure Leve
 | A-F16 | Blob archive read-back/conflict path only reached by timing in Docker | Medium | A regression in `BlobSecurityEventArchive`'s conflict handling could pass Gate A unnoticed | Authority team | LB | Add a deterministic SEC test that pre-seeds a differing blob and expects quarantine, and one that pre-seeds identical bytes and expects Anchored |
 | A-F17 | Specification manifest job failed on `e6df484` (`BUILD00_REPOSITORY_PROTECTION.md` digest) | Closed in the docs commit | None (detection working as designed) | Maintainer | SA | Manifest regenerated with the documentation commit; `ci` must be green on the branch head |
 | A-F18 | Security-test harness writes evidence JSON with platform newlines, so Windows-produced evidence is CRLF; Git `eol=lf` renormalization silently broke the `evidence_sha256` binding of the a9c0e74 provisional copy | Medium | Evidence digests can stop validating after checkout, defeating ADR-PB-012 tamper detection | Maintainer | SA | `docs/evidence/** -text` in `.gitattributes` keeps bytes verbatim (applied now); make `Evidence.cs` write LF bytes with the next code change and rerun Gate A (A-20) |
+| A-F19 | Contract test `TestIdentityProviderIsRefusedInStaging` was non-deterministic on Linux: when the host refuses to start, `WebApplicationFactory` can surface `Cannot access a disposed object` instead of the guard's message (seen on `ci` run 39124861491 for a docs-only commit) | Low (test determinism; the guard itself behaved correctly) | A flaky required check erodes trust in the gate and invites re-runs | Maintainer | SA | Guard asserted directly (`UserAuthenticationStartupGuard`) for Development/Testing/Staging/Production and unconfigured; host start still asserted to fail; contract tests are not part of the Gate A system or suite (§8) |
 
 No finding is waived. Critical and High findings owned by this team are either fixed or carried as explicit blockers.
 
@@ -235,8 +236,10 @@ organization_authorization_states: quarantined_orgs=0
 
 Evidence R3/R4 bind to `e6df484`. The documentation commit that follows contains only `docs/**`, `*.md`,
 `spec-files.json`, `SHA256SUMS.txt`, `docs/dynamic-forms/control-traceability.csv`, the evidence-reference string in
-`scripts/integrity/generate_control_checklist.py`, the `docs/evidence/** -text` attribute, and the manifest generator's
-exclusion of `docs/evidence/` (A-F18). None of these is compiled into or configures the tested system; `git diff e6df484
+`scripts/integrity/generate_control_checklist.py`, the `docs/evidence/** -text` attribute, the manifest generator's
+exclusion of `docs/evidence/` (A-F18), the BUILD-00 verifier/rulesets/CODEOWNERS comment (A-21), and one contract-test
+determinism fix in `tests/features/.../ReadinessFailsClosedTests.cs` (A-F19). The contract tests are neither built into
+the Gate A images nor part of the SEC-P01..P12 suite, so the Gate A evidence on `e6df484` is unaffected. None of these is compiled into or configures the tested system; `git diff e6df484
 <head> --stat` is recorded in the PR. Any later change outside that set requires a new Gate A run before the evidence can
 be cited. The a9c0e74 provisional copy no longer validates (its bytes were renormalized before the attribute existed); it
 is retained as a historical record only.
