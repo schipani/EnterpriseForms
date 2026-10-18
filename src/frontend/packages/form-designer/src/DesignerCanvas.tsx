@@ -105,7 +105,7 @@ export function DesignerCanvas({ layout, onChange, fields, relationships, readOn
           <h3 id="preview-heading" className="text-lg font-semibold">
             Preview
           </h3>
-          <div role="group" aria-label="Preview width" className="flex gap-1">
+          <div role="group" aria-label="Preview width" className="flex flex-wrap gap-1">
             {(["phone", "tablet", "desktop"] as const).map((option) => (
               <Button key={option} size="sm" variant={preview === option ? "primary" : "secondary"} aria-pressed={preview === option} onClick={() => setPreview(option)}>
                 {option === "phone" ? "Phone 320" : option === "tablet" ? "Tablet 768" : "Desktop"}
