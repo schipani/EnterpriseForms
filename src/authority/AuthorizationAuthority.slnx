@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/authority/">
+    <Project Path="AuthorizationAuthority.Domain/AuthorizationAuthority.Domain.csproj" />
+    <Project Path="AuthorizationAuthority.Application/AuthorizationAuthority.Application.csproj" />
+    <Project Path="AuthorizationAuthority.Infrastructure/AuthorizationAuthority.Infrastructure.csproj" />
+    <Project Path="AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
+    <Project Path="AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="../shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
+  </Folder>
+</Solution>

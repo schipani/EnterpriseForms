@@ -1,0 +1,26 @@
+<Solution>
+  <!-- Aggregate solution for local development and CI. Deployment pipelines build the business and authority solutions separately (ADR-PB-011). -->
+  <Folder Name="/src/backend/">
+    <Project Path="src/backend/EnterpriseForms.Domain/EnterpriseForms.Domain.csproj" />
+    <Project Path="src/backend/EnterpriseForms.Application/EnterpriseForms.Application.csproj" />
+    <Project Path="src/backend/EnterpriseForms.Infrastructure/EnterpriseForms.Infrastructure.csproj" />
+    <Project Path="src/backend/EnterpriseForms.Contracts/EnterpriseForms.Contracts.csproj" />
+    <Project Path="src/backend/EnterpriseForms.Api/EnterpriseForms.Api.csproj" />
+    <Project Path="src/backend/EnterpriseForms.Worker/EnterpriseForms.Worker.csproj" />
+  </Folder>
+  <Folder Name="/src/authority/">
+    <Project Path="src/authority/AuthorizationAuthority.Domain/AuthorizationAuthority.Domain.csproj" />
+    <Project Path="src/authority/AuthorizationAuthority.Application/AuthorizationAuthority.Application.csproj" />
+    <Project Path="src/authority/AuthorizationAuthority.Infrastructure/AuthorizationAuthority.Infrastructure.csproj" />
+    <Project Path="src/authority/AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
+    <Project Path="src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/shared/">
+    <Project Path="src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/architecture/EnterpriseForms.ArchitectureTests/EnterpriseForms.ArchitectureTests.csproj" />
+    <Project Path="tests/integrity/EnterpriseForms.Integrity.Tests/EnterpriseForms.Integrity.Tests.csproj" />
+    <Project Path="tests/features/EnterpriseForms.Api.ContractTests/EnterpriseForms.Api.ContractTests.csproj" />
+  </Folder>
+</Solution>

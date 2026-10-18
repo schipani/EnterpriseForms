@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Use cases by Features/<Feature>/<UseCase>. Depends on Domain, Contracts and the provider-free Integrity library only. -->
+  <PropertyGroup>
+    <RootNamespace>EnterpriseForms.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../EnterpriseForms.Domain/EnterpriseForms.Domain.csproj" />
+    <ProjectReference Include="../EnterpriseForms.Contracts/EnterpriseForms.Contracts.csproj" />
+    <ProjectReference Include="../../shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
+  </ItemGroup>
+</Project>

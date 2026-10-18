@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Versioned wire DTOs only. No EF entities, no domain types, no provider types (ADR-PB-006). -->
+  <PropertyGroup>
+    <RootNamespace>EnterpriseForms.Contracts</RootNamespace>
+  </PropertyGroup>
+</Project>

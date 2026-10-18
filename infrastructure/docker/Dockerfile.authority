@@ -1,0 +1,25 @@
+# Authorization Authority image. SEPARATELY deployed and credentialed; Compose emulates isolation locally only.
+# Production deployment uses a separately permissioned pipeline and identity (ADR-PB-011).
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj src/shared/EnterpriseForms.Integrity/
+COPY src/authority/AuthorizationAuthority.Domain/AuthorizationAuthority.Domain.csproj src/authority/AuthorizationAuthority.Domain/
+COPY src/authority/AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj src/authority/AuthorizationAuthority.Contracts/
+COPY src/authority/AuthorizationAuthority.Application/AuthorizationAuthority.Application.csproj src/authority/AuthorizationAuthority.Application/
+COPY src/authority/AuthorizationAuthority.Infrastructure/AuthorizationAuthority.Infrastructure.csproj src/authority/AuthorizationAuthority.Infrastructure/
+COPY src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj src/authority/AuthorizationAuthority.Api/
+RUN dotnet restore src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj
+COPY src/shared/ src/shared/
+COPY src/authority/ src/authority/
+COPY contracts/ contracts/
+RUN dotnet publish src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj -c Release -o /app/publish --no-restore -p:OpenApiGenerateDocumentsOnBuild=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS runtime
+WORKDIR /app
+COPY --from=build /app/publish ./
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
+    DOTNET_EnableDiagnostics=0
+EXPOSE 8080
+USER $APP_UID
+ENTRYPOINT ["dotnet", "AuthorizationAuthority.Api.dll"]

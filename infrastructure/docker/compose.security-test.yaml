@@ -1,0 +1,37 @@
+# Destructive security-test environment (ADR-PB-003 Level A). Dedicated project name, ephemeral storage,
+# and an "attacker" SQL client that is attached ONLY to business-net with BusinessDb credentials.
+# SEC-P01..SEC-P12 harnesses use this container to perform hostile writes; it must be unable to reach
+# authority-db, spicedb or vault (asserted by the Stage A tests, not assumed from this file).
+name: enterpriseforms-sectest
+services:
+  business-db:
+    tmpfs: [/var/lib/postgresql]
+  authority-db:
+    tmpfs: [/var/lib/postgresql]
+  spicedb-db:
+    tmpfs: [/var/lib/postgresql]
+  azurite:
+    tmpfs: [/data]
+  authority:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+  worker:
+    environment:
+      DOTNET_ENVIRONMENT: Testing
+  web:
+    profiles: [never]
+  attacker-sql:
+    image: postgres:18.0
+    entrypoint: ["sleep", "infinity"]
+    environment:
+      PGHOST: business-db
+      PGDATABASE: ${BUSINESS_DB_NAME:?set in .env}
+      PGUSER: ${BUSINESS_DB_ADMIN_USER:?set in .env}
+      PGPASSWORD: ${BUSINESS_DB_ADMIN_PASSWORD:?set in .env}
+    networks: [business-net]
+    depends_on:
+      business-db:
+        condition: service_healthy

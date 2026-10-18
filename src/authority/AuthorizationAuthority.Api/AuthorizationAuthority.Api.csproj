@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Separately deployed, separately credentialed Authorization Authority. Internal network only. -->
+  <PropertyGroup>
+    <RootNamespace>AuthorizationAuthority.Api</RootNamespace>
+    <UserSecretsId>authorization-authority-dev</UserSecretsId>
+    <OpenApiDocumentsDirectory>$(RepositoryRoot)contracts/openapi</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name authorization-authority-internal-v1</OpenApiGenerateDocumentsOptions>
+    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AuthorizationAuthority.Application/AuthorizationAuthority.Application.csproj" />
+    <ProjectReference Include="../AuthorizationAuthority.Infrastructure/AuthorizationAuthority.Infrastructure.csproj" />
+    <ProjectReference Include="../AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="EnterpriseForms.ArchitectureTests" />
+  </ItemGroup>
+</Project>

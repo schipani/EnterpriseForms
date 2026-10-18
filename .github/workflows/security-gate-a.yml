@@ -1,0 +1,42 @@
+# Stage A security qualification gate (ADR-PB-003 Level A). STATUS: NOT YET SATISFIABLE.
+# This workflow brings up the disposable security-test stack and evaluates SEC-P01..SEC-P12 evidence.
+# Until the Stage A tests exist and produce artifacts/security/gate-a-evidence.json, the job fails with BLOCKED.
+# A failing or missing run never counts as PASS (SECURITY_VALIDATION_RUNBOOK.md §3). Manual/scheduled only.
+name: security-gate-a
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1-5"
+
+permissions:
+  contents: read
+
+jobs:
+  gate-a:
+    name: SEC-P01..SEC-P12 against the isolated Docker stack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: Start disposable security-test stack (synthetic credentials)
+        working-directory: infrastructure/docker
+        run: |
+          cp env.example .env
+          docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait business-db authority-db spicedb vault
+      - name: Run Stage A adversarial tests
+        run: |
+          if [ ! -d tests/security ]; then
+            echo "::error::Stage A tests (tests/security/**) are not implemented yet. Gate A = BLOCKED."
+            exit 1
+          fi
+          dotnet test tests/security --results-directory artifacts/security
+      - name: Validate evidence manifest shape and digests (does not prove tests ran)
+        run: python security_validation/validate_security_evidence.py artifacts/security/gate-a-evidence.json
+      - name: Tear down
+        if: always()
+        working-directory: infrastructure/docker
+        run: docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env down -v --remove-orphans

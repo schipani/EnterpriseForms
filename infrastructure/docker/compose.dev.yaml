@@ -1,0 +1,25 @@
+# Development overrides: loopback-only host ports for services and named volumes that survive restarts.
+# Database ports are NOT published: host traffic reaches containers as the bridge gateway, which pg_hba rejects.
+# Use `docker compose ... exec business-db psql -U $BUSINESS_DB_ADMIN_USER -d $BUSINESS_DB_NAME` instead.
+services:
+  business-db:
+    volumes: [business-db-data:/var/lib/postgresql]
+  authority-db:
+    volumes: [authority-db-data:/var/lib/postgresql]
+  spicedb-db:
+    volumes: [spicedb-db-data:/var/lib/postgresql]
+  azurite:
+    ports: ["127.0.0.1:10010:10000"]   # 10000 is commonly taken by other local Azurite instances
+    volumes: [azurite-data:/data]
+  authority:
+    ports: ["127.0.0.1:5090:8080"]
+  api:
+    ports: ["127.0.0.1:5080:8080"]
+  web:
+    ports: ["127.0.0.1:8081:8080"]
+
+volumes:
+  business-db-data: {}
+  authority-db-data: {}
+  spicedb-db-data: {}
+  azurite-data: {}

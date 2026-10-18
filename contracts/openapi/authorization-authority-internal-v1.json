@@ -1,0 +1,74 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Enterprise Forms Authorization Authority (INTERNAL)",
+    "description": "Private contract. Reachable only over the authority network path with workload identity. Not part of the browser-facing API.",
+    "version": "internal-v1"
+  },
+  "paths": {
+    "/internal/v1/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "GetAuthorityLiveness",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorityProbeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "GetAuthorityReadiness",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorityProbeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuthorityProbeResponse": {
+        "required": [
+          "probeStatus",
+          "serviceName"
+        ],
+        "type": "object",
+        "properties": {
+          "probeStatus": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health"
+    }
+  ]
+}

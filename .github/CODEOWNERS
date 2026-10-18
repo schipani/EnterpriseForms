@@ -1,0 +1,17 @@
+# Review ownership (PB11_CICD_SUPPLY_CHAIN_RELEASE_STANDARD.md "Repository and code ownership").
+# Replace the placeholder teams with real GitHub teams when the private repository is created (BUILD-00).
+# Security-owner review is mandatory for Trust Authority code, security specifications, workflows and infrastructure.
+
+*                                   @enterpriseforms/maintainers
+/src/authority/                     @enterpriseforms/security-owners
+/src/shared/EnterpriseForms.Integrity/ @enterpriseforms/security-owners
+/trust_authority/                   @enterpriseforms/security-owners
+/security_hardening/                @enterpriseforms/security-owners
+/security_validation/               @enterpriseforms/security-owners
+/docs/dynamic-forms/row-integrity-format.md @enterpriseforms/security-owners
+/scripts/integrity/                 @enterpriseforms/security-owners
+/.github/                           @enterpriseforms/security-owners
+/infrastructure/                    @enterpriseforms/security-owners
+/SECURITY_THREAT_MODEL.md           @enterpriseforms/security-owners
+/SECURITY_GAP_ASSESSMENT.md         @enterpriseforms/security-owners
+/CLAUDE.md                          @enterpriseforms/security-owners @enterpriseforms/maintainers

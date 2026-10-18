@@ -1,0 +1,22 @@
+# Disposable integration-test environment: no host ports, ephemeral tmpfs storage, Testing environment names.
+# Never shares volumes with the development profile, so tests cannot erase developer data.
+services:
+  business-db:
+    tmpfs: [/var/lib/postgresql]
+  authority-db:
+    tmpfs: [/var/lib/postgresql]
+  spicedb-db:
+    tmpfs: [/var/lib/postgresql]
+  azurite:
+    tmpfs: [/data]
+  authority:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+  api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+  worker:
+    environment:
+      DOTNET_ENVIRONMENT: Testing
+  web:
+    profiles: [never]   # the SPA is not part of API integration runs

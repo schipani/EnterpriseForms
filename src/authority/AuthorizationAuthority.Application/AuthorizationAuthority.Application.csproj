@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>AuthorizationAuthority.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AuthorizationAuthority.Domain/AuthorizationAuthority.Domain.csproj" />
+    <ProjectReference Include="../AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
+    <ProjectReference Include="../../shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
+  </ItemGroup>
+</Project>

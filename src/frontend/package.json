@@ -1,0 +1,31 @@
+{
+  "name": "enterpriseforms-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Enterprise Forms web workspace: app shell plus feature-owned packages (ADR-ARCH-001 §4U.4). Toolchain pinned per ADR-PB-011.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "build": "npm run build --workspaces --if-present",
+    "generate:api-client": "npm run generate -w packages/api-client",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.5"
+  }
+}

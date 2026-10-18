@@ -1,0 +1,12 @@
+# Build context is the repository root (infrastructure/docker/compose.yaml). Never copy host build output or secrets.
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/TestResults/
+artifacts/
+.git/
+.vs/
+.vscode/
+infrastructure/docker/.env
+**/*.user

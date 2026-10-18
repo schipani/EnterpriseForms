@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Independent Authorization Authority domain. Never referenced by business assemblies. -->
+  <PropertyGroup>
+    <RootNamespace>AuthorizationAuthority.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>

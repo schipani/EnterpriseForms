@@ -1,0 +1,25 @@
+# Pinned, reviewed dependency updates (ADR-PB-011). Security reviewers own Trust Authority and workflow changes.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dotnet-platform:
+        patterns: ["Microsoft.*", "Npgsql.*"]
+  - package-ecosystem: npm
+    directory: /src/frontend
+    schedule:
+      interval: weekly
+    groups:
+      frontend-tooling:
+        patterns: ["eslint*", "typescript*", "vite*", "vitest", "@vitejs/*", "@tailwindcss/*", "tailwindcss"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /infrastructure/docker
+    schedule:
+      interval: weekly

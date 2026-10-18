@@ -1,0 +1,30 @@
+@import "tailwindcss";
+@import "@enterpriseforms/design-tokens/tokens.css";
+
+/* Tailwind v4 theme bridge: utilities read the approved tokens, never raw tenant CSS. */
+@theme {
+  --color-primary: var(--ui-primary-bg);
+  --color-primary-foreground: var(--ui-primary-fg);
+  --color-page: var(--ui-page);
+  --color-surface: var(--ui-surface);
+  --color-body: var(--ui-body-text);
+  --color-muted: var(--ui-muted-text);
+  --color-line: var(--ui-border);
+  --color-focus: var(--ui-focus);
+}
+
+html {
+  font-size: calc(100% * var(--ui-font-scale));
+}
+
+body {
+  margin: 0;
+  background: var(--ui-page);
+  color: var(--ui-body-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 2px;
+}

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Private internal contract (/internal/v1). Published separately; never part of the browser-facing OpenAPI. -->
+  <PropertyGroup>
+    <RootNamespace>AuthorizationAuthority.Contracts</RootNamespace>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,504 @@
+{
+  "schema": "DynamicForms/MerkleManifest/test-vectors/v1",
+  "status": "Gate 0 conformance vectors; machine-cross-verified in Python, C# and Node. Independent human cryptographic review still required before Stage A sign-off.",
+  "normativeSource": "trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md sections 2.1, 2.2 and 8",
+  "algorithm": {
+    "hash": "SHA-256",
+    "leafFraming": "0x00 || ASCII('DynamicForms/MerkleLeaf/v1') || UInt16BE(17) || item_key[17] || row_signature[32] || canonical_payload_digest[32] || item_kind_code[1] || UInt64BE(committed_content_revision) || committed_operation_uuid[16]",
+    "nodeFraming": "SHA256(0x01 || ASCII('DynamicForms/MerkleNode/v1') || left[32] || right[32])",
+    "emptyRoot": "SHA256(0x02 || ASCII('DynamicForms/MerkleEmpty/v1'))",
+    "indexDigest": "SHA256(0x03 || ASCII('DynamicForms/ManifestIndex/v1') || UInt64BE(leaf_count) || concat_sorted(UInt16BE(17) || item_key[17] || leaf_hash[32]))",
+    "itemKey": "1-byte kind code followed by 16 RFC 4122 network-order UUID bytes; leaves sorted by unsigned item_key bytes",
+    "oddLevelRule": "final unpaired node is promoted unchanged, never duplicated",
+    "kindCodes": {
+      "RecordHeader": 1,
+      "RepeatedGroup": 2,
+      "FieldValue": 3,
+      "FieldSelection": 4,
+      "Attachment": 5,
+      "AttachmentLifecycle": 6
+    },
+    "uuidByteOrderWarning": ".NET Guid.ToByteArray() is mixed-endian; implementations must use RFC 4122 network order (Guid.ToByteArray(bigEndian: true))."
+  },
+  "fixtures": {
+    "organizationId": "11111111-1111-4111-8111-111111111111",
+    "formRecordId": "0199a2b3-c4d5-7e6f-8123-456789abcdef",
+    "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007",
+    "committedContentRevision": 7,
+    "rowSignatureWarning": "Row signatures are invented 32-byte fixtures (0x11.., 0x22.., ...). They are not HMAC outputs and do not authorize skipping signature verification."
+  },
+  "emptyRootHex": "03a606d4c6a2e9868fa1d4282fb529238d55cc7eeee8141b585082dcac32a59e",
+  "cases": [
+    {
+      "caseId": "MRKV1-3LEAF-NORMATIVE",
+      "description": "Protocol section 8 three-item manifest (RecordHeader, FieldValue, Attachment). Odd trailing leaf promoted without duplication.",
+      "inputLeavesInSubmissionOrder": [
+        {
+          "itemKind": "RecordHeader",
+          "itemKindCode": 1,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdef",
+          "itemKeyHex": "010199a2b3c4d57e6f8123456789abcdef",
+          "rowSignatureHex": "1111111111111111111111111111111111111111111111111111111111111111",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:RecordHeader",
+          "canonicalPayloadDigestHex": "824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa3",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "FieldValue",
+          "itemKindCode": 3,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf0",
+          "itemKeyHex": "030199a2b3c4d57e6f8123456789abcdf0",
+          "rowSignatureHex": "3333333333333333333333333333333333333333333333333333333333333333",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:FieldValue",
+          "canonicalPayloadDigestHex": "9fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "Attachment",
+          "itemKindCode": 5,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf3",
+          "itemKeyHex": "050199a2b3c4d57e6f8123456789abcdf3",
+          "rowSignatureHex": "5555555555555555555555555555555555555555555555555555555555555555",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:Attachment",
+          "canonicalPayloadDigestHex": "6b4e987616691713af53111b58dccf1c153b1be418c6f35fd9b5a03569dc218d",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "sortedItemKeysHex": [
+          "010199a2b3c4d57e6f8123456789abcdef",
+          "030199a2b3c4d57e6f8123456789abcdf0",
+          "050199a2b3c4d57e6f8123456789abcdf3"
+        ],
+        "leafBytesHex": [
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011010199a2b3c4d57e6f8123456789abcdef1111111111111111111111111111111111111111111111111111111111111111824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa30100000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011030199a2b3c4d57e6f8123456789abcdf033333333333333333333333333333333333333333333333333333333333333339fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c0300000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011050199a2b3c4d57e6f8123456789abcdf355555555555555555555555555555555555555555555555555555555555555556b4e987616691713af53111b58dccf1c153b1be418c6f35fd9b5a03569dc218d0500000000000000070199a2b3c4d570008000000000000007"
+        ],
+        "leafHashesHex": [
+          "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+          "d4dbddbd8aea409df6b3fd3fe3b18ee23c98f4c5962b609ae23fd78c52797c85",
+          "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+        ],
+        "levelsBottomUpHex": [
+          [
+            "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+            "d4dbddbd8aea409df6b3fd3fe3b18ee23c98f4c5962b609ae23fd78c52797c85",
+            "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+          ],
+          [
+            "dae464a5af17c36294c57a96f6354df05881724007a1d9d8ec5125094284b62c",
+            "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+          ],
+          [
+            "3a668f718a509d04c2b9b12f068d8ae5d32d62fe4bcd791890da76f9e308178a"
+          ]
+        ],
+        "merkleRootHex": "3a668f718a509d04c2b9b12f068d8ae5d32d62fe4bcd791890da76f9e308178a",
+        "leafCount": 3,
+        "leafIndexDigestHex": "11c45437bc73506d27982671c592855b2af49d189438b9b0b7a6c6e9cb8c2bd9"
+      }
+    },
+    {
+      "caseId": "MRKV1-3LEAF-UNSORTED-INPUT",
+      "description": "Same three items submitted in reverse order; output must be identical to MRKV1-3LEAF-NORMATIVE.",
+      "inputLeavesInSubmissionOrder": [
+        {
+          "itemKind": "Attachment",
+          "itemKindCode": 5,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf3",
+          "itemKeyHex": "050199a2b3c4d57e6f8123456789abcdf3",
+          "rowSignatureHex": "5555555555555555555555555555555555555555555555555555555555555555",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:Attachment",
+          "canonicalPayloadDigestHex": "6b4e987616691713af53111b58dccf1c153b1be418c6f35fd9b5a03569dc218d",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "FieldValue",
+          "itemKindCode": 3,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf0",
+          "itemKeyHex": "030199a2b3c4d57e6f8123456789abcdf0",
+          "rowSignatureHex": "3333333333333333333333333333333333333333333333333333333333333333",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:FieldValue",
+          "canonicalPayloadDigestHex": "9fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "RecordHeader",
+          "itemKindCode": 1,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdef",
+          "itemKeyHex": "010199a2b3c4d57e6f8123456789abcdef",
+          "rowSignatureHex": "1111111111111111111111111111111111111111111111111111111111111111",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:RecordHeader",
+          "canonicalPayloadDigestHex": "824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa3",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "sortedItemKeysHex": [
+          "010199a2b3c4d57e6f8123456789abcdef",
+          "030199a2b3c4d57e6f8123456789abcdf0",
+          "050199a2b3c4d57e6f8123456789abcdf3"
+        ],
+        "leafBytesHex": [
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011010199a2b3c4d57e6f8123456789abcdef1111111111111111111111111111111111111111111111111111111111111111824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa30100000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011030199a2b3c4d57e6f8123456789abcdf033333333333333333333333333333333333333333333333333333333333333339fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c0300000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011050199a2b3c4d57e6f8123456789abcdf355555555555555555555555555555555555555555555555555555555555555556b4e987616691713af53111b58dccf1c153b1be418c6f35fd9b5a03569dc218d0500000000000000070199a2b3c4d570008000000000000007"
+        ],
+        "leafHashesHex": [
+          "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+          "d4dbddbd8aea409df6b3fd3fe3b18ee23c98f4c5962b609ae23fd78c52797c85",
+          "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+        ],
+        "levelsBottomUpHex": [
+          [
+            "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+            "d4dbddbd8aea409df6b3fd3fe3b18ee23c98f4c5962b609ae23fd78c52797c85",
+            "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+          ],
+          [
+            "dae464a5af17c36294c57a96f6354df05881724007a1d9d8ec5125094284b62c",
+            "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+          ],
+          [
+            "3a668f718a509d04c2b9b12f068d8ae5d32d62fe4bcd791890da76f9e308178a"
+          ]
+        ],
+        "merkleRootHex": "3a668f718a509d04c2b9b12f068d8ae5d32d62fe4bcd791890da76f9e308178a",
+        "leafCount": 3,
+        "leafIndexDigestHex": "11c45437bc73506d27982671c592855b2af49d189438b9b0b7a6c6e9cb8c2bd9"
+      }
+    },
+    {
+      "caseId": "MRKV1-1LEAF",
+      "description": "Single RecordHeader leaf: root equals the leaf hash.",
+      "inputLeavesInSubmissionOrder": [
+        {
+          "itemKind": "RecordHeader",
+          "itemKindCode": 1,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdef",
+          "itemKeyHex": "010199a2b3c4d57e6f8123456789abcdef",
+          "rowSignatureHex": "1111111111111111111111111111111111111111111111111111111111111111",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:RecordHeader",
+          "canonicalPayloadDigestHex": "824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa3",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "sortedItemKeysHex": [
+          "010199a2b3c4d57e6f8123456789abcdef"
+        ],
+        "leafBytesHex": [
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011010199a2b3c4d57e6f8123456789abcdef1111111111111111111111111111111111111111111111111111111111111111824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa30100000000000000070199a2b3c4d570008000000000000007"
+        ],
+        "leafHashesHex": [
+          "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65"
+        ],
+        "levelsBottomUpHex": [
+          [
+            "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65"
+          ]
+        ],
+        "merkleRootHex": "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+        "leafCount": 1,
+        "leafIndexDigestHex": "93b5d6add8971588a610549957638d0a5062168ed81de6c64ebdbb5b4e3e4573"
+      }
+    },
+    {
+      "caseId": "MRKV1-4LEAF-BALANCED",
+      "description": "Four leaves: two internal nodes then root.",
+      "inputLeavesInSubmissionOrder": [
+        {
+          "itemKind": "RecordHeader",
+          "itemKindCode": 1,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdef",
+          "itemKeyHex": "010199a2b3c4d57e6f8123456789abcdef",
+          "rowSignatureHex": "1111111111111111111111111111111111111111111111111111111111111111",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:RecordHeader",
+          "canonicalPayloadDigestHex": "824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa3",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "RepeatedGroup",
+          "itemKindCode": 2,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf1",
+          "itemKeyHex": "020199a2b3c4d57e6f8123456789abcdf1",
+          "rowSignatureHex": "2222222222222222222222222222222222222222222222222222222222222222",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:RepeatedGroup",
+          "canonicalPayloadDigestHex": "7f55ca6801f9be7595abda4a89318656f001af84cf5adeccbdc3592554e7f2e9",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "FieldValue",
+          "itemKindCode": 3,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf0",
+          "itemKeyHex": "030199a2b3c4d57e6f8123456789abcdf0",
+          "rowSignatureHex": "3333333333333333333333333333333333333333333333333333333333333333",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:FieldValue",
+          "canonicalPayloadDigestHex": "9fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "Attachment",
+          "itemKindCode": 5,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf3",
+          "itemKeyHex": "050199a2b3c4d57e6f8123456789abcdf3",
+          "rowSignatureHex": "5555555555555555555555555555555555555555555555555555555555555555",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:Attachment",
+          "canonicalPayloadDigestHex": "6b4e987616691713af53111b58dccf1c153b1be418c6f35fd9b5a03569dc218d",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "sortedItemKeysHex": [
+          "010199a2b3c4d57e6f8123456789abcdef",
+          "020199a2b3c4d57e6f8123456789abcdf1",
+          "030199a2b3c4d57e6f8123456789abcdf0",
+          "050199a2b3c4d57e6f8123456789abcdf3"
+        ],
+        "leafBytesHex": [
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011010199a2b3c4d57e6f8123456789abcdef1111111111111111111111111111111111111111111111111111111111111111824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa30100000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011020199a2b3c4d57e6f8123456789abcdf122222222222222222222222222222222222222222222222222222222222222227f55ca6801f9be7595abda4a89318656f001af84cf5adeccbdc3592554e7f2e90200000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011030199a2b3c4d57e6f8123456789abcdf033333333333333333333333333333333333333333333333333333333333333339fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c0300000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011050199a2b3c4d57e6f8123456789abcdf355555555555555555555555555555555555555555555555555555555555555556b4e987616691713af53111b58dccf1c153b1be418c6f35fd9b5a03569dc218d0500000000000000070199a2b3c4d570008000000000000007"
+        ],
+        "leafHashesHex": [
+          "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+          "735efc61ee32cb93325650b53ef3a5ca04661acf68ad485c267bdb0a1a7747de",
+          "d4dbddbd8aea409df6b3fd3fe3b18ee23c98f4c5962b609ae23fd78c52797c85",
+          "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+        ],
+        "levelsBottomUpHex": [
+          [
+            "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+            "735efc61ee32cb93325650b53ef3a5ca04661acf68ad485c267bdb0a1a7747de",
+            "d4dbddbd8aea409df6b3fd3fe3b18ee23c98f4c5962b609ae23fd78c52797c85",
+            "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+          ],
+          [
+            "c7a51db5e42ae351b7471ae386b6fe7ab46ad790af01075da95d6024a47b4041",
+            "834e0778ce60af3b5a2887550b1838b1d9a9b1c71a4b8561dd36ae99d098c3bc"
+          ],
+          [
+            "e251c1d22bcbab1f32309edb1ed16940cc6188bcaf24bfbc63cafd845b37e13f"
+          ]
+        ],
+        "merkleRootHex": "e251c1d22bcbab1f32309edb1ed16940cc6188bcaf24bfbc63cafd845b37e13f",
+        "leafCount": 4,
+        "leafIndexDigestHex": "d686ee8ef93c0efaf6e11a5230b434c94ac8349b56f34cf99ed63a2fab5549dc"
+      }
+    },
+    {
+      "caseId": "MRKV1-5LEAF-DOUBLE-PROMOTION",
+      "description": "Five leaves: unpaired node promoted at level 1 and again at level 2.",
+      "inputLeavesInSubmissionOrder": [
+        {
+          "itemKind": "RecordHeader",
+          "itemKindCode": 1,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdef",
+          "itemKeyHex": "010199a2b3c4d57e6f8123456789abcdef",
+          "rowSignatureHex": "1111111111111111111111111111111111111111111111111111111111111111",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:RecordHeader",
+          "canonicalPayloadDigestHex": "824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa3",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "RepeatedGroup",
+          "itemKindCode": 2,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf1",
+          "itemKeyHex": "020199a2b3c4d57e6f8123456789abcdf1",
+          "rowSignatureHex": "2222222222222222222222222222222222222222222222222222222222222222",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:RepeatedGroup",
+          "canonicalPayloadDigestHex": "7f55ca6801f9be7595abda4a89318656f001af84cf5adeccbdc3592554e7f2e9",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "FieldValue",
+          "itemKindCode": 3,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf0",
+          "itemKeyHex": "030199a2b3c4d57e6f8123456789abcdf0",
+          "rowSignatureHex": "3333333333333333333333333333333333333333333333333333333333333333",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:FieldValue",
+          "canonicalPayloadDigestHex": "9fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "FieldSelection",
+          "itemKindCode": 4,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf2",
+          "itemKeyHex": "040199a2b3c4d57e6f8123456789abcdf2",
+          "rowSignatureHex": "4444444444444444444444444444444444444444444444444444444444444444",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:FieldSelection",
+          "canonicalPayloadDigestHex": "aad8832a90a325818600ec2a653c17a57b4c6920e7efc58896a28cb7058626ad",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "Attachment",
+          "itemKindCode": 5,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf3",
+          "itemKeyHex": "050199a2b3c4d57e6f8123456789abcdf3",
+          "rowSignatureHex": "5555555555555555555555555555555555555555555555555555555555555555",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:Attachment",
+          "canonicalPayloadDigestHex": "6b4e987616691713af53111b58dccf1c153b1be418c6f35fd9b5a03569dc218d",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        }
+      ],
+      "expected": {
+        "sortedItemKeysHex": [
+          "010199a2b3c4d57e6f8123456789abcdef",
+          "020199a2b3c4d57e6f8123456789abcdf1",
+          "030199a2b3c4d57e6f8123456789abcdf0",
+          "040199a2b3c4d57e6f8123456789abcdf2",
+          "050199a2b3c4d57e6f8123456789abcdf3"
+        ],
+        "leafBytesHex": [
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011010199a2b3c4d57e6f8123456789abcdef1111111111111111111111111111111111111111111111111111111111111111824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa30100000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011020199a2b3c4d57e6f8123456789abcdf122222222222222222222222222222222222222222222222222222222222222227f55ca6801f9be7595abda4a89318656f001af84cf5adeccbdc3592554e7f2e90200000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011030199a2b3c4d57e6f8123456789abcdf033333333333333333333333333333333333333333333333333333333333333339fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c0300000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011040199a2b3c4d57e6f8123456789abcdf24444444444444444444444444444444444444444444444444444444444444444aad8832a90a325818600ec2a653c17a57b4c6920e7efc58896a28cb7058626ad0400000000000000070199a2b3c4d570008000000000000007",
+          "0044796e616d6963466f726d732f4d65726b6c654c6561662f76310011050199a2b3c4d57e6f8123456789abcdf355555555555555555555555555555555555555555555555555555555555555556b4e987616691713af53111b58dccf1c153b1be418c6f35fd9b5a03569dc218d0500000000000000070199a2b3c4d570008000000000000007"
+        ],
+        "leafHashesHex": [
+          "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+          "735efc61ee32cb93325650b53ef3a5ca04661acf68ad485c267bdb0a1a7747de",
+          "d4dbddbd8aea409df6b3fd3fe3b18ee23c98f4c5962b609ae23fd78c52797c85",
+          "a8e316e4fbc81677f5ff044d6a5230fe832868cd55ff0b2bd945399719d7cd0a",
+          "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+        ],
+        "levelsBottomUpHex": [
+          [
+            "59b403e1d198751d5a26c085af5fd4e35f67379f1773ac25b10a51b12d98ca65",
+            "735efc61ee32cb93325650b53ef3a5ca04661acf68ad485c267bdb0a1a7747de",
+            "d4dbddbd8aea409df6b3fd3fe3b18ee23c98f4c5962b609ae23fd78c52797c85",
+            "a8e316e4fbc81677f5ff044d6a5230fe832868cd55ff0b2bd945399719d7cd0a",
+            "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+          ],
+          [
+            "c7a51db5e42ae351b7471ae386b6fe7ab46ad790af01075da95d6024a47b4041",
+            "b54f3f9972f050152fa11102ebd986fe72384203d37d19576419ba3880f21eb6",
+            "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+          ],
+          [
+            "41bbcedfb9eed4998aa35c0565a353445101b8d5f63b32b377cfd338231390da",
+            "be69908d2f27a069ab1a7d1f4d82f6a4c23a51eb20ac602760e527597b413c67"
+          ],
+          [
+            "dda89a7b3309f5f452c2a8f49e6c8e23705c0096d96c7d98584e8dd16d84ea53"
+          ]
+        ],
+        "merkleRootHex": "dda89a7b3309f5f452c2a8f49e6c8e23705c0096d96c7d98584e8dd16d84ea53",
+        "leafCount": 5,
+        "leafIndexDigestHex": "38343e10b9f2f9fa20ef3ae2625cca30962473b26c7688e27525c50e19774289"
+      }
+    }
+  ],
+  "negativeCases": [
+    {
+      "caseId": "MRKV1-NEG-DUPLICATE-KEY",
+      "description": "Two leaves with the same item_key must be rejected.",
+      "inputLeavesInSubmissionOrder": [
+        {
+          "itemKind": "FieldValue",
+          "itemKindCode": 3,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf0",
+          "itemKeyHex": "030199a2b3c4d57e6f8123456789abcdf0",
+          "rowSignatureHex": "3333333333333333333333333333333333333333333333333333333333333333",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:FieldValue",
+          "canonicalPayloadDigestHex": "9fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "FieldValue",
+          "itemKindCode": 3,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf0",
+          "itemKeyHex": "030199a2b3c4d57e6f8123456789abcdf0",
+          "rowSignatureHex": "3333333333333333333333333333333333333333333333333333333333333333",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:FieldValue",
+          "canonicalPayloadDigestHex": "9fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        }
+      ],
+      "expectedError": "DuplicateItemKey"
+    },
+    {
+      "caseId": "MRKV1-NEG-KIND-MISMATCH",
+      "description": "item_key kind code 3 but trailing item_kind_code 5 must be rejected.",
+      "itemKeyHex": "030199a2b3c4d57e6f8123456789abcdf0",
+      "trailingItemKindCode": 5,
+      "expectedError": "KindCodeMismatch"
+    },
+    {
+      "caseId": "MRKV1-NEG-SIGNATURE-LENGTH",
+      "description": "A 31-byte row_signature must be rejected (only exact 32-byte tags are valid).",
+      "rowSignatureHex": "33333333333333333333333333333333333333333333333333333333333333",
+      "expectedError": "InvalidSignatureLength"
+    },
+    {
+      "caseId": "MRKV1-NEG-MIXED-REVISION",
+      "description": "Leaves bound to different committed revisions cannot form one manifest.",
+      "inputLeavesInSubmissionOrder": [
+        {
+          "itemKind": "RecordHeader",
+          "itemKindCode": 1,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdef",
+          "itemKeyHex": "010199a2b3c4d57e6f8123456789abcdef",
+          "rowSignatureHex": "1111111111111111111111111111111111111111111111111111111111111111",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:RecordHeader",
+          "canonicalPayloadDigestHex": "824f82050bbdc04c5d060495fafbc3cc61bdfb438ad80ec4f6fb3b6544f0ffa3",
+          "committedContentRevision": 7,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        },
+        {
+          "itemKind": "FieldValue",
+          "itemKindCode": 3,
+          "itemId": "0199a2b3-c4d5-7e6f-8123-456789abcdf0",
+          "itemKeyHex": "030199a2b3c4d57e6f8123456789abcdf0",
+          "rowSignatureHex": "3333333333333333333333333333333333333333333333333333333333333333",
+          "rowSignatureNote": "INVENTED fixed fixture bytes; not a real HMAC tag",
+          "fixturePayloadAscii": "merkle-v1-fixture-payload:FieldValue",
+          "canonicalPayloadDigestHex": "9fe7a11c7059d76a51f4e231e5a1bd79e1af9c7739b8e33fdf0c8cb94712153c",
+          "committedContentRevision": 8,
+          "committedOperationId": "0199a2b3-c4d5-7000-8000-000000000007"
+        }
+      ],
+      "expectedError": "MixedRevisionOrOperation"
+    }
+  ]
+}

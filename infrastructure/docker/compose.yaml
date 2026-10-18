@@ -1,0 +1,184 @@
+# Enterprise Forms — local trust-separated stack (ADR-PB-005, PB05_DEPLOYMENT_BLUEPRINT.md).
+#
+# Usage (always combine with exactly one override file):
+#   development:    docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d
+#   integration:    docker compose -f compose.yaml -f compose.integration.yaml --env-file .env up -d --wait
+#   security-test:  docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --wait
+# Copy env.example to .env first. Values in env.example are synthetic development credentials only.
+#
+# Trust boundaries emulated with separate networks and credentials (NOT equivalent to production isolation):
+#   business-net : business-db <-> api/worker
+#   trust-edge   : api/worker  -> authority (private HTTP contract only)
+#   authority-net: authority <-> authority-db, spicedb, vault   (no business service is attached)
+#   web-net      : web -> api
+name: enterpriseforms
+
+networks:
+  # Subnets are pinned so the PostgreSQL pg_hba policies can name them. authority-net is `internal`: Docker Desktop does
+  # not isolate bridge networks from each other by IP (verified 2026-10-17), but internal networks are isolated.
+  business-net:
+    ipam:
+      config: [{ subnet: 172.30.0.0/24 }]
+  trust-edge: {}
+  authority-net:
+    internal: true
+    ipam:
+      config: [{ subnet: 172.30.1.0/24 }]
+  web-net: {}
+
+services:
+  business-db:
+    image: postgres:18.0
+    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
+    volumes: ["./postgres/pg_hba.business.conf:/etc/postgresql/pg_hba.conf:ro"]
+    environment:
+      POSTGRES_DB: ${BUSINESS_DB_NAME:?set in .env}
+      POSTGRES_USER: ${BUSINESS_DB_ADMIN_USER:?set in .env}
+      POSTGRES_PASSWORD: ${BUSINESS_DB_ADMIN_PASSWORD:?set in .env}
+    networks: [business-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  authority-db:
+    image: postgres:18.0
+    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
+    volumes: ["./postgres/pg_hba.authority.conf:/etc/postgresql/pg_hba.conf:ro"]
+    environment:
+      POSTGRES_DB: ${AUTHORITY_DB_NAME:?set in .env}
+      POSTGRES_USER: ${AUTHORITY_DB_ADMIN_USER:?set in .env}
+      POSTGRES_PASSWORD: ${AUTHORITY_DB_ADMIN_PASSWORD:?set in .env}
+    networks: [authority-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  spicedb-db:
+    image: postgres:18.0
+    environment:
+      POSTGRES_DB: spicedb
+      POSTGRES_USER: ${SPICEDB_DB_USER:?set in .env}
+      POSTGRES_PASSWORD: ${SPICEDB_DB_PASSWORD:?set in .env}
+    networks: [authority-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d spicedb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  spicedb-migrate:
+    image: authzed/spicedb:v1.56.2
+    command: ["migrate", "head", "--datastore-engine", "postgres", "--datastore-conn-uri", "postgres://${SPICEDB_DB_USER}:${SPICEDB_DB_PASSWORD}@spicedb-db:5432/spicedb?sslmode=disable"]
+    depends_on:
+      spicedb-db:
+        condition: service_healthy
+    networks: [authority-net]
+    restart: "no"
+
+  spicedb:
+    image: authzed/spicedb:v1.56.2
+    command: ["serve", "--grpc-preshared-key", "${SPICEDB_PRESHARED_KEY:?set in .env}", "--datastore-engine", "postgres", "--datastore-conn-uri", "postgres://${SPICEDB_DB_USER}:${SPICEDB_DB_PASSWORD}@spicedb-db:5432/spicedb?sslmode=disable", "--http-enabled=false"]
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+    networks: [authority-net]
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  vault:
+    # DEVELOPMENT ONLY. Vault dev mode: in-memory, unsealed, root token from .env. Never promoted beyond local.
+    image: hashicorp/vault:1.20.4
+    command: ["server", "-dev", "-dev-root-token-id=${VAULT_DEV_ROOT_TOKEN:?set in .env}", "-dev-listen-address=0.0.0.0:8200"]
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    cap_add: [IPC_LOCK]
+    networks: [authority-net]
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  azurite:
+    # Blob emulator for the Documents feature (Phase 3A). Private container semantics are enforced by the API, not the emulator.
+    image: mcr.microsoft.com/azure-storage/azurite:3.9.0
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose"]
+    networks: [business-net]
+
+  authority:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.authority
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${AUTHORITY_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      Signing__Provider: VaultTransit
+      Signing__VaultAddress: http://vault:8200
+      ConnectionStrings__AuthorityDb: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=${AUTHORITY_DB_ADMIN_USER};Password=${AUTHORITY_DB_ADMIN_PASSWORD}
+      SpiceDb__Endpoint: spicedb:50051
+    depends_on:
+      authority-db:
+        condition: service_healthy
+      spicedb:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    networks: [authority-net, trust-edge]
+    healthcheck:
+      test: ["CMD", "dotnet", "AuthorizationAuthority.Api.dll", "--probe", "http://127.0.0.1:8080/internal/v1/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.api
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${BUSINESS_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      TrustAuthority__BaseAddress: http://authority:8080
+      ConnectionStrings__BusinessDb: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_DB_ADMIN_USER};Password=${BUSINESS_DB_ADMIN_PASSWORD}
+      Storage__BlobServiceUri: http://azurite:10000/devstoreaccount1
+    depends_on:
+      business-db:
+        condition: service_healthy
+      authority:
+        condition: service_healthy
+    networks: [business-net, trust-edge, web-net]
+    healthcheck:
+      test: ["CMD", "dotnet", "EnterpriseForms.Api.dll", "--probe", "http://127.0.0.1:8080/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.worker
+    environment:
+      DOTNET_ENVIRONMENT: ${BUSINESS_ENVIRONMENT:-Development}
+      Worker__TrustAuthorityBaseAddress: http://authority:8080
+      ConnectionStrings__BusinessDb: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_DB_ADMIN_USER};Password=${BUSINESS_DB_ADMIN_PASSWORD}
+    depends_on:
+      business-db:
+        condition: service_healthy
+      authority:
+        condition: service_healthy
+    networks: [business-net, trust-edge]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.web
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [web-net]

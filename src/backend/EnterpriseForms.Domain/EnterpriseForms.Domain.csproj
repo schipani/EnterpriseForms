@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pure domain. No ASP.NET Core, EF Core, provider SDKs, Application or Api references (ADR-ARCH-001). -->
+  <PropertyGroup>
+    <RootNamespace>EnterpriseForms.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>

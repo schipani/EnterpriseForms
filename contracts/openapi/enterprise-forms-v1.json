@@ -1,0 +1,76 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Enterprise Forms Business API",
+    "description": "Browser-facing business API generated from compiled feature endpoints (ADR-PB-006). The Authorization Authority contract is private and published separately.",
+    "version": "v1"
+  },
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Process liveness. Never consults external dependencies.",
+        "operationId": "GetLiveness",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Readiness. Fails closed when the Authorization Authority is unconfigured or unreachable.",
+        "operationId": "GetReadiness",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProbeResponse": {
+        "required": [
+          "probeStatus",
+          "serviceName"
+        ],
+        "type": "object",
+        "properties": {
+          "probeStatus": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Platform"
+    }
+  ]
+}

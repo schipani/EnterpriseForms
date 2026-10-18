@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Provider-free canonicalization and Merkle primitives shared by the independent Authorization
+    Authority (signing/verification) and the business application (verification only).
+    No key material, no HTTP, no persistence. Keys never enter this assembly in production.
+  -->
+  <PropertyGroup>
+    <RootNamespace>EnterpriseForms.Integrity</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

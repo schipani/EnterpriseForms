@@ -1,0 +1,17 @@
+{
+  "name": "@enterpriseforms/api-client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "TypeScript types generated from the committed OpenAPI artifact (ADR-PB-006). Regenerated, never hand-edited.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../../../../contracts/openapi/enterprise-forms-v1.json -o src/generated/enterprise-forms-v1.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}

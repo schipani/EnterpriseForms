@@ -1,0 +1,25 @@
+# Business API/BFF image. Multi-stage, non-root, ICU-enabled runtime (string normalization in the integrity library).
+# Base images are tag-pinned here; the PB-11 build pipeline pins and verifies digests before promotion.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj src/shared/EnterpriseForms.Integrity/
+COPY src/backend/EnterpriseForms.Domain/EnterpriseForms.Domain.csproj src/backend/EnterpriseForms.Domain/
+COPY src/backend/EnterpriseForms.Contracts/EnterpriseForms.Contracts.csproj src/backend/EnterpriseForms.Contracts/
+COPY src/backend/EnterpriseForms.Application/EnterpriseForms.Application.csproj src/backend/EnterpriseForms.Application/
+COPY src/backend/EnterpriseForms.Infrastructure/EnterpriseForms.Infrastructure.csproj src/backend/EnterpriseForms.Infrastructure/
+COPY src/backend/EnterpriseForms.Api/EnterpriseForms.Api.csproj src/backend/EnterpriseForms.Api/
+RUN dotnet restore src/backend/EnterpriseForms.Api/EnterpriseForms.Api.csproj
+COPY src/shared/ src/shared/
+COPY src/backend/ src/backend/
+COPY contracts/ contracts/
+RUN dotnet publish src/backend/EnterpriseForms.Api/EnterpriseForms.Api.csproj -c Release -o /app/publish --no-restore -p:OpenApiGenerateDocumentsOnBuild=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS runtime
+WORKDIR /app
+COPY --from=build /app/publish ./
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
+    DOTNET_EnableDiagnostics=0
+EXPOSE 8080
+USER $APP_UID
+ENTRYPOINT ["dotnet", "EnterpriseForms.Api.dll"]

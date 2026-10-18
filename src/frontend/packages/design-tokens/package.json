@@ -1,0 +1,14 @@
+{
+  "name": "@enterpriseforms/design-tokens",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Approved design tokens and WCAG contrast validation (ADR-PB-014). No business or API dependencies.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/tokens.css"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

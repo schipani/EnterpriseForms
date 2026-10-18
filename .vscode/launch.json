@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": ".NET Business API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet build (business)",
+      "program": "${workspaceFolder}/src/backend/EnterpriseForms.Api/bin/Debug/net10.0/EnterpriseForms.Api.dll",
+      "cwd": "${workspaceFolder}/src/backend/EnterpriseForms.Api",
+      "env": { "ASPNETCORE_ENVIRONMENT": "Development", "ASPNETCORE_URLS": "http://localhost:5080" }
+    },
+    {
+      "name": ".NET Authorization Authority",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet build (authority)",
+      "program": "${workspaceFolder}/src/authority/AuthorizationAuthority.Api/bin/Debug/net10.0/AuthorizationAuthority.Api.dll",
+      "cwd": "${workspaceFolder}/src/authority/AuthorizationAuthority.Api",
+      "env": { "ASPNETCORE_ENVIRONMENT": "Development", "ASPNETCORE_URLS": "http://localhost:5090" }
+    },
+    {
+      "name": "Web (Vite)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/src/frontend/apps/web"
+    }
+  ],
+  "compounds": [
+    { "name": "API + Authority + Web", "configurations": [".NET Authorization Authority", ".NET Business API", "Web (Vite)"] }
+  ]
+}

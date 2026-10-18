@@ -1,0 +1,407 @@
+{
+  "schema": "DynamicForms/RowHmac/test-vectors/v1",
+  "status": "Gate 0 conformance vectors; machine-cross-verified in Python, C# and Node. Independent human cryptographic review still required before Stage A sign-off.",
+  "normativeSource": "docs/dynamic-forms/row-integrity-format.md",
+  "testHmacKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "testHmacKeyWarning": "Published TEST key used only to make HMAC outputs reproducible. Production integrity keys exist only inside the independent signing authority (Vault Transit locally, Azure Managed HSM in production) and are never exportable.",
+  "schemas": [
+    {
+      "entityKind": "form_records",
+      "schemaVersion": 1,
+      "signedColumns": [
+        {
+          "columnName": "created_by_user_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "created_form_version_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "form_definition_id",
+          "type": "Uuid",
+          "nullable": false
+        },
+        {
+          "columnName": "owner_team_id",
+          "type": "Uuid",
+          "nullable": true
+        },
+        {
+          "columnName": "owner_user_id",
+          "type": "Uuid",
+          "nullable": true
+        },
+        {
+          "columnName": "record_status",
+          "type": "Text",
+          "nullable": false
+        },
+        {
+          "columnName": "submitted_on",
+          "type": "TimestampUtc",
+          "nullable": true
+        },
+        {
+          "columnName": "tenant_id",
+          "type": "Uuid",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "entityKind": "integrity_type_coverage",
+      "schemaVersion": 1,
+      "signedColumns": [
+        {
+          "columnName": "boolean_flag",
+          "type": "Boolean",
+          "nullable": false
+        },
+        {
+          "columnName": "bytes_value",
+          "type": "Bytes",
+          "nullable": true
+        },
+        {
+          "columnName": "date_value",
+          "type": "Date",
+          "nullable": true
+        },
+        {
+          "columnName": "decimal_value",
+          "type": "Decimal",
+          "nullable": true
+        },
+        {
+          "columnName": "int32_value",
+          "type": "Int32",
+          "nullable": false
+        },
+        {
+          "columnName": "int64_value",
+          "type": "Int64",
+          "nullable": false
+        },
+        {
+          "columnName": "json_value",
+          "type": "Json",
+          "nullable": true
+        },
+        {
+          "columnName": "text_value",
+          "type": "Text",
+          "nullable": true
+        },
+        {
+          "columnName": "timestamp_value",
+          "type": "TimestampUtc",
+          "nullable": true
+        },
+        {
+          "columnName": "uuid_value",
+          "type": "Uuid",
+          "nullable": true
+        }
+      ]
+    }
+  ],
+  "decimalEncodingExamples": [
+    {
+      "input": "1.5E+3",
+      "encodedHex": "00000000000205dc"
+    },
+    {
+      "input": "1500",
+      "encodedHex": "00000000000205dc"
+    },
+    {
+      "input": "1.5000",
+      "encodedHex": "0000000100010f"
+    },
+    {
+      "input": "1.5",
+      "encodedHex": "0000000100010f"
+    },
+    {
+      "input": "0.000",
+      "encodedHex": "00000000000100"
+    },
+    {
+      "input": "0",
+      "encodedHex": "00000000000100"
+    },
+    {
+      "input": "-0.000100",
+      "encodedHex": "000000040001ff"
+    },
+    {
+      "input": "-0.0001",
+      "encodedHex": "000000040001ff"
+    },
+    {
+      "input": "123456789012345.6789",
+      "encodedHex": "000000040008112210f47de98115"
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "ROWV1-FORM-RECORD-USER-OWNED",
+      "description": "form_records with owner_user_id set and owner_team_id NULL (explicit NULL marker is signed).",
+      "entityKind": "form_records",
+      "schemaVersion": 1,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "created_by_user_id": "0199a2b3-c4d5-7e6f-8123-456789abce01",
+        "created_form_version_id": "0199a2b3-c4d5-7e6f-8123-456789abce04",
+        "form_definition_id": "0199a2b3-c4d5-7e6f-8123-456789abce03",
+        "owner_team_id": null,
+        "owner_user_id": "0199a2b3-c4d5-7e6f-8123-456789abce01",
+        "record_status": "Submitted",
+        "submitted_on": "2026-10-17T14:30:00.250000Z",
+        "tenant_id": "11111111-1111-4111-8111-111111111111"
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f7631000100000001000c666f726d5f7265636f726473111111111111411181111111111111110199a2b3c4d57e6f8123456789abce050000000000000001000000080012637265617465645f62795f757365725f6964070199a2b3c4d57e6f8123456789abce010017637265617465645f666f726d5f76657273696f6e5f6964070199a2b3c4d57e6f8123456789abce040012666f726d5f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce03000d6f776e65725f7465616d5f696400000d6f776e65725f757365725f6964070199a2b3c4d57e6f8123456789abce01000d7265636f72645f73746174757308000000095375626d6974746564000c7375626d69747465645f6f6e0600065e0a1da43a90000974656e616e745f69640711111111111141118111111111111111",
+        "canonicalByteLength": 334,
+        "canonicalPayloadDigestHex": "8bc6b6da8e3f69a34e4ad88efd5a71cb1c9b8d0a0cd18988cdebb117fd3baa13",
+        "rowSignatureHexWithTestKey": "7c7a359e433ed62552f1443942b12d13961e776342c0e6b80d76122bfed814f7"
+      }
+    },
+    {
+      "caseId": "ROWV1-FORM-RECORD-TEAM-OWNED",
+      "description": "Same record transferred to a team: owner_user_id NULL, owner_team_id set, row_revision 2. Canonical bytes must differ from the user-owned case.",
+      "entityKind": "form_records",
+      "schemaVersion": 1,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 2,
+      "values": {
+        "created_by_user_id": "0199a2b3-c4d5-7e6f-8123-456789abce01",
+        "created_form_version_id": "0199a2b3-c4d5-7e6f-8123-456789abce04",
+        "form_definition_id": "0199a2b3-c4d5-7e6f-8123-456789abce03",
+        "owner_team_id": "0199a2b3-c4d5-7e6f-8123-456789abce02",
+        "owner_user_id": null,
+        "record_status": "Submitted",
+        "submitted_on": "2026-10-17T14:30:00.250000Z",
+        "tenant_id": "11111111-1111-4111-8111-111111111111"
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f7631000100000001000c666f726d5f7265636f726473111111111111411181111111111111110199a2b3c4d57e6f8123456789abce050000000000000002000000080012637265617465645f62795f757365725f6964070199a2b3c4d57e6f8123456789abce010017637265617465645f666f726d5f76657273696f6e5f6964070199a2b3c4d57e6f8123456789abce040012666f726d5f646566696e6974696f6e5f6964070199a2b3c4d57e6f8123456789abce03000d6f776e65725f7465616d5f6964070199a2b3c4d57e6f8123456789abce02000d6f776e65725f757365725f696400000d7265636f72645f73746174757308000000095375626d6974746564000c7375626d69747465645f6f6e0600065e0a1da43a90000974656e616e745f69640711111111111141118111111111111111",
+        "canonicalByteLength": 334,
+        "canonicalPayloadDigestHex": "693506509e81b4045135e1d389bebbdb0162372f6efad725fff7f8ab032bb7ca",
+        "rowSignatureHexWithTestKey": "4b1ecce518230d11a18911a0b4670be73354964de47b50f9e512bfd5a2b904e6"
+      }
+    },
+    {
+      "caseId": "ROWV1-TYPES-ALL-PRESENT",
+      "description": "Every v1 type populated. Text 'Caf\\u00e9' supplied in composed (NFC) form.",
+      "entityKind": "integrity_type_coverage",
+      "schemaVersion": 1,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "boolean_flag": true,
+        "bytes_value": "deadbeef",
+        "date_value": "2024-02-29",
+        "decimal_value": "1234.5600",
+        "int32_value": -2,
+        "int64_value": 9007199254740993,
+        "json_value": {
+          "b": 1,
+          "a": [
+            true,
+            null,
+            "x"
+          ],
+          "nested": {
+            "z": "é",
+            "y": -5
+          }
+        },
+        "text_value": "Café",
+        "timestamp_value": "2024-03-10T07:00:00.000001Z",
+        "uuid_value": "0199a2b3-c4d5-7e6f-8123-456789abcdf0"
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000010017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000a000c626f6f6c65616e5f666c61670101000b62797465735f76616c75650900000004deadbeef000a646174655f76616c75650500004d46000d646563696d616c5f76616c75650400000002000301e240000b696e7433325f76616c756502fffffffe000b696e7436345f76616c7565030020000000000001000a6a736f6e5f76616c75650a000000367b2261223a5b747275652c6e756c6c2c2278225d2c2262223a312c226e6573746564223a7b2279223a2d352c227a223a22c3a9227d7d000a746578745f76616c75650800000005436166c3a9000f74696d657374616d705f76616c75650600061348f9377c01000a757569645f76616c7565070199a2b3c4d57e6f8123456789abcdf0",
+        "canonicalByteLength": 369,
+        "canonicalPayloadDigestHex": "0fc81b442f25b107a5077850fb99585a9b846b9bffae5a41d9db99663a008666",
+        "rowSignatureHexWithTestKey": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a"
+      }
+    },
+    {
+      "caseId": "ROWV1-TYPES-NFC-EQUIVALENCE",
+      "description": "Identical to ROWV1-TYPES-ALL-PRESENT except text supplied decomposed ('Cafe' + U+0301); canonical bytes MUST be identical.",
+      "entityKind": "integrity_type_coverage",
+      "schemaVersion": 1,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "boolean_flag": true,
+        "bytes_value": "DEADBEEF",
+        "date_value": "2024-02-29",
+        "decimal_value": "1234.56",
+        "int32_value": -2,
+        "int64_value": 9007199254740993,
+        "json_value": {
+          "nested": {
+            "y": -5,
+            "z": "é"
+          },
+          "a": [
+            true,
+            null,
+            "x"
+          ],
+          "b": 1
+        },
+        "text_value": "Café",
+        "timestamp_value": "2024-03-10T02:00:00.000001-05:00",
+        "uuid_value": "0199A2B3-C4D5-7E6F-8123-456789ABCDF0"
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000010017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000a000c626f6f6c65616e5f666c61670101000b62797465735f76616c75650900000004deadbeef000a646174655f76616c75650500004d46000d646563696d616c5f76616c75650400000002000301e240000b696e7433325f76616c756502fffffffe000b696e7436345f76616c7565030020000000000001000a6a736f6e5f76616c75650a000000367b2261223a5b747275652c6e756c6c2c2278225d2c2262223a312c226e6573746564223a7b2279223a2d352c227a223a22c3a9227d7d000a746578745f76616c75650800000005436166c3a9000f74696d657374616d705f76616c75650600061348f9377c01000a757569645f76616c7565070199a2b3c4d57e6f8123456789abcdf0",
+        "canonicalByteLength": 369,
+        "canonicalPayloadDigestHex": "0fc81b442f25b107a5077850fb99585a9b846b9bffae5a41d9db99663a008666",
+        "rowSignatureHexWithTestKey": "9de6bf53b54a19831ffe2aa3eaa5875d33c93172d059dab66e3e44c20618914a"
+      }
+    },
+    {
+      "caseId": "ROWV1-TYPES-ALL-NULL",
+      "description": "All nullable columns NULL; non-nullable boolean/int columns present.",
+      "entityKind": "integrity_type_coverage",
+      "schemaVersion": 1,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "boolean_flag": false,
+        "bytes_value": null,
+        "date_value": null,
+        "decimal_value": null,
+        "int32_value": 0,
+        "int64_value": 0,
+        "json_value": null,
+        "text_value": null,
+        "timestamp_value": null,
+        "uuid_value": null
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000010017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000a000c626f6f6c65616e5f666c61670100000b62797465735f76616c756500000a646174655f76616c756500000d646563696d616c5f76616c756500000b696e7433325f76616c75650200000000000b696e7436345f76616c7565030000000000000000000a6a736f6e5f76616c756500000a746578745f76616c756500000f74696d657374616d705f76616c756500000a757569645f76616c756500",
+        "canonicalByteLength": 257,
+        "canonicalPayloadDigestHex": "9299694425eafc67048e5c4f9907c7e88430256356b8528272eec3724eeb838d",
+        "rowSignatureHexWithTestKey": "cbaf4eff59181a057ae30aae75b8f28e6456e3a56e2629c8eeb310322023fd4d"
+      }
+    },
+    {
+      "caseId": "ROWV1-EMPTY-STRING-NOT-NULL",
+      "description": "Empty text is tag 0x08 with length 0 and must differ from NULL (ROWV1-TYPES-ALL-NULL).",
+      "entityKind": "integrity_type_coverage",
+      "schemaVersion": 1,
+      "keyVersion": 1,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 1,
+      "values": {
+        "boolean_flag": false,
+        "bytes_value": "",
+        "date_value": null,
+        "decimal_value": null,
+        "int32_value": 0,
+        "int64_value": 0,
+        "json_value": null,
+        "text_value": "",
+        "timestamp_value": null,
+        "uuid_value": null
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000010017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce0500000000000000010000000a000c626f6f6c65616e5f666c61670100000b62797465735f76616c75650900000000000a646174655f76616c756500000d646563696d616c5f76616c756500000b696e7433325f76616c75650200000000000b696e7436345f76616c7565030000000000000000000a6a736f6e5f76616c756500000a746578745f76616c75650800000000000f74696d657374616d705f76616c756500000a757569645f76616c756500",
+        "canonicalByteLength": 265,
+        "canonicalPayloadDigestHex": "a6ee68278e4b987a0d0601be3aa24315bd3d694c4c53a7484625cd01919cd956",
+        "rowSignatureHexWithTestKey": "e1ddd71c3129917257189c4d76a81a69909f0da165db65ad4808fd515cef3f48"
+      }
+    },
+    {
+      "caseId": "ROWV1-DECIMAL-NORMALIZATION",
+      "description": "Decimals normalize to minimal scale: 1.5E+3 -> (1500, scale 0); -0.000100 -> (-1, scale 4); 0.000 -> (0, scale 0) demonstrated across cases.",
+      "entityKind": "integrity_type_coverage",
+      "schemaVersion": 1,
+      "keyVersion": 3,
+      "organizationId": "11111111-1111-4111-8111-111111111111",
+      "primaryKeyId": "0199a2b3-c4d5-7e6f-8123-456789abce05",
+      "rowRevision": 18446744073709551615,
+      "values": {
+        "boolean_flag": true,
+        "bytes_value": null,
+        "date_value": "1969-12-31",
+        "decimal_value": "-0.000100",
+        "int32_value": 2147483647,
+        "int64_value": -9223372036854775808,
+        "json_value": [],
+        "text_value": "日本語 🔒",
+        "timestamp_value": "1969-12-31T23:59:59.999999Z",
+        "uuid_value": null
+      },
+      "expected": {
+        "canonicalBytesHex": "10001744796e616d6963466f726d732f526f77486d61632f76310001000000030017696e746567726974795f747970655f636f766572616765111111111111411181111111111111110199a2b3c4d57e6f8123456789abce05ffffffffffffffff0000000a000c626f6f6c65616e5f666c61670101000b62797465735f76616c756500000a646174655f76616c756505ffffffff000d646563696d616c5f76616c756504000000040001ff000b696e7433325f76616c7565027fffffff000b696e7436345f76616c7565038000000000000000000a6a736f6e5f76616c75650a000000025b5d000a746578745f76616c7565080000000ee697a5e69cace8aa9e20f09f9492000f74696d657374616d705f76616c756506ffffffffffffffff000a757569645f76616c756500",
+        "canonicalByteLength": 300,
+        "canonicalPayloadDigestHex": "ffa76bb01725400e18071df63b24c71dda2e1838deaf716de06a0de1aae33532",
+        "rowSignatureHexWithTestKey": "27b42cf79dad5da190bf3c2ae6fb08b05770ab5fedd300fe716001908917d3f6"
+      }
+    }
+  ],
+  "negativeCases": [
+    {
+      "caseId": "ROWV1-NEG-NULL-IN-NON-NULLABLE",
+      "description": "NULL supplied for non-nullable boolean_flag.",
+      "expectedError": "NullNotPermitted"
+    },
+    {
+      "caseId": "ROWV1-NEG-JSON-FLOAT",
+      "description": "json_value containing 1.5 (float) is rejected in v1.",
+      "expectedError": "JsonFloatNotPermitted"
+    },
+    {
+      "caseId": "ROWV1-NEG-JSON-NON-ASCII-KEY",
+      "description": "json_value with key '\\u00e9' is rejected in v1.",
+      "expectedError": "JsonKeyNotAscii"
+    },
+    {
+      "caseId": "ROWV1-NEG-UNSORTED-REGISTRY",
+      "description": "A schema whose signed columns are not ASCII-sorted is rejected at registry load.",
+      "expectedError": "RegistryNotSorted"
+    },
+    {
+      "caseId": "ROWV1-NEG-EXTRA-COLUMN",
+      "description": "A value for a column absent from the registry is rejected (no silent extension).",
+      "expectedError": "UnregisteredColumn"
+    },
+    {
+      "caseId": "ROWV1-NEG-MISSING-COLUMN",
+      "description": "Omitting a registered column is rejected (absent is not NULL).",
+      "expectedError": "MissingColumn"
+    },
+    {
+      "caseId": "ROWV1-NEG-NAIVE-TIMESTAMP",
+      "description": "Timestamp without explicit offset is rejected.",
+      "expectedError": "TimestampOffsetRequired"
+    },
+    {
+      "caseId": "ROWV1-NEG-ROW-REVISION-ZERO",
+      "description": "row_revision 0 is rejected (first revision is 1).",
+      "expectedError": "RowRevisionRange"
+    }
+  ]
+}

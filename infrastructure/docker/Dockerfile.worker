@@ -1,0 +1,21 @@
+# Durable business worker image. Same application abstractions as the API, separate deployable unit and permissions.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj src/shared/EnterpriseForms.Integrity/
+COPY src/backend/EnterpriseForms.Domain/EnterpriseForms.Domain.csproj src/backend/EnterpriseForms.Domain/
+COPY src/backend/EnterpriseForms.Contracts/EnterpriseForms.Contracts.csproj src/backend/EnterpriseForms.Contracts/
+COPY src/backend/EnterpriseForms.Application/EnterpriseForms.Application.csproj src/backend/EnterpriseForms.Application/
+COPY src/backend/EnterpriseForms.Infrastructure/EnterpriseForms.Infrastructure.csproj src/backend/EnterpriseForms.Infrastructure/
+COPY src/backend/EnterpriseForms.Worker/EnterpriseForms.Worker.csproj src/backend/EnterpriseForms.Worker/
+RUN dotnet restore src/backend/EnterpriseForms.Worker/EnterpriseForms.Worker.csproj
+COPY src/shared/ src/shared/
+COPY src/backend/ src/backend/
+RUN dotnet publish src/backend/EnterpriseForms.Worker/EnterpriseForms.Worker.csproj -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0-noble-chiseled-extra AS runtime
+WORKDIR /app
+COPY --from=build /app/publish ./
+ENV DOTNET_EnableDiagnostics=0
+USER $APP_UID
+ENTRYPOINT ["dotnet", "EnterpriseForms.Worker.dll"]

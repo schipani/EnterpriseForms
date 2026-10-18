@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "dotnet build (business)", "type": "shell", "command": "dotnet build src/backend/EnterpriseForms.slnx", "group": "build", "problemMatcher": "$msCompile" },
+    { "label": "dotnet build (authority)", "type": "shell", "command": "dotnet build src/authority/AuthorizationAuthority.slnx", "group": "build", "problemMatcher": "$msCompile" },
+    { "label": "dotnet test (all)", "type": "shell", "command": "dotnet test --solution EnterpriseForms.All.slnx", "group": "test", "problemMatcher": "$msCompile" },
+    { "label": "frontend install", "type": "shell", "command": "npm ci", "options": { "cwd": "${workspaceFolder}/src/frontend" } },
+    { "label": "frontend dev", "type": "shell", "command": "npm run dev -w apps/web", "options": { "cwd": "${workspaceFolder}/src/frontend" }, "isBackground": true },
+    { "label": "frontend check", "type": "shell", "command": "npm run check", "options": { "cwd": "${workspaceFolder}/src/frontend" } },
+    { "label": "compose dev up", "type": "shell", "command": "docker compose --project-directory infrastructure/docker --profile development up -d" },
+    { "label": "compose dev down", "type": "shell", "command": "docker compose --project-directory infrastructure/docker --profile development down" },
+    { "label": "validate specifications (strict)", "type": "shell", "command": "python scripts/validate-specifications.py --strict" },
+    { "label": "verify integrity vectors", "type": "shell", "command": "python scripts/integrity/verify_vectors.py && node scripts/integrity/verify-vectors.mjs" }
+  ]
+}

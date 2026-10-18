@@ -1,0 +1,101 @@
+# Pull-request gates (ADR-PB-011, PB11_CICD_SUPPLY_CHAIN_RELEASE_STANDARD.md "Pull request (untrusted)").
+# No privileged tokens, no cloud writes, synthetic data only. Actions pinned to full commit SHAs.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  specifications:
+    name: Specifications, manifest and integrity vectors
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.20.0"
+      - name: Validate normative specification manifest (strict Gate 0 mode)
+        run: python scripts/validate-specifications.py --strict
+      - name: Verify Merkle v1 and RowHmac v1 conformance vectors (Python reference)
+        run: python scripts/integrity/verify_vectors.py
+      - name: Verify conformance vectors (independent Node implementation)
+        run: node scripts/integrity/verify-vectors.mjs
+      - name: Regenerated vectors must equal committed vectors
+        run: |
+          python scripts/integrity/generate_vectors.py
+          git diff --exit-code -- trust_authority/merkle-v1.test-vectors.json trust_authority/row-integrity-v1.test-vectors.json
+
+  dotnet:
+    name: .NET build, architecture tests, contract tests
+    runs-on: ubuntu-24.04
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      CI: "true"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore EnterpriseForms.All.slnx
+      - name: Build (warnings are errors; OpenAPI generated from compiled endpoints)
+        run: dotnet build EnterpriseForms.All.slnx --no-restore -c Release
+      - name: Generated OpenAPI contracts must equal committed contracts (ADR-PB-006)
+        run: git diff --exit-code -- contracts/openapi
+      - name: Test (integrity vectors, architecture fitness functions, API contracts)
+        run: dotnet test --solution EnterpriseForms.All.slnx --no-build -c Release --results-directory artifacts/test-results --report-xunit-trx
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with:
+          name: dotnet-test-results
+          path: artifacts/test-results
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend lint, typecheck, tests, build, generated client drift
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.20.0"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Regenerate TypeScript client from committed OpenAPI and require no drift
+        run: |
+          npm run generate:api-client
+          git diff --exit-code -- packages/api-client/src/generated
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+  compose:
+    name: Docker Compose profiles validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Validate every override set against the synthetic env.example
+        working-directory: infrastructure/docker
+        run: |
+          for override in compose.dev.yaml compose.integration.yaml compose.security-test.yaml; do
+            docker compose -f compose.yaml -f "$override" --env-file env.example config --quiet
+            echo "OK: compose.yaml + $override"
+          done

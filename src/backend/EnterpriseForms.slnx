@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/business/">
+    <Project Path="EnterpriseForms.Domain/EnterpriseForms.Domain.csproj" />
+    <Project Path="EnterpriseForms.Application/EnterpriseForms.Application.csproj" />
+    <Project Path="EnterpriseForms.Infrastructure/EnterpriseForms.Infrastructure.csproj" />
+    <Project Path="EnterpriseForms.Contracts/EnterpriseForms.Contracts.csproj" />
+    <Project Path="EnterpriseForms.Api/EnterpriseForms.Api.csproj" />
+    <Project Path="EnterpriseForms.Worker/EnterpriseForms.Worker.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="../shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
+  </Folder>
+</Solution>
