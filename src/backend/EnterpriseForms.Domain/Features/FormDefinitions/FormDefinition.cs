@@ -79,4 +79,11 @@ public sealed class FieldDefinition
     public DateTimeOffset CreatedOn { get; set; }
 
     public Guid CreatedByUserId { get; set; }
+
+    /// <summary>Optimistic-concurrency revision of the editable catalog metadata (display name, description). Key, type and id never change.</summary>
+    public long FieldDefinitionRevision { get; set; } = 1;
+
+    public DateTimeOffset? ModifiedOn { get; set; }
+
+    public Guid? ModifiedByUserId { get; set; }
 }

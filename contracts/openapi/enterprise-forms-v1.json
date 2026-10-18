@@ -339,6 +339,129 @@
         }
       }
     },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}": {
+      "patch": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Edits a field's catalog label and description (expected revision required); key and storage type are permanent and a differing value is refused.",
+        "operationId": "UpdateFieldDefinition",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFieldDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/access": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Who may design and who may create records, read from the independent Authorization Authority (design permission or organization administration required).",
+        "operationId": "GetFormAccess",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Grants/revokes create-record permission as an authority command; no form version is created and no existing record access changes.",
+        "operationId": "UpdateFormAccess",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFormAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/options": {
       "put": {
         "tags": [
@@ -1522,6 +1645,28 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "Display-name directory of the organization's teams (projection; confers nothing).",
+        "operationId": "ListOrganizationTeams",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DirectoryTeamResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/teams/{teamId}/members": {
@@ -2620,6 +2765,22 @@
           }
         }
       },
+      "DirectoryTeamResponse": {
+        "required": [
+          "teamId",
+          "teamName"
+        ],
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teamName": {
+            "type": "string"
+          }
+        }
+      },
       "DirectoryUserResponse": {
         "required": [
           "userId",
@@ -2829,6 +2990,15 @@
             "items": {
               "$ref": "#/components/schemas/FieldOptionResponse"
             }
+          },
+          "fieldDefinitionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64",
+            "default": 1
           }
         }
       },
@@ -2951,6 +3121,72 @@
           "fieldDataType": {
             "type": "string",
             "default": "String"
+          }
+        }
+      },
+      "FormAccessResponse": {
+        "required": [
+          "formDefinitionId",
+          "authorizationRevision",
+          "source",
+          "designers",
+          "formUsers",
+          "availableTeams"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "source": {
+            "type": "string"
+          },
+          "designers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubjectResponse"
+            }
+          },
+          "formUsers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubjectResponse"
+            }
+          },
+          "availableTeams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryTeamResponse"
+            }
+          }
+        }
+      },
+      "FormAccessSubjectResponse": {
+        "required": [
+          "subjectKind",
+          "subjectId",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectKind": {
+            "type": "string"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
           }
         }
       },
@@ -4009,6 +4245,45 @@
           }
         }
       },
+      "UpdateFieldDefinitionRequest": {
+        "required": [
+          "fieldDisplayName",
+          "fieldDescription",
+          "expectedFieldRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDisplayName": {
+            "type": "string"
+          },
+          "fieldDescription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expectedFieldRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "fieldKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fieldDataType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "UpdateFieldOptionsRequest": {
         "required": [
           "changes"
@@ -4020,6 +4295,49 @@
             "items": {
               "$ref": "#/components/schemas/FieldOptionChange"
             }
+          }
+        }
+      },
+      "UpdateFormAccessRequest": {
+        "required": [
+          "grantUserIds",
+          "grantTeamIds",
+          "revokeUserIds",
+          "revokeTeamIds",
+          "changeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "grantUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "grantTeamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "revokeUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "revokeTeamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "changeReason": {
+            "type": "string"
           }
         }
       },

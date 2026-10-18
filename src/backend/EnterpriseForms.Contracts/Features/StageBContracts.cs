@@ -27,7 +27,7 @@ public sealed record DirectoryUserResponse(Guid UserId, string DisplayName);
 
 public sealed record FormDefinitionSummaryResponse(Guid FormDefinitionId, string FormDefinitionName, string FormDefinitionDescription, string LifecycleStatus, int? CurrentVersionNumber, Guid? CurrentFormVersionId, bool HasDraft, bool CanDesign, bool CanCreateRecord, DateTimeOffset ModifiedOn);
 
-public sealed record FieldDefinitionResponse(Guid FieldDefinitionId, string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, string FieldClassification, string LifecycleStatus, IReadOnlyList<FieldOptionResponse> Options);
+public sealed record FieldDefinitionResponse(Guid FieldDefinitionId, string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, string FieldClassification, string LifecycleStatus, IReadOnlyList<FieldOptionResponse> Options, long FieldDefinitionRevision = 1);
 
 public sealed record FieldOptionResponse(Guid FieldOptionId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive);
 
@@ -45,6 +45,24 @@ public sealed record FormDefinitionDetailResponse(
     IReadOnlyList<RelationshipDefinitionResponse> Relationships);
 
 public sealed record CreateFormDefinitionV2Request(string FormDefinitionName, string FormDefinitionDescription, IReadOnlyList<Guid> FormUserUserIds, IReadOnlyList<Guid> FormUserTeamIds);
+
+/// <summary>
+/// Edits the catalog metadata of an existing field. <c>FieldKey</c> and <c>FieldDataType</c> are accepted only so a client can
+/// state what it believes they are: any value that differs from the stored identity is refused (the key and storage type are
+/// permanent; use a new field instead). Labels, help text and validation of a form version live in the layout draft.
+/// </summary>
+public sealed record UpdateFieldDefinitionRequest(string FieldDisplayName, string? FieldDescription, long ExpectedFieldRevision, string? FieldKey = null, string? FieldDataType = null);
+
+/// <summary>Delta of who may create records for a form (authority form_user edges). Independent of form versions.</summary>
+public sealed record UpdateFormAccessRequest(IReadOnlyList<Guid> GrantUserIds, IReadOnlyList<Guid> GrantTeamIds, IReadOnlyList<Guid> RevokeUserIds, IReadOnlyList<Guid> RevokeTeamIds, string ChangeReason);
+
+/// <summary>A principal in a form's access state; the display name comes from the local directory projection and confers nothing.</summary>
+public sealed record FormAccessSubjectResponse(string SubjectKind, Guid SubjectId, string DisplayName);
+
+/// <summary>Authoritative form access read from the independent Authorization Authority (not from business tables).</summary>
+public sealed record FormAccessResponse(Guid FormDefinitionId, long AuthorizationRevision, string Source, IReadOnlyList<FormAccessSubjectResponse> Designers, IReadOnlyList<FormAccessSubjectResponse> FormUsers, IReadOnlyList<DirectoryTeamResponse> AvailableTeams);
+
+public sealed record DirectoryTeamResponse(Guid TeamId, string TeamName);
 
 public sealed record AddFieldDefinitionRequest(string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, IReadOnlyList<CreateFieldOptionRequest>? Options);
 

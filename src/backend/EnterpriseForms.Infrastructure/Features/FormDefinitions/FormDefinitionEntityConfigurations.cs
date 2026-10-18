@@ -53,11 +53,13 @@ public sealed class FieldDefinitionConfiguration : IEntityTypeConfiguration<Fiel
         builder.Property(f => f.FieldDataType).HasMaxLength(20);
         builder.Property(f => f.FieldClassification).HasMaxLength(20);
         builder.Property(f => f.LifecycleStatus).HasMaxLength(20);
+        builder.Property(f => f.FieldDefinitionRevision).HasDefaultValue(1L);
         builder.HasIndex(f => new { f.FormDefinitionId, f.FieldKey }).IsUnique().HasDatabaseName("uq_field_definitions_form_key");
         builder.HasOne<FormDefinition>().WithMany().HasForeignKey(f => f.FormDefinitionId).HasConstraintName("fk_field_definitions_definition");
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_field_definitions_data_type", "field_data_type IN ('String','Integer','Decimal','Date','DateTime','Boolean','Guid','Option','File')");
+            t.HasCheckConstraint("ck_field_definitions_revision_positive", "field_definition_revision >= 1");
             t.HasCheckConstraint("ck_field_definitions_classification", "field_classification IN ('Public','Internal','Confidential','Restricted')");
         });
     }

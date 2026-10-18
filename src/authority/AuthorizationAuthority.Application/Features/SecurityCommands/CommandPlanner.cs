@@ -44,6 +44,7 @@ public static class CommandPlanner
             SecurityCommandKind.AddTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: true, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RemoveTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: false, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterFormDefinition => await RegisterFormDefinitionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.UpdateFormUsers => await UpdateFormUsersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterRecord => await RegisterRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.TransferOwnership => await TransferOwnershipAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -145,6 +146,82 @@ public static class CommandPlanner
         {
             await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, teamId, cancellationToken).ConfigureAwait(false);
             plan.AddEdges.Add((ResourceTypeNames.FormDefinition, payload.FormDefinitionId, "form_user", ResourceTypeNames.Team, teamId, "participant"));
+        }
+
+        return plan;
+    }
+
+    /// <summary>
+    /// Grants/revokes create-record permission (form_user edges) on an existing form. The actor must be a designer of that
+    /// form or an organization administrator; the form's version, record ownership, shares and the designer edges are
+    /// never touched, so a change grants no read/update/delete on any existing record. Every change is a journaled,
+    /// revision-bound command; revocation is effective as soon as the projection barrier opens.
+    /// </summary>
+    private static async Task<CommandPlan> UpdateFormUsersAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    {
+        var payload = CanonicalJson.Deserialize<UpdateFormUsersPayload>(request.CommandPayload);
+        RequireResource(request, ResourceKind.FormDefinition, payload.FormDefinitionId);
+        await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormDefinition, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (!graph.CanDesignForm(actor.AuthorityUserId, payload.FormDefinitionId) && !IsOrganizationAdministrator(graph, organizationId, actor.AuthorityUserId))
+        {
+            throw AuthorityException.Forbidden("changing who may create records requires design permission on the form or an organization administrator");
+        }
+
+        var grantUsers = payload.GrantUserIds.Distinct().ToList();
+        var grantTeams = payload.GrantTeamIds.Distinct().ToList();
+        var revokeUsers = payload.RevokeUserIds.Distinct().ToList();
+        var revokeTeams = payload.RevokeTeamIds.Distinct().ToList();
+        if (grantUsers.Count + grantTeams.Count + revokeUsers.Count + revokeTeams.Count == 0)
+        {
+            throw AuthorityException.Invalid("at least one grant or revoke is required");
+        }
+
+        if (grantUsers.Count + grantTeams.Count + revokeUsers.Count + revokeTeams.Count > 200)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, "too many changes in one command");
+        }
+
+        if (grantUsers.Intersect(revokeUsers).Any() || grantTeams.Intersect(revokeTeams).Any())
+        {
+            throw AuthorityException.Invalid("a principal cannot be granted and revoked in the same command");
+        }
+
+        var existing = graph.EdgesOf(ResourceTypeNames.FormDefinition, payload.FormDefinitionId, "form_user").ToList();
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload with { GrantUserIds = grantUsers, GrantTeamIds = grantTeams, RevokeUserIds = revokeUsers, RevokeTeamIds = revokeTeams }) };
+        foreach (var userId in grantUsers)
+        {
+            await RequireUserBindingAsync(scope, organizationId, userId, cancellationToken).ConfigureAwait(false);
+            if (existing.Any(e => e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == userId))
+            {
+                throw AuthorityException.Invalid("user may already create records for this form");
+            }
+
+            plan.AddEdges.Add((ResourceTypeNames.FormDefinition, payload.FormDefinitionId, "form_user", ResourceTypeNames.User, userId, string.Empty));
+        }
+
+        foreach (var teamId in grantTeams)
+        {
+            await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, teamId, cancellationToken).ConfigureAwait(false);
+            if (existing.Any(e => e.SubjectTypeName == ResourceTypeNames.Team && e.SubjectEntityId == teamId))
+            {
+                throw AuthorityException.Invalid("team may already create records for this form");
+            }
+
+            plan.AddEdges.Add((ResourceTypeNames.FormDefinition, payload.FormDefinitionId, "form_user", ResourceTypeNames.Team, teamId, "participant"));
+        }
+
+        foreach (var userId in revokeUsers)
+        {
+            var edge = existing.FirstOrDefault(e => e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == userId)
+                       ?? throw AuthorityException.Invalid("user is not currently permitted to create records for this form");
+            plan.RemoveEdges.Add(edge);
+        }
+
+        foreach (var teamId in revokeTeams)
+        {
+            var edge = existing.FirstOrDefault(e => e.SubjectTypeName == ResourceTypeNames.Team && e.SubjectEntityId == teamId)
+                       ?? throw AuthorityException.Invalid("team is not currently permitted to create records for this form");
+            plan.RemoveEdges.Add(edge);
         }
 
         return plan;

@@ -39,6 +39,9 @@ public interface IBusinessScope : IAsyncDisposable
 
     void AddFieldDefinition(FieldDefinition field);
 
+    /// <summary>Tracked lookup for catalog metadata edits (display name/description only).</summary>
+    Task<FieldDefinition?> FindFieldDefinitionAsync(Guid formDefinitionId, Guid fieldDefinitionId, CancellationToken cancellationToken);
+
     Task<List<FieldOption>> GetFieldOptionsAsync(Guid formDefinitionId, CancellationToken cancellationToken);
 
     void AddFieldOption(FieldOption fieldOption);

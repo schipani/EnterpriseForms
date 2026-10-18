@@ -72,6 +72,8 @@ public enum SecurityCommandKind
     UpdateMandatoryPolicy,
     PublishFormSecurityRevision,
     UnlinkChildRecord,
+    /// <summary>Grants or revokes the right to create records for an existing form (form_user edges). Never touches record ownership or shares.</summary>
+    UpdateFormUsers,
 }
 
 /// <summary>command_payload is validated against the exact command-specific schema in the authority; unknown fields are rejected.</summary>
@@ -117,6 +119,15 @@ public sealed record RegisterTeamPayload(Guid TeamId);
 public sealed record TeamMemberPayload(Guid TeamId, Guid MemberUserId);
 
 public sealed record RegisterFormDefinitionPayload(Guid FormDefinitionId, IReadOnlyList<Guid> FormUserUserIds, IReadOnlyList<Guid> FormUserTeamIds);
+
+/// <summary>Delta of form_user subjects (create-record permission) for an existing form; independent of any form version.</summary>
+public sealed record UpdateFormUsersPayload(Guid FormDefinitionId, IReadOnlyList<Guid> GrantUserIds, IReadOnlyList<Guid> GrantTeamIds, IReadOnlyList<Guid> RevokeUserIds, IReadOnlyList<Guid> RevokeTeamIds);
+
+/// <summary>One principal in a form's authoritative access state.</summary>
+public sealed record FormAccessSubject(string SubjectKind, Guid SubjectId);
+
+/// <summary>The authority's desired-state view of who may design and who may create records for a form, read behind the organization gate.</summary>
+public sealed record FormAccessState(Guid FormDefinitionId, long AuthorizationRevision, long ProjectionRevision, IReadOnlyList<FormAccessSubject> Designers, IReadOnlyList<FormAccessSubject> FormUsers);
 
 /// <summary>Top-level record: owner = actor or an eligible team. Child record (B-04): parent + relationship definition set, no owner edge; permissions derive from the parent.</summary>
 public sealed record RegisterRecordPayload(Guid FormRecordId, Guid FormDefinitionId, Guid? OwnerTeamId = null, Guid? ParentFormRecordId = null, Guid? FormRelationshipDefinitionId = null);

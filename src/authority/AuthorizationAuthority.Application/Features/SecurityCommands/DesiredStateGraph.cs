@@ -63,6 +63,10 @@ public sealed class DesiredStateGraph(IReadOnlyList<AuthorityRelationshipEdge> a
     public bool CanCreateRecord(Guid userId, Guid formDefinitionId) =>
         EdgesOf(ResourceTypeNames.FormDefinition, formDefinitionId, "form_user").Any(e => SubjectIncludesUser(e, userId));
 
+    /// <summary>Design permission on one form: a designer edge naming the user or a team they belong to.</summary>
+    public bool CanDesignForm(Guid userId, Guid formDefinitionId) =>
+        EdgesOf(ResourceTypeNames.FormDefinition, formDefinitionId, "designer").Any(e => SubjectIncludesUser(e, userId));
+
     public bool CanCreateForm(Guid organizationId, Guid userId) =>
         HasOrganizationRole(organizationId, userId, OrganizationRoleNames.Designer);
 

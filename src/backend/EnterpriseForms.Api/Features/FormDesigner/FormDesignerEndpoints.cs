@@ -1,5 +1,6 @@
 using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Api.Features.FormDefinitions;
+using EnterpriseForms.Application.Features.FormDefinitions.FormAccess;
 using EnterpriseForms.Application.Features.FormDesigner;
 using EnterpriseForms.Contracts.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -39,6 +40,21 @@ public static class FormDesignerEndpoints
             })
             .WithName("AddFieldDefinition")
             .WithSummary("Adds a stable field identity (storage type immutable after creation).");
+
+        group.MapPatch("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}", static async Task<Ok<FieldDefinitionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, UpdateFieldDefinitionRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.UpdateFieldAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("UpdateFieldDefinition")
+            .WithSummary("Edits a field's catalog label and description (expected revision required); key and storage type are permanent and a differing value is refused.");
+
+        group.MapGet("/{formDefinitionId:guid}/access", static async Task<Ok<FormAccessResponse>> (Guid formDefinitionId, HttpContext http, FormAccessHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.GetAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, cancellationToken).ConfigureAwait(false)))
+            .WithName("GetFormAccess")
+            .WithSummary("Who may design and who may create records, read from the independent Authorization Authority (design permission or organization administration required).");
+
+        group.MapPost("/{formDefinitionId:guid}/access", static async Task<Ok<FormAccessResponse>> (Guid formDefinitionId, UpdateFormAccessRequest request, HttpContext http, FormAccessHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.UpdateAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, request, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false)))
+            .WithName("UpdateFormAccess")
+            .WithSummary("Grants/revokes create-record permission as an authority command; no form version is created and no existing record access changes.");
 
         group.MapPut("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/options", static async Task<Ok<FieldDefinitionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, UpdateFieldOptionsRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.UpdateOptionsAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))

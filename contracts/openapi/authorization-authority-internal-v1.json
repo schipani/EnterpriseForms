@@ -139,6 +139,47 @@
         }
       }
     },
+    "/internal/v1/form-definitions/{organizationId}/{formDefinitionId}/access": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Authoritative designers and create-record principals of a form; fails closed while the organization gate is closed.",
+        "operationId": "GetFormAccess",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormAccessState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/security-commands": {
       "post": {
         "tags": [
@@ -748,6 +789,66 @@
           }
         }
       },
+      "FormAccessState": {
+        "required": [
+          "form_definition_id",
+          "authorization_revision",
+          "projection_revision",
+          "designers",
+          "form_users"
+        ],
+        "type": "object",
+        "properties": {
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "designers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubject"
+            }
+          },
+          "form_users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubject"
+            }
+          }
+        }
+      },
+      "FormAccessSubject": {
+        "required": [
+          "subject_kind",
+          "subject_id"
+        ],
+        "type": "object",
+        "properties": {
+          "subject_kind": {
+            "type": "string"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "JsonElement": { },
       "ManifestItemKind": {
         "enum": [
@@ -1146,7 +1247,8 @@
           "RevokeSystemRole",
           "UpdateMandatoryPolicy",
           "PublishFormSecurityRevision",
-          "UnlinkChildRecord"
+          "UnlinkChildRecord",
+          "UpdateFormUsers"
         ]
       },
       "SecurityCommandRequest": {

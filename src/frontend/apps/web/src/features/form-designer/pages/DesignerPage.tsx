@@ -1,5 +1,5 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { DesignerCanvas } from "@enterpriseforms/form-designer";
+import { DesignerCanvas, locateField, updateElement } from "@enterpriseforms/form-designer";
 import { emptyLayout, serializeLayout, tryParseLayout, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
 import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, PageHeader, Select, StatusMessage, Tabs, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,6 +7,8 @@ import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
 import { AddFieldDialog, toKey } from "../components/AddFieldDialog";
+import { EditFieldDialog, type FieldEditSubmission } from "../components/EditFieldDialog";
+import { FormAccessPanel } from "../components/FormAccessPanel";
 
 /**
  * PG-033/037 designer: fields catalog, relationships, draft layout canvas with save (draft revision CAS), publish
@@ -25,6 +27,7 @@ export function DesignerPage() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [addField, setAddField] = useState(false);
   const [addDocuments, setAddDocuments] = useState(false);
+  const [editFieldId, setEditFieldId] = useState<string | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [changeReason, setChangeReason] = useState("");
   const [relationshipOpen, setRelationshipOpen] = useState(false);
@@ -54,6 +57,33 @@ export function DesignerPage() {
 
   const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId] }), queryClient.invalidateQueries({ queryKey: ["forms"] })]);
   const addFieldMutation = useMutation({ mutationFn: (request: Parameters<typeof api.forms.addField>[1]) => api.forms.addField(formDefinitionId, request).then((r) => r.result), onSuccess: async () => { setAddField(false); setAddDocuments(false); await invalidate(); } });
+  const editField = useMutation({
+    mutationFn: async ({ fieldId, submission }: { fieldId: string; submission: FieldEditSubmission }) => {
+      const field = detail.data!.fields.find((candidate) => candidate.fieldDefinitionId === fieldId)!;
+      if (submission.catalogChanged) {
+        await api.forms.updateField(formDefinitionId, fieldId, { fieldDisplayName: submission.displayName, fieldDescription: submission.description, expectedFieldRevision: Number(field.fieldDefinitionRevision) });
+      }
+      const location = layout ? locateField(layout, fieldId) : null;
+      if (layout && location && submission.element) {
+        const next = updateElement(layout, location.sectionIndex, location.index, () => submission.element!);
+        if (serializeLayout(next) !== serializeLayout(layout)) {
+          return api.forms.saveDraft(formDefinitionId, { expectedDraftRevision: Number(detail.data?.draft?.draftRevision ?? 0), layoutJson: serializeLayout(next) }).then((r) => r.result);
+        }
+      }
+      return null;
+    },
+    onSuccess: async (draft) => {
+      if (draft) {
+        const parsed = tryParseLayout(draft.layoutJson);
+        if (parsed.ok) {
+          setLayout(parsed.layout);
+          setBaseJson(serializeLayout(parsed.layout));
+        }
+      }
+      setEditFieldId(null);
+      await invalidate();
+    },
+  });
   const saveDraft = useMutation({
     mutationFn: (current: FormLayout) => api.forms.saveDraft(formDefinitionId, { expectedDraftRevision: Number(detail.data?.draft?.draftRevision ?? 0), layoutJson: serializeLayout(current) }).then((r) => r.result),
     onSuccess: async (draft) => {
@@ -166,6 +196,7 @@ export function DesignerPage() {
                   columns={[
                     { key: "name", header: "Field", isRowHeader: true, render: (row) => row.fieldDisplayName },
                     { key: "key", header: "Key", render: (row) => <code>{row.fieldKey}</code> },
+                    { key: "edit", header: "Actions", render: (row) => <Button size="sm" variant="secondary" aria-label={`${form.summary.canDesign ? "Edit" : "View"} ${row.fieldDisplayName}`} onClick={() => { editField.reset(); setEditFieldId(row.fieldDefinitionId); }}>{form.summary.canDesign ? "Edit" : "View"}</Button> },
                     { key: "type", header: "Type", render: (row) => row.fieldDataType },
                     { key: "options", header: "Options", render: (row) => (row.options.length === 0 ? "" : row.options.map((option) => `${option.optionDisplayText}${option.isActive ? "" : " (inactive)"}`).join(", ")) },
                     { key: "status", header: "Status", render: (row) => <Badge tone="neutral">{row.lifecycleStatus}</Badge> },
@@ -173,6 +204,11 @@ export function DesignerPage() {
                 />
               </Card>
             ),
+          },
+          {
+            value: "access",
+            label: "Form permissions",
+            content: <FormAccessPanel formDefinitionId={formDefinitionId} canManage={form.summary.canDesign} />,
           },
           {
             value: "relationships",
@@ -223,6 +259,17 @@ export function DesignerPage() {
         ]}
       />
 
+      {editFieldId !== null && form.fields.some((candidate) => candidate.fieldDefinitionId === editFieldId) ? (
+        <EditFieldDialog
+          field={form.fields.find((candidate) => candidate.fieldDefinitionId === editFieldId)!}
+          location={layout ? locateField(layout, editFieldId) : null}
+          canEdit={form.summary.canDesign}
+          pending={editField.isPending}
+          error={editField.error}
+          onSave={(submission) => editField.mutate({ fieldId: editFieldId, submission })}
+          onClose={() => setEditFieldId(null)}
+        />
+      ) : null}
       <AddFieldDialog open={addField} onOpenChange={setAddField} pending={addFieldMutation.isPending} error={addFieldMutation.error} onSubmit={(request) => addFieldMutation.mutate(request)} />
       {addDocuments ? <AddFieldDialog kind="documents" open onOpenChange={setAddDocuments} pending={addFieldMutation.isPending} error={addFieldMutation.error} onSubmit={(request) => addFieldMutation.mutate(request)} /> : null}
 

@@ -1,7 +1,7 @@
 # Stage B Status — Enterprise Forms Application (Accused vertical slice)
 
 **Date:** 2026-10-18 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`) ·
-**Evidence commit:** `d3f144c` (GitHub run links in §4.6) · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
+**Evidence commit:** recorded in §4.6 with the hosted run links · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
 workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundation.
 
 > **Stage A status (decision A-23, 2026-10-18):** ENGINEERING COMPLETE — **ACCEPTED FOR CONTINUED DEVELOPMENT** by the
@@ -17,8 +17,8 @@ workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundat
 | Gate | Assessment |
 |---|---|
 | **Mandatory Stage B functionality** (ADR-PB-002 §Stage B items 1–8, §2 below) | **Implemented and automatically tested** for the Accused slice: every item has a working UI path, backend slice, authority hook, audit behaviour and an executed test. |
-| **Automated test suites** (§4) | .NET unit/architecture/contract/authority **150 passed, 0 failed**; frontend lint/typecheck/vitest/build **37 vitest tests passed**; Stage B Docker integration **15 passed, 0 failed**; browser e2e **7 passed, 0 failed**; Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
-| **Security controls** | **Unchanged and re-tested.** No new authorization path: shares, child records, documents, discovery pages and the new value types all go through the independent Authority and the signed manifest; SEC-P01..P12 pass on the Stage B stack. No test was weakened (§5). |
+| **Automated test suites** (§4) | .NET unit/architecture/contract/authority **152 passed, 0 failed**; frontend lint/typecheck/vitest/build **42 vitest tests passed**; Stage B Docker integration **21 passed, 0 failed**; browser e2e **10 passed, 0 failed**; Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
+| **Security controls** | **Unchanged and re-tested.** No new authorization path: shares, child records, documents, discovery pages, the new value types and now form permissions all go through the independent Authority (and the signed manifest for record content); SEC-P01..P12 pass on the Stage B stack. The one authority extension in this round is a new command kind and a gated read (B-23); existing kinds, the SpiceDB schema and the gate semantics are unchanged. No test was weakened (§5). |
 | **PB-14 design validation** | Automated part **executed** (axe WCAG 2.2 AA + reflow at 320/768/1440 px and 200%/400% zoom equivalents, keyboard-only flows, forced colours — §4.4, §6). **Human review PENDING for the owner/reviewers:** NVDA, VoiceOver, real browser zoom, product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. |
 | **Stage B feature milestone** | **Ready for owner acceptance review** once the human PB-14 items are recorded. Features intentionally deferred to later gates are listed in §7 and are not Stage B defects. Production requirements (§7 first row) are unchanged. |
 
@@ -44,7 +44,16 @@ cd ../../src/frontend && npm ci && npm run dev -w apps/web      # Vite on http:/
 
 The two compose profiles pin the same fixed subnets (172.30.0.0/24, 172.30.1.0/24), so only one of them can run at a time: if `up` fails with `Pool overlaps with other one on this address space`, stop the other profile first (`docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env down -v`).
 
-Open **http://localhost:5173** → `/login`. If the Vite terminal shows `http proxy error: /api/v1/session … ECONNREFUSED`, the API on port 5080 is not running yet: wait for the compose command above to finish (or, to use an already running security-test stack on 5180, start Vite with `API_TARGET=http://127.0.0.1:5180 npm run dev -w apps/web`). To stop: `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env down`
+Open **http://localhost:5173** → `/login`.
+
+> **Development stack lifecycle (important).** The development Vault runs in dev mode, i.e. **in memory**. If the `vault`
+> container restarts for any reason (Docker Desktop restart, reboot, `docker compose down` followed by `up`), the
+> organization's signing key is gone while its other state survives on disk: creating records then fails with
+> `SIGNING_UNAVAILABLE` / `Vault returned 400 for hmac`, and records stored earlier can no longer be verified.
+> Development data is disposable: reset with `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env down -v`
+> and `up -d --build --wait` again (this recreates the organization and personas). Stop without losing data only by
+> leaving the stack running. A persistent, auto-unsealed Vault for development is a follow-up (it touches the Stage A
+> infrastructure, so it was not changed here). If the Vite terminal shows `http proxy error: /api/v1/session … ECONNREFUSED`, the API on port 5080 is not running yet: wait for the compose command above to finish (or, to use an already running security-test stack on 5180, start Vite with `API_TARGET=http://127.0.0.1:5180 npm run dev -w apps/web`). To stop: `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env down`
 (add `-v` to discard data).
 
 ### 1.2 Development login (Development/Testing only)
@@ -81,6 +90,29 @@ development login, not a production bypass (B-01, verified by `AuthorizationAndT
    empty allows any type the server accepts);
    use the phone/tablet/desktop preview; *Save draft* → **Publish…**. **Versions** tab lists every immutable version;
    *Restore to draft* copies an older layout into the draft for a new version (publishing an unchanged draft is refused).
+
+### 1.3a Edit an existing field or document collection (designer persona)
+
+1. Open the form in the designer → **Fields** tab → press **Edit** on any row (for example *Given name* or *Case documents*).
+2. **Display label** changes what people see; **Field key** and **Storage type** are shown read-only: they are permanent
+   (records, search and integrations rely on them; changing the type would reinterpret stored values). Add a new field if
+   you need a different key or type.
+3. Edit the **Description**, and — when the field is placed on the draft layout — **Help text**, **Required**, the
+   validation rules for its type (length, number range, date range) and, for a document collection, **Maximum files**,
+   **Maximum file size (MB)** and **Allowed content types**. Values that do not fit the type are explained in the dialog
+   and refused by the server.
+4. **Save changes** saves the catalog label/description and the draft layout (repeat as often as you like). Nothing
+   already published changes: **Publish…** creates the next version (v2, v3, …). Existing records keep every value and
+   every attachment (they reference the permanent field id); a renamed document collection keeps its documents.
+
+### 1.3b Change who can create records after the form is saved (designer persona)
+
+1. Open the form in the designer → **Form permissions** tab. The panel shows the Authorization Authority as its source,
+   the authorization revision, who may create records and who may design.
+2. **Grant permission** → choose a person and/or a team, give a reason → **Grant**. Or press **Revoke** on a row, give a
+   reason → **Revoke permission**. Works for draft-only and published forms; no new form version is created.
+3. The change is effective on the next request. Granting create permission does not let anyone read existing records, and
+   revoking it does not remove records the person already owns. Every change is audited (My activity).
 
 ### 1.4 Records, addresses, documents, sharing (clerk persona, then reader)
 
@@ -135,15 +167,21 @@ arguments; use PowerShell/cmd (or run the test `.dll` directly). CI runs on Linu
 | 7 | Every feature owns components, handlers, contracts, validation, persistence, authority hooks, tests, audit; no scaffolding of non-milestone pages | Feature-owned slices under `Features/<Name>` and `apps/web/src/features/<name>`; generated client from the compiled OpenAPI; lint/architecture fitness functions | `ArchitectureTests`, ESLint boundary rules, `OpenApiSnapshotTests`; no PG-### page beyond the three flows + gallery |
 | 8 | Navigation-during-upload, conflict handling, error/loading/empty states, independent widget refresh, recovery from interrupted transfers | As above; 409 conflict UI with reload; empty/loading/error states on every list; interrupted-upload resume; commit-race retry (B-12) | e2e test 2; `DocumentTests`; `uploadManager.test.ts` (resume after failed chunk, pause/resume, commit retry) |
 
+Owner acceptance additions to requirement 2 (Designer workflow): editing existing fields (B-22) and form permissions after creation (B-23); see §5.1.
+
 ## 3. What was built (changes since the first Stage B report in bold)
 
-### 3.1 Backend (feature-owned vertical slices, `/api/v1`, 56 operations in `contracts/openapi/enterprise-forms-v1.json`)
+### 3.1 Backend (feature-owned vertical slices, `/api/v1`, 60 operations in `contracts/openapi/enterprise-forms-v1.json`)
 
 - **Identity / BFF (B-01):** session cookie scheme beside the bearer scheme, CSRF double-submit, `/session`,
   `/session/development-personas`, `/session/development-login`, `/session/logout`, `/bootstrap`. Entra provider
   registered but fails closed (no tenant, no authority validator) — see §7.
-- **FormDesigner (B-03, B-11):** drafts with revision CAS, stable options, immutable versions (layout schema v2),
+- **FormDesigner (B-03, B-11, B-22, B-23):** drafts with revision CAS, stable options, immutable versions (layout schema v2),
   publish/restore, relationships, no-op publish refusal. **Controls `dateTime` and `guid` accepted for the new types.**
+  **`PATCH …/fields/{fieldId}` edits a field's catalog label/description (revision CAS; key and type changes refused with an
+  explanation); layout rules are checked against the storage type; publish snapshots catalog names into unlabelled
+  elements. `GET/POST …/access` reads and changes who may create records through the Authorization Authority (new
+  `UpdateFormUsers` command and gated read; no business-table copy); `GET /teams` is a display-only team directory.**
 - **FormRecords (B-02, B-07, B-16, B-18):** typed signed value tables — **`field_date_time_values` v1 and
   `field_guid_values` v1 added** (EF migration `20261018184528_StageBDateTimeGuidValues`, registry entries, insert-only
   runtime grants, authority allow-list already present) — header schema v3, `FieldValueCodec` invariant wire values,
@@ -161,7 +199,7 @@ arguments; use PowerShell/cmd (or run the test `.dll` directly). CI runs on Linu
 - Packages: `work-queue`, `api-client` (regenerated: `shares.list`, new types), `upload-manager` (**pause/resume,
   replace**), `form-renderer` (**DateTime control editing local time → UTC instant, Guid control, validation**),
   `form-designer`, `ui`, `app-runtime`, `design-tokens`.
-- Features: identity, dashboard, form-catalog, form-designer, form-records (**Load more paging**), related-forms,
+- Features: identity, dashboard, form-catalog, form-designer (**Edit field dialog, Form permissions tab**), form-records (**Load more paging**), related-forms,
   documents (**Replace, Pause/Resume**), jobs (Upload Center with **Pause/Resume**), audit, organizations,
   user-preferences, support, **sharing (new: `RecordAccessPanel` on the record's Access tab)**.
 - Lint fitness functions pass: no `fetch` in features/packages, no cross-feature internals, UI packages free of
@@ -174,52 +212,41 @@ arguments; use PowerShell/cmd (or run the test `.dll` directly). CI runs on Linu
 `stage-a/level2-security-foundation` and `main`** (Docker integration tests + Playwright on a hosted runner);
 `ci.yml` compiles the Stage B test project and runs the frontend suite.
 
-## 4. Test evidence (actual results, commit `d3f144c`, 2026-10-18)
+## 4. Test evidence (actual results, 2026-10-18)
 
 ### 4.1 .NET unit / architecture / contract / authority — `dotnet test --solution EnterpriseForms.All.slnx`
 
-**150 passed, 0 failed** (4 executables; includes the OpenAPI snapshot, the signed-column registry now covering
+**152 passed, 0 failed** (4 executables; adds two authority planner tests for `UpdateFormUsers` — only `form_user` edges change, designer/administrator-only, empty/contradictory/unknown/already-applied changes rejected — and includes both regenerated OpenAPI snapshots (business and authority), the signed-column registry now covering
 `field_date_time_values`/`field_guid_values`, SpiceDB schema assertions, child-record planner, layout/codec (incl.
 DateTime offset normalization, sub-second rejection, Guid canonical form)/AES-GCM/ClamAV parser/contrast tests).
 
 ### 4.2 Frontend — `npm run lint && npm run typecheck && npm run test && npm run build`
 
-Lint clean, typecheck clean, **37 vitest tests passed** (adds pause/resume and replace tests for the upload manager), production
+Lint clean, typecheck clean, **42 vitest tests passed** (adds pause/resume and replace tests for the upload manager and five field-edit model tests: locate, round-trip, document-collection binding, type-fit, incompatible-value messages), production
 build OK (lazy route chunks per feature).
 
-### 4.3 Stage B Docker integration — `tests/integration/EnterpriseForms.StageBTests` (15 tests)
+### 4.3 Stage B Docker integration — `tests/integration/EnterpriseForms.StageBTests` (21 tests)
 
-**15 passed, 0 failed** (TRX in `docs/evidence/stage-b/2026-10-18-stage-b-final/`). Coverage as before (designer CAS/publish/restore,
+**21 passed, 0 failed** (TRX in `docs/evidence/stage-b/2026-10-18-form-management/`). Coverage as before (designer CAS/publish/restore,
 typed values, parent-child, documents incl. EICAR and tamper, authorization/cross-tenant) **plus**: the Accused form now
 carries `arrest_time` (DateTime) and `external_reference` (Guid) through create, sign, manifest, verify and edit;
 `SharingTests` — share list empty → create → listed with field keys → recipient sees exactly the shared fields, no
 documents, cannot list shares/open the child/download/re-share → revoke → denied and undiscoverable; records list pages
-with `pageSize=1` over three records with no duplicates and rejects a forged continuation token; `BrandingTests` — owner uploads a PNG logo (`image/png`) and it is served back byte-exact, `application/octet-stream` → 415, a fake PNG → 422, non-owner denied.
+with `pageSize=1` over three records with no duplicates and rejects a forged continuation token; `BrandingTests` — owner uploads a PNG logo (`image/png`) and it is served back byte-exact, `application/octet-stream` → 415, a fake PNG → 422, non-owner denied. **New this round:** `FormAccessTests` (4) — draft-only and published forms; grant/revoke immediate and audited; no new version or draft; create permission never exposes existing records (not to the grantee, not to the clerk, not to the designer); owned records survive revocation; clerk/reader/other-organization callers refused; empty, short-reason, duplicate, contradictory, unknown-principal, unknown-team and unknown-form changes rejected; teams granted/revoked through membership. `FieldEditTests` (2) — key/type changes refused (`FIELD_KEY_IMMUTABLE`, `FIELD_TYPE_IMMUTABLE`), stale revision 409, clerk and cross-tenant refused, repeated renames keep id/key/type, published v1 unchanged, draft saved repeatedly then published as v2, existing record values, the original attachment (byte-identical download) and a new upload under the renamed document collection all intact, rule/type incompatibilities rejected with explanations, label snapshot, edits audited.
 
 ### 4.4 Browser end-to-end (Playwright, Chromium) — `src/frontend/e2e`
 
-**7 passed, 0 failed** (`docs/evidence/stage-b/2026-10-18-stage-b-final/playwright-junit.xml`, run log alongside).
-1. *Designer* publishes `AccusedAddress` and `Accused` (7 placed fields incl. DateTime and Guid, plus the related
-   list and the document collection): confirms "File (document collection)" is offered in *Add field*, creates
-   `Case documents` through **Add document collection**, sets Maximum files / Maximum file size / Allowed content types
-   on the placed collection; the clerk then sees `Case documents (0 of 10)` with those limits and uploads two files.
-5. *Owner* uploads a PNG logo on the branding page; it appears top-left with non-empty alt text; a fake PNG is refused
-   with the server's message (regression for the 415 defect below).
-2. *Clerk* creates an Accused (client validation incl. UUID format, DateTime stored as UTC and displayed with the
-   instant), two addresses, edit → revision 2, two uploads across SPA navigation → Ready/Clean, download, EICAR
-   rejected, activity; *Reader* denied; **clerk shares `Given name` with the reader → reader sees the partial view
-   only (no DOB/family name/addresses/documents, no Share button, one record in the list) → clerk revokes → reader
-   denied and sees zero records.**
-3. *PB-14 automated:* axe WCAG 2.2 AA (+best-practice) with zero violations and no horizontal overflow at
-   320/768/1440 px and at the 200%/400% zoom equivalents on login, dashboard, records, record details/access, Upload
-   Center, gallery, designer fields/layout; keyboard-only: skip link, record tabs by arrow keys, designer Add-field
-   dialog focus trap + Escape returns focus, keyboard reorder; forced-colours/reduced-motion focus visibility.
-4. *Phone project (320 px):* gallery reflow, tab order, visible focus, checkbox toggles with Space.
+**10 passed, 0 failed** on the clean development stack (`docs/evidence/stage-b/2026-10-18-form-management/playwright-junit.xml`, run log `playwright-run-dev-stack.log`); the identical suite also passed 10/10 on the fresh security-test stack earlier in the same verification (`docker-gates-run.log`) and runs on a hosted runner in `stage-b-integration` (§4.6).
+1. `accused-workflow` — *Designer* publishes `AccusedAddress` and `Accused` (7 placed fields incl. DateTime and Guid, the related list and the document collection created through **Add document collection**, with Maximum files / size / content types set); *Clerk* creates an Accused (client validation incl. UUID format, DateTime stored as UTC), two addresses, edit → revision 2, uploads across SPA navigation → Ready/Clean, download, EICAR rejected, activity; share → partial view → revoke (reader denied).
+2. `branding` — *Owner* uploads a PNG logo (top-left, non-empty alt text); a fake PNG is refused with the server's message.
+3. `form-management` (owner acceptance defects 3 and 4) — *Designer* builds a form with a document collection, *clerk* creates a record and uploads a document; *designer* edits an existing field in the **Edit field** dialog (key and type read-only, incompatible values explained, label/description/help text/length saved), edits and renames the document collection (restrictions changed), saves the draft repeatedly and publishes **v2** (Versions lists v1 and v2); the clerk's existing record shows the new labels, the stored value, the original attachment (download works) and accepts another upload under the renamed collection. *Designer* then opens **Form permissions** (authority source and revision shown), grants *Riley Reader* create permission with a reason (published version unchanged), the reader creates only their own record and cannot open the clerk's; the designer revokes with a reason; the reader no longer sees the form, `/records/new` is denied, their own record still opens, and the clerk is unaffected.
+4. `pb14-accessibility` — axe WCAG 2.2 AA (+best-practice) with zero violations and no horizontal overflow at 320/768/1440 px and the 200%/400% zoom equivalents on login, dashboard, records, record details/access, Upload Center, gallery, designer fields/layout **and now the Form permissions tab and the Edit field dialog**; keyboard-only: skip link, record tabs by arrow keys, designer Add-field dialog focus trap + Escape returns focus, keyboard reorder; forced-colours/reduced-motion focus visibility.
+5. `responsive` (320 px phone project) — gallery reflow, tab order, visible focus, checkbox toggles with Space.
 
 ### 4.5 Stage A SEC-P01..SEC-P12 regression on the same stack
 
 **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)** on the identical stack (same images with ClamAV, worker and dev-seed) that ran §4.3/§4.4.
-Evidence: `docs/evidence/stage-b/2026-10-18-stage-b-final/sec-p-rerun/`. This is a regression run on the committed code; the
+Evidence: `docs/evidence/stage-b/2026-10-18-form-management/sec-p-rerun/`. This is a regression run on the committed code; the
 binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Stage A gate is not reopened.
 
 ### 4.6 GitHub-hosted runs
@@ -243,8 +270,25 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 | Owner testing: the *Add field* storage-type list clipped its last entry, so **File** looked absent and the documented "Case documents" step could not be followed | owner's manual test | select list no longer clips; a dedicated **Add document collection** button creates the File field directly; upload limits (max files, max size, types) editable on the placed collection; browser test follows the exact steps |
 | Organization logo upload answered **HTTP 415**: the client sent every binary body as `application/octet-stream`, the endpoint accepts only `image/png` | owner's manual test | binary operations declare their media type (`binaryContentType`); API + browser tests cover PNG accepted, octet-stream 415, fake PNG 422, non-owner denied |
 | Header logo could render with an empty `alt` when the owner cleared the alternative text | logo test | falls back to "<organization> logo" |
+| **Owner acceptance 3:** existing fields (including a File field) could not be renamed or edited — the Fields tab was read-only, no edit route existed, `field_definitions` was insert-only for the runtime role and unplaced fields had no editor | owner's manual test | Edit field workflow (B-22): catalog label/description (revision CAS, column-level grant), draft-layout presentation, permanent key/type with explanations, rule/type checks, label snapshot at publish; browser, integration and unit tests |
+| **Owner acceptance 4:** who may create records could only be chosen when the form was created — the authority had no command to change `form_user` and no read of the current state | owner's manual test | `UpdateFormUsers` authority command + gated access read, `GET/POST /form-definitions/{id}/access`, Form permissions tab (B-23); browser, integration and planner tests |
+| **Found while verifying:** after the verification stacks were swapped with `down` (no `-v`), the dev stack's in-memory Vault lost the organization's signing key while the organization survived on disk: record creation returned `SIGNING_UNAVAILABLE` (`Vault returned 400 for hmac`) and the earlier claim that dev data was "kept" was wrong — it was unusable | browser suite on the restored dev stack | dev stack reset (`down -v`); lifecycle hazard documented in §1.1; verification chains now end by recreating a clean dev stack. A persistent, auto-unsealed development Vault is a follow-up |
 | `web` image (node:22-alpine) failed to build: the lockfile carried only glibc/Windows bindings, so `npm ci` on musl had no rolldown/lightningcss binary | owner's first local `compose.dev.yaml` run | musl bindings pinned and locked alongside the gnu/win32 ones |
 | **This round, found by the new browser/axe tests and fixed in product code:** (1) a share-scoped (partial) projection returned the full layout and field catalog, so a recipient saw the labels of unshared fields, the address list and the document collection as empty placeholders — the server now serializes only authorized field definitions, layout elements, non-empty sections and relationship metadata (§4H), with a unit test and an integration assertion; (2) the table scroll container was not keyboard focusable (axe `scrollable-region-focusable` at 320 px) — now a labelled, focusable region; (3) dialogs opened from state did not return focus to their opener on close — the shared Dialog now records and restores the opener. Test-only corrections: field counts in `DesignerTests` after adding two fields, a unit test building signed rows with `row_revision = 0`, and `SharingTests` initially expecting the child list to be denied where the documented behaviour is an empty, count-free list for a parent-only recipient (B-04) | | |
+
+### 5.1 Owner acceptance findings (manual testing of the running application)
+
+| # | Finding reported by the owner | Root cause | Resolution and evidence |
+|---|---|---|---|
+| 1 | No *File* type when creating a field, so the documented "Case documents" step could not be followed | The storage-type list clipped its last entry; document collections had no dedicated entry point | Dedicated **Add document collection** button, list no longer clips, upload limits editable (max files, size, types); `form-management` + `accused-workflow` browser tests, §1.3 steps |
+| 2 | Organization logo upload failed with HTTP 415 | The request coordinator sent every binary body as `application/octet-stream`; the logo endpoint only accepts `image/png` | Binary operations declare their media type; `BrandingTests` (PNG accepted/served, octet-stream 415, fake PNG 422, non-owner denied) + `branding` browser test |
+| 3 | **Existing fields cannot be renamed or edited** (including a File field) | No edit route or UI; catalog rows insert-only; presentation editable only per placed element in the Layout tab | **B-22**: Edit field dialog and `PATCH` route; permanent id/key/type, editable label/description/help text/validation/limits; drafts saved repeatedly, published versions immutable (next version via **Publish…**); File-field rename preserves the document collection and every attachment. `FieldEditTests` (2), 5 vitest model tests, `form-management` browser test 2 |
+| 4 | **Cannot change form creation permissions after saving** | Form users were only settable inside `RegisterFormDefinition`; the authority had no command or read for them | **B-23**: Form permissions tab; authority `UpdateFormUsers` command and gated read are the only source of truth; immediate, audited, no new version, no record disclosure, users and teams. `FormAccessTests` (4), 2 authority planner tests, `form-management` browser test 3, SEC-P01..P12 13/13 |
+
+Both findings 3 and 4 were verified in a real browser against the running stack before this section was written; the integration
+tests drive the same API. Known limits recorded rather than hidden: the options of an existing Option field are still edited
+through the API only (no dropdown-options editor yet), an explicit key/type migration workflow does not exist (the dialog refuses
+and explains), and form permission management is limited to designers of the form and organization administrators.
 
 ## 6. Representative screens (ADR-PB-014)
 
@@ -268,6 +312,9 @@ and the product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md
 | **Application-encrypted field values** (`field_encrypted_values`) | Needs the managed KEK provider and key lifecycle before any ciphertext is persisted; the authority allow-list and schema slot exist | Phase 1B / PB-05 key custody |
 | **Repeating groups** (`form_record_groups`) | Stage B models multiplicity as independent child records per ADR-PB-002; same-record repeating occurrences are a Phase 3 slice | Phase 3 |
 | **Trusted search** (field predicates, global text) | V1 bounded verified search is a separate gate with 18 `ENC-SR-##` tests; the list remains authority-driven discovery (B-07) | Phase 4 / G06 / ADR-PB-004 |
+| **Dropdown options editor** for existing Option fields (add, relabel, reorder, deactivate) — the API (`PUT …/options`) exists, the UI does not | Not an ADR-PB-002 Stage B acceptance item; found during owner testing | Designer follow-up |
+| **Explicit key/type migration workflow** and field deprecate/retire | The Edit field dialog refuses key/type changes with an explanation; a deliberate, audited value migration is a separate feature | Phase 2/3 |
+| **Per-form administrators** distinct from designers and organization administrators; **persistent auto-unsealed development Vault** | Out of scope here; the Vault change touches the Stage A infrastructure (see §1.1) | Teams/Sharing; PB-05 |
 | **Team recipients in the share UI**, delegation lineage views | API accepts teams; Teams feature UI is not part of the Accused slice | Sharing/Teams features |
 | **Azure Key Vault / Managed HSM KEK**, retention/purge, signature refresh (`freshclam`) | Production trust services; local provider is refused outside Development/Testing | PB-05 / PB-10 |
 | **Canonical audit catalog, outbox to immutable archive, SIEM** | `audit_events` is a projection (B-06) | Phase 1C |

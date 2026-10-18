@@ -232,6 +232,63 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         return ToFieldResponses([field], options)[0];
     }
 
+    /// <summary>
+    /// Edits the catalog metadata of an existing field (display name, description). Identity (id, key, storage type,
+    /// classification) is permanent: a request that names a different key or type is refused with an explanation, never
+    /// silently ignored and never turned into a re-keyed field. Stored values and attachments reference the field id, so
+    /// they are untouched. Published form versions are immutable snapshots (publish copies the catalog name into any
+    /// element without its own label), so this edit only affects drafts and later versions. Per-version label, help text
+    /// and validation are edited in the layout draft.
+    /// </summary>
+    public async Task<FieldDefinitionResponse> UpdateFieldAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, UpdateFieldDefinitionRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(request);
+        await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        var displayName = request.FieldDisplayName?.Trim() ?? string.Empty;
+        var description = request.FieldDescription?.Trim() ?? string.Empty;
+        if (displayName.Length is 0 or > 200 || description.Length > 1000)
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, "display name (1..200) is required and the description may be at most 1000 characters");
+        }
+
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var field = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
+        if (request.FieldKey is not null && !string.Equals(request.FieldKey, field.FieldKey, StringComparison.Ordinal))
+        {
+            throw new BusinessException("FIELD_KEY_IMMUTABLE", 422, $"the field key '{field.FieldKey}' is permanent (it is the stable name used by records, searches and integrations); change the display label instead, or add a new field and migrate deliberately");
+        }
+
+        if (request.FieldDataType is not null && !string.Equals(request.FieldDataType, field.FieldDataType, StringComparison.Ordinal))
+        {
+            throw new BusinessException("FIELD_TYPE_IMMUTABLE", 422, $"the storage type {field.FieldDataType} cannot change because stored values would be reinterpreted; add a new field of the new type and migrate values explicitly");
+        }
+
+        if (request.ExpectedFieldRevision != field.FieldDefinitionRevision)
+        {
+            throw new BusinessException("FIELD_REVISION_CONFLICT", 409, "the field was changed by someone else; reload and retry");
+        }
+
+        var nameChanged = !string.Equals(field.FieldDisplayName, displayName, StringComparison.Ordinal);
+        var descriptionChanged = !string.Equals(field.FieldDescription, description, StringComparison.Ordinal);
+        var previousName = field.FieldDisplayName;
+        if (nameChanged || descriptionChanged)
+        {
+            var now = clock.GetUtcNow();
+            field.FieldDisplayName = displayName;
+            field.FieldDescription = description;
+            field.FieldDefinitionRevision++;
+            field.ModifiedOn = now;
+            field.ModifiedByUserId = context.LocalUserId;
+            AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FieldConfigurationChanged, "field catalog metadata changed (identity, key and type unchanged)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, metadata: new { fieldKey = field.FieldKey, dataType = field.FieldDataType, previousDisplayName = previousName, newDisplayName = displayName, descriptionChanged, fieldDefinitionRevision = field.FieldDefinitionRevision });
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        var options = (await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).Where(o => o.FieldDefinitionId == fieldDefinitionId).ToList();
+        return ToFieldResponses([field], options)[0];
+    }
+
     public async Task<FieldDefinitionResponse> UpdateOptionsAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, UpdateFieldOptionsRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -348,6 +405,11 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             throw new BusinessException("LAYOUT_INVALID", 422, "a published version needs at least one element");
         }
 
+        // Snapshot: an element without its own label takes the catalog name as it is now, so the immutable version never
+        // changes when the catalog name is edited later.
+        var catalogFields = (await scope.GetFieldDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(f => f.FieldDefinitionId);
+        var catalogRelationships = (await scope.GetRelationshipDefinitionsAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(r => r.FormRelationshipDefinitionId);
+        layout = SnapshotLabels(layout, catalogFields, catalogRelationships);
         var canonical = FormLayoutCodec.Serialize(layout with { LayoutSchemaVersion = FormLayout.CurrentSchemaVersion });
         var currentVersion = versions.FirstOrDefault(v => v.VersionNumber == currentNumber);
         if (currentVersion is not null && FormLayoutCodec.Serialize(FormLayoutCodec.Parse(currentVersion.LayoutJson)) == canonical)
@@ -542,6 +604,8 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                 {
                     throw new BusinessException("LAYOUT_INVALID", 422, $"control '{element.Control}' is incompatible with {field.FieldDataType} field '{field.FieldKey}'");
                 }
+
+                ValidateRuleCompatibility(element.Validation, field);
             }
 
             if (element.FormRelationshipDefinitionId is { } relId && !relationships.ContainsKey(relId))
@@ -550,6 +614,54 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             }
         }
     }
+
+    /// <summary>
+    /// Validation rules must fit the field's storage type: a length rule on a number, or a range on text, would be
+    /// silently ignored by the server and mislead the designer, so such a layout is refused with an explanation.
+    /// Inverted bounds are refused earlier by the layout parser. Rules apply to new saves only; stored values are never rewritten.
+    /// </summary>
+    internal static void ValidateRuleCompatibility(LayoutValidation rules, FieldDefinition field)
+    {
+        var isText = field.FieldDataType == FieldDataTypes.String;
+        var isNumber = field.FieldDataType is FieldDataTypes.Integer or FieldDataTypes.Decimal;
+        var isDate = field.FieldDataType is FieldDataTypes.Date or FieldDataTypes.DateTime;
+        if (!isText && (rules.MinLength is not null || rules.MaxLength is not null || rules.Pattern is not null))
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, $"length and pattern rules apply only to String fields; '{field.FieldKey}' is {field.FieldDataType}");
+        }
+
+        if (!isNumber && (rules.Minimum is not null || rules.Maximum is not null))
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, $"minimum and maximum rules apply only to Integer and Decimal fields; '{field.FieldKey}' is {field.FieldDataType}");
+        }
+
+        if (!isDate && (rules.MinDate is not null || rules.MaxDate is not null))
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, $"earliest and latest date rules apply only to Date and DateTime fields; '{field.FieldKey}' is {field.FieldDataType}");
+        }
+    }
+
+    internal static FormLayout SnapshotLabels(FormLayout layout, IReadOnlyDictionary<Guid, FieldDefinition> fields, IReadOnlyDictionary<Guid, FormRelationshipDefinition> relationships) =>
+        layout with
+        {
+            Sections = layout.Sections.Select(section => section with
+            {
+                Elements = section.Elements.Select(element =>
+                {
+                    if (!string.IsNullOrWhiteSpace(element.Label))
+                    {
+                        return element;
+                    }
+
+                    if (element.FieldDefinitionId is { } fieldId && fields.TryGetValue(fieldId, out var field))
+                    {
+                        return element with { Label = field.FieldDisplayName };
+                    }
+
+                    return element.FormRelationshipDefinitionId is { } relId && relationships.TryGetValue(relId, out var relationship) ? element with { Label = relationship.RelationshipDisplayName } : element;
+                }).ToList(),
+            }).ToList(),
+        };
 
     private static FormDefinitionSummaryResponse Summary(FormDefinition d, FormVersion? current, bool hasDraft, bool canDesign, bool canCreate) =>
         new(d.FormDefinitionId, d.FormDefinitionName, d.FormDefinitionDescription, d.LifecycleStatus, current?.VersionNumber, current?.FormVersionId, hasDraft, canDesign, canCreate, d.ModifiedOn);
@@ -564,6 +676,6 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(options);
         var byField = options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.OrderBy(o => o.OptionSortOrder).ThenBy(o => o.OptionKey, StringComparer.Ordinal).Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive)).ToList());
-        return fields.OrderBy(f => f.FieldKey, StringComparer.Ordinal).Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, byField.GetValueOrDefault(f.FieldDefinitionId, []))).ToList();
+        return fields.OrderBy(f => f.FieldKey, StringComparer.Ordinal).Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, byField.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision)).ToList();
     }
 }

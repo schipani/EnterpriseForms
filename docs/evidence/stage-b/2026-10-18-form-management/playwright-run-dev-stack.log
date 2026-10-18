@@ -1,0 +1,20 @@
+
+Running 10 tests using 1 worker
+
+  ok  1 [chromium-desktop] › e2e\accused-workflow.spec.ts:56:3 › Stage B Accused workflow › designer publishes AccusedAddress and Accused with a related list and document collection (21.3s)
+  ok  2 [chromium-desktop] › e2e\accused-workflow.spec.ts:135:3 › Stage B Accused workflow › clerk creates an Accused, adds addresses, uploads documents across navigation and reviews activity (27.2s)
+  ok  3 [chromium-desktop] › e2e\branding.spec.ts:6:1 › owner uploads a PNG logo and it appears top-left (2.0s)
+  ok  4 [chromium-desktop] › e2e\form-management.spec.ts:21:3 › Form management: edit fields and form permissions › designer builds and publishes a form with a document collection; the clerk records data and uploads a document (11.0s)
+  ok  5 [chromium-desktop] › e2e\form-management.spec.ts:56:3 › Form management: edit fields and form permissions › designer edits an existing field and the document collection, then publishes the next version; data and attachments are preserved (7.9s)
+  ok  6 [chromium-desktop] › e2e\form-management.spec.ts:130:3 › Form management: edit fields and form permissions › designer changes who can create records after the form is saved: grant, effective access, revocation, no new version (13.5s)
+  ok  7 [chromium-desktop] › e2e\pb14-accessibility.spec.ts:49:3 › PB-14 automated accessibility and responsive validation › login, dashboard, records, record, uploads, gallery and designer pass axe WCAG 2.2 AA at every width (PB14-10..14, 22, 23, 32) (1.1m)
+  ok  8 [chromium-desktop] › e2e\pb14-accessibility.spec.ts:105:3 › PB-14 automated accessibility and responsive validation › keyboard only: skip link, tabs, dialog focus trap and designer reorder (PB14-15, 25, 29) (6.0s)
+  ok  9 [chromium-desktop] › e2e\pb14-accessibility.spec.ts:167:3 › PB-14 automated accessibility and responsive validation › forced-colors and prefers-reduced-motion do not hide focus or state (PB14-30) (1.7s)
+  ok 10 [chromium-phone] › e2e\responsive.spec.ts:4:1 › gallery reflows at 320px without horizontal scroll and every control is keyboard reachable (1.9s)
+
+  10 passed (2.8m)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report ..\..\artifacts\stage-b\playwright-report[39m
+[36m[39m

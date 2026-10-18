@@ -48,6 +48,7 @@ public enum SecurityCommandKind
     UpdateMandatoryPolicy,
     PublishFormSecurityRevision,
     UnlinkChildRecord,
+    UpdateFormUsers,
 }
 
 public enum SecurityCommandStatus
@@ -99,6 +100,11 @@ public sealed record VerifiedProjectionItem(ManifestItemKind ItemKind, Guid Item
 
 public sealed record VerifyRecordProjectionResult(bool Verified, string? FailureReasonCode, long CommittedContentRevision, Guid? CommittedOperationId, long AuthorizationRevision, IReadOnlyList<VerifiedProjectionItem> AuthorizedItems, bool IsCompleteProjection, Guid CorrelationId);
 
+public sealed record FormAccessSubjectState(string SubjectKind, Guid SubjectId);
+
+/// <summary>Authoritative designers and create-record principals of a form, read from the authority's desired state behind its gate.</summary>
+public sealed record FormAccessState(Guid FormDefinitionId, long AuthorizationRevision, long ProjectionRevision, IReadOnlyList<FormAccessSubjectState> Designers, IReadOnlyList<FormAccessSubjectState> FormUsers);
+
 public sealed record RecordDiscoveryPage(IReadOnlyList<Guid> FormRecordIds, long AuthorizationRevision, string? ContinuationToken);
 
 /// <summary>Stable authority error surfaced to callers; the business API maps it to a Problem Details response without leaking internals.</summary>
@@ -117,6 +123,8 @@ public sealed record DelegatedUserContext(string IssuerUri, string SubjectIdenti
 public interface IAuthorizationAuthorityClient
 {
     Task<PermissionDecision> CheckPermissionAsync(DelegatedUserContext user, PermissionCheckRequest request, CancellationToken cancellationToken);
+
+    Task<FormAccessState> GetFormAccessAsync(DelegatedUserContext user, Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PermissionDecision>> CheckPermissionsBatchAsync(DelegatedUserContext user, IReadOnlyList<PermissionCheckRequest> requests, CancellationToken cancellationToken);
 

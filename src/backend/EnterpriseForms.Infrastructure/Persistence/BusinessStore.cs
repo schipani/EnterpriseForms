@@ -67,6 +67,9 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public Task<List<FormDefinition>> GetFormDefinitionsAsync(Guid tenantId, CancellationToken cancellationToken) =>
             context.FormDefinitions.AsNoTracking().Where(f => f.TenantId == tenantId && f.LifecycleStatus != "Deleted").OrderBy(f => f.FormDefinitionName).ToListAsync(cancellationToken);
 
+        public Task<FieldDefinition?> FindFieldDefinitionAsync(Guid formDefinitionId, Guid fieldDefinitionId, CancellationToken cancellationToken) =>
+            context.FieldDefinitions.FirstOrDefaultAsync(f => f.FormDefinitionId == formDefinitionId && f.FieldDefinitionId == fieldDefinitionId, cancellationToken);
+
         public Task<List<FieldDefinition>> GetFieldDefinitionsAsync(Guid formDefinitionId, CancellationToken cancellationToken) =>
             context.FieldDefinitions.AsNoTracking().Where(f => f.FormDefinitionId == formDefinitionId).OrderBy(f => f.FieldKey).ToListAsync(cancellationToken);
 

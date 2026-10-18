@@ -57,4 +57,5 @@ public static class SecurityCommandKinds
     public const string TransferOwnership = "TransferOwnership";
     public const string CreateShare = "CreateShare";
     public const string RevokeShare = "RevokeShare";
+    public const string UpdateFormUsers = "UpdateFormUsers";
 }

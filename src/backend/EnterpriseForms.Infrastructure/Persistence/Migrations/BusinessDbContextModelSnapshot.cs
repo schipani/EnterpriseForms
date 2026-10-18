@@ -600,6 +600,12 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("field_data_type");
 
+                    b.Property<long>("FieldDefinitionRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("field_definition_revision");
+
                     b.Property<string>("FieldDescription")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -632,6 +638,14 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("lifecycle_status");
 
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on");
+
                     b.HasKey("FieldDefinitionId");
 
                     b.HasIndex("FormDefinitionId", "FieldKey")
@@ -643,6 +657,8 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_field_definitions_classification", "field_classification IN ('Public','Internal','Confidential','Restricted')");
 
                             t.HasCheckConstraint("ck_field_definitions_data_type", "field_data_type IN ('String','Integer','Decimal','Date','DateTime','Boolean','Guid','Option','File')");
+
+                            t.HasCheckConstraint("ck_field_definitions_revision_positive", "field_definition_revision >= 1");
                         });
                 });
 

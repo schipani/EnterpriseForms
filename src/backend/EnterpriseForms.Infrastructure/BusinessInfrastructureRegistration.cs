@@ -7,6 +7,7 @@ using EnterpriseForms.Application.Features.Documents.Ports;
 using EnterpriseForms.Application.Features.Documents.Processing;
 using EnterpriseForms.Application.Features.Documents.UploadSessions;
 using EnterpriseForms.Application.Features.FormDefinitions.CreateFormDefinition;
+using EnterpriseForms.Application.Features.FormDefinitions.FormAccess;
 using EnterpriseForms.Application.Features.FormDesigner;
 using EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 using EnterpriseForms.Application.Features.FormRecords.GetFormRecord;
@@ -51,6 +52,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<EnsureIdentityProjectionHandler>();
         services.AddSingleton<CreateFormDefinitionHandler>();
         services.AddSingleton<FormDesignerHandlers>();
+        services.AddSingleton<FormAccessHandlers>();
         services.AddSingleton<CreateFormRecordHandler>();
         services.AddSingleton<GetFormRecordHandler>();
         services.AddSingleton<GetRecordProjectionHandler>();

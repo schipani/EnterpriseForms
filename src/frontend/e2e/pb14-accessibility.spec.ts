@@ -89,6 +89,16 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
       await scan(page, `${viewport.id} designer fields @${viewport.name}`);
       await page.getByRole("tab", { name: "Layout" }).click();
       await scan(page, `${viewport.id} designer layout @${viewport.name}`);
+      // New owner-acceptance UI: the Form permissions tab and the Edit field dialog get the same scans.
+      await page.getByRole("tab", { name: "Form permissions" }).click();
+      await expect(page.getByText(/Source: Authorization Authority/)).toBeVisible();
+      await scan(page, `${viewport.id} designer form permissions @${viewport.name}`);
+      await page.getByRole("tab", { name: /^Fields/ }).click();
+      await page.getByRole("button", { name: /^Edit / }).first().click();
+      await expect(page.getByRole("dialog", { name: /^Edit / })).toBeVisible();
+      await scan(page, `${viewport.id} edit field dialog @${viewport.name}`);
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog", { name: /^Edit / })).toBeHidden();
     }
   });
 

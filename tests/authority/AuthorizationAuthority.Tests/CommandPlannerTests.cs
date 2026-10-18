@@ -150,6 +150,69 @@ public sealed class CommandPlannerTests
         Assert.False(graph.IsRecordOwner(AttackerUser, Record));
     }
 
+    [Fact]
+    public async Task UpdateFormUsersIsLimitedToFormUserEdgesAndToDesignersOrAdministrators()
+    {
+        var designer = Guid.CreateVersion7();
+        var administrator = Guid.CreateVersion7();
+        var existingUser = Guid.CreateVersion7();
+        var newUser = Guid.CreateVersion7();
+        var newTeam = Guid.CreateVersion7();
+        var scope = new FakeScope(Org);
+        scope.Resources.Add(Resource(ResourceTypeNames.FormDefinition, Form));
+        scope.Resources.Add(Resource(ResourceTypeNames.Team, newTeam));
+        scope.Bindings.Add(new IdentityBinding { OrganizationId = Org, AuthorityUserId = newUser, IdentityBindingEnabled = true });
+        var graph = Graph(
+            Edge(ResourceTypeNames.FormDefinition, Form, "designer", ResourceTypeNames.User, designer),
+            Edge(ResourceTypeNames.FormDefinition, Form, "form_user", ResourceTypeNames.User, existingUser),
+            Edge(ResourceTypeNames.Organization, Org, OrganizationRoleNames.OrganizationOwner, ResourceTypeNames.User, administrator));
+        var request = Command(SecurityCommandKind.UpdateFormUsers, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, grant_user_ids = new[] { newUser }, grant_team_ids = new[] { newTeam }, revoke_user_ids = new[] { existingUser }, revoke_team_ids = Array.Empty<Guid>() });
+
+        var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(designer), request, graph, CancellationToken.None);
+        // Only form_user edges change: no designer, owner, share or organization edge is touched, so no record access is granted or removed.
+        Assert.All(plan.AddEdges, e => Assert.True(e.ResourceType == ResourceTypeNames.FormDefinition && e.Relation == "form_user"));
+        Assert.Contains(plan.AddEdges, e => e.SubjectType == ResourceTypeNames.User && e.SubjectId == newUser && e.SubjectRelation.Length == 0);
+        Assert.Contains(plan.AddEdges, e => e.SubjectType == ResourceTypeNames.Team && e.SubjectId == newTeam && e.SubjectRelation == "participant");
+        var removed = Assert.Single(plan.RemoveEdges);
+        Assert.Equal("form_user", removed.RelationshipName);
+        Assert.Equal(existingUser, removed.SubjectEntityId);
+        Assert.Empty(plan.RegisterResources);
+
+        // An organization administrator may manage form users without being a designer; anyone else may not.
+        await CommandPlanner.PlanAsync(scope, Org, Actor(administrator), request, graph, CancellationToken.None);
+        var denied = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(existingUser), request, graph, CancellationToken.None));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, denied.ErrorCode);
+        var attacker = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(AttackerUser), request, graph, CancellationToken.None));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, attacker.ErrorCode);
+    }
+
+    [Fact]
+    public async Task UpdateFormUsersRejectsEmptyContradictoryUnknownAndAlreadyAppliedChanges()
+    {
+        var designer = Guid.CreateVersion7();
+        var existingUser = Guid.CreateVersion7();
+        var stranger = Guid.CreateVersion7();
+        var scope = new FakeScope(Org);
+        scope.Resources.Add(Resource(ResourceTypeNames.FormDefinition, Form));
+        scope.Bindings.Add(new IdentityBinding { OrganizationId = Org, AuthorityUserId = existingUser, IdentityBindingEnabled = true });
+        var graph = Graph(
+            Edge(ResourceTypeNames.FormDefinition, Form, "designer", ResourceTypeNames.User, designer),
+            Edge(ResourceTypeNames.FormDefinition, Form, "form_user", ResourceTypeNames.User, existingUser));
+        var none = Array.Empty<Guid>();
+
+        async Task<string> Rejected(object payload, Guid? resourceId = null, ResourceKind kind = ResourceKind.FormDefinition) =>
+            (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), Command(SecurityCommandKind.UpdateFormUsers, kind, resourceId ?? Form, payload), graph, CancellationToken.None))).ErrorCode;
+
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = none, grant_team_ids = none, revoke_user_ids = none, revoke_team_ids = none }));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = new[] { existingUser }, grant_team_ids = none, revoke_user_ids = new[] { existingUser }, revoke_team_ids = none }));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = new[] { existingUser }, grant_team_ids = none, revoke_user_ids = none, revoke_team_ids = none })); // already permitted
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = none, grant_team_ids = none, revoke_user_ids = new[] { stranger }, revoke_team_ids = none })); // not currently permitted
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = new[] { stranger }, grant_team_ids = none, revoke_user_ids = none, revoke_team_ids = none })); // not a principal of the organization
+        var unknownForm = Guid.CreateVersion7();
+        Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, await Rejected(new { form_definition_id = unknownForm, grant_user_ids = new[] { existingUser }, grant_team_ids = none, revoke_user_ids = none, revoke_team_ids = none }, unknownForm));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = none, grant_team_ids = none, revoke_user_ids = new[] { existingUser }, revoke_team_ids = none }, Record)); // resource reference must match the payload
+    }
+
     private static SecurityCommandRequest Command(SecurityCommandKind kind, ResourceKind resourceKind, Guid resourceId, object payload) =>
         new(Org, kind, new ResourceRef(resourceKind, resourceId), 0, JsonSerializer.SerializeToElement(payload, CanonicalJson.Options));
 

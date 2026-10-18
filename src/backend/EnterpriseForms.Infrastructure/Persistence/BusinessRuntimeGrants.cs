@@ -25,6 +25,16 @@ public static class BusinessRuntimeGrants
         "organization_brandings", "user_ui_preferences",
     ];
 
+    /// <summary>
+    /// Narrow column-level UPDATE on otherwise insert-only tables (G08 least privilege): a field's catalog label and
+    /// description are editable metadata; its key, data type, classification and identity can never be changed by the
+    /// runtime role, even by a compromised API process.
+    /// </summary>
+    private static readonly Dictionary<string, string[]> ColumnUpdateGrants = new(StringComparer.Ordinal)
+    {
+        ["field_definitions"] = ["field_display_name", "field_description", "field_definition_revision", "modified_on", "modified_by_user_id"],
+    };
+
     public static void Apply(DbContext context, string runtimeRole)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -42,6 +52,7 @@ public static class BusinessRuntimeGrants
         };
         statements.AddRange(InsertOnlyTables.Select(t => $"GRANT SELECT, INSERT ON public.{t} TO {runtimeRole}"));
         statements.AddRange(ProjectionTables.Select(t => $"GRANT SELECT, INSERT, UPDATE ON public.{t} TO {runtimeRole}"));
+        statements.AddRange(ColumnUpdateGrants.Select(grant => $"GRANT UPDATE ({string.Join(", ", grant.Value)}) ON public.{grant.Key} TO {runtimeRole}"));
         statements.Add($"GRANT SELECT ON public.\"__EFMigrationsHistory\" TO {runtimeRole}");
         foreach (var statement in statements)
         {

@@ -50,6 +50,9 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<PermissionDecision> CheckPermissionAsync(DelegatedUserContext user, PermissionCheckRequest request, CancellationToken cancellationToken) =>
         SendAsync<PermissionDecision>(HttpMethod.Post, "internal/v1/authorization/check", user, request, null, cancellationToken);
 
+    public Task<FormAccessState> GetFormAccessAsync(DelegatedUserContext user, Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+        SendAsync<FormAccessState>(HttpMethod.Get, $"internal/v1/form-definitions/{organizationId:D}/{formDefinitionId:D}/access", user, null, null, cancellationToken);
+
     public async Task<IReadOnlyList<PermissionDecision>> CheckPermissionsBatchAsync(DelegatedUserContext user, IReadOnlyList<PermissionCheckRequest> requests, CancellationToken cancellationToken)
     {
         var response = await SendAsync<BatchResponse>(HttpMethod.Post, "internal/v1/authorization/check-batch", user, new { checks = requests }, null, cancellationToken).ConfigureAwait(false);

@@ -5,6 +5,9 @@ public static class AuditActions
     public const string FormCreated = "FORM_CREATED";
     public const string FormDraftUpdated = "FORM_DRAFT_UPDATED";
     public const string FormVersionPublished = "FORM_VERSION_PUBLISHED";
+    public const string FieldConfigurationChanged = "FIELD_CONFIGURATION_CHANGED";
+    public const string FormAccessGranted = "FORM_ACCESS_GRANTED";
+    public const string FormAccessRevoked = "FORM_ACCESS_REVOKED";
     public const string RecordCreated = "RECORD_CREATED";
     public const string RecordViewed = "RECORD_VIEWED";
     public const string RecordUpdated = "RECORD_UPDATED";

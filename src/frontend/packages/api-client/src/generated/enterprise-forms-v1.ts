@@ -207,6 +207,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edits a field's catalog label and description (expected revision required); key and storage type are permanent and a differing value is refused. */
+        patch: operations["UpdateFieldDefinition"];
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who may design and who may create records, read from the independent Authorization Authority (design permission or organization administration required). */
+        get: operations["GetFormAccess"];
+        put?: never;
+        /** Grants/revokes create-record permission as an authority command; no form version is created and no existing record access changes. */
+        post: operations["UpdateFormAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/options": {
         parameters: {
             query?: never;
@@ -653,7 +688,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Display-name directory of the organization's teams (projection; confers nothing). */
+        get: operations["ListOrganizationTeams"];
         put?: never;
         post: operations["CreateTeam"];
         delete?: never;
@@ -1013,6 +1049,11 @@ export interface components {
             organizationDisplayName: string;
             organizationRoles: string[];
         };
+        DirectoryTeamResponse: {
+            /** Format: uuid */
+            teamId: string;
+            teamName: string;
+        };
         DirectoryUserResponse: {
             /** Format: uuid */
             userId: string;
@@ -1070,6 +1111,11 @@ export interface components {
             fieldClassification: string;
             lifecycleStatus: string;
             options: components["schemas"]["FieldOptionResponse"][];
+            /**
+             * Format: int64
+             * @default 1
+             */
+            fieldDefinitionRevision: number | string;
         };
         FieldOptionChange: {
             /** Format: uuid */
@@ -1105,6 +1151,22 @@ export interface components {
             stringValue: string;
             /** @default String */
             fieldDataType: string;
+        };
+        FormAccessResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            source: string;
+            designers: components["schemas"]["FormAccessSubjectResponse"][];
+            formUsers: components["schemas"]["FormAccessSubjectResponse"][];
+            availableTeams: components["schemas"]["DirectoryTeamResponse"][];
+        };
+        FormAccessSubjectResponse: {
+            subjectKind: string;
+            /** Format: uuid */
+            subjectId: string;
+            displayName: string;
         };
         FormDefinitionDetailResponse: {
             summary: components["schemas"]["FormDefinitionSummaryResponse"];
@@ -1376,8 +1438,23 @@ export interface components {
             organizationDefaultTextScalePercent: number | string;
             organizationColorMode: string;
         };
+        UpdateFieldDefinitionRequest: {
+            fieldDisplayName: string;
+            fieldDescription: null | string;
+            /** Format: int64 */
+            expectedFieldRevision: number | string;
+            fieldKey?: null | string;
+            fieldDataType?: null | string;
+        };
         UpdateFieldOptionsRequest: {
             changes: components["schemas"]["FieldOptionChange"][];
+        };
+        UpdateFormAccessRequest: {
+            grantUserIds: string[];
+            grantTeamIds: string[];
+            revokeUserIds: string[];
+            revokeTeamIds: string[];
+            changeReason: string;
         };
         UpdateFormRecordRequest: {
             /** Format: int64 */
@@ -1719,6 +1796,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FieldDefinitionResponse"];
+                };
+            };
+        };
+    };
+    UpdateFieldDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFieldDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldDefinitionResponse"];
+                };
+            };
+        };
+    };
+    GetFormAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormAccessResponse"];
+                };
+            };
+        };
+    };
+    UpdateFormAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFormAccessRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormAccessResponse"];
                 };
             };
         };
@@ -2422,6 +2574,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    ListOrganizationTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryTeamResponse"][];
                 };
             };
         };
