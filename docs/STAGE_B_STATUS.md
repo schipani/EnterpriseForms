@@ -1,7 +1,7 @@
 # Stage B Status — Enterprise Forms Application (Accused vertical slice)
 
 **Date:** 2026-10-18 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`) ·
-**Evidence commit:** `PR #10 head (the commit that introduces this document version; GitHub run links in §4.6)` · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
+**Evidence commit:** `c349d84` (+ `14900b9` reflow fix; GitHub run links in §4.6) · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
 workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundation.
 
 > **Stage A status (decision A-23, 2026-10-18):** ENGINEERING COMPLETE — **ACCEPTED FOR CONTINUED DEVELOPMENT** by the
@@ -167,7 +167,7 @@ arguments; use PowerShell/cmd (or run the test `.dll` directly). CI runs on Linu
 `stage-a/level2-security-foundation` and `main`** (Docker integration tests + Playwright on a hosted runner);
 `ci.yml` compiles the Stage B test project and runs the frontend suite.
 
-## 4. Test evidence (actual results, commit `PR #10 head (the commit that introduces this document version; GitHub run links in §4.6)`, 2026-10-18)
+## 4. Test evidence (actual results, commits `c349d84`/`14900b9`, 2026-10-18)
 
 ### 4.1 .NET unit / architecture / contract / authority — `dotnet test --solution EnterpriseForms.All.slnx`
 
@@ -213,7 +213,7 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 
 ### 4.6 GitHub-hosted runs
 
-`security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074). For the PR #10 head after this change set, the `ci` and `stage-b-integration` (Docker integration + Playwright) runs are linked from the pull request checks; the first attempt at `4489b8c` failed only on an out-of-sync lockfile (`fsevents`), fixed here.
+`ci` **success** and `stage-b-integration` (Docker integration tests + Playwright on a GitHub-hosted runner) **success** for head `14900b9`: https://github.com/schipani/EnterpriseForms/actions/runs/39160072571 and https://github.com/schipani/EnterpriseForms/actions/runs/39160072502. The previous head `c349d84` passed `ci` (run 39160072571's predecessor 39159489792) but its hosted `stage-b-integration` run (39159489813) failed one axe reflow check at 320 px on the designer tabs — a non-wrapping button group that Linux font metrics pushed past the viewport; fixed in `14900b9`. `security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074); the SEC-P regression for this change set is the local run in §4.5 on the identical images.
 
 ## 5. Defects found and fixed during Stage B (none fixed by weakening a test)
 
