@@ -4,10 +4,13 @@
 ADR-PB-002 Stage B — the working Accused + AccusedAddress + document workflow from Form Designer to browser, on the
 unchanged Stage A Level 2 foundation.
 
-> **Stage A's gate status is unchanged: BLOCKED.** The independent cryptographic review (A-F1) has **not been
-> performed** and the BUILD-00 controls deferred under decision A-21 remain deferred (`docs/STAGE_A_GATE_CLOSURE.md`).
-> Nothing below waives a Level 2 requirement or claims production readiness, Level 2 certification, or AODA/WCAG
-> certification. Stage B is a feature milestone (ADR-PB-002 §Boundary).
+> **Stage A status (decision A-23, 2026-10-18):** ENGINEERING COMPLETE — **ACCEPTED FOR CONTINUED DEVELOPMENT** by the
+> project owner, whose personal review of the cryptographic implementation is recorded as an **owner review, not an
+> independent third-party review**; Stage B is **AUTHORIZED TO PROCEED**. **Production Level 2 certification is NOT
+> granted:** independent cryptographic attestation (A-F1), Azure Managed HSM, Confidential Ledger, Azure Level B
+> validation and enforced security-owner review remain outstanding and unwaived (`docs/STAGE_A_GATE_CLOSURE.md`).
+> Nothing below claims production readiness, Level 2 certification, or AODA/WCAG certification. Stage B is a feature
+> milestone (ADR-PB-002 §Boundary).
 
 ## Gate assessment
 
@@ -17,7 +20,7 @@ unchanged Stage A Level 2 foundation.
 | Stage B tests (requirement 9) | **Executed, see §4.** .NET unit/architecture/contract **149/149**; frontend unit/component **35/35**; Stage B Docker integration **12/12** (designer persistence/versioning, parent-child, multi-document upload incl. EICAR rejection, authorization/cross-tenant, tamper regression); browser e2e: **see §4.4**; Stage A SEC-P01..P12 rerun on the same stack: **see §4.5**. |
 | Security foundation | **Unchanged.** No new authorization path: every Stage B read/write is decided by the independent Authority (child ownership derives from the parent, documents are leaves of the signed record manifest, designer writes require the form `design` permission). Defects found by the Stage B tests were fixed in code, never by weakening a test (§5). |
 | Entra ID sign-in (requirement 3) | **Not operable** (B-01). The BFF session, CSRF double-submit and provider abstraction exist; the Entra provider fails closed at startup. Development personas are the only sign-in and are refused outside Development/Testing by construction. |
-| **Stage B gate** | **Demonstrated locally, not approved.** Requires: Stage A gate closure (independent review), PB-14 human AT review + product sign-off, SEC-P and Stage B workflows green on GitHub-hosted runners (`stage-b-integration` workflow added, not yet run), and the open items in §6. |
+| **Stage B gate** | **Development: AUTHORIZED TO PROCEED (A-23); vertical slice demonstrated and evaluated.** Still required before the Stage B *feature milestone* is signed off: PB-14 human AT review + product/design sign-off, the `stage-b-integration` workflow green on a GitHub-hosted runner (needs the workflow on the default branch), and the open items in §6. Production requirements (§6 first bullet) are unchanged. |
 
 ## 1. How to run it
 
@@ -253,8 +256,9 @@ bound to `e6df484`/`7e00680` is unaffected.
 
 ## 6. Unresolved findings, limitations and deferred items
 
-- **Stage A gate BLOCKED** (independent cryptographic review not performed; A-21 deferred controls). Stage B cannot
-  close any Stage A finding.
+- **Production Level 2 certification not granted** (decision A-23 accepted Stage A for development only): independent
+  cryptographic attestation, Azure Managed HSM, Confidential Ledger, Azure Level B validation and enforced security-owner
+  review remain outstanding. Stage B cannot close any of them.
 - **Entra ID sign-in not operable** (B-01); only development personas can sign in. PB-08 Conditional Access/FIDO2
   verification untouched.
 - **Field types:** DateTime, Guid and application-encrypted (`field_encrypted_values`) values are not implemented;
