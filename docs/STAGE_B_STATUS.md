@@ -1,7 +1,7 @@
 # Stage B Status — Enterprise Forms Application (Accused vertical slice)
 
 **Date:** 2026-10-18 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`) ·
-**Evidence commit:** `c349d84` (+ `14900b9` reflow fix; GitHub run links in §4.6) · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
+**Evidence commit:** `d3f144c` (GitHub run links in §4.6) · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
 workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundation.
 
 > **Stage A status (decision A-23, 2026-10-18):** ENGINEERING COMPLETE — **ACCEPTED FOR CONTINUED DEVELOPMENT** by the
@@ -17,7 +17,7 @@ workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundat
 | Gate | Assessment |
 |---|---|
 | **Mandatory Stage B functionality** (ADR-PB-002 §Stage B items 1–8, §2 below) | **Implemented and automatically tested** for the Accused slice: every item has a working UI path, backend slice, authority hook, audit behaviour and an executed test. |
-| **Automated test suites** (§4) | .NET unit/architecture/contract/authority **150 passed, 0 failed**; frontend lint/typecheck/vitest/build **37 vitest tests passed**; Stage B Docker integration **14 passed, 0 failed**; browser e2e **6 passed, 0 failed**; Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
+| **Automated test suites** (§4) | .NET unit/architecture/contract/authority **150 passed, 0 failed**; frontend lint/typecheck/vitest/build **37 vitest tests passed**; Stage B Docker integration **15 passed, 0 failed**; browser e2e **7 passed, 0 failed**; Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
 | **Security controls** | **Unchanged and re-tested.** No new authorization path: shares, child records, documents, discovery pages and the new value types all go through the independent Authority and the signed manifest; SEC-P01..P12 pass on the Stage B stack. No test was weakened (§5). |
 | **PB-14 design validation** | Automated part **executed** (axe WCAG 2.2 AA + reflow at 320/768/1440 px and 200%/400% zoom equivalents, keyboard-only flows, forced colours — §4.4, §6). **Human review PENDING for the owner/reviewers:** NVDA, VoiceOver, real browser zoom, product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. |
 | **Stage B feature milestone** | **Ready for owner acceptance review** once the human PB-14 items are recorded. Features intentionally deferred to later gates are listed in §7 and are not Stage B defects. Production requirements (§7 first row) are unchanged. |
@@ -174,7 +174,7 @@ arguments; use PowerShell/cmd (or run the test `.dll` directly). CI runs on Linu
 `stage-a/level2-security-foundation` and `main`** (Docker integration tests + Playwright on a hosted runner);
 `ci.yml` compiles the Stage B test project and runs the frontend suite.
 
-## 4. Test evidence (actual results, commits `c349d84`/`14900b9`, 2026-10-18)
+## 4. Test evidence (actual results, commit `d3f144c`, 2026-10-18)
 
 ### 4.1 .NET unit / architecture / contract / authority — `dotnet test --solution EnterpriseForms.All.slnx`
 
@@ -187,20 +187,24 @@ DateTime offset normalization, sub-second rejection, Guid canonical form)/AES-GC
 Lint clean, typecheck clean, **37 vitest tests passed** (adds pause/resume and replace tests for the upload manager), production
 build OK (lazy route chunks per feature).
 
-### 4.3 Stage B Docker integration — `tests/integration/EnterpriseForms.StageBTests` (14 tests)
+### 4.3 Stage B Docker integration — `tests/integration/EnterpriseForms.StageBTests` (15 tests)
 
-**14 passed, 0 failed** (TRX in `docs/evidence/stage-b/2026-10-18-stage-b-final/`). Coverage as before (designer CAS/publish/restore,
+**15 passed, 0 failed** (TRX in `docs/evidence/stage-b/2026-10-18-stage-b-final/`). Coverage as before (designer CAS/publish/restore,
 typed values, parent-child, documents incl. EICAR and tamper, authorization/cross-tenant) **plus**: the Accused form now
 carries `arrest_time` (DateTime) and `external_reference` (Guid) through create, sign, manifest, verify and edit;
 `SharingTests` — share list empty → create → listed with field keys → recipient sees exactly the shared fields, no
 documents, cannot list shares/open the child/download/re-share → revoke → denied and undiscoverable; records list pages
-with `pageSize=1` over three records with no duplicates and rejects a forged continuation token.
+with `pageSize=1` over three records with no duplicates and rejects a forged continuation token; `BrandingTests` — owner uploads a PNG logo (`image/png`) and it is served back byte-exact, `application/octet-stream` → 415, a fake PNG → 422, non-owner denied.
 
 ### 4.4 Browser end-to-end (Playwright, Chromium) — `src/frontend/e2e`
 
-**6 passed, 0 failed** (`docs/evidence/stage-b/2026-10-18-stage-b-final/playwright-junit.xml`, run log alongside).
-1. *Designer* publishes `AccusedAddress` and `Accused` (now 7 placed fields incl. DateTime and Guid, plus the related
-   list and the document collection).
+**7 passed, 0 failed** (`docs/evidence/stage-b/2026-10-18-stage-b-final/playwright-junit.xml`, run log alongside).
+1. *Designer* publishes `AccusedAddress` and `Accused` (7 placed fields incl. DateTime and Guid, plus the related
+   list and the document collection): confirms "File (document collection)" is offered in *Add field*, creates
+   `Case documents` through **Add document collection**, sets Maximum files / Maximum file size / Allowed content types
+   on the placed collection; the clerk then sees `Case documents (0 of 10)` with those limits and uploads two files.
+5. *Owner* uploads a PNG logo on the branding page; it appears top-left with non-empty alt text; a fake PNG is refused
+   with the server's message (regression for the 415 defect below).
 2. *Clerk* creates an Accused (client validation incl. UUID format, DateTime stored as UTC and displayed with the
    instant), two addresses, edit → revision 2, two uploads across SPA navigation → Ready/Clean, download, EICAR
    rejected, activity; *Reader* denied; **clerk shares `Given name` with the reader → reader sees the partial view
@@ -220,7 +224,7 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 
 ### 4.6 GitHub-hosted runs
 
-`ci` **success** and `stage-b-integration` (Docker integration tests + Playwright on a GitHub-hosted runner) **success** for head `14900b9`: https://github.com/schipani/EnterpriseForms/actions/runs/39160072571 and https://github.com/schipani/EnterpriseForms/actions/runs/39160072502. The previous head `c349d84` passed `ci` (run 39160072571's predecessor 39159489792) but its hosted `stage-b-integration` run (39159489813) failed one axe reflow check at 320 px on the designer tabs — a non-wrapping button group that Linux font metrics pushed past the viewport; fixed in `14900b9`. `security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074); the SEC-P regression for this change set is the local run in §4.5 on the identical images.
+`ci` **success** (run 39170555542) and `stage-b-integration` — Docker integration tests + Playwright on a GitHub-hosted runner — **success** (run 39170555532) for head `d3f144c`: https://github.com/schipani/EnterpriseForms/actions/runs/39170555542 and https://github.com/schipani/EnterpriseForms/actions/runs/39170555532. Earlier heads: `14900b9` (39160072571 / 39160072502) and `3f96e24` (39164449381 / 39164449402) green; the first hosted integration run on `c349d84` caught a 320 px overflow that was fixed. `security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074); the SEC-P regression for this change set is the local run in §4.5 on the identical images.
 
 ## 5. Defects found and fixed during Stage B (none fixed by weakening a test)
 
@@ -236,6 +240,9 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 | `dev-seed` could not write the personas file (root-owned named volume vs non-root runtime user) | browser e2e | seed directory ownership baked into the image |
 | User directory listed only principals who had already signed in | browser e2e | development login projects every seeded persona (display data only; Development/Testing path) |
 | rolldown/lightningcss native bindings dropped by npm (optional-dependency bug) | frontend CI | platform bindings pinned as optional dependencies |
+| Owner testing: the *Add field* storage-type list clipped its last entry, so **File** looked absent and the documented "Case documents" step could not be followed | owner's manual test | select list no longer clips; a dedicated **Add document collection** button creates the File field directly; upload limits (max files, max size, types) editable on the placed collection; browser test follows the exact steps |
+| Organization logo upload answered **HTTP 415**: the client sent every binary body as `application/octet-stream`, the endpoint accepts only `image/png` | owner's manual test | binary operations declare their media type (`binaryContentType`); API + browser tests cover PNG accepted, octet-stream 415, fake PNG 422, non-owner denied |
+| Header logo could render with an empty `alt` when the owner cleared the alternative text | logo test | falls back to "<organization> logo" |
 | `web` image (node:22-alpine) failed to build: the lockfile carried only glibc/Windows bindings, so `npm ci` on musl had no rolldown/lightningcss binary | owner's first local `compose.dev.yaml` run | musl bindings pinned and locked alongside the gnu/win32 ones |
 | **This round, found by the new browser/axe tests and fixed in product code:** (1) a share-scoped (partial) projection returned the full layout and field catalog, so a recipient saw the labels of unshared fields, the address list and the document collection as empty placeholders — the server now serializes only authorized field definitions, layout elements, non-empty sections and relationship metadata (§4H), with a unit test and an integration assertion; (2) the table scroll container was not keyboard focusable (axe `scrollable-region-focusable` at 320 px) — now a labelled, focusable region; (3) dialogs opened from state did not return focus to their opener on close — the shared Dialog now records and restores the opener. Test-only corrections: field counts in `DesignerTests` after adding two fields, a unit test building signed rows with `row_revision = 0`, and `SharingTests` initially expecting the child list to be denied where the documented behaviour is an empty, count-free list for a parent-only recipient (B-04) | | |
 

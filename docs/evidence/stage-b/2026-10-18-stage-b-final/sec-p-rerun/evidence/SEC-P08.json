@@ -2,50 +2,50 @@
   "test_id": "SEC-P08",
   "scenario": "Signing service outage: signing-required writes never commit as accepted; retries are idempotent after restoration; no insecure fallback",
   "outcome": "PASS",
-  "commit_sha": "4489b8c37e5b5360338ffb54ecb6b76cb1ddd4af",
+  "commit_sha": "d3f144ceb57a3fd8d23a8cb6984be5b532cb60bb",
   "image_fingerprint": "sha256:cd34863d634e5fe91fa080743912b71f15ec6db17ed41107e8b03b9c5080234e (api=sha256:af719f2048cd20ce9cf3b374d389dca82f3857ddbbb4cb4e2941e597807e17ba;authority=sha256:da726cadf76db6c726b2e0801e5685fde89da1356b92726a3b57f918c9382a41)",
-  "started_at_utc": "2026-10-18T19:31:16.1093199\u002B00:00",
-  "executed_at_utc": "2026-10-18T19:31:33.8101025\u002B00:00",
+  "started_at_utc": "2026-10-18T22:08:49.7862031\u002B00:00",
+  "executed_at_utc": "2026-10-18T22:09:07.5832254\u002B00:00",
   "authority_revision": 4,
   "content_revision": 1,
   "failure_detail": null,
   "observations": [
     {
-      "at": "2026-10-18T19:31:16.1342167\u002B00:00",
+      "at": "2026-10-18T22:08:49.8087424\u002B00:00",
       "step": "bootstrap organization",
       "status": 200,
       "error_code": null,
       "fields": {
         "authorization_revision": "1",
-        "integrity_key_name": "org-01a1507f340d7f2a999482296ea3e0ca-row-integrity-v1",
+        "integrity_key_name": "org-01a1510f747a7f1597796a8a2dc5b3c0-row-integrity-v1",
         "signing_key_version": "1"
       }
     },
     {
-      "at": "2026-10-18T19:31:16.7740695\u002B00:00",
+      "at": "2026-10-18T22:08:50.4651264\u002B00:00",
       "step": "create form definition",
       "status": 201,
       "error_code": null,
       "fields": {
-        "formDefinitionId": "c14309f9-5908-876f-a836-a2016aeccf1e",
+        "formDefinitionId": "38030d64-844e-8f82-8af4-8d777d76d83e",
         "authorizationRevision": "2"
       }
     },
     {
-      "at": "2026-10-18T19:31:17.1823090\u002B00:00",
+      "at": "2026-10-18T22:08:50.8559339\u002B00:00",
       "step": "create record",
       "status": 201,
       "error_code": null,
       "fields": {
-        "formRecordId": "2e4142b9-afe3-807f-b1eb-fd0bc545dd98",
+        "formRecordId": "1a6dc7f9-305b-8e20-a114-00fb1f519d72",
         "contentRevision": "1",
-        "committedOperationId": "108be3ee-6eda-8944-ba82-1a2bdb6a99df",
+        "committedOperationId": "26153438-99a8-80be-923e-d64b738589aa",
         "authorizationRevision": "3",
         "integrityStatus": "Committed(Pending)"
       }
     },
     {
-      "at": "2026-10-18T19:31:23.0022402\u002B00:00",
+      "at": "2026-10-18T22:08:56.8068545\u002B00:00",
       "step": "create record while Vault paused",
       "status": 503,
       "error_code": "SIGNING_UNAVAILABLE",
@@ -55,7 +55,7 @@
       }
     },
     {
-      "at": "2026-10-18T19:31:28.0311816\u002B00:00",
+      "at": "2026-10-18T22:09:01.8359207\u002B00:00",
       "step": "update existing record while Vault paused",
       "status": 503,
       "error_code": "SIGNING_UNAVAILABLE",
@@ -64,7 +64,7 @@
       }
     },
     {
-      "at": "2026-10-18T19:31:33.0653137\u002B00:00",
+      "at": "2026-10-18T22:09:06.8706722\u002B00:00",
       "step": "owner read while Vault paused",
       "status": 503,
       "error_code": "SIGNING_UNAVAILABLE",
@@ -73,28 +73,28 @@
       }
     },
     {
-      "at": "2026-10-18T19:31:33.4125289\u002B00:00",
+      "at": "2026-10-18T22:09:07.1964242\u002B00:00",
       "step": "retry with the same idempotency key after restoration",
       "status": 201,
       "error_code": null,
       "fields": {
-        "formRecordId": "810895f6-8c83-8014-8c80-2ebff67269d8",
+        "formRecordId": "25e1713d-89b7-8a78-a00d-085b722edb66",
         "contentRevision": "1",
-        "committedOperationId": "bb74147e-33ce-881c-884e-6e8001013939"
+        "committedOperationId": "d8364566-7cf8-8ca2-8e80-48b7f052958b"
       }
     },
     {
-      "at": "2026-10-18T19:31:33.4529388\u002B00:00",
+      "at": "2026-10-18T22:09:07.2288018\u002B00:00",
       "step": "second retry (duplicate)",
       "status": 201,
       "error_code": null,
       "fields": {
-        "formRecordId": "810895f6-8c83-8014-8c80-2ebff67269d8",
+        "formRecordId": "25e1713d-89b7-8a78-a00d-085b722edb66",
         "contentRevision": "1"
       }
     },
     {
-      "at": "2026-10-18T19:31:33.7571016\u002B00:00",
+      "at": "2026-10-18T22:09:07.5285200\u002B00:00",
       "step": "staged header operations for the retried record",
       "detail": {
         "operations": "1"
