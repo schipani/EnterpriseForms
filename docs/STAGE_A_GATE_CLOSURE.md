@@ -7,8 +7,10 @@
 
 Stage A is implemented, reproducibly tested in a clean checkout and on a GitHub-hosted runner, and all twelve mandatory
 adversarial tests pass against the committed code. The gate stays **BLOCKED** because three acceptance criteria are not
-satisfied and cannot be satisfied from code: the independent cryptographic review has not been performed, the
-repository is public and unprotected (BUILD-00), and the Azure Level B validation has not started. Nothing in this
+satisfied: the independent cryptographic review has not been performed (mandatory), independently authorized
+CODEOWNERS review is not enforceable on the public user-owned repository (deferred to the Azure DevOps milestone by
+decision A-21; the repository intentionally stays public during development), and the Azure Level B validation has not
+started. Nothing in this
 document waives a mandatory control, and Stage B has not begun.
 
 ## 1. Requirement-by-requirement assessment
@@ -23,7 +25,7 @@ document waives a mandatory control, and Stage B has not begun.
 | 6 | SEC-P01..SEC-P12 implemented and executed in Docker with real PostgreSQL, SpiceDB, Vault Transit | **PASS** | §3 (two runs on `e6df484`, 12/12 each) | — |
 | 7 | Cross-tenant isolation, unauthorized signing prevention, revocation, damaged audit evidence, service interruption, partial-commit recovery verified | **PASS (Level A)** | SEC-P11 (tenant/network/signing), P06 (revocation), P12 + A-F12 (archive evidence), P07/P08 (interruption), P09 (partial commit) | — |
 | 8 | Zero discovered tests = failed run; Windows path-length reliability | **PASS** | `--minimum-expected-tests 10` per executable + `assert_test_totals.py` (≥130/4 files); Gate A `13`; A-19 | — |
-| 9 | BUILD-00 repository protection / CODEOWNERS advanced; what cannot be done from code documented | **BLOCKED** | `verify_repository_protection.py` → 4/12 PASS; repository **public**, owner is a user account, no rulesets, no environments | §5 admin actions 3.1–3.10 (repository owner, Security Owner, Entra admin) |
+| 9 | BUILD-00 repository protection / CODEOWNERS advanced; what cannot be done from code documented | **PASS for the public-repository scope; deferred controls OPEN** | `verify_repository_protection.py` 2026-10-18 (after A-21): 17 PASS, 0 FAIL, 6 DEFERRED. Applied: rulesets on `main` and `v*`, required checks, PR controls, signed commits, restricted + SHA-pinned Actions, secret/dependency/code scanning. DEFERRED, not implemented: private visibility, organization teams and therefore enforceable CODEOWNERS review, segregated environments, Entra federation | §5; Azure DevOps milestone (`BUILD00_REPOSITORY_PROTECTION.md` §5) |
 | 10 | F-05 kept open as Azure Level B; Docker isolation not Level 2 proof | **PENDING (Azure Level B)** | `docs/PREBUILD_OPEN_ITEMS.md`; SEC-P11 is Level A only | Azure staging validation (Managed HSM, Confidential Ledger, private networking, F-05) |
 | 11 | Independent cryptographic review package; self-generated vectors do not count; Stage A BLOCKED until reviewed | **BLOCKED** | `docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md` (exact SHA, digests, vectors, R1–R9, blank §7) | Security Owner engages a reviewer independent of authorship; record outside BusinessDb |
 | 12 | Evidence tied to tests, commits, image digests, config versions (ADR-PB-012) | **PASS (provisional storage)** | `docs/evidence/stage-a/2026-10-18-github-run-39121925152`, `…/2026-10-18-local-e6df484`; each `SEC-P*.json` carries `commit_sha` and `image_fingerprint` | PB-12 immutable Canadian evidence storage not provisioned (BUILD-00 3.9) |
@@ -38,7 +40,7 @@ deferred by design to Azure Level B. "Level A" never implies Level 2 production 
 | 1 Change-set review | Done — `docs/STAGE_A_CHANGE_REVIEW.md`: no out-of-scope change, no secret, every dev shortcut guarded by environment, missing-test gaps listed. |
 | 2 Dedicated branch + PR | Done — `stage-a/level2-security-foundation`, PR #9, two pushes, no force-push, no bypass (there is no protection to bypass; see item 4). |
 | 3 Evidence on the exact committed SHA and image digests; clean CI checkout rerun | Done for `e6df484` — §3. The first clean-worktree rerun on `5e56238` **failed SEC-P12** and exposed A-F12; evidence is not carried over from `5e56238`. |
-| 4 BUILD-00 | Code items complete; live state verified read-only and documented; admin instructions exact (`docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §3). No external protection is claimed. |
+| 4 BUILD-00 | Decision A-21 applied: public GitHub during development, private Azure DevOps for production (deferred milestone). Rulesets, required checks, PR controls, signed commits, Actions restrictions and scanning **applied and verified read-only**; deferred controls listed explicitly as not implemented (`docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §1, §4, §5). Full history scanned for secrets: clean. |
 | 5 Review package | Enriched — exact SHA + per-file digests, real Vault vectors, canonical rules, membership vs completeness, replay/recovery assumptions, R1–R9. |
 | 6 No self-approval | §7 of the package is blank; no reviewer identity is recorded anywhere. |
 | 7 Findings table | §4 below (severity, impact, owner, release gate, remediation) — supersedes `STAGE_A_STATUS.md` §4. |
@@ -94,7 +96,7 @@ staging sign-off; Low = tracked. Gate column: SA = Stage A gate, LB = Azure Leve
 |---|---|---|---|---|---|---|
 | A-F1 | Independent cryptographic review not performed | **Critical** | Format/protocol flaws (injectivity, replay, chain) would go undetected; author review is not independent | Security Owner | SA | Engage reviewer; record in release system; `INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md` §7 |
 | A-F2 | Evidence commit binding | Closed for `e6df484` | — | Maintainer | SA | R3 + R4 bound to `e6df484`; A-20 governs doc-only follow-ups |
-| A-F3 | BUILD-00 admin steps open | **Critical** | Repository is public with forking allowed; no required review/status checks; `main` force-pushable; CODEOWNERS teams unresolvable | Repository owner + Security Owner | SA | BUILD-00 §3.1–3.10; verify with `verify_repository_protection.py` |
+| A-F3 | BUILD-00 | Closed for the public-repository scope (A-21) | Remaining: deferred controls in `BUILD00_REPOSITORY_PROTECTION.md` §4 (not implemented) | Repository owner + Security Owner | Azure DevOps milestone | Rulesets, checks, PR controls, signatures, Actions hardening, scanning applied and verified; 0 FAIL |
 | A-F4 | Managed HSM provider and Confidential Ledger anchoring not implemented; Azurite archive is a test double | High | No production signer; no externally anchored anti-rollback receipts | Authority team | LB/L2 | Production refuses non-HSM providers (fails closed); implement G04/G11 providers before staging |
 | A-F5 | SIG-11 same-key Vault vector | Closed | — | — | — | `stage-a-vault-transit-vectors.json` PASS (real Vault import, 7 cases + tamper) |
 | A-F6 | CONS/MRK/SIG/PG/DR matrices not executed beyond the 12-test core | High | Residual protocol/recovery defects outside the tested paths | Authority team | L2 | Phase gates after Stage A; A-F12 shows the core alone is insufficient |
@@ -104,8 +106,8 @@ staging sign-off; Low = tracked. Gate column: SA = Stage A gate, LB = Azure Leve
 | A-F10 | F-05 Docker cross-bridge reachability | Medium | Docker isolation is not a Level 2 boundary | Platform team | LB | Azure private networking validation |
 | A-F11 | `libgssapi_krb5` warning in chiseled images | Low | Cosmetic | Platform team | — | PB-11 image hardening |
 | **A-F12** | **Journal body stored as `jsonb`**: PostgreSQL normalized the stored body so every archived body differed from `journal_event_digest`; detected when the Azurite conflict path compared bytes (R2) | **High (fixed in `e6df484`)** | Archived "replayable" evidence did not match its chained digest; replay/receipt verification would have failed; archive stored non-canonical bytes silently | Authority team | SA | Column is `text` (migration `JournalEventBodyCanonicalText`); `ArchiveProcessor` verifies `SHA-256(body)==digest` before delivery and quarantines on mismatch; `ArchiveProcessorTests`; R3/R4 PASS; DB-level check in §7 |
-| A-F13 | Repository visibility is **public** | **Critical** | Violates ADR-PB-001/011; Stage A source, CI and evidence are world-readable; forks possible | Repository owner | SA | BUILD-00 3.1 (make private, disable forking) — verified FAIL on 2026-10-18 |
-| A-F14 | CODEOWNERS references teams of a non-existent organization | High | Code-owner review requirement is unenforceable; PR #9 has no required reviewer | Repository owner | SA | BUILD-00 3.2 (organization + teams, or explicit user logins) |
+| A-F13 | Repository visibility is **public** | Accepted by decision A-21 (no longer a finding) | Source, CI and synthetic evidence are world-readable by design during development; no secrets or customer data may exist in history (scan clean 2026-10-18); forks receive no privileges | Repository owner | Azure DevOps milestone | ADR-PB-001/011 amended; private Azure DevOps project is the production environment |
+| A-F14 | Independently authorized CODEOWNERS / security-owner review is **not enforceable** (user-owned repository, teams cannot exist; `require_code_owner_review` inert) | High (deferred control, not implemented) | PR #9 and later PRs have no machine-enforced security-owner reviewer; review is a manual recorded step | Repository owner + Security Owner | SA (manual review recorded) / Azure DevOps milestone (enforced) | Record the named security-owner review on each PR; enforce via Azure DevOps required reviewers per path |
 | A-F15 | CI test floor misconfigured (`--minimum-expected-tests 100` per executable) | Closed in `e6df484` | Branch CI failed on Linux with all tests passing; a too-low floor would have hidden missing tests | Maintainer | SA | Per-executable 10 + aggregate ≥130 (A-19); Linux `ci` .NET job PASS on `e6df484` |
 | A-F16 | Blob archive read-back/conflict path only reached by timing in Docker | Medium | A regression in `BlobSecurityEventArchive`'s conflict handling could pass Gate A unnoticed | Authority team | LB | Add a deterministic SEC test that pre-seeds a differing blob and expects quarantine, and one that pre-seeds identical bytes and expects Anchored |
 | A-F17 | Specification manifest job failed on `e6df484` (`BUILD00_REPOSITORY_PROTECTION.md` digest) | Closed in the docs commit | None (detection working as designed) | Maintainer | SA | Manifest regenerated with the documentation commit; `ci` must be green on the branch head |
@@ -113,16 +115,50 @@ staging sign-off; Low = tracked. Gate column: SA = Stage A gate, LB = Azure Leve
 
 No finding is waived. Critical and High findings owned by this team are either fixed or carried as explicit blockers.
 
-## 5. BUILD-00 — exact remaining administrative actions
+## 5. BUILD-00 — state after decision A-21 (2026-10-18)
 
-Verified live state (read-only, 2026-10-18): public repository, forking allowed, owner type `User`, no rulesets, no
-branch protection, no environments, secret scanning and push protection enabled, Actions enabled without SHA pinning,
-Dependabot security updates disabled. The full action table with commands and evidence to capture is
-`docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §3. Order: 3.1 private + no forking → 3.2 organization/teams and
-CODEOWNERS fix → 3.3 ruleset import (`.github/rulesets/main-branch-protection.json`, no bypass actors) → 3.5
-environments with segregated reviewers → 3.7 Actions hardening → 3.6 Entra federation → 3.8 reviewer engagement →
-3.9 PB-12 evidence storage → 3.10 rerun `ci` + `security-gate-a` on the protected merge commit. None has been performed;
-nothing here can be done from the repository.
+Applied and verified read-only (0 FAIL): rulesets on `main` (no deletion/force-push, linear history, signed commits,
+PR with 1 approval + stale-review dismissal + last-push approval + resolved threads, strict required `ci` checks, no
+bypass actors) and on `v*` tags; merge commits disabled; Actions restricted to GitHub-owned actions with mandatory SHA
+pinning and read-only token; secret scanning + push protection; Dependabot alerts/updates; CodeQL default setup.
+Full history scan for secrets: clean (487 blobs).
+
+Deferred to the private Azure DevOps milestone (**not implemented, not validated**): private visibility and forking,
+organization teams and therefore enforceable CODEOWNERS review, segregated deployment environments/approvers, Entra
+federation, organization audit, image signing/SBOM, PB-12 evidence storage. Details: `BUILD00_REPOSITORY_PROTECTION.md`
+§4 to §6. Remaining human actions on GitHub: signing keys (3.4), engage the independent reviewer (3.8), a second
+maintainer for the approval rule (3.11), CodeQL/Dependabot triage (3.12).
+
+Verifier output:
+
+```text
+DEFERRED 3.1 repository is private  visibility=public (public by decision A-21 until the Azure DevOps migration)
+DEFERRED 3.1 forking disabled  allow_forking=True (cannot be disabled on a public repository)
+PASS     3.1 default branch is main  main
+DEFERRED 3.2 owner is an organization (teams / enforceable CODEOWNERS)  owner type=User (deferred to Azure DevOps; CODEOWNERS review is NOT enforceable)
+PASS     3.3 merge commits disabled (linear history)  allow_merge_commit=False
+PASS     3.3 head branches deleted on merge  
+PASS     3.3 an active ruleset exists  2 active ruleset(s)
+PASS     3.3 main ruleset: PR + 1 approval + required status checks + no force-push/deletion  matches .github/rulesets/main-branch-protection.json
+PASS     3.3 main ruleset has no bypass actors  
+PASS     3.3 main ruleset requires signed commits  
+PASS     3.3 release tag ruleset (v*) exists  
+DEFERRED 3.2 CODEOWNERS review enforceable  ruleset requires code-owner review but the @enterpriseforms/* teams cannot exist under a user account
+DEFERRED 3.5 deployment environments with segregated reviewers  present=[] (no deployment pipeline exists; production delivery moves to Azure DevOps — deferred)
+PASS     3.7 secret scanning enabled  
+PASS     3.7 push protection enabled  
+DEFERRED 3.7 non-provider secret patterns enabled  generic-pattern detection; requires GitHub Advanced Security features not available on this plan if FAIL persists
+PASS     3.7 Dependabot security updates enabled  
+PASS     3.7 Dependabot alerts enabled  http=204
+PASS     3.7 CodeQL default setup configured  {"state": "configured", "languages": ["actions", "csharp", "javascript", "javascript-typescript", "python", "typescript"]}
+PASS     3.7 Actions enabled  
+PASS     3.7 Actions restricted to selected (GitHub-owned) actions  allowed_actions=selected
+PASS     3.7 Actions SHA pinning required  
+PASS     3.7 default GITHUB_TOKEN read-only, no PR approval  {"default_workflow_permissions": "read", "can_approve_pull_request_reviews": false}
+
+17 PASS, 0 FAIL, 6 DEFERRED (A-21 / Azure DevOps milestone) of 23 controls
+BUILD-00 (public-repository scope) is COMPLETE; deferred controls are NOT implemented.
+```
 
 ## 6. Azure Level B requirements carried forward (requirement 9 of the closure request)
 
@@ -174,9 +210,11 @@ is retained as a historical record only.
 ## 9. What would move the gate from BLOCKED to PASS
 
 1. A-F1: independent review recorded with decision APPROVED (or APPROVED WITH CONDITIONS whose conditions are closed).
-2. A-F3/A-F13/A-F14: repository private, forking disabled, organization/teams or explicit owners in CODEOWNERS,
-   ruleset active with no bypass actors, environments with segregated reviewers; `verify_repository_protection.py` 12/12.
-3. `ci` and `security-gate-a` green on the protected merge commit of PR #9 (BUILD-00 3.10), evidence archived per PB-12.
+2. A-F14: a named security owner, independent of the author, reviews PR #9 and records the review (manual until Azure
+   DevOps enforces it); the PR receives its required approval from a second maintainer account.
+3. `ci` and `security-gate-a` green on the protected merge commit of PR #9, evidence archived per PB-12.
+   The deferred BUILD-00 controls (§5) are tracked under the Azure DevOps milestone and are not Stage A exit criteria,
+   but they remain Level 2 production prerequisites.
 4. No new Critical/High finding opened by the reviewer or by the CODEOWNERS review.
 
 Until then: **Stage A = BLOCKED. Stage B not started. No production infrastructure deployed. No control waived.**

@@ -6,7 +6,7 @@
 
 ## Repository and code ownership
 
-- Private canonical Git repository with branch rulesets, protected main, mandatory pull requests/peer review, security reviewer CODEOWNERS on `src/trust-authority/`, `docs/security/`, `docs/trust-authority/`, `security_hardening/`, `infrastructure/security/`, key policies, credentials and authority DB migrations.
+- Canonical Git repository (public on GitHub during development per ADR-PB-011 amendment A-21; private Azure DevOps project for production) with branch rulesets, protected main, mandatory pull requests/peer review, security reviewer CODEOWNERS on `src/trust-authority/`, `docs/security/`, `docs/trust-authority/`, `security_hardening/`, `infrastructure/security/`, key policies, credentials and authority DB migrations.
 - Require explicit review for schema migrations, IAM/role/network policy, container base images and signing workflows. Validate that a business app maintainer cannot self-merge a Trust Authority workflow/policy change or disable required checks.
 - All required documentation remains in the repo. Validate file completeness, required references and architecture decisions in CI; zip bundles are releases, not parallel sources of truth.
 - Artifact version inputs (SDK, Node, lockfiles, package registries, tooling images, Github Actions SHA) pinned and reviewed; use dependency update policy with release provenance.

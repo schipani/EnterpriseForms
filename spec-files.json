@@ -9,8 +9,8 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "4c6b384048091ae871b6f3b658dc19a49cfec5fc22f101e87bf71d562c2df7c1",
-      "bytes": 285924
+      "sha256": "ce700280dbe9fd332f9b3700aa183a82d218581f1c1dc7335d63688e1d57e652",
+      "bytes": 286243
     },
     {
       "path": "ENTERPRISE_SECURITY_REDUNDANCY_AUDIT.md",
@@ -49,8 +49,8 @@
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
-      "sha256": "0d2c39760a95683ca94ebebe65772130039ca3158fe4c8826d559c532be63039",
-      "bytes": 3188
+      "sha256": "94aed64050704da8ec31a90ad594b98345b719ca94a8fa3dc9dd5093211d1fd9",
+      "bytes": 3799
     },
     {
       "path": "docs/STAGE_A_CHANGE_REVIEW.md",
@@ -59,13 +59,13 @@
     },
     {
       "path": "docs/STAGE_A_GATE_CLOSURE.md",
-      "sha256": "41ddd32dffb15669b5e7023fd7c596d4668b47268c464946acbc2f7802dbbef8",
-      "bytes": 20015
+      "sha256": "624aaaf68aa68cf2a3167d9c5fd86bf4ca9bd7b5bb615ef9dec331c019447680",
+      "bytes": 23702
     },
     {
       "path": "docs/STAGE_A_STATUS.md",
-      "sha256": "a9ac55cbc5b04976001741b9eb4172937b4297d63c0fdc2e12e68eb8770b3ea6",
-      "bytes": 15632
+      "sha256": "6c39f6ffadd057de5c7ea70004bf4ce6f15335c675a5e5c91f98945f90425211",
+      "bytes": 15931
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/decisions/ADR-PB-001-CANONICAL-REPOSITORY.md",
-      "sha256": "9b356209b857481d62bebe6f27454475394275188fcadb99dee617bb5b8432c7",
-      "bytes": 3811
+      "sha256": "3a20cf06c6008adff1b20b5c8664c026a031ba73430a16b0f7ca3c68952b466f",
+      "bytes": 5551
     },
     {
       "path": "docs/decisions/ADR-PB-002-SECURITY-FIRST-ACCUSED-VERTICAL-SLICE.md",
@@ -144,8 +144,8 @@
     },
     {
       "path": "docs/decisions/ADR-PB-011-GITHUB-ACTIONS-SECURE-DELIVERY.md",
-      "sha256": "6990657faf8aff02d1974d576478fe7bca5731c5461a9fd2e9d3030e2b77d6ec",
-      "bytes": 6812
+      "sha256": "8998d2d93a97da8c32bbca0ca6d680b67ce7a4d0f8deef91942e42c0ef280733",
+      "bytes": 8809
     },
     {
       "path": "docs/decisions/ADR-PB-012-SECURITY-EVIDENCE-RELEASE-GOVERNANCE.md",
@@ -169,18 +169,18 @@
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
-      "sha256": "8b354528c584e6c49d18b90ca578e427359132cbac958fa0d0c47ab564214247",
-      "bytes": 6603
+      "sha256": "873201a99713f70c9d2d22672debc22d68d223c44c350c61a2f042f3c6531b5c",
+      "bytes": 6777
     },
     {
       "path": "docs/decisions/STAGE_A_DECISION_LOG.md",
-      "sha256": "7ce2d16c7723f66bbbbcb79c5495f0ae0bd46f37ec58471ca59bcd267ab34633",
-      "bytes": 9001
+      "sha256": "7990cb5dab7ce28a4a6cb366b3d95eaf0950fb49d73374073fa21cb15732beb7",
+      "bytes": 9948
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
-      "sha256": "0c0c1247a323b1aacfa21531df2808709be772f7b36b1945e1948186b4a2fe0d",
-      "bytes": 8354
+      "sha256": "51029886dd3896bb7be68341b2adeb4107652bd382f57d2e12180ce7a945316a",
+      "bytes": 12963
     },
     {
       "path": "docs/delivery/PB11_CICD_ACCEPTANCE_TESTS.csv",
@@ -189,8 +189,8 @@
     },
     {
       "path": "docs/delivery/PB11_CICD_SUPPLY_CHAIN_RELEASE_STANDARD.md",
-      "sha256": "7212c1b8873d2b873e12b8aa1ed9d337c526bb9c96d36b1cbb6b958f0ac597b1",
-      "bytes": 7192
+      "sha256": "9624aa0287e12e2b8bd78cdddb5ebab1b6d23ac5b9c82909df0a71e2d82d673a",
+      "bytes": 7297
     },
     {
       "path": "docs/dynamic-forms/architecture.md",
@@ -354,8 +354,8 @@
     },
     {
       "path": "scripts/governance/verify_repository_protection.py",
-      "sha256": "6f08001e2a578ddd6cff3fb327259a36d950a5275798c415dcba0da96a814ea5",
-      "bytes": 4965
+      "sha256": "a54e20a8a28bb4d3e991ed65a14ffc50542e9a5d2fafce11120bba9e9ab36307",
+      "bytes": 8346
     },
     {
       "path": "scripts/integrity/generate_control_checklist.py",

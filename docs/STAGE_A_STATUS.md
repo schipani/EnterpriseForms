@@ -10,10 +10,10 @@ Level A adversarial tests, evidence). **Stage B has not started.**
 |---|---|
 | Stage A implementation (requirements 1–8, 12) | **DONE** — compiles, 138 unit/architecture/contract tests pass (Windows, Linux CI), 12/12 mandatory adversarial tests pass against the real Docker stack on the committed code (`e6df484`, clean worktree and GitHub-hosted runner) with validated evidence manifests. |
 | Independent cryptographic review (requirement 11) | **NOT PERFORMED** — package assembled in `docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md`; author-run tests and author-written vectors do not count. |
-| BUILD-00 repository protection (requirement 9) | **BLOCKED** — code-expressible items committed; live state verified read-only on 2026-10-18: repository **public**, user-owned (no teams), no rulesets, no environments (`scripts/governance/verify_repository_protection.py` 4/12). Admin steps in `docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §3 are open. |
+| BUILD-00 repository protection (requirement 9) | **Applied for the public-repository scope (decision A-21)** — rulesets, required checks, PR controls, signed commits, Actions hardening and scanning verified read-only (17 PASS, 0 FAIL, 6 DEFERRED). Public visibility is intentional during development; private Azure DevOps is the deferred production milestone. **Deferred, not implemented:** enforceable CODEOWNERS review, segregated environments, Entra federation (`docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §4). |
 | F-05 Docker isolation (requirement 10) | **OPEN as Azure Level B** — Docker network isolation is demonstrated (SEC-P11) but is not Level 2 proof. |
 | Evidence provenance (ADR-PB-012) | **Bound to `e6df484`** — GitHub `security-gate-a` run 39121925152 and a clean local worktree run, both 12/12 with image fingerprints; copies under `docs/evidence/stage-a/`. PB-12 immutable storage not provisioned. |
-| **Stage A gate** | **BLOCKED** (independent review A-F1; BUILD-00 A-F3/A-F13/A-F14). Full requirement table and findings: `docs/STAGE_A_GATE_CLOSURE.md`. No Level 2 or production claim is made. |
+| **Stage A gate** | **BLOCKED** (independent review A-F1 mandatory; manual security-owner review A-F14; PR approval). Full requirement table and findings: `docs/STAGE_A_GATE_CLOSURE.md`. No Level 2 or production claim is made. |
 
 ## 1. What was built
 
@@ -130,8 +130,8 @@ A-01…A-17: schema name `authority`; full-snapshot prepare with caller-bound op
 ## 4. Unresolved findings and open items
 
 Superseded by the severity/impact/owner/gate/remediation table in `docs/STAGE_A_GATE_CLOSURE.md` §4 (A-F1..A-F17).
-Blocking for Stage A: A-F1 (independent review), A-F3/A-F13/A-F14 (BUILD-00: public repository, no protection, unresolvable
-CODEOWNERS teams). Fixed during closure: A-F12 (journal body canonical storage), A-F15 (CI test floor), A-F5 (Vault vectors).
+Blocking for Stage A: A-F1 (independent review), A-F14 (security-owner review not machine-enforceable; manual recorded
+review required). A-F3 closed for the public-repository scope and A-F13 accepted by decision A-21 (public during development). Fixed during closure: A-F12 (journal body canonical storage), A-F15 (CI test floor), A-F5 (Vault vectors).
 
 ## 5. Reproduction
 
