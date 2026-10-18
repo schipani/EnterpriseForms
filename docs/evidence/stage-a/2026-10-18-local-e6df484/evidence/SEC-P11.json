@@ -1,0 +1,160 @@
+{
+  "test_id": "SEC-P11",
+  "scenario": "Unauthorized HSM signing attempt: business API/DB identities cannot call signing operations or obtain raw keys; the authority refuses to sign a forged transition",
+  "outcome": "PASS",
+  "commit_sha": "e6df484b2ee35ed822cd011a06f41b3615ec10c8",
+  "image_fingerprint": "sha256:02a6ab48930e04879ed45c040f9a4055d79ff3818d47bf62d0c01b32ade4d46d (api=sha256:d8e44f769c4a822bb77b73ac797db5f53e3d9efdf8da58106fa609959c65f583;authority=sha256:6cd2e344d46ccad942f662ae7b172b8e4493deb83ed828763d96b0123a39a9ca)",
+  "started_at_utc": "2026-10-18T11:09:55.0818004\u002B00:00",
+  "executed_at_utc": "2026-10-18T11:10:39.6315291\u002B00:00",
+  "authority_revision": 3,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T11:09:55.2205038\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a14eb4340973b8878c6f10b814da7f-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T11:09:55.7835501\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "c8ed066b-2a4d-8453-897c-60b596f5277c",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T11:09:56.1759974\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "6f4a0dfb-a6b7-81c3-b245-c327b82d5c9e",
+        "contentRevision": "1",
+        "committedOperationId": "cf3522e6-ea27-8bc3-bee6-2790b7ecf0b7",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:08.4671203\u002B00:00",
+      "step": "attacker-sql reachability vault:8200",
+      "detail": {
+        "result": "UNRESOLVED\nUNREACHABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:16.5937539\u002B00:00",
+      "step": "attacker-sql reachability spicedb:50051",
+      "detail": {
+        "result": "UNRESOLVED\nUNREACHABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:24.7267071\u002B00:00",
+      "step": "attacker-sql reachability authority-db:5432",
+      "detail": {
+        "result": "UNRESOLVED\nUNREACHABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:32.8862652\u002B00:00",
+      "step": "attacker-sql reachability archive-store:10000",
+      "detail": {
+        "result": "UNRESOLVED\nUNREACHABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:39.2310738\u002B00:00",
+      "step": "attacker-sql reachability of authority-net addresses by IP",
+      "detail": {
+        "result": "UNREACHABLE\nUNREACHABLE"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:39.2422399\u002B00:00",
+      "step": "business workload token \u2192 operator bootstrap",
+      "status": 401,
+      "error_code": "Unauthorized",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T11:10:39.2479214\u002B00:00",
+      "step": "sign-any-bytes probe /internal/v1/integrity/sign",
+      "status": 404,
+      "error_code": "Not Found",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T11:10:39.2496420\u002B00:00",
+      "step": "sign-any-bytes probe /internal/v1/signing/hmac",
+      "status": 404,
+      "error_code": "Not Found",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T11:10:39.2512437\u002B00:00",
+      "step": "sign-any-bytes probe /internal/v1/keys",
+      "status": 404,
+      "error_code": "Not Found",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T11:10:39.2649803\u002B00:00",
+      "step": "attacker content-revision lookup",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {
+        "error_code": "NOT_FOUND"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:39.2959152\u002B00:00",
+      "step": "attacker asks the authority to sign a forged header transition",
+      "status": 403,
+      "error_code": "FORBIDDEN",
+      "fields": {
+        "error_code": "FORBIDDEN"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:39.3051726\u002B00:00",
+      "step": "owner submits a candidate bound to another organization",
+      "status": 422,
+      "error_code": "INVALID_COMMAND",
+      "fields": {
+        "error_code": "INVALID_COMMAND"
+      }
+    },
+    {
+      "at": "2026-10-18T11:10:39.3150998\u002B00:00",
+      "step": "forged user assertion \u2192 business API",
+      "status": 401,
+      "error_code": "Unauthorized",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T11:10:39.3170720\u002B00:00",
+      "step": "forged user assertion \u2192 authority",
+      "status": 401,
+      "error_code": "UNAUTHORIZED",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T11:10:39.6243639\u002B00:00",
+      "step": "business api container environment keys",
+      "detail": {
+        "leaked_markers": [],
+        "key_count": 19
+      }
+    }
+  ]
+}

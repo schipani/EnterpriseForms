@@ -30,7 +30,7 @@ GITHUB_TOKEN=<token with repo scope> python scripts/governance/verify_repository
 |---|---|
 | `.github/CODEOWNERS` | Mandatory security-owner review for the Trust Authority, integrity library, security specifications, workflows and infrastructure. **Placeholder teams** `@enterpriseforms/maintainers` / `@enterpriseforms/security-owners` — see §3.2 for the required change. |
 | `.github/rulesets/main-branch-protection.json` | Importable ruleset for `main`: no deletion/force-push, signed commits, linear history, PR with 1 approval + code-owner review + last-push approval + resolved threads, strict required status checks matching the `ci.yml` job names, no bypass actors. |
-| `.github/workflows/ci.yml` | PR gates: strict specification manifest, cross-language integrity vectors, .NET build/tests with `--minimum-expected-tests 100`, contract drift, frontend check, Compose validation; builds the Stage A security test project. |
+| `.github/workflows/ci.yml` | PR gates: strict specification manifest, cross-language integrity vectors, .NET build/tests with a per-executable `--minimum-expected-tests 10` floor plus a solution-wide TRX total check (≥130), contract drift, frontend check, Compose validation; builds the Stage A security test project. |
 | `.github/workflows/security-gate-a.yml` | Stage A gate (manual/scheduled): disposable Docker stack, SEC-P01..SEC-P12 with `--minimum-expected-tests 13`, manifest validation, evidence/log artifacts. |
 | `.github/dependabot.yml`, `Directory.Packages.props`, pinned action SHAs | Reviewed, pinned dependencies (ADR-PB-011). |
 | `.gitattributes` (`eol=lf`) + LF-writing generators | Deterministic digests across Windows/Linux checkouts (Phase 0 CI failure R-01). |

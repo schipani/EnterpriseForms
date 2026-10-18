@@ -43,7 +43,7 @@ PHASE0_EVIDENCE: dict[str, tuple[str, str, str]] = {
 # Stage A (2026-10-18) evidence: real Docker Level A stack (ADR-PB-003), SEC-P01..SEC-P12 executed by
 # tests/security/EnterpriseForms.SecurityTests with artifacts/security/gate-a-evidence.json. "Tested" here means
 # Level A (Docker) only; Level B (Azure) and independent cryptographic review remain open (docs/STAGE_A_STATUS.md).
-GATE_A = "tests/security/EnterpriseForms.SecurityTests; artifacts/security/gate-a-evidence.json (security-gate-a)"
+GATE_A = "tests/security/EnterpriseForms.SecurityTests; docs/evidence/stage-a/2026-10-18-github-run-39121925152 + 2026-10-18-local-e6df484 (commit e6df484, 12/12 PASS; security-gate-a)"
 STAGE_A_EVIDENCE: dict[str, tuple[str, str, str]] = {
     "SEC-01": ("Tested", GATE_A + " SEC-P01", "Forged owner_user_id/owner_team_id in BusinessDb never grants; authority owner edge unchanged (Level A)."),
     "SEC-02": ("Tested", GATE_A + " SEC-P02, SEC-P03", "Forged record_shares/record_share_fields/team_memberships rows never grant; authority commands are the only grant path (Level A)."),

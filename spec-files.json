@@ -53,9 +53,19 @@
       "bytes": 3188
     },
     {
+      "path": "docs/STAGE_A_CHANGE_REVIEW.md",
+      "sha256": "6713611548b01db10a4ab82f6cf0cd107aa45ffe3ad15e83c696e513b3bf35d1",
+      "bytes": 6469
+    },
+    {
+      "path": "docs/STAGE_A_GATE_CLOSURE.md",
+      "sha256": "41ddd32dffb15669b5e7023fd7c596d4668b47268c464946acbc2f7802dbbef8",
+      "bytes": 20015
+    },
+    {
       "path": "docs/STAGE_A_STATUS.md",
-      "sha256": "5267645e79f842d3c0dc5e13daae149cad9043d24e5f10308f410d352f790a19",
-      "bytes": 16311
+      "sha256": "a9ac55cbc5b04976001741b9eb4172937b4297d63c0fdc2e12e68eb8770b3ea6",
+      "bytes": 15632
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -164,13 +174,13 @@
     },
     {
       "path": "docs/decisions/STAGE_A_DECISION_LOG.md",
-      "sha256": "2d033dda979281298376f4eb2c1335a86ea308f0c768a5b0ec91443e741bcddb",
-      "bytes": 7132
+      "sha256": "7ce2d16c7723f66bbbbcb79c5495f0ae0bd46f37ec58471ca59bcd267ab34633",
+      "bytes": 9001
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
-      "sha256": "ed7d19266e73aa6ee281d3951b0caded9099099d0cac3095f49581c9a42cac5e",
-      "bytes": 4952
+      "sha256": "0c0c1247a323b1aacfa21531df2808709be772f7b36b1945e1948186b4a2fe0d",
+      "bytes": 8354
     },
     {
       "path": "docs/delivery/PB11_CICD_ACCEPTANCE_TESTS.csv",
@@ -189,78 +199,13 @@
     },
     {
       "path": "docs/dynamic-forms/control-traceability.csv",
-      "sha256": "ecdccc297330c1c10101b929bfb6f50cf57536c2541f3ba1573b01e8749d94bb",
-      "bytes": 30199
+      "sha256": "309ddecd19df5fff6f48257896ac43a7f54817dce6351da8b92bf1a54b40eb1c",
+      "bytes": 31568
     },
     {
       "path": "docs/dynamic-forms/row-integrity-format.md",
       "sha256": "c75162ac988be343644d988c1f69ffdd14a09cb4185a940e1d67b08783f7bf05",
       "bytes": 14113
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P01.json",
-      "sha256": "8ea1dcd2b61422d28cdfd8f0c96572e444dff056e9ee7166d09adccd93657f7b",
-      "bytes": 3736
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P02.json",
-      "sha256": "24d44d4e3c954a00b305e06d3281ebf7c20a0762932285a2d63dcd424f874ff2",
-      "bytes": 2844
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P03.json",
-      "sha256": "a5ac4f6e3db5e663e0ad30d0cb135478607839649df1f501efc24435989a1682",
-      "bytes": 3149
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P04.json",
-      "sha256": "10469ef75ccd7748dee5ef6bc3d0a4e6360e3291645f26bbdcb4ebba1c41e05b",
-      "bytes": 3016
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P05.json",
-      "sha256": "524176f338eb1ca8530bf956ac4c716fe66bd6ebd25a09f9e352f929d44e41ef",
-      "bytes": 3236
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P06.json",
-      "sha256": "fd167f3ccf48b79099c101430d4ac8054d455cc3fb002ad08d490b1d2a2ee931",
-      "bytes": 3312
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P07.json",
-      "sha256": "3203217b7b903de90c1fc3fd7005b12f6b5b47561f6012bdca919c2e2cf879ad",
-      "bytes": 3524
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P08.json",
-      "sha256": "44ba221ccc9e25c370d971b4fee78fa9f844c65e4c17886d8b76cf30c0e904bd",
-      "bytes": 3415
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P09.json",
-      "sha256": "eb62b153122680d724d532ccd866b3bdc077663fbeef3e48312e958d8dda6ae4",
-      "bytes": 4701
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P10.json",
-      "sha256": "810ae91fa579ef1a905446985adfd7059484da6eaf8b503b47f6dc8f4ed20fd4",
-      "bytes": 3257
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P11.json",
-      "sha256": "b8046cf5db1ba22dd0ea180ac8c407ec5884f5ddeb9fb5dd0578ea7cb620cda4",
-      "bytes": 4998
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/evidence/SEC-P12.json",
-      "sha256": "8b86a9a64056f5ad9f46fe7f390715934019dc2bb105dcb59ecaaeb6abf6f406",
-      "bytes": 4024
-    },
-    {
-      "path": "docs/evidence/stage-a/2026-10-18-local/gate-a-evidence.json",
-      "sha256": "b3339f575a79d48601ea3666e3aaf91027b6591994df78a8b074bf0820642759",
-      "bytes": 8176
     },
     {
       "path": "docs/governance/PB12_RELEASE_EVIDENCE_SCHEMA.json",
@@ -304,8 +249,8 @@
     },
     {
       "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md",
-      "sha256": "e49f53a4dc9624fe78d21b324d0ca99e5006edf4853ad36721a9c884a19bad7b",
-      "bytes": 7289
+      "sha256": "6e41bf77908cc048bc3092f745058031de0b79741515b0c6512980ba647c1c4f",
+      "bytes": 17833
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",
@@ -398,14 +343,24 @@
       "bytes": 4331
     },
     {
+      "path": "scripts/ci/assert_test_totals.py",
+      "sha256": "a18433520928387776efc3abd89ecec3830dd7030f939b8f414611158c138248",
+      "bytes": 2166
+    },
+    {
       "path": "scripts/generate-spec-manifest.py",
-      "sha256": "c7ad0879cbbabe777241453b60570e28326bf13976abc4e2563f6a0583561a81",
-      "bytes": 1937
+      "sha256": "04403308014f354bed11735de5c53992b24f781c0cf31a444aaa60e07c446726",
+      "bytes": 2121
+    },
+    {
+      "path": "scripts/governance/verify_repository_protection.py",
+      "sha256": "6f08001e2a578ddd6cff3fb327259a36d950a5275798c415dcba0da96a814ea5",
+      "bytes": 4965
     },
     {
       "path": "scripts/integrity/generate_control_checklist.py",
-      "sha256": "9577352fbddc4cd8d71dcc20f7e4a0411b4e5b7f1c822f851ca1db11568235d1",
-      "bytes": 12050
+      "sha256": "19b80c163c8d9826076ede18f5cf1919459910a39ac1a60ee1803c6bb8d9b96e",
+      "bytes": 12121
     },
     {
       "path": "scripts/integrity/generate_vault_vectors.py",

@@ -4,6 +4,7 @@
 The manifest is a detection mechanism, not a substitute for signed Git review.
 Outputs are written as bytes with LF line endings so digests are identical on Windows and Linux checkouts
 (.gitattributes enforces eol=lf; the Phase 0 CI failure on GitHub was caused by CRLF working copies).
+docs/evidence/** is excluded: those files are verbatim test-run output, self-digested by each gate-a-evidence.json.
 """
 from pathlib import Path
 import hashlib, json
@@ -13,7 +14,7 @@ SCOPES=["docs","security_hardening","security_validation","trust_authority","for
 LF=chr(10)
 files=[ROOT/x for x in TOP]
 for scope in SCOPES:
-    files.extend(p for p in (ROOT/scope).rglob("*") if p.is_file() and "__pycache__" not in p.parts and p.suffix not in {".zip",".pyc"})
+    files.extend(p for p in (ROOT/scope).rglob("*") if p.is_file() and "__pycache__" not in p.parts and p.suffix not in {".zip",".pyc"} and not p.relative_to(ROOT).as_posix().startswith("docs/evidence/"))
 files=sorted(set(files),key=lambda p:p.relative_to(ROOT).as_posix())
 entries=[]
 for p in files:

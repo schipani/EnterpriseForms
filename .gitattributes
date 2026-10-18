@@ -8,3 +8,5 @@
 *.woff binary
 *.woff2 binary
 *.dump binary
+# Gate evidence is verbatim run output whose digests live in gate-a-evidence.json; never normalize it (A-F18).
+docs/evidence/** -text

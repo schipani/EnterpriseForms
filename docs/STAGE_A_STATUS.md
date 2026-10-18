@@ -8,12 +8,12 @@ Level A adversarial tests, evidence). **Stage B has not started.**
 
 | Gate | Assessment |
 |---|---|
-| Stage A implementation (requirements 1–8, 12) | **DONE** — compiles, 133 unit/architecture/contract tests pass, 12/12 mandatory adversarial tests pass against the real Docker stack with a validated evidence manifest. |
+| Stage A implementation (requirements 1–8, 12) | **DONE** — compiles, 138 unit/architecture/contract tests pass (Windows, Linux CI), 12/12 mandatory adversarial tests pass against the real Docker stack on the committed code (`e6df484`, clean worktree and GitHub-hosted runner) with validated evidence manifests. |
 | Independent cryptographic review (requirement 11) | **NOT PERFORMED** — package assembled in `docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md`; author-run tests and author-written vectors do not count. |
-| BUILD-00 repository protection (requirement 9) | **Partially done** — code-expressible items committed; human/admin items listed in `docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §3 are open. `security-gate-a` has not yet run on GitHub-hosted runners. |
+| BUILD-00 repository protection (requirement 9) | **BLOCKED** — code-expressible items committed; live state verified read-only on 2026-10-18: repository **public**, user-owned (no teams), no rulesets, no environments (`scripts/governance/verify_repository_protection.py` 4/12). Admin steps in `docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §3 are open. |
 | F-05 Docker isolation (requirement 10) | **OPEN as Azure Level B** — Docker network isolation is demonstrated (SEC-P11) but is not Level 2 proof. |
-| Evidence provenance (ADR-PB-012) | **Provisional** — evidence binds HEAD `a9c0e744…` while the working tree held 92 uncommitted changes; a clean re-run after commit on CI is required before the evidence is admissible. |
-| **Stage A gate** | **BLOCKED** (independent review + BUILD-00 + clean CI evidence run). No Level 2 or production claim is made. |
+| Evidence provenance (ADR-PB-012) | **Bound to `e6df484`** — GitHub `security-gate-a` run 39121925152 and a clean local worktree run, both 12/12 with image fingerprints; copies under `docs/evidence/stage-a/`. PB-12 immutable storage not provisioned. |
+| **Stage A gate** | **BLOCKED** (independent review A-F1; BUILD-00 A-F3/A-F13/A-F14). Full requirement table and findings: `docs/STAGE_A_GATE_CLOSURE.md`. No Level 2 or production claim is made. |
 
 ## 1. What was built
 
@@ -72,28 +72,31 @@ Level A adversarial tests, evidence). **Stage B has not started.**
   Vault dev + transit init, `archive-store` (authority-net), one-shot `authority-migrate`/`business-migrate`, Testing
   environment with fault injection and `restart: unless-stopped`, loopback ports 5180/5190, `attacker-sql` on
   business-net only. All three override sets validate.
-- CI: `ci.yml` builds the security test project and enforces `--minimum-expected-tests 100`; `security-gate-a.yml`
+- CI: `ci.yml` builds the security test project and enforces `--minimum-expected-tests 10` per test executable plus
+  `scripts/ci/assert_test_totals.py` (≥130 executed, 4 result files; A-19); `security-gate-a.yml`
   brings up the stack, runs `--minimum-expected-tests 13`, validates the manifest, uploads evidence/logs.
   `.github/rulesets/main-branch-protection.json` is importable (BUILD-00 §2).
 
-## 2. Verification actually performed (local Windows 11 host, Docker Desktop 29.1.3)
+## 2. Verification actually performed (local Windows 11 host, Docker Desktop 29.1.3; GitHub ubuntu-24.04 runners)
 
 | Command | Result |
 |---|---|
 | `dotnet build EnterpriseForms.All.slnx -c Debug/Release` | Build succeeded, 0 warnings (warnings as errors) |
-| `dotnet test --solution EnterpriseForms.All.slnx -- --minimum-expected-tests 100` | **133 passed, 0 failed** (integrity 30, architecture 72, API contracts 15, authority unit 16) |
+| `dotnet test --solution EnterpriseForms.All.slnx -- --minimum-expected-tests 10` + `assert_test_totals.py --min-total 130 --min-files 4` | **138 passed, 0 failed** on Windows, in the clean worktree and on the Linux `ci` runner (integrity 34, architecture 64, API contracts 19, authority unit 21 incl. `ArchiveProcessorTests`) |
 | `python scripts/integrity/verify_vectors.py` / `node scripts/integrity/verify-vectors.mjs` | PASS (34 checks each) |
 | `docker compose … config` ×3 | PASS |
 | `docker compose -f compose.yaml -f compose.security-test.yaml up -d --build --wait …` | 10 services healthy; authority readiness requires Vault + AuthorityDb + SpiceDB schema + archive |
-| `dotnet test --project tests/security/… -- --minimum-expected-tests 13` | **13 passed, 0 failed** (12 mandatory + harness guard), 2 min 09 s |
+| `dotnet test --project tests/security/… -- --minimum-expected-tests 13` | **13 passed, 0 failed** (12 mandatory + harness guard) on `e6df484`: clean worktree 2 min 05 s and GitHub run 39121925152. The clean-worktree run on `5e56238` **failed SEC-P12** (A-F12) — fixed, not retried blindly. |
 | `python security_validation/validate_security_evidence.py artifacts/security/gate-a-evidence.json` | PASS (manifest shape + digests only; not an attestation) |
 | Frontend `npm run generate:api-client` + `npm run check` | client regenerated without typecheck errors; lint/typecheck/7 tests/build PASS |
 
-Four passes were needed: pass 1 exposed a protocol defect (authority-issued vs caller-bound operation id, fixed by
-A-03), pass 2 a retry-identity defect (expected revision inside the idempotency digest, fixed by A-04) and harness
-errors, pass 3 a gate-reporting race; pass 4 is the recorded run. Every defect was fixed in code, not by weakening a test.
+Four local passes preceded the commit: pass 1 exposed a protocol defect (authority-issued vs caller-bound operation id,
+fixed by A-03), pass 2 a retry-identity defect (expected revision inside the idempotency digest, fixed by A-04) and
+harness errors, pass 3 a gate-reporting race. The gate-closure rerun in a clean worktree then exposed A-F12 (journal body
+`jsonb` normalization breaking the body↔digest binding; fixed by A-18 in `e6df484`). Every defect was fixed in code, not
+by weakening a test.
 
-### 2.1 SEC-P01..SEC-P12 — recorded run (`docs/evidence/stage-a/2026-10-18-local/`)
+### 2.1 SEC-P01..SEC-P12 — recorded runs (`docs/evidence/stage-a/2026-10-18-github-run-39121925152/`, `…/2026-10-18-local-e6df484/`)
 
 | Test | External effect proven (Level A) | Authority rev. at end |
 |---|---|---|
@@ -126,25 +129,16 @@ A-01…A-17: schema name `authority`; full-snapshot prepare with caller-bound op
 
 ## 4. Unresolved findings and open items
 
-| ID | Finding | Status |
-|---|---|---|
-| A-F1 | Independent cryptographic review not performed. | **BLOCKER** for Stage A. Package ready (`docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md`). |
-| A-F2 | Evidence commit binding: tests ran against an uncommitted working tree (HEAD `a9c0e744`, 92 changed paths). | Re-run `security-gate-a` on CI after commit; the committed copy under `docs/evidence/stage-a/2026-10-18-local/` is a local record, not release evidence. |
-| A-F3 | BUILD-00 human/admin steps (private repo settings, real teams, ruleset import, environments, Entra federation, scanning, signed commits). | Open; documented with verification commands. |
-| A-F4 | `AzureManagedHsmProvider` not implemented; Confidential Ledger anchoring not implemented; archive is an Azurite double. | G04/G11/G14 remain OPEN; Production startup refuses non-HSM providers by construction. |
-| A-F5 | SIG-11 explicit same-key LocalHmac-vs-Vault vector not executed (Vault dev mode cannot import the published test key). | Reviewer procedure documented. |
-| A-F6 | Full CONS-01..30, MRK-01..32, SIG-01..14, PG-01..20, DR-01..36 matrices not executed; only the 12-test core plus unit coverage. | Phase gates after Stage A. |
-| A-F7 | Transport between planes is plain HTTP inside Docker; no mTLS/workload identity; TestIdentityProvider instead of Entra. | PB-05/PB-08 before Staging; startup guards refuse the test provider outside Development/Testing. |
-| A-F8 | Per-organization command planning loads all active edges (O(n)); `FindContentJournalForHeadAsync` scans content revisions backwards. | Acceptable at Stage A scale; index/benchmark under PB-09. |
-| A-F9 | Business `audit_events` projection (Section 4D) not implemented; authority journal is the only durable security evidence in Stage A. | Phase 1C. |
-| A-F10 | F-05 (Docker Desktop cross-bridge reachability) retained; only `internal` network + pg_hba mitigations demonstrated. | Azure Level B. |
-| A-F11 | Chiseled images log `Cannot load library libgssapi_krb5.so.2` (Npgsql Kerberos probe); harmless, not silenced. | Cosmetic; pin `Include Error Detail`/GSS off in PB-11 image hardening. |
+Superseded by the severity/impact/owner/gate/remediation table in `docs/STAGE_A_GATE_CLOSURE.md` §4 (A-F1..A-F17).
+Blocking for Stage A: A-F1 (independent review), A-F3/A-F13/A-F14 (BUILD-00: public repository, no protection, unresolvable
+CODEOWNERS teams). Fixed during closure: A-F12 (journal body canonical storage), A-F15 (CI test floor), A-F5 (Vault vectors).
 
 ## 5. Reproduction
 
 ```sh
 dotnet build EnterpriseForms.All.slnx -c Release
-dotnet test --solution EnterpriseForms.All.slnx --no-build -c Release -- --minimum-expected-tests 100
+dotnet test --solution EnterpriseForms.All.slnx --no-build -c Release --results-directory artifacts/test-results --report-xunit-trx -- --minimum-expected-tests 10
+python scripts/ci/assert_test_totals.py artifacts/test-results --min-total 130 --min-files 4
 cd infrastructure/docker && cp env.example .env
 docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait \
   business-db authority-db spicedb vault vault-transit-init archive-store azurite authority-migrate authority business-migrate api attacker-sql
@@ -157,5 +151,5 @@ cd infrastructure/docker && docker compose -f compose.yaml -f compose.security-t
 Windows: the .NET 10 SDK requires `--project` for a single test project; a checkout under a very long path can make
 the runner report zero tests — `--minimum-expected-tests` turns that into a failure instead of a silent pass.
 
-**Stop point:** Stage A implementation and Level A validation are complete; the gate is BLOCKED pending the items in §4.
-Stage B is not started and requires explicit approval.
+**Stop point:** Stage A implementation and Level A validation are complete on `e6df484`; the gate is BLOCKED pending
+`docs/STAGE_A_GATE_CLOSURE.md` §9. Stage B is not started and requires explicit approval.
