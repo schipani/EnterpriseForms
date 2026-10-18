@@ -1,0 +1,29 @@
+test_id,scenario,expected_result
+PB13-01,CSV header/type mapping and dry run,No writes before approval
+PB13-02,JSON import schema/encoding limits,Malformed/nested oversized input rejected safely
+PB13-03,Unknown fields and invalid classification,Rejected; no silent plaintext downgrade
+PB13-04,Import cross-tenant GUID and team ID,No cross-tenant link or ACL grant
+PB13-05,Import forged owner/permission IDs,Independently validated and denied where unauthorized
+PB13-06,Worker crashes after committed import batch,Idempotent replay; no duplicate record
+PB13-07,Parent/child relationship import with cycles,"Valid association preserved, cycle rejected"
+PB13-08,Imported document malware and archive bomb,Quarantine/rejection before protected visibility
+PB13-09,Document encryption and version manifest,Integrity proof validated and authorized download only
+PB13-10,Duplicate detection collision,Explicit human-reviewed action; never silent merge
+PB13-11,Import canceled after partial success,Accurate partial and rollback/compensation report
+PB13-12,Organization owner without record-read entitlement requests full export,Denied or requires independent data-governance grant
+PB13-13,Field-specific sharing limits export,Only approved projection included
+PB13-14,"Export form versions, child lists and document versions",Manifest round-trip complete and verified
+PB13-15,Export credentials/authorization revoked midjob,No publish or retrievable package
+PB13-16,Export tamper/checksum mismatch,Reject download and investigate
+PB13-17,Export expiration and download replay,Expired grant denies retrieval
+PB13-18,Bulk export to out-of-region storage or telemetry,Denied and logged; Canadian residency maintained
+PB13-19,Two-person approval for destructive offboarding,Single/unauthorized approval denied
+PB13-20,Offboarding freeze with concurrent write,Trusted write fence stops further commits
+PB13-21,Offboarding legal hold and retention,Protected evidence/data preserved as required
+PB13-22,Offboarding crash/restart in each phase,Idempotent resume without reinstating access
+PB13-23,Old BusinessDb restored during offboarding,Cannot re-enable revoked permissions
+PB13-24,Physical deletion vs backup expiry proof,Receipts distinguish pending/deleted/retained accurately
+PB13-25,No deleting shared signing key,Other organizations remain verifiable and decryptable
+PB13-26,Unauthorized staff downloads closure receipt,Denied and recorded
+PB13-27,Import/export UI keyboard and independent refresh,Accessible states and no stale cross-tenant data
+PB13-28,Evidence register and approved production tests,Cannot claim first-release complete without proof

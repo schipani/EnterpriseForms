@@ -1,0 +1,37 @@
+test_id,scenario,expected_result
+PB14-01,Default black primary button and white text,Default ratio >= 4.5:1 and visible focus
+PB14-02,Invalid low-contrast organization palette,Server rejects activation; client shows accessible error
+PB14-03,Hover/active/checked/selected/error token states,All applicable text and nontext pairs meet contrast
+PB14-04,Focus ring adjacent to both page and button surfaces,Visible focus in every applicable state and theme
+PB14-05,Unchecked and checked checkbox,Unambiguous checked semantics/label and keyboard operation
+PB14-06,Theme foreground changed without background review,"Pair revalidated, inaccessible choice rejected"
+PB14-07,Organization owner uploads PNG/WebP logo,Safe decode/scan/re-encode and top-left text fallback
+PB14-08,Invalid logo/SVG/data URL/script payload,"Reject malicious or unapproved payload, no arbitrary rendering"
+PB14-09,Organization theme + user font size override,"Respect user override, persist safely without clipping"
+PB14-10,320px mobile viewport,No loss of required content or horizontal body overflow
+PB14-11,768px tablet viewport,"Responsive two-column form layout, usable navigation"
+PB14-12,1440px desktop viewport,"Four-column designer grid, readable hierarchy"
+PB14-13,200% browser zoom,"Reflow, no focus/error/input clipping"
+PB14-14,400% browser zoom,Required functionality reflows and works with keyboard
+PB14-15,Keyboard only across dashboard/record/designer,Correct focus order/visible focus/action parity
+PB14-16,NVDA screen reader test,"Labels, errors, headings, roles and live refresh announced"
+PB14-17,VoiceOver screen reader test,Equivalent accessible flow and dynamic-state announcements
+PB14-18,Gallery PG-069 production route hardening,Internal-only route not publicly exposed in prod
+PB14-19,Dashboard card independent fetch and refresh,Refreshing one card does not block/focus-reset other cards
+PB14-20,Dashboard role/persona variation,"No unauthorized widgets, titles or protected counts"
+PB14-21,Tenant switching with cached dashboard content,Cache/worker scope purged; no cross-org leak
+PB14-22,Accused record view/edit/child addresses,"Real authorized API data, stable child identities, optimistic concurrency"
+PB14-23,Accused documents and upload tray,"Upload continues SPA navigation, statuses accurate, no false success"
+PB14-24,Logout/revocation during large upload,"Abort/re-authorize, no leaked chunks or stale queue replay"
+PB14-25,Form designer keyboard reorder,"Accessible non-drag path, same persisted layout order"
+PB14-26,Designer vs submitted record privacy,Designer preview uses synthetic data absent separate record permission
+PB14-27,"Long labels, translation expansion and RTL",No clipping; meaningful direction and field relationships preserved
+PB14-28,Accessible validation and error summary,Field errors linked; screen reader announces errors without leaking data
+PB14-29,Component dialog and drawer,"Focus trap, Escape, restored focus; keyboard usability"
+PB14-30,Forced colors / OS high contrast,Functional indicators and focus remain perceivable
+PB14-31,Replace UI package / theme without backend change,Architecture test confirms no Domain/Authority/DB imports/dependencies
+PB14-32,Three representative screen acceptance,Product owner and accessibility reviewer record human signoff/evidence
+PB14-33,Performance targets on gallery/real screens,PB09 p95 shell/card targets measured with stated test profile
+PB14-34,UI test evidence retention,Current source/image/test run/locale/accessibility reviewers recorded for PB12
+PB14-35,Gallery style property injection attempt,No untrusted arbitrary CSS/JS enters rendered app
+PB14-36,Theme revalidation after token algorithm update,Unsafe stored settings revert to validated fallback

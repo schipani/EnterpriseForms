@@ -1,0 +1,65 @@
+// REFERENCE ONLY. Validate using `zed validate` and real permission tests before production.
+// All IDs are organization-scoped, authority-generated namespaced identifiers.
+// The authority checks same-tenant bindings, delegated share lineage, FIDO2/PIN,
+// key policy, and publishes only *effective* security commands to SpiceDB.
+definition user {}
+
+definition team {
+    relation member: user
+    permission participant = member
+}
+
+definition organization {
+    relation organization_owner: user
+    relation system_administrator: user
+    relation designer: user
+    permission manage_configuration = organization_owner
+    permission administer_security = system_administrator
+    permission create_form = designer
+}
+
+definition form_definition {
+    relation organization: organization
+    relation designer: user | team#participant
+    relation form_user: user | team#participant
+    permission design = designer
+    permission create_record = form_user
+}
+
+// A share represents recipients only; scope attaches this share to specific
+// field and attachment resources. Parent delegation lineage is checked by
+// the protected command service and revoked descendants are removed/blocked.
+definition record_share {
+    relation reader: user | team#participant
+    relation contributor: user | team#participant
+    relation manager: user | team#participant
+    permission read = reader + contributor + manager
+    permission edit = contributor + manager
+    permission delegate = manager
+}
+
+definition form_record {
+    relation owner: user | team#participant
+    relation shared_via: record_share
+    permission discover = owner + shared_via->read
+    permission manage_access = owner + shared_via->delegate
+    permission transfer_ownership = owner
+}
+
+// A separate item object exists for each persisted field instance or attachment.
+// No implicit inheritance of `read` from form_record#discover.
+definition field_item {
+    relation parent_record: form_record
+    relation shared_via: record_share
+    permission read = parent_record->owner + shared_via->read
+    permission edit = parent_record->owner + shared_via->edit
+    permission delegate = parent_record->owner + shared_via->delegate
+}
+
+definition document_item {
+    relation parent_record: form_record
+    relation shared_via: record_share
+    permission read = parent_record->owner + shared_via->read
+    permission replace = parent_record->owner + shared_via->edit
+    permission delegate = parent_record->owner + shared_via->delegate
+}

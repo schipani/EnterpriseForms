@@ -1,0 +1,15 @@
+operation,approved_public_internal_plaintext,confidential_restricted_encrypted,requirement
+exact,Yes,No,Only explicitly approved typed fields; field-level predicate authorization
+contains,Yes - explicitly enabled string fields,No,No global search or regex guarantee
+prefix,Yes - explicitly enabled string fields,No,No implicit wildcard expansion
+numeric_range,Yes - numeric fields,No,Type and policy validate bounds
+date_range,Yes - date/time fields,No,Respect typed UTC/local date semantics
+sort,Yes - authorized fields,No,Sort only from complete verified result set
+facets,Conditional,No,Only complete scoped authorized results; no inference
+count,Conditional,No,No unauthorized count leakage; requires completeness proof
+aggregate,Conditional,No,"Only authorized, complete, policy-approved results"
+semantic_vector,Not in V1,No,Separate future capability review
+regex,Not in V1,No,Unsupported in V1
+blind_index_exact,Not in V1,No,Separate ADR and security approval
+display_by_record_id,Yes with authorization,Yes with authorization and decryption,Display is NOT a search predicate
+authorized_export,Allowed under export policy,Allowed under protected export policy,Export is not search; requires audit and data minimization

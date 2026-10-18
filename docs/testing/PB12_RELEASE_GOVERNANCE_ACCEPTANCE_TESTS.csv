@@ -1,0 +1,25 @@
+test_id,scenario,expected_result
+PB12-01,Mandatory security test absent,Block release
+PB12-02,Mandatory security test marked not_run or blocked,Block release
+PB12-03,Mandatory security test marked failed,Block release
+PB12-04,Evidence SHA-256 changed after sign-off,Reject stale/tampered evidence and block
+PB12-05,Evidence refers to different OCI digest,Block release
+PB12-06,Test belongs to older source SHA/config revision,Block release
+PB12-07,Unsigned/forged test execution receipt,Block release
+PB12-08,Same person commits and independently approves required security release,Block release
+PB12-09,Business deploy identity tries to approve Authority deployment,Deny and audit
+PB12-10,Unprivileged PR modifies gate policy,Deny policy change
+PB12-11,Critical security check is exception-waived,"Reject exception, block release"
+PB12-12,Noncritical exception expired,Block until remediated/reapproved
+PB12-13,Reviewer loses approver authorization before deployment,Block stale approval
+PB12-14,Region/evidence archive points outside Canada,Deny archive and release
+PB12-15,Ledger checkpoint digest mismatch,Block release and investigate
+PB12-16,Evidence store temporarily unavailable,Fail closed; never fabricate pass
+PB12-17,Test outputs reveal protected records in CI,Reject/quarantine artifacts and incident response
+PB12-18,Security proof passes in Docker but cloud HSM test missing,Block production Level 2 release
+PB12-19,Authority image changed after separate approval,Block release and require new review
+PB12-20,Release dashboard operator tries to override critical gate,"Deny, audit and do not change authoritative policy"
+PB12-21,Missing recovery evidence or accepted authorization rollback,Block release
+PB12-22,Missing accessibility or signed-image compliance for release wave,Block per approved policy
+PB12-23,"All current mandatory tests, provenance and approvals valid",Allow only if protected policy evaluator and independent approvals agree
+PB12-24,Replayed valid approval for different deployment,Deny cross-release approval replay

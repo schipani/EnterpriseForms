@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/contracts/pb12-release-evidence.schema.json",
+  "title": "Enterprise Forms Release Security Evidence Register",
+  "description": "Reference structural schema only; independent provenance/approval validation and policy gates are additional mandatory requirements.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "release_id",
+    "source_commit_sha",
+    "target_environment",
+    "deployed_images",
+    "policy_bundle_digest",
+    "test_results",
+    "approvals",
+    "evaluation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "release_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "target_environment": {
+      "enum": [
+        "local-security",
+        "azure-staging",
+        "production"
+      ]
+    },
+    "deployed_images": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      }
+    },
+    "policy_bundle_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "test_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirement_id",
+          "test_id",
+          "mandatory",
+          "status",
+          "test_run_id",
+          "environment",
+          "source_commit_sha",
+          "evidence_uri",
+          "evidence_sha256",
+          "test_completed_utc",
+          "executor_principal",
+          "attestation_uri"
+        ],
+        "properties": {
+          "requirement_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "test_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mandatory": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "not_run",
+              "blocked"
+            ]
+          },
+          "test_run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "environment": {
+            "enum": [
+              "local-security",
+              "azure-staging",
+              "production"
+            ]
+          },
+          "source_commit_sha": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "evidence_uri": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "test_completed_utc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executor_principal": {
+            "type": "string",
+            "minLength": 1
+          },
+          "attestation_uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "approval_scope",
+          "principal_id",
+          "decision",
+          "approved_utc",
+          "authenticated_approval_receipt"
+        ],
+        "properties": {
+          "approval_scope": {
+            "enum": [
+              "security-release",
+              "authority-deployment",
+              "business-deployment"
+            ]
+          },
+          "principal_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision": {
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "approved_utc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authenticated_approval_receipt": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "policy_version",
+        "evaluation_receipt"
+      ],
+      "properties": {
+        "decision": {
+          "enum": [
+            "allow",
+            "block"
+          ]
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluation_receipt": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

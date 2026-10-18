@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stage A Security Proof Evidence Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "gate_id",
+    "commit_sha",
+    "image_fingerprint",
+    "environment_kind",
+    "executed_at_utc",
+    "results"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "gate_id": {
+      "const": "PB-03-STAGE-A"
+    },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "image_fingerprint": {
+      "type": "string",
+      "minLength": 10
+    },
+    "environment_kind": {
+      "const": "disposable-docker"
+    },
+    "executed_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "results": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test_id",
+          "outcome",
+          "evidence_path",
+          "evidence_sha256",
+          "commit_sha",
+          "image_fingerprint",
+          "executed_at_utc"
+        ],
+        "properties": {
+          "test_id": {
+            "type": "string",
+            "pattern": "^SEC-P(0[1-9]|1[0-2])$"
+          },
+          "outcome": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "SKIP",
+              "BLOCKED",
+              "NOT_RUN",
+              "INCONCLUSIVE"
+            ]
+          },
+          "evidence_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "commit_sha": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "image_fingerprint": {
+            "type": "string",
+            "minLength": 10
+          },
+          "executed_at_utc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authority_revision": {
+            "type": [
+              "string",
+              "integer",
+              "null"
+            ]
+          },
+          "content_revision": {
+            "type": [
+              "string",
+              "integer",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

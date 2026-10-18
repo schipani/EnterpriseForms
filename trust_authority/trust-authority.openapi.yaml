@@ -1,0 +1,446 @@
+openapi: 3.1.0
+info:
+  title: Dynamic Forms Internal Authorization Authority
+  version: 1.0.0-draft
+  description: >-
+    INTERNAL ONLY. This interface is accessible only through private networking,
+    mutual TLS, a workload credential, and validated delegated end-user identity
+    evidence. It is not a public browser API. Actor/tenant identity is resolved by
+    the authority, never trusted from JSON submitted by the business database.
+servers:
+  - url: https://authorization.internal.example
+security:
+  - workloadIdentity: []
+paths:
+  /internal/v1/authorization/check:
+    post:
+      operationId: CheckPermission
+      description: >-
+        Evaluate current effective permission, authoritative projection barrier,
+        required user assurance, scoped resource policy and current content revision.
+        Conditional, unknown, unavailable, or stale-projection outcomes do not grant access.
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionCheckRequest'
+      responses:
+        '200':
+          description: Verified access result; allowed=false on denial.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionDecision'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '423': { $ref: '#/components/responses/Quarantined' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /internal/v1/authorization/check-batch:
+    post:
+      operationId: CheckPermissionsBatch
+      description: Max 250 requested checks per call (tunable after benchmarking); same freshness invariants as CheckPermission.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checks]
+              properties:
+                checks:
+                  type: array
+                  minItems: 1
+                  maxItems: 250
+                  items: { $ref: '#/components/schemas/PermissionCheckRequest' }
+      responses:
+        '200':
+          description: Responses correlate 1-to-1 with checks; any failed check denies only its own item unless org barrier is globally unsafe.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decisions]
+                properties:
+                  decisions:
+                    type: array
+                    items: { $ref: '#/components/schemas/PermissionDecision' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /internal/v1/authorization/discover:
+    post:
+      operationId: DiscoverRecords
+      description: >-
+        Enumerate only discoverable record IDs with trusted authority cursor and
+        authorization revision. Does not imply access to individual record fields.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, page_size]
+              properties:
+                organization_id: { type: string, format: uuid }
+                page_size: { type: integer, minimum: 1, maximum: 250 }
+                continuation_token: { type: [string, 'null'] }
+      responses:
+        '200':
+          description: Authorized IDs only; pagination is invalidated on relevant auth revisions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoverResponse'
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /internal/v1/security-commands:
+    post:
+      operationId: SubmitSecurityCommand
+      description: >-
+        Validates actor, tenant, current authority revision, command-specific rights,
+        delegation bounds and approval requirements. No general-purpose relationship writer.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SecurityCommandRequest' }
+      responses:
+        '202':
+          description: Committed or pending command; never assume effective until state=Effective.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationStatus' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InvalidChange' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /internal/v1/security-commands/{command_id}:
+    get:
+      operationId: GetSecurityCommandStatus
+      parameters:
+        - name: command_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current durable command state for an authorized caller.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationStatus' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /internal/v1/content-changes/prepare:
+    post:
+      operationId: PrepareContentChange
+      description: >-
+        Authenticates actor and authorizes exact item delta against accepted content
+        manifest; DOES NOT expose a generic sign API.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrepareContentChangeRequest' }
+      responses:
+        '202':
+          description: Authorized preparation; candidate rows remain invisible until committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PreparedContentOperation' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '423': { $ref: '#/components/responses/Quarantined' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /internal/v1/content-changes/{operation_id}/commit:
+    post:
+      operationId: CommitContentChange
+      description: >-
+        Activates a prepared immutable content revision only after matching trusted
+        command, expected prior root, candidate digest and signed manifest evidence.
+      parameters:
+        - name: operation_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommitContentChangeRequest' }
+      responses:
+        '200':
+          description: Newly accepted committed content revision.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentRevision' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '423': { $ref: '#/components/responses/Quarantined' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /internal/v1/content-revisions/{form_record_id}:
+    get:
+      operationId: GetCurrentContentRevision
+      parameters:
+        - name: form_record_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current trusted commitment after authorizing the caller.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentRevision' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /internal/v1/integrity/verify-batch:
+    post:
+      operationId: VerifyCommittedItems
+      description: >-
+        Verify committed signed rows against authority-held manifest root. No signing
+        API, no caller-controlled expected manifest override, no accepted fallback to stale revisions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyBatchRequest' }
+      responses:
+        '200':
+          description: Verification status; invalid items always fail closed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationResult' }
+        '423': { $ref: '#/components/responses/Quarantined' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /internal/v1/security-challenges/verify:
+    post:
+      operationId: VerifyRecordChallenge
+      description: >-
+        Independently rate-limited record challenge; returned proof is short-lived,
+        scoped to verified actor, record and authorization revision, and revocable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, form_record_id, challenge_response]
+              properties:
+                organization_id: { type: string, format: uuid }
+                form_record_id: { type: string, format: uuid }
+                challenge_response: { type: string, minLength: 1, writeOnly: true }
+      responses:
+        '200':
+          description: Revocable short-lived unlock proof; never includes plaintext challenge.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unlock_reference, expires_on]
+                properties:
+                  unlock_reference: { type: string, format: uuid }
+                  expires_on: { type: string, format: date-time }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    workloadIdentity:
+      type: http
+      scheme: bearer
+      bearerFormat: OAuth2 JWT
+      description: >-
+        App-to-app workload credential; ALSO require mutual TLS, verified OBO/user
+        token evidence and private endpoint. Token alone is insufficient.
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  schemas:
+    ResourceRef:
+      type: object
+      additionalProperties: false
+      required: [resource_kind, resource_id]
+      properties:
+        resource_kind:
+          type: string
+          enum: [FormDefinition, FormRecord, FieldItem, DocumentItem, Team, Organization]
+        resource_id: { type: string, format: uuid }
+    PermissionCheckRequest:
+      type: object
+      additionalProperties: false
+      required: [organization_id, resource, requested_action]
+      properties:
+        organization_id: { type: string, format: uuid }
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        requested_action:
+          type: string
+          enum: [Discover, Read, Edit, Download, Replace, Delegate, ManageAccess, TransferOwnership, DesignForm, CreateRecord, ManageOrganization]
+        unlock_reference: { type: [string, 'null'], format: uuid }
+        minimum_content_revision: { type: [integer, 'null'], minimum: 0 }
+    PermissionDecision:
+      type: object
+      required: [allowed, authorization_revision, projection_revision, correlation_id]
+      properties:
+        allowed: { type: boolean }
+        denial_reason_code: { type: [string, 'null'] }
+        authorization_revision: { type: integer, minimum: 0 }
+        projection_revision: { type: integer, minimum: 0 }
+        content_revision: { type: [integer, 'null'], minimum: 0 }
+        correlation_id: { type: string, format: uuid }
+    DiscoverResponse:
+      type: object
+      required: [form_record_ids, authorization_revision]
+      properties:
+        form_record_ids:
+          type: array
+          items: { type: string, format: uuid }
+        authorization_revision: { type: integer, minimum: 0 }
+        continuation_token: { type: [string, 'null'] }
+    SecurityCommandRequest:
+      type: object
+      additionalProperties: false
+      required: [organization_id, command_kind, resource, expected_authorization_revision, command_payload]
+      properties:
+        organization_id: { type: string, format: uuid }
+        command_kind:
+          type: string
+          enum: [TransferOwnership, CreateShare, UpdateShareScope, RevokeShare, AddTeamMember, RemoveTeamMember, GrantSystemRole, RevokeSystemRole, UpdateMandatoryPolicy, PublishFormSecurityRevision]
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        expected_authorization_revision: { type: integer, minimum: 0 }
+        command_payload:
+          type: object
+          description: >-
+            Validated against exact command-specific discriminated schema in the
+            authority; reject unknown fields and mass-assignment. The payload is
+            never a raw SpiceDB relationship or signed HMAC request.
+        change_reason: { type: [string, 'null'], maxLength: 1000 }
+        approval_reference: { type: [string, 'null'], format: uuid }
+    OperationStatus:
+      type: object
+      required: [command_id, command_status, authorization_revision, correlation_id]
+      properties:
+        command_id: { type: string, format: uuid }
+        command_status:
+          type: string
+          enum: [Pending, CommittedAwaitingProjection, Effective, Rejected, FailedReconciliation]
+        authorization_revision: { type: integer, minimum: 0 }
+        projection_revision: { type: [integer, 'null'], minimum: 0 }
+        correlation_id: { type: string, format: uuid }
+    ChangedItem:
+      type: object
+      additionalProperties: false
+      required: [resource, mutation_kind, canonical_digest]
+      properties:
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        mutation_kind: { type: string, enum: [Add, Update, Remove] }
+        canonical_digest:
+          type: string
+          description: Base64url-encoded SHA-256 canonical digest, authenticated later by authority HMAC/manifest.
+    PrepareContentChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [organization_id, form_record_id, expected_authorization_revision, expected_content_revision, expected_manifest_root, changed_items]
+      properties:
+        organization_id: { type: string, format: uuid }
+        form_record_id: { type: string, format: uuid }
+        expected_authorization_revision: { type: integer, minimum: 0 }
+        expected_content_revision: { type: integer, minimum: 0 }
+        expected_manifest_root: { type: string }
+        changed_items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: '#/components/schemas/ChangedItem' }
+    PreparedContentOperation:
+      type: object
+      required: [operation_id, candidate_content_revision, operation_status]
+      properties:
+        operation_id: { type: string, format: uuid }
+        candidate_content_revision: { type: integer, minimum: 1 }
+        operation_status: { type: string, enum: [Prepared] }
+    CommitContentChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [organization_id, candidate_manifest_root, prepared_content_digest]
+      properties:
+        organization_id: { type: string, format: uuid }
+        candidate_manifest_root: { type: string }
+        prepared_content_digest: { type: string }
+    ContentRevision:
+      type: object
+      required: [form_record_id, committed_content_revision, committed_manifest_root, authorization_revision]
+      properties:
+        form_record_id: { type: string, format: uuid }
+        committed_content_revision: { type: integer, minimum: 0 }
+        committed_manifest_root: { type: string }
+        authorization_revision: { type: integer, minimum: 0 }
+        integrity_key_version: { type: integer, minimum: 1 }
+    SignedItem:
+      type: object
+      required: [resource, canonical_payload_digest, row_signature, row_signature_key_version, row_revision]
+      properties:
+        resource: { $ref: '#/components/schemas/ResourceRef' }
+        canonical_payload_digest: { type: string }
+        row_signature: { type: string }
+        row_signature_key_version: { type: integer, minimum: 1 }
+        row_revision: { type: integer, minimum: 0 }
+    VerifyBatchRequest:
+      type: object
+      required: [organization_id, form_record_id, committed_content_revision, signed_items]
+      properties:
+        organization_id: { type: string, format: uuid }
+        form_record_id: { type: string, format: uuid }
+        committed_content_revision: { type: integer, minimum: 0 }
+        signed_items:
+          type: array
+          minItems: 1
+          maxItems: 250
+          items: { $ref: '#/components/schemas/SignedItem' }
+        membership_proof:
+          type: [string, 'null']
+          description: Proof against independent committed manifest; required for claimed complete enumeration.
+    VerificationResult:
+      type: object
+      required: [verified, committed_content_revision, correlation_id]
+      properties:
+        verified: { type: boolean }
+        committed_content_revision: { type: integer, minimum: 0 }
+        failed_item_count: { type: integer, minimum: 0 }
+        correlation_id: { type: string, format: uuid }
+    ErrorResponse:
+      type: object
+      required: [error_code, correlation_id, retryable]
+      properties:
+        error_code: { type: string }
+        correlation_id: { type: string, format: uuid }
+        retryable: { type: boolean }
+  responses:
+    Unauthorized:
+      description: Invalid workload or user identity.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Forbidden:
+      description: Access is not permitted; does not reveal target existence.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Conflict:
+      description: Stale security/content revision, idempotency mismatch, or concurrent conflicting operation.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    InvalidChange:
+      description: Invalid scope/delegation or unsupported operation.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Quarantined:
+      description: Integrity check failed, resource quarantined.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    RateLimited:
+      description: Rate limit exceeded.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+    Unavailable:
+      description: Trusted authority or required projection/checkpoint unavailable. Fail closed.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }

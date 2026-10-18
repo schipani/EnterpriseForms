@@ -1,0 +1,21 @@
+test_id,area,approved_target,test_method,stage
+PERF-01,Org/user scale,25 organizations x 500 registered users; 500 active across platform,Identity/tenancy load and authorization separation,Level2
+PERF-02,Record cardinality,100000 main records per tenant,EF/Postgres size and query plan load,Level2
+PERF-03,Form complexity,250 fields per form,Designer publish + renderer + encryption/manifest regression,Level2
+PERF-04,Related forms,250 child records per collection,Paging/relationship completeness and access control,Level2
+PERF-05,Document count,100 documents per main record,"Signed manifest, document list and authorized download",Level2
+PERF-06,Standard file,500 MB,Chunk/resume/scan/encrypt; across SPA navigation,Level2
+PERF-07,Large file,2 GB opt-in,Throttling/restarts/quarantine/worker fairness,Level2
+PERF-08,Upload concurrency,2 active uploads per user,Fair scheduling and cancels on revocation/tenant switch,Level2
+PERF-09,API throughput,50 requests/second sustained aggregate,Mix of writes/reads/search with full security enabled,Level2
+PERF-10,Record read,p95 < 1s,Authorized verified projection,Level2
+PERF-11,Record write,p95 < 2s,Committed business revision or clearly separate async status,Level2
+PERF-12,Verified search,p95 < 3s,Proof-complete bounded search; fail closed if unprovable,Level2
+PERF-13,Dashboard card,p95 < 2s,Independent data-card refresh and failure isolation,Level2
+PERF-14,Initial shell,p95 < 2s,Representative browser/device/network profile,Level2
+PERF-15,Availability,99.9% monthly,Monitoring method and error-budget review,Staging/Prod
+PERF-16,Recovery time,RTO 4h,Coordinated DR rehearsal with no weakened auth,Staging/Prod
+PERF-17,Business RPO,<= 15min,Detect/quarantine missing committed content; measure region-specific restore,Staging/Prod
+PERF-18,Authorization rollback,zero accepted,Revoke then restore stale DB; gate by external trusted journal,Level2
+PERF-19,Noisy neighbor,Interactive reads/writes preserve priority during multiple 2GB uploads,Fairness/no cross-tenant leakage,Level2
+PERF-20,Cryptographic overhead,Measure HSM/ledger queue times with integrity checking enabled,p50/p95/p99 and correctness,Level2

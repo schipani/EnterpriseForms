@@ -1,0 +1,13 @@
+TestId,Scenario,MandatoryPassAssertion,TestArea,ExistingRequirements,DockerGate,AzureStagingCritical
+SEC-P01,Direct SQL owner change,Forged owner in BusinessDb remains unauthorized; authority owner unchanged; record read denied,Authorization;DatabaseTampering,G01;SIM-07,Required,Required
+SEC-P02,Direct SQL sharing grant,Inserted or modified local share row does not grant discover/read/download; no new authority edge,Authorization;DatabaseTampering,G01;SIM-02,Required,Required
+SEC-P03,Direct SQL team membership,Forged team membership cannot grant access; checked against authority revision,Authorization;DatabaseTampering,G01;SIM-28,Required,Required
+SEC-P04,Ciphertext/value mutation,Changing signed/encrypted row or document metadata produces integrity or authenticated-decryption failure; zero protected bytes,Integrity;Cryptography,G03;SIM-35,Required,Required
+SEC-P05,Delete or replay signed rows,Missing field/group/child relation or older valid row detected against current external manifest/head; no stale read,Integrity;DatabaseTampering,G03;SIM-36;SIM-37,Required,Required
+SEC-P06,Revocation with cached allow,"After effective revocation barrier, cached session/step-up token cannot start protected reads or continue unauthorized streaming",Revocation;Authorization,G02;SIM-30;SIM-32,Required,Required
+SEC-P07,SpiceDB projection lag,Protected operations fail closed while applied revision differs from authority head; no stale allow from ZedToken/cache,DistributedConsistency,G02;CONS,Required,Required
+SEC-P08,Signing service outage,Signing-required writes never commit as accepted; retries idempotent after restoration; no insecure fallback,Cryptography;DistributedConsistency,G04;SIM-40,Required,Required
+SEC-P09,Command crash and retry,"Crash between journal archive, projection, business update or checkpoint; recover exactly once effective security semantics",DistributedConsistency;DisasterRecovery,G02;CONS;SIM-06,Required,Required
+SEC-P10,Older BusinessDb restore,Restore pre-revocation DB snapshot and reject stale ownership/content until authority/current head reconciled,DisasterRecovery;Integrity,G14;SIM-13;SIM-14;SIM-42,Required,Required
+SEC-P11,Unauthorized HSM signing attempt,Business API/DB identities cannot call signing operations or obtain raw keys; authority cannot be coerced to sign forged transition,Cryptography;Authorization,G04;SIG,Required,Required
+SEC-P12,Mandatory audit archive unavailable,Operation requiring independently durable evidence remains non-effective or quarantined; never releases protected bytes without required receipt,AuditEvidence;DistributedConsistency,SIM-04;SIM-10;SIM-12,Required,Required

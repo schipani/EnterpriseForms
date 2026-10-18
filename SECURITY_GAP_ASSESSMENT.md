@@ -1,0 +1,140 @@
+# Dynamic Forms Platform — Security Gap Assessment and Release Decisions
+
+**Review date:** 2026-10-16  
+**Inputs:** `CLAUDE.md` (including Section 4L) and `SECURITY_THREAT_MODEL.md` (SEC-01 to SEC-42).  
+**Scope:** Design/specification review only. No repository source code, identity provider, cloud environment, deployed PostgreSQL instance, test results or penetration-test evidence has been evaluated. **Specified does not mean implemented, proven, or safe for production.**
+
+## Executive summary
+
+The revised design now **specifies** HMAC-SHA-256 row signatures, organization-scoped integrity keys, signed membership manifests, a trusted external authorization revision authority and explicit fail-closed verification across record reads, writes, search and decryption. These improve detection of out-of-band SQL tampering. They do not make the database tamper-proof or conceal unencrypted rows from a SQL reader.
+
+**Current readiness:** architecture specification is stronger, but high-assurance production approval is **BLOCKED pending concrete implementation decisions and adversarial evidence**. The system has no proven resistance to hostile database writes simply because a HMAC tag column is added.
+
+## Unresolved or partially resolved design and operational gaps
+
+| Gap | Priority | Current coverage | Required decision / proof before security claim |
+|---|---|---|---|
+| G01: Independent authorization source of truth | P0 | Required in Sections 4K/4L; actual service boundary undetermined | Specify who controls signing, current authoritative ACL revision/graph root, KMS release, independent persistence and administrative identities. Demonstrate forged DB ownership/share grants cannot induce a valid signature or release decrypted data. |
+| G02: Atomic update across PostgreSQL + external authority | P0 | Required protocol; exact consistency model not selected | Design authoritative write journal and state transitions, DB transaction/outbox, crash recovery, idempotency, rollback and read blocking. Document how `committed`, `pending`, and `failed` states are resolved without silently granting or permanently losing access. |
+| G03: Complete authorization graph and membership commitments | P0 | Set-root coverage is required; structure and update costs unresolved | Enumerate every ACL/team/system role/form grant/owner/document/group/delegation edge. Sign identity and row digest sets and anchor current expected roots externally. Test deletions, insertions, reparenting and old whole-database replay. |
+| G04: Trustworthy signing and key custody | P0 | Provider architecture selected: LocalHmac / Vault Transit dev / Azure Managed HSM prod; independent signer still unimplemented | Implement `trust_authority/CRYPTOGRAPHIC_SIGNING_AUTHORITY.md`, required provider identity isolation, authority validation before signing (no generic `Sign(row)` API), pinned key versions and rotation, HSM stage tests, safe recovery, and SIG-01..SIG-14. Docker/local provider tests do not close Level 2 G04. |
+| G05: Baseline vs hostile-DB-write-resistant launch tier | P0 | Two assurance levels defined; deployment choice not recorded | Decide the threat model for each tenant/deployment. If untrusted DB writers are in scope, block protected workloads until independent authorization and anti-rollback are demonstrated. Baseline cannot promise this property. |
+| G06: Protected read and search completeness | P1 | Per-read validation and search omission caveat now specified | Define trusted search/index strategy, authorization-first filtering, valid match verification and detection of intentionally suppressed matches. Specify exactly which search guarantees cannot be made without a verified index. Measure performance with millions of typed values. |
+| G07: Metadata and ordinary field confidentiality | P1 | Encryption policies and metadata classification are required | Define which PII is encrypted, including filenames, names/labels, external identifiers, and searchable field values. Raw SQL read access still reveals all unencrypted data and potentially sensitive metadata; row HMAC does not address confidentiality. |
+| G08: RLS and PostgreSQL permission enforcement | P0 | **Architecture and roles specified in G08 document; reference SQL and privilege inventory prepared; not deployed or verified** | Enforce independent BusinessDb/AuthorityDb administrative domains, NOLOGIN owners, limited runtime/projector/Entra identities, scoped migrations, FORCE RLS, SQL GUC spoof caveat, safe functions/views, Azure role/network/audit controls and PG-01..PG-20 adversarial tests. Business DBAs can read unencrypted SQL data, disable RLS or corrupt business data; only independently enforced authorization + signed/accepted data blocks forged app-mediated access. |
+| G09: IdP authentication policy and irreversible passkey settings | P1 | Provider verification/rollout required; no configured IdP evidence | Verify Entra or other provider configuration, fresh phishing-resistant authentication assurance and drift monitoring; rehearse two-person recovery. DB row HMAC cannot prevent an IdP administrator from changing external policy. |
+| G10: Live revocation and long-running operations | P1 | Cache invalidation/revision rules specified | Quantify acceptable revocation window for streams, exports, cached layouts, previews and offline copies. Test team removal during in-progress download and export; bytes already sent cannot be recalled. |
+| G11: Audit independence and insider evidence | P1 | External immutable archive and event journal required | Select immutable/WORM store with separate administrator; prove append-only delivery, missing event alarm, hash/checkpoint integrity, incident response and retention. A DBA can delete database audit rows; signed operational rows alone do not prove a complete event history. |
+| G12: Historical plaintext after encryption upgrade | P1 | Migration policy required, operational inventory incomplete | Inventory replicas, WAL, snapshots, temporal/history, indexing, exports, telemetry, caches and backups; document exposure windows and irreversibility limits for old backups. Test conversion without leaking plaintext. |
+| G13: Object storage and document processing trust | P1 | `IFileStorageProvider` and crypto/scanning model specified | Prove ciphertext-only stored objects, quarantine, sandboxed scan/previews, file-type validation, safe filenames, temporary data cleanup, tenant-isolated keys, and signed attachment IDs/versions. |
+| G14: Recovery without security rollback | P0 | Coordinated restore required, not yet drilled | Perform consistent recovery of PostgreSQL, object storage, signing/encryption keys, IdP assurance policy, external authorization journal and audit checkpoints. Verify restored security state not older than the accepted revision. |
+| G15: Secure implementation/testing supply chain | P1 | General controls required, no pipeline evidence | Add SAST/SCA, secret scanning, dependency pinning, reproducible signed artifacts, protected migration credentials, IaC policy checks, independent penetration test and attack-driven CI. Assign owners and deadlines. |
+| G16: Data retention, privacy and legal hold | P2 | Policy requirements exist, legal/regional selection pending | Pick retention periods and lawful erasure/hold policy for data, activity logs, archives, encrypted backups and tombstones. Avoid storing sensitive plaintext in observable audit events. |
+| G17: Rate, capacity and failure budgets | P1 | Quotas/DoS and HMAC batch verification required | Benchmark per-row signatures, whole-record manifests, KMS throughput, latency under load, ACL graph verification, search and huge forms. Integrity/KMS outages must fail closed with tested operational procedures. |
+| G18: New fields and schema change coverage | P1 | Versioned canonicalization and migration gates required | Define signed-column registry, schema version migration, default NULL semantics, dynamic typed field handling, unsigned new columns CI detection and a safe backfill gate. Do not re-sign unverified/tampered rows. |
+
+## Original 33-finding reconciliation
+
+These are **coverage in the written design**, not resolved vulnerability statuses. `Explicitly specified` means an implementation control and tests are stated in the documents; it **does not** mean the system has been validated. Most findings still require the evidence in the table above.
+
+| Original findings | Design status after RowSignature update | Remaining assurance issue |
+|---|---|---|
+| SEC-01 Owner GUID tampering; SEC-02 forged ACL/team/share | Explicitly specified via HMAC, set commitments, external authority | G01–G05, G08, G14; release blocker until tested |
+| SEC-03 encryption/policy weakening; SEC-06 KMS-backed decryption after forged grant | Explicitly specified and strengthened | Need independent current policy and key-release decisions; G01, G04, G07, G12 |
+| SEC-04 RLS bypass; SEC-05 spoofed database context | Explicitly specified, not fixed by HMAC | Privileged DB roles and SQL injection still pose risk; G08 |
+| SEC-07 hidden-field predicates and SEC-20 inference | Explicitly specified | Verification of returned rows cannot guarantee complete search; G06 |
+| SEC-08 delegated share graph abuse, SEC-10 team-member escalation, SEC-11 document sharing | Explicitly specified | Need graph/lineage roots and atomic authorization, G01–G03, G10 |
+| SEC-09 external identity mapping; SEC-17 Entra/FIDO assurance | Explicitly specified | IdP rollout/drift must be validated independently, G09 |
+| SEC-12 exports and asynchronous work, SEC-22 revocation races | Explicitly specified | Revocation race and already-sent bytes, G10 |
+| SEC-13 historical plaintext and SEC-14 ciphertext relabeling, SEC-15 key scope | Explicitly specified | Key/data boundaries and migration/backup copies, G04, G07, G12 |
+| SEC-16 PIN brute force and unlock replay | Explicitly specified | Live threat testing and session boundaries required, G10, G15 |
+| SEC-18 plaintext previews/CDNs and SEC-19 malicious uploads | Explicitly specified | Real storage/scanner implementation evidence required, G13 |
+| SEC-21 unsafe form restore and SEC-31 hidden rule inference | Explicitly specified | Signed versions + current security floors and safe rule projections must be tested, G18, G06 |
+| SEC-23 audit tampering, SEC-24 runtime/migration privilege, SEC-30 recovery consistency | Explicitly specified | Independent log, production identity and recovery evidence, G08, G11, G14 |
+| SEC-25 injection/DoS via JSON, translations, rules; SEC-26 mass assignment | Explicitly specified | Code paths and pipeline security still require negative tests, G15, G17 |
+| SEC-27 UUID predictability | Explicitly specified | Object IDs are identifiers, never authorization secrets, test enumeration |
+| SEC-28 retention/privacy; SEC-29 availability/quotas | Explicitly specified | Select policies and resource limits, G16, G17 |
+| SEC-32 cross-tenant references | Explicitly specified | Test composite FK/RLS at every table, G08, G18 |
+| SEC-33 disabled option historical saving | Explicitly specified | Confirm edit scope/version and validation semantics, G18 |
+
+## Newly identified findings from adding RowSignature
+
+`SEC-34` through `SEC-42` extend the original audit and are added to `SECURITY_THREAT_MODEL.md`: missing-row attacks, valid-signed replay, signing-oracle privilege escalation, multi-store split-brain, canonicalization ambiguity, key compromise/rotation, search omission, fail-open repair/availability, and missed security tables/columns.
+
+## Minimum next implementation decisions (in order)
+
+1. **Choose assurance tier and trust ownership** (G05, G01): Does production need to withstand hostile privileged SQL writes? Given the owner's GUID example, design this product for the higher tier by default and document operations that cannot receive that guarantee.
+2. **Design a genuine independent authorization authority** (G01–G04): trusted security mutation journal, latest root/revision, which service owns signing authority, and how KMS/decryption checks current permissions.
+3. **Prove read/write/rollback crash consistency** (G02, G03, G14): executable state machine and chaos tests before treating signed rows as protective.
+4. **Select confidentiality floors** (G07, G12, G13): classify fields and metadata and inventory plaintext copies, especially backups and audit payloads.
+5. **Implement measurable, adversarial release gates** (G06, G08–G11, G15–G18): performance, search, passkey, RLS, revocation, immutable audit and recovery tests, with named accountable owners.
+
+**Never claim that HMAC RowSignature alone closes the original database GUID-tampering threat.** It detects unsigned modification; the independently trusted accepted authorization state and prevention of signing unauthorized transitions are what extend it toward hostile-database-write resistance.
+
+
+## Level 2 authority architecture decision (2026-10-16)
+
+**Selected, not implemented:** Independent .NET 10 Authorization Authority; independent protected PostgreSQL desired-state/journal; SpiceDB query projection and trusted projection barrier; Azure Managed HSM HMAC-SHA-256; Confidential Ledger anchored checkpoints; immutable staged content revisions with authority-held committed manifest root. See `trust_authority/TRUST_AUTHORITY_ARCHITECTURE.md`, OpenAPI and .NET contracts.
+
+This establishes **design direction for G01, G02, G03, G04 and G05**, but does **not close any P0 gap**: no tested deployment/IAM, crash-safe implementation, ledger-recovery evidence, SpiceDB schema validation, performance benchmarks or pen-test proof exists yet. Keep G08 (database privileges), G14 (coordinated recovery), search completeness G06, signature-schema evolution G18 and remaining findings open. Security checks must be fail-closed during projection lag, tampering, key outages and authority unavailability.
+
+
+## G02 decision — Cross-system consistency protocol (2026-10-16)
+
+**Design specified; operational finding stays P0/open.** Selected: per-organization fail-closed revision gate, independently committed authority journal and desired state, ordered and externally fenced SpiceDB projection, idempotency and optimistic CAS, complete prepared-content staging with `committed_operation_id` in the trusted authority head, and crash/recovery verification. See `trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md` for invariants A1–A12, state machines, failure matrix and CONS-01 through CONS-30. `trust_authority/consistency-schema-additions.reference.sql` is *reference SQL*, not a validated migration. Passing those tests (including deliberately delayed external projector writes, missing staged revisions, and restoring old authority snapshots) is required before closing G02. Reconcile separately with G03 graph completeness, G04 HSM provider guarantees, G08 privileged SQL role isolation and G14 coordinated recovery. Protecting already-delivered plaintext is not a valid revocation claim.
+
+
+## G03 decision — Merkle record manifest and complete independent leaf registry (2026-10-16)
+
+**Design specified; security assurance remains P0/OPEN.** Chosen: versioned sorted Merkle tree per committed record snapshot; HMAC-bound leaf commitments; independent authority holds the accepted latest head, leaf count, complete canonical leaf identity/digest index, operation ID and schema/key versions. Complete or partial authorized reads compare *exact* expected authority-set membership with committed immutable candidate bytes. Direct SQL deletes, inserted extras, old valid signatures, foreign/group/field association changes and blob-version swaps must never become trusted reads. Unauthorized extra rows are suppressed immediately and discovered via independent reconciliation. `trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md` is normative; `record-manifest.reference.sql` is NOT a validated production migration.
+
+**Evidence still needed:** implement authority storage and transactional manifest CAS, independent signer and canonical vectors, trusted projection verifier, actual attachment AEAD/object binding, integration with G02, cross-tenant and partial ACL proofs, and automated MRK-01 through MRK-32 across crashes/hostile SQL writes. Bounded performance and full disaster restore still require measurement. **G06 verified search completeness remains open; record Merkle proofs cannot prove SQL returned all matches.** Do not claim G03 closed by the design document alone.
+
+
+## G04 signing-provider design selection (2026-10-16)
+
+**Provider abstraction designed, P0 implementation gap remains open.** `IIntegrityMacProvider` lives only inside the independent trust authority. Offline development uses ephemeral .NET HMAC; local Docker integration uses HashiCorp Vault Transit dev mode; Azure staging/production must use Azure Managed HSM with HS256 and independent workload identity. Never allow business API to sign arbitrary rows. Read `trust_authority/CRYPTOGRAPHIC_SIGNING_AUTHORITY.md`. SIG-01 through SIG-14 plus real Azure staging deployment, operational IAM separation, key rotation/recovery and adversarial validation are release blockers.
+
+
+## G08 decision — Privileged PostgreSQL isolation and access hardening (2026-10-16)
+
+**Design specified; P0/OPEN pending actual infrastructure and tests.** BusinessDb and AuthorityDb are independent PostgreSQL clusters and admin domains; all normal service identities have limited rights. BusinessDB API cannot hold authority/SpiceDB/HSM privileges. Runtime uses NOLOGIN schema-owner separation, column-scoped grants, FORCE RLS, safe migration identity and explicit privilege-audit gates. `trust_authority/PRIVILEGED_POSTGRESQL_ACCESS.md` is normative; business/authority role SQL scripts are references only, not validated production migrations. `postgres-privilege-inventory.sql` supplies a read-only catalog report, and `POSTGRESQL_PRIVILEGE_TEST_PLAN.md` lists PG-01..PG-20.
+
+**Essential limits:** RLS does not block a sufficiently privileged DBA; tenant custom GUCs can be forged by a SQL-capable role. Database read compromise exposes ordinary plaintext. Business DBAs can corrupt or erase data and affect search completeness. Level 2's security goal is preventing hostile business DB modifications from inducing accepted *application-mediated access* while independent authority/HSM remains uncompromised. Verify every output path; mandate application encryption for DB-reader confidentiality.
+
+G08 may close only after production-equivalent Azure role/network/IAM separation, reviewed grants/defaults/DDL, live managed-service tests and recorded PG-01..PG-20 evidence with independent reviewer approval. **Next critical focus: G14 coordinated recovery.**
+
+
+## G14 decision — Coordinated disaster recovery / replayability (2026-10-16)
+
+**Design specified; P0 OPEN pending executable proof and actual cloud recoverability.** `trust_authority/COORDINATED_DISASTER_RECOVERY.md` is normative; companion operator runbook, G14 recovery control-plane SQL/C# reference, and `DISASTER_RECOVERY_TEST_PLAN.md` specify DR-01..DR-36.
+
+**Architecture improvements:** (1) replayable security-event bodies independently durably archived before a security command becomes Effective—not only a hash anchor; (2) a verified per-organization accepted authorization/content revision checkpoint with independent ledger receipt and event/object archive identifiers; (3) externally fenced recovery epoch; (4) rebuild SpiceDB and search from independently trusted authority/current content; (5) recovery of *actual immutable committed content and documents* plus historical key versions; (6) per-record quarantine on missing content, organization/quorum quarantine on missing accepted security-event bodies; (7) two-person audited activation. Restoring an old BusinessDb/AuthorityDb snapshot must not resurrect a revoked grant or reduce a monotonic FIDO2/encryption policy floor.
+
+**Still open:** No archive replay/receipt integration, no Azure HSM Security Domain/quorum rehearsal, no independent epoch controller, no blob-ciphertext/object-version restore with hashes, no recovered authority/SpiceDB implementation and no independently reviewed Azure staging game day or measured RTO/RPO. Azure PITR/geo-restore is not automatically cross-service atomic; Azure Managed HSM restore can destructively replace keys/roles. G14 is not closed by design documentation; DR tests must pass. G06 search completeness remains separately open, even after Merkle restoration.
+
+## Additional design extension — reusable related forms and document collections (2026-10-16)
+
+**Design specified, not implemented/verified.** The existing repeating-group model covers occurrences within a single `FormRecord`, but not reusable child FormDefinitions with separate child `FormRecords`. `form_model/RELATED_FORM_COLLECTIONS.md` and `CLAUDE.md` §4S now define `FormRelationshipDefinitions`, `FormRecordRelationships`, parent-layout `relatedFormList` elements, multi-attachment `documentCollection` rendering over the existing file engine, inherited child ownership, independently scoped child sharing, and separate child content revisions.
+
+**New attack surfaces:** A malicious BusinessDb writer can forge/reparent/delete child links; a partial share can accidentally leak an unrelated child or attachment through list counts, summary columns, query predicates, or inherited access; reparenting can launder permissions; nested record graphs can create cycles/resource exhaustion; a rolled-back relationship projection can resurrect revoked access. Mitigations are an independent authority-owned complete relationship/link registry, revision-checked authorization commands, explicit child-instance/field/document scopes, v2 parent Merkle `RelatedRecordLink` leaves, separate verified child Merkle heads, concurrency limits, no implicit cascade or new-child share inheritance, and fail-closed recovery.
+
+**Open assurance gates:** G01–G03 (independent relationship authority, CAS and complete link set), G06 (search completeness and non-inference), G08 (tenant-safe FK/RLS), G10 (link/share revocation), G13 (single encrypted attachment pipeline), G14 (restored parent-child graph) and G17/G18 (bounded nested load and versioned Merkle migration). REL-01..REL-28 must be implemented and executed. Existing MRK-v1 vectors must remain valid; treat the proposed `RelatedRecordLink` as a **versioned v2** addition, not an unannounced new v1 leaf kind.
+
+### Related Form Collections implementation handoff (latest)
+
+The approved parent/child FormRecord architecture now includes a PostgreSQL 18 migration template with same-tenant and expected-form-type composite FKs, a C# service/DTO contract, a validated OpenAPI reference, and an ordered implementation plan (`form_model/RELATED_FORM_IMPLEMENTATION_PLAN.md`). Eight additional tests (REL-29–REL-36) cover tenant/type constraints, concurrency, search/projection scope, option grandfathering, new fields after share snapshots, graph limits, XSS-safe rendering, and authority outages. **No application code, live migration, or authority workflow has been deployed:** the relationship/membership projection, SpiceDB authorization model, Merkle-v2 vectors and recovery validation remain open production release gates.
+
+
+## Security simplification implementation handoff — ADR-SEC-2026-10-16-01
+
+The current architecture now selects the six changes in `security_hardening/SECURITY_SIMPLIFICATION_STANDARD.md` and orders them in `security_hardening/SECURITY_IMPLEMENTATION_PLAN.md`, with SIM-01..SIM-42 as mandatory adversarial test specifications. This is a **design decision only**, not an implementation, verified attack resistance or permission to close previously open findings.
+
+- Canonical journal/event ownership and external audit intake: design clarified. **G11 remains OPEN** until tested reliable delivery, independently durable access evidence, WORM replay and ledger receipts.
+- Organization encryption floor and sensitivity classification: design selected. **G07/G12 remain OPEN** until actual data inventory, encryption backfill, metadata protection and legacy export/backup risk acceptance.
+- Bounded authority-enumerated V1 search plus independent index V2: design selected. **G06 remains OPEN** until query-completeness attack tests and scale evidence pass. Never falsely declare a plain business SQL search complete against DBA omission.
+- User-specific phishing-resistant step-up is preferred for sensitive access; optional additional record owner challenge remains. **G09/G10 remain OPEN** until provider assertion and real revocation testing.
+- Row HMAC + independent complete Merkle remain mandatory. No elimination of per-row HMAC has been approved. **G03/G04/G18 remain OPEN** until implementation, proof and tests.
+- Checkpoint batching and duplicate audit projections reduce complexity only while preserving mandatory recoverable security-event bodies and G02/G14 replay barriers. **G02/G14 remain OPEN** until actual crash/recovery exercises.
+
+Supersede the audit's language proposing *removal* only after the dependent acceptance gates; no destructive legacy-table drop or encryption downgrades are authorized by this addendum.

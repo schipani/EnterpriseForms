@@ -1,0 +1,16 @@
+/* Reference-only: preserve existing packages/design-tokens CSS as source of truth */
+:root {
+  --ui-primary-bg: #111111;
+  --ui-primary-fg: #ffffff;
+  --ui-secondary-bg: #ffffff;
+  --ui-secondary-fg: #111111;
+  --ui-secondary-border: #111111;
+  --ui-page: #f8fafc;
+  --ui-surface: #ffffff;
+  --ui-body-text: #111827;
+  --ui-muted-text: #334155;
+  --ui-border: #cbd5e1;
+  --ui-focus: #1d4ed8;
+  --ui-font-scale: 1;
+}
+/* Never substitute tenant-authored CSS: these values are output of approved theme validation. */

@@ -1,0 +1,25 @@
+test_id,category,required_assertion
+PB11-01,Pull request protection,Unreviewed PR cannot merge protected branches
+PB11-02,Trust-owner separation,Business maintainer cannot self-approve Authority release/security policy
+PB11-03,OIDC trust,Forked/untrusted PR cannot obtain prod federated Azure token
+PB11-04,OIDC scope,Business deploy identity cannot change authority/hsm/key/SpiceDB
+PB11-05,Immutable image,Production image digest equals signed staging image digest
+PB11-06,Signature verification,Unsigned image is refused before deployment
+PB11-07,Tampered image,Altered digest/provenance fails verification
+PB11-08,SBOM,Every production image digest has reviewed machine-readable SBOM
+PB11-09,SAST SCA,Policy-triggering vulnerability blocks deployment
+PB11-10,Secrets,Injected synthetic canary secret detected and prevented from release
+PB11-11,Action integrity,Unpinned untrusted workflow action is rejected by policy
+PB11-12,Schema ownership,Unapproved destructive migration cannot run on prod
+PB11-13,Bicep drift,Unexpected region/network/role change blocked before apply
+PB11-14,Data residency,Protected customer data never enters hosted CI artifact/cache
+PB11-15,Staging proof,Missing Stage A/Azure Level2 evidence blocks prod
+PB11-16,Environment approval,Unapproved production business deployment rejected
+PB11-17,Authority approval,Authority production change requires separate security approval
+PB11-18,Signed rollback,"Rollback uses previously trusted digests, not revoked ACL state"
+PB11-19,Test evidence,Release record includes commit/image/SBOM/provenance/test/reviewer
+PB11-20,Runtime deployment,Protected environment cannot run arbitrary unverified digest via pipeline
+PB11-21,No privileged job from PR,pull_request_target/workflow_run cannot execute untrusted artifact with elevated credentials
+PB11-22,Key separation,Image attestation identity cannot access record-integrity MAC/HSM keys
+PB11-23,Least privilege,Build OIDC identity cannot perform production application deployments
+PB11-24,Recovery deployment,Authority schema/key operation requires journal checkpoint and DR evidence

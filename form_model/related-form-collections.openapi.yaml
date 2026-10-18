@@ -1,0 +1,260 @@
+openapi: 3.1.0
+info:
+  title: Related Form Collections — Business API
+  version: 1.0.0-draft
+  description: >-
+    Reference API contract for reusable child-form collections. All list/detail
+    responses are authorized projections from the independent authority.
+    Tenant and user identity come from validated server context, never request bodies.
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+paths:
+  /form-definitions/{formDefinitionId}/relationships:
+    parameters:
+      - $ref: '#/components/parameters/FormDefinitionId'
+    get:
+      operationId: ListFormRelationshipDefinitions
+      description: Designer-authorized relationship definitions only; no cross-tenant entries.
+      responses:
+        '200':
+          description: Authorized definitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RelatedFormDefinition' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: CreateFormRelationshipDefinition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDefinition' }
+      responses:
+        '201':
+          description: Stable relationship definition created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RelatedFormDefinition' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /form-records/{formRecordId}/relationships/{formRelationshipDefinitionId}:
+    parameters:
+      - $ref: '#/components/parameters/FormRecordId'
+      - $ref: '#/components/parameters/FormRelationshipDefinitionId'
+    get:
+      operationId: ListAuthorizedRelatedRecords
+      description: >-
+        Returns only authorized child records and approved summary fields.
+        No unauthorized child IDs, existence, counts, or sort keys.
+      parameters:
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Authorized child projections
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RelatedRecordPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '423': { $ref: '#/components/responses/Quarantined' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /form-records/{formRecordId}/relationships/{formRelationshipDefinitionId}/children:
+    parameters:
+      - $ref: '#/components/parameters/FormRecordId'
+      - $ref: '#/components/parameters/FormRelationshipDefinitionId'
+    post:
+      operationId: CreateChildAndRelationship
+      description: >-
+        Creates an individually versioned child record with a Pending relationship,
+        commits accepted authority state, and only then makes it visible.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateChild' }
+      responses:
+        '202':
+          description: Security command accepted; may not yet be visible
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RelatedCommandResult' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /form-record-relationships/{formRecordRelationshipId}:
+    parameters:
+      - $ref: '#/components/parameters/FormRecordRelationshipId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    patch:
+      operationId: ReorderRelatedRecord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReorderRelationship' }
+      responses:
+        '202':
+          description: Change accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RelatedCommandResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      operationId: UnlinkRelatedRecord
+      description: Soft-unlinks the child but does not delete its FormRecord or attachments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UnlinkRelationship' }
+      responses:
+        '202':
+          description: Unlink accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RelatedCommandResult' }
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    FormDefinitionId:
+      name: formDefinitionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    FormRecordId:
+      name: formRecordId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    FormRelationshipDefinitionId:
+      name: formRelationshipDefinitionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    FormRecordRelationshipId:
+      name: formRecordRelationshipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    RelatedFormDefinition:
+      type: object
+      additionalProperties: false
+      required: [formRelationshipDefinitionId, parentFormDefinitionId, childFormDefinitionId, relationshipDefinitionKey, relationshipDisplayName]
+      properties:
+        formRelationshipDefinitionId: { type: string, format: uuid }
+        parentFormDefinitionId: { type: string, format: uuid }
+        childFormDefinitionId: { type: string, format: uuid }
+        relationshipDefinitionKey: { type: string }
+        relationshipDisplayName: { type: string }
+    CreateDefinition:
+      type: object
+      additionalProperties: false
+      required: [childFormDefinitionId, relationshipDefinitionKey, relationshipDisplayName]
+      properties:
+        childFormDefinitionId: { type: string, format: uuid }
+        relationshipDefinitionKey: { type: string, minLength: 1, maxLength: 120 }
+        relationshipDisplayName: { type: string, minLength: 1, maxLength: 200 }
+    CreateChild:
+      type: object
+      additionalProperties: false
+      required: [childFormVersionId, fieldValues, expectedParentContentRevision, expectedAuthorityRevision]
+      properties:
+        childFormVersionId: { type: string, format: uuid }
+        fieldValues:
+          type: object
+          description: Server validates keys as FieldDefinitionId and values against approved child form schema.
+          additionalProperties: true
+        expectedParentContentRevision: { type: integer, minimum: 1 }
+        expectedAuthorityRevision: { type: integer, minimum: 0 }
+    ReorderRelationship:
+      type: object
+      additionalProperties: false
+      required: [childRecordSortOrder, expectedRelationshipRevision, expectedAuthorityRevision]
+      properties:
+        childRecordSortOrder: { type: integer, minimum: 0 }
+        expectedRelationshipRevision: { type: integer, minimum: 1 }
+        expectedAuthorityRevision: { type: integer, minimum: 0 }
+    UnlinkRelationship:
+      type: object
+      additionalProperties: false
+      required: [relationshipRemovalReason, expectedRelationshipRevision, expectedAuthorityRevision]
+      properties:
+        relationshipRemovalReason: { type: string, minLength: 1, maxLength: 2000 }
+        expectedRelationshipRevision: { type: integer, minimum: 1 }
+        expectedAuthorityRevision: { type: integer, minimum: 0 }
+    RelatedRecordPage:
+      type: object
+      additionalProperties: false
+      required: [records]
+      properties:
+        records:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/RelatedRecordSummary' }
+        nextCursor: { type: [string, 'null'] }
+    RelatedRecordSummary:
+      type: object
+      additionalProperties: false
+      required: [formRecordRelationshipId, childFormRecordId, authorizedFields, canEditChild, canUnlinkChild]
+      properties:
+        formRecordRelationshipId: { type: string, format: uuid }
+        childFormRecordId: { type: string, format: uuid }
+        authorizedFields:
+          type: object
+          description: Only approved child summary FieldDefinitionIds and values; never unapproved data.
+          additionalProperties: true
+        canEditChild: { type: boolean }
+        canUnlinkChild: { type: boolean }
+    RelatedCommandResult:
+      type: object
+      additionalProperties: false
+      required: [securityOperationId, commandStatus]
+      properties:
+        securityOperationId: { type: string, format: uuid }
+        commandStatus: { type: string, enum: [Pending, Committed, Rejected] }
+        formRecordRelationshipId: { type: [string, 'null'], format: uuid }
+        childFormRecordId: { type: [string, 'null'], format: uuid }
+        committedAuthorityRevision: { type: [integer, 'null'], minimum: 1 }
+    Error:
+      type: object
+      required: [errorCode, correlationId]
+      properties:
+        errorCode: { type: string }
+        correlationId: { type: string, format: uuid }
+  responses:
+    Forbidden:
+      description: Access denied (without leaking resource existence).
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Stale revision or idempotency/capacity collision.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unprocessable:
+      description: Invalid relationship configuration or child values.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Quarantined:
+      description: Content, link or manifest integrity failure.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unavailable:
+      description: Authority or verified projection unavailable; fail closed.
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
