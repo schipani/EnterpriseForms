@@ -3,8 +3,12 @@
 **Status:** Ownership inventory derived from the 69-screen catalog (`CLAUDE-DESIGN.MD` §17) and the backend feature
 catalog (`CLAUDE.md` §4U.2). Agreement between this file and the design document is enforced by
 `tests/architecture/FeatureOwnershipMatrixTests.cs`. Columns marked *planned* describe ownership that becomes real
-only when the vertical slice (endpoint, handler, persistence, authority integration, audit, UI, tests) ships; Phase 0
-ships none of them. "Public ports" are the only cross-feature entry points permitted by ADR-ARCH-001.
+only when the vertical slice ships. **Stage A (2026-10-18) shipped the first real slices** — marked *(Stage A)* below:
+`Identity` (tenants/users projection + `/api/v1/users/me`), `Teams` (teams/team_memberships projection + commands),
+`FormDefinitions` (form_definitions/form_versions/field_definitions + `POST /api/v1/form-definitions`), `FormRecords`
+(form_records/form_record_revisions/field_string_values + create/get/update/transfer-ownership) and `Sharing`
+(record_shares/record_share_fields + create/revoke). No UI pages shipped. "Public ports" are the only cross-feature
+entry points permitted by ADR-ARCH-001.
 
 | UI feature | Owned page IDs | Backend feature | Owned tables (planned) | Public ports (planned) | Tests (planned) | Release gate |
 |---|---|---|---|---|---|---|

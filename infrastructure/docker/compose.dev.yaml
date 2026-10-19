@@ -8,6 +8,8 @@ services:
     volumes: [authority-db-data:/var/lib/postgresql]
   spicedb-db:
     volumes: [spicedb-db-data:/var/lib/postgresql]
+  archive-store:
+    volumes: [archive-store-data:/data]
   azurite:
     ports: ["127.0.0.1:10010:10000"]   # 10000 is commonly taken by other local Azurite instances
     volumes: [azurite-data:/data]
@@ -22,4 +24,5 @@ volumes:
   business-db-data: {}
   authority-db-data: {}
   spicedb-db-data: {}
+  archive-store-data: {}
   azurite-data: {}

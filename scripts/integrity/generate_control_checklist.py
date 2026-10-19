@@ -40,6 +40,47 @@ PHASE0_EVIDENCE: dict[str, tuple[str, str, str]] = {
                "Format documents that HMAC provides no confidentiality; no unkeyed digest of plaintext is used anywhere."),
 }
 
+# Stage A (2026-10-18) evidence: real Docker Level A stack (ADR-PB-003), SEC-P01..SEC-P12 executed by
+# tests/security/EnterpriseForms.SecurityTests with artifacts/security/gate-a-evidence.json. "Tested" here means
+# Level A (Docker) only; Level B (Azure) and independent cryptographic review remain open (docs/STAGE_A_STATUS.md).
+GATE_A = "tests/security/EnterpriseForms.SecurityTests; docs/evidence/stage-a/2026-10-18-github-run-39121925152 + 2026-10-18-local-e6df484 (commit e6df484, 12/12 PASS; security-gate-a)"
+STAGE_A_EVIDENCE: dict[str, tuple[str, str, str]] = {
+    "SEC-01": ("Tested", GATE_A + " SEC-P01", "Forged owner_user_id/owner_team_id in BusinessDb never grants; authority owner edge unchanged (Level A)."),
+    "SEC-02": ("Tested", GATE_A + " SEC-P02, SEC-P03", "Forged record_shares/record_share_fields/team_memberships rows never grant; authority commands are the only grant path (Level A)."),
+    "SEC-06": ("Tested", GATE_A + " SEC-P04, SEC-P05, SEC-P10", "Mutation, signature flip, deletion, replay and whole-DB restore fail closed against the authority head/manifest (Level A)."),
+    "SEC-38": ("Tested", "docs/dynamic-forms/row-integrity-format.md; tests/integrity; scripts/integrity; tests/architecture/SignedColumnRegistryTests.cs",
+               "Canonical format frozen and cross-verified; Stage A production registry (form_records v2, field_string_values v1) inventoried in CI."),
+    "SEC-42": ("Tested", "tests/architecture/SignedColumnRegistryTests.cs; tests/architecture/DatabaseNamingTests.cs",
+               "Signed-column inventory and naming rules run over the compiled Stage A EF model in CI."),
+    "G01": ("Implemented", "src/authority/*; " + GATE_A, "Independent Authorization Authority with its own PostgreSQL store, SpiceDB projection, journal and operator plane; Level A tests pass. Level B/IAM proof open."),
+    "G02": ("Implemented", "src/authority/AuthorizationAuthority.Application/Features/{SecurityCommands,Projection,Journal}; " + GATE_A + " SEC-P06, SEC-P07, SEC-P09, SEC-P12",
+            "Per-organization gate, ordered projection with SpiceDB marker CAS, archive-before-effective, idempotent crash recovery demonstrated in Docker. CONS-01..30 full matrix and Azure staging remain open."),
+    "G03": ("Implemented", "src/authority/AuthorizationAuthority.Application/Features/Content/ContentService.cs; " + GATE_A + " SEC-P04, SEC-P05",
+            "Authority-held complete leaf index, prepare/commit CAS, VerifyRecordProjection with full-set equality; MRK-01..32 full matrix open."),
+    "G04": ("Implemented", "src/authority/AuthorizationAuthority.Infrastructure/Signing; " + GATE_A + " SEC-P08, SEC-P11",
+            "Vault Transit provider with per-organization non-exportable keys behind the command-validated coordinator; no sign-any-bytes endpoint. Azure Managed HSM provider NOT implemented; SIG-11 same-key vectors not executed; independent review open."),
+    "G05": ("Designed", "docs/dynamic-forms/architecture.md §1; docs/STAGE_A_STATUS.md", "Hostile-business-DB-writer tier selected; Level A evidence exists, Level B and production approval do not."),
+    "G08": ("Implemented", "infrastructure/docker/postgres/*; src/*/Persistence/*RuntimeGrants.cs; " + GATE_A + " SEC-P11",
+            "Separate clusters/admins, runtime roles without DDL/DELETE on signed tables, authority-net internal; PG-01..20 and Azure isolation open."),
+    "G11": ("Designed", "src/authority/AuthorizationAuthority.Infrastructure/Archive; " + GATE_A + " SEC-P12",
+            "Append-only archive of full journal bodies gates effectiveness (Azurite test double). WORM/ledger and SIEM delivery open."),
+    "G14": ("Designed", "src/authority/AuthorizationAuthority.Application/Features/Journal; " + GATE_A + " SEC-P09, SEC-P10",
+            "Replayable journal bodies archived before Effective; restore of BusinessDb proven harmless. Authority restore/epoch fencing and DR-01..36 open."),
+    "G15": ("Designed", ".github/workflows/*.yml; .github/rulesets/main-branch-protection.json; docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
+            "Gate A workflow with minimum-expected-tests; branch ruleset authored; repository settings and SBOM/signing pending BUILD-00/05."),
+    "G18": ("Tested", "tests/architecture/SignedColumnRegistryTests.cs; docs/dynamic-forms/row-integrity-format.md §7", "Registry per (entity_kind, schema_version); unsigned columns must be justified; F-03 decided (integer-only JSON v1)."),
+    "SIM-04": ("Tested", GATE_A + " SEC-P12", "Archive outage keeps commands non-effective and content unreleased (Level A)."),
+    "SIM-06": ("Tested", GATE_A + " SEC-P08, SEC-P09", "Idempotent retries yield one effect / one command id after outage and crash (Level A)."),
+    "SIM-07": ("Tested", GATE_A + " SEC-P01, SEC-P06, SEC-P10", "Revocation effective at the authority barrier regardless of BusinessDb state (Level A)."),
+    "SIM-30": ("Tested", GATE_A + " SEC-P06", "Cached session token cannot start protected reads after effective revocation (Level A)."),
+    "SIM-35": ("Tested", GATE_A + " SEC-P04", "Modified signed row rejected (Level A)."),
+    "SIM-36": ("Tested", GATE_A + " SEC-P05", "Deleted leaf detected by complete manifest (Level A)."),
+    "SIM-37": ("Tested", GATE_A + " SEC-P05, SEC-P10", "Replayed old valid row/snapshot rejected by head/revision (Level A)."),
+    "SIM-38": ("Designed", "docs/dynamic-forms/row-integrity-format.md §1", "No unkeyed digest of plaintext is used anywhere."),
+    "SIM-40": ("Tested", GATE_A + " SEC-P08", "Vault Transit outage fails closed (writes and verified reads); HSM variant open (Level B)."),
+    "SIM-42": ("Tested", GATE_A + " SEC-P10", "BusinessDb restore with stale share/content rejected; authority/search archive restore and epoch fencing open."),
+}
+
 ADR_SEC_DECISIONS = [
     ("ADR-SEC-D1", "Canonical audit event ownership; consolidate duplicate audit tables"),
     ("ADR-SEC-D2", "Organization data-classification and encryption floor"),
@@ -86,10 +127,10 @@ def main() -> int:
     assert len([c for c in controls if c[0].startswith("SIM-")]) == 42, "expected 42 SIM tests"
 
     with OUT.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.writer(handle)
+        writer = csv.writer(handle, lineterminator="\n")
         writer.writerow(["ControlId", "Title", "Status", "Owner", "Evidence", "Gate", "Note"])
         for cid, title in controls:
-            status, evidence, note = PHASE0_EVIDENCE.get(cid, ("Designed", "", "Normative text only; no executable evidence in Phase 0."))
+            status, evidence, note = STAGE_A_EVIDENCE.get(cid) or PHASE0_EVIDENCE.get(cid, ("Designed", "", "Normative text only; no executable evidence yet (Stage A scope did not reach this control)."))
             family = "ADR" if cid.startswith("ADR") else cid.split("-")[0] if "-" in cid else "G"
             owner = "security-owners" if family in {"SEC", "G", "SIM", "ADR"} else "maintainers"
             writer.writerow([cid, title, status, owner, evidence, GATES[family], note])

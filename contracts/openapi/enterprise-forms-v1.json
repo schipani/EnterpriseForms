@@ -47,10 +47,755 @@
           }
         }
       }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Verified principal of the current assertion (projection maintenance only; confers no permission).",
+        "operationId": "GetCurrentUser",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions": {
+      "post": {
+        "tags": [
+          "FormDefinitions"
+        ],
+        "summary": "Registers a form with the authority (designer role) and publishes a minimal v1 layout. Requires Idempotency-Key.",
+        "operationId": "CreateFormDefinition",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFormDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/records": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Registers the record with the authority, stages the signed candidate and commits the first accepted content revision.",
+        "operationId": "CreateFormRecord",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFormRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Verified read: authority head → exact staged rows → complete manifest verification → authorized subset only.",
+        "operationId": "GetFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Optimistic (expected_content_revision) full-snapshot update staged as a new immutable candidate and committed by the authority.",
+        "operationId": "UpdateFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFormRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/transfer-ownership": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "operationId": "TransferRecordOwnership",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferOwnershipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/shares": {
+      "post": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Explicit field allow-list share committed by the authority; no wildcard or future items.",
+        "operationId": "CreateRecordShare",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/shares/{recordShareId}/revoke": {
+      "post": {
+        "tags": [
+          "Sharing"
+        ],
+        "operationId": "RevokeRecordShare",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recordShareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams": {
+      "post": {
+        "tags": [
+          "Teams"
+        ],
+        "operationId": "CreateTeam",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTeamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{teamId}/members": {
+      "post": {
+        "tags": [
+          "Teams"
+        ],
+        "operationId": "AddTeamMember",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{teamId}/members/{userId}/remove": {
+      "post": {
+        "tags": [
+          "Teams"
+        ],
+        "operationId": "RemoveTeamMember",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "CommandOutcome": {
+        "required": [
+          "commandId",
+          "commandStatus",
+          "authorizationRevision",
+          "effective"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commandStatus": {
+            "type": "string"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "effective": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CommandStatusResponse": {
+        "required": [
+          "command"
+        ],
+        "type": "object",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/CommandOutcome"
+          }
+        }
+      },
+      "CreateFieldRequest": {
+        "required": [
+          "fieldKey",
+          "fieldDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldKey": {
+            "type": "string"
+          },
+          "fieldDisplayName": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateFormDefinitionRequest": {
+        "required": [
+          "formDefinitionName",
+          "formDefinitionDescription",
+          "fields",
+          "formUserUserIds",
+          "formUserTeamIds"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionName": {
+            "type": "string"
+          },
+          "formDefinitionDescription": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateFieldRequest"
+            }
+          },
+          "formUserUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "formUserTeamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "CreateFormRecordRequest": {
+        "required": [
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "ownerTeamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateShareRequest": {
+        "required": [
+          "recipientUserId",
+          "recipientTeamId",
+          "recipientRole",
+          "fieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "recipientUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientTeamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateTeamRequest": {
+        "required": [
+          "teamName"
+        ],
+        "type": "object",
+        "properties": {
+          "teamName": {
+            "type": "string"
+          }
+        }
+      },
+      "CurrentUserResponse": {
+        "required": [
+          "organizationId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "FieldResponse": {
+        "required": [
+          "fieldDefinitionId",
+          "fieldKey",
+          "fieldDisplayName",
+          "fieldDataType"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldKey": {
+            "type": "string"
+          },
+          "fieldDisplayName": {
+            "type": "string"
+          },
+          "fieldDataType": {
+            "type": "string"
+          }
+        }
+      },
+      "FieldValueResponse": {
+        "required": [
+          "fieldDefinitionId",
+          "fieldKey",
+          "fieldValueItemId",
+          "stringValue"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldKey": {
+            "type": "string"
+          },
+          "fieldValueItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stringValue": {
+            "type": "string"
+          }
+        }
+      },
+      "FormDefinitionResponse": {
+        "required": [
+          "formDefinitionId",
+          "organizationId",
+          "formDefinitionName",
+          "currentFormVersionId",
+          "fields",
+          "authorizationRevision",
+          "command"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDefinitionName": {
+            "type": "string"
+          },
+          "currentFormVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldResponse"
+            }
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "command": {
+            "$ref": "#/components/schemas/CommandOutcome"
+          }
+        }
+      },
+      "FormRecordResponse": {
+        "required": [
+          "formRecordId",
+          "organizationId",
+          "formDefinitionId",
+          "recordStatus",
+          "contentRevision",
+          "committedOperationId",
+          "authorizationRevision",
+          "isCompleteProjection",
+          "values",
+          "integrityStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordStatus": {
+            "type": "string"
+          },
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committedOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "isCompleteProjection": {
+            "type": "boolean"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldValueResponse"
+            }
+          },
+          "integrityStatus": {
+            "type": "string"
+          }
+        }
+      },
       "ProbeResponse": {
         "required": [
           "probeStatus",
@@ -65,12 +810,146 @@
             "type": "string"
           }
         }
+      },
+      "ShareResponse": {
+        "required": [
+          "recordShareId",
+          "formRecordId",
+          "recipientRole",
+          "fieldValueItemIds",
+          "shareStatus",
+          "command"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "fieldValueItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "shareStatus": {
+            "type": "string"
+          },
+          "command": {
+            "$ref": "#/components/schemas/CommandOutcome"
+          }
+        }
+      },
+      "TeamMemberRequest": {
+        "required": [
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "TeamResponse": {
+        "required": [
+          "teamId",
+          "teamName",
+          "command"
+        ],
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "command": {
+            "$ref": "#/components/schemas/CommandOutcome"
+          }
+        }
+      },
+      "TransferOwnershipRequest": {
+        "required": [
+          "newOwnerUserId",
+          "newOwnerTeamId",
+          "transferReason"
+        ],
+        "type": "object",
+        "properties": {
+          "newOwnerUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "newOwnerTeamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "transferReason": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateFormRecordRequest": {
+        "required": [
+          "expectedContentRevision",
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
       }
     }
   },
   "tags": [
     {
       "name": "Platform"
+    },
+    {
+      "name": "Identity"
+    },
+    {
+      "name": "FormDefinitions"
+    },
+    {
+      "name": "FormRecords"
+    },
+    {
+      "name": "Sharing"
+    },
+    {
+      "name": "Teams"
     }
   ]
 }

@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Authority store (separate PostgreSQL), SpiceDB projection and IIntegrityMacProvider implementations live here (Stage A). -->
+  <!--
+    Authority adapters: isolated PostgreSQL store (EF Core), SpiceDB projection (pure managed gRPC stub generated from
+    vendored protos), IIntegrityMacProvider implementations (LocalHmac dev/test, Vault Transit Docker; Azure Managed HSM
+    pending), independent event archive adapters. Never referenced by business assemblies.
+  -->
   <PropertyGroup>
     <RootNamespace>AuthorizationAuthority.Infrastructure</RootNamespace>
   </PropertyGroup>
@@ -15,5 +19,33 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Grpc.Tools">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="SpiceDb/Protos/authzed/api/v1/core.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/authzed/api/v1/debug.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/authzed/api/v1/error_reason.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/authzed/api/v1/openapi.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/authzed/api/v1/permission_service.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="Client" />
+    <Protobuf Include="SpiceDb/Protos/authzed/api/v1/schema_service.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="Client" />
+    <Protobuf Include="SpiceDb/Protos/buf/validate/validate.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/google/api/annotations.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/google/api/http.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/google/rpc/status.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/validate/validate.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/protoc-gen-openapiv2/options/annotations.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <Protobuf Include="SpiceDb/Protos/protoc-gen-openapiv2/options/openapiv2.proto" ProtoRoot="SpiceDb/Protos" GrpcServices="None" />
+    <EmbeddedResource Include="SpiceDb/authority.schema.zed" LogicalName="authority.schema.zed" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="EnterpriseForms.ArchitectureTests" />
+    <InternalsVisibleTo Include="AuthorizationAuthority.Tests" />
   </ItemGroup>
 </Project>

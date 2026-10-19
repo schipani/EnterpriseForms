@@ -1,5 +1,7 @@
 # Review ownership (PB11_CICD_SUPPLY_CHAIN_RELEASE_STANDARD.md "Repository and code ownership").
-# Replace the placeholder teams with real GitHub teams when the private repository is created (BUILD-00).
+# NOT ENFORCEABLE TODAY (decision A-21, 2026-10-18): the development repository is public under a personal account, so the
+# @enterpriseforms/* teams cannot exist and GitHub ignores these entries. Independently authorized CODEOWNERS review is a
+# deferred control of the private Azure DevOps migration milestone; until then security-owner review is a manual, recorded step.
 # Security-owner review is mandatory for Trust Authority code, security specifications, workflows and infrastructure.
 
 *                                   @enterpriseforms/maintainers

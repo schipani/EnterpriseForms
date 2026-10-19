@@ -154,16 +154,26 @@ Nothing is auto-repaired or re-signed on read (CLAUDE.md §4L.5).
 Merkle v1 leaf (`trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md` §2.1). The two framings use different domain
 strings and separate test vectors; neither may be altered in place.
 
-## 7. Registered schemas (v1)
+## 7. Registered schemas
 
-Phase 0 freezes the format and registers two schemas for conformance testing. Production tables register their
-signed columns in Phase 1A1 alongside the EF Core mappings, and CI rejects any protected table whose columns are
-not registered (`SEC-42`, acceptance test 82).
+Phase 0 froze the format and registered two schemas for conformance testing. Stage A (2026-10-18) registers the first
+production tables in `src/backend/EnterpriseForms.Application/Features/FormRecords/Integrity/BusinessSignedSchemas.cs`;
+`tests/architecture/.../SignedColumnRegistryTests.cs` rejects any protected EF column that is neither signed nor
+explicitly justified as unsigned (`SEC-42`, acceptance test 82). The authority accepts candidate items only whose
+entity kind is allow-listed for the Merkle item kind (`ContentService.AllowedEntityKinds`).
 
-| Entity kind | Version | Columns (ordinal order) |
-|---|---|---|
-| `form_records` | 1 | `created_by_user_id` Uuid, `created_form_version_id` Uuid, `form_definition_id` Uuid, `owner_team_id` Uuid?, `owner_user_id` Uuid?, `record_status` Text, `submitted_on` TimestampUtc?, `tenant_id` Uuid |
-| `integrity_type_coverage` | 1 | one column per type incl. nullable variants (test-only) |
+| Entity kind | Version | Status | Columns (ordinal order) |
+|---|---|---|---|
+| `form_records` | 1 | conformance vectors only | `created_by_user_id` Uuid, `created_form_version_id` Uuid, `form_definition_id` Uuid, `owner_team_id` Uuid?, `owner_user_id` Uuid?, `record_status` Text, `submitted_on` TimestampUtc?, `tenant_id` Uuid |
+| `form_records` | 2 | **production (Stage A)** — RecordHeader leaf, pk = `form_record_id`, row_revision = content revision | `content_change_operation_id` Uuid, `created_by_user_id` Uuid, `created_form_version_id` Uuid, `form_definition_id` Uuid, `record_status` Text, `submitted_on` TimestampUtc?, `tenant_id` Uuid |
+| `field_string_values` | 1 | **production (Stage A)** — FieldValue leaf, pk = physical staged row id, item id = `field_value_item_id` | `content_change_operation_id` Uuid, `field_definition_id` Uuid, `field_value_item_id` Uuid, `form_record_group_id` Uuid?, `form_record_id` Uuid, `string_value` Text, `tenant_id` Uuid |
+| `integrity_type_coverage` | 1 | test-only | one column per type incl. nullable variants |
+
+`form_records` v2 deliberately omits `owner_user_id`/`owner_team_id`: ownership is authoritative only in the
+Authorization Authority and the business columns are an untrusted projection (TRUST_AUTHORITY_ARCHITECTURE.md §2).
+Signing them would bind a stale projection into content history. The v1 entry remains for the conformance vectors.
+The operation id is a signed column so a validly signed row from an earlier operation cannot be replayed into a later
+candidate (SEC-P05).
 
 ## 8. Conformance vectors
 
@@ -185,9 +195,15 @@ python scripts/integrity/generate_vectors.py && git diff --exit-code trust_autho
 
 - [ ] Independent cryptographic review of the format by a reviewer who did not author it (Stage A gate owner records
       approval outside the business database, SECURITY_VALIDATION_RUNBOOK.md §4).
-- [ ] Real HMAC vectors generated through Vault Transit in the Docker stack and compared with `LocalHmacProvider`
-      (SIG tests), confirming provider-independence of the message bytes.
-- [ ] Registry entries for every protected table (CLAUDE.md §4L.1) with a CI inventory test.
-- [ ] Decision on JSONB columns that need non-integer numbers: they must use Decimal/Text columns or a v2 JSON subset.
+- [~] Real HMAC tags are produced through Vault Transit in the Docker stack for every Stage A record (SEC-P04/P05
+      verify them through the authority); the explicit LocalHmac-vs-Vault same-key vector comparison (SIG-11) is
+      documented as a reviewer procedure and not yet executed.
+- [~] Registry entries exist for the two Stage A protected tables with a CI inventory test; every further protected
+      table (CLAUDE.md §4L.1) must be added with its feature.
+- [x] **F-03 decided (Stage A, 2026-10-18):** JSON v1 stays integer-only. No Stage A JSONB column is signed; layout
+      JSON (`form_versions.layout_json`) is form-definition integrity (separate registry, Phase 2). Any future signed
+      JSONB column that needs fractional numbers must carry them as Decimal/Text columns or wait for a reviewed v2 JSON
+      subset — floats are never admitted into v1. Independent review of this decision is part of R3 in
+      `docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md`.
 - Known limitation: NFC normalization needs ICU at runtime; invariant-globalization mode is not permitted for any
   process that signs or verifies rows.

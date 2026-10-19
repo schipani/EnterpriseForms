@@ -10,6 +10,9 @@ public sealed class NamespaceBoundaryTests
 
     private static readonly string[] AuthorityNamespaces = ["AuthorizationAuthority.Domain", "AuthorizationAuthority.Application", "AuthorizationAuthority.Infrastructure", "AuthorizationAuthority.Contracts", "AuthorizationAuthority.Api"];
 
+    /// <summary>Trust-plane SDK surfaces that must never appear in business assemblies (SIG-04/SIG-05: no SpiceDB writer, no HSM/Vault client, no key material).</summary>
+    private static readonly string[] TrustPlaneNamespaces = ["Authzed", "Grpc", "Azure.Security.KeyVault", "AuthorizationAuthority.Infrastructure.Signing", "AuthorizationAuthority.Infrastructure.SpiceDb"];
+
     [Fact]
     public void DomainDependsOnNothingOutward()
     {
@@ -63,10 +66,33 @@ public sealed class NamespaceBoundaryTests
     [Fact]
     public void BusinessHostsDoNotReferenceAuthorityImplementation()
     {
-        foreach (var assembly in new[] { typeof(Api.Program).Assembly, typeof(Worker.Program).Assembly, typeof(Infrastructure.Persistence.BusinessDbContext).Assembly })
+        foreach (var assembly in new[] { typeof(Api.Program).Assembly, typeof(Worker.Program).Assembly, typeof(Infrastructure.Persistence.BusinessDbContext).Assembly, typeof(Application.Common.Authority.IAuthorizationAuthorityClient).Assembly })
         {
-            var result = Types.InAssembly(assembly).ShouldNot().HaveDependencyOnAny(AuthorityNamespaces).GetResult();
+            var result = Types.InAssembly(assembly).ShouldNot().HaveDependencyOnAny([.. AuthorityNamespaces, .. TrustPlaneNamespaces]).GetResult();
             Assert.True(result.IsSuccessful, Describe(result));
+        }
+    }
+
+    [Fact]
+    public void AuthorityApplicationHoldsNoProviderSdkTypes()
+    {
+        // The signing/projection SDKs live only behind Infrastructure adapters; the command service cannot reach them directly.
+        var result = Types.InAssembly(typeof(AuthorizationAuthority.Application.AssemblyMarker).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(["Authzed", "Grpc", "Azure", "Microsoft.EntityFrameworkCore", "Npgsql", "System.Net.Http"])
+            .GetResult();
+        Assert.True(result.IsSuccessful, Describe(result));
+    }
+
+    [Fact]
+    public void NoBusinessTypeExposesASignAnyBytesOperation()
+    {
+        foreach (var assembly in new[] { typeof(Api.Program).Assembly, typeof(Infrastructure.Persistence.BusinessDbContext).Assembly, typeof(Application.Common.Authority.IAuthorizationAuthorityClient).Assembly })
+        {
+            var offenders = assembly.GetTypes().SelectMany(t => t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly))
+                .Where(m => !m.IsSpecialName && m.Name.StartsWith("Sign", StringComparison.Ordinal))
+                .Select(m => m.DeclaringType!.FullName + "." + m.Name).ToList();
+            Assert.True(offenders.Count == 0, "business assemblies must not define row-signing operations: " + string.Join(", ", offenders));
         }
     }
 

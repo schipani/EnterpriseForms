@@ -1,3 +1,7 @@
+using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Infrastructure;
+using AuthorizationAuthority.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace AuthorizationAuthority.Api.Composition;
@@ -14,7 +18,7 @@ public enum SigningProviderKind
     /// <summary>HashiCorp Vault Transit dev mode in the Docker Compose stack. Local/integration ONLY.</summary>
     VaultTransit = 2,
 
-    /// <summary>Azure Managed HSM oct-HSM HS256 keys. The only provider permitted in Production.</summary>
+    /// <summary>Azure Managed HSM oct-HSM HS256 keys. The only provider permitted in Production. Not implemented in Stage A.</summary>
     AzureManagedHsm = 3,
 }
 
@@ -34,7 +38,7 @@ public sealed class SigningProviderPolicy(IOptions<SigningProviderOptions> optio
 
     public string? VaultAddress => options.Value.VaultAddress;
 
-    /// <summary>Fail closed: Production accepts only Azure Managed HSM; test providers are confined to Development/Testing/Staging-integration.</summary>
+    /// <summary>Fail closed: Production accepts only Azure Managed HSM; test providers are confined to Development/Testing.</summary>
     public void EnsureAllowedForEnvironment()
     {
         var provider = options.Value.Provider;
@@ -55,7 +59,7 @@ public sealed class SigningProviderPolicy(IOptions<SigningProviderOptions> optio
 
         if (provider == SigningProviderKind.VaultTransit)
         {
-            if (!Uri.TryCreate(options.Value.VaultAddress, UriKind.Absolute, out var vault))
+            if (!Uri.TryCreate(options.Value.VaultAddress, UriKind.Absolute, out _))
             {
                 throw new InvalidOperationException("Signing:VaultAddress must be an absolute URI when Provider is VaultTransit.");
             }
@@ -64,8 +68,6 @@ public sealed class SigningProviderPolicy(IOptions<SigningProviderOptions> optio
             {
                 throw new InvalidOperationException("VaultTransit is a local Docker provider and is forbidden in Staging; use AzureManagedHsm.");
             }
-
-            _ = vault;
         }
     }
 }
@@ -74,49 +76,77 @@ public static class SigningProviderRegistration
 {
     public static IServiceCollection AddSigningProviderConfiguration(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        _ = environment;
         services.Configure<SigningProviderOptions>(configuration.GetSection(SigningProviderOptions.SectionName));
         services.AddSingleton<SigningProviderPolicy>();
         services.AddHostedService<SigningProviderStartupGuard>();
-        services.AddHttpClient(SigningProviderReadiness.VaultHealthClientName);
-        services.AddSingleton<SigningProviderReadiness>();
+        services.AddSingleton<AuthorityReadiness>();
+
+        // Provider implementation is chosen here and nowhere else. Unsupported/unconfigured kinds register a provider that always fails closed.
+        var kind = configuration.GetSection(SigningProviderOptions.SectionName).GetValue<SigningProviderKind>("Provider");
+        var vaultAddress = configuration.GetSection(SigningProviderOptions.SectionName).GetValue<string>("VaultAddress");
+        switch (kind)
+        {
+            case SigningProviderKind.LocalDevelopment when environment.IsDevelopment() || environment.IsEnvironment("Testing"):
+                services.AddLocalDevelopmentMacProvider();
+                break;
+            case SigningProviderKind.VaultTransit when !environment.IsProduction() && !environment.IsStaging() && Uri.TryCreate(vaultAddress, UriKind.Absolute, out _):
+                services.AddVaultTransitMacProvider(configuration, vaultAddress!);
+                break;
+            default:
+                services.AddSingleton<IIntegrityMacProvider>(new UnavailableMacProvider(kind == SigningProviderKind.AzureManagedHsm ? "AzureManagedHsmProviderNotImplemented" : "SigningProviderUnconfigured"));
+                break;
+        }
+
         return services;
     }
 }
 
-/// <summary>Readiness reflects whether the configured provider is actually usable. Phase 0 implements configuration and Vault health only.</summary>
-public sealed class SigningProviderReadiness(SigningProviderPolicy policy, IHttpClientFactory httpClientFactory)
+/// <summary>Registered when no approved provider is usable: every operation fails closed; readiness reports the reason.</summary>
+public sealed class UnavailableMacProvider(string reason) : IIntegrityMacProvider
 {
-    public const string VaultHealthClientName = "vault-health";
+    public string ProviderName => "Unavailable";
 
+    public Task<IntegrityMacResult> SignAsync(IntegrityKeyReference keyReference, ReadOnlyMemory<byte> canonicalPayload, CancellationToken cancellationToken) => throw new IntegrityProviderUnavailableException(reason);
+
+    public Task<bool> VerifyAsync(IntegrityKeyReference keyReference, ReadOnlyMemory<byte> canonicalPayload, ReadOnlyMemory<byte> expectedMac, CancellationToken cancellationToken) => throw new IntegrityProviderUnavailableException(reason);
+
+    public Task<int> ProvisionKeyAsync(Guid organizationId, string keyPurpose, string providerKeyName, CancellationToken cancellationToken) => throw new IntegrityProviderUnavailableException(reason);
+
+    public Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken) => Task.FromResult((false, reason));
+}
+
+/// <summary>Readiness = provider usable AND authority store reachable AND SpiceDB schema present AND archive reachable.</summary>
+public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory)
+{
     public async Task<(bool Ready, string Detail)> CheckAsync(CancellationToken cancellationToken)
     {
-        switch (policy.Provider)
+        var (providerReady, providerDetail) = await provider.ProbeAsync(cancellationToken).ConfigureAwait(false);
+        if (!providerReady)
         {
-            case SigningProviderKind.LocalDevelopment:
-                return (true, "LocalDevelopment provider (TEST ONLY; not a key custodian)");
-            case SigningProviderKind.VaultTransit:
-                try
-                {
-                    using var client = httpClientFactory.CreateClient(VaultHealthClientName);
-                    client.BaseAddress = new Uri(policy.VaultAddress!, UriKind.Absolute);
-                    client.Timeout = TimeSpan.FromSeconds(2);
-                    using var response = await client.GetAsync(new Uri("v1/sys/health", UriKind.Relative), cancellationToken).ConfigureAwait(false);
-                    return response.IsSuccessStatusCode ? (true, "VaultTransit reachable (DEV ONLY)") : (false, "VaultUnhealthy");
-                }
-                catch (HttpRequestException)
-                {
-                    return (false, "VaultUnreachable");
-                }
-                catch (TaskCanceledException)
-                {
-                    return (false, "VaultTimeout");
-                }
-            case SigningProviderKind.AzureManagedHsm:
-                return (false, "AzureManagedHsmProviderNotImplemented");
-            default:
-                return (false, "SigningProviderUnconfigured");
+            return (false, providerDetail);
         }
+
+        try
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+            if (!await context.Database.CanConnectAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return (false, "AuthorityDbUnreachable");
+            }
+        }
+        catch (Npgsql.NpgsqlException)
+        {
+            return (false, "AuthorityDbUnreachable");
+        }
+
+        var (spiceReady, spiceDetail) = await spiceDb.ProbeAsync(cancellationToken).ConfigureAwait(false);
+        if (!spiceReady)
+        {
+            return (false, spiceDetail);
+        }
+
+        var (archiveReady, archiveDetail) = await archive.ProbeAsync(cancellationToken).ConfigureAwait(false);
+        return archiveReady ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}") : (false, archiveDetail);
     }
 }
 

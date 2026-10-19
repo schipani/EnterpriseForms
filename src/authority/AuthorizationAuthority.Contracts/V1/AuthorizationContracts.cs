@@ -1,0 +1,135 @@
+using System.Text.Json;
+
+namespace AuthorizationAuthority.Contracts.V1;
+
+// Private internal contract (/internal/v1). Serialized with snake_case property names.
+// Identity and tenant are resolved by the authority from the workload credential and the delegated user
+// assertion; the organization_id in these DTOs is an assertion to check, never a source of truth.
+
+public enum ResourceKind
+{
+    FormDefinition,
+    FormRecord,
+    FieldItem,
+    DocumentItem,
+    Team,
+    Organization,
+}
+
+public enum RequestedAction
+{
+    Discover,
+    Read,
+    Edit,
+    Download,
+    Replace,
+    Delegate,
+    ManageAccess,
+    TransferOwnership,
+    DesignForm,
+    CreateRecord,
+    ManageOrganization,
+}
+
+public sealed record ResourceRef(ResourceKind ResourceKind, Guid ResourceId);
+
+public sealed record PermissionCheckRequest(
+    Guid OrganizationId,
+    ResourceRef Resource,
+    RequestedAction RequestedAction,
+    Guid? UnlockReference = null,
+    long? MinimumContentRevision = null);
+
+public sealed record PermissionDecision(
+    bool Allowed,
+    string? DenialReasonCode,
+    long AuthorizationRevision,
+    long ProjectionRevision,
+    long? ContentRevision,
+    Guid CorrelationId);
+
+public sealed record PermissionCheckBatchRequest(IReadOnlyList<PermissionCheckRequest> Checks);
+
+public sealed record PermissionCheckBatchResponse(IReadOnlyList<PermissionDecision> Decisions);
+
+public sealed record DiscoverRecordsRequest(Guid OrganizationId, int PageSize, string? ContinuationToken = null);
+
+public sealed record DiscoverResponse(IReadOnlyList<Guid> FormRecordIds, long AuthorizationRevision, string? ContinuationToken);
+
+public enum SecurityCommandKind
+{
+    RegisterTeam,
+    AddTeamMember,
+    RemoveTeamMember,
+    RegisterFormDefinition,
+    RegisterRecord,
+    TransferOwnership,
+    CreateShare,
+    UpdateShareScope,
+    RevokeShare,
+    GrantSystemRole,
+    RevokeSystemRole,
+    UpdateMandatoryPolicy,
+    PublishFormSecurityRevision,
+}
+
+/// <summary>command_payload is validated against the exact command-specific schema in the authority; unknown fields are rejected.</summary>
+public sealed record SecurityCommandRequest(
+    Guid OrganizationId,
+    SecurityCommandKind CommandKind,
+    ResourceRef Resource,
+    long ExpectedAuthorizationRevision,
+    JsonElement CommandPayload,
+    string? ChangeReason = null,
+    Guid? ApprovalReference = null);
+
+public enum CommandStatus
+{
+    Pending,
+    CommittedAwaitingProjection,
+    Effective,
+    Rejected,
+    FailedReconciliation,
+}
+
+public enum ProjectionGateState
+{
+    Ready,
+    AwaitingProjection,
+    AwaitingArchive,
+    Quarantined,
+}
+
+public sealed record OperationStatus(
+    Guid CommandId,
+    CommandStatus CommandStatus,
+    long AuthorizationRevision,
+    long? ProjectionRevision,
+    ProjectionGateState ProjectionGateState,
+    string? RejectionReasonCode,
+    Guid CorrelationId);
+
+// Typed command payloads (serialized into SecurityCommandRequest.CommandPayload).
+
+public sealed record RegisterTeamPayload(Guid TeamId);
+
+public sealed record TeamMemberPayload(Guid TeamId, Guid MemberUserId);
+
+public sealed record RegisterFormDefinitionPayload(Guid FormDefinitionId, IReadOnlyList<Guid> FormUserUserIds, IReadOnlyList<Guid> FormUserTeamIds);
+
+public sealed record RegisterRecordPayload(Guid FormRecordId, Guid FormDefinitionId, Guid? OwnerTeamId = null);
+
+public sealed record TransferOwnershipPayload(Guid FormRecordId, Guid? NewOwnerUserId, Guid? NewOwnerTeamId);
+
+public sealed record CreateSharePayload(Guid RecordShareId, Guid FormRecordId, Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<Guid> FieldItemIds);
+
+public sealed record RevokeSharePayload(Guid RecordShareId, Guid FormRecordId);
+
+public static class RecipientRoles
+{
+    public const string Reader = "Reader";
+    public const string Contributor = "Contributor";
+    public const string Manager = "Manager";
+}
+
+public sealed record ErrorResponse(string ErrorCode, Guid CorrelationId, bool Retryable, string? Detail = null);

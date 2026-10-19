@@ -1,0 +1,5 @@
+authzed/api commit 3270b08244f3e97e2a57a7ee2d9c649c88b861d3
+authzed/api/v1/*.proto vendored from github.com/authzed/api at the commit above (SpiceDB v1.56.2 era API).
+Transitive imports vendored from bufbuild/protovalidate, bufbuild/protoc-gen-validate, googleapis/googleapis and grpc-ecosystem/grpc-gateway (main, 2026-10-17).
+Compiled at build time by Grpc.Tools into a pure managed Grpc.Net.Client stub; the native Grpc.Core package is deliberately not used
+(chiseled runtime images, PB-11 dependency hygiene). Re-vendor only through a reviewed PR.

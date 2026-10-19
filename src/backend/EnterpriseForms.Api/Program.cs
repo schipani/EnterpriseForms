@@ -1,5 +1,11 @@
 using EnterpriseForms.Api.Composition;
+using EnterpriseForms.Api.Features.FormDefinitions;
+using EnterpriseForms.Api.Features.FormRecords;
+using EnterpriseForms.Api.Features.Identity;
 using EnterpriseForms.Api.Features.Platform;
+using EnterpriseForms.Api.Features.Sharing;
+using EnterpriseForms.Api.Features.Teams;
+using EnterpriseForms.Infrastructure;
 
 namespace EnterpriseForms.Api;
 
@@ -17,9 +23,15 @@ public sealed class Program
             return probeExitCode;
         }
 
+        if (MigrateCommand.TryRun(args, out var migrateExitCode))
+        {
+            return migrateExitCode;
+        }
+
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddProblemDetails();
+        builder.Services.AddExceptionHandler<BusinessProblemHandler>();
         builder.Services.AddOpenApi(ApiVersions.V1DocumentName, options =>
         {
             options.AddDocumentTransformer((document, _, _) =>
@@ -34,12 +46,16 @@ public sealed class Program
         });
 
         builder.Services.AddTrustAuthorityReadinessProbe(builder.Configuration);
+        builder.Services.AddBusinessInfrastructure(builder.Configuration);
+        builder.Services.AddBusinessAuthentication(builder.Configuration);
 
         var app = builder.Build();
 
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseSecurityHeaders();
+        app.UseAuthentication();
+        app.UseAuthorization();
 
         if (app.Environment.IsDevelopment())
         {
@@ -47,6 +63,11 @@ public sealed class Program
         }
 
         app.MapPlatformEndpoints();
+        app.MapIdentityEndpoints();
+        app.MapFormDefinitionEndpoints();
+        app.MapFormRecordEndpoints();
+        app.MapSharingEndpoints();
+        app.MapTeamEndpoints();
 
         app.Run();
         return 0;

@@ -1,6 +1,6 @@
 # ADR-PB-011 — Private GitHub, GitHub Actions, ACR and Secure Image Promotion
 
-**Status:** ACCEPTED by product owner, October 17, 2026  
+**Status:** ACCEPTED by product owner, October 17, 2026; **amended A-21 on October 18, 2026** (public GitHub during development, private Azure DevOps for production)  
 **Finding:** PB-11 — CI/CD, supply chain security, production approvals  
 **Applies to:** the one canonical Git repository accepted in ADR-PB-001.  
 **Supporting standard:** `docs/delivery/PB11_CICD_SUPPLY_CHAIN_RELEASE_STANDARD.md`
@@ -30,9 +30,38 @@ Every build must be reproducibly traceable to a reviewed commit, pass mandatory 
 
 This ADR approves a release **design and implementation standard**, not an existing GitHub repo, configured Actions runs, cloud registry, signed image or proven security posture. GitHub ownership, branch protection rules, CI environments, service principals, scopes and independent reviewers must be deployed and tested. Software release risk owner/exception/evidence policy is decided under PB-12; approval here is not a production release authorization.
 
+## Amendment A-21 (2026-10-18, approved by the product owner)
+
+The binding decision's "private GitHub repository" is amended as follows:
+
+1. The development repository stays **public on GitHub** until the deferred migration to a **private Azure DevOps
+   project within an organization**, which becomes the production source-control environment. The migration is a
+   tracked infrastructure/governance milestone, not a Stage A prerequisite.
+2. On the public repository the following are implemented and verified read-only by
+   `scripts/governance/verify_repository_protection.py`: active ruleset on `main` (no deletion/force-push, linear
+   history, signed commits, pull request with one approval, stale-review dismissal, last-push approval, resolved
+   threads, strict required status checks, no bypass actors), tag ruleset for `v*`, Actions restricted to GitHub-owned
+   actions with mandatory full-SHA pinning and read-only `GITHUB_TOKEN`, secret scanning + push protection +
+   non-provider patterns, Dependabot alerts and security updates, CodeQL default setup.
+3. **Not enforceable until the migration** and therefore explicitly *deferred, not implemented*: independently
+   authorized CODEOWNERS review (no organization teams exist; the `require_code_owner_review` rule has no resolvable
+   owners), separation of business and Authority deployment approvers (no environments or deployment identities exist
+   yet), Entra OIDC federation, SBOM/signing/attestation of images (no registry yet), organization-level audit of
+   repository administration.
+4. Required controls 1–10 of this ADR remain the production standard and are re-verified on Azure DevOps; nothing in
+   this amendment lowers them. Public visibility raises the bar on control 6: no customer data, production
+   configuration, signing keys or real credentials may appear in commits, workflow logs or artifacts.
+
 ## References
 
 - [Microsoft: GitHub Actions sign-in with OIDC](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect)
 - [GitHub Docs: OIDC in Azure](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-azure)
 - [GitHub Docs: artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
 - [Microsoft: OCI image signature with Notation and Artifact Signing](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-tutorial-sign-verify-notation-artifact-signing)
+
+## Reaffirmation A-23 (2026-10-18)
+
+The project owner reaffirmed amendment A-21 as part of the Stage A development acceptance: the repository remains
+public on GitHub during development with every protection the platform supports, and migrates to a private Azure
+DevOps project before production. Enforceable independent security-owner review (CODEOWNERS equivalent) remains a
+production prerequisite delivered by that migration; it is not described as implemented.

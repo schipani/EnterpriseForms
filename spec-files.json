@@ -9,8 +9,8 @@
     },
     {
       "path": "CLAUDE.md",
-      "sha256": "4c6b384048091ae871b6f3b658dc19a49cfec5fc22f101e87bf71d562c2df7c1",
-      "bytes": 285924
+      "sha256": "49d12d18b59a004f4c4b3ed0273fae8df501daf925da20fff083ea1fcb0cc6ac",
+      "bytes": 286580
     },
     {
       "path": "ENTERPRISE_SECURITY_REDUNDANCY_AUDIT.md",
@@ -44,13 +44,28 @@
     },
     {
       "path": "docs/PHASE0_STATUS.md",
-      "sha256": "4eda9d295b4491b6886e86cf5c5f10fb158c69852fcb7caaebb46cde838849af",
-      "bytes": 26077
+      "sha256": "d013f5cc90a1d88854de0ff9579483361f28349cedd63c061b3caa83b15477df",
+      "bytes": 25771
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
-      "sha256": "23dfd5158f945a7f5239d9458801008fa86eea076a9317f046830a310c47fdc7",
-      "bytes": 2612
+      "sha256": "94aed64050704da8ec31a90ad594b98345b719ca94a8fa3dc9dd5093211d1fd9",
+      "bytes": 3799
+    },
+    {
+      "path": "docs/STAGE_A_CHANGE_REVIEW.md",
+      "sha256": "6713611548b01db10a4ab82f6cf0cd107aa45ffe3ad15e83c696e513b3bf35d1",
+      "bytes": 6469
+    },
+    {
+      "path": "docs/STAGE_A_GATE_CLOSURE.md",
+      "sha256": "60ac71258fadf47af8a628fca8b3e684b2f1996ec075fe7909cc4c6f1546db14",
+      "bytes": 29496
+    },
+    {
+      "path": "docs/STAGE_A_STATUS.md",
+      "sha256": "a2750d6002a2870a89551314bc8e1348c3034af94a0c47735f2259642d79c33a",
+      "bytes": 16884
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -64,8 +79,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "2478855d5f4c2a9827c3cf9cb76702999f6e5f5e4ad63601318e13979bf8f748",
-      "bytes": 6058
+      "sha256": "5cfab96eebcfad8c30dccc536a1e7faa16f9377c5a309f51f10a0bf0530d4ee0",
+      "bytes": 6417
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -79,18 +94,18 @@
     },
     {
       "path": "docs/decisions/ADR-PB-001-CANONICAL-REPOSITORY.md",
-      "sha256": "9b356209b857481d62bebe6f27454475394275188fcadb99dee617bb5b8432c7",
-      "bytes": 3811
+      "sha256": "3a20cf06c6008adff1b20b5c8664c026a031ba73430a16b0f7ca3c68952b466f",
+      "bytes": 5551
     },
     {
       "path": "docs/decisions/ADR-PB-002-SECURITY-FIRST-ACCUSED-VERTICAL-SLICE.md",
-      "sha256": "debb88c87f3b34b5e62bf978e48c57b5e4300e3159bb0ad47cb835afb7309ed0",
-      "bytes": 6617
+      "sha256": "3011da888a1df84f2e95acb8562175e86b5cc533ed67cd53a6d356e8baa23bdc",
+      "bytes": 7634
     },
     {
       "path": "docs/decisions/ADR-PB-003-MANDATORY-ADVERSARIAL-SECURITY-VALIDATION.md",
-      "sha256": "57bf99219ec364dc4884ff59d1094cd20aa4c927b93156f4e0560d59313de724",
-      "bytes": 7517
+      "sha256": "224df1c5605a0b57e4efda4c3d98c19be193a67826429e69df330d9a2aadb6e9",
+      "bytes": 8078
     },
     {
       "path": "docs/decisions/ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md",
@@ -129,8 +144,8 @@
     },
     {
       "path": "docs/decisions/ADR-PB-011-GITHUB-ACTIONS-SECURE-DELIVERY.md",
-      "sha256": "6990657faf8aff02d1974d576478fe7bca5731c5461a9fd2e9d3030e2b77d6ec",
-      "bytes": 6812
+      "sha256": "ab9afb82f5144a01a7dc35b13aeaa73a07ed112eb9be349f81c87eeef9bc2f17",
+      "bytes": 9276
     },
     {
       "path": "docs/decisions/ADR-PB-012-SECURITY-EVIDENCE-RELEASE-GOVERNANCE.md",
@@ -149,23 +164,33 @@
     },
     {
       "path": "docs/decisions/PHASE0_DECISION_LOG.md",
-      "sha256": "fb2c23e088352bd53d023cbb309770755e8763c860b461637ff4aa3fd9842f1a",
-      "bytes": 6909
+      "sha256": "6137949b9093de4013767e4401f2c3a908b72c7f2fae97cc04d213e66772aa92",
+      "bytes": 6884
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
-      "sha256": "8b354528c584e6c49d18b90ca578e427359132cbac958fa0d0c47ab564214247",
-      "bytes": 6603
+      "sha256": "ef84c4841db084c531258495072973deb28edc4ebc8753a17a2f0b5b6ec4ee89",
+      "bytes": 7231
+    },
+    {
+      "path": "docs/decisions/STAGE_A_DECISION_LOG.md",
+      "sha256": "49bd741a2c34814a7db61c73b2b70fb284d2b57b213935cb4f20dbde939d656b",
+      "bytes": 11781
+    },
+    {
+      "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
+      "sha256": "51029886dd3896bb7be68341b2adeb4107652bd382f57d2e12180ce7a945316a",
+      "bytes": 12963
     },
     {
       "path": "docs/delivery/PB11_CICD_ACCEPTANCE_TESTS.csv",
-      "sha256": "0bca4003fa0a0d56c59e552978be340b540694d41267de711e7845641f50f5f2",
-      "bytes": 2128
+      "sha256": "baffc3e9f52d4cd1a8a68b54ab447a2348c2941585a7ce5b64d840df8249d3ae",
+      "bytes": 2103
     },
     {
       "path": "docs/delivery/PB11_CICD_SUPPLY_CHAIN_RELEASE_STANDARD.md",
-      "sha256": "7212c1b8873d2b873e12b8aa1ed9d337c526bb9c96d36b1cbb6b958f0ac597b1",
-      "bytes": 7192
+      "sha256": "9624aa0287e12e2b8bd78cdddb5ebab1b6d23ac5b9c82909df0a71e2d82d673a",
+      "bytes": 7297
     },
     {
       "path": "docs/dynamic-forms/architecture.md",
@@ -174,13 +199,13 @@
     },
     {
       "path": "docs/dynamic-forms/control-traceability.csv",
-      "sha256": "c3009e7d6c20c9f3137afe559fbb4eb3ec536dcb94c16ea2284a291b9892ec51",
-      "bytes": 24286
+      "sha256": "309ddecd19df5fff6f48257896ac43a7f54817dce6351da8b92bf1a54b40eb1c",
+      "bytes": 31568
     },
     {
       "path": "docs/dynamic-forms/row-integrity-format.md",
-      "sha256": "6e0631da5ef79ea3bdeda25968281007d32e764f083ccd5e7d0ea62a28d92fb7",
-      "bytes": 12080
+      "sha256": "c75162ac988be343644d988c1f69ffdd14a09cb4185a940e1d67b08783f7bf05",
+      "bytes": 14113
     },
     {
       "path": "docs/governance/PB12_RELEASE_EVIDENCE_SCHEMA.json",
@@ -204,8 +229,8 @@
     },
     {
       "path": "docs/performance/PB09_BENCHMARK_ACCEPTANCE_MATRIX.csv",
-      "sha256": "740f1ebd90df7eac1145dfe437029264bb45a28ff0392a43be7b75359435337f",
-      "bytes": 2185
+      "sha256": "a458d131eb2a1c63c99bc89e6c5beaf33a087f425630a5e97af46f92b7e09c94",
+      "bytes": 2164
     },
     {
       "path": "docs/performance/PB09_CAPACITY_SLO_STANDARD.md",
@@ -219,8 +244,23 @@
     },
     {
       "path": "docs/privacy/PB10_DATA_FLOW_RESIDENCY_REGISTER.csv",
-      "sha256": "f72f8902fbc20272586e3aecb9f720d2c00bd54b2116b83a7b6220bb4dc33fc9",
-      "bytes": 3363
+      "sha256": "b9af1a78b380185468d858794369dd024f8aa4d22776a21a4d24e76566fffe88",
+      "bytes": 3348
+    },
+    {
+      "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_ATTESTATION_TEMPLATE.md",
+      "sha256": "60eb8d2f70d1f1a15ca8a8c1e17c290f3553a04b7490468e2b001b68b599afc6",
+      "bytes": 4142
+    },
+    {
+      "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md",
+      "sha256": "f98f40734275f986ffbe5d42400121e1c04b6535880d2a16888477c206d2c4f3",
+      "bytes": 18024
+    },
+    {
+      "path": "docs/security/stage-a-vault-transit-vectors.json",
+      "sha256": "037be3608ab900e9e4da7e1941d6e6303d82d33cdf40b350b08d960a32a9c987",
+      "bytes": 5272
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",
@@ -239,18 +279,18 @@
     },
     {
       "path": "docs/testing/PB12_RELEASE_GOVERNANCE_ACCEPTANCE_TESTS.csv",
-      "sha256": "df66f6c85b94f937717fc2584228365b08b15e79cd74e165bc666e32bf34dad3",
-      "bytes": 2079
+      "sha256": "35657a5f9340803f5c0f6cf1ecded40c006c42d50342bc134a1f98947ca83e8e",
+      "bytes": 2054
     },
     {
       "path": "docs/testing/PB13_DATA_LIFECYCLE_ACCEPTANCE_TESTS.csv",
-      "sha256": "1e796fb961b9dacfd4bf4ccc4e87d251e19b0c488380c29ee20c27900587ebca",
-      "bytes": 2675
+      "sha256": "fc1c4f454eac50d2694ff5d683285a4ae1ce5beba780ffc4b28ba05120955864",
+      "bytes": 2646
     },
     {
       "path": "docs/testing/PB14_UI_DESIGN_ACCEPTANCE_TESTS.csv",
-      "sha256": "a1811a8bdd1088f363eebc86cb78d82153fecf3e85a582017db7158681dc8341",
-      "bytes": 3784
+      "sha256": "6623155c5d92e01165f427a1247836e4025877f4a37f038628cb083a017b52e7",
+      "bytes": 3747
     },
     {
       "path": "docs/ui/PB14_COLOR_CONTRAST.reference.ts",
@@ -308,14 +348,29 @@
       "bytes": 4331
     },
     {
+      "path": "scripts/ci/assert_test_totals.py",
+      "sha256": "a18433520928387776efc3abd89ecec3830dd7030f939b8f414611158c138248",
+      "bytes": 2166
+    },
+    {
       "path": "scripts/generate-spec-manifest.py",
-      "sha256": "949118f4882917e56130e5e9e003556cb0975985270b71bb72c9cd45484ff15f",
-      "bytes": 1470
+      "sha256": "04403308014f354bed11735de5c53992b24f781c0cf31a444aaa60e07c446726",
+      "bytes": 2121
+    },
+    {
+      "path": "scripts/governance/verify_repository_protection.py",
+      "sha256": "a54e20a8a28bb4d3e991ed65a14ffc50542e9a5d2fafce11120bba9e9ab36307",
+      "bytes": 8346
     },
     {
       "path": "scripts/integrity/generate_control_checklist.py",
-      "sha256": "34fc033f2346947379c48bc986bc769e1f814352d50fedbe452e6dea31516813",
-      "bytes": 6341
+      "sha256": "19b80c163c8d9826076ede18f5cf1919459910a39ac1a60ee1803c6bb8d9b96e",
+      "bytes": 12121
+    },
+    {
+      "path": "scripts/integrity/generate_vault_vectors.py",
+      "sha256": "d93a892f67493b53b61509289609e713de04023f52138b72a797e3cc59f626de",
+      "bytes": 4915
     },
     {
       "path": "scripts/integrity/generate_vectors.py",
@@ -349,8 +404,8 @@
     },
     {
       "path": "security_hardening/SEARCH_CAPABILITY_MATRIX.csv",
-      "sha256": "d59ce6887bf8d5448e950e1b146ba5b7d327bf72fe2992bf09f0acda710fba67",
-      "bytes": 1242
+      "sha256": "b9c67aa17e7992dcb534d3540fcdb3be8fd5046ed35d2d1bf32b51acf6c49f98",
+      "bytes": 1227
     },
     {
       "path": "security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md",
@@ -389,8 +444,8 @@
     },
     {
       "path": "security_validation/SECURITY_PROOF_TEST_MATRIX.csv",
-      "sha256": "666ff58a85fa633d6fc6cb8278f3a6b6084c3bfa3b63d12eef9825b8297735ce",
-      "bytes": 2672
+      "sha256": "879a7217e96b6ab3cffd78ce32e0eebd73ee24a44b8871392763a7030e519d27",
+      "bytes": 2659
     },
     {
       "path": "security_validation/SECURITY_VALIDATION_RUNBOOK.md",
@@ -504,8 +559,8 @@
     },
     {
       "path": "trust_authority/merkle-v1.test-vectors.json",
-      "sha256": "b6c3179a611a710eb0f9e47f7260893ba8dcb620768268a722950636d492cc52",
-      "bytes": 29676
+      "sha256": "e6f43b3743562c3971e1b8c8bbb1b7518224e2e8340b2e7b01b93d2a6e269245",
+      "bytes": 29172
     },
     {
       "path": "trust_authority/postgres-privilege-inventory.sql",
@@ -524,8 +579,8 @@
     },
     {
       "path": "trust_authority/row-integrity-v1.test-vectors.json",
-      "sha256": "893541197f675de76da84567ee7666d962becbfdac601c7b8f089a509599a844",
-      "bytes": 18464
+      "sha256": "7a42ce583f61e7efc7ddf07231074b4baaa3e8acd1481b643df3f8bd98a14899",
+      "bytes": 18057
     },
     {
       "path": "trust_authority/spicedb.schema.zed",
@@ -534,8 +589,8 @@
     },
     {
       "path": "trust_authority/trust-authority.openapi.yaml",
-      "sha256": "3c5be8988c3af46a76955800785220cd4cd6ab873dbec26b1a3ddc2cb6e73dca",
-      "bytes": 19221
+      "sha256": "3b6034ad3376dd486fed34fc62cb0e78980ebac6a2a387bdc3efb513a80aafca",
+      "bytes": 20424
     }
   ]
 }

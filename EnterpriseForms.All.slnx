@@ -22,5 +22,6 @@
     <Project Path="tests/architecture/EnterpriseForms.ArchitectureTests/EnterpriseForms.ArchitectureTests.csproj" />
     <Project Path="tests/integrity/EnterpriseForms.Integrity.Tests/EnterpriseForms.Integrity.Tests.csproj" />
     <Project Path="tests/features/EnterpriseForms.Api.ContractTests/EnterpriseForms.Api.ContractTests.csproj" />
+    <Project Path="tests/authority/AuthorizationAuthority.Tests/AuthorizationAuthority.Tests.csproj" />
   </Folder>
 </Solution>

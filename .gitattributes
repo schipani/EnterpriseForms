@@ -1,0 +1,12 @@
+# Deterministic line endings everywhere (PB-11 reproducibility; spec-files.json digests are computed over LF content).
+# Phase 0 CI failed on GitHub because Windows autocrlf working copies produced CRLF digests while Linux checkouts are LF.
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.dump binary
+# Gate evidence is verbatim run output whose digests live in gate-a-evidence.json; never normalize it (A-F18).
+docs/evidence/** -text

@@ -9,6 +9,8 @@ services:
     tmpfs: [/var/lib/postgresql]
   azurite:
     tmpfs: [/data]
+  archive-store:
+    tmpfs: [/data]
   authority:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing

@@ -1,0 +1,83 @@
+{
+  "test_id": "SEC-P10",
+  "scenario": "Older BusinessDb restore: a pre-revocation / pre-update snapshot restored into BusinessDb neither revives the revoked share nor serves the stale content",
+  "outcome": "PASS",
+  "commit_sha": "e6df484b2ee35ed822cd011a06f41b3615ec10c8",
+  "image_fingerprint": "sha256:053f48c5e52d59462ed125e741a2aad9802acad36bc61d187869c1b075da1caf (api=sha256:6afbcd41c7a6467a741e652a4708ae7399fb72f8852788b777710eacb4f297d8;authority=sha256:37b1e24358c03f4f147f890a6de82b0f7c278ead6fa428c50af28fdbeb56f47e)",
+  "started_at_utc": "2026-10-18T11:08:48.3091323\u002B00:00",
+  "executed_at_utc": "2026-10-18T11:08:54.0039928\u002B00:00",
+  "authority_revision": 5,
+  "content_revision": 2,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T11:08:49.0373820\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a14eb32f357fe7a6adecad1cf3c432-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:51.3704695\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "37ed6c0a-651d-8285-a389-c4c881c91e72",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:51.9495164\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "57e7c6f6-cb83-847f-8f2d-07d33aebf973",
+        "contentRevision": "1",
+        "committedOperationId": "5bd5aa0c-300d-89b4-9c0b-5f18e6015b39",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:52.8513917\u002B00:00",
+      "step": "pg_dump BusinessDb snapshot",
+      "detail": {
+        "result": "-rw-r--r-- 1 root root 45018 Oct 18 11:08 /tmp/business-snapshot.dump"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:53.9657578\u002B00:00",
+      "step": "hostile pg_restore of pre-revocation snapshot",
+      "detail": {
+        "result": "RESTORED\nActive\n3"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:53.9774915\u002B00:00",
+      "step": "revoked reader read after restore (share row is Active again locally)",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T11:08:53.9997486\u002B00:00",
+      "step": "owner read after restore (accepted revision 2 rows missing)",
+      "status": 423,
+      "error_code": "INTEGRITY_VERIFICATION_FAILED",
+      "fields": {
+        "title": "INTEGRITY_VERIFICATION_FAILED"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:54.0030575\u002B00:00",
+      "step": "authority state after restore (unchanged by business restore)",
+      "detail": "{\u0022organization_id\u0022:\u002201a14eb3-2f35-7fe7-a6ad-ecad1cf3c432\u0022,\u0022authorization_revision\u0022:5,\u0022projection_applied_revision\u0022:5,\u0022content_integrity_revision\u0022:3,\u0022projection_gate_state\u0022:\u0022Ready\u0022,\u0022pending_archive_entries\u0022:1,\u0022integrity_quarantine_enabled\u0022:false}"
+    }
+  ]
+}

@@ -37,3 +37,24 @@ A single commit captures consistent code, deployment and security decisions. Sep
 - Automated completeness/reference/checksum checks fail on a missing or stale dependency.
 - A documented fresh-clone setup finds every required specification without external ZIPs.
 - CI and human review can associate a deployed image with source commit and specification revision.
+
+## Amendment A-21 (2026-10-18, approved by the product owner)
+
+The existing GitHub repository `github.com/schipani/EnterpriseForms` **intentionally remains public during
+development**. Making it private is **not** a prerequisite for development or for the Stage A gate. The production
+source-control environment will be a **private Azure DevOps project inside an organization**; that migration is a
+deferred infrastructure and governance milestone (see `docs/delivery/BUILD00_REPOSITORY_PROTECTION.md` §5).
+
+Consequences for this ADR:
+
+- Safeguard 5 ("code review, protected main branch, pinned dependencies") is applied with the controls a public,
+  user-owned GitHub repository supports: active rulesets on `main` and `v*` tags, required status checks, pull-request
+  review, signed commits, restricted and SHA-pinned Actions, secret scanning with push protection, Dependabot and CodeQL.
+- Controls that **cannot** be enforced until the Azure DevOps milestone — organization teams and therefore independently
+  authorized CODEOWNERS review, protected deployment environments with segregated approvers, Entra workload-identity
+  federation — are recorded as deferred and must never be described as implemented or validated.
+- The "no real secrets, HSM keys, certificates, production values or customer data in Git" tradeoff becomes a hard
+  rule with history verification: the full object history was scanned on 2026-10-18 (487 blobs) and contains only
+  labelled synthetic placeholders; secret scanning and push protection are enabled; any future finding is a Critical
+  incident requiring history rewrite and credential rotation.
+- The independent cryptographic review (Stage A requirement 11) is unaffected and remains mandatory.

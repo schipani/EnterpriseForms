@@ -1,0 +1,99 @@
+{
+  "test_id": "SEC-P05",
+  "scenario": "Delete or replay signed rows: missing or older valid rows are detected against the current external manifest/head; no stale read",
+  "outcome": "PASS",
+  "commit_sha": "e6df484b2ee35ed822cd011a06f41b3615ec10c8",
+  "image_fingerprint": "sha256:02a6ab48930e04879ed45c040f9a4055d79ff3818d47bf62d0c01b32ade4d46d (api=sha256:d8e44f769c4a822bb77b73ac797db5f53e3d9efdf8da58106fa609959c65f583;authority=sha256:6cd2e344d46ccad942f662ae7b172b8e4493deb83ed828763d96b0123a39a9ca)",
+  "started_at_utc": "2026-10-18T11:08:36.5548042\u002B00:00",
+  "executed_at_utc": "2026-10-18T11:08:45.3354630\u002B00:00",
+  "authority_revision": 3,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T11:08:37.2813156\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a14eb3014a7eacb7e83c548bf3f32a-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:40.0578116\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "5ea1e04b-0c0b-8a71-89df-03a2127aea11",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:40.8900807\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "1cde008c-30e1-8160-bbb6-6b39d19cffa1",
+        "contentRevision": "1",
+        "committedOperationId": "fa3b750d-a610-88f8-aa81-da484a80c00e",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:41.1416724\u002B00:00",
+      "step": "owner update to revision 2",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "contentRevision": "2",
+        "committedOperationId": "50b59fee-8074-8ca0-89ee-e735cbdd21d2"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:41.8699455\u002B00:00",
+      "step": "hostile replay of revision-1 signed row into revision-2 slot",
+      "detail": {
+        "rows": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:41.9175379\u002B00:00",
+      "step": "owner read after replay",
+      "status": 423,
+      "error_code": "INTEGRITY_VERIFICATION_FAILED",
+      "fields": {
+        "title": "INTEGRITY_VERIFICATION_FAILED"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:43.6846606\u002B00:00",
+      "step": "hostile DELETE of one accepted value row",
+      "detail": {
+        "remaining_rows": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:43.7211852\u002B00:00",
+      "step": "owner read after deletion",
+      "status": 423,
+      "error_code": "INTEGRITY_VERIFICATION_FAILED",
+      "fields": {
+        "title": "INTEGRITY_VERIFICATION_FAILED"
+      }
+    },
+    {
+      "at": "2026-10-18T11:08:45.3339785\u002B00:00",
+      "step": "owner read after whole-record deletion",
+      "status": 423,
+      "error_code": "INTEGRITY_VERIFICATION_FAILED",
+      "fields": {
+        "title": "INTEGRITY_VERIFICATION_FAILED"
+      }
+    }
+  ]
+}

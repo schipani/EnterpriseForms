@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Authority unit tests: command planning/authorization, canonical header binding, provider contract, journal chain, SpiceDB cursor encoding. No live services. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <RootNamespace>AuthorizationAuthority.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Application/AuthorizationAuthority.Application.csproj" />
+    <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Infrastructure/AuthorizationAuthority.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

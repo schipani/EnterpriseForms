@@ -1,0 +1,114 @@
+{
+  "test_id": "SEC-P12",
+  "scenario": "Mandatory audit archive unavailable: operations requiring independently durable evidence stay non-effective; protected bytes are not released without the receipt",
+  "outcome": "PASS",
+  "commit_sha": "a9c0e744f57ede438e7cda9f222f20b190178984",
+  "image_fingerprint": "sha256:8cf5a87eb5bdd5ae2f7ce50e7b1e5415fe98e5caa31d612f8b6eca94ced7aac2 (api=sha256:6a2db921dffe868152c8ed02877a3376f6867d7a1ffce7990eafab234b376905;authority=sha256:2701e8e45f91b22ffebfa4f5fa8b627665fc0b37245d1d7379c176b06e8916bb)",
+  "started_at_utc": "2026-10-18T05:06:32.1913177\u002B00:00",
+  "executed_at_utc": "2026-10-18T05:06:50.4173778\u002B00:00",
+  "authority_revision": 4,
+  "content_revision": 2,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T05:06:32.2151844\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a14d67847f7a4e82c82221212059cd-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:32.6482204\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "749e8818-51a3-828f-b0b3-50a50a4dac74",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:33.0242449\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "c001dd15-d853-8fbf-8437-c4635c1a4ebf",
+        "contentRevision": "1",
+        "committedOperationId": "f08a1e2d-3a63-87fc-ac20-61296e7b397e",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:49.1104999\u002B00:00",
+      "step": "share while archive paused",
+      "status": 202,
+      "error_code": "COMMAND_PENDING",
+      "fields": {
+        "title": "COMMAND_PENDING",
+        "command_status": "CommittedAwaitingProjection"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:49.1161827\u002B00:00",
+      "step": "gate during archive outage",
+      "detail": "{\u0022organization_id\u0022:\u002201a14d67-847f-7a4e-82c8-2221212059cd\u0022,\u0022authorization_revision\u0022:4,\u0022projection_applied_revision\u0022:3,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022AwaitingArchive\u0022,\u0022pending_archive_entries\u0022:1,\u0022integrity_quarantine_enabled\u0022:false}"
+    },
+    {
+      "at": "2026-10-18T05:06:49.1233014\u002B00:00",
+      "step": "reader read during archive outage",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T05:06:49.1318464\u002B00:00",
+      "step": "owner read during archive outage (gate closed)",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T05:06:49.8360267\u002B00:00",
+      "step": "reader read after archive receipt",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "isCompleteProjection": "false"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:50.1395131\u002B00:00",
+      "step": "update while archive paused (commit allowed, release gated)",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "contentRevision": "2",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:50.1609408\u002B00:00",
+      "step": "owner read of new revision during archive outage",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {
+        "title": "AUTHORITY_NOT_READY"
+      }
+    },
+    {
+      "at": "2026-10-18T05:06:50.4171477\u002B00:00",
+      "step": "owner read after content checkpoint archived",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "contentRevision": "2"
+      }
+    }
+  ]
+}

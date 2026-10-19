@@ -1,0 +1,9 @@
+# Adversarial integration tests: scenario-style naming and inline fixtures are intentional.
+[*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.CA1869.severity = none
+dotnet_diagnostic.CA1001.severity = none
+dotnet_diagnostic.CA2000.severity = none

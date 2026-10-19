@@ -1,7 +1,8 @@
 # Destructive security-test environment (ADR-PB-003 Level A). Dedicated project name, ephemeral storage,
-# and an "attacker" SQL client that is attached ONLY to business-net with BusinessDb credentials.
+# Testing environment, fault injection enabled in the authority, loopback host ports for the test harness, and an
+# "attacker" SQL client attached ONLY to business-net with BusinessDb ADMIN credentials (the hostile DBA of the threat model).
 # SEC-P01..SEC-P12 harnesses use this container to perform hostile writes; it must be unable to reach
-# authority-db, spicedb or vault (asserted by the Stage A tests, not assumed from this file).
+# authority-db, spicedb, vault or archive-store (asserted by SEC-P11, not assumed from this file).
 name: enterpriseforms-sectest
 services:
   business-db:
@@ -12,12 +13,18 @@ services:
     tmpfs: [/var/lib/postgresql]
   azurite:
     tmpfs: [/data]
+  archive-store:
+    tmpfs: [/data]
   authority:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
+      FaultInjection__Enabled: "true"
+    restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
+    ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
   api:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
+    ports: ["127.0.0.1:5180:8080"]
   worker:
     environment:
       DOTNET_ENVIRONMENT: Testing
