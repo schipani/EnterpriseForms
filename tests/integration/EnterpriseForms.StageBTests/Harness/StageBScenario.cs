@@ -26,6 +26,12 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
 
     public TestUser Reader { get; } = TestUser.New("Reader");
 
+    /// <summary>System administrator of the organization (no designer role): the distinct principal of Amendment A1 downgrades.</summary>
+    public TestUser Administrator { get; } = TestUser.New("Administrator");
+
+    /// <summary>Designer only (no organization administration): may strengthen protection, may never remove it.</summary>
+    public TestUser DesignerOnly { get; } = TestUser.New("DesignerOnly");
+
     public Guid AccusedFormId { get; private set; }
 
     public Guid AddressFormId { get; private set; }
@@ -51,11 +57,13 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
                 new { authority_user_id = Designer.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Designer.Subject, organization_roles = new[] { "organization_owner", "designer" } },
                 new { authority_user_id = Clerk.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Clerk.Subject, organization_roles = Array.Empty<string>() },
                 new { authority_user_id = Reader.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Reader.Subject, organization_roles = Array.Empty<string>() },
+                new { authority_user_id = Administrator.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Administrator.Subject, organization_roles = new[] { "system_administrator" } },
+                new { authority_user_id = DesignerOnly.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = DesignerOnly.Subject, organization_roles = new[] { "designer" } },
             },
         }).ConfigureAwait(false);
         Assert.True(bootstrap.IsSuccess, "bootstrap failed: " + bootstrap.Body);
         await WaitGateReadyAsync().ConfigureAwait(false);
-        foreach (var user in new[] { Designer, Clerk, Reader })
+        foreach (var user in new[] { Designer, Clerk, Reader, Administrator, DesignerOnly })
         {
             var me = await Fixture.Api.GetAsync("/api/v1/users/me", Token(user)).ConfigureAwait(false);
             Assert.True(me.IsSuccess, "users/me failed for " + user.DisplayName + ": " + me.Body);

@@ -531,6 +531,159 @@
         }
       }
     },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reclassify": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Amendment A1: declassifies an encrypted field to Public/Internal through the authority's ReclassifyField command (organization owner or system administrator; governance approval reference).",
+        "operationId": "ReclassifyField",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReclassifyFieldRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/downgrade": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Amendment A1: releases a Public/Internal field from application encryption (organization owner or system administrator; distinct principal for declassified fields) and starts the audited background decryption migration.",
+        "operationId": "DowngradeFieldProtection",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DowngradeFieldProtectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/cancel-downgrade": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Amendment A1 rollback: re-requires encryption and re-encrypts already converted active values (organization owner or system administrator).",
+        "operationId": "CancelFieldProtectionDowngrade",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelFieldProtectionDowngradeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions/{formDefinitionId}/access": {
       "get": {
         "tags": [
@@ -2486,6 +2639,17 @@
           }
         }
       },
+      "CancelFieldProtectionDowngradeRequest": {
+        "required": [
+          "changeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "changeReason": {
+            "type": "string"
+          }
+        }
+      },
       "ChildRecordListResponse": {
         "required": [
           "relationship",
@@ -3153,6 +3317,26 @@
           }
         }
       },
+      "DowngradeFieldProtectionRequest": {
+        "required": [
+          "changeReason",
+          "expectedProtectionRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "changeReason": {
+            "type": "string"
+          },
+          "expectedProtectionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "FieldDefinitionResponse": {
         "required": [
           "fieldDefinitionId",
@@ -3378,6 +3562,24 @@
           "authorityCommandId": {
             "type": "string",
             "format": "uuid"
+          },
+          "migrationDirection": {
+            "type": "string",
+            "default": "Encrypt"
+          },
+          "cancelledOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "rollbackOfMigrationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -3458,6 +3660,19 @@
                 "$ref": "#/components/schemas/FieldProtectionMigrationResponse"
               }
             ]
+          },
+          "fullyPlaintext": {
+            "type": "boolean",
+            "default": false
+          },
+          "legacyEncryptedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -3955,6 +4170,17 @@
           },
           "isUnreviewedDefault": {
             "type": "boolean"
+          },
+          "plaintextDowngradePermitted": {
+            "type": "boolean",
+            "default": false
+          },
+          "authorityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -3996,6 +4222,25 @@
               "string"
             ],
             "format": "int32"
+          },
+          "changeReason": {
+            "type": "string"
+          }
+        }
+      },
+      "ReclassifyFieldRequest": {
+        "required": [
+          "targetClassification",
+          "approvalReference",
+          "changeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "targetClassification": {
+            "type": "string"
+          },
+          "approvalReference": {
+            "type": "string"
           },
           "changeReason": {
             "type": "string"
@@ -4880,6 +5125,10 @@
               "string"
             ],
             "format": "int64"
+          },
+          "plaintextDowngradePermitted": {
+            "type": "boolean",
+            "default": false
           }
         }
       },

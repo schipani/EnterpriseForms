@@ -112,6 +112,78 @@ public sealed class ReprotectionTests
     }
 
     [Fact]
+    public void DecryptDirectionAcceptsOnlyCiphertextToPlaintextOfTheFieldAndRefusesTheRest()
+    {
+        var item = Guid.CreateVersion7();
+        var other = Guid.CreateVersion7();
+        var current = new[] { HeaderItem(OpA), Sealed(OpA, Field, item), Plain(OpA, OtherField, other, "keep") };
+        var candidate = new[] { HeaderItem(OpB), Plain(OpB, Field, item, "revealed"), Plain(OpB, OtherField, other, "keep") };
+
+        var mutations = ReprotectionRules.Validate(current, candidate, Field, ProtectionDirection.Decrypt);
+        Assert.Equal(ContentMutationKinds.Deprotect, mutations[Convert.ToHexStringLower(candidate[1].Key)]);
+        Assert.Equal(ContentMutationKinds.Unchanged, mutations[Convert.ToHexStringLower(candidate[2].Key)]);
+
+        static string Code(Func<Dictionary<string, string>> act) => Assert.Throws<AuthorityException>(act).Message.Split(':')[0];
+        // The same candidate is not an encryption, an unrelated change alongside is refused, and leaving the row encrypted is incomplete.
+        Assert.Equal("REPROTECT_ROW_CHANGED", Code(() => ReprotectionRules.Validate(current, candidate, Field, ProtectionDirection.Encrypt)));
+        Assert.Equal("DEPROTECT_ROW_CHANGED", Code(() => ReprotectionRules.Validate(current, [HeaderItem(OpB), Plain(OpB, Field, item, "revealed"), Plain(OpB, OtherField, other, "changed")], Field, ProtectionDirection.Decrypt)));
+        Assert.Equal("DEPROTECT_INCOMPLETE", Code(() => ReprotectionRules.Validate(current, [HeaderItem(OpB), Sealed(OpB, Field, item), Plain(OpB, OtherField, other, "keep")], Field, ProtectionDirection.Decrypt)));
+        // Decrypting a field the command does not name is refused.
+        Assert.Equal("DEPROTECT_ROW_CHANGED", Code(() => ReprotectionRules.Validate(current, candidate, OtherField, ProtectionDirection.Decrypt)));
+    }
+
+    [Fact]
+    public void BarrierRefusesRowsOfTheOldFormOnceTheAuthorityHoldsARequirementOrRelease()
+    {
+        var item = Guid.CreateVersion7();
+        var plainItems = new[] { (ManifestItemKind.RecordHeader, (ReadOnlyMemory<byte>)Encode(HeaderItem(OpA))), (ManifestItemKind.FieldValue, (ReadOnlyMemory<byte>)Encode(Plain(OpA, Field, item, "x"))) };
+        var sealedItems = new[] { (ManifestItemKind.RecordHeader, (ReadOnlyMemory<byte>)Encode(HeaderItem(OpA))), (ManifestItemKind.FieldValue, (ReadOnlyMemory<byte>)Encode(Sealed(OpA, Field, item))) };
+        var none = new HashSet<Guid>();
+        var field = new HashSet<Guid> { Field };
+
+        ReprotectionRules.EnforceBarrier(plainItems, none, none);
+        ReprotectionRules.EnforceBarrier(plainItems, none, field);
+        ReprotectionRules.EnforceBarrier(sealedItems, field, none);
+        ReprotectionRules.EnforceBarrier(plainItems, new HashSet<Guid> { OtherField }, none);
+        Assert.Equal(AuthorityErrorCodes.FieldProtectionChanged, Assert.Throws<AuthorityException>(() => ReprotectionRules.EnforceBarrier(plainItems, field, none)).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.FieldProtectionChanged, Assert.Throws<AuthorityException>(() => ReprotectionRules.EnforceBarrier(sealedItems, none, field)).ErrorCode);
+    }
+
+    private static byte[] Encode(ReprotectionRules.SnapshotItem item)
+    {
+        // Re-encode from the decoded document: header framing + columns are exactly the original bytes.
+        var header = item.Document.Header;
+        using var stream = new MemoryStream();
+        stream.WriteByte(RowCanonicalizerV1.FramingMarker);
+        WriteAscii(stream, RowCanonicalizerV1.Domain);
+        stream.Write(new[] { (byte)(header.SchemaVersion >> 8), (byte)header.SchemaVersion });
+        stream.Write(new[] { (byte)(header.KeyVersion >> 24), (byte)(header.KeyVersion >> 16), (byte)(header.KeyVersion >> 8), (byte)header.KeyVersion });
+        WriteAscii(stream, header.EntityKind);
+        stream.Write(header.OrganizationId.ToByteArray(bigEndian: true));
+        stream.Write(header.PrimaryKeyId.ToByteArray(bigEndian: true));
+        var revision = BitConverter.GetBytes(header.RowRevision);
+        if (BitConverter.IsLittleEndian) Array.Reverse(revision);
+        stream.Write(revision);
+        var count = BitConverter.GetBytes(header.ColumnCount);
+        if (BitConverter.IsLittleEndian) Array.Reverse(count);
+        stream.Write(count);
+        foreach (var column in item.Document.Columns)
+        {
+            WriteAscii(stream, column.Name);
+            stream.Write(column.FramedValue.Span);
+        }
+
+        return stream.ToArray();
+    }
+
+    private static void WriteAscii(Stream stream, string value)
+    {
+        var bytes = System.Text.Encoding.ASCII.GetBytes(value);
+        stream.Write(new[] { (byte)(bytes.Length >> 8), (byte)bytes.Length });
+        stream.Write(bytes);
+    }
+
+    [Fact]
     public void RefusesEveryOtherChange()
     {
         var item = Guid.CreateVersion7();

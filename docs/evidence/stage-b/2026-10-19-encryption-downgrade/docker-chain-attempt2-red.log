@@ -1,0 +1,53 @@
+### stop security-test stack
+ Network enterpriseforms-sectest_business-net Removed 
+ Network enterpriseforms-sectest_authority-net Removed 
+ Network enterpriseforms-sectest_web-net Removed 
+### start security-test stack
+ Container enterpriseforms-sectest-spicedb-migrate-1 Exited 
+ Container enterpriseforms-sectest-archive-store-1 Healthy 
+ Container enterpriseforms-sectest-authority-db-1 Healthy 
+ Container enterpriseforms-sectest-business-db-1 Healthy 
+ Container enterpriseforms-sectest-worker-1 Healthy 
+ Container enterpriseforms-sectest-authority-migrate-1 Exited 
+ Container enterpriseforms-sectest-api-1 Healthy 
+container enterpriseforms-sectest-dev-seed-1 exited (0)
+### build tests
+Build succeeded.
+Build succeeded.
+### stage-b integration
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored (14s 749ms)
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.NothingIsReleasedUntilTheOwnerPublishesThePolicyAndDesignersClerksReadersAndOtherTenantsNeverCan (3s 937ms)
+  Assert.Equal() Failure: Values differ
+  Expected: NotFound
+  Actual:   Forbidden
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.ConcurrentWritesAcrossTheCutoverCannotReintroduceCiphertextAndNoEditIsLost (13s 467ms)
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.ReleasingAnInternalFieldFlipsTheBarrierDecryptsEveryRecordThroughTheAuthorityAndClaimsPlaintextOnlyAfterVerification (11s 103ms)
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.CancellingAReleaseReEncryptsConvertedValuesAndRecordsTheIrreversibleExposureWindow (8s 690ms)
+  Assert.Equal() Failure: Strings differ
+  Expected: "NO_DOWNGRADE_TO_CANCEL"
+  Actual:   "unexpected"
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.AConfidentialFieldNeedsADeclassificationByOneAdministratorAndTheReleaseByADifferentOne (4s 870ms)
+  Assert.Equal() Failure: Strings differ
+  Expected: "DECLASSIFICATION_REQUIRED"
+  Actual:   "FORBIDDEN"
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.ConcurrentUserEditsAndAWorkerRestartNeitherLoseDataNorBlockCompletion (5m 19s 035ms)
+  total: 39
+  failed: 7
+  succeeded: 32
+  skipped: 0
+  duration: 11m 27s 335ms
+### playwright
+    Error: page.goto: net::ERR_CONNECTION_FAILED at http://127.0.0.1:5173/app/gallery
+      75 |       await expect(page.getByRole("heading", { level: 1, name: "Upload Center" })).toBeVisible();
+      78 |       await expect(page.getByRole("heading", { name: "Component gallery" })).toBeVisible();
+    test-results\pb14-accessibility-PB-14-a-5fbad--width-PB14-10-14-22-23-32--chromium-desktop\test-failed-1.png
+[1A[2K  1 failed
+  17 passed (2.5m)
+### sec-p
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 2m 29s 512ms
+### DONE
+exit 0

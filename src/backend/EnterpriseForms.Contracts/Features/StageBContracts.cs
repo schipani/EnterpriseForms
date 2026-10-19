@@ -72,20 +72,30 @@ public sealed record StrengthenFieldProtectionRequest(string? TargetClassificati
 
 /// <summary>Protection state of a field. <c>MigrationState</c>: Plaintext, Encrypted, or EncryptionPendingRewrite (records still carrying a legacy plaintext copy: <c>LegacyPlaintextRecordCount</c>, a business-table estimate).</summary>
 public sealed record FieldProtectionResponse(Guid FieldDefinitionId, string FieldKey, string FieldClassification, string FieldProtectionMode, long ProtectionPolicyRevision, DateTimeOffset? ProtectionChangedOn, string MigrationState, int LegacyPlaintextRecordCount, string SearchImpact, string OrganizationMinimumClassification, bool OrganizationPermitsPlaintext,
-    bool FullyEncrypted = false, FieldProtectionMigrationResponse? Migration = null);
+    bool FullyEncrypted = false, FieldProtectionMigrationResponse? Migration = null, bool FullyPlaintext = false, int LegacyEncryptedRecordCount = 0);
 
 /// <summary>
 /// Progress of the background plaintext→encrypted migration of a field (B-28). <c>MigrationState</c>: Queued, Running,
 /// Blocked (dependency unavailable, retried), Failed (bounded attempts exhausted for some records; retry available),
 /// Completed (every record re-protected through the authority and the post-check found no plaintext copy).
 /// </summary>
-public sealed record FieldProtectionMigrationResponse(Guid FieldProtectionMigrationId, string MigrationState, int TotalRecordCount, int TotalValueCount, int CompletedRecordCount, int FailedRecordCount, int PendingRecordCount, string? LastErrorCode, DateTimeOffset StartedOn, DateTimeOffset? CompletedOn, DateTimeOffset? VerifiedOn, Guid AuthorityCommandId);
+public sealed record FieldProtectionMigrationResponse(Guid FieldProtectionMigrationId, string MigrationState, int TotalRecordCount, int TotalValueCount, int CompletedRecordCount, int FailedRecordCount, int PendingRecordCount, string? LastErrorCode, DateTimeOffset StartedOn, DateTimeOffset? CompletedOn, DateTimeOffset? VerifiedOn, Guid AuthorityCommandId,
+    string MigrationDirection = "Encrypt", DateTimeOffset? CancelledOn = null, Guid? RollbackOfMigrationId = null);
 
 public sealed record RetryFieldProtectionMigrationRequest(string RetryReason);
 
-public sealed record OrganizationSecurityPolicyResponse(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, DateTimeOffset? PolicyReviewedOn, Guid? PolicyReviewedByUserId, long SecurityPolicyRevision, bool IsUnreviewedDefault);
+/// <summary>Amendment A1 step 1 (organization owner / system administrator): declassify an encrypted Confidential/Restricted field to Public or Internal; the governance approval reference is journaled by the authority.</summary>
+public sealed record ReclassifyFieldRequest(string TargetClassification, string ApprovalReference, string ChangeReason);
 
-public sealed record UpdateOrganizationSecurityPolicyRequest(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, long ExpectedPolicyRevision);
+/// <summary>Amendment A1 step 2 (a distinct organization owner / system administrator for sensitive fields): release the field from application encryption and start the audited decryption migration.</summary>
+public sealed record DowngradeFieldProtectionRequest(string ChangeReason, long ExpectedProtectionRevision);
+
+/// <summary>Amendment A1 rollback: re-require encryption; already decrypted active values are re-encrypted by a new migration. Historical plaintext revisions, logs, WAL and backups are not reversible.</summary>
+public sealed record CancelFieldProtectionDowngradeRequest(string ChangeReason);
+
+public sealed record OrganizationSecurityPolicyResponse(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, DateTimeOffset? PolicyReviewedOn, Guid? PolicyReviewedByUserId, long SecurityPolicyRevision, bool IsUnreviewedDefault, bool PlaintextDowngradePermitted = false, Guid? AuthorityCommandId = null);
+
+public sealed record UpdateOrganizationSecurityPolicyRequest(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, long ExpectedPolicyRevision, bool PlaintextDowngradePermitted = false);
 
 public sealed record CreateFieldOptionRequest(string OptionKey, string OptionDisplayText);
 

@@ -30,6 +30,9 @@ public enum ProtectedAction
     DesignForm,
     CreateRecord,
     ManageOrganization,
+
+    /// <summary>Organization security administration (system administrators); Amendment A1 governance routes accept it alongside ManageOrganization.</summary>
+    AdministerSecurity,
 }
 
 public enum SecurityCommandKind
@@ -49,6 +52,7 @@ public enum SecurityCommandKind
     PublishFormSecurityRevision,
     UnlinkChildRecord,
     UpdateFormUsers,
+    ReclassifyField,
 }
 
 public enum SecurityCommandStatus

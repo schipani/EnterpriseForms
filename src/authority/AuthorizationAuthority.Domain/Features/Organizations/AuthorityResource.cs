@@ -44,4 +44,10 @@ public static class ResourceTypeNames
 
     /// <summary>A field that must be application-encrypted (entity id = field definition id, parent = form definition id).</summary>
     public const string FieldProtectionRequirement = "field_protection_requirement";
+
+    /// <summary>A field released from application encryption by an authorized downgrade (entity id = field definition id, parent = form). Amendment A1.</summary>
+    public const string FieldProtectionRelease = "field_protection_release";
+
+    /// <summary>A pending declassification of a field (entity id = field definition id, parent = form), consumed by the downgrade command. Amendment A1.</summary>
+    public const string FieldReclassification = "field_reclassification";
 }

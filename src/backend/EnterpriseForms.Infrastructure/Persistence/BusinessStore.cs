@@ -323,6 +323,30 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             return count;
         }
 
+        public async Task<List<LegacyPlaintextRecord>> GetLegacyEncryptedRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken)
+        {
+            var rows = await context.FieldEncryptedValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }).ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (rows.Count == 0)
+            {
+                return [];
+            }
+
+            var recordIds = rows.Select(r => r.FormRecordId).Distinct().ToList();
+            var latest = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
+            var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
+            return rows.Where(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId)
+                .GroupBy(r => r.FormRecordId)
+                .Select(g => new LegacyPlaintextRecord(g.Key, g.Count()))
+                .OrderBy(r => r.FormRecordId)
+                .ToList();
+        }
+
+        public async Task<int> CountLegacyEncryptedRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken) =>
+            (await GetLegacyEncryptedRecordsAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false)).Count;
+
+        public Task<int> CountEncryptedRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken) =>
+            context.FieldEncryptedValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken);
+
         public void AddProtectionMigration(FieldProtectionMigration migration) => context.FieldProtectionMigrations.Add(migration);
 
         public void AddProtectionMigrationItem(FieldProtectionMigrationItem item) => context.FieldProtectionMigrationItems.Add(item);

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
@@ -14,7 +15,7 @@ namespace EnterpriseForms.Application.Features.Organizations;
 /// explains the rules with it); only the organization owner (authority manage_organization) may change it, with a
 /// reason, audited. The policy can be tightened freely; loosening is recorded as such in the audit metadata.
 /// </summary>
-public sealed class SecurityPolicyHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, TimeProvider clock)
+public sealed class SecurityPolicyHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
 {
     public const string DevelopmentDefaultStatement = "Development default, not yet reviewed: Internal fields may be stored in plaintext (readable by a database administrator); new free text and documents are Confidential and encrypted.";
 
@@ -44,26 +45,50 @@ public sealed class SecurityPolicyHandlers(IBusinessStore store, IAuthorizationA
             throw new BusinessException("INVALID_REQUEST", 422, "a policy statement of 10..2000 characters is required (why plaintext is or is not acceptable for this organization)");
         }
 
+        long expected;
+        await using (var check = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var current = await EnsureAsync(check, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+            if (current.SecurityPolicyRevision != request.ExpectedPolicyRevision)
+            {
+                throw new BusinessException("POLICY_REVISION_CONFLICT", 409, "the policy was changed by someone else; reload");
+            }
+
+            expected = current.SecurityPolicyRevision;
+            await check.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        // Authority first (Amendment A1 rule 1/3): the policy the downgrade planners enforce is the authority's own copy, written by this command.
+        var payload = JsonSerializer.SerializeToElement(new { minimum_field_classification = request.MinimumFieldClassification, plaintext_internal_fields_permitted = request.PlaintextInternalFieldsPermitted, plaintext_downgrade_permitted = request.PlaintextDowngradePermitted });
+        var command = await awaiter.SubmitAndAwaitAsync(context.ToDelegatedUser(), new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.UpdateMandatoryPolicy, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), decision.AuthorizationRevision, payload, statement), $"org-policy:{context.OrganizationId:N}:{expected + 1}", cancellationToken).ConfigureAwait(false);
+        if (command.CommandStatus != SecurityCommandStatus.Effective)
+        {
+            throw new FormDefinitions.CreateFormDefinition.PendingCommandException(new EnterpriseForms.Contracts.Features.CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, false));
+        }
+
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var policy = await EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
-        if (policy.SecurityPolicyRevision != request.ExpectedPolicyRevision)
+        if (policy.SecurityPolicyRevision != expected)
         {
-            throw new BusinessException("POLICY_REVISION_CONFLICT", 409, "the policy was changed by someone else; reload");
+            throw new BusinessException("POLICY_REVISION_CONFLICT", 409, "the policy was changed concurrently; reload");
         }
 
         var loosened = FieldProtectionPolicy.Rank(request.MinimumFieldClassification!) < FieldProtectionPolicy.Rank(policy.MinimumFieldClassification)
-                       || (request.PlaintextInternalFieldsPermitted && !policy.PlaintextInternalFieldsPermitted);
+                       || (request.PlaintextInternalFieldsPermitted && !policy.PlaintextInternalFieldsPermitted)
+                       || (request.PlaintextDowngradePermitted && !policy.PlaintextDowngradePermitted);
         var now = clock.GetUtcNow();
-        var previous = new { policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted };
+        var previous = new { policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, policy.PlaintextDowngradePermitted };
         policy.MinimumFieldClassification = request.MinimumFieldClassification!;
         policy.PlaintextInternalFieldsPermitted = request.PlaintextInternalFieldsPermitted;
+        policy.PlaintextDowngradePermitted = request.PlaintextDowngradePermitted;
+        policy.AuthorityCommandId = command.CommandId;
         policy.PolicyStatementText = statement;
         policy.PolicyReviewedOn = now;
         policy.PolicyReviewedByUserId = context.LocalUserId;
         policy.SecurityPolicyRevision++;
         policy.PolicyModifiedOn = now;
         policy.PolicyModifiedByUserId = context.LocalUserId;
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.OrganizationSecurityPolicyUpdated, loosened ? "organization data-protection policy loosened by the organization owner" : "organization data-protection policy reviewed/tightened by the organization owner", metadata: new { previous, minimumFieldClassification = policy.MinimumFieldClassification, plaintextInternalFieldsPermitted = policy.PlaintextInternalFieldsPermitted, loosened, revision = policy.SecurityPolicyRevision });
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.OrganizationSecurityPolicyUpdated, loosened ? "organization data-protection policy loosened by the organization owner" : "organization data-protection policy reviewed/tightened by the organization owner", metadata: new { previous, minimumFieldClassification = policy.MinimumFieldClassification, plaintextInternalFieldsPermitted = policy.PlaintextInternalFieldsPermitted, plaintextDowngradePermitted = policy.PlaintextDowngradePermitted, loosened, revision = policy.SecurityPolicyRevision, authorityCommandId = command.CommandId });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToResponse(policy);
     }
@@ -92,5 +117,5 @@ public sealed class SecurityPolicyHandlers(IBusinessStore store, IAuthorizationA
     }
 
     private static OrganizationSecurityPolicyResponse ToResponse(OrganizationSecurityPolicy p) =>
-        new(p.MinimumFieldClassification, p.PlaintextInternalFieldsPermitted, p.PolicyStatementText, p.PolicyReviewedOn, p.PolicyReviewedByUserId, p.SecurityPolicyRevision, p.PolicyReviewedOn is null);
+        new(p.MinimumFieldClassification, p.PlaintextInternalFieldsPermitted, p.PolicyStatementText, p.PolicyReviewedOn, p.PolicyReviewedByUserId, p.SecurityPolicyRevision, p.PolicyReviewedOn is null, p.PlaintextDowngradePermitted, p.AuthorityCommandId);
 }

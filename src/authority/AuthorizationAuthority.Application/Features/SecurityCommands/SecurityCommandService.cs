@@ -157,6 +157,23 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             }
         }
 
+        foreach (var resource in plan.ReactivateResources)
+        {
+            resource.ResourceLifecycleState = Domain.Features.Organizations.ResourceLifecycleStates.Active;
+            resource.RegisteredBySecurityCommandId = command.SecurityCommandId;
+            resource.ResourceRegisteredOn = now;
+        }
+
+        if (plan.ProtectionPolicy is { } policy)
+        {
+            policy.UpdatedBySecurityCommandId = command.SecurityCommandId;
+            policy.PolicyUpdatedOn = now;
+            if (plan.ProtectionPolicyIsNew)
+            {
+                scope.AddProtectionPolicy(policy);
+            }
+        }
+
         command.CommandStateName = SecurityCommandStates.CommittedAwaitingProjection;
         command.CommittedAuthorizationRevision = revision;
         command.CommandModifiedOn = now;
@@ -188,7 +205,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             Convert.ToHexStringLower(command.CommandRequestDigest),
             System.Text.Json.JsonDocument.Parse(plan.NormalizedPayloadJson).RootElement,
             delta.Select(d => $"{d.Operation} {d.Tuple.Canonical}").ToList(),
-            plan.RegisterResources.Select(r => $"{r.ResourceTypeName}:{r.ResourceEntityId}").ToList(),
+            plan.RegisterResources.Concat(plan.ReactivateResources).Select(r => $"{r.ResourceTypeName}:{r.ResourceEntityId}").ToList(),
             plan.RevokeResources.Select(r => $"{r.ResourceTypeName}:{r.ResourceEntityId}").ToList(),
             command.CommandReasonText,
             command.CorrelationIdentifier);

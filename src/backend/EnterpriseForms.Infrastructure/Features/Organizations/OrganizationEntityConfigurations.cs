@@ -38,6 +38,7 @@ public sealed class OrganizationSecurityPolicyConfiguration : IEntityTypeConfigu
     public void Configure(EntityTypeBuilder<OrganizationSecurityPolicy> builder)
     {
         builder.MapSnakeCase("organization_security_policies");
+        builder.Property(p => p.PlaintextDowngradePermitted).HasDefaultValue(false);
         builder.HasKey(p => p.OrganizationSecurityPolicyId);
         builder.Property(p => p.MinimumFieldClassification).HasMaxLength(20);
         builder.Property(p => p.PolicyStatementText).HasMaxLength(2000);

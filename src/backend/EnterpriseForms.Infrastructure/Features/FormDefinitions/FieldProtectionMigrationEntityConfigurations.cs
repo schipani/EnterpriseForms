@@ -14,6 +14,7 @@ public sealed class FieldProtectionMigrationConfiguration : IEntityTypeConfigura
         builder.MapSnakeCase("field_protection_migrations");
         builder.HasKey(m => m.FieldProtectionMigrationId);
         builder.Property(m => m.MigrationState).HasMaxLength(20);
+        builder.Property(m => m.MigrationDirection).HasMaxLength(10).HasDefaultValue("Encrypt");
         builder.Property(m => m.LastErrorCode).HasMaxLength(200);
         builder.Property(m => m.LeaseOwnerName).HasMaxLength(120);
         builder.HasIndex(m => new { m.FieldDefinitionId, m.ProtectionPolicyRevision }).IsUnique().HasDatabaseName("uq_field_protection_migrations_field_revision");
@@ -23,7 +24,8 @@ public sealed class FieldProtectionMigrationConfiguration : IEntityTypeConfigura
         builder.HasOne<FieldDefinition>().WithMany().HasForeignKey(m => m.FieldDefinitionId).HasConstraintName("fk_field_protection_migrations_field");
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Completed','Failed','Blocked')");
+            t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Completed','Failed','Blocked','Cancelled')");
+            t.HasCheckConstraint("ck_field_protection_migrations_direction", "migration_direction IN ('Encrypt','Decrypt')");
             t.HasCheckConstraint("ck_field_protection_migrations_counts", "total_record_count >= 0 AND total_value_count >= 0 AND completed_record_count >= 0 AND failed_record_count >= 0 AND completed_record_count + failed_record_count <= total_record_count");
         });
     }

@@ -56,6 +56,14 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddResource(AuthorityResource resource) => context.Resources.Add(resource);
 
+        public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
+            context.Resources.AsNoTracking().Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToListAsync(cancellationToken);
+
+        public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            context.ProtectionPolicies.FirstOrDefaultAsync(p => p.OrganizationId == organizationId, cancellationToken);
+
+        public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => context.ProtectionPolicies.Add(policy);
+
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.RelationshipEdges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId == null).ToListAsync(cancellationToken);
 

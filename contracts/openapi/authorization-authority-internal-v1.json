@@ -1227,7 +1227,8 @@
           "TransferOwnership",
           "DesignForm",
           "CreateRecord",
-          "ManageOrganization"
+          "ManageOrganization",
+          "AdministerSecurity"
         ]
       },
       "ResourceKind": {
@@ -1272,7 +1273,8 @@
           "UpdateMandatoryPolicy",
           "PublishFormSecurityRevision",
           "UnlinkChildRecord",
-          "UpdateFormUsers"
+          "UpdateFormUsers",
+          "ReclassifyField"
         ]
       },
       "SecurityCommandRequest": {

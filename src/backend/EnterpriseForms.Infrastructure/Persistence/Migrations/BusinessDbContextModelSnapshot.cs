@@ -803,6 +803,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("lease_owner_name");
 
+                    b.Property<DateTimeOffset?>("MigrationCancelledOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("migration_cancelled_on");
+
                     b.Property<DateTimeOffset?>("MigrationCompletedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("migration_completed_on");
@@ -810,6 +814,14 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("MigrationCreatedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("migration_created_on");
+
+                    b.Property<string>("MigrationDirection")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Encrypt")
+                        .HasColumnName("migration_direction");
 
                     b.Property<DateTimeOffset>("MigrationModifiedOn")
                         .HasColumnType("timestamp with time zone")
@@ -832,6 +844,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.Property<long>("ProtectionPolicyRevision")
                         .HasColumnType("bigint")
                         .HasColumnName("protection_policy_revision");
+
+                    b.Property<Guid?>("RollbackOfMigrationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rollback_of_migration_id");
 
                     b.Property<Guid>("StartedByUserId")
                         .HasColumnType("uuid")
@@ -866,7 +882,9 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_field_protection_migrations_counts", "total_record_count >= 0 AND total_value_count >= 0 AND completed_record_count >= 0 AND failed_record_count >= 0 AND completed_record_count + failed_record_count <= total_record_count");
 
-                            t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Completed','Failed','Blocked')");
+                            t.HasCheckConstraint("ck_field_protection_migrations_direction", "migration_direction IN ('Encrypt','Decrypt')");
+
+                            t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Completed','Failed','Blocked','Cancelled')");
                         });
                 });
 
@@ -2372,11 +2390,21 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_security_policy_id");
 
+                    b.Property<Guid?>("AuthorityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authority_command_id");
+
                     b.Property<string>("MinimumFieldClassification")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("minimum_field_classification");
+
+                    b.Property<bool>("PlaintextDowngradePermitted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("plaintext_downgrade_permitted");
 
                     b.Property<bool>("PlaintextInternalFieldsPermitted")
                         .HasColumnType("boolean")

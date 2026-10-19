@@ -133,6 +133,12 @@ public sealed class ArchiveProcessorTests
 
         public void AddResource(AuthorityResource resource) => throw new NotSupportedException();
 
+        public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid org, Guid parent, IReadOnlyCollection<string> types, CancellationToken ct) => Task.FromResult(new List<AuthorityResource>());
+
+        public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationProtectionPolicy?>(null);
+
+        public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => throw new NotSupportedException();
+
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddEdge(AuthorityRelationshipEdge edge) => throw new NotSupportedException();

@@ -23,6 +23,14 @@ public sealed class FieldProtectionMigration
 
     public string MigrationState { get; set; } = FieldProtectionMigrationStates.Queued;
 
+    /// <summary>Encrypt (plaintext → ciphertext, B-28) or Decrypt (ciphertext → plaintext, Amendment A1).</summary>
+    public string MigrationDirection { get; set; } = FieldProtectionMigrationDirections.Encrypt;
+
+    /// <summary>For an Encrypt migration started by cancelling a downgrade: the Decrypt migration being rolled back.</summary>
+    public Guid? RollbackOfMigrationId { get; set; }
+
+    public DateTimeOffset? MigrationCancelledOn { get; set; }
+
     /// <summary>Records holding a plaintext copy of the field when the migration was created (the "before" count).</summary>
     public int TotalRecordCount { get; set; }
 
@@ -68,6 +76,15 @@ public static class FieldProtectionMigrationStates
 
     /// <summary>A dependency (key provider, authority, signer) is unavailable; retried automatically, nothing is lost.</summary>
     public const string Blocked = "Blocked";
+
+    /// <summary>A downgrade cancelled by an administrator; the rollback Encrypt migration re-protects already converted values.</summary>
+    public const string Cancelled = "Cancelled";
+}
+
+public static class FieldProtectionMigrationDirections
+{
+    public const string Encrypt = "Encrypt";
+    public const string Decrypt = "Decrypt";
 }
 
 /// <summary>One record of a migration: pending, completed (by the worker or by a user's own commit), or failed after bounded attempts.</summary>

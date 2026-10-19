@@ -18,6 +18,12 @@ public sealed class OrganizationSecurityPolicy
     /// <summary>When false, every field (whatever its classification) must be application-encrypted.</summary>
     public bool PlaintextInternalFieldsPermitted { get; set; } = true;
 
+    /// <summary>Explicit permission for encrypted → plaintext migrations of Public/Internal fields (Amendment A1); never implied. Default false.</summary>
+    public bool PlaintextDowngradePermitted { get; set; }
+
+    /// <summary>The authority's effective UpdateMandatoryPolicy command that holds this policy (null for the unreviewed development default).</summary>
+    public Guid? AuthorityCommandId { get; set; }
+
     public string PolicyStatementText { get; set; } = string.Empty;
 
     /// <summary>Null until an organization owner has explicitly reviewed and saved the policy.</summary>

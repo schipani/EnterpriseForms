@@ -44,6 +44,8 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<IntegrityKeyRegistration> KeyRegistrations => Set<IntegrityKeyRegistration>();
 
+    public DbSet<OrganizationProtectionPolicy> ProtectionPolicies => Set<OrganizationProtectionPolicy>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

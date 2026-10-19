@@ -259,6 +259,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reclassify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Amendment A1: declassifies an encrypted field to Public/Internal through the authority's ReclassifyField command (organization owner or system administrator; governance approval reference). */
+        post: operations["ReclassifyField"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/downgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Amendment A1: releases a Public/Internal field from application encryption (organization owner or system administrator; distinct principal for declassified fields) and starts the audited background decryption migration. */
+        post: operations["DowngradeFieldProtection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/cancel-downgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Amendment A1 rollback: re-requires encryption and re-encrypts already converted active values (organization owner or system administrator). */
+        post: operations["CancelFieldProtectionDowngrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/{formDefinitionId}/access": {
         parameters: {
             query?: never;
@@ -982,6 +1033,9 @@ export interface components {
             /** Format: int64 */
             brandingRevision: number | string;
         };
+        CancelFieldProtectionDowngradeRequest: {
+            changeReason: string;
+        };
         ChildRecordListResponse: {
             relationship: components["schemas"]["RelationshipDefinitionResponse"];
             items: components["schemas"]["ChildRecordSummaryResponse"][];
@@ -1156,6 +1210,11 @@ export interface components {
             /** Format: int64 */
             contentRevision: null | number | string;
         };
+        DowngradeFieldProtectionRequest: {
+            changeReason: string;
+            /** Format: int64 */
+            expectedProtectionRevision: number | string;
+        };
         FieldDefinitionResponse: {
             /** Format: uuid */
             fieldDefinitionId: string;
@@ -1220,6 +1279,12 @@ export interface components {
             verifiedOn: null | string;
             /** Format: uuid */
             authorityCommandId: string;
+            /** @default Encrypt */
+            migrationDirection: string;
+            /** Format: date-time */
+            cancelledOn?: null | string;
+            /** Format: uuid */
+            rollbackOfMigrationId?: null | string;
         };
         FieldProtectionResponse: {
             /** Format: uuid */
@@ -1240,6 +1305,13 @@ export interface components {
             /** @default false */
             fullyEncrypted: boolean;
             migration?: null | components["schemas"]["FieldProtectionMigrationResponse"];
+            /** @default false */
+            fullyPlaintext: boolean;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            legacyEncryptedRecordCount: number | string;
         };
         FieldResponse: {
             /** Format: uuid */
@@ -1372,6 +1444,10 @@ export interface components {
             /** Format: int64 */
             securityPolicyRevision: number | string;
             isUnreviewedDefault: boolean;
+            /** @default false */
+            plaintextDowngradePermitted: boolean;
+            /** Format: uuid */
+            authorityCommandId?: null | string;
         };
         ProbeResponse: {
             probeStatus: string;
@@ -1382,6 +1458,11 @@ export interface components {
             expectedDraftRevision: number | string;
             /** Format: int32 */
             expectedCurrentVersionNumber: number | string;
+            changeReason: string;
+        };
+        ReclassifyFieldRequest: {
+            targetClassification: string;
+            approvalReference: string;
             changeReason: string;
         };
         RecordActivityResponse: {
@@ -1601,6 +1682,8 @@ export interface components {
             policyStatementText: string;
             /** Format: int64 */
             expectedPolicyRevision: number | string;
+            /** @default false */
+            plaintextDowngradePermitted: boolean;
         };
         UpdateUiPreferenceRequest: {
             textScalePreferenceMode: string;
@@ -2029,6 +2112,87 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RetryFieldProtectionMigrationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldProtectionResponse"];
+                };
+            };
+        };
+    };
+    ReclassifyField: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReclassifyFieldRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldProtectionResponse"];
+                };
+            };
+        };
+    };
+    DowngradeFieldProtection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DowngradeFieldProtectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldProtectionResponse"];
+                };
+            };
+        };
+    };
+    CancelFieldProtectionDowngrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelFieldProtectionDowngradeRequest"];
             };
         };
         responses: {

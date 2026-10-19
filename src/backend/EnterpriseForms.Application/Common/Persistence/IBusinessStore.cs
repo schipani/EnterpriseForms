@@ -162,6 +162,13 @@ public interface IBusinessScope : IAsyncDisposable
     /// <summary>Plaintext rows of the field inside one operation's staged snapshot (used with the authority-accepted head operation for the verified post-check).</summary>
     Task<int> CountPlaintextRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken);
 
+    /// <summary>Records whose latest staged snapshot still holds encrypted rows of the field (projection estimate for a decrypt migration).</summary>
+    Task<List<LegacyPlaintextRecord>> GetLegacyEncryptedRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+
+    Task<int> CountLegacyEncryptedRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+
+    Task<int> CountEncryptedRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken);
+
     void AddProtectionMigration(FieldProtectionMigration migration);
 
     void AddProtectionMigrationItem(FieldProtectionMigrationItem item);

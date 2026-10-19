@@ -13,6 +13,10 @@ public static class AuditActions
     public const string FieldProtectionMigrationCompleted = "FIELD_PROTECTION_MIGRATION_COMPLETED";
     public const string FieldProtectionMigrationFailed = "FIELD_PROTECTION_MIGRATION_FAILED";
     public const string FieldProtectionMigrationRetried = "FIELD_PROTECTION_MIGRATION_RETRIED";
+    public const string FieldDeclassified = "FIELD_DECLASSIFIED";
+    public const string FieldProtectionDowngraded = "FIELD_PROTECTION_DOWNGRADED";
+    public const string FieldValuesDeprotected = "FIELD_VALUES_DEPROTECTED";
+    public const string FieldProtectionDowngradeCancelled = "FIELD_PROTECTION_DOWNGRADE_CANCELLED";
     public const string OrganizationSecurityPolicyUpdated = "ORGANIZATION_SECURITY_POLICY_UPDATED";
     public const string FormAccessGranted = "FORM_ACCESS_GRANTED";
     public const string FormAccessRevoked = "FORM_ACCESS_REVOKED";

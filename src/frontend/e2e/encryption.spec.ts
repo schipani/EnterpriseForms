@@ -114,7 +114,8 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await security.getByLabel("Reason").fill("Exhibit counts are case-sensitive data");
     await security.getByRole("button", { name: "Apply strengthening" }).click();
     await expect(security.getByText("Enabled", { exact: true })).toBeVisible();
-    await expect(security.getByText(/1 record\(s\) still hold a plaintext copy/)).toBeVisible();
+    // The background migration may already have re-encrypted the single record by now: either the pending count or the verified badge is correct.
+    await expect(security.getByText(/1 record\(s\) still hold a plaintext copy|Fully encrypted · verified/).first()).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("row", { name: /Exhibit count/ })).toContainText("Confidential · Encrypted");

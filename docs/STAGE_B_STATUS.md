@@ -1,7 +1,7 @@
 # Stage B Status — Enterprise Forms Application (Accused vertical slice)
 
-**Date:** 2026-10-18 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`) ·
-**Evidence commit:** `5d7da9f` (hosted run links in §4.6) · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
+**Date:** 2026-10-19 · **Branch:** `stage-b/accused-vertical-slice` (PR #10 → `stage-a/level2-security-foundation`) ·
+**Evidence commits:** `5d7da9f` (Stage B rounds 1–4), `a0f0b37` (B-28), this head (B-29, §4.7; hosted run links in §4.6) · **Scope:** ADR-PB-002 Stage B — the working Accused + AccusedAddress + document
 workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundation.
 
 > **Stage A status (decision A-23, 2026-10-18):** ENGINEERING COMPLETE — **ACCEPTED FOR CONTINUED DEVELOPMENT** by the
@@ -17,7 +17,7 @@ workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundat
 | Gate | Assessment |
 |---|---|
 | **Mandatory Stage B functionality** (ADR-PB-002 §Stage B items 1–8, §2 below) | **Implemented and automatically tested** for the Accused slice: every item has a working UI path, backend slice, authority hook, audit behaviour and an executed test. |
-| **Automated test suites** (§4) | .NET unit/architecture/contract/authority **159 passed, 0 failed**; frontend lint/typecheck/vitest/build **42 vitest tests passed**; Stage B Docker integration **33 passed, 0 failed**; browser e2e **14 passed, 0 failed**; Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
+| **Automated test suites** (§4, §4.7) | .NET unit/architecture/contract/authority **163 passed, 0 failed**; frontend lint/typecheck/vitest/build **42 vitest tests passed**; Stage B Docker integration **39 passed, 0 failed**; browser e2e **18 specs** (17/18 on the security-test stack with one pre-existing race, the two encryption specs 8/8 on rerun; development stack: §4.7); Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
 | **Security controls** | **Unchanged and re-tested.** No new authorization path: shares, child records, documents, discovery pages, the new value types and now form permissions all go through the independent Authority (and the signed manifest for record content); SEC-P01..P12 pass on the Stage B stack. The one authority extension in the fourth round is a new command kind and a gated read (B-23); existing kinds, the SpiceDB schema and the gate semantics are unchanged. **Phase 1B (B-24..B-26) adds application-level field encryption on top of this foundation without touching the authority: encrypted values are manifest leaves like any other value, decryption happens only after the authority-verified read, and the local development KEK is refused outside Development/Testing. Production key custody (Azure Key Vault / Managed HSM, purpose-separated keys, rotation) is still open — §7.1.** No test was weakened (§5). |
 | **PB-14 design validation** | Automated part **executed** (axe WCAG 2.2 AA + reflow at 320/768/1440 px and 200%/400% zoom equivalents, keyboard-only flows, forced colours — §4.4, §6). **Human review PENDING for the owner/reviewers:** NVDA, VoiceOver, real browser zoom, product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. |
 | **Stage B feature milestone** | **Ready for owner acceptance review** once the human PB-14 items are recorded. Features intentionally deferred to later gates are listed in §7 and are not Stage B defects. Production requirements (§7 first row) are unchanged. |
@@ -142,9 +142,10 @@ development login, not a production bypass (B-01, verified by `AuthorizationAndT
    (queued → running → completed; records re-encrypted / pending / failed, a progress bar, the last error) while the
    background worker re-seals every existing record through the Authorization Authority; when it finishes and the
    post-check finds no plaintext copy, the badge **Fully encrypted · verified** appears and the progress block
-   disappears (B-28). A failed or blocked migration shows why and offers **Retry failed records** to designers. There is
-   no control to make an encrypted field plaintext again; a lower classification is not offered and is refused by the
-   server (encrypted → plaintext is a proposed, unapproved amendment: `docs/decisions/PROPOSED-ADR-PB-004-A1-ENCRYPTED-TO-PLAINTEXT-MIGRATION.md`).
+   disappears (B-28). A failed or blocked migration shows why and offers **Retry failed records** to designers. A
+   designer has no control to make an encrypted field plaintext again: a lower classification is not offered, the
+   server refuses it (`FIELD_PROTECTION_DOWNGRADE_REFUSED`), and the dialog explains that removing encryption is an
+   organization-administration action (§1.3e).
 8. To see what the database holds: `docker exec enterpriseforms-business-db-1 psql -U postgres -d enterpriseforms -c
    "select encrypted_logical_type, encode(encrypted_value_bytes,'hex') from field_encrypted_values order by created_on desc limit 3"`
    returns ciphertext only; the record's `field_string_values` rows for that field do not exist.
@@ -161,6 +162,51 @@ development login, not a production bypass (B-01, verified by `AuthorizationAndT
    protected. Other roles see the card read-only; the designer's Add-field dialog now refuses plaintext.
 3. Restore the development default afterwards if you want the Stage A SEC-P tests' plaintext Internal fields to remain
    creatable on this organization (tick the checkbox again and save with a statement).
+4. The card also has **Permit removal of encryption from Public/Internal fields (governance)** — off by default and
+   only enabled while plaintext storage is permitted. Saving the card publishes the policy to the Authorization
+   Authority first (`UpdateMandatoryPolicy`; the response carries the `authorityCommandId`), then updates the local
+   projection; the authority, not the business row, decides whether a release may proceed (B-29).
+
+### 1.3e Remove encryption from a field (owner persona; Amendment A1, B-29) — the other direction
+
+Prerequisite: §1.3d step 4 (the governance switch is on). The **owner** persona is an organization owner *and* a
+designer; the **designer** persona is a designer only and never sees these controls. The Edit field dialog lives on
+the designer page, so in the browser the administrator must also be a designer of that form (the API routes need only
+organization administration). Only fields whose encryption requirement the authority recorded (every encrypted field
+created through the designer since B-29, and every field strengthened since B-28) can be released; a field created
+encrypted before that, or through the Stage A route, is refused as *not application-encrypted according to the
+authority* until a strengthening publishes its requirement.
+
+1. Sign in as **owner** → open the form → **Fields** → **Edit** on an encrypted **Internal** field (for example a field
+   created with classification Internal and *Encrypt this field* ticked, with at least one clerk record). The
+   **Security & Encryption** section shows **Enabled** and **Fully encrypted · verified**, the usual **Strengthen
+   protection…**, and — for organization administrators only — **Remove encryption…**.
+2. Press **Remove encryption…**: the panel *Governed removal of encryption* states that new saves become plaintext at
+   once, existing values are decrypted by an audited background migration, a plaintext value is readable by a
+   database administrator, and plaintext written to historical revisions, logs, WAL or backups **cannot be taken back**.
+   Enter a reason (3–500 characters) and press **Remove encryption**. The badge flips to **Off — plaintext**; the
+   **Decryption migration progress** block shows queued → running → completed with records decrypted / pending /
+   failed. While it runs the panel **Cancel removal of encryption** is available (reason required): it re-requires
+   encryption through the authority, marks the decrypt migration *Cancelled* and starts a rollback re-encryption.
+3. When the worker has converted every record and the post-check against the authority-accepted heads finds no
+   encrypted row, the badge **Fully migrated to plaintext · verified** appears (it is rendered only from the server's
+   verified status). The Fields table shows **Internal · Plaintext**; Versions still lists only v1. Sign in as
+   **clerk**, open the record: the value is unchanged and the **Encrypted** badge is gone; the reader is still denied.
+4. For a **Confidential** or **Restricted** field the button reads **Declassify for removal of encryption…** (*Step 1
+   of 2*): choose Public/Internal, enter the governance **approval reference** and a reason, press **Declassify**. The
+   field becomes Internal but **stays encrypted**. The release (step 2) must be done by a *different* organization
+   owner or system administrator within 24 hours; the same person is refused by the authority. The development seed
+   has a single owner persona, so step 2 for a declassified field is exercised by the Docker integration test
+   (`AConfidentialFieldNeedsADeclassificationByOneAdministratorAndTheReleaseByADifferentOne`), not by the browser.
+5. Sign in as **designer** and open the same dialog: strengthening is offered, no *Remove encryption* or *Declassify*
+   control exists, and the text explains why. Direct API calls by a designer, clerk, reader or another organization's
+   administrator are refused (`403`/`404`); with the governance switch off even the owner gets
+   `PLAINTEXT_DOWNGRADE_NOT_PERMITTED`.
+6. Database view: after completion `select count(*) from field_encrypted_values where field_definition_id = '…'` still
+   returns the historic rows (immutable history), and the latest revision of each record holds a `field_string_values`
+   row instead. Audit (`/app/activity`): `FIELD_PROTECTION_DOWNGRADED`, `FIELD_PROTECTION_MIGRATION_STARTED`, one
+   `FIELD_VALUES_DEPROTECTED` per record, `FIELD_PROTECTION_MIGRATION_COMPLETED`; a cancellation adds
+   `FIELD_PROTECTION_DOWNGRADE_CANCELLED` with the exposure window.
 
 ### 1.4 Records, addresses, documents, sharing (clerk persona, then reader)
 
@@ -256,6 +302,14 @@ Owner acceptance additions to requirement 2 (Designer workflow): editing existin
   `RowCanonicalDecoder` in the shared Integrity library, authority migration `ReprotectionOperations`), `field_protection_migrations` +
   `field_protection_migration_items` (migration `StageBFieldProtectionMigration`), `FieldProtectionMigrationService` hosted by the Worker
   (and the API in-process host), `GET …/protection` with `fullyEncrypted` + `migration` progress, `POST …/protection/retry`.
+- **Controlled removal of encryption (B-29, Amendment A1):** authority command kinds `UpdateMandatoryPolicy` (authority-held
+  `organization_protection_policies`, migration `ProtectionPolicyAndReleases`), `ReclassifyField` and `PublishFormSecurityRevision(Standard)`
+  (owner/administrator; distinct principal + 24 h freshness for sensitive fields; `field_protection_release` / `field_reclassification`
+  resources); **cutover barrier** `ReprotectionRules.EnforceBarrier` at Prepare and Commit (`409 FIELD_PROTECTION_CHANGED`);
+  `ReprotectionRules` in `Decrypt` direction; business `POST …/protection/reclassify | downgrade | cancel-downgrade`,
+  `field_protection_migrations.migration_direction / rollback_of_migration_id / migration_cancelled_on` and
+  `organization_security_policies.plaintext_downgrade_permitted / authority_command_id` (migration `StageBFieldProtectionDowngrade`),
+  worker decrypt direction, `fullyPlaintext` + `legacyEncryptedRecordCount` in `GET …/protection`.
 - **Document-encryption audit fixes (B-27):** historic-version downloads verified by the authority against the manifest of their own
   operation (optional `historic_committed_operation_id` on `VerifyRecordProjection`); staging deletion discards uncommitted blocks;
   `SweepStagingAsync` expires and purges staging (`upload_sessions.staging_object_purged_on`, migration `20261019130416_StageBStagingPurge`);
@@ -318,6 +372,18 @@ with `pageSize=1` over three records with no duplicates and rejects a forged con
 Evidence: `docs/evidence/stage-b/2026-10-18-field-encryption/sec-p-rerun/` (previous round: `docs/evidence/stage-b/2026-10-18-form-management/sec-p-rerun/`). This is a regression run on the committed code; the
 binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Stage A gate is not reopened.
 
+### 4.7 Controlled removal of encryption (B-29, Amendment A1) — run of 2026-10-19 in `docs/evidence/stage-b/2026-10-19-encryption-downgrade/`
+
+**.NET unit / architecture / contract / authority: 163 passed, 0 failed** (authority 34 — adds the Amendment A1 planner test: no authority-held policy ⇒ nothing released or reclassified, designer refused for policy/release/reclassify, Confidential field refused without declassification, approval reference required, same user refused through either of their identity bindings, distinct administrator accepted with requirement + reclassification revoked and release registered, stale (>24 h) declassification refused, release below the policy floor refused, target mismatch refused, withdrawn policy refused; the decrypt-direction and barrier rules tests; and `RuntimeGrantsTests` — contract 30, architecture 65, integrity 34). Frontend lint/typecheck clean, **42 vitest tests**, production build OK.
+
+**Stage B Docker integration: 39 passed, 0 failed** (`stage-b-integration/stage-b-integration.trx`; 7 m 09 s). **`FieldProtectionDowngradeTests` (6):** (a) *gate and roles* — no policy ⇒ `PLAINTEXT_DOWNGRADE_NOT_PERMITTED` for release and declassification even for the owner; a designer cannot publish the policy; with the policy open a designer-only user, the clerk and the reader are refused on release/reclassify/cancel; the designer's strengthen route still answers `FIELD_PROTECTION_DOWNGRADE_REFUSED`; another organization's administrator gets 404; stale revision 409; a plaintext field and a Confidential field are refused (`INVALID_REQUEST`, `DECLASSIFICATION_REQUIRED`); the field stays encrypted and no migration row exists. (b) *full release of an Internal field with 6 records* — the administrator's command flips the field to `Standard` at once with the command id recorded, overlapping changes are `MIGRATION_IN_PROGRESS`, the worker decrypts every record through the authority, `fullyPlaintext`/`Plaintext` only after completion and the authority-head recount, zero encrypted rows in the latest snapshots, six typed plaintext rows, the Confidential field and the Integer field untouched, one new revision per record, the six historic ciphertext rows kept, every record verifies and reads for the clerk as plaintext, the reader stays denied, published v1 unchanged, the administrator's activity holds `FIELD_PROTECTION_DOWNGRADED`, start, six `FIELD_VALUES_DEPROTECTED` and completion without values, a new write after the release is plaintext, and a later re-strengthening re-encrypts everything (verified). (c) *two-person rule for a Confidential field* — release refused without declassification; empty approval reference and non-lowering target 422; designer refused; the owner declassifies (field Internal, still encrypted, `FIELD_DECLASSIFIED`); the **same** owner's release is refused by the authority; a distinct system administrator's release succeeds and decrypts both records; after re-encryption a designer-only release is still refused. (d) *concurrent writers across the cutover* — six writers edit the migrating field before, during and after the release while the worker is restarted; every refusal is a stated 409/412/423/503, the barrier holds (zero encrypted rows in any latest snapshot, none after each record's last migration revision), every committed edit is visible as plaintext, 24/24 verified. (e) *interrupted and tampered* — release refused while the authority is paused (field unchanged); a DBA-corrupted ciphertext fails its record (`DEPROTECT_AUTHENTICATION_FAILED` after bounded attempts) while the authority outage parks the migration `Blocked` and it resumes after `docker compose restart worker`; four records decrypt, the field is **not** fully plaintext, a forged `Completed` row changes nothing, a designer cannot retry a decrypt migration, the administrator can, and the tampered record stays refused. (f) *cancellation* — cancel with nothing to cancel refused; after the release made progress the owner cancels: field `ApplicationEncrypted`, decrypt migration `Cancelled` (never resumed), rollback `Encrypt` migration with `rollback_of_migration_id` completes to `fullyEncrypted`, zero plaintext rows in the latest snapshots, values readable and encrypted, `FIELD_PROTECTION_DOWNGRADE_CANCELLED` says "not reversible" and carries the exposure window, and the plaintext rows written during the window remain as immutable history (stated, not hidden). The B-28 encrypt suite (4), `EncryptionTests` (3) and all earlier Stage B scenarios pass on the same stack (every designer-created encrypted field now also registers its requirement with the authority at birth).
+
+**Browser (Playwright, Chromium): 17 of 18 passed on the security-test stack**, the one failure being a race in the pre-existing `encryption` spec (the single legacy record was already re-encrypted before the "1 record still holds a plaintext copy" assertion ran; the spec now accepts either that text or the verified badge — the product behaviour it checks is unchanged); the two encryption specs then passed **8/8** on the same stack (`playwright-encryption-rerun-sectest.log`). **`encryption-downgrade` (4):** owner enables *Permit removal of encryption*; owner publishes a form with an encrypted Internal field; a designer-only user on their own form sees *Strengthen protection…* but no *Remove encryption* / *Declassify* and the explanation; the clerk's record shows the **Encrypted** badge; the owner's *Remove encryption…* panel shows the irreversibility warning, requires a reason, flips the badge to *Off — plaintext*, shows **Fully migrated to plaintext · verified** only when the server reports it, the Fields table reads *Internal · Plaintext*, Versions still lists only v1, the clerk's record keeps its value without the Encrypted badge; the development policy is restored. Development-stack run (clean `compose.dev.yaml` stack recreated after the chain, `API_TARGET=http://127.0.0.1:5080`): **18 passed, 0 failed** (`playwright-dev-stack.log`). Browser evidence of this round is the chain logs (the chain runs Playwright with the line reporter, so no junit file was produced).
+
+**Stage A SEC-P01..SEC-P12 regression on the same stack: 13 passed, 0 failed** (`sec-p-rerun/`).
+
+**Red attempts kept** (`docker-chain-attempt1..5-*.log`): (1) the dev stack still held the shared subnets; (2) missing runtime grant on `organization_protection_policies`; (3) system administrator refused by the business routes (`manage_configuration` is owner-only) and a lease pinned by a graceful worker restart; (4) a tampered ciphertext crashed the Worker host; (5) actor-scoped idempotency keys and test-side fixes, with the two unrelated integration failures and one browser failure of that attempt traced to a leftover SEC-P test host (fault injection `CrashAfterJournalCommit`) from an earlier aborted run still hitting the stack — the clean run that followed is the evidence above. Every product defect is listed in §5; no test was weakened.
+
 ### 4.6 GitHub-hosted runs
 
 **Encryption-migration head `a0f0b37` (B-28):** `ci` **success** (run 39275110192), `stage-b-integration` — Docker integration (33, incl. the four migration tests) + Playwright (14) on a GitHub-hosted runner — **success** (run 39275110333): https://github.com/schipani/EnterpriseForms/actions/runs/39275110192 and https://github.com/schipani/EnterpriseForms/actions/runs/39275110333.
@@ -339,6 +405,11 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 | **Phase 1B:** creating the organization's default data-protection policy row committed the caller's transaction, so the first field creation of a fresh organization failed with 500 (`NpgsqlTransaction has completed`) | `EncryptionTests` first Docker run (21/24 red) | the default row is only *added* to the caller's scope; every caller commits itself |
 | **Phase 1B:** `FieldProtectionPolicy.Resolve` silently forced encryption when Confidential was requested with `Standard` | unit test | explicit plaintext for Confidential/Restricted is refused (`FIELD_PROTECTION_REQUIRED`), never corrected silently |
 | **Phase 1B:** the Stage A `POST /form-definitions` route created plaintext fields regardless of the organization policy | `EncryptionTests` policy test | the route resolves its explicit Internal/Standard fields through the same policy (`PLAINTEXT_NOT_PERMITTED` when the owner has turned plaintext off) |
+| **Amendment A1:** the authority runtime role had no grant on the new `organization_protection_policies` table, so every policy publish failed closed with `503 AUTHORITY_NOT_READY` (seven integration tests, two browser tests red) | first Docker chain of B-29 | grant added; new `RuntimeGrantsTests` asserts every table of the authority EF model has a runtime grant |
+| **Amendment A1:** the business routes checked `ManageOrganization`, which the SpiceDB schema grants to organization owners only, so a system administrator was refused although the authority's planner accepts both roles | second Docker chain of B-29 (six tests red) | new `AdministerSecurity` action (`administer_security`); the routes accept either |
+| **B-28 worker:** a graceful shutdown mid-batch (`docker compose restart worker`) returned from the loop without releasing the migration lease, so no worker could resume for the full 5-minute lease (the 24-record concurrent-edit test timed out at 300 s although the migration completed at 5m06s) | second Docker chain of B-29 | the lease is handed back on cancellation and the migration is parked `Blocked` on an unexpected failure; recorded items stay recorded |
+| **Amendment A1:** a DBA-corrupted ciphertext made the worker's decrypt throw `AuthenticationTagMismatchException`, which escaped the migration loop and **stopped the whole Worker host** (every later migration stayed Queued) | third Docker chain of B-29 (tampered-ciphertext test) | the record fails closed (`DEPROTECT_AUTHENTICATION_FAILED`, bounded attempts, then `Failed`); the migration loops in the Worker and the API in-process host log and continue on any non-cancellation exception |
+| **Amendment A1:** the security-command idempotency keys of the governance routes were per field and revision only, so after one administrator's refused release the second administrator's legitimate command hit `IDEMPOTENCY_CONFLICT` | fourth Docker chain of B-29 (two-person test) | keys include the acting user |
 | `MapSnakeCase` skipped `DateOnly` → naming violation on `field_date_values` | registry test | naming helper maps `DateOnly`/`TimeOnly` |
 | SpiceDB schema tests expected `read = owner` after the parent edge | authority tests | expectations updated to `effective_owner` (schema change is deliberate, B-04) |
 | Rejected upload sessions reported no scanner verdict | integration test | verdict derived from the recorded worker failure code (B-13) |
@@ -411,8 +482,10 @@ organization's protected data is held in Azure, the following are required; none
 | **Purpose-separated keys**: distinct KEKs (or HSM keys) for field values, documents and signing; per-organization keys | Fields and documents share the single development KEK; separation is by DEK and AAD domain only (`DynamicForms/FieldValue/v1` vs the document envelope); HMAC keys are already separate (Vault Transit / Managed HSM) | PB-05 / G04 |
 | **Key rotation and re-wrap**: new KEK version for new DEKs, background re-wrap of stored wrapped DEKs, retired-version retention for backups, incident re-key | `encryption_key_reference` is recorded per value/version; no rotation job exists | PB-05, G14 (historic key versions in recovery) |
 | ~~Bulk re-encryption job~~ **Implemented (B-28, 2026-10-19):** authority-governed background re-protection of every record after a strengthening, with verified completion, retry and progress UI | Done; see §4.3/§4.4 and decision B-28 | — |
-| **Encrypted → plaintext migration** (controlled removal of encryption) | **Proposed, not approved, not implemented**: `docs/decisions/PROPOSED-ADR-PB-004-A1-ENCRYPTED-TO-PLAINTEXT-MIGRATION.md`; no-downgrade enforcement stays | Owner approval of the amendment |
-| **Authority-held organization data-protection policy** (`UpdateMandatoryPolicy`) so the authority, not a business row, decides whether plaintext is permitted | Business row only today | Amendment A1 prerequisite |
+| ~~Encrypted → plaintext migration~~ **Implemented (B-29, 2026-10-19, Amendment A1 accepted):** governance-approved, administrator-only, distinct-principal for sensitive data, authority cutover barrier, verified decryption migration, rollback with exposure-window evidence | Done on the local stack; see §1.3e, §4.3/§4.4 and `docs/decisions/ADR-AMENDMENT-PB-004-A1-ENCRYPTED-TO-PLAINTEXT-MIGRATION.md` | Production: independent review, managed keys, Azure staging, Level 2 approval |
+| ~~Authority-held organization data-protection policy~~ **Implemented (B-29):** `UpdateMandatoryPolicy` writes the authority's own `organization_protection_policies` before the business projection | Done | — |
+| **Step-up (fresh FIDO2) assurance on the governance commands** (declassify, release, cancel, policy) | Not available: PB-08 identity assurance is not implemented; the commands rely on the authenticated session and the distinct-principal rule | PB-08 |
+| **Purge of historic plaintext revisions** written during a release / exposure window | Immutable history in Business PostgreSQL and backups; the cancel audit event records the window | Retention/purge workflow (CLAUDE.md §4A) |
 | **Production organization policy**: a reviewed default (`PlaintextInternalFieldsPermitted=false` or an approved statement) set by the organization's owner/security owner before onboarding; approval evidence | Development default permits plaintext Internal fields and says so in the UI | PB-12, PB-13 onboarding |
 | **Per-record challenge unlock**, blind-index exact match for encrypted values | Not implemented (ADR-PB-004: no encrypted search in V1) | §4C.5 / future ADR |
 | **Confidential/Restricted search** | Explicitly unsupported in V1; designer dialog states it | Phase 4 / G06 |
@@ -430,7 +503,7 @@ authority-verified metadata in the version history list; independent cryptograph
 
 ### 7.3 Encryption migration — explicitly not done (2026-10-19)
 
-- **Encrypted → plaintext** conversion: proposed only (`PROPOSED-ADR-PB-004-A1-ENCRYPTED-TO-PLAINTEXT-MIGRATION.md`), awaiting the owner's decision; nothing in the code weakens a field.
+- **Encrypted → plaintext** conversion is implemented (B-29) but **only** through the governed protocol of Amendment A1; no designer control, PATCH or republish weakens a field. Historical plaintext exposure during a release is irreversible and is recorded, not undone, by a cancellation.
 - **Fail-closed scope during an incomplete migration:** authorized reads of a not-yet-migrated value continue (flagged `legacyPlaintext`); the field is not reported as encrypted, and no search/export surface exists yet that would have to refuse it. If a future surface depends on "fully encrypted", it must consult `fullyEncrypted`, never the migration row.
 - **Historic plaintext revisions** remain immutable history in Business PostgreSQL (and backups); purging them is the retention/purge workflow, not this migration.
 - **Fields strengthened before this build** (no authority command recorded) keep rewrite-on-save; they can be migrated by raising their classification once (which issues the command and queues the migration).

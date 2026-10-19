@@ -59,4 +59,6 @@ public static class SecurityCommandKinds
     public const string RevokeShare = "RevokeShare";
     public const string UpdateFormUsers = "UpdateFormUsers";
     public const string PublishFormSecurityRevision = "PublishFormSecurityRevision";
+    public const string UpdateMandatoryPolicy = "UpdateMandatoryPolicy";
+    public const string ReclassifyField = "ReclassifyField";
 }

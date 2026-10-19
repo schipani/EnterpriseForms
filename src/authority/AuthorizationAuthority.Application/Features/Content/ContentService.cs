@@ -113,6 +113,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         {
             mutations = ClassifyMutations(parsed, currentLeaves);
             AuthorizeMutations(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false), bound, request.FormRecordId, mutations);
+            await EnforceProtectionBarrierAsync(scope, state.OrganizationId, resource.ParentResourceEntityId, parsed.Select(p => (p.Kind, (ReadOnlyMemory<byte>)p.CanonicalBytes)), cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -200,6 +201,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // A reprotection operation is committed by the workload under its command; a user operation by the same user.
         var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, operation.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
+        if (reprotection is null)
+        {
+            // Atomic cutover (Amendment A1 req. 7): a candidate prepared before a protection command became effective may not commit rows of the old form.
+            var recordResource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, request.FormRecordId, cancellationToken).ConfigureAwait(false);
+            await EnforceProtectionBarrierAsync(scope, state.OrganizationId, recordResource?.ParentResourceEntityId, request.StagedItems.Select(i => (i.ItemKind, (ReadOnlyMemory<byte>)Convert.FromBase64String(i.CanonicalBytesBase64))), cancellationToken).ConfigureAwait(false);
+        }
         if (operation.ActorIdentityBindingId != bound.Binding.IdentityBindingId)
         {
             throw AuthorityException.Forbidden("operation belongs to another actor");
@@ -264,9 +271,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
                 throw;
             }
         }
-        else if (mutations.Values.Any(m => m is not (ContentMutationKinds.Unchanged or ContentMutationKinds.Reprotect)))
+        else if (mutations.Values.Any(m => m is not (ContentMutationKinds.Unchanged or ContentMutationKinds.Reprotect or ContentMutationKinds.Deprotect)))
         {
-            throw AuthorityException.Forbidden("a reprotection operation may only carry reprotect mutations");
+            throw AuthorityException.Forbidden("a protection migration operation may only carry reprotect/deprotect mutations");
         }
 
         // Prove the staged bytes are exactly the approved candidate: same key set, same digests, same signatures, signatures verify, same root.
@@ -710,7 +717,33 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
     }
 
-    private sealed record ReprotectionContext(Guid CommandId, Guid FormDefinitionId, Guid FieldDefinitionId);
+    private sealed record ReprotectionContext(Guid CommandId, Guid FormDefinitionId, Guid FieldDefinitionId, ProtectionDirection Direction);
+
+    /// <summary>Fields of the form with an active encryption requirement must appear encrypted; fields with an active release must appear plaintext (user operations only).</summary>
+    private static async Task EnforceProtectionBarrierAsync(IAuthorityScope scope, Guid organizationId, Guid? formDefinitionId, IEnumerable<(ManifestItemKind Kind, ReadOnlyMemory<byte> Bytes)> items, CancellationToken cancellationToken)
+    {
+        if (formDefinitionId is null)
+        {
+            return;
+        }
+
+        var protections = await scope.GetActiveResourcesByParentAsync(organizationId, formDefinitionId.Value, [ResourceTypeNames.FieldProtectionRequirement, ResourceTypeNames.FieldProtectionRelease], cancellationToken).ConfigureAwait(false);
+        if (protections.Count == 0)
+        {
+            return;
+        }
+
+        var mustBeEncrypted = protections.Where(p => p.ResourceTypeName == ResourceTypeNames.FieldProtectionRequirement).Select(p => p.ResourceEntityId).ToHashSet();
+        var mustBePlaintext = protections.Where(p => p.ResourceTypeName == ResourceTypeNames.FieldProtectionRelease).Select(p => p.ResourceEntityId).ToHashSet();
+        try
+        {
+            ReprotectionRules.EnforceBarrier(items, mustBeEncrypted, mustBePlaintext);
+        }
+        catch (IntegrityFormatException ex)
+        {
+            throw AuthorityException.Invalid("candidate bytes are not RowHmac v1: " + ex.Code);
+        }
+    }
 
     /// <summary>
     /// A user operation binds the delegated user. A reprotection operation has no user: it is authorized by an effective
@@ -748,8 +781,18 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         var binding = await scope.FindIdentityBindingByIdAsync(command.ActorIdentityBindingId, cancellationToken).ConfigureAwait(false)
                       ?? throw AuthorityException.Forbidden("the command's actor binding no longer exists");
-        var recorded = new VerifiedActor(binding.IdentityIssuerUri, binding.IdentitySubjectIdentifier, "reprotection-worker");
-        return (new BoundActor(recorded, binding), new ReprotectionContext(command.SecurityCommandId, payload.FormDefinitionId, payload.FieldDefinitionId));
+        var direction = payload.RequiredProtectionMode == "Standard" ? ProtectionDirection.Decrypt : ProtectionDirection.Encrypt;
+
+        // The command must still be the field's current protection decision: a later command in the other direction supersedes it.
+        var currentType = direction == ProtectionDirection.Encrypt ? ResourceTypeNames.FieldProtectionRequirement : ResourceTypeNames.FieldProtectionRelease;
+        var current = await scope.FindResourceAsync(state.OrganizationId, currentType, payload.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (current is null || current.ResourceLifecycleState != ResourceLifecycleStates.Active || current.RegisteredBySecurityCommandId != command.SecurityCommandId)
+        {
+            throw AuthorityException.Forbidden("the command no longer describes the field's current protection (superseded or cancelled)");
+        }
+
+        var recorded = new VerifiedActor(binding.IdentityIssuerUri, binding.IdentitySubjectIdentifier, direction == ProtectionDirection.Encrypt ? "reprotection-worker" : "deprotection-worker");
+        return (new BoundActor(recorded, binding), new ReprotectionContext(command.SecurityCommandId, payload.FormDefinitionId, payload.FieldDefinitionId, direction));
     }
 
     /// <summary>
@@ -786,7 +829,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var candidate = parsed.Select(p => new ReprotectionRules.SnapshotItem(p.Kind, p.ItemId, p.Key, RowCanonicalDecoder.Decode(p.CanonicalBytes), p.Digest)).ToList();
         try
         {
-            return ReprotectionRules.Validate(current, candidate, reprotection.FieldDefinitionId);
+            return ReprotectionRules.Validate(current, candidate, reprotection.FieldDefinitionId, reprotection.Direction);
         }
         catch (IntegrityFormatException ex)
         {

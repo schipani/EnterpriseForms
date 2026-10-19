@@ -1,0 +1,15 @@
+Encrypt|Completed|1|1|0|f|t
+Decrypt|Failed|5|4|1|f|f
+Decrypt|Completed|24|24|0|f|t
+Decrypt|Completed|6|6|0|f|t
+Encrypt|Completed|6|6|0|f|t
+Decrypt|Cancelled|8|8|0|f|f
+Encrypt|Completed|8|8|0|t|t
+Decrypt|Completed|2|2|0|f|t
+Encrypt|Completed|2|2|0|f|t
+Encrypt|Completed|6|6|0|f|t
+Encrypt|Failed|5|4|1|f|f
+Encrypt|Completed|1|1|0|f|t
+Encrypt|Completed|24|24|0|f|t
+Decrypt|Completed|1|1|0|f|t
+Encrypt|Completed|1|1|0|f|t

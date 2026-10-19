@@ -20,8 +20,9 @@ public sealed partial class FieldProtectionMigrationWorker(FieldProtectionMigrat
             {
                 return;
             }
-            catch (Exception ex) when (ex is Npgsql.NpgsqlException or Microsoft.EntityFrameworkCore.DbUpdateException or IOException or InvalidOperationException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                // One record's failure (the service has already parked the migration as Blocked) must never stop the host: log and keep polling.
                 LogLoopError(logger, ex.GetType().Name, ex.Message);
             }
 

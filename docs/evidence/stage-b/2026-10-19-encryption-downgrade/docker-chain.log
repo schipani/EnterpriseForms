@@ -1,0 +1,42 @@
+### stop security-test stack
+ Network enterpriseforms-sectest_web-net Removed 
+ Network enterpriseforms-sectest_business-net Removed 
+ Network enterpriseforms-sectest_trust-edge Removed 
+### start security-test stack
+ Container enterpriseforms-sectest-business-migrate-1 Exited 
+ Container enterpriseforms-sectest-authority-1 Healthy 
+ Container enterpriseforms-sectest-clamav-1 Healthy 
+ Container enterpriseforms-sectest-azurite-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Exited 
+ Container enterpriseforms-sectest-attacker-sql-1 Healthy 
+ Container enterpriseforms-sectest-api-1 Healthy 
+container enterpriseforms-sectest-dev-seed-1 exited (0)
+### build tests
+Build succeeded.
+Build succeeded.
+### stage-b integration
+  total: 39
+  failed: 0
+  succeeded: 39
+  skipped: 0
+  duration: 7m 08s 965ms
+### playwright
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+    Timeout: 20000ms
+    Error: element(s) not found
+      116 |     await expect(security.getByText("Enabled", { exact: true })).toBeVisible();
+    > 117 |     await expect(security.getByText(/1 record\(s\) still hold a plaintext copy/)).toBeVisible();
+      119 |     await expect(dialog).toBeHidden();
+      120 |     await expect(page.getByRole("row", { name: /Exhibit count/ })).toContainText("Confidential · Encrypted");
+    test-results\encryption-Field-encryptio-e04f8-ypted-the-change-is-one-way-chromium-desktop\test-failed-1.png
+    Error Context: test-results\encryption-Field-encryptio-e04f8-ypted-the-change-is-one-way-chromium-desktop\error-context.md
+[1A[2K  1 failed
+  16 passed (3.9m)
+### sec-p
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 2m 28s 063ms
+### DONE
+exit 0

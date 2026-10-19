@@ -61,6 +61,21 @@ public static class FormDesignerEndpoints
             .WithName("RetryFieldProtectionMigration")
             .WithSummary("Re-queues the failed records of a field's encryption migration (design permission; audited).");
 
+        group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection/reclassify", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, ReclassifyFieldRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.ReclassifyFieldAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("ReclassifyField")
+            .WithSummary("Amendment A1: declassifies an encrypted field to Public/Internal through the authority's ReclassifyField command (organization owner or system administrator; governance approval reference).");
+
+        group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection/downgrade", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, DowngradeFieldProtectionRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.DowngradeProtectionAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("DowngradeFieldProtection")
+            .WithSummary("Amendment A1: releases a Public/Internal field from application encryption (organization owner or system administrator; distinct principal for declassified fields) and starts the audited background decryption migration.");
+
+        group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection/cancel-downgrade", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, CancelFieldProtectionDowngradeRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.CancelDowngradeAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("CancelFieldProtectionDowngrade")
+            .WithSummary("Amendment A1 rollback: re-requires encryption and re-encrypts already converted active values (organization owner or system administrator).");
+
         group.MapGet("/{formDefinitionId:guid}/access", static async Task<Ok<FormAccessResponse>> (Guid formDefinitionId, HttpContext http, FormAccessHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.GetAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, cancellationToken).ConfigureAwait(false)))
             .WithName("GetFormAccess")

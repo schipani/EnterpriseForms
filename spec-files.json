@@ -69,8 +69,8 @@
     },
     {
       "path": "docs/STAGE_B_STATUS.md",
-      "sha256": "4474d85d4a5a5b20919b2484d90d724694a032f5723b8b7077874cbb9892dea6",
-      "bytes": 61686
+      "sha256": "caae317583824b581e2b2b9637bc4556ba5ea158ce7ea91309b1da248dd24d35",
+      "bytes": 77324
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -98,6 +98,11 @@
       "bytes": 6295
     },
     {
+      "path": "docs/decisions/ADR-AMENDMENT-PB-004-A1-ENCRYPTED-TO-PLAINTEXT-MIGRATION.md",
+      "sha256": "d10ff4a49cfd3c0703de8dc5e02e42616b0bf0201457f960c7e2d777a1f01dbf",
+      "bytes": 15129
+    },
+    {
       "path": "docs/decisions/ADR-PB-001-CANONICAL-REPOSITORY.md",
       "sha256": "3a20cf06c6008adff1b20b5c8664c026a031ba73430a16b0f7ca3c68952b466f",
       "bytes": 5551
@@ -114,8 +119,8 @@
     },
     {
       "path": "docs/decisions/ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md",
-      "sha256": "daf3eec1583d349f7526f3b1fcf9139dc508acdd38cbd8de58eb4beeb1f71155",
-      "bytes": 9967
+      "sha256": "3c1be74d6cac043055bbbb49f32415007b5b3d5856689f9c37a0640b4fc1a46e",
+      "bytes": 10418
     },
     {
       "path": "docs/decisions/ADR-PB-005-DOCKER-AZURE-BICEP-DEPLOYMENT.md",
@@ -174,13 +179,8 @@
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
-      "sha256": "657c2686586dedda27e17522e53484608b4d9441edf78c1607d20ec7e068947c",
-      "bytes": 7606
-    },
-    {
-      "path": "docs/decisions/PROPOSED-ADR-PB-004-A1-ENCRYPTED-TO-PLAINTEXT-MIGRATION.md",
-      "sha256": "23a9142103d7347ff24e1850e47fb8158e5a0d47171e23faab1d2a96628f0dc3",
-      "bytes": 11393
+      "sha256": "ca6f4db76f78eee3a4b610de4c035aa47b7fcb5ed733faecabfba01fc345b2ab",
+      "bytes": 7960
     },
     {
       "path": "docs/decisions/STAGE_A_DECISION_LOG.md",
@@ -189,8 +189,8 @@
     },
     {
       "path": "docs/decisions/STAGE_B_DECISION_LOG.md",
-      "sha256": "74909422def860e2924f365abb6de8142e3140b6308c2a66ad46d9e2a9005abf",
-      "bytes": 31805
+      "sha256": "2dba19e6918b265a264167c4d280d40fd435413478b33d33b73f12c3736221c8",
+      "bytes": 36100
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",

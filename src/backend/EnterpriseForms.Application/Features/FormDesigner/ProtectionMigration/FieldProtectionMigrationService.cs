@@ -51,9 +51,33 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        if (field.FieldProtectionMode != FieldProtectionModes.ApplicationEncrypted)
+        try
         {
-            await SettleAsync(migration.FieldProtectionMigrationId, FieldProtectionMigrationStates.Failed, "FIELD_NOT_ENCRYPTED", TimeSpan.FromHours(1), cancellationToken).ConfigureAwait(false);
+            return await ProcessLeasedAsync(migration, field, options, batch, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Graceful shutdown (e.g. `docker compose restart worker`) mid-batch: hand the lease back now instead of letting it expire,
+            // so another worker resumes immediately. Items already recorded stay recorded; the rest are still Pending.
+            await ReleaseLeaseAsync(migration.FieldProtectionMigrationId).ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // An unexpected failure must not pin the lease for its full duration: park the migration as Blocked and retry shortly.
+            await SettleAsync(migration.FieldProtectionMigrationId, FieldProtectionMigrationStates.Blocked, "UNEXPECTED_WORKER_FAILURE", TimeSpan.FromSeconds(30), CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task<bool> ProcessLeasedAsync(FieldProtectionMigration migration, FieldDefinition field, List<FieldOption> options, List<FieldProtectionMigrationItem> batch, CancellationToken cancellationToken)
+    {
+        var decrypting = migration.MigrationDirection == FieldProtectionMigrationDirections.Decrypt;
+        var expectedMode = decrypting ? FieldProtectionModes.Standard : FieldProtectionModes.ApplicationEncrypted;
+        if (field.FieldProtectionMode != expectedMode)
+        {
+            // The field's live mode no longer matches the migration (e.g. a cancelled downgrade superseded it): never convert against the current decision.
+            await SettleAsync(migration.FieldProtectionMigrationId, FieldProtectionMigrationStates.Failed, decrypting ? "FIELD_NOT_RELEASED" : "FIELD_NOT_ENCRYPTED", TimeSpan.FromHours(1), cancellationToken).ConfigureAwait(false);
             return true;
         }
 
@@ -77,7 +101,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var outcome = await MigrateRecordAsync(migration, field, optionsById, item, cancellationToken).ConfigureAwait(false);
+                var outcome = await MigrateRecordAsync(migration, field, options, optionsById, item, cancellationToken).ConfigureAwait(false);
                 await RecordItemAsync(migration.FieldProtectionMigrationId, item.FieldProtectionMigrationItemId, outcome, cancellationToken).ConfigureAwait(false);
             }
             catch (EncryptionUnavailableException)
@@ -109,7 +133,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
 
     private sealed record ItemOutcome(string State, string? ErrorCode, Guid? OperationId, long? ContentRevision, bool ByUserCommit, bool Retry);
 
-    private async Task<ItemOutcome> MigrateRecordAsync(FieldProtectionMigration migration, FieldDefinition field, IReadOnlyDictionary<Guid, FieldOption> optionsById, FieldProtectionMigrationItem item, CancellationToken cancellationToken)
+    private async Task<ItemOutcome> MigrateRecordAsync(FieldProtectionMigration migration, FieldDefinition field, IReadOnlyList<FieldOption> options, IReadOnlyDictionary<Guid, FieldOption> optionsById, FieldProtectionMigrationItem item, CancellationToken cancellationToken)
     {
         // 1. The authority's accepted head for the record (metadata only), read under the migration's command.
         AcceptedContentRevision head;
@@ -134,30 +158,56 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             return Failure(item, "COMMITTED_ROWS_MISSING");
         }
 
-        var plaintextRows = snapshot.Rows.OfType<FieldValueRowBase>().Where(v => v.FieldDefinitionId == field.FieldDefinitionId && v is not FieldEncryptedValue).ToList();
-        if (plaintextRows.Count == 0)
+        var decrypting = migration.MigrationDirection == FieldProtectionMigrationDirections.Decrypt;
+        var sourceRows = snapshot.Rows.OfType<FieldValueRowBase>().Where(v => v.FieldDefinitionId == field.FieldDefinitionId && (decrypting ? v is FieldEncryptedValue : v is not FieldEncryptedValue)).ToList();
+        if (sourceRows.Count == 0)
         {
             return new ItemOutcome(FieldProtectionMigrationItemStates.Completed, null, head.CommittedOperationId, head.CommittedContentRevision, ByUserCommit: true, Retry: false);
         }
 
-        // 3. Candidate: same header, same attachments, same other values; the field's plaintext rows re-sealed under the same item ids and self-checked.
+        // 3. Candidate: same header, same attachments, same other values; the field's rows converted under the same item ids and self-checked
+        //    (encrypt: seal then decrypt-compare; decrypt: decrypt, re-encode as the typed row, format-compare).
         var header = CandidateBuilder.CloneHeader(snapshot.Header);
         var rows = new List<ISignedContentRow>();
         foreach (var value in snapshot.Rows.OfType<FieldValueRowBase>())
         {
-            if (value.FieldDefinitionId != field.FieldDefinitionId || value is FieldEncryptedValue)
+            if (value.FieldDefinitionId != field.FieldDefinitionId || (decrypting ? value is not FieldEncryptedValue : value is FieldEncryptedValue))
             {
                 rows.Add(Documents.UploadSessions.UploadSessionHandlers.CloneValue(value));
                 continue;
             }
 
-            var sealedRow = FieldValueCodec.Protect(value, field, optionsById, encryption);
-            if (sealedRow is not FieldEncryptedValue || FieldValueCodec.Format(sealedRow, optionsById, encryption) != FieldValueCodec.Format(value, optionsById))
+            FieldValueRowBase converted;
+            if (decrypting)
             {
-                return Failure(item, "REPROTECT_SELF_CHECK_FAILED");
+                string wire;
+                try
+                {
+                    wire = FieldValueCodec.Format(value, optionsById, encryption);
+                }
+                catch (System.Security.Cryptography.CryptographicException)
+                {
+                    // Tampered or foreign ciphertext (AEAD tag/AAD mismatch): this record fails closed; nothing is written and the worker keeps running.
+                    return Failure(item, "DEPROTECT_AUTHENTICATION_FAILED");
+                }
+
+                converted = FieldValueCodec.CreateRow(field, null, options, wire, value.TenantId, value.FormRecordId, value.FieldValueItemId, value.CreatedOn, value.CreatedByUserId);
+                converted.FormRecordGroupId = value.FormRecordGroupId;
+                if (converted is FieldEncryptedValue || FieldValueCodec.Format(converted, optionsById) != wire)
+                {
+                    return Failure(item, "DEPROTECT_SELF_CHECK_FAILED");
+                }
+            }
+            else
+            {
+                converted = FieldValueCodec.Protect(value, field, optionsById, encryption);
+                if (converted is not FieldEncryptedValue || FieldValueCodec.Format(converted, optionsById, encryption) != FieldValueCodec.Format(value, optionsById))
+                {
+                    return Failure(item, "REPROTECT_SELF_CHECK_FAILED");
+                }
             }
 
-            rows.Add(sealedRow);
+            rows.Add(converted);
         }
 
         rows.AddRange(snapshot.Rows.OfType<FileAttachmentVersion>().Select(a => CandidateBuilder.CloneAttachment(a)));
@@ -175,7 +225,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
                 record.ModifiedOn = clock.GetUtcNow();
             }
 
-            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldValuesReprotected, "Success", "plaintext values of the field re-sealed as ciphertext in a new accepted content revision", item.FormRecordId, new { contentRevision = accepted.CommittedContentRevision, operationId = accepted.CommittedOperationId, reprotectedValueCount = plaintextRows.Count }));
+            scope.AddAuditEvent(ServiceEvent(migration, decrypting ? AuditActions.FieldValuesDeprotected : AuditActions.FieldValuesReprotected, "Success", decrypting ? "encrypted values of the field re-written as typed plaintext in a new accepted content revision (Amendment A1)" : "plaintext values of the field re-sealed as ciphertext in a new accepted content revision", item.FormRecordId, new { contentRevision = accepted.CommittedContentRevision, operationId = accepted.CommittedOperationId, convertedValueCount = sourceRows.Count, direction = migration.MigrationDirection }));
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             return new ItemOutcome(FieldProtectionMigrationItemStates.Completed, null, accepted.CommittedOperationId, accepted.CommittedContentRevision, ByUserCommit: false, Retry: false);
         }
@@ -251,14 +301,18 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             tracked = await readScope.GetProtectionMigrationItemRecordIdsAsync(leased.FieldProtectionMigrationId, cancellationToken).ConfigureAwait(false);
         }
 
-        var stillPlaintext = 0;
+        var decrypting = leased.MigrationDirection == FieldProtectionMigrationDirections.Decrypt;
+        var stillPlaintext = 0; // records whose authority-accepted head still holds rows of the old form
         foreach (var recordId in tracked)
         {
             var head = await authority.GetCommittedContentRevisionForReprotectionAsync(leased.TenantId, recordId, leased.AuthorityCommandId, cancellationToken).ConfigureAwait(false);
             if (head.CommittedOperationId is { } accepted)
             {
                 await using var countScope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-                stillPlaintext += await countScope.CountPlaintextRowsInOperationAsync(field.FieldDefinitionId, recordId, accepted, cancellationToken).ConfigureAwait(false) > 0 ? 1 : 0;
+                var oldForm = decrypting
+                    ? await countScope.CountEncryptedRowsInOperationAsync(field.FieldDefinitionId, recordId, accepted, cancellationToken).ConfigureAwait(false)
+                    : await countScope.CountPlaintextRowsInOperationAsync(field.FieldDefinitionId, recordId, accepted, cancellationToken).ConfigureAwait(false);
+                stillPlaintext += oldForm > 0 ? 1 : 0;
             }
         }
 
@@ -270,7 +324,9 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
         }
 
         var now = clock.GetUtcNow();
-        var remaining = await scope.GetLegacyPlaintextRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+        var remaining = decrypting
+            ? await scope.GetLegacyEncryptedRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false)
+            : await scope.GetLegacyPlaintextRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
         var untracked = remaining.Where(r => !tracked.Contains(r.FormRecordId)).ToList();
         if (untracked.Count > 0)
         {
@@ -297,7 +353,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             migration.MigrationState = FieldProtectionMigrationStates.Failed;
             migration.LastErrorCode = "PLAINTEXT_STILL_PRESENT";
             migration.NextAttemptOn = now.AddHours(1);
-            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationFailed, "Failed", "post-check against the authority heads found plaintext copies after all items completed", null, new { remaining = stillPlaintext }));
+            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationFailed, "Failed", "post-check against the authority heads found rows of the old form after all items completed", null, new { remaining = stillPlaintext, direction = migration.MigrationDirection }));
         }
         else
         {
@@ -306,7 +362,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             migration.MigrationVerifiedOn = now;
             migration.LastErrorCode = null;
             migration.NextAttemptOn = DateTimeOffset.MaxValue;
-            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationCompleted, "Success", "every record re-protected through the authority; post-check against the authority-accepted heads found no plaintext copy of the field", null, new { migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, verifiedRecords = tracked.Count }));
+            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationCompleted, "Success", decrypting ? "every record decrypted through the authority; post-check against the authority-accepted heads found no encrypted row of the field (Amendment A1)" : "every record re-protected through the authority; post-check against the authority-accepted heads found no plaintext copy of the field", null, new { migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, verifiedRecords = tracked.Count, direction = migration.MigrationDirection }));
         }
 
         migration.LeaseOwnerName = null;
@@ -315,11 +371,37 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Returns a leased migration to the queue unchanged (state Running stays Running, due now) with a bounded, non-cancellable write.</summary>
+    private async Task ReleaseLeaseAsync(Guid migrationId)
+    {
+        using var bounded = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            await using var scope = await store.BeginScopeAsync(bounded.Token).ConfigureAwait(false);
+            var migration = await scope.FindProtectionMigrationAsync(migrationId, bounded.Token).ConfigureAwait(false);
+            if (migration is null || migration.MigrationState is FieldProtectionMigrationStates.Completed or FieldProtectionMigrationStates.Cancelled)
+            {
+                return;
+            }
+
+            var now = clock.GetUtcNow();
+            migration.LeaseOwnerName = null;
+            migration.LeaseExpiresOn = null;
+            migration.NextAttemptOn = now;
+            migration.MigrationModifiedOn = now;
+            await scope.CommitAsync(bounded.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException || ex.GetType().Name.Contains("Npgsql", StringComparison.Ordinal) || ex.GetType().Name.Contains("DbUpdate", StringComparison.Ordinal))
+        {
+            // Best effort: the lease then expires on its own; nothing is lost.
+        }
+    }
+
     private async Task SettleAsync(Guid migrationId, string state, string? errorCode, TimeSpan retryAfter, CancellationToken cancellationToken)
     {
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var migration = await scope.FindProtectionMigrationAsync(migrationId, cancellationToken).ConfigureAwait(false);
-        if (migration is null || migration.MigrationState is FieldProtectionMigrationStates.Completed)
+        if (migration is null || migration.MigrationState is FieldProtectionMigrationStates.Completed or FieldProtectionMigrationStates.Cancelled)
         {
             return;
         }

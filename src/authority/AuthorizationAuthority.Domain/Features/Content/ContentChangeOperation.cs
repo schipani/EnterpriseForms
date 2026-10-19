@@ -84,4 +84,7 @@ public static class ContentMutationKinds
 
     /// <summary>A plaintext row of a field replaced by an encrypted row of the same item (reprotection operations only).</summary>
     public const string Reprotect = "Reprotect";
+
+    /// <summary>An encrypted row of a field replaced by a plaintext row of the same item (deprotection operations only, Amendment A1).</summary>
+    public const string Deprotect = "Deprotect";
 }

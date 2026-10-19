@@ -29,6 +29,9 @@ public enum RequestedAction
     DesignForm,
     CreateRecord,
     ManageOrganization,
+
+    /// <summary>Organization-level security administration (SpiceDB <c>administer_security</c>: system administrators). Amendment A1 governance routes accept it alongside ManageOrganization.</summary>
+    AdministerSecurity,
 }
 
 public sealed record ResourceRef(ResourceKind ResourceKind, Guid ResourceId);
@@ -74,6 +77,8 @@ public enum SecurityCommandKind
     UnlinkChildRecord,
     /// <summary>Grants or revokes the right to create records for an existing form (form_user edges). Never touches record ownership or shares.</summary>
     UpdateFormUsers,
+    /// <summary>Declassifies a field to Public/Internal (organization owner or system administrator, governance approval reference required). Amendment A1.</summary>
+    ReclassifyField,
 }
 
 /// <summary>command_payload is validated against the exact command-specific schema in the authority; unknown fields are rejected.</summary>
@@ -128,7 +133,13 @@ public sealed record UpdateFormUsersPayload(Guid FormDefinitionId, IReadOnlyList
 /// designer's audited strengthening). It is the only basis on which the authority accepts workload reprotection
 /// operations for that field; it creates no permission and touches no relationship.
 /// </summary>
-public sealed record PublishFormSecurityRevisionPayload(Guid FormDefinitionId, Guid FieldDefinitionId, string RequiredProtectionMode, long ProtectionPolicyRevision);
+public sealed record PublishFormSecurityRevisionPayload(Guid FormDefinitionId, Guid FieldDefinitionId, string RequiredProtectionMode, long ProtectionPolicyRevision, string? FieldClassification = null);
+
+/// <summary>The organization's data-protection policy as decided by its owner/system administrator; the authority keeps it for the reclassification and downgrade planners.</summary>
+public sealed record UpdateMandatoryPolicyPayload(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, bool PlaintextDowngradePermitted);
+
+/// <summary>Declassification of an encrypted field to Public or Internal; the approval reference identifies the governance decision and is journaled.</summary>
+public sealed record ReclassifyFieldPayload(Guid FormDefinitionId, Guid FieldDefinitionId, string TargetClassification, string ApprovalReference);
 
 /// <summary>One principal in a form's authoritative access state.</summary>
 public sealed record FormAccessSubject(string SubjectKind, Guid SubjectId);

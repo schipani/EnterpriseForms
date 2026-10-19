@@ -37,6 +37,13 @@ public interface IAuthorityScope : IAsyncDisposable
 
     void AddResource(AuthorityResource resource);
 
+    /// <summary>Active resources of the given types whose parent is the given entity (e.g. the protection requirements/releases of a form's fields).</summary>
+    Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken);
+
+    Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    void AddProtectionPolicy(OrganizationProtectionPolicy policy);
+
     /// <summary>All currently active desired-state edges of the organization (normalized authoritative graph).</summary>
     Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid organizationId, CancellationToken cancellationToken);
 
