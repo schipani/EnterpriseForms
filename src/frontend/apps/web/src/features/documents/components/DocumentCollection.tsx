@@ -1,9 +1,9 @@
 import type { DocumentSummaryResponse } from "@enterpriseforms/api-client";
 import { DOWNLOAD_PATH, resolvePath, useApi, useRuntime } from "@enterpriseforms/app-runtime";
 import type { LayoutUploadPolicy } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, ProgressBar, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, ProgressBar, RowActions, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { phaseTone, useUploadItems } from "../../jobs";
 import { ErrorPanel } from "../../support";
 
@@ -170,35 +170,51 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
           {
             key: "actions",
             header: "Actions",
-            render: (row) => (
-              <div className="flex flex-wrap gap-2">
-                {row.attachmentLifecycleState === "Ready" && row.inAcceptedManifest ? (
-                  <a href={resolvePath(DOWNLOAD_PATH, { formRecordId, fileAttachmentId: row.fileAttachmentId })} download={row.originalFileName} className="inline-flex min-h-9 items-center rounded border border-secondary-border bg-secondary px-3 text-sm font-medium text-secondary-foreground">
-                    Download
-                  </a>
-                ) : null}
-                <Button size="sm" variant="ghost" onClick={() => setHistoryTarget(row)}>
-                  Versions
-                </Button>
-                {canEdit && row.attachmentLifecycleState === "Ready" ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setReplaceTarget(row);
-                      replaceInput.current?.click();
-                    }}
-                  >
-                    Replace
-                  </Button>
-                ) : null}
-                {canEdit ? (
-                  <Button size="sm" variant="ghost" onClick={() => setRemoveTarget(row)}>
-                    Remove
-                  </Button>
-                ) : null}
-              </div>
-            ),
+            isActions: true,
+            render: (row) => {
+              const ready = row.attachmentLifecycleState === "Ready" && row.inAcceptedManifest;
+              const overflow: Array<{ key: string; content: ReactNode }> = [];
+              if (ready) {
+                overflow.push({ key: "versions", content: <button type="button" className="w-full text-left" onClick={() => setHistoryTarget(row)}>Versions</button> });
+              }
+              if (canEdit && row.attachmentLifecycleState === "Ready") {
+                overflow.push({
+                  key: "replace",
+                  content: (
+                    <button
+                      type="button"
+                      className="w-full text-left"
+                      onClick={() => {
+                        setReplaceTarget(row);
+                        replaceInput.current?.click();
+                      }}
+                    >
+                      Replace
+                    </button>
+                  ),
+                });
+              }
+              if (canEdit) {
+                overflow.push({ key: "remove", content: <button type="button" className="w-full text-left" onClick={() => setRemoveTarget(row)}>Remove</button> });
+              }
+              return (
+                <RowActions
+                  overflowLabel={`More actions for ${row.originalFileName}`}
+                  primary={
+                    ready ? (
+                      <a href={resolvePath(DOWNLOAD_PATH, { formRecordId, fileAttachmentId: row.fileAttachmentId })} download={row.originalFileName} className="inline-flex min-h-9 items-center rounded border border-secondary-border bg-secondary px-3 text-sm font-medium text-secondary-foreground">
+                        Download
+                      </a>
+                    ) : (
+                      <Button size="sm" variant="secondary" onClick={() => setHistoryTarget(row)}>
+                        Versions
+                      </Button>
+                    )
+                  }
+                  overflow={ready ? overflow : overflow.filter((item) => item.key !== "versions")}
+                />
+              );
+            },
           },
         ]}
       />
@@ -263,7 +279,7 @@ function VersionHistoryDialog({ formRecordId, document, onClose }: { formRecordI
             { key: "scan", header: "Scanner", render: (row) => `${row.scanVerdict} (${row.scannerName})` },
             { key: "state", header: "State", render: (row) => <Badge tone={row.versionState === "Current" ? "success" : row.versionState === "Processed" ? "warning" : "neutral"}>{row.versionState === "Processed" ? "Processed (not committed)" : row.versionState}</Badge> },
             { key: "uploaded", header: "Uploaded", render: (row) => new Date(row.uploadedOn).toLocaleString() },
-            { key: "dl", header: "Download", render: (row) => (row.versionState !== "Processed" ? <a href={`${resolvePath(DOWNLOAD_PATH, { formRecordId, fileAttachmentId: document.fileAttachmentId })}?versionNumber=${row.versionNumber}`} download={row.originalFileName} className="underline underline-offset-4">Download v{row.versionNumber}</a> : null) },
+            { key: "dl", header: "Actions", isActions: true, render: (row) => (row.versionState !== "Processed" ? <a href={`${resolvePath(DOWNLOAD_PATH, { formRecordId, fileAttachmentId: document.fileAttachmentId })}?versionNumber=${row.versionNumber}`} download={row.originalFileName} className="underline underline-offset-4">Download v{row.versionNumber}</a> : null) },
           ]}
         />
       ) : null}

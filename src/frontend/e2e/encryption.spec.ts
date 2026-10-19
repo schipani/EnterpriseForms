@@ -104,6 +104,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await page.getByRole("tab", { name: /^Fields/ }).click();
     await page.getByRole("button", { name: "Edit Exhibit count" }).click();
     const dialog = page.getByRole("dialog", { name: "Edit field" });
+    await dialog.getByRole("tab", { name: "Security & Encryption" }).click();
     const security = dialog.getByRole("group", { name: "Security & Encryption" });
     await expect(security.getByText("Off — plaintext")).toBeVisible();
     await security.getByRole("button", { name: /Strengthen protection/ }).click();
@@ -120,6 +121,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("row", { name: /Exhibit count/ })).toContainText("Confidential · Encrypted");
     await page.getByRole("button", { name: "Edit Exhibit count" }).click();
+    await page.getByRole("dialog", { name: "Edit field" }).getByRole("tab", { name: "Security & Encryption" }).click();
     const reopened = page.getByRole("dialog", { name: "Edit field" }).getByRole("group", { name: "Security & Encryption" });
     await expect(reopened.getByText("Enabled", { exact: true })).toBeVisible();
     // The background migration re-encrypts the clerk's existing record through the Authority; only then is the field reported as fully encrypted.

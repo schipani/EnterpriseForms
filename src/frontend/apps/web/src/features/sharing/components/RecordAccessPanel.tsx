@@ -78,7 +78,7 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
                 { key: "status", header: "Status", render: (row) => <Badge tone={row.shareStatus === "Active" ? "success" : "neutral"}>{row.shareStatus}</Badge> },
                 { key: "by", header: "Shared by", render: (row) => row.sharedByDisplayName ?? row.sharedByUserId },
                 { key: "created", header: "Created", render: (row) => new Date(row.shareCreatedOn).toLocaleString() },
-                { key: "actions", header: "Actions", render: (row) => (row.shareStatus === "Active" ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(row)}>Revoke</Button> : null) },
+                { key: "actions", header: "Actions", isActions: true, render: (row) => (row.shareStatus === "Active" ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(row)}>Revoke</Button> : null) },
               ]}
             />
           ) : null}

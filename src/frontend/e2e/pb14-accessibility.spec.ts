@@ -95,8 +95,14 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
       await scan(page, `${viewport.id} designer form permissions @${viewport.name}`);
       await page.getByRole("tab", { name: /^Fields/ }).click();
       await page.getByRole("button", { name: /^Edit / }).first().click();
-      await expect(page.getByRole("dialog", { name: /^Edit / })).toBeVisible();
-      await scan(page, `${viewport.id} edit field dialog @${viewport.name}`);
+      const editDialog = page.getByRole("dialog", { name: /^Edit / });
+      await expect(editDialog).toBeVisible();
+      await scan(page, `${viewport.id} edit field dialog general tab @${viewport.name}`);
+      // C1-UX §C: each tab of the Edit Field dialog (General/Validation/Rules/Security & Encryption/Advanced) gets its own scan.
+      for (const tabName of ["Validation", "Rules", "Security & Encryption", "Advanced"]) {
+        await editDialog.getByRole("tab", { name: tabName }).click();
+        await scan(page, `${viewport.id} edit field dialog ${tabName} tab @${viewport.name}`);
+      }
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: /^Edit / })).toBeHidden();
       // Phase 1B: the Security & Encryption section of the Add field dialog.

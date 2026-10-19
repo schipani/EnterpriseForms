@@ -1,6 +1,6 @@
 import type { RelationshipDefinitionResponse } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, RowActions, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -71,26 +71,41 @@ export function ChildRecordList({ parentFormRecordId, relationship, label, canEd
             {
               key: "actions",
               header: "Actions",
+              isActions: true,
               render: (row) => (
-                <div className="flex flex-wrap gap-2">
-                  <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }}>
-                    <Button size="sm" variant="secondary">
-                      View
-                    </Button>
-                  </Link>
-                  {canEdit ? (
-                    <>
+                <RowActions
+                  overflowLabel={`More actions for record ${row.listSortOrder}`}
+                  primary={
+                    canEdit ? (
                       <Link to="/app/records/$formRecordId/edit" params={{ formRecordId: row.formRecordId }}>
                         <Button size="sm" variant="secondary">
                           Edit
                         </Button>
                       </Link>
-                      <Button size="sm" variant="ghost" onClick={() => setUnlinkTarget(row.formRecordId)}>
-                        Remove
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
+                    ) : (
+                      <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }}>
+                        <Button size="sm" variant="secondary">
+                          View
+                        </Button>
+                      </Link>
+                    )
+                  }
+                  overflow={
+                    canEdit
+                      ? [
+                          {
+                            key: "view",
+                            content: (
+                              <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }}>
+                                View
+                              </Link>
+                            ),
+                          },
+                          { key: "remove", content: <button type="button" className="w-full text-left" onClick={() => setUnlinkTarget(row.formRecordId)}>Remove from list</button> },
+                        ]
+                      : []
+                  }
+                />
               ),
             },
           ]}

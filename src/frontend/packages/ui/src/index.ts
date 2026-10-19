@@ -6,4 +6,5 @@ export { Dialog, type DialogProps } from "./Dialog";
 export { Tabs, type TabItem } from "./Tabs";
 export { Badge, Card, DescriptionList, EmptyState, LoadingBlock, PageHeader, ProgressBar, StatusMessage, type StatusTone } from "./Surfaces";
 export { DataTable, type DataTableColumn } from "./DataTable";
+export { OverflowMenu, RowActions, type OverflowMenuItem } from "./Menu";
 export { VisuallyHidden } from "@radix-ui/react-visually-hidden";

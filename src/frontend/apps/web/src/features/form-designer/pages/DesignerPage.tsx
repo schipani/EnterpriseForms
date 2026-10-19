@@ -3,8 +3,8 @@ import { DesignerCanvas, locateField, updateElement } from "@enterpriseforms/for
 import { emptyLayout, serializeLayout, tryParseLayout, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
 import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, PageHeader, Select, StatusMessage, Tabs, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Link, useBlocker, useParams } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { ErrorPanel } from "../../support";
 import { AddFieldDialog, toKey } from "../components/AddFieldDialog";
 import type { StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
@@ -26,6 +26,42 @@ export function DesignerPage() {
   const [layout, setLayout] = useState<FormLayout | null>(null);
   const [baseJson, setBaseJson] = useState<string>("");
   const [parseError, setParseError] = useState<string | null>(null);
+  // Undo/redo over the draft layout (C1-UX §A toolbar): `setLayout` below is the single mutation path used by the
+  // canvas, so every layout-changing action — including drag/drop, span changes and inline rename — is undoable.
+  const undoStack = useRef<FormLayout[]>([]);
+  const redoStack = useRef<FormLayout[]>([]);
+  const [, setHistoryTick] = useState(0);
+  const setLayoutTracked = (next: FormLayout | ((current: FormLayout | null) => FormLayout | null)) => {
+    setLayout((current) => {
+      const resolved = typeof next === "function" ? (next as (c: FormLayout | null) => FormLayout | null)(current) : next;
+      if (current && resolved && serializeLayout(resolved) !== serializeLayout(current)) {
+        undoStack.current = [...undoStack.current, current].slice(-50);
+        redoStack.current = [];
+        setHistoryTick((tick) => tick + 1);
+      }
+      return resolved;
+    });
+  };
+  const undo = () => {
+    const previous = undoStack.current.at(-1);
+    if (!previous || !layout) {
+      return;
+    }
+    undoStack.current = undoStack.current.slice(0, -1);
+    redoStack.current = [...redoStack.current, layout];
+    setLayout(previous);
+    setHistoryTick((tick) => tick + 1);
+  };
+  const redo = () => {
+    const next = redoStack.current.at(-1);
+    if (!next || !layout) {
+      return;
+    }
+    redoStack.current = redoStack.current.slice(0, -1);
+    undoStack.current = [...undoStack.current, layout];
+    setLayout(next);
+    setHistoryTick((tick) => tick + 1);
+  };
   const [addField, setAddField] = useState(false);
   const [addDocuments, setAddDocuments] = useState(false);
   const [editFieldId, setEditFieldId] = useState<string | null>(null);
@@ -36,10 +72,16 @@ export function DesignerPage() {
   const [relationshipName, setRelationshipName] = useState("");
   const [maxChildren, setMaxChildren] = useState("50");
 
+  const resetHistory = () => {
+    undoStack.current = [];
+    redoStack.current = [];
+  };
+
   useEffect(() => {
     if (!detail.data || layout) {
       return;
     }
+    resetHistory();
     const source = detail.data.draft?.layoutJson ?? detail.data.currentVersion?.layoutJson;
     if (!source) {
       const fresh = emptyLayout(detail.data.summary.formDefinitionName);
@@ -129,6 +171,10 @@ export function DesignerPage() {
     },
   });
 
+  // Unsaved layout changes block accidental SPA navigation (and tab close) until the designer confirms (C1-UX §A/B).
+  const dirtyRef = useRef(false);
+  const blocker = useBlocker({ shouldBlockFn: () => dirtyRef.current, enableBeforeUnload: () => dirtyRef.current, withResolver: true });
+
   if (detail.isPending) {
     return <LoadingBlock label="Loading form" />;
   }
@@ -138,6 +184,7 @@ export function DesignerPage() {
   const form = detail.data;
   const fields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })) }));
   const dirty = layout !== null && serializeLayout(layout) !== baseJson;
+  dirtyRef.current = dirty;
   const canPublish = form.draft !== null && !dirty;
   const childCandidates = (forms.data ?? []).filter((candidate) => candidate.formDefinitionId !== formDefinitionId && candidate.currentVersionNumber !== null);
 
@@ -151,6 +198,12 @@ export function DesignerPage() {
             <Link to="/app/forms">
               <Button variant="ghost">All forms</Button>
             </Link>
+            <Button variant="secondary" disabled={undoStack.current.length === 0} onClick={undo} aria-label="Undo last layout change">
+              Undo
+            </Button>
+            <Button variant="secondary" disabled={redoStack.current.length === 0} onClick={redo} aria-label="Redo last undone layout change">
+              Redo
+            </Button>
             <Button variant="secondary" busy={saveDraft.isPending} disabled={!layout || !dirty || !form.summary.canDesign} onClick={() => layout && saveDraft.mutate(layout)}>
               Save draft
             </Button>
@@ -175,7 +228,21 @@ export function DesignerPage() {
           {
             value: "layout",
             label: "Layout",
-            content: layout ? <DesignerCanvas layout={layout} onChange={setLayout} fields={fields} relationships={form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }))} readOnly={!form.summary.canDesign} /> : <LoadingBlock />,
+            content: layout ? (
+              <DesignerCanvas
+                layout={layout}
+                onChange={setLayoutTracked}
+                fields={fields}
+                relationships={form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }))}
+                readOnly={!form.summary.canDesign}
+                onOpenFullEditor={(fieldId) => {
+                  editField.reset();
+                  setEditFieldId(fieldId);
+                }}
+              />
+            ) : (
+              <LoadingBlock />
+            ),
           },
           {
             value: "fields",
@@ -204,7 +271,7 @@ export function DesignerPage() {
                   columns={[
                     { key: "name", header: "Field", isRowHeader: true, render: (row) => row.fieldDisplayName },
                     { key: "key", header: "Key", render: (row) => <code>{row.fieldKey}</code> },
-                    { key: "edit", header: "Actions", render: (row) => <Button size="sm" variant="secondary" aria-label={`${form.summary.canDesign ? "Edit" : "View"} ${row.fieldDisplayName}`} onClick={() => { editField.reset(); setEditFieldId(row.fieldDefinitionId); }}>{form.summary.canDesign ? "Edit" : "View"}</Button> },
+                    { key: "edit", header: "Actions", isActions: true, render: (row) => <Button size="sm" variant="secondary" aria-label={`${form.summary.canDesign ? "Edit" : "View"} ${row.fieldDisplayName}`} onClick={() => { editField.reset(); setEditFieldId(row.fieldDefinitionId); }}>{form.summary.canDesign ? "Edit" : "View"}</Button> },
                     { key: "type", header: "Type", render: (row) => row.fieldDataType },
                     { key: "protection", header: "Protection", render: (row) => (row.fieldProtectionMode === "ApplicationEncrypted" ? <Badge tone="success">{row.fieldClassification} · Encrypted</Badge> : <Badge tone="warning">{row.fieldClassification} · Plaintext</Badge>) },
                     { key: "options", header: "Options", render: (row) => (row.options.length === 0 ? "" : row.options.map((option) => `${option.optionDisplayText}${option.isActive ? "" : " (inactive)"}`).join(", ")) },
@@ -258,7 +325,7 @@ export function DesignerPage() {
                       { key: "reason", header: "Change reason", render: (row) => row.changeReason },
                       { key: "published", header: "Published", render: (row) => new Date(row.publishedOn).toLocaleString() },
                       { key: "restored", header: "Restored from", render: (row) => (row.restoredFromFormVersionId ? "earlier version" : "") },
-                      { key: "actions", header: "Actions", render: (row) => (form.summary.canDesign ? <Button size="sm" variant="secondary" busy={restore.isPending} onClick={() => restore.mutate(row.formVersionId)}>Restore to draft</Button> : null) },
+                      { key: "actions", header: "Actions", isActions: true, render: (row) => (form.summary.canDesign ? <Button size="sm" variant="secondary" busy={restore.isPending} onClick={() => restore.mutate(row.formVersionId)}>Restore to draft</Button> : null) },
                     ]}
                   />
                 ) : null}
@@ -328,6 +395,25 @@ export function DesignerPage() {
         <TextInput label="List name" value={relationshipName} required maxLength={200} helpText={`Key: ${toKey(relationshipName) || "(derived)"}`} onChange={(event) => setRelationshipName(event.target.value)} />
         <TextInput label="Maximum items" value={maxChildren} inputMode="numeric" onChange={(event) => setMaxChildren(event.target.value)} />
         {createRelationship.isError ? <ErrorPanel error={createRelationship.error} /> : null}
+      </Dialog>
+
+      <Dialog
+        open={blocker.status === "blocked"}
+        onOpenChange={(open) => (open ? undefined : blocker.reset?.())}
+        title="Discard unsaved layout changes?"
+        description="This draft layout has changes that have not been saved. Leaving now discards them; the last saved draft (or published version) is unaffected."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => blocker.reset?.()}>
+              Stay and keep editing
+            </Button>
+            <Button variant="danger" onClick={() => blocker.proceed?.()}>
+              Discard changes and leave
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted">Use Save draft first if you want to keep this layout.</p>
       </Dialog>
     </>
   );

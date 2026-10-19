@@ -56,6 +56,18 @@ export function RecordsPage() {
               { key: "created", header: "Created", render: (row) => new Date(row.createdOn).toLocaleString() },
               { key: "modified", header: "Modified", render: (row) => new Date(row.modifiedOn).toLocaleString() },
               { key: "verified", header: "Integrity", render: (row) => (row.projectionVerified ? <Badge tone="success">Verified</Badge> : <Badge tone="neutral">Verified on open</Badge>) },
+              {
+                key: "actions",
+                header: "Actions",
+                isActions: true,
+                render: (row) => (
+                  <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }}>
+                    <Button size="sm" variant="secondary">
+                      View
+                    </Button>
+                  </Link>
+                ),
+              },
             ]}
           />
         ) : null}

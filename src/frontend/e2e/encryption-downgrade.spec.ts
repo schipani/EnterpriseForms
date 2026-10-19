@@ -68,6 +68,7 @@ test.describe.serial("Field encryption removal: policy switch, administrator-onl
     await expect(page.getByRole("heading", { level: 1, name: `Release designer ${run}` })).toBeVisible();
     await addEncryptedInternalField(page, "Locker number");
     await page.getByRole("button", { name: "Edit Locker number" }).click();
+    await page.getByRole("dialog", { name: "Edit field" }).getByRole("tab", { name: "Security & Encryption" }).click();
     const edit = page.getByRole("dialog", { name: "Edit field" }).getByRole("group", { name: "Security & Encryption" });
     await expect(edit.getByText("Enabled", { exact: true })).toBeVisible();
     await expect(edit.getByRole("button", { name: /Strengthen protection/ })).toBeVisible();
@@ -94,6 +95,7 @@ test.describe.serial("Field encryption removal: policy switch, administrator-onl
     await page.getByRole("tab", { name: /^Fields/ }).click();
     await page.getByRole("button", { name: "Edit Badge number" }).click();
     const dialog = page.getByRole("dialog", { name: "Edit field" });
+    await dialog.getByRole("tab", { name: "Security & Encryption" }).click();
     const security = dialog.getByRole("group", { name: "Security & Encryption" });
     await expect(security.getByText("Fully encrypted · verified")).toBeVisible();
     await security.getByRole("button", { name: /Remove encryption…/ }).click();
