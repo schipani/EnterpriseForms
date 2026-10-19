@@ -43,9 +43,9 @@ test.describe.serial("Designer canvas: selection, empty-cell placement, rename, 
     await expect(inspector.getByText(/Field: Case title/)).toBeVisible();
 
     // Keyboard-accessible width change: Narrower/Wider buttons are real buttons, reachable and operable by keyboard.
-    const wider = card.getByRole("button", { name: "Increase width of Field: Case title (String)" });
+    const wider = card.getByRole("button", { name: "Wider: increase width of Field: Case title (String)" });
     await expect(wider).toBeDisabled(); // already full width (4 of 4)
-    const narrower = card.getByRole("button", { name: "Decrease width of Field: Case title (String)" });
+    const narrower = card.getByRole("button", { name: "Narrower: decrease width of Field: Case title (String)" });
     await narrower.focus();
     await page.keyboard.press("Enter");
     await expect(card.getByRole("combobox", { name: "Width" }).first()).toHaveText(/75%/);
@@ -75,7 +75,7 @@ test.describe.serial("Designer canvas: selection, empty-cell placement, rename, 
     await page.goto(`/app/forms/${formId}/design`);
     await page.getByRole("tab", { name: "Layout" }).click();
     const card = page.getByRole("listitem").filter({ hasText: "Field: Matter title" });
-    await card.getByRole("button", { name: "Decrease width of Field: Matter title (String)" }).click();
+    await card.getByRole("button", { name: "Narrower: decrease width of Field: Matter title (String)" }).click();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
 
     await page.getByRole("link", { name: "All forms" }).click();

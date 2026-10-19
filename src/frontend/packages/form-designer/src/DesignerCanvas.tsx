@@ -77,12 +77,16 @@ export function DesignerCanvas({ layout, onChange, fields, relationships, readOn
                   const field = element.kind === "relatedFormList" ? undefined : fieldById.get(element.fieldDefinitionId);
                   const relationship = element.kind === "relatedFormList" ? relationships.find((r) => r.formRelationshipDefinitionId === element.formRelationshipDefinitionId) : undefined;
                   const isSelected = selected?.sectionIndex === sectionIndex && selected.index === index;
+                  const title = elementTitle(element, field, relationship);
                   return (
                     <li
                       key={elementKey(element)}
                       style={cell ? { gridColumn: `${cell.column} / span ${cell.span}`, gridRowStart: cell.row } : undefined}
                       draggable={!readOnly}
-                      aria-selected={isSelected}
+                      // `aria-selected` is only a valid ARIA attribute on roles such as option/tab/row/gridcell, not on
+                      // the implicit `listitem` role these cards carry (axe aria-allowed-attr, PB-14). `aria-current`
+                      // is a global attribute valid on any role and still announces the selected card.
+                      aria-current={isSelected ? "true" : undefined}
                       className={`rounded border p-3 transition-colors ${isSelected ? "border-focus ring-2 ring-focus" : "border-input"}`}
                       onClick={(event) => {
                         if ((event.target as HTMLElement).closest("input,select,button,textarea,label")) {
@@ -108,6 +112,12 @@ export function DesignerCanvas({ layout, onChange, fields, relationships, readOn
                         }
                       }}
                     >
+                      {/* Always-present identity anchor: the visible title inside ElementEditor is replaced by the rename
+                          input while renaming, which would otherwise make this card briefly unidentifiable (by element
+                          text content) to both screen readers and any `hasText` locator. This span never disappears. */}
+                      <span className="sr-only">
+                        Element {index + 1} of {section.elements.length}: {title}
+                      </span>
                       <ElementEditor
                         element={element}
                         field={element.kind === "relatedFormList" ? undefined : field}
@@ -278,8 +288,17 @@ function elementKey(element: LayoutElement): string {
   return element.kind === "relatedFormList" ? `rel:${element.formRelationshipDefinitionId}` : `${element.kind}:${element.fieldDefinitionId}`;
 }
 
+/**
+ * The card's identifying title shows this element's own layout-version label (`element.label`) — the same value the
+ * card's "Label" input, the Properties inspector and the inline rename control all read and write — falling back to
+ * the field/relationship catalog name only when the layout label is blank (e.g. a legacy/unlabelled element). This
+ * keeps the headline in sync with what double-click rename actually changes; the catalog name alone would never
+ * visibly change after a rename, since the catalog's display name is independent of this version's label.
+ */
 function elementTitle(element: LayoutElement, field: RendererField | undefined, relationship: DesignerRelationship | undefined): string {
-  return element.kind === "relatedFormList" ? `Related list: ${relationship?.relationshipDisplayName ?? "unknown relationship"}` : element.kind === "documentCollection" ? `Documents: ${field?.fieldDisplayName ?? "unknown field"}` : `Field: ${field?.fieldDisplayName ?? "unknown field"} (${field?.fieldDataType ?? "?"})`;
+  const catalogName = element.kind === "relatedFormList" ? relationship?.relationshipDisplayName ?? "unknown relationship" : field?.fieldDisplayName ?? "unknown field";
+  const displayLabel = element.label.trim() || catalogName;
+  return element.kind === "relatedFormList" ? `Related list: ${displayLabel}` : element.kind === "documentCollection" ? `Documents: ${displayLabel}` : `Field: ${displayLabel} (${field?.fieldDataType ?? "?"})`;
 }
 
 function PreviewSlot({ label, detail }: { label: string; detail: string }) {
@@ -433,9 +452,8 @@ function ElementEditor({
           />
         ) : (
           <p className="font-medium" onDoubleClick={() => !readOnly && onStartRename()} title={readOnly ? undefined : "Double-click to rename the display label"}>
-            <span className="sr-only">
-              Element {position} of {count}:{" "}
-            </span>
+            {/* Position/identity for screen readers is announced by the always-present sr-only span in the parent <li>
+                (DesignerCanvas), which survives rename mode; this visible text is not duplicated with that prefix. */}
             {title}
           </p>
         )}
@@ -447,14 +465,14 @@ function ElementEditor({
             <Button size="sm" variant="secondary" disabled={position === count} onClick={() => onMove(1)} aria-label={`Move ${title} down`}>
               ↓ Down
             </Button>
-            <Button size="sm" variant="secondary" disabled={span <= 1} onClick={() => onPatch((current) => ({ ...current, layout: { ...current.layout, columnSpan: Math.max(1, span - 1) as 1 | 2 | 3 | 4 } }))} aria-label={`Decrease width of ${title}`}>
+            <Button size="sm" variant="secondary" disabled={span <= 1} onClick={() => onPatch((current) => ({ ...current, layout: { ...current.layout, columnSpan: Math.max(1, span - 1) as 1 | 2 | 3 | 4 } }))} aria-label={`Narrower: decrease width of ${title}`}>
               ← Narrower
             </Button>
-            <Button size="sm" variant="secondary" disabled={span >= 4} onClick={() => onPatch((current) => ({ ...current, layout: { ...current.layout, columnSpan: Math.min(4, span + 1) as 1 | 2 | 3 | 4 } }))} aria-label={`Increase width of ${title}`}>
+            <Button size="sm" variant="secondary" disabled={span >= 4} onClick={() => onPatch((current) => ({ ...current, layout: { ...current.layout, columnSpan: Math.min(4, span + 1) as 1 | 2 | 3 | 4 } }))} aria-label={`Wider: increase width of ${title}`}>
               Wider →
             </Button>
             {onOpenFullEditor ? (
-              <Button size="sm" variant="ghost" onClick={onOpenFullEditor} aria-label={`Open full editor for ${title}`}>
+              <Button size="sm" variant="ghost" onClick={onOpenFullEditor} aria-label={`Configure: open full editor for ${title}`}>
                 Configure
               </Button>
             ) : null}

@@ -122,11 +122,11 @@ test.describe.serial("Stage B Accused workflow", () => {
     await documents.getByLabel("Allowed content types").fill("application/pdf, text/plain");
     // Two half-width name fields on one row, required.
     const given = page.getByRole("listitem").filter({ hasText: "Field: Given name" });
-    await given.getByLabel("Width").click();
+    await given.getByLabel("Width", { exact: true }).click();
     await page.getByRole("option", { name: /2 of 4/ }).click();
     await given.getByRole("checkbox", { name: "Required" }).check();
     const family = page.getByRole("listitem").filter({ hasText: "Field: Family name" });
-    await family.getByLabel("Width").click();
+    await family.getByLabel("Width", { exact: true }).click();
     await page.getByRole("option", { name: /2 of 4/ }).click();
     await saveAndPublish(page, "initial accused layout");
     await signOut(page);
