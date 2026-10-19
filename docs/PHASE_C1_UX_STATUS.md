@@ -83,7 +83,7 @@ None of these three fixes touch validation/security/encryption logic, `FormVersi
 
 ## Commit
 
-The original Phase C1-UX implementation is `2c24c11` (parent: `556c562`), with the commit-SHA follow-up `8bb0177`. The Docker/Playwright/SEC-P verification round described above — the two product fixes to `DesignerCanvas.tsx`, the two e2e locator fixes, and this status update — is committed as `(recorded below)` on `phase-c/form-platform-expansion`, on top of `00ab240` (the unrelated web Docker build fix). The PR URL is in the final report delivered through the handoff.
+The original Phase C1-UX implementation is `2c24c11` (parent: `556c562`), with the commit-SHA follow-up `8bb0177`. The Docker/Playwright/SEC-P verification round described above — the two product fixes to `DesignerCanvas.tsx`, the two e2e locator fixes, and this status update — is committed as `84641b9` on `phase-c/form-platform-expansion`, on top of `00ab240` (the unrelated web Docker build fix). The PR URL is in the final report delivered through the handoff.
 
 ## Exact steps for a human reviewer to reproduce the six representative flows in a real browser
 
