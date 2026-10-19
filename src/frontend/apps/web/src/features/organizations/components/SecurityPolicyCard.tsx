@@ -45,7 +45,7 @@ export function SecurityPolicyCard() {
   return (
     <Card title={<span id="data-protection-policy-heading">Data protection policy</span>} aria-labelledby="data-protection-policy-heading">
       <div className="flex flex-wrap gap-2">
-        <Badge tone={policy.data.isUnreviewedDefault ? "warning" : "success"}>{policy.data.isUnreviewedDefault ? "Development default — not yet reviewed" : `Reviewed ${new Date(policy.data.policyReviewedOn!).toLocaleString()}`}</Badge>
+        <Badge tone={policy.data.isUnreviewedDefault ? "warning" : "success"}>{policy.data.isUnreviewedDefault ? "Development default — not yet reviewed" : `Reviewed ${new Date(policy.data.policyReviewedOn!).toLocaleDateString()}`}</Badge>
         <Badge tone="neutral">Policy revision {String(policy.data.securityPolicyRevision)}</Badge>
       </div>
       <p className="text-sm text-muted">New free text and documents are always Confidential and encrypted by default. This policy decides what designers may choose beyond that default. It never decrypts or re-protects stored values.</p>

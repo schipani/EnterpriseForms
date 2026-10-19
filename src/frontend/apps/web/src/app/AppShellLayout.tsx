@@ -72,7 +72,7 @@ function UserMenu() {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button variant="secondary" size="sm" className="max-w-full !whitespace-normal text-left" aria-label={`Account menu for ${name}`}>
+        <Button variant="secondary" size="sm" className="max-w-full whitespace-normal! text-left" aria-label={`Account menu for ${name}`}>
           <span className="min-w-0 break-words">{name}</span>
         </Button>
       </DropdownMenu.Trigger>
