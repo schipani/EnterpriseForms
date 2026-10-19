@@ -104,7 +104,7 @@ export function BrandingPage() {
       </div>
       {save.isError ? <div className="mt-4"><ErrorPanel error={save.error} /></div> : null}
       {save.isSuccess ? <div className="mt-4"><StatusMessage tone="success" title="Branding saved" /></div> : null}
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         <Button busy={save.isPending} disabled={failures.length > 0} onClick={() => save.mutate(draft)}>
           Save branding
         </Button>
