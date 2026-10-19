@@ -386,6 +386,8 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 
 ### 4.6 GitHub-hosted runs
 
+**Controlled-removal head `1c33aea` (B-29, Amendment A1):** `ci` **success** (run 39302882460), `stage-b-integration` — Docker integration (39, incl. the six downgrade tests) + Playwright (18) on a GitHub-hosted runner — **success** (run 39302882413): https://github.com/schipani/EnterpriseForms/actions/runs/39302882460 and https://github.com/schipani/EnterpriseForms/actions/runs/39302882413.
+
 **Encryption-migration head `a0f0b37` (B-28):** `ci` **success** (run 39275110192), `stage-b-integration` — Docker integration (33, incl. the four migration tests) + Playwright (14) on a GitHub-hosted runner — **success** (run 39275110333): https://github.com/schipani/EnterpriseForms/actions/runs/39275110192 and https://github.com/schipani/EnterpriseForms/actions/runs/39275110333.
 
 **Document-encryption audit head `b597bfb`:** `ci` **success** (run 39259813854), `stage-b-integration` **success** (run 39259813842): https://github.com/schipani/EnterpriseForms/actions/runs/39259813854 and https://github.com/schipani/EnterpriseForms/actions/runs/39259813842.
