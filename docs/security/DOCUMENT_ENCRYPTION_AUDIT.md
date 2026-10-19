@@ -49,6 +49,8 @@ Azurite) and the .NET solution; evidence in `docs/evidence/stage-b/2026-10-19-do
 
 The five new integration tests passed on their first run on this stack; no test was weakened or retried.
 
+Hosted runs for head `b597bfb`: `ci` **success** (run 39259813854) and `stage-b-integration` (Docker integration incl. the five audit tests + Playwright on a GitHub-hosted runner) **success** (run 39259813842): https://github.com/schipani/EnterpriseForms/actions/runs/39259813854 and https://github.com/schipani/EnterpriseForms/actions/runs/39259813842.
+
 ## 5. Outstanding (not implemented, not waived)
 
 | Item | State | Gate |

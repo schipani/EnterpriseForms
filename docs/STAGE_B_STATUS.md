@@ -312,6 +312,8 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 
 ### 4.6 GitHub-hosted runs
 
+**Document-encryption audit head `b597bfb`:** `ci` **success** (run 39259813854), `stage-b-integration` **success** (run 39259813842): https://github.com/schipani/EnterpriseForms/actions/runs/39259813854 and https://github.com/schipani/EnterpriseForms/actions/runs/39259813842.
+
 **Phase 1B head `d4da719`:** `ci` **success** (run 39187664563) and `stage-b-integration` — Docker integration (24) + Playwright (14) on a GitHub-hosted runner — **success** (run 39187664589): https://github.com/schipani/EnterpriseForms/actions/runs/39187664563 and https://github.com/schipani/EnterpriseForms/actions/runs/39187664589. The two preceding Phase 1B heads (`5a05b4c`, `d604bef`) passed `ci` but failed `stage-b-integration` on one PB14-10 check only — a 20 px horizontal overflow of the branding page at 320 px under Linux fonts (the pre-existing Save/Discard row did not wrap; the owner persona's page had never been scanned at 320 px before). Fixed by letting the row and the header account button wrap; no test was changed.
 
 `ci` **success** (run 39175837148) and `stage-b-integration` — Docker integration tests (21) + Playwright (10) on a GitHub-hosted runner — **success** (run 39175837149) for head `5d7da9f`: https://github.com/schipani/EnterpriseForms/actions/runs/39175837148 and https://github.com/schipani/EnterpriseForms/actions/runs/39175837149. Earlier heads green: `d3f144c` (39170555542 / 39170555532), `14900b9` (39160072571 / 39160072502). `security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074); the SEC-P regression for this change set is the local run in §4.5 on the identical images.
