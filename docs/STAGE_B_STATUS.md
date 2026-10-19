@@ -9,8 +9,17 @@ workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundat
 > independent third-party review**; Stage B is **AUTHORIZED TO PROCEED**. **Production Level 2 certification is NOT
 > granted:** independent cryptographic attestation (A-F1), Azure Managed HSM, Confidential Ledger, Azure Level B
 > validation and enforced security-owner review remain outstanding and unwaived (`docs/STAGE_A_GATE_CLOSURE.md`).
-> Nothing below claims production readiness, Level 2 certification, or AODA/WCAG certification. Stage B is a feature
-> milestone (ADR-PB-002 §Release boundaries).
+>
+> **Stage B status (decision B-30, 2026-10-19):** **OWNER ACCEPTED FOR CONTINUED DEVELOPMENT.** The project owner
+> personally tested the Accused + AccusedAddress vertical slice, the Form Designer, document management and the
+> field encryption/decryption workflows and accepted Stage B; this is an **owner review, not an independent
+> third-party review**. The PB-14 human review items the owner's testing did not cover — NVDA, VoiceOver, real
+> browser zoom, perceived performance, evidence retention and product/design sign-off
+> (`docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2) — **remain PENDING** and are not marked passed by this
+> decision. Deferred items (§7 below) and production requirements (§7.1–§7.3) are unchanged. Nothing below claims
+> production readiness, Level 2 certification, or AODA/WCAG certification. Stage B is a feature milestone
+> (ADR-PB-002 §Release boundaries); see `docs/decisions/STAGE_B_DECISION_LOG.md` decision B-30 and
+> `docs/decisions/PREBUILD_DECISION_REGISTER.md` PB-02.
 
 ## Gate assessment
 
@@ -20,7 +29,7 @@ workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundat
 | **Automated test suites** (§4, §4.7) | .NET unit/architecture/contract/authority **163 passed, 0 failed**; frontend lint/typecheck/vitest/build **42 vitest tests passed**; Stage B Docker integration **39 passed, 0 failed**; browser e2e **18 specs** (17/18 on the security-test stack with one pre-existing race, the two encryption specs 8/8 on rerun; development stack: §4.7); Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
 | **Security controls** | **Unchanged and re-tested.** No new authorization path: shares, child records, documents, discovery pages, the new value types and now form permissions all go through the independent Authority (and the signed manifest for record content); SEC-P01..P12 pass on the Stage B stack. The one authority extension in the fourth round is a new command kind and a gated read (B-23); existing kinds, the SpiceDB schema and the gate semantics are unchanged. **Phase 1B (B-24..B-26) adds application-level field encryption on top of this foundation without touching the authority: encrypted values are manifest leaves like any other value, decryption happens only after the authority-verified read, and the local development KEK is refused outside Development/Testing. Production key custody (Azure Key Vault / Managed HSM, purpose-separated keys, rotation) is still open — §7.1.** No test was weakened (§5). |
 | **PB-14 design validation** | Automated part **executed** (axe WCAG 2.2 AA + reflow at 320/768/1440 px and 200%/400% zoom equivalents, keyboard-only flows, forced colours — §4.4, §6). **Human review PENDING for the owner/reviewers:** NVDA, VoiceOver, real browser zoom, product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. |
-| **Stage B feature milestone** | **Ready for owner acceptance review** once the human PB-14 items are recorded. Features intentionally deferred to later gates are listed in §7 and are not Stage B defects. Production requirements (§7 first row) are unchanged. |
+| **Stage B feature milestone** | **OWNER ACCEPTED FOR CONTINUED DEVELOPMENT (decision B-30, 2026-10-19)** — the project owner personally tested the Accused slice, Form Designer, document management and field encryption/decryption and accepted Stage B; an owner review, not an independent review. PB-14 human review items the owner did not test (§6, `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2) remain **PENDING**. Features intentionally deferred to later gates are listed in §7 and are not Stage B defects. Production requirements (§7 first row) are unchanged. |
 
 ## 1. How to run it (exact local startup)
 
@@ -454,8 +463,9 @@ and explains), and form permission management is limited to designers of the for
 | Component gallery | PG-069 | Internal, synthetic data only. |
 
 Automated PB-14 evidence: §4.4 items 3–4 (register rows PB14-10..15, 22, 23, 25, 28, 29, 30, 32). **Human review
-pending (owner/reviewers):** PB14-16 NVDA, PB14-17 VoiceOver, real-zoom PB14-13/14, PB14-07/09/19/20/24/26/27/31/33/34
-and the product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. Dark mode is not offered.
+PENDING (owner/reviewers), not covered by decision B-30's functional acceptance:** PB14-16 NVDA, PB14-17 VoiceOver,
+real-zoom PB14-13/14, PB14-07/09/19/20/24/26/27/31/33/34 and the product/design sign-off —
+`docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. Dark mode is not offered.
 
 ## 7. Intentionally deferred (not Stage B defects) and open production requirements
 
