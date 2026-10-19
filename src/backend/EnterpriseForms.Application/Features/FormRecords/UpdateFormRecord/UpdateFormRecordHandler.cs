@@ -38,7 +38,7 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var now = clock.GetUtcNow();
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var currentValues = verified.AllRows.OfType<FieldValueRowBase>().ToList();
-        var candidateValues = CandidateBuilder.ApplyValues(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, editable, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById);
+        var candidateValues = CandidateBuilder.ApplyValues(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, editable, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption);
         var rows = new List<ISignedContentRow>(candidateValues);
         rows.AddRange(verified.AllRows.OfType<Domain.Features.Documents.FileAttachmentVersion>().Select(a => CandidateBuilder.CloneAttachment(a)));
 
@@ -63,7 +63,7 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var optionsById = verified.OptionsById;
         var released = editable is null ? candidateValues : candidateValues.Where(v => editable.Contains(v.FieldValueItemId)).ToList();
         return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, editable is null,
-            released.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, optionsById), fieldsById[v.FieldDefinitionId].FieldDataType)).ToList(),
+            released.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, optionsById, verified.Encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is Domain.Features.FormRecords.FieldEncryptedValue)).ToList(),
             "Committed(" + accepted.ArchiveState + ")");
     }
 }

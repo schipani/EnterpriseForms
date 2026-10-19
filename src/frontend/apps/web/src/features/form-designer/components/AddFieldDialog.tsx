@@ -1,4 +1,8 @@
-import type { AddFieldDefinitionRequest } from "@enterpriseforms/api-client";
+import type { AddFieldDefinitionRequest, OrganizationSecurityPolicyResponse } from "@enterpriseforms/api-client";
+import { useApi } from "@enterpriseforms/app-runtime";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { FieldSecuritySection, defaultClassification, resolveEncryption } from "./FieldSecuritySection";
 import { FIELD_DATA_TYPES } from "@enterpriseforms/form-renderer";
 import { Button, Dialog, Select, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useState } from "react";
@@ -27,6 +31,17 @@ export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error, k
   const [keyTouched, setKeyTouched] = useState(false);
   const [dataType, setDataType] = useState<string>(documents ? "File" : "String");
   const [description, setDescription] = useState("");
+  const api = useApi();
+  const policyQuery = useQuery({ queryKey: ["organization", "security-policy"], queryFn: () => api.organization.securityPolicy().then((r) => r.result), enabled: open });
+  const policy: OrganizationSecurityPolicyResponse | undefined = policyQuery.data;
+  const [classification, setClassification] = useState<string>(defaultClassification(documents ? "File" : "String"));
+  const [encryptChoice, setEncryptChoice] = useState<boolean>(true);
+  // Changing the storage type re-applies the secure defaults (free text and documents are Confidential + encrypted).
+  useEffect(() => {
+    setClassification(defaultClassification(dataType));
+    setEncryptChoice(dataType === "String" || dataType === "File");
+  }, [dataType]);
+  const security = resolveEncryption(dataType, classification, encryptChoice, policy);
   const [optionsText, setOptionsText] = useState("");
   const effectiveKey = keyTouched ? key : toKey(displayName);
   const options = optionsText
@@ -34,7 +49,7 @@ export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error, k
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => ({ optionKey: toKey(line), optionDisplayText: line }));
-  const valid = KEY.test(effectiveKey) && displayName.trim().length > 0 && (dataType !== "Option" || options.length > 0);
+  const valid = KEY.test(effectiveKey) && displayName.trim().length > 0 && (dataType !== "Option" || options.length > 0) && security.allowed;
   return (
     <Dialog
       open={open}
@@ -47,7 +62,7 @@ export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error, k
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
-          <Button busy={pending} disabled={!valid} onClick={() => onSubmit({ fieldKey: effectiveKey, fieldDisplayName: displayName.trim(), fieldDescription: description.trim(), fieldDataType: documents ? "File" : dataType, options: dataType === "Option" ? options : null })}>
+          <Button busy={pending} disabled={!valid} onClick={() => onSubmit({ fieldKey: effectiveKey, fieldDisplayName: displayName.trim(), fieldDescription: description.trim(), fieldDataType: documents ? "File" : dataType, options: dataType === "Option" ? options : null, fieldClassification: classification, fieldProtectionMode: security.protectionMode })}>
             {documents ? "Add document collection" : "Add field"}
           </Button>
         </>
@@ -62,6 +77,7 @@ export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error, k
       )}
       <TextArea label="Description" value={description} maxLength={1000} rows={2} onChange={(event) => setDescription(event.target.value)} />
       {dataType === "Option" ? <TextArea label="Options (one per line)" value={optionsText} required helpText="Display text per line; keys are derived and stay stable." onChange={(event) => setOptionsText(event.target.value)} /> : null}
+      <FieldSecuritySection dataType={documents ? "File" : dataType} classification={classification} encryptChoice={encryptChoice} policy={policy} policyPending={policyQuery.isPending} onClassificationChange={setClassification} onEncryptChoiceChange={setEncryptChoice} />
       {error ? <ErrorPanel error={error} /> : null}
     </Dialog>
   );

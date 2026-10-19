@@ -54,6 +54,8 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
 
     public DbSet<FieldGuidValue> FieldGuidValues => Set<FieldGuidValue>();
 
+    public DbSet<FieldEncryptedValue> FieldEncryptedValues => Set<FieldEncryptedValue>();
+
     public DbSet<FieldBooleanValue> FieldBooleanValues => Set<FieldBooleanValue>();
 
     public DbSet<FieldOptionValue> FieldOptionValues => Set<FieldOptionValue>();
@@ -77,6 +79,8 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     public DbSet<OrganizationBranding> OrganizationBrandings => Set<OrganizationBranding>();
+
+    public DbSet<OrganizationSecurityPolicy> OrganizationSecurityPolicies => Set<OrganizationSecurityPolicy>();
 
     public DbSet<UserUiPreference> UserUiPreferences => Set<UserUiPreference>();
 

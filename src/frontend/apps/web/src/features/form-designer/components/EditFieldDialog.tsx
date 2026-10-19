@@ -1,4 +1,5 @@
-import type { FieldDefinitionResponse } from "@enterpriseforms/api-client";
+import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
+import { CurrentProtectionSection } from "./FieldSecuritySection";
 import { applyEditValues, toEditValues, validateEditValues, type FieldEditValues, type FieldLocation } from "@enterpriseforms/form-designer";
 import type { LayoutElement } from "@enterpriseforms/form-renderer";
 import { Button, Checkbox, Dialog, StatusMessage, TextArea, TextInput } from "@enterpriseforms/ui";
@@ -19,7 +20,7 @@ export interface FieldEditSubmission {
  * draft (published versions stay immutable until the draft is published); the catalog label and description are saved
  * on the field identity, so stored values and attachments, which reference the field id, are untouched.
  */
-export function EditFieldDialog({ field, location, canEdit, pending, error, onSave, onClose }: { field: FieldDefinitionResponse; location: FieldLocation | null; canEdit: boolean; pending: boolean; error: unknown; onSave: (submission: FieldEditSubmission) => void; onClose: () => void }) {
+export function EditFieldDialog({ field, location, canEdit, pending, error, onSave, onClose, formDefinitionId, onStrengthen, strengthenPending, strengthenError }: { field: FieldDefinitionResponse; location: FieldLocation | null; canEdit: boolean; pending: boolean; error: unknown; onSave: (submission: FieldEditSubmission) => void; onClose: () => void; formDefinitionId: string; onStrengthen: (request: StrengthenFieldProtectionRequest) => void; strengthenPending: boolean; strengthenError: unknown }) {
   const [values, setValues] = useState<FieldEditValues>(() => toEditValues(location?.element ?? null, field.fieldDisplayName));
   const [description, setDescription] = useState(field.fieldDescription);
   const errors = validateEditValues(values, field.fieldDataType);
@@ -54,6 +55,7 @@ export function EditFieldDialog({ field, location, canEdit, pending, error, onSa
       <TextInput label="Field key" value={field.fieldKey} readOnly helpText="Permanent identifier used by records, searches and integrations. It cannot be renamed: add a new field if you need a different key." />
       <TextInput label="Storage type" value={isDocuments ? "File (document collection)" : field.fieldDataType} readOnly helpText="Permanent: changing it would reinterpret stored values. Add a new field of the new type and migrate deliberately." />
       <TextArea label="Description" value={description} rows={2} maxLength={1000} disabled={!canEdit} onChange={(event) => setDescription(event.target.value)} />
+      <CurrentProtectionSection formDefinitionId={formDefinitionId} field={field} canEdit={canEdit} onStrengthen={onStrengthen} pending={strengthenPending} error={strengthenError} />
       {location ? (
         <>
           <TextInput label="Help text" value={values.helpText} maxLength={1000} disabled={!canEdit} error={field_("helpText")} onChange={(event) => set("helpText", event.target.value)} />

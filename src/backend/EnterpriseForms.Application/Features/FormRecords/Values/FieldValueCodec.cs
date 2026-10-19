@@ -58,12 +58,46 @@ public static class FieldValueCodec
         return row;
     }
 
-    /// <summary>Invariant wire string of a stored row.</summary>
+    /// <summary>
+    /// Applies the field's storage protection to a validated typed row: an ApplicationEncrypted field stores the
+    /// canonical wire string as an AES-GCM envelope (no typed plaintext row is ever persisted for it); a Standard field
+    /// keeps the typed row. Called on every write path after validation, so protection cannot be skipped by a client.
+    /// </summary>
+    public static FieldValueRowBase Protect(FieldValueRowBase typedRow, FieldDefinition field, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService encryption)
+    {
+        ArgumentNullException.ThrowIfNull(typedRow);
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(encryption);
+        if (field.FieldProtectionMode != FieldProtectionModes.ApplicationEncrypted || typedRow is FieldEncryptedValue)
+        {
+            return typedRow;
+        }
+
+        var sealedRow = encryption.Encrypt(new Encryption.FieldEncryptionContext(typedRow.TenantId, typedRow.FormRecordId, typedRow.FieldDefinitionId, typedRow.FieldValueItemId, field.FieldDataType), Format(typedRow, optionsById));
+        sealedRow.FormRecordGroupId = typedRow.FormRecordGroupId;
+        sealedRow.CreatedOn = typedRow.CreatedOn;
+        sealedRow.CreatedByUserId = typedRow.CreatedByUserId;
+        return sealedRow;
+    }
+
+    /// <summary>Invariant wire string of a stored row; encrypted rows are decrypted (authenticated) through the field encryption service.</summary>
+    public static string Format(ISignedContentRow row, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService? encryption)
+    {
+        if (row is FieldEncryptedValue encrypted)
+        {
+            return (encryption ?? throw new InvalidOperationException("an encrypted value cannot be formatted without the field encryption service")).Decrypt(encrypted);
+        }
+
+        return Format(row, optionsById);
+    }
+
+    /// <summary>Invariant wire string of a stored plaintext row. Encrypted rows are never formatted here (no accidental plaintext path).</summary>
     public static string Format(ISignedContentRow row, IReadOnlyDictionary<Guid, FieldOption> optionsById)
     {
         ArgumentNullException.ThrowIfNull(optionsById);
         return row switch
         {
+            FieldEncryptedValue => throw new InvalidOperationException("an encrypted value cannot be formatted without the field encryption service"),
             FieldStringValue v => v.StringValue,
             FieldIntegerValue v => v.IntegerValue.ToString(CultureInfo.InvariantCulture),
             FieldDecimalValue v => v.DecimalValue.ToString(CultureInfo.InvariantCulture),

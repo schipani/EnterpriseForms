@@ -1,0 +1,49 @@
+### stop security-test stack
+ Network enterpriseforms-sectest_business-net Removed 
+ Network enterpriseforms-sectest_web-net Removed 
+ Network enterpriseforms-sectest_authority-net Removed 
+### start security-test stack
+ Container enterpriseforms-sectest-worker-1 Healthy 
+ Container enterpriseforms-sectest-clamav-1 Healthy 
+ Container enterpriseforms-sectest-vault-1 Healthy 
+ Container enterpriseforms-sectest-attacker-sql-1 Healthy 
+ Container enterpriseforms-sectest-azurite-1 Healthy 
+ Container enterpriseforms-sectest-authority-1 Healthy 
+ Container enterpriseforms-sectest-api-1 Healthy 
+container enterpriseforms-sectest-dev-seed-1 exited (0)
+### build tests
+Build succeeded.
+Build succeeded.
+### stage-b integration
+  total: 24
+  failed: 0
+  succeeded: 24
+  skipped: 0
+  duration: 1m 28s 742ms
+### playwright
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+    Timeout: 20000ms
+    Error: element(s) not found
+    > 116 |     await expect(page.getByRole("row", { name: /Exhibit count/ })).toContainText("Confidential · Encrypted");
+      119 |     await expect(reopened.getByText("Enabled", { exact: true })).toBeVisible();
+    test-results\encryption-Field-encryptio-e04f8-ypted-the-change-is-one-way-chromium-desktop\test-failed-1.png
+    Error Context: test-results\encryption-Field-encryptio-e04f8-ypted-the-change-is-one-way-chromium-desktop\error-context.md
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+    Timeout: 20000ms
+    Error: element(s) not found
+      115 |     await expect(page.getByText("Integrity: Verified")).toBeVisible({ timeout: 60_000 });
+      116 |     await expect(page.getByText("Layout v2")).toBeVisible();
+    > 117 |     await expect(page.getByText("Forename", { exact: true })).toBeVisible();
+      118 |     await expect(page.getByText("Casey", { exact: true })).toBeVisible();
+      119 |     await expect(page.getByRole("heading", { name: /Evidence \(1 of 5\)/ })).toBeVisible();
+    test-results\form-management-Form-manag-582f9-d-attachments-are-preserved-chromium-desktop\test-failed-1.png
+    Error Context: test-results\form-management-Form-manag-582f9-d-attachments-are-preserved-chromium-desktop\error-context.md
+[1A[2K  2 failed
+  10 passed (3.5m)
+### sec-p
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 2m 03s 091ms
+### DONE

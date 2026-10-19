@@ -5,6 +5,8 @@ export interface RendererField {
   fieldKey: string;
   fieldDisplayName: string;
   fieldDataType: string;
+  /** True when the field is stored application-encrypted (shown as a badge; never a search capability). */
+  applicationEncrypted?: boolean;
   options: Array<{ fieldOptionId: string; optionKey: string; optionDisplayText: string; optionSortOrder: number; isActive: boolean }>;
 }
 

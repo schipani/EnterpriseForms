@@ -9,6 +9,10 @@ using EnterpriseForms.Domain.Features.Documents;
 using EnterpriseForms.Domain.Features.FormDefinitions;
 using EnterpriseForms.Domain.Features.FormRecords;
 using EnterpriseForms.Infrastructure.Features.Documents;
+using EnterpriseForms.Infrastructure.Features.FormRecords;
+using EnterpriseForms.Domain.Features.Organizations;
+using EnterpriseForms.Application.Features.FormRecords.Encryption;
+using EnterpriseForms.Application.Features.FormDefinitions.Protection;
 using EnterpriseForms.Integrity.Canonical;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -110,6 +114,103 @@ public sealed class StageBUnitTests
         var withDocuments = EnterpriseForms.Application.Features.FormRecords.GetFormRecord.GetRecordProjectionHandler.AuthorizedLayout(layout, new HashSet<Guid> { shared }, new HashSet<Guid> { documents });
         Assert.Equal(2, withDocuments.Sections.Count);
         Assert.Equal("documentCollection", Assert.Single(withDocuments.Sections[1].Elements).Kind);
+    }
+
+    [Fact]
+    public void FieldEncryptionSealsCanonicalValuesBindsIdentityAndFailsClosed()
+    {
+        var keys = new LocalDevelopmentKeyProvider(Options.Create(new EncryptionOptions { KeyProvider = "LocalDevelopment", LocalDevelopmentKekBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }));
+        var service = new AesGcmFieldEncryptionService(keys);
+        var context = new FieldEncryptionContext(Tenant, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), "String");
+        var sealedRow = service.Encrypt(context, "Avery Synthetic");
+        Assert.Equal("AES-256-GCM", sealedRow.EncryptionAlgorithmName);
+        Assert.Equal(12, sealedRow.EncryptionNonceBytes.Length);
+        Assert.Equal(16, sealedRow.EncryptionAuthTagBytes.Length);
+        Assert.DoesNotContain("Avery", System.Text.Encoding.Latin1.GetString(sealedRow.EncryptedValueBytes), StringComparison.Ordinal);
+        Assert.Equal("Avery Synthetic", service.Decrypt(sealedRow));
+
+        // Two seals of the same plaintext never share nonce or ciphertext (per-value DEK, random nonce).
+        var again = service.Encrypt(context, "Avery Synthetic");
+        Assert.NotEqual(sealedRow.EncryptionNonceBytes, again.EncryptionNonceBytes);
+        Assert.NotEqual(sealedRow.EncryptedValueBytes, again.EncryptedValueBytes);
+
+        // AAD binds tenant/record/field/item/type: a transplanted envelope is rejected without a plaintext.
+        foreach (var mutate in new Action<FieldEncryptedValue>[] { v => v.FormRecordId = Guid.CreateVersion7(), v => v.FieldDefinitionId = Guid.CreateVersion7(), v => v.FieldValueItemId = Guid.CreateVersion7(), v => v.TenantId = Guid.CreateVersion7(), v => v.EncryptedLogicalType = "Integer" })
+        {
+            var transplanted = Clone(sealedRow);
+            mutate(transplanted);
+            Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(transplanted));
+        }
+
+        // Hostile byte flips in ciphertext, tag or wrapped key fail closed.
+        var tampered = Clone(sealedRow);
+        tampered.EncryptedValueBytes[0] ^= 0x01;
+        Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(tampered));
+        var tagged = Clone(sealedRow);
+        tagged.EncryptionAuthTagBytes[3] ^= 0x01;
+        Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(tagged));
+        var rekeyed = Clone(sealedRow);
+        rekeyed.WrappedDataKeyBytes[^1] ^= 0x01;
+        Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(rekeyed));
+
+        // Unknown key reference and a missing/unconfigured provider fail closed (never a silent plaintext fallback).
+        var unknownKey = Clone(sealedRow);
+        unknownKey.EncryptionKeyReference = "some-other-kek";
+        Assert.Throws<EncryptionUnavailableException>(() => service.Decrypt(unknownKey));
+        var unavailable = new AesGcmFieldEncryptionService(new UnavailableKeyProvider("test: no provider"));
+        Assert.False(unavailable.IsAvailable);
+        Assert.Throws<EncryptionUnavailableException>(() => unavailable.Encrypt(context, "x"));
+        Assert.Throws<EncryptionUnavailableException>(() => unavailable.Decrypt(sealedRow));
+
+        // The signed schema binds the exact envelope (row-integrity-format §3.7).
+        sealedRow.RowRevision = 1;
+        Assert.Equal("field_encrypted_values", RowCanonicalHeader.Parse(BusinessSignedSchemas.Encode(sealedRow, 1)).EntityKind);
+        Assert.Equal(BusinessSignedSchemas.FieldEncryptedValuesV1.SchemaVersion, BusinessSignedSchemas.CurrentSchemaVersion(sealedRow));
+        var canonicalBefore = BusinessSignedSchemas.Encode(sealedRow, 1);
+        sealedRow.EncryptedValueBytes[^1] ^= 0x01;
+        Assert.NotEqual(canonicalBefore, BusinessSignedSchemas.Encode(sealedRow, 1));
+
+        // Plaintext formatting paths refuse encrypted rows unless the encryption service is supplied.
+        Assert.Throws<InvalidOperationException>(() => FieldValueCodec.Format(sealedRow, new Dictionary<Guid, FieldOption>()));
+        Assert.Throws<InvalidOperationException>(() => FieldValueCodec.Format(sealedRow, new Dictionary<Guid, FieldOption>(), null));
+
+        static FieldEncryptedValue Clone(FieldEncryptedValue v) => new()
+        {
+            FieldEncryptedValueId = v.FieldEncryptedValueId, TenantId = v.TenantId, FormRecordId = v.FormRecordId, FieldDefinitionId = v.FieldDefinitionId, FieldValueItemId = v.FieldValueItemId,
+            EncryptedValueBytes = [.. v.EncryptedValueBytes], EncryptionNonceBytes = [.. v.EncryptionNonceBytes], EncryptionAuthTagBytes = [.. v.EncryptionAuthTagBytes], WrappedDataKeyBytes = [.. v.WrappedDataKeyBytes],
+            EncryptionAlgorithmName = v.EncryptionAlgorithmName, EncryptionKeyReference = v.EncryptionKeyReference, EncryptionEnvelopeVersion = v.EncryptionEnvelopeVersion, EncryptedLogicalType = v.EncryptedLogicalType,
+        };
+    }
+
+    [Fact]
+    public void FieldProtectionPolicyDefaultsFreeTextToEncryptionEnforcesTheFloorAndNeverDowngrades()
+    {
+        var policy = new OrganizationSecurityPolicy { MinimumFieldClassification = "Internal", PlaintextInternalFieldsPermitted = true };
+        Assert.Equal(("Confidential", "ApplicationEncrypted"), FieldProtectionPolicy.Resolve("String", null, null, policy));
+        Assert.Equal(("Confidential", "ApplicationEncrypted"), FieldProtectionPolicy.Resolve("File", null, null, policy));
+        Assert.Equal(("Internal", "Standard"), FieldProtectionPolicy.Resolve("Integer", null, null, policy));
+        Assert.Equal(("Internal", "Standard"), FieldProtectionPolicy.Resolve("String", "Internal", "Standard", policy));
+        Assert.Equal(("Internal", "ApplicationEncrypted"), FieldProtectionPolicy.Resolve("Integer", "Internal", "ApplicationEncrypted", policy));
+        Assert.Equal(("Restricted", "ApplicationEncrypted"), FieldProtectionPolicy.Resolve("String", "Restricted", null, policy));
+        Assert.Equal("FIELD_PROTECTION_REQUIRED", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.Resolve("String", "Confidential", "Standard", policy)).ErrorCode);
+        Assert.Equal("CLASSIFICATION_BELOW_FLOOR", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.Resolve("String", "Public", "Standard", policy)).ErrorCode);
+        Assert.Equal("INVALID_REQUEST", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.Resolve("String", "Secret", null, policy)).ErrorCode);
+
+        var strict = new OrganizationSecurityPolicy { MinimumFieldClassification = "Internal", PlaintextInternalFieldsPermitted = false };
+        Assert.Equal("PLAINTEXT_NOT_PERMITTED", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.Resolve("Integer", "Internal", "Standard", strict)).ErrorCode);
+        Assert.Equal("PLAINTEXT_NOT_PERMITTED", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.Resolve("Integer", null, null, strict)).ErrorCode);
+        Assert.Equal(("Internal", "ApplicationEncrypted"), FieldProtectionPolicy.Resolve("Integer", "Internal", "ApplicationEncrypted", strict));
+        var floorConfidential = new OrganizationSecurityPolicy { MinimumFieldClassification = "Confidential", PlaintextInternalFieldsPermitted = true };
+        Assert.Equal("CLASSIFICATION_BELOW_FLOOR", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.Resolve("Integer", "Internal", null, floorConfidential)).ErrorCode);
+
+        var plaintext = new FieldDefinition { FieldKey = "note_text", FieldDataType = "String", FieldClassification = "Internal", FieldProtectionMode = "Standard" };
+        Assert.Equal(("Confidential", "ApplicationEncrypted"), FieldProtectionPolicy.ResolveStrengthening(plaintext, "Confidential", null, policy));
+        Assert.Equal(("Internal", "ApplicationEncrypted"), FieldProtectionPolicy.ResolveStrengthening(plaintext, null, "ApplicationEncrypted", policy));
+        Assert.Equal("NO_PROTECTION_CHANGE", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.ResolveStrengthening(plaintext, "Internal", "Standard", policy)).ErrorCode);
+        var encrypted = new FieldDefinition { FieldKey = "secret_text", FieldDataType = "String", FieldClassification = "Confidential", FieldProtectionMode = "ApplicationEncrypted" };
+        Assert.Equal("FIELD_PROTECTION_DOWNGRADE_REFUSED", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.ResolveStrengthening(encrypted, "Internal", "Standard", policy)).ErrorCode);
+        Assert.Equal("FIELD_PROTECTION_DOWNGRADE_REFUSED", Assert.Throws<BusinessException>(() => FieldProtectionPolicy.ResolveStrengthening(encrypted, "Confidential", "Standard", policy)).ErrorCode);
+        Assert.Equal(("Restricted", "ApplicationEncrypted"), FieldProtectionPolicy.ResolveStrengthening(encrypted, "Restricted", null, policy));
     }
 
     [Fact]

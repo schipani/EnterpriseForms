@@ -95,9 +95,11 @@ function renderElement(
 
 export function FieldControl({ element, field, value, error, onChange, readOnly }: { element: FieldElement; field: RendererField; value: string; error: string | undefined; onChange: (value: string) => void; readOnly: boolean }) {
   const label = element.label || field.fieldDisplayName;
-  const common = { label, helpText: element.helpText, error, required: element.required, disabled: readOnly } as const;
+  const encrypted = field.applicationEncrypted === true;
+  const helpText = encrypted ? [element.helpText, "Encrypted for privacy — not searchable."].filter(Boolean).join(" ") : element.helpText;
+  const common = { label, helpText, error, required: element.required, disabled: readOnly } as const;
   if (readOnly) {
-    return <ReadOnlyValue label={label} value={displayValue(field, value)} helpText={element.helpText} />;
+    return <ReadOnlyValue label={label} value={displayValue(field, value)} helpText={element.helpText} encrypted={encrypted} />;
   }
   switch (field.fieldDataType) {
     case "String":
@@ -179,10 +181,13 @@ export function fromLocalDateTimeInput(local: string): string {
   return parsed.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-export function ReadOnlyValue({ label, value, helpText }: { label: string; value: string; helpText?: string | undefined }) {
+export function ReadOnlyValue({ label, value, helpText, encrypted }: { label: string; value: string; helpText?: string | undefined; encrypted?: boolean | undefined }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="text-sm font-medium text-muted">{label}</span>
+      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted">
+        <span>{label}</span>
+        {encrypted ? <span className="rounded border border-line px-1.5 py-0.5 text-xs font-normal" title="Stored application-encrypted; decrypted for you after authorization. Not searchable.">Encrypted</span> : null}
+      </span>
       <span className="min-h-6 break-words text-base text-body">{value === "" ? <span className="text-muted">Not provided</span> : value}</span>
       {helpText ? <span className="text-xs text-muted">{helpText}</span> : null}
     </div>

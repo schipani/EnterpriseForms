@@ -53,6 +53,7 @@ public static class AuditRecorder
 
 public static class AuditCategories
 {
+    public const string Security = "Security";
     public const string Record = "Record";
     public const string Form = "Form";
     public const string Document = "Document";

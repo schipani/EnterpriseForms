@@ -33,6 +33,24 @@ public sealed class OrganizationBrandingConfiguration : IEntityTypeConfiguration
     }
 }
 
+public sealed class OrganizationSecurityPolicyConfiguration : IEntityTypeConfiguration<OrganizationSecurityPolicy>
+{
+    public void Configure(EntityTypeBuilder<OrganizationSecurityPolicy> builder)
+    {
+        builder.MapSnakeCase("organization_security_policies");
+        builder.HasKey(p => p.OrganizationSecurityPolicyId);
+        builder.Property(p => p.MinimumFieldClassification).HasMaxLength(20);
+        builder.Property(p => p.PolicyStatementText).HasMaxLength(2000);
+        builder.HasIndex(p => p.TenantId).IsUnique().HasDatabaseName("uq_organization_security_policies_tenant");
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).HasConstraintName("fk_organization_security_policies_tenant");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_organization_security_policies_minimum", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')");
+            t.HasCheckConstraint("ck_organization_security_policies_revision", "security_policy_revision >= 1");
+        });
+    }
+}
+
 public sealed class UserUiPreferenceConfiguration : IEntityTypeConfiguration<UserUiPreference>
 {
     public void Configure(EntityTypeBuilder<UserUiPreference> builder)

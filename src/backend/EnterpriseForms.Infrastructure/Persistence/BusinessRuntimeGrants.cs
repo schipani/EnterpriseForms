@@ -13,7 +13,7 @@ public static class BusinessRuntimeGrants
 {
     private static readonly string[] InsertOnlyTables =
     [
-        "form_record_revisions", "field_string_values", "field_integer_values", "field_decimal_values", "field_date_values", "field_date_time_values", "field_guid_values", "field_boolean_values", "field_option_values",
+        "form_record_revisions", "field_string_values", "field_integer_values", "field_decimal_values", "field_date_values", "field_date_time_values", "field_guid_values", "field_boolean_values", "field_option_values", "field_encrypted_values",
         "form_versions", "field_definitions", "audit_events", "file_attachment_versions",
     ];
 
@@ -22,7 +22,7 @@ public static class BusinessRuntimeGrants
         "tenants", "users", "teams", "team_memberships", "form_definitions", "form_records", "record_shares", "record_share_fields",
         "form_drafts", "field_options", "form_relationship_definitions", "form_record_relationships",
         "upload_sessions", "file_attachments", "document_processing_jobs",
-        "organization_brandings", "user_ui_preferences",
+        "organization_brandings", "user_ui_preferences", "organization_security_policies",
     ];
 
     /// <summary>
@@ -32,7 +32,7 @@ public static class BusinessRuntimeGrants
     /// </summary>
     private static readonly Dictionary<string, string[]> ColumnUpdateGrants = new(StringComparer.Ordinal)
     {
-        ["field_definitions"] = ["field_display_name", "field_description", "field_definition_revision", "modified_on", "modified_by_user_id"],
+        ["field_definitions"] = ["field_display_name", "field_description", "field_definition_revision", "modified_on", "modified_by_user_id", "field_classification", "field_protection_mode", "protection_policy_revision", "protection_changed_on", "protection_changed_by_user_id"],
     };
 
     public static void Apply(DbContext context, string runtimeRole)

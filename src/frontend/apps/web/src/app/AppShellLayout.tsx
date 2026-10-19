@@ -25,7 +25,7 @@ export function AppShellLayout({ children }: PropsWithChildren) {
             )}
             <span className="text-lg font-semibold">{branding?.organizationDisplayName ?? "Enterprise Forms"}</span>
           </Link>
-          <div className="ml-auto flex items-center gap-2">{session.status === "authenticated" ? <UserMenu /> : null}</div>
+          <div className="ml-auto flex min-w-0 max-w-full items-center gap-2">{session.status === "authenticated" ? <UserMenu /> : null}</div>
         </div>
         {session.status === "authenticated" ? <PrimaryNav /> : null}
       </header>
@@ -72,8 +72,8 @@ function UserMenu() {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button variant="secondary" size="sm" aria-label={`Account menu for ${name}`}>
-          {name}
+        <Button variant="secondary" size="sm" className="max-w-full !whitespace-normal text-left" aria-label={`Account menu for ${name}`}>
+          <span className="min-w-0 break-words">{name}</span>
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

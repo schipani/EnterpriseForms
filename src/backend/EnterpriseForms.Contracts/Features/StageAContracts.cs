@@ -33,7 +33,8 @@ public sealed record FormRecordResponse(
     string IntegrityStatus);
 
 /// <summary>Invariant wire value: text, integer/decimal literal, ISO date, true/false or option key (Stage B typed values, B-02).</summary>
-public sealed record FieldValueResponse(Guid FieldDefinitionId, string FieldKey, Guid FieldValueItemId, string StringValue, string FieldDataType = "String");
+/// <summary><c>ApplicationEncrypted</c>: the value was stored as ciphertext and decrypted for this authorized response. <c>LegacyPlaintext</c>: the field is now encrypted but this record still holds a plaintext copy until its next commit (migration pending).</summary>
+public sealed record FieldValueResponse(Guid FieldDefinitionId, string FieldKey, Guid FieldValueItemId, string StringValue, string FieldDataType = "String", bool ApplicationEncrypted = false, bool LegacyPlaintext = false);
 
 public sealed record CreateShareRequest(Guid? RecipientUserId, Guid? RecipientTeamId, string RecipientRole, IReadOnlyList<string> FieldKeys);
 

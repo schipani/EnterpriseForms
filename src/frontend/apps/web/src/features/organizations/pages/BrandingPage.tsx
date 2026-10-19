@@ -4,6 +4,7 @@ import { Button, Card, LoadingBlock, PageHeader, Select, StatusMessage, TextInpu
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { ErrorPanel } from "../../support";
+import { SecurityPolicyCard } from "../components/SecurityPolicyCard";
 
 type Draft = { organizationDisplayName: string; logoAlternativeText: string; primary: string; primaryText: string; secondary: string; secondaryText: string; secondaryBorder: string; textScale: string; colorMode: string };
 
@@ -97,6 +98,9 @@ export function BrandingPage() {
             </span>
           </div>
         </Card>
+      </div>
+      <div className="mt-6">
+        <SecurityPolicyCard />
       </div>
       {save.isError ? <div className="mt-4"><ErrorPanel error={save.error} /></div> : null}
       {save.isSuccess ? <div className="mt-4"><StatusMessage tone="success" title="Branding saved" /></div> : null}

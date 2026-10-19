@@ -59,6 +59,17 @@ public static class OrganizationEndpoints
                 TypedResults.Ok(await handlers.UpdatePreferenceAsync(BusinessAuthentication.RequireContext(http), request, cancellationToken).ConfigureAwait(false)))
             .WithName("UpdateUiPreferences");
 
+        var policy = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/security-policy").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        policy.MapGet("/", static async Task<Ok<OrganizationSecurityPolicyResponse>> (HttpContext http, SecurityPolicyHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.GetAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false)))
+            .WithName("GetOrganizationSecurityPolicy")
+            .WithSummary("Data-protection policy: minimum field classification and whether plaintext Internal fields are permitted (ADR-PB-004).");
+
+        policy.MapPut("/", static async Task<Ok<OrganizationSecurityPolicyResponse>> (UpdateOrganizationSecurityPolicyRequest request, HttpContext http, SecurityPolicyHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.UpdateAsync(BusinessAuthentication.RequireContext(http), request, cancellationToken).ConfigureAwait(false)))
+            .WithName("UpdateOrganizationSecurityPolicy")
+            .WithSummary("OrganizationOwner only; reason required; audited; revision CAS.");
+
         var users = endpoints.MapGroup(ApiVersions.V1Prefix + "/users").WithTags("Identity").WithFeatureOwner("Identity").RequireAuthorization(BusinessAuthentication.Policy);
         users.MapGet("/", static async Task<Ok<IReadOnlyList<DirectoryUserResponse>>> (HttpContext http, IBusinessStore store, CancellationToken cancellationToken) =>
             {

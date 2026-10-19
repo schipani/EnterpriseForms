@@ -22,7 +22,8 @@ public sealed record VerifiedRecord(
     FormVersion LayoutVersion,
     FormLayout Layout,
     IReadOnlyList<FieldDefinition> Fields,
-    IReadOnlyList<FieldOption> Options)
+    IReadOnlyList<FieldOption> Options,
+    Encryption.IFieldEncryptionService Encryption)
 {
     public IReadOnlyDictionary<Guid, FieldDefinition> FieldsById => Fields.ToDictionary(f => f.FieldDefinitionId);
 
@@ -43,7 +44,9 @@ public sealed record VerifiedRecord(
         return AuthorizedValues
             .Where(v => fields.ContainsKey(v.FieldDefinitionId))
             .OrderBy(v => fields[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal)
-            .Select(v => new FieldValueResponse(v.FieldDefinitionId, fields[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, options), fields[v.FieldDefinitionId].FieldDataType))
+            .Select(v => new FieldValueResponse(v.FieldDefinitionId, fields[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, options, Encryption), fields[v.FieldDefinitionId].FieldDataType,
+                ApplicationEncrypted: v is FieldEncryptedValue,
+                LegacyPlaintext: v is not FieldEncryptedValue && fields[v.FieldDefinitionId].FieldProtectionMode == FieldProtectionModes.ApplicationEncrypted))
             .ToList();
     }
 
@@ -57,7 +60,7 @@ public sealed record VerifiedRecord(
 /// authority VerifyRecordProjection (complete leaf index, every signature, root, gate, archive receipt) → release only
 /// the authorized subset. Local candidate_state, owner columns, share and link rows are never consulted.
 /// </summary>
-public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAuthorityClient authority, RecordCandidateStager stager)
+public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAuthorityClient authority, RecordCandidateStager stager, Encryption.IFieldEncryptionService encryption)
 {
     public async Task<VerifiedRecord> ReadAsync(RequestContext context, Guid formRecordId, ProtectedAction action, CancellationToken cancellationToken)
     {
@@ -101,6 +104,6 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
             options = await scope.GetFieldOptionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
         }
 
-        return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options);
+        return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption);
     }
 }

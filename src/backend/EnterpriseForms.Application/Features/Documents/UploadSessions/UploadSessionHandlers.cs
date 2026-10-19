@@ -347,6 +347,8 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             FieldGuidValue g => new FieldGuidValue { FieldGuidValueId = Guid.CreateVersion7(), GuidValue = g.GuidValue },
             FieldBooleanValue b => new FieldBooleanValue { FieldBooleanValueId = Guid.CreateVersion7(), BooleanValue = b.BooleanValue },
             FieldOptionValue o => new FieldOptionValue { FieldOptionValueId = Guid.CreateVersion7(), FieldOptionId = o.FieldOptionId },
+            // Ciphertext is carried unchanged: the AAD binds tenant/record/field/item, none of which change in a copy.
+            FieldEncryptedValue e => new FieldEncryptedValue { FieldEncryptedValueId = Guid.CreateVersion7(), EncryptedValueBytes = e.EncryptedValueBytes, EncryptionNonceBytes = e.EncryptionNonceBytes, EncryptionAuthTagBytes = e.EncryptionAuthTagBytes, WrappedDataKeyBytes = e.WrappedDataKeyBytes, EncryptionAlgorithmName = e.EncryptionAlgorithmName, EncryptionKeyReference = e.EncryptionKeyReference, EncryptionEnvelopeVersion = e.EncryptionEnvelopeVersion, EncryptedLogicalType = e.EncryptedLogicalType },
             _ => throw new InvalidOperationException("unsupported value row " + v.GetType().Name),
         };
         clone.TenantId = v.TenantId;

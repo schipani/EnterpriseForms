@@ -142,6 +142,12 @@ public interface IBusinessScope : IAsyncDisposable
 
     void AddBranding(OrganizationBranding branding);
 
+    Task<OrganizationSecurityPolicy?> FindSecurityPolicyAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    void AddSecurityPolicy(OrganizationSecurityPolicy policy);
+
+    Task<int> CountLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+
     Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken);
 
     void AddUiPreference(UserUiPreference preference);

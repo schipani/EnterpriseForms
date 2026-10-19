@@ -67,7 +67,7 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
         var options = verified.Options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive)).ToList());
         var fields = verified.Fields
             .Where(f => authorizedFieldIds is null || authorizedFieldIds.Contains(f.FieldDefinitionId) || authorizedDocumentFieldIds!.Contains(f.FieldDefinitionId))
-            .Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, options.GetValueOrDefault(f.FieldDefinitionId, [])))
+            .Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, options.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision))
             .ToList();
         var version = verified.LayoutVersion;
         return new RecordProjectionResponse(

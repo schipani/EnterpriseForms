@@ -95,6 +95,17 @@ public sealed class SignedColumnRegistryTests
             "created_on:audit timestamp of the physical copy",
             "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
         }),
+        ["field_encrypted_values"] = (BusinessSignedSchemas.FieldEncryptedValuesV1, "field_encrypted_values", new[]
+        {
+            "field_encrypted_value_id:bound as the canonical primary key",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
         ["field_boolean_values"] = (BusinessSignedSchemas.FieldBooleanValuesV1, "field_boolean_values", new[]
         {
             "field_boolean_value_id:bound as the canonical primary key",

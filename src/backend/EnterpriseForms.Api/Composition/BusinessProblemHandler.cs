@@ -28,6 +28,13 @@ public sealed class BusinessProblemHandler : IExceptionHandler
                 problem.Extensions["command_id"] = ex.Outcome.CommandId;
                 problem.Extensions["command_status"] = ex.Outcome.CommandStatus;
                 break;
+            case Application.Features.Documents.Ports.EncryptionUnavailableException:
+                // Fail closed, generic: no key material, provider detail or value reaches the client.
+                problem = Build(StatusCodes.Status503ServiceUnavailable, "ENCRYPTION_UNAVAILABLE", "encryption keys are unavailable; protected values cannot be written or read right now");
+                break;
+            case System.Security.Cryptography.CryptographicException:
+                problem = Build(StatusCodes.Status423Locked, "FIELD_DECRYPTION_FAILED", "a protected value failed authenticated decryption; nothing was released");
+                break;
             case BadHttpRequestException:
             case System.Text.Json.JsonException:
                 problem = Build(StatusCodes.Status422UnprocessableEntity, "INVALID_REQUEST", "request body invalid");

@@ -56,6 +56,20 @@ public sealed class FormVersion
 }
 
 /// <summary>Stable field identity; storage type immutable after creation. Stage A supports String fields.</summary>
+public static class FieldClassifications
+{
+    public const string Public = "Public";
+    public const string Internal = "Internal";
+    public const string Confidential = "Confidential";
+    public const string Restricted = "Restricted";
+}
+
+public static class FieldProtectionModes
+{
+    public const string Standard = "Standard";
+    public const string ApplicationEncrypted = "ApplicationEncrypted";
+}
+
 public sealed class FieldDefinition
 {
     public Guid FieldDefinitionId { get; set; }
@@ -79,6 +93,16 @@ public sealed class FieldDefinition
     public DateTimeOffset CreatedOn { get; set; }
 
     public Guid CreatedByUserId { get; set; }
+
+    /// <summary>Storage protection (ADR-PB-004): Standard (typed plaintext, readable by a database administrator) or ApplicationEncrypted (AES-256-GCM envelope per value). Strengthened only, never weakened.</summary>
+    public string FieldProtectionMode { get; set; } = FieldProtectionModes.Standard;
+
+    /// <summary>Increments on every classification/protection strengthening (audited migration step).</summary>
+    public long ProtectionPolicyRevision { get; set; } = 1;
+
+    public DateTimeOffset? ProtectionChangedOn { get; set; }
+
+    public Guid? ProtectionChangedByUserId { get; set; }
 
     /// <summary>Optimistic-concurrency revision of the editable catalog metadata (display name, description). Key, type and id never change.</summary>
     public long FieldDefinitionRevision { get; set; } = 1;

@@ -6,6 +6,7 @@ using EnterpriseForms.Application.Common.Persistence;
 using EnterpriseForms.Application.Features.Audit;
 using EnterpriseForms.Application.Features.FormDefinitions.CreateFormDefinition;
 using EnterpriseForms.Application.Features.FormDefinitions.Layout;
+using EnterpriseForms.Application.Features.FormDefinitions.Protection;
 using EnterpriseForms.Application.Features.FormRecords.Values;
 using EnterpriseForms.Contracts.Features;
 using EnterpriseForms.Domain.Features.Audit;
@@ -20,7 +21,7 @@ namespace EnterpriseForms.Application.Features.FormDesigner;
 /// version, restore-to-draft, relationship definitions. Every write requires the authority <c>design</c> permission on
 /// the form; nothing here reads submitted record values.
 /// </summary>
-public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
+public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock, FormRecords.Encryption.IFieldEncryptionService encryption)
 {
     [GeneratedRegex("^[a-z][a-z0-9_]{0,63}$")]
     private static partial Regex KeyPattern();
@@ -183,6 +184,13 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
 
         var now = clock.GetUtcNow();
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var policy = await Organizations.SecurityPolicyHandlers.EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+        var (classification, protectionMode) = FieldProtectionPolicy.Resolve(request.FieldDataType!, request.FieldClassification, request.FieldProtectionMode, policy);
+        if (protectionMode == FieldProtectionModes.ApplicationEncrypted && request.FieldDataType != FieldDataTypes.File && !encryption.IsAvailable)
+        {
+            throw new Documents.Ports.EncryptionUnavailableException("no permitted encryption key provider is configured; an encrypted field cannot be created");
+        }
+
         var fields = await scope.GetFieldDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
         if (fields.Any(f => f.FieldKey == request.FieldKey))
         {
@@ -202,7 +210,8 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             FieldDisplayName = request.FieldDisplayName.Trim(),
             FieldDescription = request.FieldDescription?.Trim() ?? string.Empty,
             FieldDataType = request.FieldDataType!,
-            FieldClassification = "Internal",
+            FieldClassification = classification,
+            FieldProtectionMode = protectionMode,
             IsSearchable = false,
             LifecycleStatus = "Available",
             CreatedOn = now,
@@ -227,7 +236,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             }
         }
 
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormDraftUpdated, "field definition added", formDefinitionId: formDefinitionId, fieldDefinitionId: field.FieldDefinitionId, metadata: new { fieldKey = field.FieldKey, dataType = field.FieldDataType });
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormDraftUpdated, "field definition added", formDefinitionId: formDefinitionId, fieldDefinitionId: field.FieldDefinitionId, metadata: new { fieldKey = field.FieldKey, dataType = field.FieldDataType, classification = field.FieldClassification, protectionMode = field.FieldProtectionMode });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToFieldResponses([field], options)[0];
     }
@@ -287,6 +296,74 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
 
         var options = (await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).Where(o => o.FieldDefinitionId == fieldDefinitionId).ToList();
         return ToFieldResponses([field], options)[0];
+    }
+
+    /// <summary>Current protection of a field plus the migration state (how many records still carry a legacy plaintext copy after a strengthening).</summary>
+    public async Task<FieldProtectionResponse> GetProtectionAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var field = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
+        var policy = await Organizations.SecurityPolicyHandlers.EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+        var response = await ProtectionResponseAsync(scope, field, policy, cancellationToken).ConfigureAwait(false);
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return response;
+    }
+
+    /// <summary>
+    /// Explicit, audited migration step (ADR-PB-004 §Versioning): raise a field's classification and/or switch it from
+    /// plaintext to application encryption. Never the reverse. Future writes are encrypted immediately; existing plaintext
+    /// copies are rewritten as ciphertext when each record is next committed by an authorized user (reads flag them as
+    /// legacy plaintext until then) — no background process holds a user's signing authority.
+    /// </summary>
+    public async Task<FieldProtectionResponse> StrengthenProtectionAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, StrengthenFieldProtectionRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(request);
+        await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        var reason = request.ChangeReason?.Trim() ?? string.Empty;
+        if (reason.Length is < 3 or > 500)
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, "a change reason of 3..500 characters is required");
+        }
+
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var field = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
+        if (request.ExpectedProtectionRevision != field.ProtectionPolicyRevision)
+        {
+            throw new BusinessException("FIELD_REVISION_CONFLICT", 409, "the field's protection was changed by someone else; reload and retry");
+        }
+
+        var policy = await Organizations.SecurityPolicyHandlers.EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+        var (classification, mode) = FieldProtectionPolicy.ResolveStrengthening(field, request.TargetClassification, request.TargetProtectionMode, policy);
+        if (mode == FieldProtectionModes.ApplicationEncrypted && field.FieldDataType != FieldDataTypes.File && !encryption.IsAvailable)
+        {
+            throw new Documents.Ports.EncryptionUnavailableException("no permitted encryption key provider is configured; the field cannot be switched to encryption");
+        }
+
+        var previous = new { field.FieldClassification, field.FieldProtectionMode, field.ProtectionPolicyRevision };
+        var now = clock.GetUtcNow();
+        field.FieldClassification = classification;
+        field.FieldProtectionMode = mode;
+        field.ProtectionPolicyRevision++;
+        field.ProtectionChangedOn = now;
+        field.ProtectionChangedByUserId = context.LocalUserId;
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.FieldProtectionStrengthened, "field classification/protection strengthened (audited migration; existing plaintext rewritten as ciphertext on each record's next commit)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, metadata: new { fieldKey = field.FieldKey, previous, classification, protectionMode = mode, protectionPolicyRevision = field.ProtectionPolicyRevision, changeReason = reason });
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return await ProtectionResponseAsync(scope, field, policy, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<FieldProtectionResponse> ProtectionResponseAsync(IBusinessScope scope, FieldDefinition field, Domain.Features.Organizations.OrganizationSecurityPolicy policy, CancellationToken cancellationToken)
+    {
+        var encrypted = field.FieldProtectionMode == FieldProtectionModes.ApplicationEncrypted;
+        var legacy = encrypted && field.FieldDataType != FieldDataTypes.File ? await scope.CountLegacyPlaintextRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false) : 0;
+        var state = !encrypted ? "Plaintext" : legacy == 0 ? "Encrypted" : "EncryptionPendingRewrite";
+        return new FieldProtectionResponse(field.FieldDefinitionId, field.FieldKey, field.FieldClassification, field.FieldProtectionMode, field.ProtectionPolicyRevision, field.ProtectionChangedOn, state, legacy,
+            encrypted ? "Encrypted for privacy — not searchable in V1 (ADR-PB-004). Authorized users see the value on the record; no plaintext copy exists in the business database." : "Plaintext: searchable within authorization, and readable by a database administrator.",
+            policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted);
     }
 
     public async Task<FieldDefinitionResponse> UpdateOptionsAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, UpdateFieldOptionsRequest request, CancellationToken cancellationToken)
@@ -659,6 +736,12 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                     }
 
                     return element.FormRelationshipDefinitionId is { } relId && relationships.TryGetValue(relId, out var relationship) ? element with { Label = relationship.RelationshipDisplayName } : element;
+                }).Select(element =>
+                {
+                    // The published version declares each field's classification/protection as of publish (ADR-PB-004).
+                    return element.FieldDefinitionId is { } fieldId && fields.TryGetValue(fieldId, out var field)
+                        ? element with { Protection = new LayoutProtection(field.FieldClassification, field.FieldProtectionMode) }
+                        : element;
                 }).ToList(),
             }).ToList(),
         };
@@ -676,6 +759,6 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(options);
         var byField = options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.OrderBy(o => o.OptionSortOrder).ThenBy(o => o.OptionKey, StringComparer.Ordinal).Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive)).ToList());
-        return fields.OrderBy(f => f.FieldKey, StringComparer.Ordinal).Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, byField.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision)).ToList();
+        return fields.OrderBy(f => f.FieldKey, StringComparer.Ordinal).Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, byField.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision)).ToList();
     }
 }

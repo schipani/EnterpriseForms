@@ -139,6 +139,26 @@ public sealed class FieldGuidValueConfiguration : IEntityTypeConfiguration<Field
     }
 }
 
+public sealed class FieldEncryptedValueConfiguration : IEntityTypeConfiguration<FieldEncryptedValue>
+{
+    public void Configure(EntityTypeBuilder<FieldEncryptedValue> builder)
+    {
+        FieldValueConfiguration.ConfigureValueRow(builder, "field_encrypted_values", "field_encrypted_values");
+        builder.HasKey(v => v.FieldEncryptedValueId);
+        builder.Property(v => v.EncryptionAlgorithmName).HasMaxLength(32);
+        builder.Property(v => v.EncryptionKeyReference).HasMaxLength(200);
+        builder.Property(v => v.EncryptedLogicalType).HasMaxLength(20);
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_field_encrypted_values_nonce_length", "octet_length(encryption_nonce_bytes) = 12");
+            t.HasCheckConstraint("ck_field_encrypted_values_tag_length", "octet_length(encryption_auth_tag_bytes) = 16");
+            t.HasCheckConstraint("ck_field_encrypted_values_envelope_positive", "encryption_envelope_version >= 1");
+            t.HasCheckConstraint("ck_field_encrypted_values_logical_type", "encrypted_logical_type IN ('String','Integer','Decimal','Date','DateTime','Boolean','Guid','Option')");
+        });
+        // No lookup index on the ciphertext: encrypted values are never searched (ADR-PB-004).
+    }
+}
+
 public sealed class FieldBooleanValueConfiguration : IEntityTypeConfiguration<FieldBooleanValue>
 {
     public void Configure(EntityTypeBuilder<FieldBooleanValue> builder)

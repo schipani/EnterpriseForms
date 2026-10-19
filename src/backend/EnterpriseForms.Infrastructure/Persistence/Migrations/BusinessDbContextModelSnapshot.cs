@@ -624,6 +624,14 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("field_key");
 
+                    b.Property<string>("FieldProtectionMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("Standard")
+                        .HasColumnName("field_protection_mode");
+
                     b.Property<Guid>("FormDefinitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("form_definition_id");
@@ -646,6 +654,20 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on");
 
+                    b.Property<Guid?>("ProtectionChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protection_changed_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ProtectionChangedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("protection_changed_on");
+
+                    b.Property<long>("ProtectionPolicyRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("protection_policy_revision");
+
                     b.HasKey("FieldDefinitionId");
 
                     b.HasIndex("FormDefinitionId", "FieldKey")
@@ -657,6 +679,12 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_field_definitions_classification", "field_classification IN ('Public','Internal','Confidential','Restricted')");
 
                             t.HasCheckConstraint("ck_field_definitions_data_type", "field_data_type IN ('String','Integer','Decimal','Date','DateTime','Boolean','Guid','Option','File')");
+
+                            t.HasCheckConstraint("ck_field_definitions_protection_floor", "field_classification IN ('Public','Internal') OR field_protection_mode = 'ApplicationEncrypted'");
+
+                            t.HasCheckConstraint("ck_field_definitions_protection_mode", "field_protection_mode IN ('Standard','ApplicationEncrypted')");
+
+                            t.HasCheckConstraint("ck_field_definitions_protection_revision_positive", "protection_policy_revision >= 1");
 
                             t.HasCheckConstraint("ck_field_definitions_revision_positive", "field_definition_revision >= 1");
                         });
@@ -1261,6 +1289,139 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_field_decimal_values_signature_length", "octet_length(row_signature) = 32");
 
                             t.HasCheckConstraint("ck_field_decimal_values_versions_positive", "row_revision >= 1 AND row_signature_key_version >= 1 AND row_signature_schema_version >= 1 AND content_revision >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldEncryptedValue", b =>
+                {
+                    b.Property<Guid>("FieldEncryptedValueId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_encrypted_value_id");
+
+                    b.Property<Guid>("ContentChangeOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("content_change_operation_id");
+
+                    b.Property<long>("ContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("content_revision");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<string>("EncryptedLogicalType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("encrypted_logical_type");
+
+                    b.Property<byte[]>("EncryptedValueBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("encrypted_value_bytes");
+
+                    b.Property<string>("EncryptionAlgorithmName")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("encryption_algorithm_name");
+
+                    b.Property<byte[]>("EncryptionAuthTagBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("encryption_auth_tag_bytes");
+
+                    b.Property<int>("EncryptionEnvelopeVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("encryption_envelope_version");
+
+                    b.Property<string>("EncryptionKeyReference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("encryption_key_reference");
+
+                    b.Property<byte[]>("EncryptionNonceBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("encryption_nonce_bytes");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldValueItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_value_item_id");
+
+                    b.Property<Guid?>("FormRecordGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_group_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<long>("RowRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_revision");
+
+                    b.Property<byte[]>("RowSignature")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("row_signature");
+
+                    b.Property<int>("RowSignatureKeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_signature_key_version");
+
+                    b.Property<int>("RowSignatureSchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_signature_schema_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<byte[]>("WrappedDataKeyBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("wrapped_data_key_bytes");
+
+                    b.HasKey("FieldEncryptedValueId");
+
+                    b.HasIndex("FieldDefinitionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("FormRecordId", "ContentChangeOperationId")
+                        .HasDatabaseName("ix_field_encrypted_values_record_operation");
+
+                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_field_encrypted_values_occurrence");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId"), false);
+
+                    b.ToTable("field_encrypted_values", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_field_encrypted_values_envelope_positive", "encryption_envelope_version >= 1");
+
+                            t.HasCheckConstraint("ck_field_encrypted_values_logical_type", "encrypted_logical_type IN ('String','Integer','Decimal','Date','DateTime','Boolean','Guid','Option')");
+
+                            t.HasCheckConstraint("ck_field_encrypted_values_nonce_length", "octet_length(encryption_nonce_bytes) = 12");
+
+                            t.HasCheckConstraint("ck_field_encrypted_values_signature_length", "octet_length(row_signature) = 32");
+
+                            t.HasCheckConstraint("ck_field_encrypted_values_tag_length", "octet_length(encryption_auth_tag_bytes) = 16");
+
+                            t.HasCheckConstraint("ck_field_encrypted_values_versions_positive", "row_revision >= 1 AND row_signature_key_version >= 1 AND row_signature_schema_version >= 1 AND content_revision >= 1");
                         });
                 });
 
@@ -2009,6 +2170,67 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Organizations.OrganizationSecurityPolicy", b =>
+                {
+                    b.Property<Guid>("OrganizationSecurityPolicyId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_security_policy_id");
+
+                    b.Property<string>("MinimumFieldClassification")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("minimum_field_classification");
+
+                    b.Property<bool>("PlaintextInternalFieldsPermitted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("plaintext_internal_fields_permitted");
+
+                    b.Property<Guid?>("PolicyModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("policy_modified_by_user_id");
+
+                    b.Property<DateTimeOffset>("PolicyModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("policy_modified_on");
+
+                    b.Property<Guid?>("PolicyReviewedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("policy_reviewed_by_user_id");
+
+                    b.Property<DateTimeOffset?>("PolicyReviewedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("policy_reviewed_on");
+
+                    b.Property<string>("PolicyStatementText")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("policy_statement_text");
+
+                    b.Property<long>("SecurityPolicyRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("security_policy_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("OrganizationSecurityPolicyId");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_organization_security_policies_tenant");
+
+                    b.ToTable("organization_security_policies", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_organization_security_policies_minimum", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')");
+
+                            t.HasCheckConstraint("ck_organization_security_policies_revision", "security_policy_revision >= 1");
+                        });
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.RelatedForms.FormRecordRelationship", b =>
                 {
                     b.Property<Guid>("FormRecordRelationshipId")
@@ -2702,6 +2924,30 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_field_decimal_values_tenant");
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldEncryptedValue", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FieldDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_encrypted_values_field");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormRecords.FormRecord", null)
+                        .WithMany()
+                        .HasForeignKey("FormRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_encrypted_values_record");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_encrypted_values_tenant");
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldGuidValue", b =>
                 {
                     b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldDefinition", null)
@@ -2874,6 +3120,16 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_organization_brandings_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Organizations.OrganizationSecurityPolicy", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_organization_security_policies_tenant");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.RelatedForms.FormRecordRelationship", b =>

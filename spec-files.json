@@ -69,8 +69,8 @@
     },
     {
       "path": "docs/STAGE_B_STATUS.md",
-      "sha256": "b75081f3445f5fd99faa572694730f553b148bc40edb530c21c3b27716b2eff7",
-      "bytes": 39503
+      "sha256": "2e2b459cee05045b5b293d28915bc1d0cc30b44846eb2037082e3f5799d11a85",
+      "bytes": 53418
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -184,8 +184,8 @@
     },
     {
       "path": "docs/decisions/STAGE_B_DECISION_LOG.md",
-      "sha256": "c3253e0c059be5aa876dbef0f5071068bb2cd82c1f487151899f333f1102c59e",
-      "bytes": 19100
+      "sha256": "e42833309b6a3c3ea641b7db04537b90d66713516c1744562ba0e3fe0f8f1676",
+      "bytes": 25863
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
@@ -299,8 +299,8 @@
     },
     {
       "path": "docs/testing/PB14_UI_DESIGN_ACCEPTANCE_TESTS.csv",
-      "sha256": "6623155c5d92e01165f427a1247836e4025877f4a37f038628cb083a017b52e7",
-      "bytes": 3747
+      "sha256": "a06f90e129955c578175e3dfe77d3367168378312cb5fd513f36f791be80ab56",
+      "bytes": 4288
     },
     {
       "path": "docs/ui/PB14_COLOR_CONTRAST.reference.ts",
@@ -319,8 +319,8 @@
     },
     {
       "path": "docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md",
-      "sha256": "7a7e3df95caa1cabbc73030875217208afe8c03352cc0cade4fe2207f9570ac7",
-      "bytes": 7115
+      "sha256": "173e85138c5b11143b74a2417c4e3c890ee3d21c1a3554d77ab6d26d4c8d1999",
+      "bytes": 7455
     },
     {
       "path": "docs/ui/PB14_REPRESENTATIVE_SCREEN_CONTRACTS.md",

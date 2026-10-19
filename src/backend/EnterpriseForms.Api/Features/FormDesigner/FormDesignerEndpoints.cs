@@ -46,6 +46,16 @@ public static class FormDesignerEndpoints
             .WithName("UpdateFieldDefinition")
             .WithSummary("Edits a field's catalog label and description (expected revision required); key and storage type are permanent and a differing value is refused.");
 
+        group.MapGet("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.GetProtectionAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)))
+            .WithName("GetFieldProtection")
+            .WithSummary("Classification, storage protection, search impact and migration state of a field.");
+
+        group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, StrengthenFieldProtectionRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.StrengthenProtectionAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("StrengthenFieldProtection")
+            .WithSummary("Audited migration: raise classification and/or switch a field to application encryption. Downgrades are refused.");
+
         group.MapGet("/{formDefinitionId:guid}/access", static async Task<Ok<FormAccessResponse>> (Guid formDefinitionId, HttpContext http, FormAccessHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.GetAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, cancellationToken).ConfigureAwait(false)))
             .WithName("GetFormAccess")

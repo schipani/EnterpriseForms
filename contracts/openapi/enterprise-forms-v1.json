@@ -390,6 +390,96 @@
         }
       }
     },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Classification, storage protection, search impact and migration state of a field.",
+        "operationId": "GetFieldProtection",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Audited migration: raise classification and/or switch a field to application encryption. Downgrades are refused.",
+        "operationId": "StrengthenFieldProtection",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrengthenFieldProtectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions/{formDefinitionId}/access": {
       "get": {
         "tags": [
@@ -2021,6 +2111,56 @@
         }
       }
     },
+    "/api/v1/organization/security-policy": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Data-protection policy: minimum field classification and whether plaintext Internal fields are permitted (ADR-PB-004).",
+        "operationId": "GetOrganizationSecurityPolicy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSecurityPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "OrganizationOwner only; reason required; audited; revision CAS.",
+        "operationId": "UpdateOrganizationSecurityPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationSecurityPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSecurityPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users": {
       "get": {
         "tags": [
@@ -2078,6 +2218,18 @@
             "items": {
               "$ref": "#/components/schemas/CreateFieldOptionRequest"
             }
+          },
+          "fieldClassification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fieldProtectionMode": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -2999,6 +3151,19 @@
             ],
             "format": "int64",
             "default": 1
+          },
+          "fieldProtectionMode": {
+            "type": "string",
+            "default": "Standard"
+          },
+          "protectionPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64",
+            "default": 1
           }
         }
       },
@@ -3071,6 +3236,72 @@
           }
         }
       },
+      "FieldProtectionResponse": {
+        "required": [
+          "fieldDefinitionId",
+          "fieldKey",
+          "fieldClassification",
+          "fieldProtectionMode",
+          "protectionPolicyRevision",
+          "protectionChangedOn",
+          "migrationState",
+          "legacyPlaintextRecordCount",
+          "searchImpact",
+          "organizationMinimumClassification",
+          "organizationPermitsPlaintext"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldKey": {
+            "type": "string"
+          },
+          "fieldClassification": {
+            "type": "string"
+          },
+          "fieldProtectionMode": {
+            "type": "string"
+          },
+          "protectionPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "protectionChangedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "migrationState": {
+            "type": "string"
+          },
+          "legacyPlaintextRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "searchImpact": {
+            "type": "string"
+          },
+          "organizationMinimumClassification": {
+            "type": "string"
+          },
+          "organizationPermitsPlaintext": {
+            "type": "boolean"
+          }
+        }
+      },
       "FieldResponse": {
         "required": [
           "fieldDefinitionId",
@@ -3121,6 +3352,14 @@
           "fieldDataType": {
             "type": "string",
             "default": "String"
+          },
+          "applicationEncrypted": {
+            "type": "boolean",
+            "default": false
+          },
+          "legacyPlaintext": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -3509,6 +3748,54 @@
           "publishedByUserId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "OrganizationSecurityPolicyResponse": {
+        "required": [
+          "minimumFieldClassification",
+          "plaintextInternalFieldsPermitted",
+          "policyStatementText",
+          "policyReviewedOn",
+          "policyReviewedByUserId",
+          "securityPolicyRevision",
+          "isUnreviewedDefault"
+        ],
+        "type": "object",
+        "properties": {
+          "minimumFieldClassification": {
+            "type": "string"
+          },
+          "plaintextInternalFieldsPermitted": {
+            "type": "boolean"
+          },
+          "policyStatementText": {
+            "type": "string"
+          },
+          "policyReviewedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "policyReviewedByUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "securityPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "isUnreviewedDefault": {
+            "type": "boolean"
           }
         }
       },
@@ -4076,6 +4363,40 @@
         "type": "string",
         "format": "binary"
       },
+      "StrengthenFieldProtectionRequest": {
+        "required": [
+          "targetClassification",
+          "targetProtectionMode",
+          "changeReason",
+          "expectedProtectionRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "targetClassification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetProtectionMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "changeReason": {
+            "type": "string"
+          },
+          "expectedProtectionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "TeamMemberRequest": {
         "required": [
           "userId"
@@ -4361,6 +4682,34 @@
             "additionalProperties": {
               "type": "string"
             }
+          }
+        }
+      },
+      "UpdateOrganizationSecurityPolicyRequest": {
+        "required": [
+          "minimumFieldClassification",
+          "plaintextInternalFieldsPermitted",
+          "policyStatementText",
+          "expectedPolicyRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "minimumFieldClassification": {
+            "type": "string"
+          },
+          "plaintextInternalFieldsPermitted": {
+            "type": "boolean"
+          },
+          "policyStatementText": {
+            "type": "string"
+          },
+          "expectedPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },

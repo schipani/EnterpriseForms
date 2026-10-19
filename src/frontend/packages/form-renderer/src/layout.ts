@@ -26,6 +26,9 @@ const upload = z
   })
   .strict();
 
+/** Published declaration of a field's classification and storage protection (ADR-PB-004); informational for the renderer. */
+const protection = z.object({ classification: z.enum(["Public", "Internal", "Confidential", "Restricted"]), protectionMode: z.enum(["Standard", "ApplicationEncrypted"]) }).strict();
+
 const safeText = (max: number) => z.string().max(max).refine((text) => !/[<>]/.test(text), "Angle brackets are not permitted in layout text");
 
 const fieldElement = z
@@ -38,6 +41,7 @@ const fieldElement = z
     required: z.boolean().default(false),
     layout: placement.default({ columnSpan: 4, startOnNewRow: false }),
     validation: validation.optional(),
+    protection: protection.optional(),
   })
   .strict();
 const documentElement = z
@@ -52,6 +56,7 @@ const documentElement = z
     layout: placement.default({ columnSpan: 4, startOnNewRow: true }),
     validation: validation.optional(),
     upload: upload.optional(),
+    protection: protection.optional(),
   })
   .strict();
 const relatedElement = z

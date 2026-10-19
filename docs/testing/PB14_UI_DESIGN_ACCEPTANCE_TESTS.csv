@@ -35,3 +35,6 @@ PB14-33,Performance targets on gallery/real screens,PB09 p95 shell/card targets 
 PB14-34,UI test evidence retention,Current source/image/test run/locale/accessibility reviewers recorded for PB12
 PB14-35,Gallery style property injection attempt,No untrusted arbitrary CSS/JS enters rendered app
 PB14-36,Theme revalidation after token algorithm update,Unsafe stored settings revert to validated fallback
+PB14-37,Add field dialog Security & Encryption section,Free text defaults to Confidential/encrypted; search impact stated; plaintext only under organization policy; axe clean at 320/768/1440 and zoom equivalents
+PB14-38,Organization data-protection policy card,Owner-only edit with reason and revision; read-only for other roles; unreviewed development default visibly labelled; axe clean
+PB14-39,Encrypted value on the record view,Decrypted value with an Encrypted badge for authorized viewers; unauthorized viewer denied without the value

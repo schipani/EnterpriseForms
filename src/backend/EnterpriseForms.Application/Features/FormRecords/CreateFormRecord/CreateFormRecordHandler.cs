@@ -19,7 +19,7 @@ namespace EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 /// Effective → typed, validated candidate v1 → staged → committed head. Local projections (record, link, audit) are
 /// written only after the authority command is Effective.
 /// </summary>
-public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock)
+public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption)
 {
     public Task<FormRecordResponse> HandleAsync(RequestContext context, Guid formDefinitionId, CreateFormRecordRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
@@ -92,7 +92,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         var now = clock.GetUtcNow();
         var formRecordId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "record");
         // Validate before any authority command so a bad request never registers a phantom resource.
-        var candidateValues = CandidateBuilder.ApplyValues([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId));
+        var candidateValues = CandidateBuilder.ApplyValues([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption);
 
         if (child is null)
         {
@@ -185,7 +185,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         var fieldsById = fields.ToDictionary(f => f.FieldDefinitionId);
         var optionsById = options.ToDictionary(o => o.FieldOptionId);
         return new FormRecordResponse(formRecordId, context.OrganizationId, formDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true,
-            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById), fieldsById[v.FieldDefinitionId].FieldDataType)).ToList(),
+            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue)).ToList(),
             "Committed(" + accepted.ArchiveState + ")");
     }
 }

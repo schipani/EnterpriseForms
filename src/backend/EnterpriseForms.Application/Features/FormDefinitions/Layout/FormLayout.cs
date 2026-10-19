@@ -33,6 +33,9 @@ public sealed record LayoutPlacement(int ColumnSpan, bool StartOnNewRow);
 /// <summary>Validation rules carried in the immutable version (subset for Stage B). Server-enforced on every write.</summary>
 public sealed record LayoutValidation(bool Required, int? MinLength, int? MaxLength, string? Pattern, decimal? Minimum, decimal? Maximum, DateOnly? MinDate, DateOnly? MaxDate);
 
+/// <summary>Published declaration of a field's classification and storage protection at publish time (ADR-PB-004: immutable per version; the catalog may only be strengthened afterwards).</summary>
+public sealed record LayoutProtection(string Classification, string ProtectionMode);
+
 public sealed record LayoutUploadPolicy(bool AllowMultiple, int MaxFiles, long MaxFileSizeBytes, IReadOnlyList<string> AllowedContentTypes);
 
 public sealed record LayoutElement(
@@ -45,7 +48,8 @@ public sealed record LayoutElement(
     LayoutPlacement Layout,
     LayoutValidation Validation,
     LayoutUploadPolicy? Upload,
-    IReadOnlyList<string>? SummaryFieldKeys);
+    IReadOnlyList<string>? SummaryFieldKeys,
+    LayoutProtection? Protection = null);
 
 public static class FormLayoutCodec
 {
@@ -165,6 +169,7 @@ public static class FormLayoutCodec
                     validation = new { minLength = e.Validation.MinLength, maxLength = e.Validation.MaxLength, pattern = e.Validation.Pattern, minimum = e.Validation.Minimum, maximum = e.Validation.Maximum, minDate = e.Validation.MinDate, maxDate = e.Validation.MaxDate },
                     upload = e.Upload is null ? null : new { allowMultiple = e.Upload.AllowMultiple, maxFiles = e.Upload.MaxFiles, maxFileSizeBytes = e.Upload.MaxFileSizeBytes, allowedContentTypes = e.Upload.AllowedContentTypes },
                     summaryFieldKeys = e.SummaryFieldKeys,
+                    protection = e.Protection is null ? null : new { classification = e.Protection.Classification, protectionMode = e.Protection.ProtectionMode },
                 }).ToArray(),
             }).ToArray(),
         };
@@ -189,14 +194,14 @@ public static class FormLayoutCodec
                     throw new BusinessException("LAYOUT_INVALID", 422, $"unknown control '{control}'");
                 }
 
-                return new LayoutElement(kind, fieldId, null, control, label, help, placement, validation, null, null);
+                return new LayoutElement(kind, fieldId, null, control, label, help, placement, validation, null, null, ParseProtection(element));
             }
 
             case LayoutElementKinds.DocumentCollection:
             {
                 var fieldId = RequiredGuid(element, "fieldDefinitionId");
                 var upload = ParseUpload(element);
-                return new LayoutElement(kind, fieldId, null, "fileUpload", label, help, placement, validation, upload, null);
+                return new LayoutElement(kind, fieldId, null, "fileUpload", label, help, placement, validation, upload, null, ParseProtection(element));
             }
 
             case LayoutElementKinds.RelatedFormList:
@@ -239,6 +244,28 @@ public static class FormLayoutCodec
         }
 
         return new LayoutPlacement(span, newRow);
+    }
+
+    private static LayoutProtection? ParseProtection(JsonElement element)
+    {
+        if (!element.TryGetProperty("protection", out var protection) || protection.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var classification = OptionalString(protection, "classification", 20) ?? string.Empty;
+        var mode = OptionalString(protection, "protectionMode", 24) ?? string.Empty;
+        if (classification is not ("Public" or "Internal" or "Confidential" or "Restricted") || mode is not ("Standard" or "ApplicationEncrypted"))
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, "protection must name a classification (Public, Internal, Confidential, Restricted) and a protectionMode (Standard, ApplicationEncrypted)");
+        }
+
+        if (classification is "Confidential" or "Restricted" && mode != "ApplicationEncrypted")
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, "Confidential and Restricted fields must be ApplicationEncrypted");
+        }
+
+        return new LayoutProtection(classification, mode);
     }
 
     private static LayoutValidation ParseValidation(JsonElement element)

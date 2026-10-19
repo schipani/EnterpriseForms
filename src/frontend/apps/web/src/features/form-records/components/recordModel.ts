@@ -2,7 +2,7 @@ import type { FieldDefinitionResponse, FormRecordResponse, RecordProjectionRespo
 import { tryParseLayout, type FormLayout, type RendererField, type ValueMap } from "@enterpriseforms/form-renderer";
 
 export function toRendererFields(fields: readonly FieldDefinitionResponse[]): RendererField[] {
-  return fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })) }));
+  return fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted", options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })) }));
 }
 
 export function toValueMap(record: FormRecordResponse): ValueMap {

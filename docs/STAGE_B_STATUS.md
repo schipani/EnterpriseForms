@@ -17,8 +17,8 @@ workflow from Form Designer to browser, on the unchanged Stage A Level 2 foundat
 | Gate | Assessment |
 |---|---|
 | **Mandatory Stage B functionality** (ADR-PB-002 §Stage B items 1–8, §2 below) | **Implemented and automatically tested** for the Accused slice: every item has a working UI path, backend slice, authority hook, audit behaviour and an executed test. |
-| **Automated test suites** (§4) | .NET unit/architecture/contract/authority **152 passed, 0 failed**; frontend lint/typecheck/vitest/build **42 vitest tests passed**; Stage B Docker integration **21 passed, 0 failed**; browser e2e **10 passed, 0 failed**; Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
-| **Security controls** | **Unchanged and re-tested.** No new authorization path: shares, child records, documents, discovery pages, the new value types and now form permissions all go through the independent Authority (and the signed manifest for record content); SEC-P01..P12 pass on the Stage B stack. The one authority extension in this round is a new command kind and a gated read (B-23); existing kinds, the SpiceDB schema and the gate semantics are unchanged. No test was weakened (§5). |
+| **Automated test suites** (§4) | .NET unit/architecture/contract/authority **154 passed, 0 failed**; frontend lint/typecheck/vitest/build **42 vitest tests passed**; Stage B Docker integration **24 passed, 0 failed**; browser e2e **14 passed, 0 failed**; Stage A SEC-P01..P12 regression on the same stack **13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)**. GitHub-hosted runs: §4.6. |
+| **Security controls** | **Unchanged and re-tested.** No new authorization path: shares, child records, documents, discovery pages, the new value types and now form permissions all go through the independent Authority (and the signed manifest for record content); SEC-P01..P12 pass on the Stage B stack. The one authority extension in the fourth round is a new command kind and a gated read (B-23); existing kinds, the SpiceDB schema and the gate semantics are unchanged. **Phase 1B (B-24..B-26) adds application-level field encryption on top of this foundation without touching the authority: encrypted values are manifest leaves like any other value, decryption happens only after the authority-verified read, and the local development KEK is refused outside Development/Testing. Production key custody (Azure Key Vault / Managed HSM, purpose-separated keys, rotation) is still open — §7.1.** No test was weakened (§5). |
 | **PB-14 design validation** | Automated part **executed** (axe WCAG 2.2 AA + reflow at 320/768/1440 px and 200%/400% zoom equivalents, keyboard-only flows, forced colours — §4.4, §6). **Human review PENDING for the owner/reviewers:** NVDA, VoiceOver, real browser zoom, product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` §2. |
 | **Stage B feature milestone** | **Ready for owner acceptance review** once the human PB-14 items are recorded. Features intentionally deferred to later gates are listed in §7 and are not Stage B defects. Production requirements (§7 first row) are unchanged. |
 
@@ -114,6 +114,51 @@ development login, not a production bypass (B-01, verified by `AuthorizationAndT
 3. The change is effective on the next request. Granting create permission does not let anyone read existing records, and
    revoking it does not remove records the person already owns. Every change is audited (My activity).
 
+### 1.3c Configure a field's security and encryption (designer persona) — Phase 1B
+
+1. Open a form in the designer → **Fields** tab → **Add field**. The dialog now has a **Security & Encryption** section:
+   **Classification** (Public / Internal / Confidential / Restricted) and the **Application-level encryption** badge.
+2. Leave the storage type as *String*: the classification defaults to **Confidential** and the badge reads
+   **Enabled (required)** — there is no opt-out for Confidential/Restricted. The text under it explains the trade-off:
+   *Encrypted for privacy — not searchable* (Confidential/Restricted values cannot be searched in V1, ADR-PB-004).
+   Press **Add field** → the Fields table shows **Confidential · Encrypted** in the new *Protection* column.
+3. Add a second field with storage type *Integer*: it defaults to **Internal** with the *Encrypt this field* checkbox
+   ticked. Untick it → the badge reads **Off — plaintext** and the text warns that the value is searchable within
+   authorization *and readable by a database administrator*. Press **Add field** → **Internal · Plaintext**.
+4. Choose **Restricted** (or Confidential) for any type: the checkbox disappears and encryption becomes required. The
+   section also shows the organization policy in force (minimum classification, whether plaintext Internal fields are
+   permitted, and *development default, not yet reviewed* until the owner saves it — §1.3d). Selecting something the
+   policy does not allow disables **Add field** with the reason; the server refuses the same request made directly
+   (`CLASSIFICATION_BELOW_FLOOR`, `FIELD_PROTECTION_REQUIRED`, `PLAINTEXT_NOT_PERMITTED`).
+5. Place both fields in the **Layout** tab, **Save draft**, **Publish…**. The published version records each field's
+   protection; later catalog changes never alter it.
+6. Sign in as **clerk**, create a record with both fields: the encrypted field's help text ends with *Encrypted for
+   privacy — not searchable*; after **Create record** the value is shown decrypted with an **Encrypted** badge next to
+   its label. Sign in as **reader** and open the same record URL: denied, no value shown.
+7. Back as **designer**: **Fields** → **Edit** on the plaintext field → the **Security & Encryption** section shows the
+   current state and **Strengthen protection…**. Choose a higher classification and/or switch on encryption, give a
+   reason, **Apply strengthening**. The row changes to **Confidential · Encrypted**; no new version or draft change is
+   created (Versions still lists only v1). Re-open **Edit**: the section reports how many records still hold a
+   plaintext copy; each is rewritten as ciphertext when it is next saved (edit the clerk's record and save to see the
+   count drop to zero). There is no control to make an encrypted field plaintext again; a lower classification is not
+   offered and is refused by the server.
+8. To see what the database holds: `docker exec enterpriseforms-business-db-1 psql -U postgres -d enterpriseforms -c
+   "select encrypted_logical_type, encode(encrypted_value_bytes,'hex') from field_encrypted_values order by created_on desc limit 3"`
+   returns ciphertext only; the record's `field_string_values` rows for that field do not exist.
+
+### 1.3d Organization data-protection policy (owner persona) — Phase 1B
+
+1. Sign in as **owner** → **Organization** → *Organization branding* page → **Data protection policy** card. Until the
+   owner saves it, the badge reads **Development default — not yet reviewed** (minimum classification Internal,
+   plaintext permitted for Public/Internal fields).
+2. Change **Minimum field classification** and/or untick **Permit plaintext storage for Public/Internal fields**, write
+   the **Policy statement** (10–2000 characters) and **Save data protection policy**. The change is immediate for new
+   fields (including the Stage A `POST /form-definitions` route), audited (`ORGANIZATION_SECURITY_POLICY_UPDATED`,
+   flagged when it loosens the policy), protected by a revision check, and never changes how stored values are
+   protected. Other roles see the card read-only; the designer's Add-field dialog now refuses plaintext.
+3. Restore the development default afterwards if you want the Stage A SEC-P tests' plaintext Internal fields to remain
+   creatable on this organization (tick the checkbox again and save with a statement).
+
 ### 1.4 Records, addresses, documents, sharing (clerk persona, then reader)
 
 - **Forms → New record** on `Accused`. Client validation mirrors the server rules; the server re-validates typed values
@@ -167,11 +212,11 @@ arguments; use PowerShell/cmd (or run the test `.dll` directly). CI runs on Linu
 | 7 | Every feature owns components, handlers, contracts, validation, persistence, authority hooks, tests, audit; no scaffolding of non-milestone pages | Feature-owned slices under `Features/<Name>` and `apps/web/src/features/<name>`; generated client from the compiled OpenAPI; lint/architecture fitness functions | `ArchitectureTests`, ESLint boundary rules, `OpenApiSnapshotTests`; no PG-### page beyond the three flows + gallery |
 | 8 | Navigation-during-upload, conflict handling, error/loading/empty states, independent widget refresh, recovery from interrupted transfers | As above; 409 conflict UI with reload; empty/loading/error states on every list; interrupted-upload resume; commit-race retry (B-12) | e2e test 2; `DocumentTests`; `uploadManager.test.ts` (resume after failed chunk, pause/resume, commit retry) |
 
-Owner acceptance additions to requirement 2 (Designer workflow): editing existing fields (B-22) and form permissions after creation (B-23); see §5.1.
+Owner acceptance additions to requirement 2 (Designer workflow): editing existing fields (B-22) and form permissions after creation (B-23); see §5.1. **Phase 1B (not an ADR-PB-002 Stage B item, delivered on the same slice): application-level field encryption with designer configuration and an organization data-protection policy (B-24..B-26); steps §1.3c/§1.3d, evidence §4, open production requirements §7.1.**
 
 ## 3. What was built (changes since the first Stage B report in bold)
 
-### 3.1 Backend (feature-owned vertical slices, `/api/v1`, 60 operations in `contracts/openapi/enterprise-forms-v1.json`)
+### 3.1 Backend (feature-owned vertical slices, `/api/v1`, 64 operations in `contracts/openapi/enterprise-forms-v1.json`)
 
 - **Identity / BFF (B-01):** session cookie scheme beside the bearer scheme, CSRF double-submit, `/session`,
   `/session/development-personas`, `/session/development-login`, `/session/logout`, `/bootstrap`. Entra provider
@@ -192,6 +237,17 @@ Owner acceptance additions to requirement 2 (Designer workflow): editing existin
   AES-256-GCM segments with per-version DEK, user-session commit, verified download, versions, remove, replace.
 - **Sharing (B-17):** `POST /form-records/{id}/shares`, **`GET /form-records/{id}/shares` (new; manage-access only,
   concealment-safe 404 otherwise)**, `POST …/shares/{shareId}/revoke`.
+- **Field encryption — Phase 1B (B-24, B-25, B-26):** `field_encrypted_values` (RowHmac/v1 schema `field_encrypted_values` v1; EF
+  migration `20261018235515_StageBFieldEncryption`, insert-only runtime grant, authority allow-list already present),
+  `IFieldEncryptionService` → `AesGcmFieldEncryptionService` (AES-256-GCM, random per-value DEK wrapped by the
+  `IEncryptionKeyProvider` KEK, AAD = tenant/record/field/item/logical type/envelope version), `FieldValueCodec.Protect`/decrypting
+  `Format`, carry-forward re-protection in `CandidateBuilder`, `applicationEncrypted`/`legacyPlaintext` flags on value
+  responses, `503 ENCRYPTION_UNAVAILABLE` / `423 FIELD_DECRYPTION_FAILED` problem mappings (generic messages).
+  `field_definitions` gains `field_protection_mode`, `protection_policy_revision`, `protection_changed_on/by`, and the
+  check constraint *Public/Internal or ApplicationEncrypted*. `FieldProtectionPolicy` (floor, required encryption,
+  plaintext permission, secure defaults) runs on both field-creation routes; `GET/POST …/fields/{id}/protection`
+  (status + audited strengthening, `FIELD_PROTECTION_STRENGTHENED`); `organization_security_policies` with
+  `GET/PUT /organization/security-policy` (owner-only, revision CAS, `ORGANIZATION_SECURITY_POLICY_UPDATED`).
 - **Audit (B-06), Organizations/UserPreferences (B-08), Dashboard:** unchanged.
 
 ### 3.2 Frontend (`src/frontend`, React 19 + TypeScript + Vite 8 + Tailwind 4 + Radix)
@@ -212,11 +268,11 @@ Owner acceptance additions to requirement 2 (Designer workflow): editing existin
 `stage-a/level2-security-foundation` and `main`** (Docker integration tests + Playwright on a hosted runner);
 `ci.yml` compiles the Stage B test project and runs the frontend suite.
 
-## 4. Test evidence (actual results, 2026-10-18)
+## 4. Test evidence (actual results, 2026-10-18; Phase 1B run in `docs/evidence/stage-b/2026-10-18-field-encryption/`)
 
 ### 4.1 .NET unit / architecture / contract / authority — `dotnet test --solution EnterpriseForms.All.slnx`
 
-**152 passed, 0 failed** (4 executables; adds two authority planner tests for `UpdateFormUsers` — only `form_user` edges change, designer/administrator-only, empty/contradictory/unknown/already-applied changes rejected — and includes both regenerated OpenAPI snapshots (business and authority), the signed-column registry now covering
+**154 passed, 0 failed** (4 executables; Phase 1B adds `FieldEncryptionSealsCanonicalValuesBindsIdentityAndFailsClosed` — every logical type round-trips, ciphertext ≠ plaintext, tampered tag/ciphertext and a transplanted record/field/tenant are rejected, unconfigured provider fails closed — and `FieldProtectionPolicyDefaultsFreeTextToEncryptionEnforcesTheFloorAndNeverDowngrades`, plus the signed-column registry entry for `field_encrypted_values`; earlier rounds added two authority planner tests for `UpdateFormUsers` — only `form_user` edges change, designer/administrator-only, empty/contradictory/unknown/already-applied changes rejected — and includes both regenerated OpenAPI snapshots (business and authority), the signed-column registry now covering
 `field_date_time_values`/`field_guid_values`, SpiceDB schema assertions, child-record planner, layout/codec (incl.
 DateTime offset normalization, sub-second rejection, Guid canonical form)/AES-GCM/ClamAV parser/contrast tests).
 
@@ -225,9 +281,9 @@ DateTime offset normalization, sub-second rejection, Guid canonical form)/AES-GC
 Lint clean, typecheck clean, **42 vitest tests passed** (adds pause/resume and replace tests for the upload manager and five field-edit model tests: locate, round-trip, document-collection binding, type-fit, incompatible-value messages), production
 build OK (lazy route chunks per feature).
 
-### 4.3 Stage B Docker integration — `tests/integration/EnterpriseForms.StageBTests` (21 tests)
+### 4.3 Stage B Docker integration — `tests/integration/EnterpriseForms.StageBTests` (24 tests)
 
-**21 passed, 0 failed** (TRX in `docs/evidence/stage-b/2026-10-18-form-management/`). Coverage as before (designer CAS/publish/restore,
+**24 passed, 0 failed** (TRX in `docs/evidence/stage-b/2026-10-18-field-encryption/stage-b-integration/`; the previous round's 21 in `docs/evidence/stage-b/2026-10-18-form-management/`). **Phase 1B — `EncryptionTests` (3):** (a) defaults and refusals through the direct API (String → Confidential/encrypted, Integer → Internal/plaintext, Restricted → encrypted, explicit Internal+encrypted Date; Confidential/Restricted+Standard → `FIELD_PROTECTION_REQUIRED`, Public → `CLASSIFICATION_BELOW_FLOOR`, unknown classification 422), published layout carries each field's `protection`; a record with three encrypted and one plaintext value → `attacker-sql` finds **no** `field_string_values`/`field_date_values` rows, three `field_encrypted_values` rows whose hex dump contains neither the plaintext nor its UTF-8 hex (key *reference* only), plaintext for the Standard integer; owner reads decrypted values with `applicationEncrypted=true`, reader/designer/another organization denied, a field-scoped share releases exactly the shared encrypted value, an edit re-seals, activity and validation errors carry no plaintext, a flipped ciphertext byte → `423` with no plaintext in the body. (b) strengthening: `GET …/protection` reports `Plaintext`; clerk refused, short reason 422, no-op `NO_PROTECTION_CHANGE`, Public target `FIELD_PROTECTION_DOWNGRADE_REFUSED`; after strengthening `EncryptionPendingRewrite` with one legacy record, the legacy value stays readable with `legacyPlaintext=true`, published v1 still says `Standard`, the next save writes ciphertext only (`Encrypted`, zero legacy), a downgrade and a catalog `PATCH` restating plaintext both leave the field encrypted, `FIELD_PROTECTION_STRENGTHENED` audited. (c) policy: unreviewed default read, clerk refused, short statement 422, owner tightens → plaintext refused on the designer route (explicit and defaulted Integer) **and** on the Stage A route (`PLAINTEXT_NOT_PERMITTED`), encrypted Integer accepted, owner loosens (audited), stale revision 409, two `ORGANIZATION_SECURITY_POLICY_UPDATED` events. Because the harness's String fields now default to Confidential/encrypted, every earlier scenario (designer, parent/child, documents, sharing, form access, field edit, tamper) now runs with encrypted free-text values as well. Coverage as before (designer CAS/publish/restore,
 typed values, parent-child, documents incl. EICAR and tamper, authorization/cross-tenant) **plus**: the Accused form now
 carries `arrest_time` (DateTime) and `external_reference` (Guid) through create, sign, manifest, verify and edit;
 `SharingTests` — share list empty → create → listed with field keys → recipient sees exactly the shared fields, no
@@ -236,7 +292,8 @@ with `pageSize=1` over three records with no duplicates and rejects a forged con
 
 ### 4.4 Browser end-to-end (Playwright, Chromium) — `src/frontend/e2e`
 
-**10 passed, 0 failed** on the clean development stack (`docs/evidence/stage-b/2026-10-18-form-management/playwright-junit.xml`, run log `playwright-run-dev-stack.log`); the identical suite also passed 10/10 on the fresh security-test stack earlier in the same verification (`docker-gates-run.log`) and runs on a hosted runner in `stage-b-integration` (§4.6).
+**14 passed, 0 failed** on the fresh security-test stack (`docs/evidence/stage-b/2026-10-18-field-encryption/playwright-junit.xml`, `docker-chain.log`) and again on the clean development stack after it was restored (`playwright-dev-stack.log`); the suite also runs on a hosted runner in `stage-b-integration` (§4.6).
+6. **`encryption` (Phase 1B, 4 tests)** — *Designer*: Add field shows the Security & Encryption section with Confidential / *Enabled (required)* / *not searchable* for free text and no opt-out, an Integer field defaults to Internal and can be made plaintext with the DBA warning, Restricted removes the opt-out; both fields placed and published. *Clerk*: the create form shows the encrypted help text, the record shows the decrypted value with the **Encrypted** badge; *Reader* is denied without the value. *Designer*: Edit field → Strengthen protection (reason required) → row shows Confidential · Encrypted, reopened dialog shows the pending-rewrite count, no downgrade offered, Versions still only v1. *Owner*: tightens the data-protection policy on the Organization page → the designer's dialog shows *not permitted*, disables **Add field** for plaintext and re-enables it with encryption; the policy is restored at the end. `pb14-accessibility` additionally scans the Add-field dialog with the new section and the owner's policy card at every width/zoom.
 1. `accused-workflow` — *Designer* publishes `AccusedAddress` and `Accused` (7 placed fields incl. DateTime and Guid, the related list and the document collection created through **Add document collection**, with Maximum files / size / content types set); *Clerk* creates an Accused (client validation incl. UUID format, DateTime stored as UTC), two addresses, edit → revision 2, uploads across SPA navigation → Ready/Clean, download, EICAR rejected, activity; share → partial view → revoke (reader denied).
 2. `branding` — *Owner* uploads a PNG logo (top-left, non-empty alt text); a fake PNG is refused with the server's message.
 3. `form-management` (owner acceptance defects 3 and 4) — *Designer* builds a form with a document collection, *clerk* creates a record and uploads a document; *designer* edits an existing field in the **Edit field** dialog (key and type read-only, incompatible values explained, label/description/help text/length saved), edits and renames the document collection (restrictions changed), saves the draft repeatedly and publishes **v2** (Versions lists v1 and v2); the clerk's existing record shows the new labels, the stored value, the original attachment (download works) and accepts another upload under the renamed collection. *Designer* then opens **Form permissions** (authority source and revision shown), grants *Riley Reader* create permission with a reason (published version unchanged), the reader creates only their own record and cannot open the clerk's; the designer revokes with a reason; the reader no longer sees the form, `/records/new` is denied, their own record still opens, and the clerk is unaffected.
@@ -245,11 +302,13 @@ with `pageSize=1` over three records with no duplicates and rejects a forged con
 
 ### 4.5 Stage A SEC-P01..SEC-P12 regression on the same stack
 
-**13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)** on the identical stack (same images with ClamAV, worker and dev-seed) that ran §4.3/§4.4.
-Evidence: `docs/evidence/stage-b/2026-10-18-form-management/sec-p-rerun/`. This is a regression run on the committed code; the
+**13 passed, 0 failed (SEC-P01..SEC-P12 + harness guard)** on the identical stack (same images with ClamAV, worker and dev-seed) that ran §4.3/§4.4 — the Stage A route still creates plaintext Internal fields under the development policy, so the Stage A tamper/rollback/replay scenarios are unchanged.
+Evidence: `docs/evidence/stage-b/2026-10-18-field-encryption/sec-p-rerun/` (previous round: `docs/evidence/stage-b/2026-10-18-form-management/sec-p-rerun/`). This is a regression run on the committed code; the
 binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Stage A gate is not reopened.
 
 ### 4.6 GitHub-hosted runs
+
+**Phase 1B head: hosted runs pending at the time of writing — see the PR checks for `ci` and `stage-b-integration` on the Phase 1B commit; this line is updated once they finish.**
 
 `ci` **success** (run 39175837148) and `stage-b-integration` — Docker integration tests (21) + Playwright (10) on a GitHub-hosted runner — **success** (run 39175837149) for head `5d7da9f`: https://github.com/schipani/EnterpriseForms/actions/runs/39175837148 and https://github.com/schipani/EnterpriseForms/actions/runs/39175837149. Earlier heads green: `d3f144c` (39170555542 / 39170555532), `14900b9` (39160072571 / 39160072502). `security-gate-a` passed on a hosted runner for `2311e6b` (run 39135823037) and `93df639` (run 39136591074); the SEC-P regression for this change set is the local run in §4.5 on the identical images.
 
@@ -258,6 +317,9 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 | Defect | Found by | Fix |
 |---|---|---|
 | Signed attachment timestamps carried 100 ns ticks → canonicalizer rejects on the real commit path | unit test | `SignedTimestamp.Truncate` before persisting `scanned_on`/`uploaded_on` |
+| **Phase 1B:** creating the organization's default data-protection policy row committed the caller's transaction, so the first field creation of a fresh organization failed with 500 (`NpgsqlTransaction has completed`) | `EncryptionTests` first Docker run (21/24 red) | the default row is only *added* to the caller's scope; every caller commits itself |
+| **Phase 1B:** `FieldProtectionPolicy.Resolve` silently forced encryption when Confidential was requested with `Standard` | unit test | explicit plaintext for Confidential/Restricted is refused (`FIELD_PROTECTION_REQUIRED`), never corrected silently |
+| **Phase 1B:** the Stage A `POST /form-definitions` route created plaintext fields regardless of the organization policy | `EncryptionTests` policy test | the route resolves its explicit Internal/Standard fields through the same policy (`PLAINTEXT_NOT_PERMITTED` when the owner has turned plaintext off) |
 | `MapSnakeCase` skipped `DateOnly` → naming violation on `field_date_values` | registry test | naming helper maps `DateOnly`/`TimeOnly` |
 | SpiceDB schema tests expected `read = owner` after the parent edge | authority tests | expectations updated to `effective_owner` (schema change is deliberate, B-04) |
 | Rejected upload sessions reported no scanner verdict | integration test | verdict derived from the recorded worker failure code (B-13) |
@@ -309,13 +371,28 @@ and the product/design sign-off — `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md
 |---|---|---|
 | **Production Level 2 certification** — independent cryptographic attestation, Azure Managed HSM, Confidential Ledger, Azure Level B validation, enforced security-owner review | Not a Stage B deliverable; A-23 accepted Stage A for development only | PB-03 Azure staging, PB-12 evidence governance, `docs/STAGE_A_GATE_CLOSURE.md` |
 | **Operable Entra ID sign-in** (BFF, CSRF, provider abstraction exist; Entra fails closed) | Requires an Entra tenant, Conditional Access authentication-strength policy and an authority assertion validator — "Pilot requires separately agreed identity" (ADR-PB-002) | PB-08 Azure staging |
-| **Application-encrypted field values** (`field_encrypted_values`) | Needs the managed KEK provider and key lifecycle before any ciphertext is persisted; the authority allow-list and schema slot exist | Phase 1B / PB-05 key custody |
 | **Repeating groups** (`form_record_groups`) | Stage B models multiplicity as independent child records per ADR-PB-002; same-record repeating occurrences are a Phase 3 slice | Phase 3 |
 | **Trusted search** (field predicates, global text) | V1 bounded verified search is a separate gate with 18 `ENC-SR-##` tests; the list remains authority-driven discovery (B-07) | Phase 4 / G06 / ADR-PB-004 |
 | **Dropdown options editor** for existing Option fields (add, relabel, reorder, deactivate) — the API (`PUT …/options`) exists, the UI does not | Not an ADR-PB-002 Stage B acceptance item; found during owner testing | Designer follow-up |
 | **Explicit key/type migration workflow** and field deprecate/retire | The Edit field dialog refuses key/type changes with an explanation; a deliberate, audited value migration is a separate feature | Phase 2/3 |
 | **Per-form administrators** distinct from designers and organization administrators; **persistent auto-unsealed development Vault** | Out of scope here; the Vault change touches the Stage A infrastructure (see §1.1) | Teams/Sharing; PB-05 |
 | **Team recipients in the share UI**, delegation lineage views | API accepts teams; Teams feature UI is not part of the Accused slice | Sharing/Teams features |
-| **Azure Key Vault / Managed HSM KEK**, retention/purge, signature refresh (`freshclam`) | Production trust services; local provider is refused outside Development/Testing | PB-05 / PB-10 |
+| **Azure Key Vault / Managed HSM KEK** (fields and documents), retention/purge, signature refresh (`freshclam`) | Production trust services; local provider is refused outside Development/Testing — see §7.1 for the full Phase 1B list | PB-05 / PB-10 |
 | **Canonical audit catalog, outbox to immutable archive, SIEM** | `audit_events` is a projection (B-06) | Phase 1C |
 | **PB-09 benchmarks**, dark mode, 69-screen backlog | Out of Stage B scope by ADR-PB-002 §Explicit deferrals | PB-09 / PB-14 follow-on |
+
+### 7.1 Phase 1B — remaining key-management and Azure production requirements (not implemented, not waived)
+
+Field encryption is implemented and tested on the local stack with the **development** key provider only. Before any
+organization's protected data is held in Azure, the following are required; none is claimed here.
+
+| Requirement | State today | Owning gate |
+|---|---|---|
+| **Managed KEK provider**: `IEncryptionKeyProvider` backed by Azure Key Vault / Managed HSM (`WrapKey`/`UnwrapKey` with a non-exportable key, managed identity with wrap/unwrap only, separate provisioning identity, key catalog) | Only `LocalDevelopment` (32-byte KEK from configuration, Development/Testing only; the API refuses to start with it elsewhere) and `UnavailableKeyProvider` (fails closed) exist | PB-05 §key custody, PB-10 (Canadian HSM, manual Canada-only recovery) |
+| **Purpose-separated keys**: distinct KEKs (or HSM keys) for field values, documents and signing; per-organization keys | Fields and documents share the single development KEK; separation is by DEK and AAD domain only (`DynamicForms/FieldValue/v1` vs the document envelope); HMAC keys are already separate (Vault Transit / Managed HSM) | PB-05 / G04 |
+| **Key rotation and re-wrap**: new KEK version for new DEKs, background re-wrap of stored wrapped DEKs, retired-version retention for backups, incident re-key | `encryption_key_reference` is recorded per value/version; no rotation job exists | PB-05, G14 (historic key versions in recovery) |
+| **Bulk re-encryption job** for plaintext → encrypted migrations (today: rewrite on the next save per record, with a visible count) | Deferred: needs an authority-signed content command per record (no signing oracle) | Phase 1B migration job / §4C.2 |
+| **Production organization policy**: a reviewed default (`PlaintextInternalFieldsPermitted=false` or an approved statement) set by the organization's owner/security owner before onboarding; approval evidence | Development default permits plaintext Internal fields and says so in the UI | PB-12, PB-13 onboarding |
+| **Per-record challenge unlock**, blind-index exact match for encrypted values | Not implemented (ADR-PB-004: no encrypted search in V1) | §4C.5 / future ADR |
+| **Confidential/Restricted search** | Explicitly unsupported in V1; designer dialog states it | Phase 4 / G06 |
+| **Staging proof**: SEC-P + `EncryptionTests` with the managed provider, key outage fail-closed, backup restore with historic key versions | Local Docker evidence only | PB-03 Azure staging, PB-12 evidence chain |

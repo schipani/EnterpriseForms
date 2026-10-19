@@ -32,6 +32,10 @@ export type RelationshipDefinitionResponse = S["RelationshipDefinitionResponse"]
 export type CreateFormDefinitionV2Request = S["CreateFormDefinitionV2Request"];
 export type AddFieldDefinitionRequest = S["AddFieldDefinitionRequest"];
 export type UpdateFieldDefinitionRequest = S["UpdateFieldDefinitionRequest"];
+export type FieldProtectionResponse = S["FieldProtectionResponse"];
+export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
+export type OrganizationSecurityPolicyResponse = S["OrganizationSecurityPolicyResponse"];
+export type UpdateOrganizationSecurityPolicyRequest = S["UpdateOrganizationSecurityPolicyRequest"];
 export type UpdateFormAccessRequest = S["UpdateFormAccessRequest"];
 export type FormAccessResponse = S["FormAccessResponse"];
 export type FormAccessSubjectResponse = S["FormAccessSubjectResponse"];
@@ -111,6 +115,8 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       create: (request: CreateFormDefinitionV2Request) => write<FormDefinitionDetailResponse>("POST", "forms.create", undefined, request, { idempotent: true }),
       addField: (formDefinitionId: string, request: AddFieldDefinitionRequest) => write<FieldDefinitionResponse>("POST", "forms.addField", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       updateField: (formDefinitionId: string, fieldDefinitionId: string, request: UpdateFieldDefinitionRequest) => write<FieldDefinitionResponse>("PATCH", "forms.updateField", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      protection: (formDefinitionId: string, fieldDefinitionId: string, signal?: AbortSignal) => read<FieldProtectionResponse>("forms.protection", { formDefinitionId, fieldDefinitionId }, undefined, "interactive-read", signal),
+      strengthenProtection: (formDefinitionId: string, fieldDefinitionId: string, request: StrengthenFieldProtectionRequest) => write<FieldProtectionResponse>("POST", "forms.strengthenProtection", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       access: (formDefinitionId: string, signal?: AbortSignal) => read<FormAccessResponse>("forms.access", { formDefinitionId }, undefined, "interactive-read", signal),
       updateAccess: (formDefinitionId: string, request: UpdateFormAccessRequest) => write<FormAccessResponse>("POST", "forms.updateAccess", { formDefinitionId }, request, { idempotent: true, resourceKey: `form-access:${formDefinitionId}` }),
       updateOptions: (formDefinitionId: string, fieldDefinitionId: string, request: UpdateFieldOptionsRequest) => write<FieldDefinitionResponse>("PUT", "forms.updateOptions", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
@@ -157,6 +163,8 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       updateBranding: (request: UpdateBrandingRequest) => write<BrandingResponse>("PUT", "organization.updateBranding", undefined, request, { resourceKey: "branding" }),
       uploadLogo: (png: ArrayBuffer) => coordinator.execute<BrandingResponse>({ lane: "interactive-write", method: "POST", endpointKey: "organization.uploadLogo", binaryPayload: png, binaryContentType: "image/png", resourceKey: "branding" }),
       users: (signal?: AbortSignal) => read<DirectoryUserResponse[]>("users.list", undefined, undefined, "background-read", signal),
+      securityPolicy: (signal?: AbortSignal) => read<OrganizationSecurityPolicyResponse>("organization.securityPolicy", undefined, undefined, "interactive-read", signal),
+      updateSecurityPolicy: (request: UpdateOrganizationSecurityPolicyRequest) => write<OrganizationSecurityPolicyResponse>("PUT", "organization.updateSecurityPolicy", undefined, request, { resourceKey: "security-policy" }),
     },
     preferences: {
       get: (signal?: AbortSignal) => read<UiPreferenceResponse>("preferences.get", undefined, undefined, "interactive-read", signal),

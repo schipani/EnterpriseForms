@@ -7,6 +7,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
 import { AddFieldDialog, toKey } from "../components/AddFieldDialog";
+import type { StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { EditFieldDialog, type FieldEditSubmission } from "../components/EditFieldDialog";
 import { FormAccessPanel } from "../components/FormAccessPanel";
 
@@ -82,6 +83,13 @@ export function DesignerPage() {
       }
       setEditFieldId(null);
       await invalidate();
+    },
+  });
+  const strengthen = useMutation({
+    mutationFn: ({ fieldId, request }: { fieldId: string; request: StrengthenFieldProtectionRequest }) => api.forms.strengthenProtection(formDefinitionId, fieldId, request).then((r) => r.result),
+    onSuccess: async (_state, { fieldId }) => {
+      await invalidate();
+      await queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId, "protection", fieldId] });
     },
   });
   const saveDraft = useMutation({
@@ -198,6 +206,7 @@ export function DesignerPage() {
                     { key: "key", header: "Key", render: (row) => <code>{row.fieldKey}</code> },
                     { key: "edit", header: "Actions", render: (row) => <Button size="sm" variant="secondary" aria-label={`${form.summary.canDesign ? "Edit" : "View"} ${row.fieldDisplayName}`} onClick={() => { editField.reset(); setEditFieldId(row.fieldDefinitionId); }}>{form.summary.canDesign ? "Edit" : "View"}</Button> },
                     { key: "type", header: "Type", render: (row) => row.fieldDataType },
+                    { key: "protection", header: "Protection", render: (row) => (row.fieldProtectionMode === "ApplicationEncrypted" ? <Badge tone="success">{row.fieldClassification} · Encrypted</Badge> : <Badge tone="warning">{row.fieldClassification} · Plaintext</Badge>) },
                     { key: "options", header: "Options", render: (row) => (row.options.length === 0 ? "" : row.options.map((option) => `${option.optionDisplayText}${option.isActive ? "" : " (inactive)"}`).join(", ")) },
                     { key: "status", header: "Status", render: (row) => <Badge tone="neutral">{row.lifecycleStatus}</Badge> },
                   ]}
@@ -268,6 +277,10 @@ export function DesignerPage() {
           error={editField.error}
           onSave={(submission) => editField.mutate({ fieldId: editFieldId, submission })}
           onClose={() => setEditFieldId(null)}
+          formDefinitionId={formDefinitionId}
+          onStrengthen={(request) => strengthen.mutate({ fieldId: editFieldId, request })}
+          strengthenPending={strengthen.isPending}
+          strengthenError={strengthen.error}
         />
       ) : null}
       <AddFieldDialog open={addField} onOpenChange={setAddField} pending={addFieldMutation.isPending} error={addFieldMutation.error} onSubmit={(request) => addFieldMutation.mutate(request)} />

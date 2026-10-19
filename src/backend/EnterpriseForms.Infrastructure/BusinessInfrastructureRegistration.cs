@@ -14,6 +14,8 @@ using EnterpriseForms.Application.Features.FormRecords.GetFormRecord;
 using EnterpriseForms.Application.Features.FormRecords.ListRecords;
 using EnterpriseForms.Application.Features.FormRecords.Projection;
 using EnterpriseForms.Application.Features.FormRecords.Staging;
+using EnterpriseForms.Infrastructure.Features.FormRecords;
+using EnterpriseForms.Application.Features.FormRecords.Encryption;
 using EnterpriseForms.Application.Features.FormRecords.TransferOwnership;
 using EnterpriseForms.Application.Features.FormRecords.UpdateFormRecord;
 using EnterpriseForms.Application.Features.Identity.EnsureProjection;
@@ -53,6 +55,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<CreateFormDefinitionHandler>();
         services.AddSingleton<FormDesignerHandlers>();
         services.AddSingleton<FormAccessHandlers>();
+        services.AddSingleton<SecurityPolicyHandlers>();
         services.AddSingleton<CreateFormRecordHandler>();
         services.AddSingleton<GetFormRecordHandler>();
         services.AddSingleton<GetRecordProjectionHandler>();
@@ -114,5 +117,6 @@ public static class BusinessInfrastructureRegistration
         }
 
         services.AddSingleton<IFileEncryptionService, AesGcmFileEncryptionService>();
+        services.AddSingleton<IFieldEncryptionService, AesGcmFieldEncryptionService>();
     }
 }

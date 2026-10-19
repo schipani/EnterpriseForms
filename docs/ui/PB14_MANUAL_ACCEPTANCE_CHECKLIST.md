@@ -22,6 +22,7 @@ Register of record: `docs/testing/PB14_UI_DESIGN_ACCEPTANCE_TESTS.csv` (PB14-01.
 | PB14-29 | Dialog focus trap / Escape | `pb14-accessibility.spec.ts` test 2 |
 | PB14-30 | Forced colours + reduced motion: focus outline still visible, axe clean on login | `pb14-accessibility.spec.ts` test 3 |
 | PB14-32 | The three representative flows run against the real stack | `accused-workflow.spec.ts`, Stage B integration tests |
+| PB14-37, 38, 39 | Add field dialog with the Security & Encryption section and the owner's data-protection policy card scanned with axe at every width/zoom; encrypted-field defaults, plaintext refusal under policy, Encrypted badge and reader denial exercised in a real browser | `pb14-accessibility.spec.ts` test 1, `encryption.spec.ts` |
 
 Automation limits (stated, not hidden): axe covers roughly 30–40% of WCAG success criteria; the zoom checks use
 narrow CSS viewports rather than browser zoom; screen-reader semantics, reading order judgement, meaningful

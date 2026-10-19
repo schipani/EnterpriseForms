@@ -1,0 +1,18 @@
+
+Running 14 tests using 1 worker
+
+[1A[2K[1/14] [chromium-desktop] › e2e\accused-workflow.spec.ts:56:3 › Stage B Accused workflow › designer publishes AccusedAddress and Accused with a related list and document collection
+[1A[2K[2/14] [chromium-desktop] › e2e\accused-workflow.spec.ts:135:3 › Stage B Accused workflow › clerk creates an Accused, adds addresses, uploads documents across navigation and reviews activity
+[1A[2K[3/14] [chromium-desktop] › e2e\branding.spec.ts:6:1 › owner uploads a PNG logo and it appears top-left
+[1A[2K[4/14] [chromium-desktop] › e2e\encryption.spec.ts:23:3 › Field encryption: designer configuration, record display, strengthening, organization policy › designer sees secure defaults, creates an encrypted and a plaintext field, and publishes
+[1A[2K[5/14] [chromium-desktop] › e2e\encryption.spec.ts:80:3 › Field encryption: designer configuration, record display, strengthening, organization policy › clerk sees the decrypted value with an Encrypted badge; the reader is denied
+[1A[2K[6/14] [chromium-desktop] › e2e\encryption.spec.ts:101:3 › Field encryption: designer configuration, record display, strengthening, organization policy › designer strengthens the plaintext field to encrypted; the change is one-way
+[1A[2K[7/14] [chromium-desktop] › e2e\encryption.spec.ts:140:3 › Field encryption: designer configuration, record display, strengthening, organization policy › organization owner tightens the data-protection policy; the designer is then refused plaintext
+[1A[2K[8/14] [chromium-desktop] › e2e\form-management.spec.ts:21:3 › Form management: edit fields and form permissions › designer builds and publishes a form with a document collection; the clerk records data and uploads a document
+[1A[2K[9/14] [chromium-desktop] › e2e\form-management.spec.ts:56:3 › Form management: edit fields and form permissions › designer edits an existing field and the document collection, then publishes the next version; data and attachments are preserved
+[1A[2K[10/14] [chromium-desktop] › e2e\form-management.spec.ts:130:3 › Form management: edit fields and form permissions › designer changes who can create records after the form is saved: grant, effective access, revocation, no new version
+[1A[2K[11/14] [chromium-desktop] › e2e\pb14-accessibility.spec.ts:49:3 › PB-14 automated accessibility and responsive validation › login, dashboard, records, record, uploads, gallery and designer pass axe WCAG 2.2 AA at every width (PB14-10..14, 22, 23, 32)
+[1A[2K[12/14] [chromium-desktop] › e2e\pb14-accessibility.spec.ts:124:3 › PB-14 automated accessibility and responsive validation › keyboard only: skip link, tabs, dialog focus trap and designer reorder (PB14-15, 25, 29)
+[1A[2K[13/14] [chromium-desktop] › e2e\pb14-accessibility.spec.ts:186:3 › PB-14 automated accessibility and responsive validation › forced-colors and prefers-reduced-motion do not hide focus or state (PB14-30)
+[1A[2K[14/14] [chromium-phone] › e2e\responsive.spec.ts:4:1 › gallery reflows at 320px without horizontal scroll and every control is keyboard reachable
+[1A[2K  14 passed (2.9m)

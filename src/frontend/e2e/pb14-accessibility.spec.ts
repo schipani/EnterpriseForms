@@ -99,6 +99,25 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
       await scan(page, `${viewport.id} edit field dialog @${viewport.name}`);
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: /^Edit / })).toBeHidden();
+      // Phase 1B: the Security & Encryption section of the Add field dialog.
+      await page.getByRole("button", { name: "Add field" }).first().click();
+      const add = page.getByRole("dialog", { name: "Add field" });
+      await expect(add.getByRole("group", { name: "Security & Encryption" })).toBeVisible();
+      await scan(page, `${viewport.id} add field dialog with security section @${viewport.name}`);
+      await page.keyboard.press("Escape");
+      await expect(add).toBeHidden();
+    }
+    await page.getByRole("button", { name: /Account menu/ }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+
+    // Phase 1B: the organization data-protection policy card (owner).
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signIn(page, "owner");
+    for (const viewport of VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto("/app/organization/branding");
+      await expect(page.getByRole("region", { name: "Data protection policy" })).toBeVisible();
+      await scan(page, `${viewport.id} organization data-protection policy @${viewport.name}`);
     }
   });
 

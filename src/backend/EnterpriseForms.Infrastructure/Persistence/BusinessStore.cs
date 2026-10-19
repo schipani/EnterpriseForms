@@ -130,6 +130,7 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                     case FieldDateValue v: context.FieldDateValues.Add(v); break;
                     case FieldDateTimeValue v: context.FieldDateTimeValues.Add(v); break;
                     case FieldGuidValue v: context.FieldGuidValues.Add(v); break;
+                    case FieldEncryptedValue v: context.FieldEncryptedValues.Add(v); break;
                     case FieldBooleanValue v: context.FieldBooleanValues.Add(v); break;
                     case FieldOptionValue v: context.FieldOptionValues.Add(v); break;
                     case FileAttachmentVersion v: context.FileAttachmentVersions.Add(v); break; // per-operation immutable copy (B-05)
@@ -150,6 +151,7 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             rows.AddRange(await context.FieldDateValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldDateTimeValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldGuidValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
+            rows.AddRange(await context.FieldEncryptedValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldBooleanValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldOptionValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FileAttachmentVersions.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
@@ -247,6 +249,29 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             context.OrganizationBrandings.FirstOrDefaultAsync(b => b.TenantId == tenantId, cancellationToken);
 
         public void AddBranding(OrganizationBranding branding) => context.OrganizationBrandings.Add(branding);
+
+        public Task<OrganizationSecurityPolicy?> FindSecurityPolicyAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            context.OrganizationSecurityPolicies.FirstOrDefaultAsync(p => p.TenantId == tenantId, cancellationToken);
+
+        public void AddSecurityPolicy(OrganizationSecurityPolicy policy) => context.OrganizationSecurityPolicies.Add(policy);
+
+        /// <summary>Records whose latest committed copy of this field is still a typed plaintext row (projection estimate for the migration status; the authority head decides what is current).</summary>
+        public async Task<int> CountLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken)
+        {
+            var currentOperations = context.FormRecordRevisions.Where(r => r.CandidateState == "Committed").GroupBy(r => r.FormRecordId).Select(g => g.Max(r => r.ContentChangeOperationId));
+            var plaintext = context.FieldStringValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId })
+                .Concat(context.FieldIntegerValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldDecimalValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldDateValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldDateTimeValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldGuidValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldBooleanValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldOptionValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }));
+            var rows = await plaintext.ToListAsync(cancellationToken).ConfigureAwait(false);
+            var latest = await context.FormRecordRevisions.Where(r => rows.Select(x => x.FormRecordId).Distinct().Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
+            var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
+            return rows.Count(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId);
+        }
 
         public Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken) =>
             context.UserUiPreferences.FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);

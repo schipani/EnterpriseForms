@@ -206,6 +206,37 @@ public sealed class FieldGuidValue : FieldValueRowBase
     public override Guid RowPrimaryKey => FieldGuidValueId;
 }
 
+/// <summary>
+/// Application-encrypted value of any logical type (CLAUDE.md §4C.3): AES-256-GCM ciphertext of the canonical wire string,
+/// nonce, tag, the per-value DEK wrapped by the organization KEK, algorithm/key/envelope identifiers and the logical
+/// type. No plaintext copy exists in any typed table; the row HMAC binds the whole envelope.
+/// </summary>
+public sealed class FieldEncryptedValue : FieldValueRowBase
+{
+    public Guid FieldEncryptedValueId { get; set; }
+
+    public byte[] EncryptedValueBytes { get; set; } = [];
+
+    public byte[] EncryptionNonceBytes { get; set; } = [];
+
+    public byte[] EncryptionAuthTagBytes { get; set; } = [];
+
+    public byte[] WrappedDataKeyBytes { get; set; } = [];
+
+    public string EncryptionAlgorithmName { get; set; } = string.Empty;
+
+    public string EncryptionKeyReference { get; set; } = string.Empty;
+
+    public int EncryptionEnvelopeVersion { get; set; }
+
+    /// <summary>The data type the plaintext was serialized as (String, Integer, Date, …); needed to render and validate after decryption.</summary>
+    public string EncryptedLogicalType { get; set; } = string.Empty;
+
+    public override string EntityKind => "field_encrypted_values";
+
+    public override Guid RowPrimaryKey => FieldEncryptedValueId;
+}
+
 public sealed class FieldBooleanValue : FieldValueRowBase
 {
     public Guid FieldBooleanValueId { get; set; }

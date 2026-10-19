@@ -224,6 +224,24 @@ export interface paths {
         patch: operations["UpdateFieldDefinition"];
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Classification, storage protection, search impact and migration state of a field. */
+        get: operations["GetFieldProtection"];
+        put?: never;
+        /** Audited migration: raise classification and/or switch a field to application encryption. Downgrades are refused. */
+        post: operations["StrengthenFieldProtection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/{formDefinitionId}/access": {
         parameters: {
             query?: never;
@@ -846,6 +864,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/security-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Data-protection policy: minimum field classification and whether plaintext Internal fields are permitted (ADR-PB-004). */
+        get: operations["GetOrganizationSecurityPolicy"];
+        /** OrganizationOwner only; reason required; audited; revision CAS. */
+        put: operations["UpdateOrganizationSecurityPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -873,6 +909,8 @@ export interface components {
             fieldDescription: string;
             fieldDataType: string;
             options: null | components["schemas"]["CreateFieldOptionRequest"][];
+            fieldClassification?: null | string;
+            fieldProtectionMode?: null | string;
         };
         AuditEventResponse: {
             /** Format: uuid */
@@ -1116,6 +1154,13 @@ export interface components {
              * @default 1
              */
             fieldDefinitionRevision: number | string;
+            /** @default Standard */
+            fieldProtectionMode: string;
+            /**
+             * Format: int64
+             * @default 1
+             */
+            protectionPolicyRevision: number | string;
         };
         FieldOptionChange: {
             /** Format: uuid */
@@ -1135,6 +1180,23 @@ export interface components {
             optionSortOrder: number | string;
             isActive: boolean;
         };
+        FieldProtectionResponse: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            fieldKey: string;
+            fieldClassification: string;
+            fieldProtectionMode: string;
+            /** Format: int64 */
+            protectionPolicyRevision: number | string;
+            /** Format: date-time */
+            protectionChangedOn: null | string;
+            migrationState: string;
+            /** Format: int32 */
+            legacyPlaintextRecordCount: number | string;
+            searchImpact: string;
+            organizationMinimumClassification: string;
+            organizationPermitsPlaintext: boolean;
+        };
         FieldResponse: {
             /** Format: uuid */
             fieldDefinitionId: string;
@@ -1151,6 +1213,10 @@ export interface components {
             stringValue: string;
             /** @default String */
             fieldDataType: string;
+            /** @default false */
+            applicationEncrypted: boolean;
+            /** @default false */
+            legacyPlaintext: boolean;
         };
         FormAccessResponse: {
             /** Format: uuid */
@@ -1250,6 +1316,18 @@ export interface components {
             publishedOn: string;
             /** Format: uuid */
             publishedByUserId: string;
+        };
+        OrganizationSecurityPolicyResponse: {
+            minimumFieldClassification: string;
+            plaintextInternalFieldsPermitted: boolean;
+            policyStatementText: string;
+            /** Format: date-time */
+            policyReviewedOn: null | string;
+            /** Format: uuid */
+            policyReviewedByUserId: null | string;
+            /** Format: int64 */
+            securityPolicyRevision: number | string;
+            isUnreviewedDefault: boolean;
         };
         ProbeResponse: {
             probeStatus: string;
@@ -1395,6 +1473,13 @@ export interface components {
         };
         /** Format: binary */
         Stream: string;
+        StrengthenFieldProtectionRequest: {
+            targetClassification: null | string;
+            targetProtectionMode: null | string;
+            changeReason: string;
+            /** Format: int64 */
+            expectedProtectionRevision: number | string;
+        };
         TeamMemberRequest: {
             /** Format: uuid */
             userId: string;
@@ -1462,6 +1547,13 @@ export interface components {
             values: {
                 [key: string]: string;
             };
+        };
+        UpdateOrganizationSecurityPolicyRequest: {
+            minimumFieldClassification: string;
+            plaintextInternalFieldsPermitted: boolean;
+            policyStatementText: string;
+            /** Format: int64 */
+            expectedPolicyRevision: number | string;
         };
         UpdateUiPreferenceRequest: {
             textScalePreferenceMode: string;
@@ -1823,6 +1915,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FieldDefinitionResponse"];
+                };
+            };
+        };
+    };
+    GetFieldProtection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldProtectionResponse"];
+                };
+            };
+        };
+    };
+    StrengthenFieldProtection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrengthenFieldProtectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldProtectionResponse"];
                 };
             };
         };
@@ -2885,6 +3027,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UiPreferenceResponse"];
+                };
+            };
+        };
+    };
+    GetOrganizationSecurityPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSecurityPolicyResponse"];
+                };
+            };
+        };
+    };
+    UpdateOrganizationSecurityPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrganizationSecurityPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSecurityPolicyResponse"];
                 };
             };
         };

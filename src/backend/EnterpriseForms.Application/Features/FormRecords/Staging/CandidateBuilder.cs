@@ -76,8 +76,10 @@ public static class CandidateBuilder
         Guid formRecordId,
         DateTimeOffset now,
         Guid actorUserId,
-        IReadOnlyDictionary<Guid, FieldOption> optionsById)
+        IReadOnlyDictionary<Guid, FieldOption> optionsById,
+        Encryption.IFieldEncryptionService encryption)
     {
+        ArgumentNullException.ThrowIfNull(encryption);
         ArgumentNullException.ThrowIfNull(currentValues);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(layout);
@@ -99,16 +101,19 @@ public static class CandidateBuilder
                 continue; // field retired from the definition entirely; value no longer carried (never for Stage B data)
             }
 
+            // Carry-forward re-creates the row under the field's *current* protection: a field strengthened to encryption
+            // since the last save rewrites its legacy plaintext as ciphertext here (the audited migration's backfill step).
+            var currentWire = FieldValueCodec.Format(existing, optionsById, encryption);
             if (!values.TryGetValue(field.FieldKey, out var wire))
             {
-                result.Add(FieldValueCodec.CreateRow(field, elementByField.GetValueOrDefault(field.FieldDefinitionId), options, FieldValueCodec.Format(existing, optionsById), tenantId, formRecordId, existing.FieldValueItemId, existing.CreatedOn, existing.CreatedByUserId));
+                result.Add(Protect(FieldValueCodec.CreateRow(field, elementByField.GetValueOrDefault(field.FieldDefinitionId), options, currentWire, tenantId, formRecordId, existing.FieldValueItemId, existing.CreatedOn, existing.CreatedByUserId)));
                 continue;
             }
 
-            var unchanged = string.Equals(wire, FieldValueCodec.Format(existing, optionsById), StringComparison.Ordinal);
+            var unchanged = string.Equals(wire, currentWire, StringComparison.Ordinal);
             if (unchanged)
             {
-                result.Add(FieldValueCodec.CreateRow(field, elementByField.GetValueOrDefault(field.FieldDefinitionId), options, wire, tenantId, formRecordId, existing.FieldValueItemId, existing.CreatedOn, existing.CreatedByUserId));
+                result.Add(Protect(FieldValueCodec.CreateRow(field, elementByField.GetValueOrDefault(field.FieldDefinitionId), options, wire, tenantId, formRecordId, existing.FieldValueItemId, existing.CreatedOn, existing.CreatedByUserId)));
                 continue;
             }
 
@@ -127,7 +132,7 @@ public static class CandidateBuilder
                 continue; // explicit clear: missing value means no row (CLAUDE.md §2.4)
             }
 
-            result.Add(FieldValueCodec.CreateRow(field, elementByField.GetValueOrDefault(field.FieldDefinitionId), options, wire, tenantId, formRecordId, existing.FieldValueItemId, now, actorUserId));
+            result.Add(Protect(FieldValueCodec.CreateRow(field, elementByField.GetValueOrDefault(field.FieldDefinitionId), options, wire, tenantId, formRecordId, existing.FieldValueItemId, now, actorUserId)));
         }
 
         foreach (var (key, wire) in values.OrderBy(kv => kv.Key, StringComparer.Ordinal))
@@ -143,7 +148,7 @@ public static class CandidateBuilder
                 throw new BusinessException("FORBIDDEN", 403, "adding items requires record ownership");
             }
 
-            result.Add(FieldValueCodec.CreateRow(field, elementByField.GetValueOrDefault(field.FieldDefinitionId), options, wire, tenantId, formRecordId, Guid.CreateVersion7(), now, actorUserId));
+            result.Add(Protect(FieldValueCodec.CreateRow(field, elementByField.GetValueOrDefault(field.FieldDefinitionId), options, wire, tenantId, formRecordId, Guid.CreateVersion7(), now, actorUserId)));
         }
 
         if (editableItems is null)
@@ -152,5 +157,7 @@ public static class CandidateBuilder
         }
 
         return result;
+
+        FieldValueRowBase Protect(FieldValueRowBase typed) => FieldValueCodec.Protect(typed, fields.First(f => f.FieldDefinitionId == typed.FieldDefinitionId), optionsById, encryption);
     }
 }
