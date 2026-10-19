@@ -78,6 +78,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid recordManifestCommitId, CancellationToken cancellationToken);
 
+    /// <summary>The accepted manifest commit of one earlier operation of a record (historic verification), or null.</summary>
+    Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken);
+
     void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint);
 
     Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken);

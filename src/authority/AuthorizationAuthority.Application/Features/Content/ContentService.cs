@@ -388,16 +388,43 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw AuthorityException.NotReady("AwaitingArchive");
         }
 
-        var expected = await scope.GetManifestLeavesAsync(head.CurrentRecordManifestCommitId.Value, cancellationToken).ConfigureAwait(false);
+        // Target manifest: the current head, or (historic document versions) the accepted manifest of an earlier operation of the
+        // same record. Historic verification needs full read permission now; partial readers only ever see the current head.
+        var manifestCommitId = head.CurrentRecordManifestCommitId.Value;
+        var verifiedRevision = head.CommittedContentRevision;
+        var verifiedOperationId = head.CommittedOperationId!.Value;
+        var verifiedRoot = head.CommittedManifestRoot;
+        var verifiedKeyVersion = head.SignatureKeyVersion;
+        if (request.HistoricCommittedOperationId is { } historicOperationId && historicOperationId != verifiedOperationId)
+        {
+            if (!fullRead)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+            }
+
+            var historic = await scope.FindManifestCommitByOperationAsync(state.OrganizationId, request.FormRecordId, historicOperationId, cancellationToken).ConfigureAwait(false);
+            if (historic is null || historic.CommittedContentRevision >= head.CommittedContentRevision)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+            }
+
+            manifestCommitId = historic.RecordManifestCommitId;
+            verifiedRevision = historic.CommittedContentRevision;
+            verifiedOperationId = historic.CommittedOperationId;
+            verifiedRoot = historic.ManifestRootDigest;
+            verifiedKeyVersion = historic.RowSignatureKeyVersion;
+        }
+
+        var expected = await scope.GetManifestLeavesAsync(manifestCommitId, cancellationToken).ConfigureAwait(false);
         var key = await scope.FindKeyRegistrationAsync(state.OrganizationId, IntegrityKeyPurposes.RowIntegrityV1, cancellationToken).ConfigureAwait(false)
                   ?? throw new AuthorityException(AuthorityErrorCodes.KeyUnavailable, 503, true, "organization integrity key unavailable");
-        var keyReference = new IntegrityKeyReference(state.OrganizationId, key.KeyPurposeName, key.ProviderKeyName, head.SignatureKeyVersion);
-        if (head.SignatureKeyVersion < key.MinimumVerificationKeyVersion)
+        var keyReference = new IntegrityKeyReference(state.OrganizationId, key.KeyPurposeName, key.ProviderKeyName, verifiedKeyVersion);
+        if (verifiedKeyVersion < key.MinimumVerificationKeyVersion)
         {
             throw new AuthorityException(AuthorityErrorCodes.KeyUnavailable, 503, false, "accepted key version is no longer verifiable");
         }
 
-        var failure = await VerifyStagedAgainstLeavesAsync(request.ObservedItems, expected.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList(), state.OrganizationId, keyReference, head.CommittedContentRevision, head.CommittedOperationId!.Value, head.CommittedManifestRoot, cancellationToken).ConfigureAwait(false);
+        var failure = await VerifyStagedAgainstLeavesAsync(request.ObservedItems, expected.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList(), state.OrganizationId, keyReference, verifiedRevision, verifiedOperationId, verifiedRoot, cancellationToken).ConfigureAwait(false);
         if (failure is not null)
         {
             // Tamper evidence: quarantine the record head and journal a minimal incident; never auto-repair or re-sign.
@@ -405,10 +432,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             head.QuarantineReasonCode = failure;
             head.ContentHeadModifiedOn = clock.GetUtcNow();
             state.ContentIntegrityRevision++;
-            var incident = new IntegrityIncidentBody(request.FormRecordId, head.CommittedContentRevision, head.CommittedOperationId, failure, bound.AuthorityUserId, correlationId);
+            var incident = new IntegrityIncidentBody(request.FormRecordId, verifiedRevision, verifiedOperationId, failure, bound.AuthorityUserId, correlationId);
             scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return new VerifyRecordProjectionResult(false, failure, head.CommittedContentRevision, head.CommittedOperationId, state.AuthorizationRevision, [], fullRead, correlationId);
+            return new VerifyRecordProjectionResult(false, failure, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, [], fullRead, correlationId);
         }
 
         List<VerifiedProjectionItem> authorized;
@@ -430,7 +457,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw AuthorityException.NotReady("authorization state moved during verification");
         }
 
-        return new VerifyRecordProjectionResult(true, null, head.CommittedContentRevision, head.CommittedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId);
+        return new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId);
     }
 
     /// <summary>Returns null when the observed set is exactly the expected set with verifying signatures and matching root; otherwise a failure code.</summary>

@@ -244,9 +244,9 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
     public static byte[] Eicar() => Encoding.ASCII.GetBytes("X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*");
 
     /// <summary>Drives one upload the way the browser upload manager does: begin → chunks → complete → poll → commit → readable.</summary>
-    public async Task<JsonElement> UploadAsync(TestUser user, Guid accusedId, string fileName, string contentType, byte[] bytes, bool expectCommit = true, TimeSpan? timeout = null)
+    public async Task<JsonElement> UploadAsync(TestUser user, Guid accusedId, string fileName, string contentType, byte[] bytes, bool expectCommit = true, TimeSpan? timeout = null, Guid? replacesFileAttachmentId = null)
     {
-        var session = await TransferAsync(user, accusedId, fileName, contentType, bytes, timeout).ConfigureAwait(false);
+        var session = await TransferAsync(user, accusedId, fileName, contentType, bytes, timeout, replacesFileAttachmentId).ConfigureAwait(false);
         return session.GetProperty("sessionState").GetString() == "Processed" && expectCommit ? await CommitAsync(user, accusedId, session.GetProperty("uploadSessionId").GetGuid()).ConfigureAwait(false) : session;
     }
 
@@ -260,9 +260,9 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
     }
 
     /// <summary>begin → chunks → complete → poll until the worker settled the session (Processed/Rejected/Failed).</summary>
-    public async Task<JsonElement> TransferAsync(TestUser user, Guid accusedId, string fileName, string contentType, byte[] bytes, TimeSpan? timeout = null)
+    public async Task<JsonElement> TransferAsync(TestUser user, Guid accusedId, string fileName, string contentType, byte[] bytes, TimeSpan? timeout = null, Guid? replacesFileAttachmentId = null)
     {
-        var begun = await Fixture.Api.PostAsync("/api/v1/upload-sessions", Token(user), new { formRecordId = accusedId, fieldDefinitionId = AccusedFields["case_documents"], originalFileName = fileName, contentType, sizeBytes = bytes.LongLength, replacesFileAttachmentId = (Guid?)null }).ConfigureAwait(false);
+        var begun = await Fixture.Api.PostAsync("/api/v1/upload-sessions", Token(user), new { formRecordId = accusedId, fieldDefinitionId = AccusedFields["case_documents"], originalFileName = fileName, contentType, sizeBytes = bytes.LongLength, replacesFileAttachmentId }).ConfigureAwait(false);
         Assert.True(begun.Status == HttpStatusCode.Created, "begin upload failed: " + begun.Body);
         var sessionId = begun.Root.GetProperty("uploadSessionId").GetGuid();
         var chunkSize = begun.Root.GetProperty("chunkSizeBytes").GetInt32();

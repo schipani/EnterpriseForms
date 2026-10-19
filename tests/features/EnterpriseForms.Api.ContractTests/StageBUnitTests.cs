@@ -271,6 +271,76 @@ public sealed class StageBUnitTests
     }
 
     [Fact]
+    public async Task DocumentEncryptionUsesAFreshKeyPerVersionAndRejectsSegmentTruncationReorderingAndVersionTransplant()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var keys = new LocalDevelopmentKeyProvider(Options.Create(new EncryptionOptions { KeyProvider = "LocalDevelopment", LocalDevelopmentKekBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }));
+        var service = new AesGcmFileEncryptionService(keys);
+        var context = new FileEncryptionContext(Tenant, Guid.CreateVersion7(), Guid.CreateVersion7(), 1);
+        const int Record = 4 + AesGcmFileEncryptionService.SegmentSize + 16;
+
+        async Task<(byte[] Cipher, EncryptionOutcome Outcome)> SealAsync(byte[] plaintext, FileEncryptionContext c)
+        {
+            using var sink = new MemoryStream();
+            var outcome = await service.EncryptAsync(new MemoryStream(plaintext), sink, c, ct);
+            return (sink.ToArray(), outcome);
+        }
+
+        async Task<byte[]> OpenAsync(byte[] cipher, FileEncryptionEnvelope envelope, FileEncryptionContext c, AesGcmFileEncryptionService? with = null)
+        {
+            using var sink = new MemoryStream();
+            await (with ?? service).DecryptAsync(new MemoryStream(cipher), sink, envelope, c, ct);
+            return sink.ToArray();
+        }
+
+        // Identical plaintext sealed twice (e.g. a re-uploaded version): new DEK, new nonce prefix, different ciphertext.
+        var twoSegments = RandomNumberGenerator.GetBytes(2 * AesGcmFileEncryptionService.SegmentSize); // exact multiple of the segment size
+        var (cipherA, outcomeA) = await SealAsync(twoSegments, context);
+        var (cipherB, outcomeB) = await SealAsync(twoSegments, context);
+        Assert.False(outcomeA.Envelope.WrappedDataKey.AsSpan().SequenceEqual(outcomeB.Envelope.WrappedDataKey));
+        Assert.False(outcomeA.Envelope.NoncePrefix.AsSpan().SequenceEqual(outcomeB.Envelope.NoncePrefix));
+        Assert.NotEqual(outcomeA.CiphertextSha256, outcomeB.CiphertextSha256);
+        Assert.Equal(outcomeA.PlaintextSha256, outcomeB.PlaintextSha256);
+        Assert.Equal(60, outcomeA.Envelope.WrappedDataKey.Length);
+        Assert.Equal(8, outcomeA.Envelope.NoncePrefix.Length);
+        Assert.Equal(2 * Record, cipherA.Length);
+        Assert.Equal(twoSegments, await OpenAsync(cipherA, outcomeA.Envelope, context));
+
+        // Dropping a whole trailing segment is detected (the remaining last segment was not sealed as final).
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(cipherA[..Record], outcomeA.Envelope, context));
+
+        // Reordering whole segments is detected (segment index is in the nonce and the AAD).
+        var reordered = cipherA[Record..].Concat(cipherA[..Record]).ToArray();
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(reordered, outcomeA.Envelope, context));
+
+        // Splicing a segment from another version of the same document is detected.
+        var spliced = cipherA[..Record].Concat(cipherB[Record..]).ToArray();
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(spliced, outcomeA.Envelope, context));
+
+        // A version's ciphertext cannot be served as another version or attachment, or under another tenant.
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(cipherA, outcomeA.Envelope, context with { VersionNumber = 2 }));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(cipherA, outcomeA.Envelope, context with { FileAttachmentId = Guid.CreateVersion7() }));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(cipherA, outcomeA.Envelope, context with { TenantId = Guid.CreateVersion7() }));
+
+        // Another document's wrapped key or nonce prefix does not open this ciphertext.
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(cipherA, outcomeA.Envelope with { WrappedDataKey = outcomeB.Envelope.WrappedDataKey }, context));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(cipherA, outcomeA.Envelope with { NoncePrefix = outcomeB.Envelope.NoncePrefix }, context));
+
+        // A different KEK cannot unwrap the DEK; an unknown key reference or no provider fails closed (never plaintext).
+        var otherKeys = new LocalDevelopmentKeyProvider(Options.Create(new EncryptionOptions { KeyProvider = "LocalDevelopment", LocalDevelopmentKekBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(cipherA, outcomeA.Envelope, context, new AesGcmFileEncryptionService(otherKeys)));
+        await Assert.ThrowsAsync<EncryptionUnavailableException>(() => OpenAsync(cipherA, outcomeA.Envelope with { KeyReference = "rotated-kek-v2" }, context));
+        await Assert.ThrowsAsync<EncryptionUnavailableException>(() => OpenAsync(cipherA, outcomeA.Envelope, context, new AesGcmFileEncryptionService(new UnavailableKeyProvider("no provider"))));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync(cipherA, outcomeA.Envelope with { AlgorithmName = "AES-128-CBC" }, context));
+
+        // Empty file: one authenticated zero-length final segment.
+        var (emptyCipher, emptyOutcome) = await SealAsync([], context);
+        Assert.Equal(20, emptyCipher.Length);
+        Assert.Empty(await OpenAsync(emptyCipher, emptyOutcome.Envelope, context));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => OpenAsync([], emptyOutcome.Envelope, context));
+    }
+
+    [Fact]
     public void ClamAvRepliesMapToVerdictsAndUnknownRepliesFailClosed()
     {
         var scanner = new ClamAvTcpScanner(Options.Create(new MalwareScannerOptions()));

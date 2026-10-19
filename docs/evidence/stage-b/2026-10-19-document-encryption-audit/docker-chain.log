@@ -1,0 +1,28 @@
+### stop security-test stack
+### start security-test stack
+ Container enterpriseforms-sectest-attacker-sql-1 Healthy 
+ Container enterpriseforms-sectest-azurite-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-db-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-1 Healthy 
+ Container enterpriseforms-sectest-worker-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-migrate-1 Exited 
+ Container enterpriseforms-sectest-api-1 Healthy 
+container enterpriseforms-sectest-dev-seed-1 exited (0)
+### build tests
+Build succeeded.
+Build succeeded.
+### stage-b integration
+  total: 29
+  failed: 0
+  succeeded: 29
+  skipped: 0
+  duration: 2m 10s 818ms
+### playwright
+[1A[2K  14 passed (3.2m)
+### sec-p
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 2m 19s 312ms
+### DONE

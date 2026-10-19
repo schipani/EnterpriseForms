@@ -67,6 +67,12 @@ public sealed class UploadSession
 
     /// <summary>Set when processing finished: the version row that the user's commit will bind into the manifest.</summary>
     public Guid? ProducedFileAttachmentVersionId { get; set; }
+
+    /// <summary>
+    /// When the plaintext staging object (committed blob and any uncommitted blocks) was confirmed deleted. Null while the
+    /// quarantined plaintext may still exist; the staging sweep keeps purging until it is set.
+    /// </summary>
+    public DateTimeOffset? StagingObjectPurgedOn { get; set; }
 }
 
 public static class AttachmentLifecycleStates

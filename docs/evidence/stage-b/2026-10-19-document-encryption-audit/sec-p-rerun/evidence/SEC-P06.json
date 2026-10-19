@@ -1,0 +1,87 @@
+{
+  "test_id": "SEC-P06",
+  "scenario": "Revocation with cached allow: after the effective revocation barrier a still-valid session token cannot start protected reads; while the barrier is pending no stale allow is returned",
+  "outcome": "PASS",
+  "commit_sha": "2f792900ac775f1238c867c7e41819f39209472b",
+  "image_fingerprint": "sha256:8c7151b43ce67d53cdf7ad0b1ef94e5dc2ff2cab9acf2377779b7dd43894c7f8 (api=sha256:62e90533ce34cdc26751ecc84795c2b6536983d4a630d000351defdbe166196a;authority=sha256:5553b34eb6ff000c66ae0df990a98fc6c88b326e4f0398d53faa2f8418cbf14b)",
+  "started_at_utc": "2026-10-19T13:18:59.3115635\u002B00:00",
+  "executed_at_utc": "2026-10-19T13:19:01.7111772\u002B00:00",
+  "authority_revision": 5,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-19T13:18:59.3421146\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a15450baef767e9a49220ed8704f48-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-19T13:18:59.9727511\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "2958aef4-b7b3-82a8-b986-b73ed4edecad",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-19T13:19:00.4290488\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "d3bc7296-39fa-831b-9611-01a0b4b01a24",
+        "contentRevision": "1",
+        "committedOperationId": "1b405943-cde7-8c92-8d97-24a4cba43b7d",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-19T13:19:00.9734916\u002B00:00",
+      "step": "reader read before revocation",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "isCompleteProjection": "false"
+      }
+    },
+    {
+      "at": "2026-10-19T13:19:01.3373093\u002B00:00",
+      "step": "direct authority command RevokeShare",
+      "status": 202,
+      "error_code": null,
+      "fields": {
+        "command_status": "CommittedAwaitingProjection",
+        "authorization_revision": "5",
+        "projection_gate_state": "AwaitingArchive"
+      }
+    },
+    {
+      "at": "2026-10-19T13:19:01.3477368\u002B00:00",
+      "step": "reader read with cached token during closed barrier",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-19T13:19:01.3573099\u002B00:00",
+      "step": "gate during barrier",
+      "detail": "{\u0022organization_id\u0022:\u002201a15450-baef-767e-9a49-220ed8704f48\u0022,\u0022authorization_revision\u0022:5,\u0022projection_applied_revision\u0022:4,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022AwaitingArchive\u0022,\u0022pending_archive_entries\u0022:1,\u0022integrity_quarantine_enabled\u0022:false}"
+    },
+    {
+      "at": "2026-10-19T13:19:01.6573056\u002B00:00",
+      "step": "reader read with cached token after effective revocation",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    }
+  ]
+}

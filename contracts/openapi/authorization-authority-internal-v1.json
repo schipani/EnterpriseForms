@@ -1390,6 +1390,13 @@
             "items": {
               "$ref": "#/components/schemas/StagedContentItem"
             }
+          },
+          "historic_committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

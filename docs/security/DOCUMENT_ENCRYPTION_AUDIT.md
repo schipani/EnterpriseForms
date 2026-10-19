@@ -1,0 +1,65 @@
+# Document encryption audit — Stage B (2026-10-19)
+
+Internal engineering audit of the existing document-encryption implementation (Documents slice, decision B-05) by the
+development team. **This is not an independent review, attestation or production approval.** The implementation was not
+redesigned; four gaps were closed in place (§3) and regression tests were added (§4). Production key custody and the
+remaining items in §5 are outstanding.
+
+## 1. Scope and method
+
+Code read end to end: `UploadSessionHandlers` (begin, chunks, complete, cancel, commit), `DocumentProcessingService`
+(lease, scan, sniff, encrypt, store, version row), `AesGcmFileEncryptionService` and `LocalDevelopmentKeyProvider`,
+`AzureBlobFileStorageProvider`, `DocumentHandlers` (list, history, download, remove), the authority's
+`ContentService.VerifyProjectionAsync`, the signed schema `file_attachment_versions` v1 and the EF constraints. What is at
+rest was read independently of the API: business rows through the hostile-DBA `attacker-sql` container, and blob objects
+through a SharedKey-signed request executed inside the Azurite container (`AzuriteProbe`, test-only).
+
+## 2. Findings by question
+
+| # | Question | What is implemented | Verified by |
+|---|---|---|---|
+| 1 | Unique DEK and authenticated encryption per document version | Every processed version is encrypted by the worker before it can exist as a version row: a fresh random 256-bit DEK and a random 8-byte nonce prefix per version, segmented AES-256-GCM (1 MiB segments, nonce = prefix ‖ segment counter, 16-byte tags). The AAD binds envelope version, tenant, record, attachment, version number, segment index and a final-segment flag. The DEK is wrapped by the key provider (AES-GCM, AAD `DynamicForms/DekWrap/v1:<key reference>`) and zeroed after use. | Unit: `AesGcmEnvelopeRoundTripsAcrossSegmentsAndDetectsTamperingOrTransplant`, **new** `DocumentEncryptionUsesAFreshKeyPerVersionAndRejectsSegmentTruncationReorderingAndVersionTransplant` (same plaintext → new DEK, nonce prefix and ciphertext; whole-segment truncation, reordering, cross-version splice, version/attachment/tenant transplant, foreign wrapped key or nonce prefix, wrong KEK, unknown key reference, no provider, wrong algorithm, empty file). Integration: **new** `ReplacedVersionsHaveIndependentKeysAndHistoricDownloadsAreVerifiedByTheAuthority` (three versions, v1 and v2 identical plaintext: three distinct wrapped DEKs, nonce prefixes, objects and ciphertexts, read from the database and the blob store). |
+| 2 | Signed metadata and Authority enforcement before download/decryption | The version row (object key, both digests and sizes, detected type, file name, scanner verdict, algorithm, key reference, wrapped DEK, nonce prefix, segment size, uploader, record/attachment/version identity) is a RowHmac/v1 signed leaf of the record manifest. A **current-version** download runs the full verified read (authority head, complete leaf set, every HMAC, root, gate, archive receipt, read permission) before the envelope is used; decryption happens only on the server; the response is `attachment`, `no-store`, `nosniff`. **Gap found and fixed:** a **historic-version** download took the envelope, object key and file name from an unverified business row (§3 G-1). | Existing: `AuthorizationAndTamperTests` (ciphertext digest tamper → refused), `DocumentTests`, `SharingTests` (field-share recipient cannot download). **New:** historic download of v1/v2 returns the original bytes only after authority verification; a DBA edit of a historic row's file name → `423`, no bytes; a processed-but-never-committed version promoted into an earlier operation with a borrowed signature → `423`, no bytes; reader and unknown versions refused. |
+| 3 | No plaintext bytes in permanent blob storage or business tables | Only the worker writes the `documents` container, and only the encryptor's output (`IfNoneMatch=*`, so an object is never overwritten). Business tables hold metadata and digests, never bytes. The worker's local temporary file holds ciphertext only (`DeleteOnClose`). | **New** `EveryCommittedVersionIsCiphertextAtRestEvenWhenTheFileFieldIsLabelledPublicPlaintext`: the stored object's size and SHA-256 equal the signed ciphertext metadata, differ from the plaintext, contain no plaintext marker and have exactly 20 bytes of overhead per segment; no plaintext in typed value tables; authorized download reproduces the bytes. |
+| 4 | Plaintext during staging and scanning | Chunks (4 MiB, buffered in API memory) are staged as blocks of one block blob in the private `upload-staging` container (same storage account and Shared Key as `documents`), committed at *complete*, read by the worker, streamed to clamd (`INSTREAM` over TCP on `business-net`; clamd's temporary file is deleted after each scan), sniffed (16 bytes), streamed through the encryptor, then deleted. Sessions live at most 24 hours. **Gaps found and fixed:** deleting a staging object did not remove *uncommitted* blocks, no expiry sweep existed although the code referred to one, permanently failed sessions kept their plaintext, and an expired session still accepted chunks (§3 G-2, G-3). | **New** `CancelledExpiredAndRejectedUploadsLeaveNoPlaintextInStaging`: uncommitted plaintext block visible after a chunk → gone after cancel; expired session refuses chunks and completion (`UPLOAD_SESSION_EXPIRED`), becomes `Expired` and is purged by the sweep; infected upload leaves nothing; no clamd temporary files remain. First test also checks the staging object is gone after a clean upload. |
+| 5 | Can a Public/Internal configuration disable document encryption? | **No.** The processing path never reads the field's classification or protection mode; encryption is unconditional and fails closed (`ScanPending`, retried) when no key provider is available. `FieldProtectionPolicy` records every File field as `ApplicationEncrypted` whatever is requested. The database does not constrain the label for File fields, but the label has no effect on bytes. | **New** test 1: designer request `Internal`/`Standard` for a File field → stored `ApplicationEncrypted`; a DBA relabels the live document field `Public`/`Standard`; the next upload is still ciphertext at rest with a normal envelope. Unit `FieldProtectionPolicyDefaultsFreeTextToEncryptionEnforcesTheFloorAndNeverDowngrades`. |
+| 6 | Replace, history, download, deletion | Replace creates version *n+1* of the same attachment with its own DEK and object; earlier versions stay immutable and downloadable by full readers (now authority-verified). History lists one row per version (current, superseded, processed). Partial (field-share) readers never receive attachment leaves from the authority, so they see no documents, no history and no downloads. Removal is a **soft delete**: a new content revision without the leaf; the attachment is marked `Removed`, the ciphertext object and version rows are retained, nothing is released afterwards. No purge exists. | New tests 2 and 5 (`RemovedDocumentsKeepOnlyCiphertextAndAreNoLongerReleased`: ciphertext retained in the blob store, current and historic downloads refused). Existing `DocumentTests` (removal, limits, resume, EICAR). |
+| 7 | Key custody and rotation | Only `LocalDevelopmentKeyProvider` (one 32-byte KEK from configuration, `local-dev-kek-v1`, shared with field encryption) and a fail-closed `UnavailableKeyProvider` exist. The API refuses to start with the local provider outside Development/Testing. Each version stores its key reference and wrapped DEK, so multiple KEK versions could coexist, but nothing rotates or re-wraps. | Startup guard (existing); unit tests above (unknown key reference and missing provider fail closed). Production custody: §5. |
+
+## 3. Gaps found and fixed in place
+
+| Id | Gap | Fix | Regression test |
+|---|---|---|---|
+| G-1 | Historic-version downloads used a business row the authority never verified: a database writer could alter its metadata or promote a processed-but-never-committed version into history. | The download reads the complete immutable snapshot of the operation that holds the version and asks the authority to verify it against the manifest it accepted for that operation (new optional `historic_committed_operation_id` on the existing verify call: full read permission now, open gate, unquarantined head, revision older than the head, complete leaf set, every HMAC, root). Only the verified row's envelope is used. A mismatch quarantines the record and journals an incident, exactly like the current-head check. | Integration tests 2 and 3. |
+| G-2 | Plaintext staging could outlive its session: Delete Blob does not remove uncommitted blocks (cancelled/expired uploads), no sweep existed, permanent processing failures never deleted staging. | Staging deletion commits an empty block list before deleting (discards uncommitted blocks); permanent failure deletes staging; new `SweepStagingAsync` (every 30 s in the worker and the in-process host) expires open/received sessions past their lifetime (job `Failed`, audit event) and purges every expired or terminal session after a 2-minute grace, recording `upload_sessions.staging_object_purged_on` (migration `StageBStagingPurge`); storage failures are retried by the next sweep. | Integration test 4. |
+| G-3 | An expired but not yet swept session still accepted chunks and completion. | Chunk and complete refuse expired sessions (`409 UPLOAD_SESSION_EXPIRED`). | Integration test 4. |
+| G-4 | No test read what is actually stored: the existing check compared two digests recorded in the database. | `AzuriteProbe` reads objects and block lists directly from the emulator. | Integration tests 1, 2, 4, 5. |
+
+## 4. Test results
+
+Run on the fresh `compose.security-test.yaml` stack (real PostgreSQL, SpiceDB, Vault Transit, authority, worker, ClamAV,
+Azurite) and the .NET solution; evidence in `docs/evidence/stage-b/2026-10-19-document-encryption-audit/`.
+
+| Suite | Result |
+|---|---|
+| .NET unit/architecture/contract/authority (incl. the two AES-GCM document tests) | 155 passed, 0 failed |
+| Stage B Docker integration (incl. the five new `DocumentEncryptionAuditTests` and the four existing document tests) | 29 passed, 0 failed |
+| Browser end-to-end (uploads across navigation, download, replace, EICAR) | 14 passed, 0 failed |
+| Stage A SEC-P01..SEC-P12 regression on the same stack | 13 passed, 0 failed (incl. harness guard) |
+
+The five new integration tests passed on their first run on this stack; no test was weakened or retried.
+
+## 5. Outstanding (not implemented, not waived)
+
+| Item | State | Gate |
+|---|---|---|
+| **Managed KEK**: Azure Key Vault / Managed HSM wrap/unwrap provider, non-exportable keys, wrap/unwrap-only managed identity, separate provisioning identity | Not implemented; the API refuses the local provider outside Development/Testing | PB-05, PB-10 |
+| **Purpose and tenant separation of keys**: separate KEKs for documents and field values, per organization | One development KEK for everything; separation is per-version DEK and AAD domain only | PB-05, G04 |
+| **Rotation and re-wrap**: new KEK versions for new DEKs, background re-wrap of stored wrapped DEKs, retired versions kept for backups, compromise re-key | Key reference stored per version; no rotation or re-wrap job | PB-05, G14 |
+| **Storage identity**: managed identity with RBAC instead of the Shared Key held by the API and worker; staging and documents in separately permissioned containers or accounts; lifecycle-management rule deleting staging after 24 h as a backstop; blob versioning/soft delete/immutability on `documents` | Local Azurite with one Shared Key | PB-05, PB-10, PB-11 |
+| **Plaintext in transit inside the platform**: API → staging and worker → clamd run over plain HTTP/TCP on the private Docker network | Private network only; TLS and network policy are production configuration | PB-05 |
+| **Retention and purge**: removed documents and processed-but-never-committed versions keep their ciphertext and rows indefinitely; no legal-hold-aware purge or orphan reconciliation | Soft delete only | CLAUDE.md §4A, PB-13 |
+| **Download audit milestones**: one "released" event is written before streaming; no completed/failed event; a tampered segment aborts the stream after earlier authenticated segments were sent | Behaviour documented, not changed | Phase 1C |
+| **History listing metadata** for non-current versions (names, sizes) is shown to full readers from business rows; only downloads are authority-verified | Display only | Phase 2/3 |
+| **Staging sweep race**: a session can expire while a worker is about to lease it; the sweep skips sessions with a live lease, and a late worker result for an expired session is discarded, but its ciphertext object stays as an orphan | Ciphertext only | Retention/purge above |
+| **Independent cryptographic review and Azure staging proof** of the document path with the managed provider | Not done; this audit is internal | PB-03, PB-12 |

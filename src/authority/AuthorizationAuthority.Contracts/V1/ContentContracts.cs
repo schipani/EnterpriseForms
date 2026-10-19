@@ -59,7 +59,12 @@ public sealed record ContentRevision(
     string ArchiveState,
     Guid CorrelationId);
 
-public sealed record VerifyRecordProjectionRequest(Guid OrganizationId, Guid FormRecordId, RequestedAction RequestedAction, IReadOnlyList<StagedContentItem> ObservedItems);
+/// <summary>
+/// historic_committed_operation_id (optional): verify the observed items against the complete manifest the authority accepted
+/// for that earlier operation of the same record instead of the current head (historic document versions). Requires full
+/// read permission now, an open gate and an unquarantined head; never authorizes anything the current head would not.
+/// </summary>
+public sealed record VerifyRecordProjectionRequest(Guid OrganizationId, Guid FormRecordId, RequestedAction RequestedAction, IReadOnlyList<StagedContentItem> ObservedItems, Guid? HistoricCommittedOperationId = null);
 
 public sealed record VerifiedProjectionItem(ManifestItemKind ItemKind, Guid ItemId);
 

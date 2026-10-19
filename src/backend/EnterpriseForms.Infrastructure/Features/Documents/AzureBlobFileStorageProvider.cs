@@ -120,6 +120,16 @@ public sealed class AzureBlobFileStorageProvider : IFileStorageProvider
     {
         try
         {
+            if (area == StorageArea.Staging)
+            {
+                // Uncommitted plaintext blocks of an open/cancelled/expired session are not removed by Delete Blob (the blob
+                // does not exist yet). Committing an empty block list discards every uncommitted block; the empty blob is then
+                // deleted. For an already committed staging blob this simply truncates it before deletion.
+                await EnsureContainersAsync(cancellationToken).ConfigureAwait(false);
+                using var cts = Linked(cancellationToken);
+                await staging.GetBlockBlobClient(objectKey).CommitBlockListAsync([], cancellationToken: cts.Token).ConfigureAwait(false);
+            }
+
             await Container(area).GetBlobClient(objectKey).DeleteIfExistsAsync(DeleteSnapshotsOption.IncludeSnapshots, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException ex)

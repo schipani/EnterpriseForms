@@ -128,6 +128,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             throw new BusinessException("UPLOAD_SESSION_NOT_OPEN", 409, "session is " + session.SessionState);
         }
 
+        RequireUnexpired(session);
         if (chunkIndex < 0 || chunkIndex >= session.ExpectedChunkCount)
         {
             throw new BusinessException("INVALID_REQUEST", 422, "chunk index out of range");
@@ -184,6 +185,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             return await ToResponseAsync(scope, session, cancellationToken).ConfigureAwait(false); // idempotent
         }
 
+        RequireUnexpired(session);
         if (ReceivedIndexes(session.ReceivedChunkBitmap).Count != session.ExpectedChunkCount)
         {
             throw new BusinessException("UPLOAD_INCOMPLETE", 409, "not every chunk has been received");
@@ -252,7 +254,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             }
             catch (IOException)
             {
-                // staged bytes are reclaimed by the expiry sweep
+                // staged bytes are reclaimed by the staging sweep (DocumentProcessingService.SweepStagingAsync)
             }
         }
 
@@ -359,6 +361,15 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         clone.CreatedOn = v.CreatedOn;
         clone.CreatedByUserId = v.CreatedByUserId;
         return clone;
+    }
+
+    /// <summary>An expired session accepts no more plaintext and cannot be released; the staging sweep purges what it holds.</summary>
+    private void RequireUnexpired(UploadSession session)
+    {
+        if (session.SessionExpiresOn <= clock.GetUtcNow())
+        {
+            throw new BusinessException("UPLOAD_SESSION_EXPIRED", 409, "the upload session expired; start a new upload");
+        }
     }
 
     private static async Task<UploadSession> RequireOwnedSessionAsync(IBusinessScope scope, RequestContext context, Guid uploadSessionId, CancellationToken cancellationToken)

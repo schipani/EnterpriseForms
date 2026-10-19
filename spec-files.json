@@ -69,8 +69,8 @@
     },
     {
       "path": "docs/STAGE_B_STATUS.md",
-      "sha256": "796fcc00f13d59b872c02a8e228836cb817348e653b59edc7ed8dcaa01e56b05",
-      "bytes": 53982
+      "sha256": "3ebf3426b2bd30929b578288111fae82666b5be399859deb45adb5cff74a9144",
+      "bytes": 56614
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
@@ -184,8 +184,8 @@
     },
     {
       "path": "docs/decisions/STAGE_B_DECISION_LOG.md",
-      "sha256": "e42833309b6a3c3ea641b7db04537b90d66713516c1744562ba0e3fe0f8f1676",
-      "bytes": 25863
+      "sha256": "11dba9235325ae2d0e04fc29d15c67475f7b63b08bc2e0b20acab8969a428a01",
+      "bytes": 27869
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
@@ -256,6 +256,11 @@
       "path": "docs/privacy/PB10_DATA_FLOW_RESIDENCY_REGISTER.csv",
       "sha256": "b9af1a78b380185468d858794369dd024f8aa4d22776a21a4d24e76566fffe88",
       "bytes": 3348
+    },
+    {
+      "path": "docs/security/DOCUMENT_ENCRYPTION_AUDIT.md",
+      "sha256": "a6015cff5324d624f2cc70811d0f3406f3be070705122b0d39d702e3fb270300",
+      "bytes": 13057
     },
     {
       "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_ATTESTATION_TEMPLATE.md",

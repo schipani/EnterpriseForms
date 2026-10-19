@@ -167,6 +167,17 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public Task<List<UploadSession>> GetUploadSessionsForUserAsync(Guid tenantId, Guid ownerUserId, IReadOnlyCollection<string> states, CancellationToken cancellationToken) =>
             context.UploadSessions.AsNoTracking().Where(s => s.TenantId == tenantId && s.OwnerUserId == ownerUserId && states.Contains(s.SessionState)).OrderByDescending(s => s.SessionCreatedOn).Take(100).ToListAsync(cancellationToken);
 
+        public Task<List<UploadSession>> GetSessionsDueForStagingPurgeAsync(DateTimeOffset now, DateTimeOffset terminalBefore, int limit, CancellationToken cancellationToken) =>
+            context.UploadSessions
+                .Where(s => s.StagingObjectPurgedOn == null
+                            && (((s.SessionState == UploadSessionStates.Open || s.SessionState == UploadSessionStates.Completed) && s.SessionExpiresOn < now)
+                                || ((s.SessionState == UploadSessionStates.Processed || s.SessionState == UploadSessionStates.Committed || s.SessionState == UploadSessionStates.Rejected
+                                     || s.SessionState == UploadSessionStates.Cancelled || s.SessionState == UploadSessionStates.Failed || s.SessionState == UploadSessionStates.Expired)
+                                    && s.SessionModifiedOn < terminalBefore)))
+                .OrderBy(s => s.SessionModifiedOn)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+
         public void AddUploadSession(UploadSession session) => context.UploadSessions.Add(session);
 
         public void AddProcessingJob(DocumentProcessingJob job) => context.DocumentProcessingJobs.Add(job);

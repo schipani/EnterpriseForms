@@ -90,6 +90,12 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<List<UploadSession>> GetUploadSessionsForUserAsync(Guid tenantId, Guid ownerUserId, IReadOnlyCollection<string> states, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Sessions whose plaintext staging object must be purged (tracked for update): unpurged and either still open/received past
+    /// their expiry, or terminal (processed, committed, rejected, cancelled, failed, expired) for longer than the grace period.
+    /// </summary>
+    Task<List<UploadSession>> GetSessionsDueForStagingPurgeAsync(DateTimeOffset now, DateTimeOffset terminalBefore, int limit, CancellationToken cancellationToken);
+
     void AddUploadSession(UploadSession session);
 
     void AddProcessingJob(DocumentProcessingJob job);

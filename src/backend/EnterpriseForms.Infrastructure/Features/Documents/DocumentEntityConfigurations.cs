@@ -22,6 +22,7 @@ public sealed class UploadSessionConfiguration : IEntityTypeConfiguration<Upload
         builder.Property(s => s.FailureReasonCode).HasMaxLength(60);
         builder.HasIndex(s => new { s.TenantId, s.OwnerUserId, s.SessionIdempotencyKey }).IsUnique().HasDatabaseName("uq_upload_sessions_owner_idempotency");
         builder.HasIndex(s => new { s.FormRecordId, s.SessionState }).HasDatabaseName("ix_upload_sessions_record_state");
+        builder.HasIndex(s => new { s.SessionState, s.SessionExpiresOn }).HasDatabaseName("ix_upload_sessions_staging_purge").HasFilter("staging_object_purged_on IS NULL");
         builder.HasOne<Tenant>().WithMany().HasForeignKey(s => s.TenantId).HasConstraintName("fk_upload_sessions_tenant");
         builder.HasOne<FormRecord>().WithMany().HasForeignKey(s => s.FormRecordId).HasConstraintName("fk_upload_sessions_record");
         builder.HasOne<FieldDefinition>().WithMany().HasForeignKey(s => s.FieldDefinitionId).HasConstraintName("fk_upload_sessions_field");

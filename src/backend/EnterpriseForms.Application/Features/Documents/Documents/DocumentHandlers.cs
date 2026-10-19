@@ -14,7 +14,7 @@ using EnterpriseForms.Domain.Features.FormRecords;
 namespace EnterpriseForms.Application.Features.Documents.Documents;
 
 /// <summary>Authorized document projection, version history, download (server-side decrypt) and removal (new content revision without the leaf).</summary>
-public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, TimeProvider clock)
+public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock)
 {
     public async Task<IReadOnlyList<DocumentSummaryResponse>> ListAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)
     {
@@ -61,10 +61,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
                 throw new BusinessException("NOT_FOUND", 404, "document version not found"); // partial readers see the current version only
             }
 
-            await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-            var versions = await scope.GetAttachmentVersionsAsync(fileAttachmentId, cancellationToken).ConfigureAwait(false);
-            target = versions.Where(v => v.VersionNumber == requested && v.ContentChangeOperationId != Guid.Empty).OrderByDescending(v => v.ContentRevision).FirstOrDefault()
-                     ?? throw new BusinessException("NOT_FOUND", 404, "document version not found");
+            target = await VerifiedHistoricVersionAsync(context, formRecordId, fileAttachmentId, requested, cancellationToken).ConfigureAwait(false);
         }
 
         var envelope = new FileEncryptionEnvelope(target.EncryptionAlgorithmName, target.EncryptionEnvelopeVersion, target.EncryptionKeyReference, target.WrappedDataKey, target.EncryptionNoncePrefix, target.EncryptionSegmentSizeBytes);
@@ -76,6 +73,38 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             await using var ciphertext = await storage.OpenReadAsync(StorageArea.Documents, captured.StorageObjectKey, ct).ConfigureAwait(false);
             await encryption.DecryptAsync(ciphertext, output, envelope, aad, ct).ConfigureAwait(false);
         });
+    }
+
+    /// <summary>
+    /// A historic version is released only from an earlier record snapshot the authority accepted: the business rows of that
+    /// operation are verified against its stored manifest (complete leaf set, every row HMAC, root) before the envelope,
+    /// object key or file name are used. Business rows alone (which a database writer could alter or promote) are never trusted.
+    /// </summary>
+    private async Task<FileAttachmentVersion> VerifiedHistoricVersionAsync(RequestContext context, Guid formRecordId, Guid fileAttachmentId, int requested, CancellationToken cancellationToken)
+    {
+        List<Guid> candidateOperations;
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var versions = await scope.GetAttachmentVersionsAsync(fileAttachmentId, cancellationToken).ConfigureAwait(false);
+            candidateOperations = versions.Where(v => v.VersionNumber == requested && v.ContentChangeOperationId != Guid.Empty && v.FormRecordId == formRecordId)
+                .OrderByDescending(v => v.ContentRevision).Select(v => v.ContentChangeOperationId).Distinct().Take(1).ToList();
+        }
+
+        if (candidateOperations.Count == 0)
+        {
+            throw new BusinessException("NOT_FOUND", 404, "document version not found");
+        }
+
+        var operationId = candidateOperations[0];
+        var snapshot = await stager.ReadStagedAsync(formRecordId, operationId, cancellationToken).ConfigureAwait(false);
+        var verification = await authority.VerifyRecordProjectionAsync(context.ToDelegatedUser(), new VerifyRecordProjectionRequest(context.OrganizationId, formRecordId, ProtectedAction.Read, snapshot.Items, operationId), cancellationToken).ConfigureAwait(false);
+        if (!verification.Verified || !verification.IsCompleteProjection || verification.CommittedOperationId != operationId)
+        {
+            throw new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423, "historic document version failed integrity verification: " + verification.FailureReasonCode);
+        }
+
+        return snapshot.Rows.OfType<FileAttachmentVersion>().SingleOrDefault(v => v.FileAttachmentId == fileAttachmentId && v.VersionNumber == requested)
+               ?? throw new BusinessException("NOT_FOUND", 404, "document version not found");
     }
 
     public async Task<FormRecordResponse> RemoveAsync(RequestContext context, Guid formRecordId, Guid fileAttachmentId, RemoveDocumentRequest request, string idempotencyKey, CancellationToken cancellationToken)

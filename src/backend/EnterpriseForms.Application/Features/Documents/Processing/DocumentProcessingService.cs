@@ -17,6 +17,93 @@ public sealed class DocumentProcessingService(IBusinessStore store, IFileStorage
 {
     public static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(10);
 
+    /// <summary>Terminal sessions are purged again after this grace period (covers best-effort deletes and chunks still in flight at cancel).</summary>
+    public static readonly TimeSpan StagingPurgeGrace = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Staging sweep (CLAUDE.md §4A "uncommitted staged uploads expire and are cleaned by a retryable scheduled job"): expires
+    /// open/received sessions past their lifetime (the job can no longer release them), then deletes the plaintext staging
+    /// object — committed blob and uncommitted blocks — of every expired or terminal session and records the purge. A storage
+    /// failure leaves the session unpurged so the next sweep retries. Returns the number of sessions purged.
+    /// </summary>
+    public async Task<int> SweepStagingAsync(int batchSize, CancellationToken cancellationToken)
+    {
+        var now = clock.GetUtcNow();
+        List<UploadSession> due;
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            due = await scope.GetSessionsDueForStagingPurgeAsync(now, now - StagingPurgeGrace, batchSize, cancellationToken).ConfigureAwait(false);
+            var expiring = new List<UploadSession>();
+            foreach (var session in due.Where(s => s.SessionState is UploadSessionStates.Open or UploadSessionStates.Completed))
+            {
+                var job = await scope.FindProcessingJobAsync(session.UploadSessionId, cancellationToken).ConfigureAwait(false);
+                if (job is not null && job.JobState == ProcessingJobStates.Leased && job.LeaseExpiresOn > now)
+                {
+                    continue; // a worker holds it right now; the next sweep re-evaluates
+                }
+
+                if (job is not null)
+                {
+                    job.JobState = ProcessingJobStates.Failed;
+                    job.LastErrorCode = "SESSION_EXPIRED";
+                    job.LeaseOwnerName = null;
+                    job.LeaseExpiresOn = null;
+                    job.JobModifiedOn = now;
+                }
+
+                session.SessionState = UploadSessionStates.Expired;
+                session.FailureReasonCode = "SESSION_EXPIRED";
+                session.SessionModifiedOn = now;
+                expiring.Add(session);
+                scope.AddAuditEvent(new AuditEvent
+                {
+                    AuditEventId = Guid.CreateVersion7(),
+                    TenantId = session.TenantId,
+                    EventOccurredOn = now,
+                    EventCategory = "Document",
+                    EventAction = AuditActions.DocumentRejected,
+                    EventOutcome = "Failed",
+                    ActorUserId = session.OwnerUserId,
+                    ActorType = "Service",
+                    FormRecordId = session.FormRecordId,
+                    FieldDefinitionId = session.FieldDefinitionId,
+                    TargetEntityType = "upload_session",
+                    TargetEntityId = session.UploadSessionId,
+                    CorrelationIdentifier = Guid.CreateVersion7(),
+                    EventDescription = "upload session expired before it was released; staged bytes purged",
+                    EventMetadataJson = System.Text.Json.JsonSerializer.Serialize(new { reason = "SESSION_EXPIRED", receivedBytes = session.ReceivedBytes }),
+                });
+            }
+
+            due = due.Where(s => s.SessionState is not (UploadSessionStates.Open or UploadSessionStates.Completed)).ToList();
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        var purged = 0;
+        foreach (var session in due)
+        {
+            try
+            {
+                await storage.DeleteAsync(StorageArea.Staging, session.StagingObjectKey, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                continue; // storage unavailable: stays unpurged, retried by the next sweep
+            }
+
+            await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+            var tracked = await scope.FindUploadSessionAsync(session.TenantId, session.UploadSessionId, cancellationToken).ConfigureAwait(false);
+            if (tracked is not null && tracked.StagingObjectPurgedOn is null)
+            {
+                tracked.StagingObjectPurgedOn = clock.GetUtcNow();
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                purged++;
+            }
+        }
+
+        return purged;
+    }
+
     /// <summary>Processes at most one job; returns false when no job was due.</summary>
     public async Task<bool> ProcessOnceAsync(string workerName, CancellationToken cancellationToken)
     {
@@ -58,6 +145,10 @@ public sealed class DocumentProcessingService(IBusinessStore store, IFileStorage
         {
             var permanent = job.AttemptCount >= 5;
             await MarkAsync(job.UploadSessionId, permanent ? ProcessingJobStates.Failed : ProcessingJobStates.Queued, permanent ? UploadSessionStates.Failed : UploadSessionStates.Completed, "PROCESSING_ERROR:" + Truncate(ex.Message), TimeSpan.FromSeconds(Math.Min(300, 10 * Math.Pow(2, job.AttemptCount))), cancellationToken).ConfigureAwait(false);
+            if (permanent)
+            {
+                await SafeDeleteStagingAsync(session, cancellationToken).ConfigureAwait(false); // never released: drop the plaintext now (the sweep confirms)
+            }
         }
 
         return true;
@@ -294,7 +385,7 @@ public sealed class DocumentProcessingService(IBusinessStore store, IFileStorage
         }
         catch (IOException)
         {
-            // reclaimed by the expiry sweep
+            // reclaimed by the staging sweep (SweepStagingAsync)
         }
     }
 

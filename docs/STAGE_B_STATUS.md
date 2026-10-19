@@ -212,7 +212,7 @@ arguments; use PowerShell/cmd (or run the test `.dll` directly). CI runs on Linu
 | 7 | Every feature owns components, handlers, contracts, validation, persistence, authority hooks, tests, audit; no scaffolding of non-milestone pages | Feature-owned slices under `Features/<Name>` and `apps/web/src/features/<name>`; generated client from the compiled OpenAPI; lint/architecture fitness functions | `ArchitectureTests`, ESLint boundary rules, `OpenApiSnapshotTests`; no PG-### page beyond the three flows + gallery |
 | 8 | Navigation-during-upload, conflict handling, error/loading/empty states, independent widget refresh, recovery from interrupted transfers | As above; 409 conflict UI with reload; empty/loading/error states on every list; interrupted-upload resume; commit-race retry (B-12) | e2e test 2; `DocumentTests`; `uploadManager.test.ts` (resume after failed chunk, pause/resume, commit retry) |
 
-Owner acceptance additions to requirement 2 (Designer workflow): editing existing fields (B-22) and form permissions after creation (B-23); see §5.1. **Phase 1B (not an ADR-PB-002 Stage B item, delivered on the same slice): application-level field encryption with designer configuration and an organization data-protection policy (B-24..B-26); steps §1.3c/§1.3d, evidence §4, open production requirements §7.1.**
+Owner acceptance additions to requirement 2 (Designer workflow): editing existing fields (B-22) and form permissions after creation (B-23); see §5.1. **Document-encryption audit (2026-10-19, internal, B-27): every committed document version is AES-256-GCM ciphertext at rest regardless of the File field's classification; four gaps closed (historic-version release now authority-verified, staging plaintext purged on cancel/expiry/failure with a sweep, expired sessions refuse chunks, at-rest bytes now tested directly); report `docs/security/DOCUMENT_ENCRYPTION_AUDIT.md`.** **Phase 1B (not an ADR-PB-002 Stage B item, delivered on the same slice): application-level field encryption with designer configuration and an organization data-protection policy (B-24..B-26); steps §1.3c/§1.3d, evidence §4, open production requirements §7.1.**
 
 ## 3. What was built (changes since the first Stage B report in bold)
 
@@ -248,6 +248,10 @@ Owner acceptance additions to requirement 2 (Designer workflow): editing existin
   plaintext permission, secure defaults) runs on both field-creation routes; `GET/POST …/fields/{id}/protection`
   (status + audited strengthening, `FIELD_PROTECTION_STRENGTHENED`); `organization_security_policies` with
   `GET/PUT /organization/security-policy` (owner-only, revision CAS, `ORGANIZATION_SECURITY_POLICY_UPDATED`).
+- **Document-encryption audit fixes (B-27):** historic-version downloads verified by the authority against the manifest of their own
+  operation (optional `historic_committed_operation_id` on `VerifyRecordProjection`); staging deletion discards uncommitted blocks;
+  `SweepStagingAsync` expires and purges staging (`upload_sessions.staging_object_purged_on`, migration `20261019130416_StageBStagingPurge`);
+  `409 UPLOAD_SESSION_EXPIRED` on chunk/complete of an expired session.
 - **Audit (B-06), Organizations/UserPreferences (B-08), Dashboard:** unchanged.
 
 ### 3.2 Frontend (`src/frontend`, React 19 + TypeScript + Vite 8 + Tailwind 4 + Radix)
@@ -317,6 +321,9 @@ binding Stage A evidence bound to `e6df484`/`7e00680` is unaffected, and the Sta
 | Defect | Found by | Fix |
 |---|---|---|
 | Signed attachment timestamps carried 100 ns ticks → canonicalizer rejects on the real commit path | unit test | `SignedTimestamp.Truncate` before persisting `scanned_on`/`uploaded_on` |
+| **Document audit:** historic document versions were released from an unverified business row (metadata edits or a promoted never-committed version undetected) | internal document-encryption audit | authority verifies the historic operation's complete snapshot before release; `DocumentEncryptionAuditTests` 2 and 3 |
+| **Document audit:** cancelled/expired uploads left plaintext uncommitted blocks in staging, no expiry sweep existed, permanently failed sessions kept plaintext, expired sessions accepted chunks | internal document-encryption audit | empty-block-list purge, staging sweep with purge timestamp, expiry check; `DocumentEncryptionAuditTests` 4 |
+| **Document audit:** no test read the bytes actually stored | internal document-encryption audit | `AzuriteProbe`; `DocumentEncryptionAuditTests` 1, 2, 4, 5 |
 | **Phase 1B:** creating the organization's default data-protection policy row committed the caller's transaction, so the first field creation of a fresh organization failed with 500 (`NpgsqlTransaction has completed`) | `EncryptionTests` first Docker run (21/24 red) | the default row is only *added* to the caller's scope; every caller commits itself |
 | **Phase 1B:** `FieldProtectionPolicy.Resolve` silently forced encryption when Confidential was requested with `Standard` | unit test | explicit plaintext for Confidential/Restricted is refused (`FIELD_PROTECTION_REQUIRED`), never corrected silently |
 | **Phase 1B:** the Stage A `POST /form-definitions` route created plaintext fields regardless of the organization policy | `EncryptionTests` policy test | the route resolves its explicit Internal/Standard fields through the same policy (`PLAINTEXT_NOT_PERMITTED` when the owner has turned plaintext off) |
@@ -396,3 +403,13 @@ organization's protected data is held in Azure, the following are required; none
 | **Per-record challenge unlock**, blind-index exact match for encrypted values | Not implemented (ADR-PB-004: no encrypted search in V1) | §4C.5 / future ADR |
 | **Confidential/Restricted search** | Explicitly unsupported in V1; designer dialog states it | Phase 4 / G06 |
 | **Staging proof**: SEC-P + `EncryptionTests` with the managed provider, key outage fail-closed, backup restore with historic key versions | Local Docker evidence only | PB-03 Azure staging, PB-12 evidence chain |
+
+### 7.2 Document encryption — outstanding after the 2026-10-19 internal audit
+
+Document bytes are encrypted with AES-256-GCM per version on the local stack (verified in §4 and
+`docs/evidence/stage-b/2026-10-19-document-encryption-audit/`). Outstanding, not waived: managed KEK in Azure Key Vault / Managed HSM; separate KEKs for documents and field
+values per organization; rotation and re-wrap; storage managed identity instead of the Shared Key, separately permissioned
+staging, a lifecycle rule as backstop and blob versioning/immutability on `documents`; TLS inside the platform (API → storage,
+worker → clamd); legal-hold-aware purge of removed and never-committed ciphertext; download completed/failed audit events;
+authority-verified metadata in the version history list; independent cryptographic review and Azure staging proof. Details:
+`docs/security/DOCUMENT_ENCRYPTION_AUDIT.md` §5.

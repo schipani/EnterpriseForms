@@ -550,6 +550,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(512)")
                         .HasColumnName("staging_object_key");
 
+                    b.Property<DateTimeOffset?>("StagingObjectPurgedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("staging_object_purged_on");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -560,6 +564,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FormRecordId", "SessionState")
                         .HasDatabaseName("ix_upload_sessions_record_state");
+
+                    b.HasIndex("SessionState", "SessionExpiresOn")
+                        .HasDatabaseName("ix_upload_sessions_staging_purge")
+                        .HasFilter("staging_object_purged_on IS NULL");
 
                     b.HasIndex("TenantId", "OwnerUserId", "SessionIdempotencyKey")
                         .IsUnique()

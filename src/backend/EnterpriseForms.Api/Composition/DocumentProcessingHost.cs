@@ -16,6 +16,8 @@ public sealed class DocumentProcessingHostOptions
 /// <summary>Leased job loop around <see cref="DocumentProcessingService"/>; one job at a time per host, bounded backoff.</summary>
 public sealed partial class DocumentProcessingHostedService(DocumentProcessingService processing, IOptions<DocumentProcessingHostOptions> options, ILogger<DocumentProcessingHostedService> logger) : BackgroundService
 {
+    private static readonly TimeSpan StagingSweepInterval = TimeSpan.FromSeconds(30);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (HostExecutionMode.IsOpenApiDocumentGeneration || !options.Value.HostInProcess)
@@ -25,11 +27,18 @@ public sealed partial class DocumentProcessingHostedService(DocumentProcessingSe
 
         var worker = Environment.MachineName + ":" + Environment.ProcessId;
         LogStarted(logger, worker);
+        var nextSweep = DateTimeOffset.MinValue;
         while (!stoppingToken.IsCancellationRequested)
         {
             var didWork = false;
             try
             {
+                if (DateTimeOffset.UtcNow >= nextSweep)
+                {
+                    nextSweep = DateTimeOffset.UtcNow.Add(StagingSweepInterval);
+                    await processing.SweepStagingAsync(100, stoppingToken).ConfigureAwait(false);
+                }
+
                 didWork = await processing.ProcessOnceAsync(worker, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
