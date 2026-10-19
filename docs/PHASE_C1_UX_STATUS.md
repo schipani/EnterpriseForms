@@ -64,7 +64,7 @@ All four passed cleanly after the changes in this phase (the only failure hit du
 
 ## Commit
 
-This status file and all the diffs described above are committed together. Commit SHA and PR URL are in the final report delivered through the handoff (not duplicated here to avoid staleness if a subsequent commit is made).
+This status file and all the diffs described above are committed as `2c24c11` on `phase-c/form-platform-expansion` (parent: `556c562`). The PR URL is in the final report delivered through the handoff.
 
 ## Exact steps for a human reviewer to reproduce the six representative flows in a real browser
 
