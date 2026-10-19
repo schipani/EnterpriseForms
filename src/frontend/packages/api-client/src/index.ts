@@ -34,6 +34,8 @@ export type AddFieldDefinitionRequest = S["AddFieldDefinitionRequest"];
 export type UpdateFieldDefinitionRequest = S["UpdateFieldDefinitionRequest"];
 export type FieldProtectionResponse = S["FieldProtectionResponse"];
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
+export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
+export type RetryFieldProtectionMigrationRequest = S["RetryFieldProtectionMigrationRequest"];
 export type OrganizationSecurityPolicyResponse = S["OrganizationSecurityPolicyResponse"];
 export type UpdateOrganizationSecurityPolicyRequest = S["UpdateOrganizationSecurityPolicyRequest"];
 export type UpdateFormAccessRequest = S["UpdateFormAccessRequest"];
@@ -117,6 +119,7 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       updateField: (formDefinitionId: string, fieldDefinitionId: string, request: UpdateFieldDefinitionRequest) => write<FieldDefinitionResponse>("PATCH", "forms.updateField", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       protection: (formDefinitionId: string, fieldDefinitionId: string, signal?: AbortSignal) => read<FieldProtectionResponse>("forms.protection", { formDefinitionId, fieldDefinitionId }, undefined, "interactive-read", signal),
       strengthenProtection: (formDefinitionId: string, fieldDefinitionId: string, request: StrengthenFieldProtectionRequest) => write<FieldProtectionResponse>("POST", "forms.strengthenProtection", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      retryProtectionMigration: (formDefinitionId: string, fieldDefinitionId: string, request: RetryFieldProtectionMigrationRequest) => write<FieldProtectionResponse>("POST", "forms.retryProtectionMigration", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       access: (formDefinitionId: string, signal?: AbortSignal) => read<FormAccessResponse>("forms.access", { formDefinitionId }, undefined, "interactive-read", signal),
       updateAccess: (formDefinitionId: string, request: UpdateFormAccessRequest) => write<FormAccessResponse>("POST", "forms.updateAccess", { formDefinitionId }, request, { idempotent: true, resourceKey: `form-access:${formDefinitionId}` }),
       updateOptions: (formDefinitionId: string, fieldDefinitionId: string, request: UpdateFieldOptionsRequest) => write<FieldDefinitionResponse>("PUT", "forms.updateOptions", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),

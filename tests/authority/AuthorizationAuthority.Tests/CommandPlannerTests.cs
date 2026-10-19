@@ -187,6 +187,38 @@ public sealed class CommandPlannerTests
     }
 
     [Fact]
+    public async Task PublishFormSecurityRevisionIsDesignerOnlyRegistersARequirementAndNeverGrantsOrWeakens()
+    {
+        var scope = new FakeScope(Org);
+        scope.Resources.Add(Resource(ResourceTypeNames.FormDefinition, Form));
+        var designer = Guid.CreateVersion7();
+        var field = Guid.CreateVersion7();
+        var graph = Graph(Edge(ResourceTypeNames.FormDefinition, Form, "designer", ResourceTypeNames.User, designer), Edge(ResourceTypeNames.FormDefinition, Form, "form_user", ResourceTypeNames.User, OwnerUser));
+        var request = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = field, required_protection_mode = "ApplicationEncrypted", protection_policy_revision = 2 });
+
+        var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(designer), request, graph, CancellationToken.None);
+        Assert.Empty(plan.AddEdges);
+        Assert.Empty(plan.RemoveEdges);
+        var resource = Assert.Single(plan.RegisterResources);
+        Assert.Equal(ResourceTypeNames.FieldProtectionRequirement, resource.ResourceTypeName);
+        Assert.Equal(field, resource.ResourceEntityId);
+        Assert.Equal(Form, resource.ParentResourceEntityId);
+
+        // A form user (clerk) or an unrelated user cannot publish a requirement.
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), request, graph, CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(AttackerUser), request, graph, CancellationToken.None))).ErrorCode);
+
+        // Weakening is not a command; an unregistered form and a duplicate requirement are refused.
+        var weaken = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = field, required_protection_mode = "Standard", protection_policy_revision = 3 });
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), weaken, graph, CancellationToken.None))).ErrorCode);
+        var unknownForm = Guid.CreateVersion7();
+        var unregistered = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, unknownForm, new { form_definition_id = unknownForm, field_definition_id = field, required_protection_mode = "ApplicationEncrypted", protection_policy_revision = 2 });
+        Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), unregistered, graph, CancellationToken.None))).ErrorCode);
+        scope.Resources.Add(Resource(ResourceTypeNames.FieldProtectionRequirement, field));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), request, graph, CancellationToken.None))).ErrorCode);
+    }
+
+    [Fact]
     public async Task UpdateFormUsersRejectsEmptyContradictoryUnknownAndAlreadyAppliedChanges()
     {
         var designer = Guid.CreateVersion7();
@@ -254,6 +286,8 @@ public sealed class CommandPlannerTests
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid commitId, CancellationToken ct) => Task.FromResult(Leaves.TryGetValue(commitId, out var leaves) ? leaves : []);
 
         public Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken ct) => Task.FromResult<RecordManifestCommit?>(null);
+
+        public Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken ct) => Task.FromResult<IdentityBinding?>(null);
 
         public Task<SecurityCommand?> FindCommandAsync(Guid id, CancellationToken ct) => Task.FromResult<SecurityCommand?>(null);
 

@@ -662,6 +662,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on");
 
+                    b.Property<Guid?>("ProtectionAuthorityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("protection_authority_command_id");
+
                     b.Property<Guid?>("ProtectionChangedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("protection_changed_by_user_id");
@@ -752,6 +756,189 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("uq_field_options_field_key");
 
                     b.ToTable("field_options", (string)null);
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionMigration", b =>
+                {
+                    b.Property<Guid>("FieldProtectionMigrationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_protection_migration_id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<Guid>("AuthorityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authority_command_id");
+
+                    b.Property<int>("CompletedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("completed_record_count");
+
+                    b.Property<int>("FailedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_record_count");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("last_error_code");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_on");
+
+                    b.Property<string>("LeaseOwnerName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("lease_owner_name");
+
+                    b.Property<DateTimeOffset?>("MigrationCompletedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("migration_completed_on");
+
+                    b.Property<DateTimeOffset>("MigrationCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("migration_created_on");
+
+                    b.Property<DateTimeOffset>("MigrationModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("migration_modified_on");
+
+                    b.Property<string>("MigrationState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("migration_state");
+
+                    b.Property<DateTimeOffset?>("MigrationVerifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("migration_verified_on");
+
+                    b.Property<DateTimeOffset>("NextAttemptOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_on");
+
+                    b.Property<long>("ProtectionPolicyRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("protection_policy_revision");
+
+                    b.Property<Guid>("StartedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("started_by_user_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_record_count");
+
+                    b.Property<int>("TotalValueCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_value_count");
+
+                    b.HasKey("FieldProtectionMigrationId");
+
+                    b.HasIndex("FormDefinitionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("FieldDefinitionId", "ProtectionPolicyRevision")
+                        .IsUnique()
+                        .HasDatabaseName("uq_field_protection_migrations_field_revision");
+
+                    b.HasIndex("MigrationState", "NextAttemptOn")
+                        .HasDatabaseName("ix_field_protection_migrations_due");
+
+                    b.ToTable("field_protection_migrations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_field_protection_migrations_counts", "total_record_count >= 0 AND total_value_count >= 0 AND completed_record_count >= 0 AND failed_record_count >= 0 AND completed_record_count + failed_record_count <= total_record_count");
+
+                            t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Completed','Failed','Blocked')");
+                        });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionMigrationItem", b =>
+                {
+                    b.Property<Guid>("FieldProtectionMigrationItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_protection_migration_item_id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<bool>("CompletedByUserCommit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("completed_by_user_commit");
+
+                    b.Property<long?>("CompletedContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("completed_content_revision");
+
+                    b.Property<Guid?>("CompletedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("completed_operation_id");
+
+                    b.Property<Guid>("FieldProtectionMigrationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_protection_migration_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<DateTimeOffset>("ItemModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("item_modified_on");
+
+                    b.Property<string>("ItemState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("item_state");
+
+                    b.Property<DateTimeOffset?>("LastAttemptOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_on");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("last_error_code");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("FieldProtectionMigrationItemId");
+
+                    b.HasIndex("FormRecordId");
+
+                    b.HasIndex("FieldProtectionMigrationId", "FormRecordId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_field_protection_migration_items_record");
+
+                    b.HasIndex("FieldProtectionMigrationId", "ItemState")
+                        .HasDatabaseName("ix_field_protection_migration_items_state");
+
+                    b.ToTable("field_protection_migration_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_field_protection_migration_items_state", "item_state IN ('Pending','Completed','Failed')");
+                        });
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FormDefinition", b =>
@@ -2794,6 +2981,47 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_field_options_field");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionMigration", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FieldDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_protection_migrations_field");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FormDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FormDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_protection_migrations_form");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_protection_migrations_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionMigrationItem", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionMigration", null)
+                        .WithMany()
+                        .HasForeignKey("FieldProtectionMigrationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_protection_migration_items_migration");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormRecords.FormRecord", null)
+                        .WithMany()
+                        .HasForeignKey("FormRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_protection_migration_items_record");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FormDefinition", b =>

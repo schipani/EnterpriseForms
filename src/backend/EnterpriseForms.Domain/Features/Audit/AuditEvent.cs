@@ -7,6 +7,12 @@ public static class AuditActions
     public const string FormVersionPublished = "FORM_VERSION_PUBLISHED";
     public const string FieldConfigurationChanged = "FIELD_CONFIGURATION_CHANGED";
     public const string FieldProtectionStrengthened = "FIELD_PROTECTION_STRENGTHENED";
+    public const string FieldProtectionMigrationStarted = "FIELD_PROTECTION_MIGRATION_STARTED";
+    public const string FieldValuesReprotected = "FIELD_VALUES_REPROTECTED";
+    public const string FieldProtectionMigrationRecordFailed = "FIELD_PROTECTION_MIGRATION_RECORD_FAILED";
+    public const string FieldProtectionMigrationCompleted = "FIELD_PROTECTION_MIGRATION_COMPLETED";
+    public const string FieldProtectionMigrationFailed = "FIELD_PROTECTION_MIGRATION_FAILED";
+    public const string FieldProtectionMigrationRetried = "FIELD_PROTECTION_MIGRATION_RETRIED";
     public const string OrganizationSecurityPolicyUpdated = "ORGANIZATION_SECURITY_POLICY_UPDATED";
     public const string FormAccessGranted = "FORM_ACCESS_GRANTED";
     public const string FormAccessRevoked = "FORM_ACCESS_REVOKED";

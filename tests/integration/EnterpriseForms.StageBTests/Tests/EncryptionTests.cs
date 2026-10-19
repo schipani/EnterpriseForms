@@ -181,22 +181,28 @@ public sealed class EncryptionTests(StageBFixture fixture)
         var strengthened = await fixture.Api.PostAsync($"/api/v1/form-definitions/{formId:D}/fields/{noteId:D}/protection", s.Token(s.Designer), new { targetClassification = "Confidential", targetProtectionMode = "ApplicationEncrypted", changeReason = "notes contain personal data", expectedProtectionRevision = revision });
         Assert.True(strengthened.IsSuccess, strengthened.Body);
         Assert.Equal("ApplicationEncrypted", strengthened.Root.GetProperty("fieldProtectionMode").GetString());
-        Assert.Equal("EncryptionPendingRewrite", strengthened.Root.GetProperty("migrationState").GetString());
-        Assert.Equal(1, strengthened.Root.GetProperty("legacyPlaintextRecordCount").GetInt32());
+        // The one existing plaintext record is counted and queued for the authority-governed background migration (B-28); nothing claims encryption yet.
+        Assert.Equal(1, strengthened.Root.GetProperty("migration").GetProperty("totalRecordCount").GetInt32());
+        Assert.Contains(strengthened.Root.GetProperty("migrationState").GetString(), new[] { "EncryptionMigrationQueued", "EncryptionMigrationRunning", "Encrypted" });
 
-        // The existing record is still readable (its plaintext copy is flagged, not hidden); published v1 is unchanged.
+        // The existing record stays readable throughout (plaintext copy flagged until re-protected, never hidden); published v1 is unchanged.
         var legacy = await s.WaitProjectionAsync(s.Clerk, recordId);
         var legacyValue = legacy.Root.GetProperty("record").GetProperty("values").EnumerateArray().Single();
         Assert.Equal("legacy plaintext note", legacyValue.GetProperty("stringValue").GetString());
-        Assert.True(legacyValue.GetProperty("legacyPlaintext").GetBoolean());
-        Assert.False(legacyValue.GetProperty("applicationEncrypted").GetBoolean());
+        Assert.Equal(legacyValue.GetProperty("applicationEncrypted").GetBoolean(), !legacyValue.GetProperty("legacyPlaintext").GetBoolean());
         var versions = await fixture.Api.GetAsync($"/api/v1/form-definitions/{formId:D}/versions", s.Token(s.Designer));
         Assert.Single(versions.Root.EnumerateArray());
         Assert.Contains("\"protectionMode\":\"Standard\"", versions.Root[0].GetProperty("layoutJson").GetString()!.Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
 
-        // The next commit of the record rewrites the value as ciphertext: no plaintext row remains; the status reports completion.
+        // A user commit during the migration also writes ciphertext (the worker then recognises the record as done); either way no plaintext row remains in the latest snapshot.
         var edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{recordId:D}", s.Token(s.Clerk), new { expectedContentRevision = legacy.Root.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["plain_note"] = "legacy plaintext note" } });
-        Assert.True(edit.IsSuccess, edit.Body);
+        if (!edit.IsSuccess)
+        {
+            Assert.Equal("CONTENT_REVISION_CONFLICT", edit.ErrorCode); // the worker committed first
+            var head = await s.WaitProjectionAsync(s.Clerk, recordId);
+            edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{recordId:D}", s.Token(s.Clerk), new { expectedContentRevision = head.Root.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["plain_note"] = "legacy plaintext note" } });
+            Assert.True(edit.IsSuccess, edit.Body);
+        }
         var rewritten = await s.WaitProjectionAsync(s.Clerk, recordId);
         var value = rewritten.Root.GetProperty("record").GetProperty("values").EnumerateArray().Single();
         Assert.Equal("legacy plaintext note", value.GetProperty("stringValue").GetString());
@@ -205,9 +211,23 @@ public sealed class EncryptionTests(StageBFixture fixture)
         var latestOperation = fixture.Stack.AttackerSql($"SELECT content_change_operation_id FROM form_record_revisions WHERE form_record_id = '{recordId:D}' ORDER BY content_revision DESC LIMIT 1;").Trim();
         Assert.Equal("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_string_values WHERE form_record_id = '{recordId:D}' AND content_change_operation_id = '{latestOperation}';").Trim());
         Assert.Equal("1", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values WHERE form_record_id = '{recordId:D}' AND content_change_operation_id = '{latestOperation}';").Trim());
-        var done = await fixture.Api.GetAsync($"/api/v1/form-definitions/{formId:D}/fields/{noteId:D}/protection", s.Token(s.Designer));
+        var deadline = DateTime.UtcNow.AddSeconds(120);
+        HttpResult done;
+        do
+        {
+            done = await fixture.Api.GetAsync($"/api/v1/form-definitions/{formId:D}/fields/{noteId:D}/protection", s.Token(s.Designer));
+            if (done.Root.GetProperty("fullyEncrypted").GetBoolean())
+            {
+                break;
+            }
+
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
+        }
+        while (DateTime.UtcNow < deadline);
         Assert.Equal("Encrypted", done.Root.GetProperty("migrationState").GetString());
+        Assert.True(done.Root.GetProperty("fullyEncrypted").GetBoolean(), done.Body);
         Assert.Equal(0, done.Root.GetProperty("legacyPlaintextRecordCount").GetInt32());
+        Assert.Equal("Completed", done.Root.GetProperty("migration").GetProperty("migrationState").GetString());
 
         // Once encrypted, no API path makes it plaintext again; the catalog edit route cannot touch protection either.
         var downgrade = await fixture.Api.PostAsync($"/api/v1/form-definitions/{formId:D}/fields/{noteId:D}/protection", s.Token(s.Designer), new { targetClassification = "Internal", targetProtectionMode = "Standard", changeReason = "undo", expectedProtectionRevision = revision + 1 });

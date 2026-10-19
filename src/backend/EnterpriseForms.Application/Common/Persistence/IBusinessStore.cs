@@ -15,6 +15,8 @@ namespace EnterpriseForms.Application.Common.Persistence;
 /// Business PostgreSQL store (untrusted for authorization). Feature handlers use only the methods of their owned
 /// aggregate; cross-feature reads go through published application contracts (ADR-ARCH-001).
 /// </summary>
+public sealed record LegacyPlaintextRecord(Guid FormRecordId, int PlaintextValueCount);
+
 public interface IBusinessStore
 {
     Task<IBusinessScope> BeginScopeAsync(CancellationToken cancellationToken);
@@ -153,6 +155,33 @@ public interface IBusinessScope : IAsyncDisposable
     void AddSecurityPolicy(OrganizationSecurityPolicy policy);
 
     Task<int> CountLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+
+    /// <summary>Records whose latest committed snapshot still holds plaintext rows of the field, with the number of such rows (projection estimate).</summary>
+    Task<List<LegacyPlaintextRecord>> GetLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+
+    /// <summary>Plaintext rows of the field inside one operation's staged snapshot (used with the authority-accepted head operation for the verified post-check).</summary>
+    Task<int> CountPlaintextRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken);
+
+    void AddProtectionMigration(FieldProtectionMigration migration);
+
+    void AddProtectionMigrationItem(FieldProtectionMigrationItem item);
+
+    Task<FieldProtectionMigration?> FindProtectionMigrationAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
+
+    /// <summary>The latest migration of a field (highest protection policy revision), tracked.</summary>
+    Task<FieldProtectionMigration?> FindLatestProtectionMigrationAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+
+    Task<FieldProtectionMigration?> LeaseNextProtectionMigrationAsync(string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken);
+
+    Task<List<FieldProtectionMigrationItem>> GetPendingProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, int limit, CancellationToken cancellationToken);
+
+    Task<FieldProtectionMigrationItem?> FindProtectionMigrationItemAsync(Guid fieldProtectionMigrationItemId, CancellationToken cancellationToken);
+
+    Task<HashSet<Guid>> GetProtectionMigrationItemRecordIdsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
+
+    Task<List<FieldProtectionMigrationItem>> GetFailedProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
+
+    Task<int> CountPendingProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
 
     Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken);
 

@@ -79,6 +79,69 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
         return await authority.CommitContentChangeAsync(context.ToDelegatedUser(), operationId, new CommitContentChangeRequest(context.OrganizationId, candidate.Header.FormRecordId, staged.Items), cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reprotection (B-28): the same prepare → stage → read-back → commit sequence without a user. The authority is given
+    /// the verified current snapshot and the authorizing command; it signs the candidate only if it replaces plaintext rows
+    /// of that command's field with encrypted rows of the same items and nothing else.
+    /// </summary>
+    public async Task<AcceptedContentRevision> StageAndCommitReprotectionAsync(Guid organizationId, AcceptedContentRevision head, IReadOnlyList<StagedContentItem> currentItems, CandidateInput candidate, Guid reprotectionCommandId, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(head);
+        ArgumentNullException.ThrowIfNull(candidate);
+        var keyVersion = (uint)head.CurrentSigningKeyVersion;
+        if (keyVersion == 0)
+        {
+            throw new BusinessException("SIGNING_UNAVAILABLE", 503, "organization integrity key unavailable");
+        }
+
+        var operationId = DeriveOperationId(organizationId, candidate.Header.FormRecordId, idempotencyKey);
+        if (head.CommittedOperationId == operationId)
+        {
+            return head;
+        }
+
+        var candidateRevision = head.CommittedContentRevision + 1;
+        var allRows = new List<ISignedContentRow>(candidate.Rows.Count + 1) { candidate.Header };
+        allRows.AddRange(candidate.Rows);
+        foreach (var row in allRows)
+        {
+            row.ContentChangeOperationId = operationId;
+            row.ContentRevision = candidateRevision;
+            row.RowRevision = candidateRevision;
+            row.RowSignatureKeyVersion = (int)keyVersion;
+            row.RowSignatureSchemaVersion = BusinessSignedSchemas.CurrentSchemaVersion(row);
+        }
+
+        var items = allRows.Select(r => new CandidateContentItem((ManifestItemKind)r.ItemKindCode, r.ItemId, Convert.ToBase64String(BusinessSignedSchemas.Encode(r, keyVersion)))).ToList();
+        var prepared = await authority.PrepareReprotectionAsync(new PrepareContentChangeRequest(
+            organizationId, candidate.Header.FormRecordId, operationId, head.AuthorizationRevision, head.CommittedContentRevision, head.CommittedManifestRootBase64, items, reprotectionCommandId, currentItems),
+            "content:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
+        if (prepared.OperationId != operationId || prepared.CandidateContentRevision != candidateRevision || prepared.SignatureKeyVersion != (int)keyVersion)
+        {
+            throw new BusinessException("CANDIDATE_MISMATCH", 409, "authority prepared a different operation than the staged candidate");
+        }
+
+        var signatures = prepared.SignedItems.ToDictionary(s => ((byte)s.ItemKind, s.ItemId), s => Convert.FromBase64String(s.RowSignatureBase64));
+        foreach (var row in allRows)
+        {
+            row.RowSignature = signatures[(row.ItemKindCode, row.ItemId)];
+        }
+
+        candidate.Header.StagedOn = clock.GetUtcNow();
+        candidate.Header.CandidateState = "Staged";
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (await scope.FindStagedHeaderAsync(candidate.Header.FormRecordId, operationId, cancellationToken).ConfigureAwait(false) is null)
+            {
+                scope.StageCandidate(candidate.Header, candidate.Rows);
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        var staged = await ReadStagedAsync(candidate.Header.FormRecordId, operationId, cancellationToken).ConfigureAwait(false);
+        return await authority.CommitReprotectionAsync(operationId, new CommitContentChangeRequest(organizationId, candidate.Header.FormRecordId, staged.Items), cancellationToken).ConfigureAwait(false);
+    }
+
     public sealed record StagedSnapshot(FormRecordRevision? Header, IReadOnlyList<ISignedContentRow> Rows, IReadOnlyList<StagedContentItem> Items);
 
     /// <summary>Reads the staged rows for an operation and canonicalizes them exactly as they are stored.</summary>

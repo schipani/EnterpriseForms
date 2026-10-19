@@ -23,6 +23,7 @@ public static class BusinessRuntimeGrants
         "form_drafts", "field_options", "form_relationship_definitions", "form_record_relationships",
         "upload_sessions", "file_attachments", "document_processing_jobs",
         "organization_brandings", "user_ui_preferences", "organization_security_policies",
+        "field_protection_migrations", "field_protection_migration_items",
     ];
 
     /// <summary>
@@ -32,7 +33,7 @@ public static class BusinessRuntimeGrants
     /// </summary>
     private static readonly Dictionary<string, string[]> ColumnUpdateGrants = new(StringComparer.Ordinal)
     {
-        ["field_definitions"] = ["field_display_name", "field_description", "field_definition_revision", "modified_on", "modified_by_user_id", "field_classification", "field_protection_mode", "protection_policy_revision", "protection_changed_on", "protection_changed_by_user_id"],
+        ["field_definitions"] = ["field_display_name", "field_description", "field_definition_revision", "modified_on", "modified_by_user_id", "field_classification", "field_protection_mode", "protection_policy_revision", "protection_changed_on", "protection_changed_by_user_id", "protection_authority_command_id"],
     };
 
     public static void Apply(DbContext context, string runtimeRole)

@@ -121,7 +121,9 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await page.getByRole("button", { name: "Edit Exhibit count" }).click();
     const reopened = page.getByRole("dialog", { name: "Edit field" }).getByRole("group", { name: "Security & Encryption" });
     await expect(reopened.getByText("Enabled", { exact: true })).toBeVisible();
-    await expect(reopened.getByText(/1 record\(s\) still hold a plaintext copy/)).toBeVisible();
+    // The background migration re-encrypts the clerk's existing record through the Authority; only then is the field reported as fully encrypted.
+    await expect(reopened.getByText("Fully encrypted · verified")).toBeVisible({ timeout: 120_000 });
+    await expect(reopened.getByRole("group", { name: "Encryption migration progress" })).toHaveCount(0);
     await reopened.getByRole("button", { name: /Strengthen protection/ }).click();
     await expect(reopened.getByRole("checkbox", { name: /Switch to application-level encryption/ })).toHaveCount(0);
     await reopened.getByRole("combobox", { name: /New classification/ }).click();

@@ -1,0 +1,32 @@
+### stop security-test stack
+ Network enterpriseforms-sectest_authority-net Removed 
+ Network enterpriseforms-sectest_business-net Removed 
+ Network enterpriseforms-sectest_trust-edge Removed 
+### start security-test stack
+ Container enterpriseforms-sectest-attacker-sql-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-db-1 Healthy 
+ Container enterpriseforms-sectest-business-db-1 Healthy 
+ Container enterpriseforms-sectest-azurite-1 Healthy 
+ Container enterpriseforms-sectest-business-migrate-1 Exited 
+ Container enterpriseforms-sectest-api-1 Healthy 
+container enterpriseforms-sectest-dev-seed-1 exited (0)
+### build tests
+Build succeeded.
+Build succeeded.
+### stage-b integration
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AuthorityOutageBlocksAndResumesAndHostileRowTamperingFailsTheRecordWithoutClaimingEncryption (24s 207ms)
+  total: 33
+  failed: 1
+  succeeded: 32
+  skipped: 0
+  duration: 3m 18s 809ms
+### playwright
+[1A[2K  14 passed (3.0m)
+### sec-p
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 2m 24s 810ms
+### DONE

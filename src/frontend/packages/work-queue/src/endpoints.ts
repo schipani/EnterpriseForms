@@ -22,6 +22,7 @@ export const ENDPOINTS = {
   "forms.access": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/access" },
   "forms.protection": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection" },
   "forms.strengthenProtection": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection" },
+  "forms.retryProtectionMigration": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/retry" },
   "organization.securityPolicy": { method: "GET", path: "/api/v1/organization/security-policy" },
   "organization.updateSecurityPolicy": { method: "PUT", path: "/api/v1/organization/security-policy" },
   "forms.updateAccess": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/access" },

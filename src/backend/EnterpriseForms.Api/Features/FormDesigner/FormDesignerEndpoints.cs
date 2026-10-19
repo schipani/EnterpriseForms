@@ -54,7 +54,12 @@ public static class FormDesignerEndpoints
         group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, StrengthenFieldProtectionRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.StrengthenProtectionAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
             .WithName("StrengthenFieldProtection")
-            .WithSummary("Audited migration: raise classification and/or switch a field to application encryption. Downgrades are refused.");
+            .WithSummary("Audited migration: raise classification and/or switch a field to application encryption (starts the authority-governed background re-encryption of existing plaintext values). Downgrades are refused.");
+
+        group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection/retry", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, RetryFieldProtectionMigrationRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.RetryProtectionMigrationAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("RetryFieldProtectionMigration")
+            .WithSummary("Re-queues the failed records of a field's encryption migration (design permission; audited).");
 
         group.MapGet("/{formDefinitionId:guid}/access", static async Task<Ok<FormAccessResponse>> (Guid formDefinitionId, HttpContext http, FormAccessHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.GetAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, cancellationToken).ConfigureAwait(false)))

@@ -247,7 +247,7 @@
         "tags": [
           "Content"
         ],
-        "summary": "Validates the exact candidate snapshot against the accepted head and the actor's edit scope, then signs it. Not a generic signing endpoint.",
+        "summary": "Validates the exact candidate snapshot against the accepted head and the actor's edit scope (or, without a user, the reprotection rules of an effective PublishFormSecurityRevision command), then signs it. Not a generic signing endpoint.",
         "operationId": "PrepareContentChange",
         "requestBody": {
           "content": {
@@ -335,6 +335,14 @@
             "name": "formRecordId",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reprotectionCommandId",
+            "in": "query",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1129,6 +1137,22 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CandidateContentItem"
+            }
+          },
+          "reprotection_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "current_items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
             }
           }
         }

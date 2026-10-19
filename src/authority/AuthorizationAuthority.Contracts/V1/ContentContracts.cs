@@ -30,7 +30,19 @@ public sealed record PrepareContentChangeRequest(
     long ExpectedAuthorizationRevision,
     long ExpectedContentRevision,
     string ExpectedManifestRootBase64,
-    IReadOnlyList<CandidateContentItem> CandidateItems);
+    IReadOnlyList<CandidateContentItem> CandidateItems,
+    Guid? ReprotectionCommandId = null,
+    IReadOnlyList<StagedContentItem>? CurrentItems = null);
+
+/// <summary>
+/// Reprotection operation (workload-only, no delegated user): <c>reprotection_command_id</c> names an effective
+/// PublishFormSecurityRevision command and <c>current_items</c> the complete accepted snapshot the candidate was built
+/// from. The authority verifies the current snapshot against the head and accepts the candidate only if it replaces
+/// plaintext rows of that command's field with encrypted rows of the same item identity and changes nothing else.
+/// </summary>
+public static class ReprotectionRequestNotes
+{
+}
 
 public sealed record SignedCandidateItem(ManifestItemKind ItemKind, Guid ItemId, string RowSignatureBase64, string CanonicalPayloadDigestBase64, string MutationKind);
 

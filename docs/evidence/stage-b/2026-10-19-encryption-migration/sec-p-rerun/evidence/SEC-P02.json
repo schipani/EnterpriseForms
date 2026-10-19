@@ -1,0 +1,88 @@
+{
+  "test_id": "SEC-P02",
+  "scenario": "Direct SQL sharing grant: inserted local share row does not grant discover/read; no new authority edge",
+  "outcome": "PASS",
+  "commit_sha": "1c05ee2405bf1687b6d1826a7c0f8ee96c8425f3",
+  "image_fingerprint": "sha256:13ebe96c74ef00398852ef49326416fe772464034d45d795f14e038929c081bc (api=sha256:c2ac0ebea6cfd00f4f6487db7097df8ffcfe0603d67d334caed93b9316729995;authority=sha256:ff71c491976f1cb3b27c032210b31396d6983b19d162d8043db666703c2deb69)",
+  "started_at_utc": "2026-10-19T14:57:12.9586338\u002B00:00",
+  "executed_at_utc": "2026-10-19T14:57:15.0646241\u002B00:00",
+  "authority_revision": 4,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-19T14:57:12.9867280\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a154aaa8fe7de2bb724aff99b25985-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:13.5779027\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "9a56bf31-8bfb-82bd-af69-60fdb0a62153",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:14.0029108\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "3ca2959f-ad22-8ac8-8de5-c07eba6c9ee1",
+        "contentRevision": "1",
+        "committedOperationId": "dfa85a0a-a218-86a3-96d9-c823d904ccc2",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:14.7260597\u002B00:00",
+      "step": "hostile INSERT record_shares \u002B record_share_fields",
+      "detail": {
+        "field_rows": "3"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:14.7384039\u002B00:00",
+      "step": "attacker read with forged share",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-19T14:57:14.7501277\u002B00:00",
+      "step": "attacker (forged Manager) tries to delegate",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-19T14:57:14.9935522\u002B00:00",
+      "step": "owner shares given_name with reader",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "recordShareId": "92f4ac30-c579-85d1-ba24-4cbc98c11e9d",
+        "shareStatus": "Active"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:15.0447199\u002B00:00",
+      "step": "reader read",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "isCompleteProjection": "false"
+      }
+    }
+  ]
+}

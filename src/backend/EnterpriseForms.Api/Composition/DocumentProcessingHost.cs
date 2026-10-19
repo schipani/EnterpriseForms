@@ -61,6 +61,41 @@ public sealed partial class DocumentProcessingHostedService(DocumentProcessingSe
     private static partial void LogLoopError(ILogger logger, string exceptionType, string detail);
 }
 
+/// <summary>In-process host of the field protection migration loop (Development convenience, same switch as document processing; the Worker image is the production host).</summary>
+public sealed partial class FieldProtectionMigrationHostedService(EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService migration, IOptions<DocumentProcessingHostOptions> options, ILogger<FieldProtectionMigrationHostedService> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (HostExecutionMode.IsOpenApiDocumentGeneration || !options.Value.HostInProcess)
+        {
+            return;
+        }
+
+        var worker = "api-migration:" + Environment.MachineName + ":" + Environment.ProcessId;
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var didWork = false;
+            try
+            {
+                didWork = await migration.ProcessOnceAsync(worker, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex) when (ex is Npgsql.NpgsqlException or Microsoft.EntityFrameworkCore.DbUpdateException or IOException or InvalidOperationException)
+            {
+                LogLoopError(logger, ex.GetType().Name, ex.Message);
+            }
+
+            await Task.Delay(didWork ? 50 : Math.Max(250, options.Value.PollMilliseconds), stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Field protection migration loop transient failure {ExceptionType}: {Detail}")]
+    private static partial void LogLoopError(ILogger logger, string exceptionType, string detail);
+}
+
 /// <summary>Fail-closed environment policy for document providers: the local KEK provider is Development/Testing only.</summary>
 public sealed class DocumentProviderStartupGuard(IConfiguration configuration, IHostEnvironment environment) : IHostedService
 {

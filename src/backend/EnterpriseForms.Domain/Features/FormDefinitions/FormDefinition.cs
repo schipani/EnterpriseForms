@@ -104,6 +104,9 @@ public sealed class FieldDefinition
 
     public Guid? ProtectionChangedByUserId { get; set; }
 
+    /// <summary>The authority's effective PublishFormSecurityRevision command for the current encryption requirement (null for fields never strengthened to encryption through the migration path).</summary>
+    public Guid? ProtectionAuthorityCommandId { get; set; }
+
     /// <summary>Optimistic-concurrency revision of the editable catalog metadata (display name, description). Key, type and id never change.</summary>
     public long FieldDefinitionRevision { get; set; } = 1;
 

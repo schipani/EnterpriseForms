@@ -40,6 +40,9 @@ public sealed class ContentChangeOperation
     public DateTimeOffset OperationExpiresOn { get; set; }
 
     public DateTimeOffset? OperationCommittedOn { get; set; }
+
+    /// <summary>Set for workload reprotection operations: the effective PublishFormSecurityRevision command that authorizes them. Null for user operations.</summary>
+    public Guid? ReprotectionCommandId { get; set; }
 }
 
 public static class ContentOperationStates
@@ -78,4 +81,7 @@ public static class ContentMutationKinds
     public const string Update = "Update";
     public const string Remove = "Remove";
     public const string Unchanged = "Unchanged";
+
+    /// <summary>A plaintext row of a field replaced by an encrypted row of the same item (reprotection operations only).</summary>
+    public const string Reprotect = "Reprotect";
 }

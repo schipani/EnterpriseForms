@@ -1,7 +1,7 @@
-import type { FieldDefinitionResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
+import type { FieldDefinitionResponse, FieldProtectionMigrationResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
 import { Badge, Button, Checkbox, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
 
@@ -70,10 +70,68 @@ export function FieldSecuritySection({ dataType, classification, encryptChoice, 
   );
 }
 
+const MIGRATION_LABELS: Record<string, { tone: "info" | "warning" | "danger" | "success"; label: string }> = {
+  Queued: { tone: "info", label: "Encryption migration queued" },
+  Running: { tone: "info", label: "Encryption migration running" },
+  Blocked: { tone: "warning", label: "Encryption migration waiting for a dependency" },
+  Failed: { tone: "danger", label: "Encryption migration failed" },
+  Completed: { tone: "success", label: "Encryption migration completed" },
+};
+
+/** Progress of the background re-encryption of existing values (B-28). Shown until the server reports the field as fully encrypted and verified. */
+function MigrationProgress({ migration, legacyRecords, canEdit, onRetry, retrying, retryError }: { migration: FieldProtectionMigrationResponse; legacyRecords: number; canEdit: boolean; onRetry: () => void; retrying: boolean; retryError: unknown }) {
+  const label = MIGRATION_LABELS[migration.migrationState] ?? { tone: "warning" as const, label: migration.migrationState };
+  const totalRecords = Number(migration.totalRecordCount);
+  const completedRecords = Number(migration.completedRecordCount);
+  const percent = Math.round((completedRecords / Math.max(totalRecords, 1)) * 100);
+  return (
+    <div className="flex flex-col gap-2 rounded border border-line bg-page p-3" role="group" aria-label="Encryption migration progress">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone={label.tone}>{label.label}</Badge>
+        <span className="text-xs text-muted">
+          {migration.completedRecordCount} of {migration.totalRecordCount} record(s) re-encrypted · {migration.pendingRecordCount} pending · {migration.failedRecordCount} failed
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={totalRecords} aria-valuenow={completedRecords} aria-label="Records re-encrypted">
+        <div className="h-2 bg-primary" style={{ width: `${percent}%` }} />
+      </div>
+      <p className="text-xs text-muted">
+        Existing values are re-sealed one record at a time through the Authorization Authority; every step is audited. Until this finishes and is verified, {legacyRecords} record(s) still hold a plaintext copy and the field is not reported as fully encrypted.
+        {migration.lastErrorCode ? ` Last error: ${migration.lastErrorCode}.` : ""}
+      </p>
+      {migration.migrationState === "Failed" || migration.migrationState === "Blocked" ? (
+        <div className="flex flex-col gap-2">
+          <StatusMessage tone="warning" title={migration.migrationState === "Failed" ? "Some records could not be re-encrypted" : "The migration is waiting for a dependency"}>
+            {migration.migrationState === "Failed" ? "Records that failed keep their plaintext copy and are listed in the audit trail. Investigate them, then retry; nothing is re-signed silently." : "The key provider, signer or Authorization Authority is unavailable. The migration resumes automatically; nothing was lost."}
+          </StatusMessage>
+          {canEdit ? (
+            <div>
+              <Button size="sm" variant="secondary" busy={retrying} onClick={onRetry}>
+                Retry failed records
+              </Button>
+            </div>
+          ) : null}
+          {retryError ? <ErrorPanel error={retryError} /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Read-only protection state of an existing field plus the audited "Strengthen protection" step (Edit field dialog). */
 export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onStrengthen, pending, error }: { formDefinitionId: string; field: FieldDefinitionResponse; canEdit: boolean; onStrengthen: (request: StrengthenFieldProtectionRequest) => void; pending: boolean; error: unknown }) {
   const api = useApi();
-  const status = useQuery({ queryKey: ["forms", formDefinitionId, "protection", field.fieldDefinitionId], queryFn: () => api.forms.protection(formDefinitionId, field.fieldDefinitionId).then((r) => r.result) });
+  const queryClient = useQueryClient();
+  const status = useQuery({
+    queryKey: ["forms", formDefinitionId, "protection", field.fieldDefinitionId],
+    queryFn: () => api.forms.protection(formDefinitionId, field.fieldDefinitionId).then((r) => r.result),
+    // A running migration is polled; the claim "Fully encrypted" only ever comes from the server's verified status.
+    refetchInterval: (query) => (query.state.data?.migration && ["Queued", "Running", "Blocked"].includes(query.state.data.migration.migrationState) ? 2000 : false),
+  });
+  const retry = useMutation({
+    mutationFn: () => api.forms.retryProtectionMigration(formDefinitionId, field.fieldDefinitionId, { retryReason: "Retried from the Edit field dialog after reviewing the failed records" }).then((r) => r.result),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId, "protection", field.fieldDefinitionId] }),
+  });
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState<string>(field.fieldClassification);
   const [encrypt, setEncrypt] = useState(true);
@@ -96,8 +154,10 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         <Badge tone="neutral">{field.fieldClassification}</Badge>
         <span>Application-level encryption</span>
         <Badge tone={encrypted ? "success" : "warning"}>{encrypted ? "Enabled" : "Off — plaintext"}</Badge>
+        {status.data?.fullyEncrypted ? <Badge tone="success">Fully encrypted · verified</Badge> : null}
         {status.data?.migrationState === "EncryptionPendingRewrite" ? <Badge tone="warning">{status.data.legacyPlaintextRecordCount} record(s) still hold a plaintext copy until their next save</Badge> : null}
       </div>
+      {status.data?.migration && !status.data.fullyEncrypted ? <MigrationProgress migration={status.data.migration} legacyRecords={Number(status.data.legacyPlaintextRecordCount)} canEdit={canEdit} onRetry={() => retry.mutate()} retrying={retry.isPending} retryError={retry.error} /> : null}
       <p className="text-xs text-muted">{status.data?.searchImpact ?? (encrypted ? SEARCH_IMPACT_ENCRYPTED : SEARCH_IMPACT_PLAINTEXT)}</p>
       {status.isError ? <ErrorPanel error={status.error} onRetry={() => void status.refetch()} /> : null}
       {encrypted && field.fieldClassification === "Restricted" ? null : canEdit && !open ? (

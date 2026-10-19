@@ -434,7 +434,7 @@
         "tags": [
           "FormDesigner"
         ],
-        "summary": "Audited migration: raise classification and/or switch a field to application encryption. Downgrades are refused.",
+        "summary": "Audited migration: raise classification and/or switch a field to application encryption (starts the authority-governed background re-encryption of existing plaintext values). Downgrades are refused.",
         "operationId": "StrengthenFieldProtection",
         "parameters": [
           {
@@ -461,6 +461,57 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/StrengthenFieldProtectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/retry": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Re-queues the failed records of a field's encryption migration (design permission; audited).",
+        "operationId": "RetryFieldProtectionMigration",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryFieldProtectionMigrationRequest"
               }
             }
           },
@@ -3236,6 +3287,100 @@
           }
         }
       },
+      "FieldProtectionMigrationResponse": {
+        "required": [
+          "fieldProtectionMigrationId",
+          "migrationState",
+          "totalRecordCount",
+          "totalValueCount",
+          "completedRecordCount",
+          "failedRecordCount",
+          "pendingRecordCount",
+          "lastErrorCode",
+          "startedOn",
+          "completedOn",
+          "verifiedOn",
+          "authorityCommandId"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldProtectionMigrationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "migrationState": {
+            "type": "string"
+          },
+          "totalRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalValueCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pendingRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastErrorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "verifiedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "authorityCommandId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "FieldProtectionResponse": {
         "required": [
           "fieldDefinitionId",
@@ -3299,6 +3444,20 @@
           },
           "organizationPermitsPlaintext": {
             "type": "boolean"
+          },
+          "fullyEncrypted": {
+            "type": "boolean",
+            "default": false
+          },
+          "migration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FieldProtectionMigrationResponse"
+              }
+            ]
           }
         }
       },
@@ -4235,6 +4394,17 @@
           "fromFormVersionId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "RetryFieldProtectionMigrationRequest": {
+        "required": [
+          "retryReason"
+        ],
+        "type": "object",
+        "properties": {
+          "retryReason": {
+            "type": "string"
           }
         }
       },

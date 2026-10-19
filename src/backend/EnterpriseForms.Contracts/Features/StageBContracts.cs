@@ -71,7 +71,17 @@ public sealed record AddFieldDefinitionRequest(string FieldKey, string FieldDisp
 public sealed record StrengthenFieldProtectionRequest(string? TargetClassification, string? TargetProtectionMode, string ChangeReason, long ExpectedProtectionRevision);
 
 /// <summary>Protection state of a field. <c>MigrationState</c>: Plaintext, Encrypted, or EncryptionPendingRewrite (records still carrying a legacy plaintext copy: <c>LegacyPlaintextRecordCount</c>, a business-table estimate).</summary>
-public sealed record FieldProtectionResponse(Guid FieldDefinitionId, string FieldKey, string FieldClassification, string FieldProtectionMode, long ProtectionPolicyRevision, DateTimeOffset? ProtectionChangedOn, string MigrationState, int LegacyPlaintextRecordCount, string SearchImpact, string OrganizationMinimumClassification, bool OrganizationPermitsPlaintext);
+public sealed record FieldProtectionResponse(Guid FieldDefinitionId, string FieldKey, string FieldClassification, string FieldProtectionMode, long ProtectionPolicyRevision, DateTimeOffset? ProtectionChangedOn, string MigrationState, int LegacyPlaintextRecordCount, string SearchImpact, string OrganizationMinimumClassification, bool OrganizationPermitsPlaintext,
+    bool FullyEncrypted = false, FieldProtectionMigrationResponse? Migration = null);
+
+/// <summary>
+/// Progress of the background plaintext→encrypted migration of a field (B-28). <c>MigrationState</c>: Queued, Running,
+/// Blocked (dependency unavailable, retried), Failed (bounded attempts exhausted for some records; retry available),
+/// Completed (every record re-protected through the authority and the post-check found no plaintext copy).
+/// </summary>
+public sealed record FieldProtectionMigrationResponse(Guid FieldProtectionMigrationId, string MigrationState, int TotalRecordCount, int TotalValueCount, int CompletedRecordCount, int FailedRecordCount, int PendingRecordCount, string? LastErrorCode, DateTimeOffset StartedOn, DateTimeOffset? CompletedOn, DateTimeOffset? VerifiedOn, Guid AuthorityCommandId);
+
+public sealed record RetryFieldProtectionMigrationRequest(string RetryReason);
 
 public sealed record OrganizationSecurityPolicyResponse(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, DateTimeOffset? PolicyReviewedOn, Guid? PolicyReviewedByUserId, long SecurityPolicyRevision, bool IsUnreviewedDefault);
 

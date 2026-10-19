@@ -29,6 +29,8 @@ public interface IAuthorityScope : IAsyncDisposable
 
     Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken);
 
+    Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken cancellationToken);
+
     void AddIdentityBinding(IdentityBinding binding);
 
     Task<AuthorityResource?> FindResourceAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, CancellationToken cancellationToken);

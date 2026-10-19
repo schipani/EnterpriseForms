@@ -8,6 +8,7 @@ using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using EnterpriseForms.Integrity;
 using EnterpriseForms.Integrity.Canonical;
 using EnterpriseForms.Integrity.Merkle;
@@ -34,7 +35,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         [ManifestItemKind.AttachmentLifecycle] = ["file_attachment_lifecycle_events"],
     };
 
-    public async Task<PreparedContentOperation> PrepareAsync(VerifiedActor actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
+    public async Task<PreparedContentOperation> PrepareAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 128)
@@ -47,7 +48,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
-        var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
+        var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, request.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
         var existing = await scope.FindOperationByIdempotencyKeyAsync(state.OrganizationId, idempotencyKey, cancellationToken).ConfigureAwait(false);
@@ -71,6 +72,11 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         if (resource is null || resource.ResourceLifecycleState != ResourceLifecycleStates.Active)
         {
             throw AuthorityException.NotRegistered("record is not registered");
+        }
+
+        if (reprotection is not null && resource.ParentResourceEntityId != reprotection.FormDefinitionId)
+        {
+            throw AuthorityException.Forbidden("the record does not belong to the form of the protection requirement");
         }
 
         var head = await scope.FindContentHeadAsync(state.OrganizationId, request.FormRecordId, lockForUpdate: true, cancellationToken).ConfigureAwait(false)
@@ -102,8 +108,16 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
 
         var parsed = ParseCandidate(request, state.OrganizationId, key.CurrentSigningKeyVersion);
-        var mutations = ClassifyMutations(parsed, currentLeaves);
-        AuthorizeMutations(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false), bound, request.FormRecordId, mutations);
+        Dictionary<string, string> mutations;
+        if (reprotection is null)
+        {
+            mutations = ClassifyMutations(parsed, currentLeaves);
+            AuthorizeMutations(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false), bound, request.FormRecordId, mutations);
+        }
+        else
+        {
+            mutations = await AuthorizeReprotectionAsync(request, parsed, currentLeaves, head, key, reprotection, cancellationToken).ConfigureAwait(false);
+        }
 
         var keyReference = new IntegrityKeyReference(state.OrganizationId, key.KeyPurposeName, key.ProviderKeyName, key.CurrentSigningKeyVersion);
         var signed = new List<(ParsedCandidateItem Item, byte[] Signature, string Mutation)>(parsed.Count);
@@ -142,6 +156,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             CorrelationIdentifier = correlationId,
             OperationCreatedOn = clock.GetUtcNow(),
             OperationExpiresOn = clock.GetUtcNow().Add(OperationLifetime),
+            ReprotectionCommandId = reprotection?.CommandId,
         };
         scope.AddOperation(operation);
 
@@ -169,13 +184,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return ToPrepared(operation, candidateLeaves, correlationId);
     }
 
-    public async Task<ContentRevision> CommitAsync(VerifiedActor actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken)
+    public async Task<ContentRevision> CommitAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
-        var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
         var operation = await scope.FindOperationAsync(operationId, cancellationToken).ConfigureAwait(false);
@@ -184,6 +198,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
         }
 
+        // A reprotection operation is committed by the workload under its command; a user operation by the same user.
+        var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, operation.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
         if (operation.ActorIdentityBindingId != bound.Binding.IdentityBindingId)
         {
             throw AuthorityException.Forbidden("operation belongs to another actor");
@@ -234,16 +250,23 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             mutations[Convert.ToHexStringLower(removed.ManifestItemKey)] = ContentMutationKinds.Remove;
         }
 
-        try
+        if (reprotection is null)
         {
-            AuthorizeMutations(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false), bound, request.FormRecordId, mutations);
+            try
+            {
+                AuthorizeMutations(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false), bound, request.FormRecordId, mutations);
+            }
+            catch (AuthorityException)
+            {
+                operation.OperationStateName = ContentOperationStates.Aborted;
+                operation.OperationQuarantineReasonCode = "PERMISSION_REVOKED_BEFORE_COMMIT";
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                throw;
+            }
         }
-        catch (AuthorityException)
+        else if (mutations.Values.Any(m => m is not (ContentMutationKinds.Unchanged or ContentMutationKinds.Reprotect)))
         {
-            operation.OperationStateName = ContentOperationStates.Aborted;
-            operation.OperationQuarantineReasonCode = "PERMISSION_REVOKED_BEFORE_COMMIT";
-            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-            throw;
+            throw AuthorityException.Forbidden("a reprotection operation may only carry reprotect mutations");
         }
 
         // Prove the staged bytes are exactly the approved candidate: same key set, same digests, same signatures, signatures verify, same root.
@@ -319,12 +342,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return await ToRevisionAsync(scope, state, head, correlationId, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<ContentRevision> GetHeadAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, Guid correlationId, CancellationToken cancellationToken)
+    public async Task<ContentRevision> GetHeadAsync(VerifiedActor? actor, Guid organizationId, Guid formRecordId, Guid? reprotectionCommandId, Guid correlationId, CancellationToken cancellationToken)
     {
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
-        var bound = await ActorResolver.BindAsync(scope, organizationId, actor, cancellationToken).ConfigureAwait(false);
+        var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, reprotectionCommandId, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
         var head = await scope.FindContentHeadAsync(organizationId, formRecordId, false, cancellationToken).ConfigureAwait(false)
                    ?? throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
@@ -332,6 +355,17 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         if (resource is null || resource.ResourceLifecycleState != ResourceLifecycleStates.Active)
         {
             throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+        }
+
+        if (reprotection is not null)
+        {
+            // Head metadata (revision, root, key version) for a record of the command's form; no content, no permission beyond the command.
+            if (resource.ParentResourceEntityId != reprotection.FormDefinitionId)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+            }
+
+            return await ToRevisionAsync(scope, state, head, correlationId, cancellationToken).ConfigureAwait(false);
         }
 
         var discover = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
@@ -673,6 +707,90 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             {
                 throw AuthorityException.Forbidden("mutation exceeds the actor's edit scope");
             }
+        }
+    }
+
+    private sealed record ReprotectionContext(Guid CommandId, Guid FormDefinitionId, Guid FieldDefinitionId);
+
+    /// <summary>
+    /// A user operation binds the delegated user. A reprotection operation has no user: it is authorized by an effective
+    /// PublishFormSecurityRevision command of the organization, and is recorded under the identity of the designer who
+    /// issued that command. Neither path accepts the other's shape (no user + no command ⇒ 401; user + command ⇒ 422).
+    /// </summary>
+    private static async Task<(BoundActor Bound, ReprotectionContext? Reprotection)> ResolveActorAsync(IAuthorityScope scope, OrganizationAuthorizationState state, VerifiedActor? actor, Guid? reprotectionCommandId, CancellationToken cancellationToken)
+    {
+        if (reprotectionCommandId is null)
+        {
+            if (actor is null)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.Unauthorized, 401, false, "delegated user assertion missing");
+            }
+
+            return (await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false), null);
+        }
+
+        if (actor is not null)
+        {
+            throw AuthorityException.Invalid("a reprotection operation is a workload operation and carries no delegated user");
+        }
+
+        var command = await scope.FindCommandAsync(reprotectionCommandId.Value, cancellationToken).ConfigureAwait(false);
+        if (command is null || command.OrganizationId != state.OrganizationId || command.CommandKindName != SecurityCommandKinds.PublishFormSecurityRevision || command.CommandStateName != SecurityCommandStates.Effective)
+        {
+            throw AuthorityException.Forbidden("reprotection requires an effective PublishFormSecurityRevision command of this organization");
+        }
+
+        PublishFormSecurityRevisionPayload payload;
+        using (var document = System.Text.Json.JsonDocument.Parse(command.CommandPayloadJson))
+        {
+            payload = CanonicalJson.Deserialize<PublishFormSecurityRevisionPayload>(document.RootElement);
+        }
+
+        var binding = await scope.FindIdentityBindingByIdAsync(command.ActorIdentityBindingId, cancellationToken).ConfigureAwait(false)
+                      ?? throw AuthorityException.Forbidden("the command's actor binding no longer exists");
+        var recorded = new VerifiedActor(binding.IdentityIssuerUri, binding.IdentitySubjectIdentifier, "reprotection-worker");
+        return (new BoundActor(recorded, binding), new ReprotectionContext(command.SecurityCommandId, payload.FormDefinitionId, payload.FieldDefinitionId));
+    }
+
+    /// <summary>
+    /// Reprotection: the current snapshot the worker built on must be exactly the accepted head (complete leaf set, every
+    /// signature, root — the same proof as VerifyRecordProjection); then ReprotectionRules decides, from the bytes, that
+    /// the candidate replaces plaintext rows of the command's field with encrypted rows of the same items and nothing else.
+    /// </summary>
+    private async Task<Dictionary<string, string>> AuthorizeReprotectionAsync(PrepareContentChangeRequest request, IReadOnlyList<ParsedCandidateItem> parsed, IReadOnlyList<RecordManifestLeaf> currentLeaves, RecordContentHead head, IntegrityKeyRegistration key, ReprotectionContext reprotection, CancellationToken cancellationToken)
+    {
+        if (request.CurrentItems is null || request.CurrentItems.Count == 0 || head.CommittedOperationId is null)
+        {
+            throw AuthorityException.Invalid("REPROTECT_CURRENT_REQUIRED: current_items (the complete accepted snapshot) are required");
+        }
+
+        if (head.SignatureKeyVersion < key.MinimumVerificationKeyVersion)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.KeyUnavailable, 503, false, "accepted key version is no longer verifiable");
+        }
+
+        var headKey = new IntegrityKeyReference(head.OrganizationId, key.KeyPurposeName, key.ProviderKeyName, head.SignatureKeyVersion);
+        var mismatch = await VerifyStagedAgainstLeavesAsync(request.CurrentItems, currentLeaves.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList(), head.OrganizationId, headKey, head.CommittedContentRevision, head.CommittedOperationId.Value, head.CommittedManifestRoot, cancellationToken).ConfigureAwait(false);
+        if (mismatch is not null)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.CandidateMismatch, 409, false, "REPROTECT_CURRENT_MISMATCH: " + mismatch);
+        }
+
+        var current = new List<ReprotectionRules.SnapshotItem>(request.CurrentItems.Count);
+        foreach (var item in request.CurrentItems)
+        {
+            var bytes = Convert.FromBase64String(item.CanonicalBytesBase64);
+            current.Add(new ReprotectionRules.SnapshotItem(item.ItemKind, item.ItemId, MerkleManifestV1.ItemKey(ToMerkleKind(item.ItemKind), item.ItemId), RowCanonicalDecoder.Decode(bytes), SHA256.HashData(bytes)));
+        }
+
+        var candidate = parsed.Select(p => new ReprotectionRules.SnapshotItem(p.Kind, p.ItemId, p.Key, RowCanonicalDecoder.Decode(p.CanonicalBytes), p.Digest)).ToList();
+        try
+        {
+            return ReprotectionRules.Validate(current, candidate, reprotection.FieldDefinitionId);
+        }
+        catch (IntegrityFormatException ex)
+        {
+            throw AuthorityException.Invalid("REPROTECT_ENCODING_INVALID: " + ex.Code);
         }
     }
 

@@ -169,6 +169,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<Guid?>("ReprotectionCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reprotection_command_id");
+
                     b.HasKey("ContentChangeOperationId");
 
                     b.HasIndex("ActorIdentityBindingId");

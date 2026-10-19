@@ -74,6 +74,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<UploadSessionHandlers>();
         services.AddSingleton<DocumentHandlers>();
         services.AddSingleton<DocumentProcessingService>();
+        services.AddSingleton<EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService>();
 
         AddDocumentProviders(services, configuration);
         return services;

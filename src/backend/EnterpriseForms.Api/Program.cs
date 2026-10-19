@@ -56,6 +56,7 @@ public sealed class Program
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));
         builder.Services.AddHostedService<DocumentProviderStartupGuard>();
         builder.Services.AddHostedService<DocumentProcessingHostedService>();
+        builder.Services.AddHostedService<FieldProtectionMigrationHostedService>();
         builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 5L * 1024 * 1024); // one 4 MiB chunk (+ framing); never whole files
 
         var app = builder.Build();

@@ -266,10 +266,9 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public void AddSecurityPolicy(OrganizationSecurityPolicy policy) => context.OrganizationSecurityPolicies.Add(policy);
 
-        /// <summary>Records whose latest committed copy of this field is still a typed plaintext row (projection estimate for the migration status; the authority head decides what is current).</summary>
+        /// <summary>Records whose latest staged copy of this field is still a typed plaintext row (projection estimate for the migration status: the local store holds every staged revision, highest revision last; the authority head decides what is current).</summary>
         public async Task<int> CountLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken)
         {
-            var currentOperations = context.FormRecordRevisions.Where(r => r.CandidateState == "Committed").GroupBy(r => r.FormRecordId).Select(g => g.Max(r => r.ContentChangeOperationId));
             var plaintext = context.FieldStringValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId })
                 .Concat(context.FieldIntegerValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
                 .Concat(context.FieldDecimalValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
@@ -283,6 +282,88 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
             return rows.Count(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId);
         }
+
+        public async Task<List<LegacyPlaintextRecord>> GetLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken)
+        {
+            var plaintext = context.FieldStringValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId })
+                .Concat(context.FieldIntegerValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldDecimalValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldDateValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldDateTimeValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldGuidValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldBooleanValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                .Concat(context.FieldOptionValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }));
+            var rows = await plaintext.ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (rows.Count == 0)
+            {
+                return [];
+            }
+
+            var recordIds = rows.Select(r => r.FormRecordId).Distinct().ToList();
+            var latest = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
+            var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
+            return rows.Where(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId)
+                .GroupBy(r => r.FormRecordId)
+                .Select(g => new LegacyPlaintextRecord(g.Key, g.Count()))
+                .OrderBy(r => r.FormRecordId)
+                .ToList();
+        }
+
+        public async Task<int> CountPlaintextRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken)
+        {
+            var count = 0;
+            count += await context.FieldStringValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldIntegerValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldDecimalValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldDateValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldDateTimeValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldGuidValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldBooleanValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldOptionValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
+            return count;
+        }
+
+        public void AddProtectionMigration(FieldProtectionMigration migration) => context.FieldProtectionMigrations.Add(migration);
+
+        public void AddProtectionMigrationItem(FieldProtectionMigrationItem item) => context.FieldProtectionMigrationItems.Add(item);
+
+        public Task<FieldProtectionMigration?> FindProtectionMigrationAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrations.FirstOrDefaultAsync(m => m.FieldProtectionMigrationId == fieldProtectionMigrationId, cancellationToken);
+
+        public Task<FieldProtectionMigration?> FindLatestProtectionMigrationAsync(Guid fieldDefinitionId, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrations.Where(m => m.FieldDefinitionId == fieldDefinitionId).OrderByDescending(m => m.ProtectionPolicyRevision).FirstOrDefaultAsync(cancellationToken);
+
+        public async Task<FieldProtectionMigration?> LeaseNextProtectionMigrationAsync(string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken)
+        {
+            var now = clock.GetUtcNow();
+            var migration = await context.FieldProtectionMigrations
+                .FromSqlInterpolated($"SELECT * FROM field_protection_migrations WHERE migration_state IN ('Queued','Running','Blocked') AND next_attempt_on <= {now} AND (lease_expires_on IS NULL OR lease_expires_on < {now}) ORDER BY next_attempt_on LIMIT 1 FOR UPDATE SKIP LOCKED")
+                .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            if (migration is null)
+            {
+                return null;
+            }
+
+            migration.LeaseOwnerName = leaseOwner;
+            migration.LeaseExpiresOn = now.Add(leaseDuration);
+            migration.MigrationModifiedOn = now;
+            return migration;
+        }
+
+        public Task<List<FieldProtectionMigrationItem>> GetPendingProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, int limit, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrationItems.AsNoTracking().Where(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId && i.ItemState == FieldProtectionMigrationItemStates.Pending).OrderBy(i => i.LastAttemptOn ?? DateTimeOffset.MinValue).ThenBy(i => i.FormRecordId).Take(limit).ToListAsync(cancellationToken);
+
+        public Task<FieldProtectionMigrationItem?> FindProtectionMigrationItemAsync(Guid fieldProtectionMigrationItemId, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrationItems.FirstOrDefaultAsync(i => i.FieldProtectionMigrationItemId == fieldProtectionMigrationItemId, cancellationToken);
+
+        public async Task<HashSet<Guid>> GetProtectionMigrationItemRecordIdsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
+            (await context.FieldProtectionMigrationItems.AsNoTracking().Where(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId).Select(i => i.FormRecordId).ToListAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
+
+        public Task<List<FieldProtectionMigrationItem>> GetFailedProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrationItems.Where(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId && i.ItemState == FieldProtectionMigrationItemStates.Failed).ToListAsync(cancellationToken);
+
+        public Task<int> CountPendingProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrationItems.CountAsync(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId && i.ItemState == FieldProtectionMigrationItemStates.Pending, cancellationToken);
 
         public Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken) =>
             context.UserUiPreferences.FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);

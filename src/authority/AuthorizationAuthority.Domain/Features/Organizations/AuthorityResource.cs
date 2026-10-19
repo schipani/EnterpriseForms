@@ -41,4 +41,7 @@ public static class ResourceTypeNames
     public const string DocumentItem = "document_item";
     public const string User = "user";
     public const string ProjectionStep = "projection_step";
+
+    /// <summary>A field that must be application-encrypted (entity id = field definition id, parent = form definition id).</summary>
+    public const string FieldProtectionRequirement = "field_protection_requirement";
 }

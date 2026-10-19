@@ -1,0 +1,52 @@
+### stop security-test stack
+### start security-test stack
+ Container enterpriseforms-sectest-business-db-1 Healthy 
+ Container enterpriseforms-sectest-vault-transit-init-1 Exited 
+ Container enterpriseforms-sectest-clamav-1 Healthy 
+ Container enterpriseforms-sectest-business-migrate-1 Exited 
+ Container enterpriseforms-sectest-spicedb-db-1 Healthy 
+ Container enterpriseforms-sectest-vault-1 Healthy 
+ Container enterpriseforms-sectest-api-1 Healthy 
+container enterpriseforms-sectest-dev-seed-1 exited (0)
+### build tests
+Build succeeded.
+Build succeeded.
+### stage-b integration
+failed EnterpriseForms.StageBTests.Tests.EncryptionTests.StrengtheningAFieldIsAnAuditedMigrationThatRewritesPlaintextOnTheNextSaveAndNeverDowngrades (5s 649ms)
+  Assert.Equal() Failure: Strings differ
+  Expected: "EncryptionPendingRewrite"
+  Actual:   "EncryptionMigrationIncomplete"
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.StrengtheningCountsPlaintextThenTheWorkerReprotectsEveryRecordThroughTheAuthorityAndOnlyThenClaimsFullEncryption (3s 455ms)
+  Assert.Equal() Failure: Strings differ
+  Expected: "6"
+  Actual:   "0"
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AuthorityOutageBlocksAndResumesAndHostileRowTamperingFailsTheRecordWithoutClaimingEncryption (13s 872ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 5
+  Actual:   0
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.TheAuthorityRefusesReprotectionWithoutAnEffectiveCommandAndRefusesAnyOtherChangeUnderOne (3m 03s 337ms)
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.ConcurrentUserEditsAndAWorkerRestartNeitherLoseDataNorBlockCompletion (5m 12s 430ms)
+  total: 33
+  failed: 5
+  succeeded: 28
+  skipped: 0
+  duration: 10m 50s 392ms
+### playwright
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+    Timeout: 120000ms
+    Error: element(s) not found
+      123 |     await expect(reopened.getByText("Enabled", { exact: true })).toBeVisible();
+    > 125 |     await expect(reopened.getByText("Fully encrypted · verified")).toBeVisible({ timeout: 120_000 });
+      126 |     await expect(reopened.getByRole("group", { name: "Encryption migration progress" })).toHaveCount(0);
+      128 |     await expect(reopened.getByRole("checkbox", { name: /Switch to application-level encryption/ })).toHaveCount(0);
+    test-results\encryption-Field-encryptio-e04f8-ypted-the-change-is-one-way-chromium-desktop\test-failed-1.png
+    Error Context: test-results\encryption-Field-encryptio-e04f8-ypted-the-change-is-one-way-chromium-desktop\error-context.md
+[1A[2K  1 failed
+  12 passed (5.2m)
+### sec-p
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 2m 24s 574ms
+### DONE

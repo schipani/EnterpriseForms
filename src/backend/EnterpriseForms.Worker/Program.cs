@@ -19,6 +19,7 @@ public sealed class Program
         builder.Services.AddHostedService<StartupConfigurationGuard>();
         builder.Services.AddBusinessInfrastructure(builder.Configuration);
         builder.Services.AddHostedService<DocumentProcessingWorker>();
+        builder.Services.AddHostedService<EnterpriseForms.Worker.Features.FormDesigner.FieldProtectionMigrationWorker>();
         builder.Build().Run();
     }
 }

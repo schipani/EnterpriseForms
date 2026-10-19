@@ -50,6 +50,7 @@ public static class CommandPlanner
             SecurityCommandKind.CreateShare => await CreateShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RevokeShare => await RevokeShareAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UnlinkChildRecord => await UnlinkChildRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.PublishFormSecurityRevision => await PublishFormSecurityRevisionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             _ => throw new AuthorityException(AuthorityErrorCodes.CommandKindNotImplemented, 422, false, $"command kind {request.CommandKind} is not implemented in Stage A"),
         };
     }
@@ -224,6 +225,44 @@ public static class CommandPlanner
             plan.RemoveEdges.Add(edge);
         }
 
+        return plan;
+    }
+
+    /// <summary>
+    /// Records that a field must be application-encrypted (the designer's audited strengthening, B-26). Actor: a designer
+    /// of the form or an organization administrator. The plan registers a field_protection_requirement resource and no
+    /// relationship: it grants no access and reads nothing. It is the only basis on which the authority later accepts
+    /// workload reprotection operations for the field (ReprotectionRules); it can never be reversed by a command — a
+    /// weakening would need a separately approved protocol (ADR-PB-004 amendment, proposed, not implemented).
+    /// </summary>
+    private static async Task<CommandPlan> PublishFormSecurityRevisionAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, CancellationToken cancellationToken)
+    {
+        var payload = CanonicalJson.Deserialize<PublishFormSecurityRevisionPayload>(request.CommandPayload);
+        RequireResource(request, ResourceKind.FormDefinition, payload.FormDefinitionId);
+        await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.FormDefinition, payload.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (!graph.CanDesignForm(actor.AuthorityUserId, payload.FormDefinitionId) && !IsOrganizationAdministrator(graph, organizationId, actor.AuthorityUserId))
+        {
+            throw AuthorityException.Forbidden("publishing a field protection requirement requires design permission on the form or an organization administrator");
+        }
+
+        if (payload.RequiredProtectionMode != "ApplicationEncrypted")
+        {
+            throw AuthorityException.Invalid("required_protection_mode must be ApplicationEncrypted (weakening is not a command)");
+        }
+
+        if (payload.FieldDefinitionId == Guid.Empty || payload.ProtectionPolicyRevision < 1)
+        {
+            throw AuthorityException.Invalid("field_definition_id and a positive protection_policy_revision are required");
+        }
+
+        var existing = await scope.FindResourceAsync(organizationId, ResourceTypeNames.FieldProtectionRequirement, payload.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            throw AuthorityException.Invalid("the field is already required to be application-encrypted");
+        }
+
+        var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };
+        plan.RegisterResources.Add(NewResource(organizationId, ResourceTypeNames.FieldProtectionRequirement, payload.FieldDefinitionId, payload.FormDefinitionId));
         return plan;
     }
 

@@ -234,8 +234,25 @@ export interface paths {
         /** Classification, storage protection, search impact and migration state of a field. */
         get: operations["GetFieldProtection"];
         put?: never;
-        /** Audited migration: raise classification and/or switch a field to application encryption. Downgrades are refused. */
+        /** Audited migration: raise classification and/or switch a field to application encryption (starts the authority-governed background re-encryption of existing plaintext values). Downgrades are refused. */
         post: operations["StrengthenFieldProtection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-queues the failed records of a field's encryption migration (design permission; audited). */
+        post: operations["RetryFieldProtectionMigration"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1180,6 +1197,30 @@ export interface components {
             optionSortOrder: number | string;
             isActive: boolean;
         };
+        FieldProtectionMigrationResponse: {
+            /** Format: uuid */
+            fieldProtectionMigrationId: string;
+            migrationState: string;
+            /** Format: int32 */
+            totalRecordCount: number | string;
+            /** Format: int32 */
+            totalValueCount: number | string;
+            /** Format: int32 */
+            completedRecordCount: number | string;
+            /** Format: int32 */
+            failedRecordCount: number | string;
+            /** Format: int32 */
+            pendingRecordCount: number | string;
+            lastErrorCode: null | string;
+            /** Format: date-time */
+            startedOn: string;
+            /** Format: date-time */
+            completedOn: null | string;
+            /** Format: date-time */
+            verifiedOn: null | string;
+            /** Format: uuid */
+            authorityCommandId: string;
+        };
         FieldProtectionResponse: {
             /** Format: uuid */
             fieldDefinitionId: string;
@@ -1196,6 +1237,9 @@ export interface components {
             searchImpact: string;
             organizationMinimumClassification: string;
             organizationPermitsPlaintext: boolean;
+            /** @default false */
+            fullyEncrypted: boolean;
+            migration?: null | components["schemas"]["FieldProtectionMigrationResponse"];
         };
         FieldResponse: {
             /** Format: uuid */
@@ -1441,6 +1485,9 @@ export interface components {
         RestoreVersionRequest: {
             /** Format: uuid */
             fromFormVersionId: string;
+        };
+        RetryFieldProtectionMigrationRequest: {
+            retryReason: string;
         };
         SaveDraftRequest: {
             /** Format: int64 */
@@ -1955,6 +2002,33 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["StrengthenFieldProtectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldProtectionResponse"];
+                };
+            };
+        };
+    };
+    RetryFieldProtectionMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetryFieldProtectionMigrationRequest"];
             };
         };
         responses: {

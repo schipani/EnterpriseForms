@@ -314,56 +314,208 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
 
     /// <summary>
     /// Explicit, audited migration step (ADR-PB-004 §Versioning): raise a field's classification and/or switch it from
-    /// plaintext to application encryption. Never the reverse. Future writes are encrypted immediately; existing plaintext
-    /// copies are rewritten as ciphertext when each record is next committed by an authorized user (reads flag them as
-    /// legacy plaintext until then) — no background process holds a user's signing authority.
+    /// plaintext to application encryption. Never the reverse. Future writes are encrypted immediately. Existing plaintext
+    /// copies are re-protected by the background migration (B-28): the authority first accepts a PublishFormSecurityRevision
+    /// command for the field (designer-authorized, journaled, revision-bound); every record is then re-sealed through the
+    /// ordinary content workflow as a reprotection operation the authority validates against that command. Until the
+    /// migration completes and is verified, the field is reported as not fully encrypted.
     /// </summary>
     public async Task<FieldProtectionResponse> StrengthenProtectionAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, StrengthenFieldProtectionRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
-        await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        var decision = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormDefinition, formDefinitionId), ProtectedAction.DesignForm), cancellationToken).ConfigureAwait(false);
+        if (!decision.Allowed)
+        {
+            throw new BusinessException("NOT_FOUND", 404, "form definition not found");
+        }
+
         var reason = request.ChangeReason?.Trim() ?? string.Empty;
         if (reason.Length is < 3 or > 500)
         {
             throw new BusinessException("INVALID_REQUEST", 422, "a change reason of 3..500 characters is required");
         }
 
-        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-        var field = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)
-                    ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
-        if (request.ExpectedProtectionRevision != field.ProtectionPolicyRevision)
+        FieldDefinition field;
+        Domain.Features.Organizations.OrganizationSecurityPolicy policy;
+        string classification;
+        string mode;
+        List<LegacyPlaintextRecord> legacyRecords = [];
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
-            throw new BusinessException("FIELD_REVISION_CONFLICT", 409, "the field's protection was changed by someone else; reload and retry");
+            field = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
+            if (request.ExpectedProtectionRevision != field.ProtectionPolicyRevision)
+            {
+                throw new BusinessException("FIELD_REVISION_CONFLICT", 409, "the field's protection was changed by someone else; reload and retry");
+            }
+
+            policy = await Organizations.SecurityPolicyHandlers.EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+            (classification, mode) = FieldProtectionPolicy.ResolveStrengthening(field, request.TargetClassification, request.TargetProtectionMode, policy);
+            var running = await scope.FindLatestProtectionMigrationAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            if (running is not null && running.MigrationState is not FieldProtectionMigrationStates.Completed)
+            {
+                throw new BusinessException("MIGRATION_IN_PROGRESS", 409, "the field's encryption migration has not completed; wait for it (or retry a failed one) before changing the protection again");
+            }
+
+            if (mode == FieldProtectionModes.ApplicationEncrypted && field.FieldProtectionMode != FieldProtectionModes.ApplicationEncrypted && field.FieldDataType != FieldDataTypes.File)
+            {
+                legacyRecords = await scope.GetLegacyPlaintextRecordsAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            }
+
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        var policy = await Organizations.SecurityPolicyHandlers.EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
-        var (classification, mode) = FieldProtectionPolicy.ResolveStrengthening(field, request.TargetClassification, request.TargetProtectionMode, policy);
-        if (mode == FieldProtectionModes.ApplicationEncrypted && field.FieldDataType != FieldDataTypes.File && !encryption.IsAvailable)
+        var switchingToEncryption = mode == FieldProtectionModes.ApplicationEncrypted && field.FieldProtectionMode != FieldProtectionModes.ApplicationEncrypted && field.FieldDataType != FieldDataTypes.File;
+        if (switchingToEncryption && !encryption.IsAvailable)
         {
             throw new Documents.Ports.EncryptionUnavailableException("no permitted encryption key provider is configured; the field cannot be switched to encryption");
         }
 
-        var previous = new { field.FieldClassification, field.FieldProtectionMode, field.ProtectionPolicyRevision };
+        var newRevision = field.ProtectionPolicyRevision + 1;
+        Guid? commandId = null;
+        if (switchingToEncryption)
+        {
+            // Authority first: the requirement is a journaled, revision-bound security command; its id authorizes every reprotection operation.
+            var payload = JsonSerializer.SerializeToElement(new { form_definition_id = formDefinitionId, field_definition_id = fieldDefinitionId, required_protection_mode = FieldProtectionModes.ApplicationEncrypted, protection_policy_revision = newRevision });
+            var command = await awaiter.SubmitAndAwaitAsync(context.ToDelegatedUser(), new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.PublishFormSecurityRevision, new ResourceReference(ProtectedResourceKind.FormDefinition, formDefinitionId), decision.AuthorizationRevision, payload, reason), $"field-protection:{fieldDefinitionId:N}:{newRevision}", cancellationToken).ConfigureAwait(false);
+            if (command.CommandStatus != SecurityCommandStatus.Effective)
+            {
+                throw new PendingCommandException(new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, false));
+            }
+
+            commandId = command.CommandId;
+        }
+
         var now = clock.GetUtcNow();
-        field.FieldClassification = classification;
-        field.FieldProtectionMode = mode;
-        field.ProtectionPolicyRevision++;
-        field.ProtectionChangedOn = now;
-        field.ProtectionChangedByUserId = context.LocalUserId;
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.FieldProtectionStrengthened, "field classification/protection strengthened (audited migration; existing plaintext rewritten as ciphertext on each record's next commit)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, metadata: new { fieldKey = field.FieldKey, previous, classification, protectionMode = mode, protectionPolicyRevision = field.ProtectionPolicyRevision, changeReason = reason });
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var tracked = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                          ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
+            if (tracked.ProtectionPolicyRevision != field.ProtectionPolicyRevision)
+            {
+                throw new BusinessException("FIELD_REVISION_CONFLICT", 409, "the field's protection was changed concurrently; reload and retry");
+            }
+
+            var previous = new { tracked.FieldClassification, tracked.FieldProtectionMode, tracked.ProtectionPolicyRevision };
+            tracked.FieldClassification = classification;
+            tracked.FieldProtectionMode = mode;
+            tracked.ProtectionPolicyRevision = newRevision;
+            tracked.ProtectionChangedOn = now;
+            tracked.ProtectionChangedByUserId = context.LocalUserId;
+            if (commandId is { } authorizedBy)
+            {
+                tracked.ProtectionAuthorityCommandId = authorizedBy;
+                var migration = new FieldProtectionMigration
+                {
+                    FieldProtectionMigrationId = Guid.CreateVersion7(),
+                    TenantId = context.OrganizationId,
+                    FormDefinitionId = formDefinitionId,
+                    FieldDefinitionId = fieldDefinitionId,
+                    ProtectionPolicyRevision = newRevision,
+                    AuthorityCommandId = authorizedBy,
+                    MigrationState = legacyRecords.Count == 0 ? FieldProtectionMigrationStates.Completed : FieldProtectionMigrationStates.Queued,
+                    TotalRecordCount = legacyRecords.Count,
+                    TotalValueCount = legacyRecords.Sum(r => r.PlaintextValueCount),
+                    NextAttemptOn = legacyRecords.Count == 0 ? DateTimeOffset.MaxValue : now,
+                    StartedByUserId = context.LocalUserId,
+                    MigrationCreatedOn = now,
+                    MigrationModifiedOn = now,
+                    MigrationCompletedOn = legacyRecords.Count == 0 ? now : null,
+                    MigrationVerifiedOn = legacyRecords.Count == 0 ? now : null,
+                };
+                scope.AddProtectionMigration(migration);
+                foreach (var record in legacyRecords)
+                {
+                    scope.AddProtectionMigrationItem(new FieldProtectionMigrationItem { FieldProtectionMigrationItemId = Guid.CreateVersion7(), FieldProtectionMigrationId = migration.FieldProtectionMigrationId, TenantId = context.OrganizationId, FormRecordId = record.FormRecordId, ItemModifiedOn = now });
+                }
+
+                AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.FieldProtectionMigrationStarted, legacyRecords.Count == 0 ? "no existing plaintext value; the field is fully encrypted" : "background re-encryption of existing plaintext values queued (authority-governed reprotection operations)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, targetEntityType: "field_protection_migration", targetEntityId: migration.FieldProtectionMigrationId, metadata: new { authorityCommandId = authorizedBy, totalRecordCount = migration.TotalRecordCount, totalValueCount = migration.TotalValueCount });
+            }
+
+            AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.FieldProtectionStrengthened, "field classification/protection strengthened (audited migration)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, metadata: new { fieldKey = tracked.FieldKey, previous, classification, protectionMode = mode, protectionPolicyRevision = newRevision, changeReason = reason, authorityCommandId = commandId });
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return await ProtectionResponseAsync(scope, tracked, policy, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Re-queues the failed records of a field's encryption migration (design permission; audited). Nothing is re-signed here; the worker runs the authority workflow again.</summary>
+    public async Task<FieldProtectionResponse> RetryProtectionMigrationAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, RetryFieldProtectionMigrationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(request);
+        await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        var reason = request.RetryReason?.Trim() ?? string.Empty;
+        if (reason.Length is < 3 or > 500)
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, "a retry reason of 3..500 characters is required");
+        }
+
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var field = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
+        var migration = await scope.FindLatestProtectionMigrationAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                        ?? throw new BusinessException("NOT_FOUND", 404, "the field has no encryption migration");
+        if (migration.MigrationState is not (FieldProtectionMigrationStates.Failed or FieldProtectionMigrationStates.Blocked))
+        {
+            throw new BusinessException("MIGRATION_NOT_RETRYABLE", 409, "only a failed or blocked migration can be retried");
+        }
+
+        var now = clock.GetUtcNow();
+        var failed = await scope.GetFailedProtectionMigrationItemsAsync(migration.FieldProtectionMigrationId, cancellationToken).ConfigureAwait(false);
+        foreach (var item in failed)
+        {
+            item.ItemState = FieldProtectionMigrationItemStates.Pending;
+            item.AttemptCount = 0;
+            item.LastErrorCode = null;
+            item.ItemModifiedOn = now;
+        }
+
+        migration.FailedRecordCount = 0;
+        migration.MigrationState = FieldProtectionMigrationStates.Queued;
+        migration.LastErrorCode = null;
+        migration.NextAttemptOn = now;
+        migration.LeaseOwnerName = null;
+        migration.LeaseExpiresOn = null;
+        migration.MigrationModifiedOn = now;
+        var policy = await Organizations.SecurityPolicyHandlers.EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.FieldProtectionMigrationRetried, "failed records of the encryption migration re-queued", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, targetEntityType: "field_protection_migration", targetEntityId: migration.FieldProtectionMigrationId, metadata: new { requeued = failed.Count, retryReason = reason });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return await ProtectionResponseAsync(scope, field, policy, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Status: <c>FullyEncrypted</c> is true only when the field is application-encrypted, no latest committed snapshot
+    /// holds a plaintext copy (recomputed now, never read from the migration row alone) and, when a migration exists,
+    /// it completed and was verified. A forged "Completed" row cannot make a field report as encrypted.
+    /// </summary>
     private static async Task<FieldProtectionResponse> ProtectionResponseAsync(IBusinessScope scope, FieldDefinition field, Domain.Features.Organizations.OrganizationSecurityPolicy policy, CancellationToken cancellationToken)
     {
         var encrypted = field.FieldProtectionMode == FieldProtectionModes.ApplicationEncrypted;
         var legacy = encrypted && field.FieldDataType != FieldDataTypes.File ? await scope.CountLegacyPlaintextRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false) : 0;
-        var state = !encrypted ? "Plaintext" : legacy == 0 ? "Encrypted" : "EncryptionPendingRewrite";
+        var migration = encrypted ? await scope.FindLatestProtectionMigrationAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false) : null;
+        FieldProtectionMigrationResponse? progress = null;
+        if (migration is not null)
+        {
+            var pending = await scope.CountPendingProtectionMigrationItemsAsync(migration.FieldProtectionMigrationId, cancellationToken).ConfigureAwait(false);
+            progress = new FieldProtectionMigrationResponse(migration.FieldProtectionMigrationId, migration.MigrationState, migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, migration.FailedRecordCount, pending, migration.LastErrorCode, migration.MigrationCreatedOn, migration.MigrationCompletedOn, migration.MigrationVerifiedOn, migration.AuthorityCommandId);
+        }
+
+        var fullyEncrypted = encrypted && legacy == 0 && (migration is null || (migration.MigrationState == FieldProtectionMigrationStates.Completed && migration.MigrationVerifiedOn is not null));
+        var state = !encrypted ? "Plaintext"
+            : fullyEncrypted ? "Encrypted"
+            : migration is null ? "EncryptionPendingRewrite"
+            : migration.MigrationState switch
+            {
+                FieldProtectionMigrationStates.Queued => "EncryptionMigrationQueued",
+                FieldProtectionMigrationStates.Running => "EncryptionMigrationRunning",
+                FieldProtectionMigrationStates.Blocked => "EncryptionMigrationBlocked",
+                FieldProtectionMigrationStates.Failed => "EncryptionMigrationFailed",
+                _ => "EncryptionMigrationIncomplete",
+            };
         return new FieldProtectionResponse(field.FieldDefinitionId, field.FieldKey, field.FieldClassification, field.FieldProtectionMode, field.ProtectionPolicyRevision, field.ProtectionChangedOn, state, legacy,
             encrypted ? "Encrypted for privacy — not searchable in V1 (ADR-PB-004). Authorized users see the value on the record; no plaintext copy exists in the business database." : "Plaintext: searchable within authorization, and readable by a database administrator.",
-            policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted);
+            policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, fullyEncrypted, progress);
     }
 
     public async Task<FieldDefinitionResponse> UpdateOptionsAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, UpdateFieldOptionsRequest request, CancellationToken cancellationToken)

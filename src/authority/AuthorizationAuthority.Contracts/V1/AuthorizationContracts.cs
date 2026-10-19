@@ -123,6 +123,13 @@ public sealed record RegisterFormDefinitionPayload(Guid FormDefinitionId, IReadO
 /// <summary>Delta of form_user subjects (create-record permission) for an existing form; independent of any form version.</summary>
 public sealed record UpdateFormUsersPayload(Guid FormDefinitionId, IReadOnlyList<Guid> GrantUserIds, IReadOnlyList<Guid> GrantTeamIds, IReadOnlyList<Guid> RevokeUserIds, IReadOnlyList<Guid> RevokeTeamIds);
 
+/// <summary>
+/// Records in the authority that a field must be application-encrypted from this protection policy revision on (the
+/// designer's audited strengthening). It is the only basis on which the authority accepts workload reprotection
+/// operations for that field; it creates no permission and touches no relationship.
+/// </summary>
+public sealed record PublishFormSecurityRevisionPayload(Guid FormDefinitionId, Guid FieldDefinitionId, string RequiredProtectionMode, long ProtectionPolicyRevision);
+
 /// <summary>One principal in a form's authoritative access state.</summary>
 public sealed record FormAccessSubject(string SubjectKind, Guid SubjectId);
 
