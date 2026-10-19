@@ -50,6 +50,9 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<PermissionDecision> CheckPermissionAsync(DelegatedUserContext user, PermissionCheckRequest request, CancellationToken cancellationToken) =>
         SendAsync<PermissionDecision>(HttpMethod.Post, "internal/v1/authorization/check", user, request, null, cancellationToken);
 
+    public Task<FormAccessState> GetFormAccessAsync(DelegatedUserContext user, Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+        SendAsync<FormAccessState>(HttpMethod.Get, $"internal/v1/form-definitions/{organizationId:D}/{formDefinitionId:D}/access", user, null, null, cancellationToken);
+
     public async Task<IReadOnlyList<PermissionDecision>> CheckPermissionsBatchAsync(DelegatedUserContext user, IReadOnlyList<PermissionCheckRequest> requests, CancellationToken cancellationToken)
     {
         var response = await SendAsync<BatchResponse>(HttpMethod.Post, "internal/v1/authorization/check-batch", user, new { checks = requests }, null, cancellationToken).ConfigureAwait(false);
@@ -77,9 +80,26 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<VerifyRecordProjectionResult> VerifyRecordProjectionAsync(DelegatedUserContext user, VerifyRecordProjectionRequest request, CancellationToken cancellationToken) =>
         SendAsync<VerifyRecordProjectionResult>(HttpMethod.Post, "internal/v1/integrity/verify-record-projection", user, request, null, cancellationToken);
 
-    private async Task<T> SendAsync<T>(HttpMethod method, string path, DelegatedUserContext user, object? body, string? idempotencyKey, CancellationToken cancellationToken)
+    public Task<AcceptedContentRevision> GetCommittedContentRevisionForReprotectionAsync(Guid organizationId, Guid formRecordId, Guid reprotectionCommandId, CancellationToken cancellationToken) =>
+        SendAsync<AcceptedContentRevision>(HttpMethod.Get, $"internal/v1/content-revisions/{organizationId:D}/{formRecordId:D}?reprotectionCommandId={reprotectionCommandId:D}", null, null, null, cancellationToken);
+
+    public Task<PreparedContentOperation> PrepareReprotectionAsync(PrepareContentChangeRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.ReprotectionCommandId is null)
+        {
+            throw new ArgumentException("a reprotection prepare needs the authorizing command", nameof(request));
+        }
+
+        return SendAsync<PreparedContentOperation>(HttpMethod.Post, "internal/v1/content-changes/prepare", null, request, idempotencyKey, cancellationToken);
+    }
+
+    public Task<AcceptedContentRevision> CommitReprotectionAsync(Guid operationId, CommitContentChangeRequest request, CancellationToken cancellationToken) =>
+        SendAsync<AcceptedContentRevision>(HttpMethod.Post, $"internal/v1/content-changes/{operationId:D}/commit", null, request, null, cancellationToken);
+
+    /// <summary>user == null: workload-only call (reprotection); the authority then requires the operation's own authorization reference.</summary>
+    private async Task<T> SendAsync<T>(HttpMethod method, string path, DelegatedUserContext? user, object? body, string? idempotencyKey, CancellationToken cancellationToken)
+    {
         var settings = options.Value;
         if (string.IsNullOrWhiteSpace(settings.BaseAddress) || string.IsNullOrWhiteSpace(settings.WorkloadSharedKeyBase64))
         {
@@ -88,7 +108,11 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", MintWorkloadToken(settings));
-        request.Headers.Add("X-Delegated-User-Assertion", user.RawAssertion);
+        if (user is not null)
+        {
+            request.Headers.Add("X-Delegated-User-Assertion", user.RawAssertion);
+        }
+
         request.Headers.Add("X-Correlation-Id", Guid.CreateVersion7().ToString("D"));
         if (idempotencyKey is not null)
         {

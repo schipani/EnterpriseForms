@@ -15,6 +15,9 @@
     <Project Path="src/authority/AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
     <Project Path="src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj" />
   </Folder>
+  <Folder Name="/src/tools/">
+    <Project Path="src/tools/EnterpriseForms.DevSeed/EnterpriseForms.DevSeed.csproj" />
+  </Folder>
   <Folder Name="/src/shared/">
     <Project Path="src/shared/EnterpriseForms.Integrity/EnterpriseForms.Integrity.csproj" />
   </Folder>

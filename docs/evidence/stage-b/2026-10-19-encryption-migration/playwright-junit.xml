@@ -1,0 +1,32 @@
+<testsuites id="" name="" tests="10" failures="0" skipped="0" errors="0" time="166.272659">
+<testsuite name="accused-workflow.spec.ts" timestamp="2026-10-18T23:12:23.298Z" hostname="chromium-desktop" tests="2" failures="0" skipped="0" time="48.532" errors="0">
+<testcase name="Stage B Accused workflow › designer publishes AccusedAddress and Accused with a related list and document collection" classname="accused-workflow.spec.ts" time="21.345">
+</testcase>
+<testcase name="Stage B Accused workflow › clerk creates an Accused, adds addresses, uploads documents across navigation and reviews activity" classname="accused-workflow.spec.ts" time="27.187">
+</testcase>
+</testsuite>
+<testsuite name="branding.spec.ts" timestamp="2026-10-18T23:12:23.298Z" hostname="chromium-desktop" tests="1" failures="0" skipped="0" time="2.001" errors="0">
+<testcase name="owner uploads a PNG logo and it appears top-left" classname="branding.spec.ts" time="2.001">
+</testcase>
+</testsuite>
+<testsuite name="form-management.spec.ts" timestamp="2026-10-18T23:12:23.298Z" hostname="chromium-desktop" tests="3" failures="0" skipped="0" time="32.488" errors="0">
+<testcase name="Form management: edit fields and form permissions › designer builds and publishes a form with a document collection; the clerk records data and uploads a document" classname="form-management.spec.ts" time="11.048">
+</testcase>
+<testcase name="Form management: edit fields and form permissions › designer edits an existing field and the document collection, then publishes the next version; data and attachments are preserved" classname="form-management.spec.ts" time="7.898">
+</testcase>
+<testcase name="Form management: edit fields and form permissions › designer changes who can create records after the form is saved: grant, effective access, revocation, no new version" classname="form-management.spec.ts" time="13.542">
+</testcase>
+</testsuite>
+<testsuite name="pb14-accessibility.spec.ts" timestamp="2026-10-18T23:12:23.298Z" hostname="chromium-desktop" tests="3" failures="0" skipped="0" time="74.839" errors="0">
+<testcase name="PB-14 automated accessibility and responsive validation › login, dashboard, records, record, uploads, gallery and designer pass axe WCAG 2.2 AA at every width (PB14-10..14, 22, 23, 32)" classname="pb14-accessibility.spec.ts" time="67.091">
+</testcase>
+<testcase name="PB-14 automated accessibility and responsive validation › keyboard only: skip link, tabs, dialog focus trap and designer reorder (PB14-15, 25, 29)" classname="pb14-accessibility.spec.ts" time="6.045">
+</testcase>
+<testcase name="PB-14 automated accessibility and responsive validation › forced-colors and prefers-reduced-motion do not hide focus or state (PB14-30)" classname="pb14-accessibility.spec.ts" time="1.703">
+</testcase>
+</testsuite>
+<testsuite name="responsive.spec.ts" timestamp="2026-10-18T23:12:23.298Z" hostname="chromium-phone" tests="1" failures="0" skipped="0" time="1.901" errors="0">
+<testcase name="gallery reflows at 320px without horizontal scroll and every control is keyboard reachable" classname="responsive.spec.ts" time="1.901">
+</testcase>
+</testsuite>
+</testsuites>

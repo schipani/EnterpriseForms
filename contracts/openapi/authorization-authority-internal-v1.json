@@ -139,6 +139,47 @@
         }
       }
     },
+    "/internal/v1/form-definitions/{organizationId}/{formDefinitionId}/access": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Authoritative designers and create-record principals of a form; fails closed while the organization gate is closed.",
+        "operationId": "GetFormAccess",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormAccessState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/security-commands": {
       "post": {
         "tags": [
@@ -206,7 +247,7 @@
         "tags": [
           "Content"
         ],
-        "summary": "Validates the exact candidate snapshot against the accepted head and the actor's edit scope, then signs it. Not a generic signing endpoint.",
+        "summary": "Validates the exact candidate snapshot against the accepted head and the actor's edit scope (or, without a user, the reprotection rules of an effective PublishFormSecurityRevision command), then signs it. Not a generic signing endpoint.",
         "operationId": "PrepareContentChange",
         "requestBody": {
           "content": {
@@ -294,6 +335,14 @@
             "name": "formRecordId",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reprotectionCommandId",
+            "in": "query",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -748,6 +797,66 @@
           }
         }
       },
+      "FormAccessState": {
+        "required": [
+          "form_definition_id",
+          "authorization_revision",
+          "projection_revision",
+          "designers",
+          "form_users"
+        ],
+        "type": "object",
+        "properties": {
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "designers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubject"
+            }
+          },
+          "form_users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubject"
+            }
+          }
+        }
+      },
+      "FormAccessSubject": {
+        "required": [
+          "subject_kind",
+          "subject_id"
+        ],
+        "type": "object",
+        "properties": {
+          "subject_kind": {
+            "type": "string"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "JsonElement": { },
       "ManifestItemKind": {
         "enum": [
@@ -1029,6 +1138,22 @@
             "items": {
               "$ref": "#/components/schemas/CandidateContentItem"
             }
+          },
+          "reprotection_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "current_items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
+            }
           }
         }
       },
@@ -1102,7 +1227,8 @@
           "TransferOwnership",
           "DesignForm",
           "CreateRecord",
-          "ManageOrganization"
+          "ManageOrganization",
+          "AdministerSecurity"
         ]
       },
       "ResourceKind": {
@@ -1145,7 +1271,10 @@
           "GrantSystemRole",
           "RevokeSystemRole",
           "UpdateMandatoryPolicy",
-          "PublishFormSecurityRevision"
+          "PublishFormSecurityRevision",
+          "UnlinkChildRecord",
+          "UpdateFormUsers",
+          "ReclassifyField"
         ]
       },
       "SecurityCommandRequest": {
@@ -1287,6 +1416,13 @@
             "items": {
               "$ref": "#/components/schemas/StagedContentItem"
             }
+          },
+          "historic_committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

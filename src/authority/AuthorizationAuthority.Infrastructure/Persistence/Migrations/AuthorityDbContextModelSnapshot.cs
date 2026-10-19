@@ -169,6 +169,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<Guid?>("ReprotectionCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reprotection_command_id");
+
                     b.HasKey("ContentChangeOperationId");
 
                     b.HasIndex("ActorIdentityBindingId");
@@ -782,6 +786,55 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationProtectionPolicy", b =>
+                {
+                    b.Property<Guid>("OrganizationProtectionPolicyId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_protection_policy_id");
+
+                    b.Property<string>("MinimumFieldClassification")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("minimum_field_classification");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<bool>("PlaintextDowngradePermitted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("plaintext_downgrade_permitted");
+
+                    b.Property<bool>("PlaintextInternalFieldsPermitted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("plaintext_internal_fields_permitted");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("policy_revision");
+
+                    b.Property<DateTimeOffset>("PolicyUpdatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("policy_updated_on");
+
+                    b.Property<Guid>("UpdatedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_security_command_id");
+
+                    b.HasKey("OrganizationProtectionPolicyId");
+
+                    b.HasIndex("OrganizationId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_protection_policy_org");
+
+                    b.ToTable("organization_protection_policies", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_protection_policy_classification", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SecurityCommands.AuthorityRelationshipEdge", b =>
                 {
                     b.Property<Guid>("AuthorityRelationshipEdgeId")
@@ -1149,6 +1202,17 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_identity_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationProtectionPolicy", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_protection_policy_org");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SecurityCommands.AuthorityRelationshipEdge", b =>

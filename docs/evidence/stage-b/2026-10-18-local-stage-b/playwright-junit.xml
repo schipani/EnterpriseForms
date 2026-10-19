@@ -1,0 +1,12 @@
+<testsuites id="" name="" tests="3" failures="0" skipped="0" errors="0" time="35.587621">
+<testsuite name="accused-workflow.spec.ts" timestamp="2026-10-18T14:19:26.687Z" hostname="chromium-desktop" tests="2" failures="0" skipped="0" time="28.357" errors="0">
+<testcase name="Stage B Accused workflow › designer publishes AccusedAddress and Accused with a related list and document collection" classname="accused-workflow.spec.ts" time="13.777">
+</testcase>
+<testcase name="Stage B Accused workflow › clerk creates an Accused, adds addresses, uploads documents across navigation and reviews activity" classname="accused-workflow.spec.ts" time="14.58">
+</testcase>
+</testsuite>
+<testsuite name="responsive.spec.ts" timestamp="2026-10-18T14:19:26.687Z" hostname="chromium-phone" tests="1" failures="0" skipped="0" time="1.87" errors="0">
+<testcase name="gallery reflows at 320px without horizontal scroll and every control is keyboard reachable" classname="responsive.spec.ts" time="1.87">
+</testcase>
+</testsuite>
+</testsuites>

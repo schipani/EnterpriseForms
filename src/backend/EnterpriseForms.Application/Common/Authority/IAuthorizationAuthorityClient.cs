@@ -30,6 +30,9 @@ public enum ProtectedAction
     DesignForm,
     CreateRecord,
     ManageOrganization,
+
+    /// <summary>Organization security administration (system administrators); Amendment A1 governance routes accept it alongside ManageOrganization.</summary>
+    AdministerSecurity,
 }
 
 public enum SecurityCommandKind
@@ -47,6 +50,9 @@ public enum SecurityCommandKind
     RevokeSystemRole,
     UpdateMandatoryPolicy,
     PublishFormSecurityRevision,
+    UnlinkChildRecord,
+    UpdateFormUsers,
+    ReclassifyField,
 }
 
 public enum SecurityCommandStatus
@@ -80,7 +86,8 @@ public sealed record SecurityCommandResult(Guid CommandId, SecurityCommandStatus
 
 public sealed record CandidateContentItem(ManifestItemKind ItemKind, Guid ItemId, string CanonicalBytesBase64);
 
-public sealed record PrepareContentChangeRequest(Guid OrganizationId, Guid FormRecordId, Guid OperationId, long ExpectedAuthorizationRevision, long ExpectedContentRevision, string ExpectedManifestRootBase64, IReadOnlyList<CandidateContentItem> CandidateItems);
+/// <summary>ReprotectionCommandId + CurrentItems: a workload reprotection operation (no delegated user) under an effective PublishFormSecurityRevision command; null for user operations.</summary>
+public sealed record PrepareContentChangeRequest(Guid OrganizationId, Guid FormRecordId, Guid OperationId, long ExpectedAuthorizationRevision, long ExpectedContentRevision, string ExpectedManifestRootBase64, IReadOnlyList<CandidateContentItem> CandidateItems, Guid? ReprotectionCommandId = null, IReadOnlyList<StagedContentItem>? CurrentItems = null);
 
 public sealed record SignedCandidateItem(ManifestItemKind ItemKind, Guid ItemId, string RowSignatureBase64, string CanonicalPayloadDigestBase64, string MutationKind);
 
@@ -92,11 +99,17 @@ public sealed record CommitContentChangeRequest(Guid OrganizationId, Guid FormRe
 
 public sealed record AcceptedContentRevision(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, string CommittedManifestRootBase64, long AuthorizationRevision, int IntegrityKeyVersion, int CurrentSigningKeyVersion, string ArchiveState, Guid CorrelationId);
 
-public sealed record VerifyRecordProjectionRequest(Guid OrganizationId, Guid FormRecordId, ProtectedAction RequestedAction, IReadOnlyList<StagedContentItem> ObservedItems);
+/// <summary>HistoricCommittedOperationId: verify an earlier accepted manifest of the record (historic document versions; full readers only).</summary>
+public sealed record VerifyRecordProjectionRequest(Guid OrganizationId, Guid FormRecordId, ProtectedAction RequestedAction, IReadOnlyList<StagedContentItem> ObservedItems, Guid? HistoricCommittedOperationId = null);
 
 public sealed record VerifiedProjectionItem(ManifestItemKind ItemKind, Guid ItemId);
 
 public sealed record VerifyRecordProjectionResult(bool Verified, string? FailureReasonCode, long CommittedContentRevision, Guid? CommittedOperationId, long AuthorizationRevision, IReadOnlyList<VerifiedProjectionItem> AuthorizedItems, bool IsCompleteProjection, Guid CorrelationId);
+
+public sealed record FormAccessSubjectState(string SubjectKind, Guid SubjectId);
+
+/// <summary>Authoritative designers and create-record principals of a form, read from the authority's desired state behind its gate.</summary>
+public sealed record FormAccessState(Guid FormDefinitionId, long AuthorizationRevision, long ProjectionRevision, IReadOnlyList<FormAccessSubjectState> Designers, IReadOnlyList<FormAccessSubjectState> FormUsers);
 
 public sealed record RecordDiscoveryPage(IReadOnlyList<Guid> FormRecordIds, long AuthorizationRevision, string? ContinuationToken);
 
@@ -117,6 +130,8 @@ public interface IAuthorizationAuthorityClient
 {
     Task<PermissionDecision> CheckPermissionAsync(DelegatedUserContext user, PermissionCheckRequest request, CancellationToken cancellationToken);
 
+    Task<FormAccessState> GetFormAccessAsync(DelegatedUserContext user, Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<PermissionDecision>> CheckPermissionsBatchAsync(DelegatedUserContext user, IReadOnlyList<PermissionCheckRequest> requests, CancellationToken cancellationToken);
 
     Task<RecordDiscoveryPage> DiscoverAuthorizedRecordsAsync(DelegatedUserContext user, Guid organizationId, int pageSize, string? continuationToken, CancellationToken cancellationToken);
@@ -132,4 +147,11 @@ public interface IAuthorizationAuthorityClient
     Task<AcceptedContentRevision> GetCommittedContentRevisionAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);
 
     Task<VerifyRecordProjectionResult> VerifyRecordProjectionAsync(DelegatedUserContext user, VerifyRecordProjectionRequest request, CancellationToken cancellationToken);
+
+    // Workload reprotection operations (B-28): no delegated user; the authority authorizes them from the effective PublishFormSecurityRevision command only.
+    Task<AcceptedContentRevision> GetCommittedContentRevisionForReprotectionAsync(Guid organizationId, Guid formRecordId, Guid reprotectionCommandId, CancellationToken cancellationToken);
+
+    Task<PreparedContentOperation> PrepareReprotectionAsync(PrepareContentChangeRequest request, string idempotencyKey, CancellationToken cancellationToken);
+
+    Task<AcceptedContentRevision> CommitReprotectionAsync(Guid operationId, CommitContentChangeRequest request, CancellationToken cancellationToken);
 }

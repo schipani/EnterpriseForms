@@ -142,6 +142,45 @@ services:
     command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose"]
     networks: [business-net]
 
+  clamav:
+    # Real malware scanner for the Documents feature (B-05). clamd INSTREAM over TCP on business-net; the API/worker never
+    # release a document without a verdict from it. Signature database ships inside the image; startup takes ~30-90 s.
+    image: clamav/clamav:1.4
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "true"
+      CLAMD_CONF_StreamMaxLength: 600M
+      CLAMD_CONF_MaxScanSize: 600M
+      CLAMD_CONF_MaxFileSize: 600M
+    networks: [business-net]
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  dev-seed:
+    # Development/Testing only: bootstraps a synthetic organization and personas through the authority OPERATOR plane and
+    # writes dev-personas.json for the business API's development login. Holds the operator key; the api container does not.
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.devseed
+    environment:
+      DEVSEED_AUTHORITY_BASE_ADDRESS: http://authority:8080
+      DEVSEED_OPERATOR_ISSUER: ${OPERATOR_ISSUER}
+      DEVSEED_OPERATOR_AUDIENCE: ${OPERATOR_AUDIENCE}
+      DEVSEED_OPERATOR_SHARED_KEY_BASE64: ${OPERATOR_SHARED_KEY_BASE64}
+      DEVSEED_TEST_IDP_ISSUER: ${TEST_IDP_ISSUER}
+      DEVSEED_OUTPUT_PATH: /seed/dev-personas.json
+      DEVSEED_ORGANIZATION_NAME: ${DEVSEED_ORGANIZATION_NAME:-Northwind Crown Office (synthetic)}
+    volumes:
+      - dev-seed:/seed
+    depends_on:
+      authority:
+        condition: service_healthy
+    networks: [trust-edge]
+    restart: "no"
+
   authority-migrate:
     build:
       context: ../..
@@ -233,7 +272,20 @@ services:
       UserAuthentication__Audience: ${TEST_IDP_AUDIENCE}
       UserAuthentication__SharedKeyBase64: ${TEST_IDP_SHARED_KEY_BASE64}
       ConnectionStrings__BusinessDb: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_RUNTIME_USER};Password=${BUSINESS_RUNTIME_PASSWORD}
+      Storage__Provider: AzureBlob
       Storage__BlobServiceUri: http://azurite:10000/devstoreaccount1
+      Storage__AccountName: ${DOCUMENTS_ACCOUNT_NAME}
+      Storage__AccountKey: ${DOCUMENTS_ACCOUNT_KEY}
+      MalwareScanner__Provider: ClamAv
+      MalwareScanner__Host: clamav
+      MalwareScanner__Port: "3310"
+      Encryption__KeyProvider: LocalDevelopment
+      Encryption__LocalDevelopmentKekBase64: ${LOCAL_DEV_KEK_BASE64}
+      DevelopmentIdentity__Enabled: "true"
+      DevelopmentIdentity__PersonasFilePath: /seed/dev-personas.json
+      DocumentProcessing__HostInProcess: "false"
+    volumes:
+      - dev-seed:/seed:ro
     depends_on:
       business-db:
         condition: service_healthy
@@ -256,10 +308,27 @@ services:
       DOTNET_ENVIRONMENT: ${BUSINESS_ENVIRONMENT:-Development}
       Worker__TrustAuthorityBaseAddress: http://authority:8080
       ConnectionStrings__BusinessDb: Host=business-db;Database=${BUSINESS_DB_NAME};Username=${BUSINESS_RUNTIME_USER};Password=${BUSINESS_RUNTIME_PASSWORD}
+      TrustAuthority__BaseAddress: http://authority:8080
+      TrustAuthority__WorkloadIssuer: ${WORKLOAD_ISSUER}
+      TrustAuthority__WorkloadAudience: ${WORKLOAD_AUDIENCE}
+      TrustAuthority__WorkloadSharedKeyBase64: ${WORKLOAD_SHARED_KEY_BASE64}
+      Storage__Provider: AzureBlob
+      Storage__BlobServiceUri: http://azurite:10000/devstoreaccount1
+      Storage__AccountName: ${DOCUMENTS_ACCOUNT_NAME}
+      Storage__AccountKey: ${DOCUMENTS_ACCOUNT_KEY}
+      MalwareScanner__Provider: ClamAv
+      MalwareScanner__Host: clamav
+      MalwareScanner__Port: "3310"
+      Encryption__KeyProvider: LocalDevelopment
+      Encryption__LocalDevelopmentKekBase64: ${LOCAL_DEV_KEK_BASE64}
     depends_on:
       business-db:
         condition: service_healthy
+      business-migrate:
+        condition: service_completed_successfully
       authority:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     networks: [business-net, trust-edge]
 
@@ -271,3 +340,6 @@ services:
       api:
         condition: service_healthy
     networks: [web-net]
+
+volumes:
+  dev-seed: {}

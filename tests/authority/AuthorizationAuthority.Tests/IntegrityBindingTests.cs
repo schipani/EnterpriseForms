@@ -119,8 +119,10 @@ public sealed class IntegrityBindingTests
         var schema = SpiceDbProjectionClient.EmbeddedSchema();
         Assert.Contains("definition projection_step {}", schema, StringComparison.Ordinal);
         Assert.Contains("relation projection_cursor: projection_step", schema, StringComparison.Ordinal);
-        Assert.Contains("permission read = owner", schema, StringComparison.Ordinal);
-        Assert.DoesNotContain("permission read = owner + shared_via->read\n", schema, StringComparison.Ordinal);
+        // B-04: record read/edit derive from effective ownership (owner or parent chain); shares never widen record read.
+        Assert.Contains("permission effective_owner = owner + parent->effective_owner", schema, StringComparison.Ordinal);
+        Assert.Contains("permission read = effective_owner\n", schema, StringComparison.Ordinal);
+        Assert.DoesNotContain("permission read = effective_owner + shared_via->read", schema, StringComparison.Ordinal);
         Assert.DoesNotContain("*", schema, StringComparison.Ordinal);
     }
 

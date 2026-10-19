@@ -1,0 +1,90 @@
+{
+  "test_id": "SEC-P04",
+  "scenario": "Ciphertext/value mutation: changing a signed row produces an integrity failure; zero protected bytes released",
+  "outcome": "PASS",
+  "commit_sha": "0836b5fdf3088a85d3031d83085779ce47fb8097",
+  "image_fingerprint": "sha256:ff0e3e6c111adee352cb085ebb3df49aebe3f10615651a2118eb8038da3c7cce (api=sha256:d04d4a65c8789f954b4ded920b3d104a7e36b63957c3d5cfed260b6385ba0c0a;authority=sha256:56890153c1761450cd4f0ae9c4352864f3597102546f73f9afb09a1d5e8a45d4)",
+  "started_at_utc": "2026-10-18T23:01:23.9782684\u002B00:00",
+  "executed_at_utc": "2026-10-18T23:01:27.7286526\u002B00:00",
+  "authority_revision": 3,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T23:01:24.0075305\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a1513f958a74c6816a950451548e09-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T23:01:24.4654390\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "e45edb87-5cb3-8546-ad32-0cc88dbd136b",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T23:01:24.9257698\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "d1eae5c6-bba4-88c0-a348-864bd61dbdf1",
+        "contentRevision": "1",
+        "committedOperationId": "3a738d4d-0679-80f3-8502-a21ff2d63e1e",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T23:01:25.7272908\u002B00:00",
+      "step": "hostile UPDATE field_string_values.string_value (signature untouched)",
+      "detail": {
+        "rows": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T23:01:25.7725954\u002B00:00",
+      "step": "owner read after mutation",
+      "status": 423,
+      "error_code": "INTEGRITY_VERIFICATION_FAILED",
+      "fields": {
+        "title": "INTEGRITY_VERIFICATION_FAILED",
+        "detail": "record content failed integrity verification: ITEM_DIGEST_MISMATCH"
+      }
+    },
+    {
+      "at": "2026-10-18T23:01:25.8065332\u002B00:00",
+      "step": "owner edit after mutation (quarantined head)",
+      "status": 423,
+      "error_code": "INTEGRITY_QUARANTINE",
+      "fields": {
+        "title": "INTEGRITY_QUARANTINE"
+      }
+    },
+    {
+      "at": "2026-10-18T23:01:27.6828779\u002B00:00",
+      "step": "hostile signature bit flip on second record",
+      "detail": {
+        "rows": "3"
+      }
+    },
+    {
+      "at": "2026-10-18T23:01:27.7281447\u002B00:00",
+      "step": "owner read after signature flip",
+      "status": 423,
+      "error_code": "INTEGRITY_VERIFICATION_FAILED",
+      "fields": {
+        "title": "INTEGRITY_VERIFICATION_FAILED"
+      }
+    }
+  ]
+}

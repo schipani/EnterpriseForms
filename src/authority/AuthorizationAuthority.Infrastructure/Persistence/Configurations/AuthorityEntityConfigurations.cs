@@ -41,6 +41,19 @@ public sealed class IdentityBindingConfiguration : IEntityTypeConfiguration<Iden
     }
 }
 
+public sealed class OrganizationProtectionPolicyConfiguration : IEntityTypeConfiguration<OrganizationProtectionPolicy>
+{
+    public void Configure(EntityTypeBuilder<OrganizationProtectionPolicy> builder)
+    {
+        builder.MapSnakeCase("organization_protection_policies");
+        builder.HasKey(e => e.OrganizationProtectionPolicyId);
+        builder.Property(e => e.MinimumFieldClassification).HasMaxLength(20);
+        builder.HasIndex(e => e.OrganizationId).IsUnique().HasDatabaseName("uq_protection_policy_org");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_protection_policy_org");
+        builder.ToTable(t => t.HasCheckConstraint("ck_protection_policy_classification", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')"));
+    }
+}
+
 public sealed class AuthorityResourceConfiguration : IEntityTypeConfiguration<AuthorityResource>
 {
     public void Configure(EntityTypeBuilder<AuthorityResource> builder)

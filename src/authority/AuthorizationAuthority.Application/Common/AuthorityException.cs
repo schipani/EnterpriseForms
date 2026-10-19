@@ -24,6 +24,9 @@ public static class AuthorityErrorCodes
     public const string KeyUnavailable = "KEY_UNAVAILABLE";
     public const string CandidateMismatch = "CANDIDATE_MISMATCH";
     public const string LimitExceeded = "LIMIT_EXCEEDED";
+
+    /// <summary>A content change carries rows of a field in a protection form the authority no longer accepts (atomic cutover barrier, Amendment A1); rebuild and retry.</summary>
+    public const string FieldProtectionChanged = "FIELD_PROTECTION_CHANGED";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

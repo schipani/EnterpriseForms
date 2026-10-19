@@ -1,0 +1,14 @@
+
+Running 3 tests using 1 worker
+
+  ok 1 [chromium-desktop] › e2e\accused-workflow.spec.ts:56:3 › Stage B Accused workflow › designer publishes AccusedAddress and Accused with a related list and document collection (13.8s)
+  ok 2 [chromium-desktop] › e2e\accused-workflow.spec.ts:114:3 › Stage B Accused workflow › clerk creates an Accused, adds addresses, uploads documents across navigation and reviews activity (14.6s)
+  ok 3 [chromium-phone] › e2e\responsive.spec.ts:4:1 › gallery reflows at 320px without horizontal scroll and every control is keyboard reachable (1.9s)
+
+  3 passed (35.6s)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report ..\..\artifacts\stage-b\playwright-report[39m
+[36m[39m
+exit=0

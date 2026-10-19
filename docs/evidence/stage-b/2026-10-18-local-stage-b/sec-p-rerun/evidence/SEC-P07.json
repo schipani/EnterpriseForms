@@ -1,0 +1,94 @@
+{
+  "test_id": "SEC-P07",
+  "scenario": "SpiceDB projection lag: protected operations fail closed while applied revision differs from the authority head; no stale allow from a ZedToken or cache",
+  "outcome": "PASS",
+  "commit_sha": "7e006809c977e9332c74910eb131ed73af52a63e",
+  "image_fingerprint": "sha256:000fc1b4161dcb8cad2da1ae1c17e471a3aa18d1142252fa46c01e46c35b4d8f (api=sha256:60c445fb839e1ab18813b3fc7f3d2cd630c09418cb023314ada23452d0922314;authority=sha256:da726cadf76db6c726b2e0801e5685fde89da1356b92726a3b57f918c9382a41)",
+  "started_at_utc": "2026-10-18T14:22:17.3071639\u002B00:00",
+  "executed_at_utc": "2026-10-18T14:22:25.4071269\u002B00:00",
+  "authority_revision": 4,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-18T14:22:17.4991641\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a14f6452db79d9b0e317650a75a172-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:18.1446312\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "27349281-358f-8223-b3f5-5d3e3a003faf",
+        "authorizationRevision": "2"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:18.9989460\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "d7387c38-ce9d-8c87-ba0a-9943f5a8c66c",
+        "contentRevision": "1",
+        "committedOperationId": "1315c45f-0381-8434-b237-526f6c15da40",
+        "authorizationRevision": "3",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:24.7572832\u002B00:00",
+      "step": "owner read while projection engine unavailable",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T14:22:24.8251413\u002B00:00",
+      "step": "direct authority command CreateShare",
+      "status": 202,
+      "error_code": null,
+      "fields": {
+        "command_status": "CommittedAwaitingProjection",
+        "authorization_revision": "4",
+        "projection_gate_state": "AwaitingArchive"
+      }
+    },
+    {
+      "at": "2026-10-18T14:22:25.0477062\u002B00:00",
+      "step": "gate during lag",
+      "detail": "{\u0022organization_id\u0022:\u002201a14f64-52db-79d9-b0e3-17650a75a172\u0022,\u0022authorization_revision\u0022:4,\u0022projection_applied_revision\u0022:3,\u0022content_integrity_revision\u0022:1,\u0022projection_gate_state\u0022:\u0022AwaitingProjection\u0022,\u0022pending_archive_entries\u0022:0,\u0022integrity_quarantine_enabled\u0022:false}"
+    },
+    {
+      "at": "2026-10-18T14:22:25.0573943\u002B00:00",
+      "step": "reader read during lag (grant committed, not projected)",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T14:22:25.0663607\u002B00:00",
+      "step": "owner read during lag (gate closed for the whole organization)",
+      "status": 503,
+      "error_code": "AUTHORITY_NOT_READY",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-18T14:22:25.3964983\u002B00:00",
+      "step": "reader read after projection caught up",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "isCompleteProjection": "false"
+      }
+    }
+  ]
+}

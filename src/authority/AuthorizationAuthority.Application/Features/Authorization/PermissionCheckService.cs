@@ -138,6 +138,7 @@ public sealed class PermissionCheckService(IAuthorityStore store, ISpiceDbProjec
             (ResourceKind.FormDefinition, RequestedAction.DesignForm) => (new SpiceDbCheck(ResourceTypeNames.FormDefinition, id, "design", ResourceTypeNames.User, subject), true, ResourceTypeNames.FormDefinition),
             (ResourceKind.FormDefinition, RequestedAction.CreateRecord) => (new SpiceDbCheck(ResourceTypeNames.FormDefinition, id, "create_record", ResourceTypeNames.User, subject), true, ResourceTypeNames.FormDefinition),
             (ResourceKind.Organization, RequestedAction.ManageOrganization) => (new SpiceDbCheck(ResourceTypeNames.Organization, id, "manage_configuration", ResourceTypeNames.User, subject), false, null),
+            (ResourceKind.Organization, RequestedAction.AdministerSecurity) => (new SpiceDbCheck(ResourceTypeNames.Organization, id, "administer_security", ResourceTypeNames.User, subject), false, null),
             (ResourceKind.Organization, RequestedAction.DesignForm) => (new SpiceDbCheck(ResourceTypeNames.Organization, id, "create_form", ResourceTypeNames.User, subject), false, null),
             _ => throw AuthorityException.Invalid($"action {request.RequestedAction} is not defined for {request.Resource.ResourceKind}"),
         };

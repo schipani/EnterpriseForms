@@ -1,0 +1,17 @@
+### stop security-test stack
+ Network enterpriseforms-sectest_authority-net Removed 
+ Network enterpriseforms-sectest_web-net Removed 
+ Network enterpriseforms-sectest_business-net Removed 
+### start security-test stack
+ Container enterpriseforms-sectest-worker-1 Healthy 
+ Container enterpriseforms-sectest-authority-migrate-1 Exited 
+ Container enterpriseforms-sectest-archive-store-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-db-1 Healthy 
+ Container enterpriseforms-sectest-authority-1 Healthy 
+ Container enterpriseforms-sectest-business-db-1 Healthy 
+ Container enterpriseforms-sectest-api-1 Healthy 
+container enterpriseforms-sectest-dev-seed-1 exited (0)
+### build tests
+Build succeeded.
+Build succeeded.
+### stage-b integration

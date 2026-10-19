@@ -67,6 +67,13 @@ public static class InternalAuthentication
         return validator.Validate(assertion, workload);
     }
 
+    /// <summary>Like <see cref="RequireActor"/> but returns null when no assertion header is present (workload-only operations that carry their own authorization reference). An invalid assertion is still rejected.</summary>
+    public static VerifiedActor? TryActor(HttpContext context, DelegatedUserAssertionValidator validator)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return string.IsNullOrWhiteSpace(context.Request.Headers[UserAssertionHeader].ToString()) ? null : RequireActor(context, validator);
+    }
+
     public static Guid Correlation(HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

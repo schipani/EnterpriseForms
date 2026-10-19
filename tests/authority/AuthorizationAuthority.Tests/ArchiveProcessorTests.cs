@@ -133,6 +133,12 @@ public sealed class ArchiveProcessorTests
 
         public void AddResource(AuthorityResource resource) => throw new NotSupportedException();
 
+        public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid org, Guid parent, IReadOnlyCollection<string> types, CancellationToken ct) => Task.FromResult(new List<AuthorityResource>());
+
+        public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationProtectionPolicy?>(null);
+
+        public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => throw new NotSupportedException();
+
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddEdge(AuthorityRelationshipEdge edge) => throw new NotSupportedException();
@@ -172,6 +178,10 @@ public sealed class ArchiveProcessorTests
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => throw new NotSupportedException();
 
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid commitId, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken ct) => Task.FromResult<RecordManifestCommit?>(null);
+
+        public Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken ct) => Task.FromResult<IdentityBinding?>(null);
 
         public void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint) => throw new NotSupportedException();
 

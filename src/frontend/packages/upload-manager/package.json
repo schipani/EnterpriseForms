@@ -1,0 +1,17 @@
+{
+  "name": "@enterpriseforms/upload-manager",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "App-shell owned resumable upload manager (ADR-PB-007): chunked sessions through the request coordinator, progress, resume, user-session commit. Files live in memory for the tab's lifetime; no bytes or tokens are persisted in the browser.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@enterpriseforms/api-client": "0.0.0",
+    "@enterpriseforms/work-queue": "0.0.0"
+  }
+}

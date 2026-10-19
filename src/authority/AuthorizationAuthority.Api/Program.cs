@@ -70,6 +70,7 @@ public sealed class Program
 
         app.MapHealthEndpoints();
         app.MapAuthorizationEndpoints();
+        app.MapFormAccessEndpoints();
         app.MapSecurityCommandEndpoints();
         app.MapContentEndpoints();
         app.MapOperatorEndpoints();

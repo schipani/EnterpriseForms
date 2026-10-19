@@ -69,6 +69,119 @@
         }
       }
     },
+    "/api/v1/session": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Current browser session (no secrets): authenticated flag, organization, CSRF token for mutations.",
+        "operationId": "GetSession",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/session/development-personas": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Synthetic personas seeded through the authority operator plane. 404 outside Development/Testing.",
+        "operationId": "ListDevelopmentPersonas",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DevelopmentPersonaResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/session/development-login": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Development/Testing only: starts a BFF session for a seeded persona. Refused elsewhere by construction.",
+        "operationId": "DevelopmentLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevelopmentLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/session/logout": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "operationId": "Logout",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/v1/bootstrap": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Authenticated bootstrap: user, capabilities, safe branding, UI preferences and current authorization revision (no record counts).",
+        "operationId": "GetBootstrap",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BootstrapResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions": {
       "post": {
         "tags": [
@@ -98,6 +211,802 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Forms the caller may design or use (authority-filtered; no other forms are disclosed).",
+        "operationId": "ListFormDefinitions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FormDefinitionSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "operationId": "GetFormDefinition",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDefinitionDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/designer": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Registers a new form with the authority and opens an empty draft (no published version yet). Requires Idempotency-Key.",
+        "operationId": "CreateFormDefinitionDraft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFormDefinitionV2Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDefinitionDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Adds a stable field identity (storage type immutable after creation).",
+        "operationId": "AddFieldDefinition",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddFieldDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}": {
+      "patch": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Edits a field's catalog label and description (expected revision required); key and storage type are permanent and a differing value is refused.",
+        "operationId": "UpdateFieldDefinition",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFieldDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Classification, storage protection, search impact and migration state of a field.",
+        "operationId": "GetFieldProtection",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Audited migration: raise classification and/or switch a field to application encryption (starts the authority-governed background re-encryption of existing plaintext values). Downgrades are refused.",
+        "operationId": "StrengthenFieldProtection",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrengthenFieldProtectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/retry": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Re-queues the failed records of a field's encryption migration (design permission; audited).",
+        "operationId": "RetryFieldProtectionMigration",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryFieldProtectionMigrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reclassify": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Amendment A1: declassifies an encrypted field to Public/Internal through the authority's ReclassifyField command (organization owner or system administrator; governance approval reference).",
+        "operationId": "ReclassifyField",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReclassifyFieldRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/downgrade": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Amendment A1: releases a Public/Internal field from application encryption (organization owner or system administrator; distinct principal for declassified fields) and starts the audited background decryption migration.",
+        "operationId": "DowngradeFieldProtection",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DowngradeFieldProtectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/cancel-downgrade": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Amendment A1 rollback: re-requires encryption and re-encrypts already converted active values (organization owner or system administrator).",
+        "operationId": "CancelFieldProtectionDowngrade",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelFieldProtectionDowngradeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/access": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Who may design and who may create records, read from the independent Authorization Authority (design permission or organization administration required).",
+        "operationId": "GetFormAccess",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Grants/revokes create-record permission as an authority command; no form version is created and no existing record access changes.",
+        "operationId": "UpdateFormAccess",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFormAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/options": {
+      "put": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Adds, relabels, reorders or deactivates options; keys and ids are stable, nothing is deleted.",
+        "operationId": "UpdateFieldOptions",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFieldOptionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/draft": {
+      "put": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Saves the draft layout (schema v2, validated) with draft-revision CAS.",
+        "operationId": "SaveFormDraft",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDraftResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/publish": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Atomically publishes the draft as an immutable version and advances the current pointer (expected draft revision + current version number).",
+        "operationId": "PublishFormVersion",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishFormRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormVersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/restore-draft": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Copies a published version into the draft; publishing creates a NEW version (history is never rewritten).",
+        "operationId": "RestoreVersionToDraft",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDraftResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/versions": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "operationId": "ListFormVersions",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FormVersionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/relationships": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Defines a reusable related-form list (e.g. AccusedAddressList): parent → child form, bounds, cycle-checked.",
+        "operationId": "CreateRelationshipDefinition",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRelationshipDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationshipDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/form-definitions/{formDefinitionId}/records": {
@@ -105,7 +1014,7 @@
         "tags": [
           "FormRecords"
         ],
-        "summary": "Registers the record with the authority, stages the signed candidate and commits the first accepted content revision.",
+        "summary": "Registers the record with the authority, validates typed values against the published layout, stages the signed candidate and commits the first accepted content revision.",
         "operationId": "CreateFormRecord",
         "parameters": [
           {
@@ -135,6 +1044,63 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FormRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Authority-discoverable records with unverified local metadata; open a record for the verified projection.",
+        "operationId": "ListFormRecords",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "includeChildren",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordListResponse"
                 }
               }
             }
@@ -177,7 +1143,7 @@
         "tags": [
           "FormRecords"
         ],
-        "summary": "Optimistic (expected_content_revision) full-snapshot update staged as a new immutable candidate and committed by the authority.",
+        "summary": "Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority.",
         "operationId": "UpdateFormRecord",
         "parameters": [
           {
@@ -207,6 +1173,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FormRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/projection": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag.",
+        "operationId": "GetRecordProjection",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordProjectionResponse"
                 }
               }
             }
@@ -255,6 +1253,552 @@
         }
       }
     },
+    "/api/v1/form-records/{formRecordId}/related/{formRelationshipDefinitionId}": {
+      "get": {
+        "tags": [
+          "RelatedForms"
+        ],
+        "summary": "Authorized, verified child records of a related-form list (no hidden counts).",
+        "operationId": "ListChildRecords",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formRelationshipDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChildRecordListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/related": {
+      "post": {
+        "tags": [
+          "RelatedForms"
+        ],
+        "summary": "Creates a child record linked to the parent through the authority (parent edge, signed header binding). Requires Idempotency-Key.",
+        "operationId": "CreateChildRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChildRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/related/{childFormRecordId}/unlink": {
+      "post": {
+        "tags": [
+          "RelatedForms"
+        ],
+        "summary": "Authority UnlinkChildRecord command: removes the parent edge, keeps the data, remover becomes owner.",
+        "operationId": "UnlinkChildRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "childFormRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlinkChildRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upload-sessions": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Opens an authorized, idempotent chunked upload session bound to a record's document collection field.",
+        "operationId": "BeginUploadSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BeginUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upload-sessions/{uploadSessionId}/chunks/{chunkIndex}": {
+      "put": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Streams one exact-size chunk (4 MiB; last chunk remainder) into quarantine; acknowledged ranges are server truth.",
+        "operationId": "UploadChunk",
+        "parameters": [
+          {
+            "name": "uploadSessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "chunkIndex",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/Stream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadChunkReceiptResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upload-sessions/{uploadSessionId}": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "operationId": "GetUploadSession",
+        "parameters": [
+          {
+            "name": "uploadSessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Documents"
+        ],
+        "operationId": "CancelUploadSession",
+        "parameters": [
+          {
+            "name": "uploadSessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upload-sessions/{uploadSessionId}/complete": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Idempotent finalize: assembles quarantined chunks and queues durable scan/encrypt processing. 202 = queued, not Ready.",
+        "operationId": "CompleteUploadSession",
+        "parameters": [
+          {
+            "name": "uploadSessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upload-sessions/{uploadSessionId}/commit": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Binds the processed (clean, encrypted) version into the record's signed manifest through the caller's authority context; the document becomes Ready.",
+        "operationId": "CommitUploadSession",
+        "parameters": [
+          {
+            "name": "uploadSessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/my-upload-jobs": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "The caller's own upload sessions and their authoritative processing stage.",
+        "operationId": "ListMyUploadJobs",
+        "parameters": [
+          {
+            "name": "states",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UploadSessionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/documents": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Documents whose version leaf is in the accepted manifest and authorized for the caller.",
+        "operationId": "ListRecordDocuments",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/documents/{fileAttachmentId}": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "operationId": "GetRecordDocument",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fileAttachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/documents/{fileAttachmentId}/download": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Authorized download: re-verifies the record projection, decrypts server-side, streams with no-store and attachment disposition.",
+        "operationId": "DownloadRecordDocument",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fileAttachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "versionNumber",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/documents/{fileAttachmentId}/remove": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Removes the document from the accepted content by committing a new revision without its leaf; bytes and history are retained.",
+        "operationId": "RemoveRecordDocument",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fileAttachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveDocumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormRecordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-records/{formRecordId}/shares": {
       "post": {
         "tags": [
@@ -290,6 +1834,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ShareResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Sharing"
+        ],
+        "summary": "Shares of a record for its access managers (local projection; the authority decides every recipient's access).",
+        "operationId": "ListRecordShares",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordShareListResponse"
                 }
               }
             }
@@ -360,6 +1934,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "Display-name directory of the organization's teams (projection; confers nothing).",
+        "operationId": "ListOrganizationTeams",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DirectoryTeamResponse"
+                  }
                 }
               }
             }
@@ -447,10 +2043,685 @@
           }
         }
       }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Authorized widget descriptors from the static catalog; no inline data, no arbitrary endpoints.",
+        "operationId": "GetDashboard",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/widgets/{widgetIdentifier}/count": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Counts computed only over resources discoverable by the caller.",
+        "operationId": "GetDashboardWidgetCount",
+        "parameters": [
+          {
+            "name": "widgetIdentifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardCountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/my-activity": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "operationId": "GetMyActivity",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEventResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/activity": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Record activity timeline (local audit projection; authority Read permission required).",
+        "operationId": "GetRecordActivity",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordActivityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/branding": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "operationId": "GetOrganizationBranding",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandingResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "OrganizationOwner only; WCAG pairwise contrast validated server-side; revision CAS.",
+        "operationId": "UpdateOrganizationBranding",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBrandingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/branding/logo": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "operationId": "GetOrganizationLogo",
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "operationId": "UploadOrganizationLogo",
+        "requestBody": {
+          "content": {
+            "image/png": {
+              "schema": {
+                "$ref": "#/components/schemas/Stream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/ui-preferences": {
+      "get": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "operationId": "GetUiPreferences",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiPreferenceResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "operationId": "UpdateUiPreferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUiPreferenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiPreferenceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/security-policy": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Data-protection policy: minimum field classification and whether plaintext Internal fields are permitted (ADR-PB-004).",
+        "operationId": "GetOrganizationSecurityPolicy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSecurityPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "OrganizationOwner only; reason required; audited; revision CAS.",
+        "operationId": "UpdateOrganizationSecurityPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationSecurityPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSecurityPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Display-name directory of users seen in this organization (projection; confers nothing).",
+        "operationId": "ListOrganizationUsers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DirectoryUserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AddFieldDefinitionRequest": {
+        "required": [
+          "fieldKey",
+          "fieldDisplayName",
+          "fieldDescription",
+          "fieldDataType",
+          "options"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldKey": {
+            "type": "string"
+          },
+          "fieldDisplayName": {
+            "type": "string"
+          },
+          "fieldDescription": {
+            "type": "string"
+          },
+          "fieldDataType": {
+            "type": "string"
+          },
+          "options": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CreateFieldOptionRequest"
+            }
+          },
+          "fieldClassification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fieldProtectionMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "AuditEventResponse": {
+        "required": [
+          "auditEventId",
+          "eventOccurredOn",
+          "eventCategory",
+          "eventAction",
+          "eventOutcome",
+          "actorUserId",
+          "actorDisplayName",
+          "eventDescription",
+          "correlationIdentifier",
+          "fileAttachmentId",
+          "targetEntityId"
+        ],
+        "type": "object",
+        "properties": {
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventOccurredOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eventCategory": {
+            "type": "string"
+          },
+          "eventAction": {
+            "type": "string"
+          },
+          "eventOutcome": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventDescription": {
+            "type": "string"
+          },
+          "correlationIdentifier": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileAttachmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "targetEntityId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "BeginUploadRequest": {
+        "required": [
+          "formRecordId",
+          "fieldDefinitionId",
+          "originalFileName",
+          "contentType",
+          "sizeBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalFileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "replacesFileAttachmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "BootstrapResponse": {
+        "required": [
+          "session",
+          "branding",
+          "preferences",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/SessionResponse"
+          },
+          "branding": {
+            "$ref": "#/components/schemas/BrandingResponse"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/UiPreferenceResponse"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "BrandingResponse": {
+        "required": [
+          "organizationDisplayName",
+          "hasLogo",
+          "logoAlternativeText",
+          "primaryButtonBackgroundColor",
+          "primaryButtonForegroundColor",
+          "secondaryButtonBackgroundColor",
+          "secondaryButtonForegroundColor",
+          "secondaryButtonBorderColor",
+          "organizationDefaultTextScalePercent",
+          "organizationColorMode",
+          "brandingRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "hasLogo": {
+            "type": "boolean"
+          },
+          "logoAlternativeText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "primaryButtonBackgroundColor": {
+            "type": "string"
+          },
+          "primaryButtonForegroundColor": {
+            "type": "string"
+          },
+          "secondaryButtonBackgroundColor": {
+            "type": "string"
+          },
+          "secondaryButtonForegroundColor": {
+            "type": "string"
+          },
+          "secondaryButtonBorderColor": {
+            "type": "string"
+          },
+          "organizationDefaultTextScalePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "organizationColorMode": {
+            "type": "string"
+          },
+          "brandingRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "CancelFieldProtectionDowngradeRequest": {
+        "required": [
+          "changeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "changeReason": {
+            "type": "string"
+          }
+        }
+      },
+      "ChildRecordListResponse": {
+        "required": [
+          "relationship",
+          "items",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "relationship": {
+            "$ref": "#/components/schemas/RelationshipDefinitionResponse"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChildRecordSummaryResponse"
+            }
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "ChildRecordSummaryResponse": {
+        "required": [
+          "formRecordId",
+          "listSortOrder",
+          "recordStatus",
+          "contentRevision",
+          "summaryValues",
+          "integrityStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "listSortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "recordStatus": {
+            "type": "string"
+          },
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "summaryValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldValueResponse"
+            }
+          },
+          "integrityStatus": {
+            "type": "string"
+          }
+        }
+      },
       "CommandOutcome": {
         "required": [
           "commandId",
@@ -488,6 +2759,40 @@
         "properties": {
           "command": {
             "$ref": "#/components/schemas/CommandOutcome"
+          }
+        }
+      },
+      "CreateChildRecordRequest": {
+        "required": [
+          "formRelationshipDefinitionId",
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "formRelationshipDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateFieldOptionRequest": {
+        "required": [
+          "optionKey",
+          "optionDisplayText"
+        ],
+        "type": "object",
+        "properties": {
+          "optionKey": {
+            "type": "string"
+          },
+          "optionDisplayText": {
+            "type": "string"
           }
         }
       },
@@ -544,6 +2849,37 @@
           }
         }
       },
+      "CreateFormDefinitionV2Request": {
+        "required": [
+          "formDefinitionName",
+          "formDefinitionDescription",
+          "formUserUserIds",
+          "formUserTeamIds"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionName": {
+            "type": "string"
+          },
+          "formDefinitionDescription": {
+            "type": "string"
+          },
+          "formUserUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "formUserTeamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "CreateFormRecordRequest": {
         "required": [
           "values"
@@ -562,6 +2898,44 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "CreateRelationshipDefinitionRequest": {
+        "required": [
+          "childFormDefinitionId",
+          "relationshipDefinitionKey",
+          "relationshipDisplayName",
+          "minimumChildCount",
+          "maximumChildCount"
+        ],
+        "type": "object",
+        "properties": {
+          "childFormDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "relationshipDefinitionKey": {
+            "type": "string"
+          },
+          "relationshipDisplayName": {
+            "type": "string"
+          },
+          "minimumChildCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maximumChildCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -634,6 +3008,674 @@
           }
         }
       },
+      "DashboardCountResponse": {
+        "required": [
+          "widgetIdentifier",
+          "count",
+          "computedOn",
+          "scope"
+        ],
+        "type": "object",
+        "properties": {
+          "widgetIdentifier": {
+            "type": "string"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "computedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scope": {
+            "type": "string"
+          }
+        }
+      },
+      "DashboardResponse": {
+        "required": [
+          "widgets",
+          "capabilities"
+        ],
+        "type": "object",
+        "properties": {
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardWidgetDefinitionResponse"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "DashboardWidgetDefinitionResponse": {
+        "required": [
+          "widgetIdentifier",
+          "widgetTitle",
+          "widgetType",
+          "minimumColumnSpan",
+          "dataEndpointKey"
+        ],
+        "type": "object",
+        "properties": {
+          "widgetIdentifier": {
+            "type": "string"
+          },
+          "widgetTitle": {
+            "type": "string"
+          },
+          "widgetType": {
+            "type": "string"
+          },
+          "minimumColumnSpan": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dataEndpointKey": {
+            "type": "string"
+          }
+        }
+      },
+      "DevelopmentLoginRequest": {
+        "required": [
+          "personaKey"
+        ],
+        "type": "object",
+        "properties": {
+          "personaKey": {
+            "type": "string"
+          }
+        }
+      },
+      "DevelopmentPersonaResponse": {
+        "required": [
+          "personaKey",
+          "displayName",
+          "organizationId",
+          "organizationDisplayName",
+          "organizationRoles"
+        ],
+        "type": "object",
+        "properties": {
+          "personaKey": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "organizationRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "DirectoryTeamResponse": {
+        "required": [
+          "teamId",
+          "teamName"
+        ],
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teamName": {
+            "type": "string"
+          }
+        }
+      },
+      "DirectoryUserResponse": {
+        "required": [
+          "userId",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "DocumentDetailResponse": {
+        "required": [
+          "document",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DocumentSummaryResponse"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentVersionResponse"
+            }
+          }
+        }
+      },
+      "DocumentSummaryResponse": {
+        "required": [
+          "fileAttachmentId",
+          "fieldDefinitionId",
+          "originalFileName",
+          "currentVersionNumber",
+          "detectedContentType",
+          "plaintextSizeBytes",
+          "scanVerdict",
+          "attachmentLifecycleState",
+          "uploadedOn",
+          "uploadedByUserId",
+          "inAcceptedManifest"
+        ],
+        "type": "object",
+        "properties": {
+          "fileAttachmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalFileName": {
+            "type": "string"
+          },
+          "currentVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detectedContentType": {
+            "type": "string"
+          },
+          "plaintextSizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "scanVerdict": {
+            "type": "string"
+          },
+          "attachmentLifecycleState": {
+            "type": "string"
+          },
+          "uploadedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uploadedByUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inAcceptedManifest": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DocumentVersionResponse": {
+        "required": [
+          "fileAttachmentVersionId",
+          "versionNumber",
+          "originalFileName",
+          "detectedContentType",
+          "plaintextSizeBytes",
+          "scanVerdict",
+          "scannerName",
+          "uploadedOn",
+          "uploadedByUserId",
+          "versionState",
+          "contentRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "fileAttachmentVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "originalFileName": {
+            "type": "string"
+          },
+          "detectedContentType": {
+            "type": "string"
+          },
+          "plaintextSizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "scanVerdict": {
+            "type": "string"
+          },
+          "scannerName": {
+            "type": "string"
+          },
+          "uploadedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uploadedByUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionState": {
+            "type": "string"
+          },
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "DowngradeFieldProtectionRequest": {
+        "required": [
+          "changeReason",
+          "expectedProtectionRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "changeReason": {
+            "type": "string"
+          },
+          "expectedProtectionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "FieldDefinitionResponse": {
+        "required": [
+          "fieldDefinitionId",
+          "fieldKey",
+          "fieldDisplayName",
+          "fieldDescription",
+          "fieldDataType",
+          "fieldClassification",
+          "lifecycleStatus",
+          "options"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldKey": {
+            "type": "string"
+          },
+          "fieldDisplayName": {
+            "type": "string"
+          },
+          "fieldDescription": {
+            "type": "string"
+          },
+          "fieldDataType": {
+            "type": "string"
+          },
+          "fieldClassification": {
+            "type": "string"
+          },
+          "lifecycleStatus": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldOptionResponse"
+            }
+          },
+          "fieldDefinitionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64",
+            "default": 1
+          },
+          "fieldProtectionMode": {
+            "type": "string",
+            "default": "Standard"
+          },
+          "protectionPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64",
+            "default": 1
+          }
+        }
+      },
+      "FieldOptionChange": {
+        "required": [
+          "fieldOptionId",
+          "optionKey",
+          "optionDisplayText",
+          "optionSortOrder",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldOptionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "optionKey": {
+            "type": "string"
+          },
+          "optionDisplayText": {
+            "type": "string"
+          },
+          "optionSortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FieldOptionResponse": {
+        "required": [
+          "fieldOptionId",
+          "optionKey",
+          "optionDisplayText",
+          "optionSortOrder",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldOptionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "optionKey": {
+            "type": "string"
+          },
+          "optionDisplayText": {
+            "type": "string"
+          },
+          "optionSortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FieldProtectionMigrationResponse": {
+        "required": [
+          "fieldProtectionMigrationId",
+          "migrationState",
+          "totalRecordCount",
+          "totalValueCount",
+          "completedRecordCount",
+          "failedRecordCount",
+          "pendingRecordCount",
+          "lastErrorCode",
+          "startedOn",
+          "completedOn",
+          "verifiedOn",
+          "authorityCommandId"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldProtectionMigrationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "migrationState": {
+            "type": "string"
+          },
+          "totalRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalValueCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pendingRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastErrorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "verifiedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "authorityCommandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "migrationDirection": {
+            "type": "string",
+            "default": "Encrypt"
+          },
+          "cancelledOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "rollbackOfMigrationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "FieldProtectionResponse": {
+        "required": [
+          "fieldDefinitionId",
+          "fieldKey",
+          "fieldClassification",
+          "fieldProtectionMode",
+          "protectionPolicyRevision",
+          "protectionChangedOn",
+          "migrationState",
+          "legacyPlaintextRecordCount",
+          "searchImpact",
+          "organizationMinimumClassification",
+          "organizationPermitsPlaintext"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldKey": {
+            "type": "string"
+          },
+          "fieldClassification": {
+            "type": "string"
+          },
+          "fieldProtectionMode": {
+            "type": "string"
+          },
+          "protectionPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "protectionChangedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "migrationState": {
+            "type": "string"
+          },
+          "legacyPlaintextRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "searchImpact": {
+            "type": "string"
+          },
+          "organizationMinimumClassification": {
+            "type": "string"
+          },
+          "organizationPermitsPlaintext": {
+            "type": "boolean"
+          },
+          "fullyEncrypted": {
+            "type": "boolean",
+            "default": false
+          },
+          "migration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FieldProtectionMigrationResponse"
+              }
+            ]
+          },
+          "fullyPlaintext": {
+            "type": "boolean",
+            "default": false
+          },
+          "legacyEncryptedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          }
+        }
+      },
       "FieldResponse": {
         "required": [
           "fieldDefinitionId",
@@ -680,6 +3722,131 @@
           },
           "stringValue": {
             "type": "string"
+          },
+          "fieldDataType": {
+            "type": "string",
+            "default": "String"
+          },
+          "applicationEncrypted": {
+            "type": "boolean",
+            "default": false
+          },
+          "legacyPlaintext": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "FormAccessResponse": {
+        "required": [
+          "formDefinitionId",
+          "authorizationRevision",
+          "source",
+          "designers",
+          "formUsers",
+          "availableTeams"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "source": {
+            "type": "string"
+          },
+          "designers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubjectResponse"
+            }
+          },
+          "formUsers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubjectResponse"
+            }
+          },
+          "availableTeams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryTeamResponse"
+            }
+          }
+        }
+      },
+      "FormAccessSubjectResponse": {
+        "required": [
+          "subjectKind",
+          "subjectId",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectKind": {
+            "type": "string"
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "FormDefinitionDetailResponse": {
+        "required": [
+          "summary",
+          "fields",
+          "currentVersion",
+          "draft",
+          "relationships"
+        ],
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/FormDefinitionSummaryResponse"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldDefinitionResponse"
+            }
+          },
+          "currentVersion": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FormVersionResponse"
+              }
+            ]
+          },
+          "draft": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FormDraftResponse"
+              }
+            ]
+          },
+          "relationships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelationshipDefinitionResponse"
+            }
           }
         }
       },
@@ -726,6 +3893,112 @@
           },
           "command": {
             "$ref": "#/components/schemas/CommandOutcome"
+          }
+        }
+      },
+      "FormDefinitionSummaryResponse": {
+        "required": [
+          "formDefinitionId",
+          "formDefinitionName",
+          "formDefinitionDescription",
+          "lifecycleStatus",
+          "currentVersionNumber",
+          "currentFormVersionId",
+          "hasDraft",
+          "canDesign",
+          "canCreateRecord",
+          "modifiedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDefinitionName": {
+            "type": "string"
+          },
+          "formDefinitionDescription": {
+            "type": "string"
+          },
+          "lifecycleStatus": {
+            "type": "string"
+          },
+          "currentVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "currentFormVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "hasDraft": {
+            "type": "boolean"
+          },
+          "canDesign": {
+            "type": "boolean"
+          },
+          "canCreateRecord": {
+            "type": "boolean"
+          },
+          "modifiedOn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FormDraftResponse": {
+        "required": [
+          "formDraftId",
+          "basedOnFormVersionId",
+          "layoutSchemaVersion",
+          "layoutJson",
+          "draftRevision",
+          "updatedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "formDraftId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "basedOnFormVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "layoutSchemaVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "layoutJson": {
+            "type": "string"
+          },
+          "draftRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "updatedOn": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -796,6 +4069,121 @@
           }
         }
       },
+      "FormVersionResponse": {
+        "required": [
+          "formVersionId",
+          "versionNumber",
+          "layoutSchemaVersion",
+          "layoutJson",
+          "changeReason",
+          "restoredFromFormVersionId",
+          "publishedOn",
+          "publishedByUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "formVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "layoutSchemaVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "layoutJson": {
+            "type": "string"
+          },
+          "changeReason": {
+            "type": "string"
+          },
+          "restoredFromFormVersionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "publishedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedByUserId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationSecurityPolicyResponse": {
+        "required": [
+          "minimumFieldClassification",
+          "plaintextInternalFieldsPermitted",
+          "policyStatementText",
+          "policyReviewedOn",
+          "policyReviewedByUserId",
+          "securityPolicyRevision",
+          "isUnreviewedDefault"
+        ],
+        "type": "object",
+        "properties": {
+          "minimumFieldClassification": {
+            "type": "string"
+          },
+          "plaintextInternalFieldsPermitted": {
+            "type": "boolean"
+          },
+          "policyStatementText": {
+            "type": "string"
+          },
+          "policyReviewedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "policyReviewedByUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "securityPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "isUnreviewedDefault": {
+            "type": "boolean"
+          },
+          "plaintextDowngradePermitted": {
+            "type": "boolean",
+            "default": false
+          },
+          "authorityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "ProbeResponse": {
         "required": [
           "probeStatus",
@@ -807,6 +4195,544 @@
             "type": "string"
           },
           "serviceName": {
+            "type": "string"
+          }
+        }
+      },
+      "PublishFormRequest": {
+        "required": [
+          "expectedDraftRevision",
+          "expectedCurrentVersionNumber",
+          "changeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedDraftRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expectedCurrentVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "changeReason": {
+            "type": "string"
+          }
+        }
+      },
+      "ReclassifyFieldRequest": {
+        "required": [
+          "targetClassification",
+          "approvalReference",
+          "changeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "targetClassification": {
+            "type": "string"
+          },
+          "approvalReference": {
+            "type": "string"
+          },
+          "changeReason": {
+            "type": "string"
+          }
+        }
+      },
+      "RecordActivityResponse": {
+        "required": [
+          "formRecordId",
+          "events",
+          "trustNote"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEventResponse"
+            }
+          },
+          "trustNote": {
+            "type": "string"
+          }
+        }
+      },
+      "RecordListItemResponse": {
+        "required": [
+          "formRecordId",
+          "formDefinitionId",
+          "formDefinitionName",
+          "recordStatus",
+          "createdOn",
+          "modifiedOn",
+          "parentFormRecordId",
+          "projectionVerified"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDefinitionName": {
+            "type": "string"
+          },
+          "recordStatus": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modifiedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "parentFormRecordId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "projectionVerified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RecordListResponse": {
+        "required": [
+          "items",
+          "authorizationRevision",
+          "continuationToken"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordListItemResponse"
+            }
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "continuationToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RecordPermissionsResponse": {
+        "required": [
+          "canRead",
+          "canEdit",
+          "canManageAccess",
+          "canTransferOwnership",
+          "isCompleteProjection"
+        ],
+        "type": "object",
+        "properties": {
+          "canRead": {
+            "type": "boolean"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canManageAccess": {
+            "type": "boolean"
+          },
+          "canTransferOwnership": {
+            "type": "boolean"
+          },
+          "isCompleteProjection": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RecordProjectionResponse": {
+        "required": [
+          "record",
+          "formDefinitionName",
+          "layoutVersion",
+          "fields",
+          "documents",
+          "relationships",
+          "permissions",
+          "parentFormRecordId",
+          "formRelationshipDefinitionId",
+          "eTag"
+        ],
+        "type": "object",
+        "properties": {
+          "record": {
+            "$ref": "#/components/schemas/FormRecordResponse"
+          },
+          "formDefinitionName": {
+            "type": "string"
+          },
+          "layoutVersion": {
+            "$ref": "#/components/schemas/FormVersionResponse"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldDefinitionResponse"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentSummaryResponse"
+            }
+          },
+          "relationships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelationshipDefinitionResponse"
+            }
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/RecordPermissionsResponse"
+          },
+          "parentFormRecordId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "formRelationshipDefinitionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "eTag": {
+            "type": "string"
+          }
+        }
+      },
+      "RecordShareListResponse": {
+        "required": [
+          "items",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordShareSummaryResponse"
+            }
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "RecordShareSummaryResponse": {
+        "required": [
+          "recordShareId",
+          "formRecordId",
+          "sharedByUserId",
+          "sharedByDisplayName",
+          "recipientUserId",
+          "recipientDisplayName",
+          "recipientTeamId",
+          "recipientRole",
+          "shareScope",
+          "shareStatus",
+          "shareRevision",
+          "shareCreatedOn",
+          "shareRevokedOn",
+          "fieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "recordShareId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sharedByUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sharedByDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recipientUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recipientTeamId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recipientRole": {
+            "type": "string"
+          },
+          "shareScope": {
+            "type": "string"
+          },
+          "shareStatus": {
+            "type": "string"
+          },
+          "shareRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "shareCreatedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shareRevokedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RelationshipDefinitionResponse": {
+        "required": [
+          "formRelationshipDefinitionId",
+          "parentFormDefinitionId",
+          "childFormDefinitionId",
+          "childFormDefinitionName",
+          "relationshipDefinitionKey",
+          "relationshipDisplayName",
+          "minimumChildCount",
+          "maximumChildCount",
+          "lifecycleStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "formRelationshipDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parentFormDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "childFormDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "childFormDefinitionName": {
+            "type": "string"
+          },
+          "relationshipDefinitionKey": {
+            "type": "string"
+          },
+          "relationshipDisplayName": {
+            "type": "string"
+          },
+          "minimumChildCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maximumChildCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lifecycleStatus": {
+            "type": "string"
+          }
+        }
+      },
+      "RemoveDocumentRequest": {
+        "required": [
+          "expectedContentRevision",
+          "removalReason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "removalReason": {
+            "type": "string"
+          }
+        }
+      },
+      "RestoreVersionRequest": {
+        "required": [
+          "fromFormVersionId"
+        ],
+        "type": "object",
+        "properties": {
+          "fromFormVersionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "RetryFieldProtectionMigrationRequest": {
+        "required": [
+          "retryReason"
+        ],
+        "type": "object",
+        "properties": {
+          "retryReason": {
+            "type": "string"
+          }
+        }
+      },
+      "SaveDraftRequest": {
+        "required": [
+          "expectedDraftRevision",
+          "layoutJson"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedDraftRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "layoutJson": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionResponse": {
+        "required": [
+          "authenticated",
+          "organizationId",
+          "organizationDisplayName",
+          "userId",
+          "displayName",
+          "capabilities",
+          "csrfToken",
+          "expiresOn",
+          "identityProviderKind"
+        ],
+        "type": "object",
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          },
+          "organizationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "csrfToken": {
+            "type": "string"
+          },
+          "expiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "identityProviderKind": {
             "type": "string"
           }
         }
@@ -845,6 +4771,44 @@
           },
           "command": {
             "$ref": "#/components/schemas/CommandOutcome"
+          }
+        }
+      },
+      "Stream": {
+        "type": "string",
+        "format": "binary"
+      },
+      "StrengthenFieldProtectionRequest": {
+        "required": [
+          "targetClassification",
+          "targetProtectionMode",
+          "changeReason",
+          "expectedProtectionRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "targetClassification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetProtectionMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "changeReason": {
+            "type": "string"
+          },
+          "expectedProtectionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -907,6 +4871,212 @@
           }
         }
       },
+      "UiPreferenceResponse": {
+        "required": [
+          "textScalePreferenceMode",
+          "explicitTextScalePercent",
+          "effectiveTextScalePercent",
+          "preferenceRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "textScalePreferenceMode": {
+            "type": "string"
+          },
+          "explicitTextScalePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "effectiveTextScalePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "preferenceRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "UnlinkChildRecordRequest": {
+        "required": [
+          "removalReason"
+        ],
+        "type": "object",
+        "properties": {
+          "removalReason": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateBrandingRequest": {
+        "required": [
+          "expectedBrandingRevision",
+          "organizationDisplayName",
+          "logoAlternativeText",
+          "primaryButtonBackgroundColor",
+          "primaryButtonForegroundColor",
+          "secondaryButtonBackgroundColor",
+          "secondaryButtonForegroundColor",
+          "secondaryButtonBorderColor",
+          "organizationDefaultTextScalePercent",
+          "organizationColorMode"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedBrandingRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "logoAlternativeText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "primaryButtonBackgroundColor": {
+            "type": "string"
+          },
+          "primaryButtonForegroundColor": {
+            "type": "string"
+          },
+          "secondaryButtonBackgroundColor": {
+            "type": "string"
+          },
+          "secondaryButtonForegroundColor": {
+            "type": "string"
+          },
+          "secondaryButtonBorderColor": {
+            "type": "string"
+          },
+          "organizationDefaultTextScalePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "organizationColorMode": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateFieldDefinitionRequest": {
+        "required": [
+          "fieldDisplayName",
+          "fieldDescription",
+          "expectedFieldRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDisplayName": {
+            "type": "string"
+          },
+          "fieldDescription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expectedFieldRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "fieldKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fieldDataType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "UpdateFieldOptionsRequest": {
+        "required": [
+          "changes"
+        ],
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldOptionChange"
+            }
+          }
+        }
+      },
+      "UpdateFormAccessRequest": {
+        "required": [
+          "grantUserIds",
+          "grantTeamIds",
+          "revokeUserIds",
+          "revokeTeamIds",
+          "changeReason"
+        ],
+        "type": "object",
+        "properties": {
+          "grantUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "grantTeamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "revokeUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "revokeTeamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "changeReason": {
+            "type": "string"
+          }
+        }
+      },
       "UpdateFormRecordRequest": {
         "required": [
           "expectedContentRevision",
@@ -929,6 +5099,224 @@
             }
           }
         }
+      },
+      "UpdateOrganizationSecurityPolicyRequest": {
+        "required": [
+          "minimumFieldClassification",
+          "plaintextInternalFieldsPermitted",
+          "policyStatementText",
+          "expectedPolicyRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "minimumFieldClassification": {
+            "type": "string"
+          },
+          "plaintextInternalFieldsPermitted": {
+            "type": "boolean"
+          },
+          "policyStatementText": {
+            "type": "string"
+          },
+          "expectedPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "plaintextDowngradePermitted": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "UpdateUiPreferenceRequest": {
+        "required": [
+          "textScalePreferenceMode",
+          "explicitTextScalePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "textScalePreferenceMode": {
+            "type": "string"
+          },
+          "explicitTextScalePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "UploadChunkReceiptResponse": {
+        "required": [
+          "uploadSessionId",
+          "chunkIndex",
+          "receivedBytes",
+          "receivedChunkIndexes",
+          "complete"
+        ],
+        "type": "object",
+        "properties": {
+          "uploadSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chunkIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "receivedBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "receivedChunkIndexes": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UploadSessionResponse": {
+        "required": [
+          "uploadSessionId",
+          "formRecordId",
+          "fieldDefinitionId",
+          "originalFileName",
+          "declaredSizeBytes",
+          "chunkSizeBytes",
+          "expectedChunkCount",
+          "receivedChunkIndexes",
+          "receivedBytes",
+          "sessionState",
+          "failureReasonCode",
+          "processingStage",
+          "sessionExpiresOn",
+          "fileAttachmentId",
+          "versionNumber",
+          "scanVerdict"
+        ],
+        "type": "object",
+        "properties": {
+          "uploadSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalFileName": {
+            "type": "string"
+          },
+          "declaredSizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "chunkSizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "expectedChunkCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "receivedChunkIndexes": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          "receivedBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "sessionState": {
+            "type": "string"
+          },
+          "failureReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "processingStage": {
+            "type": "string"
+          },
+          "sessionExpiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fileAttachmentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "versionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "scanVerdict": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       }
     }
   },
@@ -943,13 +5331,34 @@
       "name": "FormDefinitions"
     },
     {
+      "name": "FormDesigner"
+    },
+    {
       "name": "FormRecords"
+    },
+    {
+      "name": "RelatedForms"
+    },
+    {
+      "name": "Documents"
     },
     {
       "name": "Sharing"
     },
     {
       "name": "Teams"
+    },
+    {
+      "name": "Dashboard"
+    },
+    {
+      "name": "Audit"
+    },
+    {
+      "name": "Organizations"
+    },
+    {
+      "name": "UserPreferences"
     }
   ]
 }

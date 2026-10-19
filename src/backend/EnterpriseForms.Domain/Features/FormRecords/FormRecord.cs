@@ -37,13 +37,19 @@ public sealed class FormRecord
     public long RecordRevision { get; set; } = 1;
 
     public Guid? AuthorityCommandId { get; set; }
+
+    /// <summary>Local projection of the authority parent edge (child records); the signed header binds the link (schema v3).</summary>
+    public Guid? ParentFormRecordId { get; set; }
+
+    public Guid? FormRelationshipDefinitionId { get; set; }
 }
 
 /// <summary>
 /// Immutable staged header candidate keyed by (record, operation) — the RecordHeader Merkle item (MERKLE §2).
-/// Signed under RowHmac v1 entity kind <c>form_records</c>, schema version 2, primary key = form_record_id.
+/// Signed under RowHmac v1 entity kind <c>form_records</c>, schema version 3 (v2 + parent/relationship binding, B-04),
+/// primary key = form_record_id.
 /// </summary>
-public sealed class FormRecordRevision
+public sealed class FormRecordRevision : ISignedContentRow
 {
     public Guid FormRecordRevisionId { get; set; }
 
@@ -65,6 +71,13 @@ public sealed class FormRecordRevision
 
     public DateTimeOffset? SubmittedOn { get; set; }
 
+    /// <summary>Parent record of a child record (signed; null for top-level records).</summary>
+    public Guid? ParentFormRecordId { get; set; }
+
+    public Guid? FormRelationshipDefinitionId { get; set; }
+
+    public long? RelationshipSortOrder { get; set; }
+
     public long RowRevision { get; set; }
 
     public byte[] RowSignature { get; set; } = [];
@@ -77,16 +90,19 @@ public sealed class FormRecordRevision
     public string CandidateState { get; set; } = "Staged";
 
     public DateTimeOffset StagedOn { get; set; }
+
+    public string EntityKind => "form_records";
+
+    public byte ItemKindCode => ContentItemKindCodes.RecordHeader;
+
+    public Guid ItemId => FormRecordId;
+
+    public Guid RowPrimaryKey => FormRecordId;
 }
 
-/// <summary>
-/// Typed string value row (CLAUDE.md §2.4), staged immutably per content operation. <c>FieldValueItemId</c> is the stable
-/// logical item identity (Merkle FieldValue item id); the surrogate key identifies the physical staged copy.
-/// </summary>
-public sealed class FieldStringValue
+/// <summary>Common shape of the typed value tables (CLAUDE.md §2.4): one logical item identity, staged immutably per operation.</summary>
+public abstract class FieldValueRowBase : ISignedContentRow
 {
-    public Guid FieldStringValueId { get; set; }
-
     public Guid TenantId { get; set; }
 
     public Guid FormRecordId { get; set; }
@@ -101,8 +117,6 @@ public sealed class FieldStringValue
 
     public long ContentRevision { get; set; }
 
-    public string StringValue { get; set; } = string.Empty;
-
     public long RowRevision { get; set; }
 
     public byte[] RowSignature { get; set; } = [];
@@ -114,4 +128,136 @@ public sealed class FieldStringValue
     public DateTimeOffset CreatedOn { get; set; }
 
     public Guid CreatedByUserId { get; set; }
+
+    public abstract string EntityKind { get; }
+
+    public virtual byte ItemKindCode => ContentItemKindCodes.FieldValue;
+
+    public Guid ItemId => FieldValueItemId;
+
+    public abstract Guid RowPrimaryKey { get; }
+}
+
+/// <summary>Typed string value row; <c>FieldValueItemId</c> is the stable logical item identity (Merkle FieldValue item id).</summary>
+public sealed class FieldStringValue : FieldValueRowBase
+{
+    public Guid FieldStringValueId { get; set; }
+
+    public string StringValue { get; set; } = string.Empty;
+
+    public override string EntityKind => "field_string_values";
+
+    public override Guid RowPrimaryKey => FieldStringValueId;
+}
+
+public sealed class FieldIntegerValue : FieldValueRowBase
+{
+    public Guid FieldIntegerValueId { get; set; }
+
+    public long IntegerValue { get; set; }
+
+    public override string EntityKind => "field_integer_values";
+
+    public override Guid RowPrimaryKey => FieldIntegerValueId;
+}
+
+public sealed class FieldDecimalValue : FieldValueRowBase
+{
+    public Guid FieldDecimalValueId { get; set; }
+
+    public decimal DecimalValue { get; set; }
+
+    public override string EntityKind => "field_decimal_values";
+
+    public override Guid RowPrimaryKey => FieldDecimalValueId;
+}
+
+public sealed class FieldDateValue : FieldValueRowBase
+{
+    public Guid FieldDateValueId { get; set; }
+
+    public DateOnly DateValue { get; set; }
+
+    public override string EntityKind => "field_date_values";
+
+    public override Guid RowPrimaryKey => FieldDateValueId;
+}
+
+public sealed class FieldDateTimeValue : FieldValueRowBase
+{
+    public Guid FieldDateTimeValueId { get; set; }
+
+    /// <summary>Exact instant, UTC, second precision (the canonical timestamp encoding is second-exact).</summary>
+    public DateTimeOffset DateTimeValue { get; set; }
+
+    public override string EntityKind => "field_date_time_values";
+
+    public override Guid RowPrimaryKey => FieldDateTimeValueId;
+}
+
+public sealed class FieldGuidValue : FieldValueRowBase
+{
+    public Guid FieldGuidValueId { get; set; }
+
+    public Guid GuidValue { get; set; }
+
+    public override string EntityKind => "field_guid_values";
+
+    public override Guid RowPrimaryKey => FieldGuidValueId;
+}
+
+/// <summary>
+/// Application-encrypted value of any logical type (CLAUDE.md §4C.3): AES-256-GCM ciphertext of the canonical wire string,
+/// nonce, tag, the per-value DEK wrapped by the organization KEK, algorithm/key/envelope identifiers and the logical
+/// type. No plaintext copy exists in any typed table; the row HMAC binds the whole envelope.
+/// </summary>
+public sealed class FieldEncryptedValue : FieldValueRowBase
+{
+    public Guid FieldEncryptedValueId { get; set; }
+
+    public byte[] EncryptedValueBytes { get; set; } = [];
+
+    public byte[] EncryptionNonceBytes { get; set; } = [];
+
+    public byte[] EncryptionAuthTagBytes { get; set; } = [];
+
+    public byte[] WrappedDataKeyBytes { get; set; } = [];
+
+    public string EncryptionAlgorithmName { get; set; } = string.Empty;
+
+    public string EncryptionKeyReference { get; set; } = string.Empty;
+
+    public int EncryptionEnvelopeVersion { get; set; }
+
+    /// <summary>The data type the plaintext was serialized as (String, Integer, Date, …); needed to render and validate after decryption.</summary>
+    public string EncryptedLogicalType { get; set; } = string.Empty;
+
+    public override string EntityKind => "field_encrypted_values";
+
+    public override Guid RowPrimaryKey => FieldEncryptedValueId;
+}
+
+public sealed class FieldBooleanValue : FieldValueRowBase
+{
+    public Guid FieldBooleanValueId { get; set; }
+
+    public bool BooleanValue { get; set; }
+
+    public override string EntityKind => "field_boolean_values";
+
+    public override Guid RowPrimaryKey => FieldBooleanValueId;
+}
+
+/// <summary>Option selection row (single-select in Stage B): references the stable option id, never the label (CLAUDE.md §2.2).</summary>
+public sealed class FieldOptionValue : FieldValueRowBase
+{
+    public Guid FieldOptionValueId { get; set; }
+
+    public Guid FieldOptionId { get; set; }
+
+    public override string EntityKind => "field_option_values";
+
+    public override byte ItemKindCode => ContentItemKindCodes.FieldSelection;
+
+    public override Guid RowPrimaryKey => FieldOptionValueId;
 }

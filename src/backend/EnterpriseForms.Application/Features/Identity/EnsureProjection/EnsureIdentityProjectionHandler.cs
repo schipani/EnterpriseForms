@@ -13,4 +13,17 @@ public sealed class EnsureIdentityProjectionHandler(IBusinessStore store)
         await scope.EnsureTenantAndUserProjectionAsync(context.OrganizationId, context.LocalUserId, context.IssuerUri, context.SubjectIdentifier, context.DisplayName, cancellationToken).ConfigureAwait(false);
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>Projects several known principals of one organization at once (development personas); display data only, no permission.</summary>
+    public async Task HandleManyAsync(Guid organizationId, IReadOnlyList<(Guid UserId, string IssuerUri, string SubjectIdentifier, string DisplayName)> principals, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(principals);
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var principal in principals)
+        {
+            await scope.EnsureTenantAndUserProjectionAsync(organizationId, principal.UserId, principal.IssuerUri, principal.SubjectIdentifier, principal.DisplayName, cancellationToken).ConfigureAwait(false);
+        }
+
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
 }

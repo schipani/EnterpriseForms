@@ -1,0 +1,21 @@
+{
+  "name": "@enterpriseforms/app-runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "App-shell runtime shared with features: request coordinator + typed API client + upload manager context, BFF session state, branding application and Problem Details presentation.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@enterpriseforms/api-client": "0.0.0",
+    "@enterpriseforms/design-tokens": "0.0.0",
+    "@enterpriseforms/upload-manager": "0.0.0",
+    "@enterpriseforms/work-queue": "0.0.0",
+    "@tanstack/react-query": "5.104.4",
+    "react": "19.3.1"
+  }
+}

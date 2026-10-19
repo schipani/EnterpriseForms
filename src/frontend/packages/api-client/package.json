@@ -13,5 +13,8 @@
   },
   "devDependencies": {
     "openapi-typescript": "7.13.0"
+  },
+  "dependencies": {
+    "@enterpriseforms/work-queue": "0.0.0"
   }
 }

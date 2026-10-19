@@ -1,0 +1,45 @@
+### stop security-test stack
+ Network enterpriseforms-sectest_authority-net Removed 
+ Network enterpriseforms-sectest_web-net Removed 
+ Network enterpriseforms-sectest_trust-edge Removed 
+### start security-test stack
+ Container enterpriseforms-sectest-vault-1 Healthy 
+ Container enterpriseforms-sectest-spicedb-1 Healthy 
+ Container enterpriseforms-sectest-worker-1 Healthy 
+ Container enterpriseforms-sectest-authority-db-1 Healthy 
+ Container enterpriseforms-sectest-attacker-sql-1 Healthy 
+ Container enterpriseforms-sectest-vault-transit-init-1 Exited 
+ Container enterpriseforms-sectest-api-1 Healthy 
+container enterpriseforms-sectest-dev-seed-1 exited (0)
+### build tests
+Build succeeded.
+Build succeeded.
+### stage-b integration
+  total: 24
+  failed: 0
+  succeeded: 24
+  skipped: 0
+  duration: 1m 30s 967ms
+### playwright
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+    Timeout: 20000ms
+    Error: element(s) not found
+      90 |     await expect(page.getByText(`Marina meeting ${run}`)).toBeVisible();
+    > 91 |     await expect(page.getByText("Encrypted", { exact: true })).toBeVisible();
+    test-results\encryption-Field-encryptio-21154--badge-the-reader-is-denied-chromium-desktop\test-failed-1.png
+    Error Context: test-results\encryption-Field-encryptio-21154--badge-the-reader-is-denied-chromium-desktop\error-context.md
+    Error: PB14-10 organization data-protection policy @320 phone: horizontal overflow
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoBeLessThanOrEqual[2m([22m[32mexpected[39m[2m)[22m
+      29 |   expect(violations.map((v) => `${label}: ${v.id} (${v.impact}) ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join("; ")}`)).toEqual([]);
+    > 31 |   expect(overflow, `${label}: horizontal overflow`).toBeLessThanOrEqual(0);
+    test-results\pb14-accessibility-PB-14-a-5fbad--width-PB14-10-14-22-23-32--chromium-desktop\test-failed-1.png
+    Error Context: test-results\pb14-accessibility-PB-14-a-5fbad--width-PB14-10-14-22-23-32--chromium-desktop\error-context.md
+[1A[2K  2 failed
+  10 passed (3.5m)
+### sec-p
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 2m 09s 275ms
+### DONE

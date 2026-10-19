@@ -65,6 +65,7 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<SecurityCommandService>();
         services.AddSingleton<PermissionCheckService>();
+        services.AddSingleton<FormAccessService>();
         services.AddSingleton<ContentService>();
         services.AddSingleton<ProjectionProcessor>();
         services.AddSingleton<ArchiveProcessor>();

@@ -27,6 +27,7 @@ public sealed class RevokeShareHandler(IBusinessStore store, IAuthorizationAutho
                 share.ShareRevokedOn = clock.GetUtcNow();
                 share.ShareRevokedByUserId = context.LocalUserId;
                 share.ShareRevision++;
+                Audit.AuditRecorder.Record(scope, context, clock, Audit.AuditCategories.Access, Domain.Features.Audit.AuditActions.RecordAccessRevoked, "share revoked at the authority barrier", formRecordId, targetEntityType: "record_share", targetEntityId: recordShareId, metadata: new { commandId = command.CommandId });
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             }
         }

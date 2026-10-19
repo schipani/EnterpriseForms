@@ -24,8 +24,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "0bb02979fdba86f7a52450bd4fbedbacdcbe038e6e65d1e0f55d2bb71e81b969",
-      "bytes": 4839
+      "sha256": "d41e73764c5cc75f1b67877d8df4d6998bc24ee100ab0581781a126c77a87a29",
+      "bytes": 5896
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
@@ -68,6 +68,11 @@
       "bytes": 16884
     },
     {
+      "path": "docs/STAGE_B_STATUS.md",
+      "sha256": "306e3e7c99855ac659f3ecba03873b66b858a7aa972e1a53c2247d51d0e55991",
+      "bytes": 78952
+    },
+    {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
       "sha256": "2bf4738113e263f7c8dae715dc8e95900ef3c799d55a89d67d697d43a4153828",
       "bytes": 5405
@@ -79,8 +84,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "5cfab96eebcfad8c30dccc536a1e7faa16f9377c5a309f51f10a0bf0530d4ee0",
-      "bytes": 6417
+      "sha256": "5351b8f54b8de25302113fc63399394d9a413bddbcc0cb13eb36d6f6d1fc3cae",
+      "bytes": 7824
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -91,6 +96,11 @@
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
       "sha256": "601d3bd714ada33016c5ad2a39b8d2b2711e112813340a247d45aca2b19790c2",
       "bytes": 6295
+    },
+    {
+      "path": "docs/decisions/ADR-AMENDMENT-PB-004-A1-ENCRYPTED-TO-PLAINTEXT-MIGRATION.md",
+      "sha256": "d10ff4a49cfd3c0703de8dc5e02e42616b0bf0201457f960c7e2d777a1f01dbf",
+      "bytes": 15129
     },
     {
       "path": "docs/decisions/ADR-PB-001-CANONICAL-REPOSITORY.md",
@@ -109,8 +119,8 @@
     },
     {
       "path": "docs/decisions/ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md",
-      "sha256": "daf3eec1583d349f7526f3b1fcf9139dc508acdd38cbd8de58eb4beeb1f71155",
-      "bytes": 9967
+      "sha256": "3c1be74d6cac043055bbbb49f32415007b5b3d5856689f9c37a0640b4fc1a46e",
+      "bytes": 10418
     },
     {
       "path": "docs/decisions/ADR-PB-005-DOCKER-AZURE-BICEP-DEPLOYMENT.md",
@@ -169,13 +179,18 @@
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
-      "sha256": "ef84c4841db084c531258495072973deb28edc4ebc8753a17a2f0b5b6ec4ee89",
-      "bytes": 7231
+      "sha256": "46c0ad4d5c7c0744cda8cc4bea0827e50e1fb0c0a263ba9bcd2e0b3ca583f5df",
+      "bytes": 8374
     },
     {
       "path": "docs/decisions/STAGE_A_DECISION_LOG.md",
-      "sha256": "49bd741a2c34814a7db61c73b2b70fb284d2b57b213935cb4f20dbde939d656b",
-      "bytes": 11781
+      "sha256": "61726c4fca02869f8c740919b3910fecfc54f65c25c9628d7758861396056f0d",
+      "bytes": 12282
+    },
+    {
+      "path": "docs/decisions/STAGE_B_DECISION_LOG.md",
+      "sha256": "407eca8a4056083e4d53642dffcee1133fc0be36552117ea36964bef6af3f2a6",
+      "bytes": 38250
     },
     {
       "path": "docs/delivery/BUILD00_REPOSITORY_PROTECTION.md",
@@ -248,6 +263,11 @@
       "bytes": 3348
     },
     {
+      "path": "docs/security/DOCUMENT_ENCRYPTION_AUDIT.md",
+      "sha256": "0cef9d3ddb8d8689f1df57777a34de5bb7af28c8358d60b796a9067e5cf6fc71",
+      "bytes": 13412
+    },
+    {
       "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_ATTESTATION_TEMPLATE.md",
       "sha256": "60eb8d2f70d1f1a15ca8a8c1e17c290f3553a04b7490468e2b001b68b599afc6",
       "bytes": 4142
@@ -289,8 +309,8 @@
     },
     {
       "path": "docs/testing/PB14_UI_DESIGN_ACCEPTANCE_TESTS.csv",
-      "sha256": "6623155c5d92e01165f427a1247836e4025877f4a37f038628cb083a017b52e7",
-      "bytes": 3747
+      "sha256": "a06f90e129955c578175e3dfe77d3367168378312cb5fd513f36f791be80ab56",
+      "bytes": 4288
     },
     {
       "path": "docs/ui/PB14_COLOR_CONTRAST.reference.ts",
@@ -306,6 +326,11 @@
       "path": "docs/ui/PB14_ENTERPRISE_DESIGN_VALIDATION_STANDARD.md",
       "sha256": "58323f8071182549f38e039ee09cf403397323a60ff603681d1ba1b7311e52eb",
       "bytes": 5991
+    },
+    {
+      "path": "docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md",
+      "sha256": "173e85138c5b11143b74a2417c4e3c890ee3d21c1a3554d77ab6d26d4c8d1999",
+      "bytes": 7455
     },
     {
       "path": "docs/ui/PB14_REPRESENTATIVE_SCREEN_CONTRACTS.md",

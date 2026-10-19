@@ -18,7 +18,11 @@ public static class AuthorityRuntimeGrants
     private static readonly string[] MutableTables =
     [
         "organization_authorization_states", "identity_bindings", "authority_resources", "record_content_heads", "content_change_operations", "integrity_key_registrations",
+        "organization_protection_policies",
     ];
+
+    /// <summary>Every table the runtime role may touch; a model table missing here is a startup defect caught by the unit test, not in Docker.</summary>
+    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. MutableTables];
 
     public static void Apply(DbContext context, string runtimeRole)
     {

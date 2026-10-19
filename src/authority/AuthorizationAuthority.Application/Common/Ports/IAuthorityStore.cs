@@ -29,11 +29,20 @@ public interface IAuthorityScope : IAsyncDisposable
 
     Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken);
 
+    Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken cancellationToken);
+
     void AddIdentityBinding(IdentityBinding binding);
 
     Task<AuthorityResource?> FindResourceAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, CancellationToken cancellationToken);
 
     void AddResource(AuthorityResource resource);
+
+    /// <summary>Active resources of the given types whose parent is the given entity (e.g. the protection requirements/releases of a form's fields).</summary>
+    Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken);
+
+    Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    void AddProtectionPolicy(OrganizationProtectionPolicy policy);
 
     /// <summary>All currently active desired-state edges of the organization (normalized authoritative graph).</summary>
     Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid organizationId, CancellationToken cancellationToken);
@@ -77,6 +86,9 @@ public interface IAuthorityScope : IAsyncDisposable
     void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves);
 
     Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid recordManifestCommitId, CancellationToken cancellationToken);
+
+    /// <summary>The accepted manifest commit of one earlier operation of a record (historic verification), or null.</summary>
+    Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken);
 
     void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint);
 

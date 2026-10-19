@@ -1,8 +1,13 @@
 using EnterpriseForms.Api.Composition;
+using EnterpriseForms.Api.Features.Dashboard;
+using EnterpriseForms.Api.Features.Documents;
 using EnterpriseForms.Api.Features.FormDefinitions;
+using EnterpriseForms.Api.Features.FormDesigner;
 using EnterpriseForms.Api.Features.FormRecords;
 using EnterpriseForms.Api.Features.Identity;
+using EnterpriseForms.Api.Features.Organizations;
 using EnterpriseForms.Api.Features.Platform;
+using EnterpriseForms.Api.Features.RelatedForms;
 using EnterpriseForms.Api.Features.Sharing;
 using EnterpriseForms.Api.Features.Teams;
 using EnterpriseForms.Infrastructure;
@@ -47,7 +52,12 @@ public sealed class Program
 
         builder.Services.AddTrustAuthorityReadinessProbe(builder.Configuration);
         builder.Services.AddBusinessInfrastructure(builder.Configuration);
-        builder.Services.AddBusinessAuthentication(builder.Configuration);
+        builder.Services.AddBusinessAuthentication(builder.Configuration, builder.Environment);
+        builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));
+        builder.Services.AddHostedService<DocumentProviderStartupGuard>();
+        builder.Services.AddHostedService<DocumentProcessingHostedService>();
+        builder.Services.AddHostedService<FieldProtectionMigrationHostedService>();
+        builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 5L * 1024 * 1024); // one 4 MiB chunk (+ framing); never whole files
 
         var app = builder.Build();
 
@@ -55,6 +65,7 @@ public sealed class Program
         app.UseStatusCodePages();
         app.UseSecurityHeaders();
         app.UseAuthentication();
+        app.UseSessionCsrfProtection();
         app.UseAuthorization();
 
         if (app.Environment.IsDevelopment())
@@ -64,10 +75,16 @@ public sealed class Program
 
         app.MapPlatformEndpoints();
         app.MapIdentityEndpoints();
+        app.MapSessionEndpoints();
         app.MapFormDefinitionEndpoints();
+        app.MapFormDesignerEndpoints();
         app.MapFormRecordEndpoints();
+        app.MapRelatedFormsEndpoints();
+        app.MapDocumentEndpoints();
         app.MapSharingEndpoints();
         app.MapTeamEndpoints();
+        app.MapDashboardEndpoints();
+        app.MapOrganizationEndpoints();
 
         app.Run();
         return 0;

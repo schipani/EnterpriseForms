@@ -1,5 +1,6 @@
 using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Api.Features.FormDefinitions;
+using EnterpriseForms.Application.Common.Persistence;
 using EnterpriseForms.Application.Features.Teams.ManageTeam;
 using EnterpriseForms.Contracts.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -21,6 +22,16 @@ public static class TeamEndpoints
                 return TypedResults.Created($"{ApiVersions.V1Prefix}/teams/{response.TeamId:D}", response);
             })
             .WithName("CreateTeam");
+
+        group.MapGet("/", static async Task<Ok<IReadOnlyList<DirectoryTeamResponse>>> (HttpContext http, IBusinessStore store, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+                var teams = await scope.GetTeamsAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false);
+                return TypedResults.Ok<IReadOnlyList<DirectoryTeamResponse>>(teams.Select(t => new DirectoryTeamResponse(t.TeamId, t.TeamName)).ToList());
+            })
+            .WithName("ListOrganizationTeams")
+            .WithSummary("Display-name directory of the organization's teams (projection; confers nothing).");
 
         group.MapPost("/{teamId:guid}/members", static async Task<Ok<CommandStatusResponse>> (Guid teamId, TeamMemberRequest request, HttpContext http, ChangeTeamMembershipHandler handler, CancellationToken cancellationToken) =>
             {

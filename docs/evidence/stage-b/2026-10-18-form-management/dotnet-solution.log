@@ -1,0 +1,5 @@
+dotnet test --solution EnterpriseForms.All.slnx -c Debug (PowerShell)
+  total: 152
+  failed: 0
+  succeeded: 152
+  skipped: 0

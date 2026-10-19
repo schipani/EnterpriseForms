@@ -27,13 +27,13 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
             throw new BusinessException("NO_COMMITTED_CONTENT", 404, "record has no accepted content");
         }
 
-        List<Domain.Features.FormRecords.FieldStringValue> values;
+        List<Domain.Features.FormRecords.FieldValueRowBase> values;
         List<Domain.Features.FormDefinitions.FieldDefinition> fields;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             var header = await scope.FindStagedHeaderAsync(formRecordId, head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false)
                          ?? throw new BusinessException("NO_COMMITTED_CONTENT", 404, "committed header missing");
-            values = await scope.GetStagedValuesAsync(formRecordId, head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false);
+            values = (await scope.GetStagedRowsAsync(formRecordId, head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false)).OfType<Domain.Features.FormRecords.FieldValueRowBase>().ToList();
             fields = await scope.GetFieldDefinitionsAsync(header.FormDefinitionId, cancellationToken).ConfigureAwait(false);
         }
 
@@ -73,6 +73,7 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
             if (await scope.FindShareProjectionAsync(context.OrganizationId, recordShareId, cancellationToken).ConfigureAwait(false) is null)
             {
                 var now = clock.GetUtcNow();
+                Audit.AuditRecorder.Record(scope, context, clock, Audit.AuditCategories.Access, Domain.Features.Audit.AuditActions.RecordAccessGranted, "field-scoped share committed by the authority", formRecordId, targetEntityType: "record_share", targetEntityId: recordShareId, metadata: new { role = request.RecipientRole, recipientUserId = request.RecipientUserId, recipientTeamId = request.RecipientTeamId, fieldKeys = request.FieldKeys, commandId = command.CommandId });
                 scope.AddShareProjection(new RecordShare
                 {
                     RecordShareId = recordShareId,

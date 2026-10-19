@@ -33,6 +33,26 @@ The current documentation references three **future generated or finalized artif
 
 **Gate 0:** These missing deliverables must exist, be reviewed, and pass the specification reference validator in strict mode before Stage A security implementation is considered complete. Their absence is an explicit blocker, not an accidental omission. Other operational decisions—including region-specific Managed HSM recovery and real 15-minute RPO proof—remain deployment validation tasks, not waived by approved ADRs.
 
+## Stage B local run (Accused vertical slice)
+
+Stage A's security gate remains **BLOCKED** (independent cryptographic review not performed); Stage B is a feature
+milestone on top of it, not a production or Level 2 claim. Status, test evidence and open defects:
+`docs/STAGE_B_STATUS.md`.
+
+```bash
+# 1. Full local stack (PostgreSQL x2, SpiceDB, Vault Transit, Azurite, ClamAV, authority, API, worker, dev-seed)
+cd infrastructure/docker && cp env.example .env
+docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d --build --wait     # API on http://localhost:5080
+
+# 2. Web app (Vite dev server proxies /api to the API)
+cd ../../src/frontend && npm ci && npm run dev -w apps/web                                  # http://localhost:5173
+
+# 3. Sign in: /login lists the seeded development personas (owner, designer, clerk, reader) — Development/Testing only.
+```
+
+Integration and browser tests use the disposable security-test profile instead (API on 5180): see
+`docs/STAGE_B_STATUS.md` §4 for the exact commands and the recorded results.
+
 ## Package integrity and repeatability
 
 - `spec-files.json` enumerates the exact canonical snapshot inputs with SHA-256 hashes. `SHA256SUMS.txt` contains the same listed byte digests.

@@ -58,6 +58,11 @@ public sealed partial class CreateFormDefinitionHandler(IBusinessStore store, Au
             return ToResponse(existing, existingFields, outcome);
         }
 
+        // Stage A fields are explicit Internal/Standard String fields; the organization data-protection policy decides whether
+        // plaintext Internal storage is still permitted (B-25) — the same rule the designer route applies.
+        var securityPolicy = await Organizations.SecurityPolicyHandlers.EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+        var (stageAClassification, stageAProtectionMode) = Protection.FieldProtectionPolicy.Resolve("String", "Internal", "Standard", securityPolicy);
+
         var versionId = Guid.CreateVersion7();
         var fields = request.Fields.Select(f => new FieldDefinition
         {
@@ -67,7 +72,8 @@ public sealed partial class CreateFormDefinitionHandler(IBusinessStore store, Au
             FieldDisplayName = f.FieldDisplayName,
             FieldDescription = string.Empty,
             FieldDataType = "String",
-            FieldClassification = "Internal",
+            FieldClassification = stageAClassification,
+            FieldProtectionMode = stageAProtectionMode,
             IsSearchable = false,
             LifecycleStatus = "Available",
             CreatedOn = now,

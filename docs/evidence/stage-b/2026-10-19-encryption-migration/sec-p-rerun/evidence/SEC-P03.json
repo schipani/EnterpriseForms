@@ -1,0 +1,101 @@
+{
+  "test_id": "SEC-P03",
+  "scenario": "Direct SQL team membership: forged membership cannot grant access; checked against authority revision",
+  "outcome": "PASS",
+  "commit_sha": "1c05ee2405bf1687b6d1826a7c0f8ee96c8425f3",
+  "image_fingerprint": "sha256:13ebe96c74ef00398852ef49326416fe772464034d45d795f14e038929c081bc (api=sha256:c2ac0ebea6cfd00f4f6487db7097df8ffcfe0603d67d334caed93b9316729995;authority=sha256:ff71c491976f1cb3b27c032210b31396d6983b19d162d8043db666703c2deb69)",
+  "started_at_utc": "2026-10-19T14:57:05.4927585\u002B00:00",
+  "executed_at_utc": "2026-10-19T14:57:08.6125719\u002B00:00",
+  "authority_revision": 7,
+  "content_revision": 1,
+  "failure_detail": null,
+  "observations": [
+    {
+      "at": "2026-10-19T14:57:05.5235264\u002B00:00",
+      "step": "bootstrap organization",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "authorization_revision": "1",
+        "integrity_key_name": "org-01a154aa8bd47bf7b5a8c11813019e92-row-integrity-v1",
+        "signing_key_version": "1"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:06.1297401\u002B00:00",
+      "step": "create team",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "teamId": "029a49e4-194b-814c-aa92-23408e8c1d71"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:06.8308602\u002B00:00",
+      "step": "create form definition",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formDefinitionId": "8bcd8995-692c-8e32-a59a-7a8e45c3692d",
+        "authorizationRevision": "4"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:07.2985066\u002B00:00",
+      "step": "create record",
+      "status": 201,
+      "error_code": null,
+      "fields": {
+        "formRecordId": "ed3b2205-4dcd-81ff-b872-27aee52ea367",
+        "contentRevision": "1",
+        "committedOperationId": "9142b321-19da-8047-93ba-068ad2454c46",
+        "authorizationRevision": "5",
+        "integrityStatus": "Committed(Pending)"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:07.9949527\u002B00:00",
+      "step": "hostile INSERT team_memberships",
+      "detail": {
+        "rows": "1"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:08.0084339\u002B00:00",
+      "step": "attacker read with forged membership",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    },
+    {
+      "at": "2026-10-19T14:57:08.3448387\u002B00:00",
+      "step": "legitimate AddTeamMember",
+      "status": 200,
+      "error_code": null,
+      "fields": {}
+    },
+    {
+      "at": "2026-10-19T14:57:08.3973807\u002B00:00",
+      "step": "member read after legitimate membership",
+      "status": 200,
+      "error_code": null,
+      "fields": {
+        "isCompleteProjection": "true"
+      }
+    },
+    {
+      "at": "2026-10-19T14:57:08.5933386\u002B00:00",
+      "step": "RemoveTeamMember",
+      "status": 200,
+      "error_code": null,
+      "fields": {}
+    },
+    {
+      "at": "2026-10-19T14:57:08.6064825\u002B00:00",
+      "step": "former member read after removal (local projection row still present)",
+      "status": 404,
+      "error_code": "NOT_FOUND",
+      "fields": {}
+    }
+  ]
+}

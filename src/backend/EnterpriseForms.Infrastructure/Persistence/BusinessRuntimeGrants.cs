@@ -5,15 +5,36 @@ namespace EnterpriseForms.Infrastructure.Persistence;
 
 /// <summary>
 /// Least-privilege grants for the business API runtime role (business-postgres-privileges.reference.sql, G08).
-/// Signed staged content is insert-only for the runtime; projection tables allow update; nothing allows DELETE or DDL.
-/// A compromised runtime credential therefore cannot erase staged revisions; a DBA still can (and is detected by the
-/// authority head/manifest, never prevented — PRIVILEGED_POSTGRESQL_ACCESS.md §1).
+/// Signed staged content and audit events are insert-only for the runtime; projection tables allow update; nothing
+/// allows DELETE or DDL. A compromised runtime credential therefore cannot erase staged revisions or audit rows; a DBA
+/// still can (and is detected by the authority head/manifest, never prevented — PRIVILEGED_POSTGRESQL_ACCESS.md §1).
 /// </summary>
 public static class BusinessRuntimeGrants
 {
-    private static readonly string[] InsertOnlyTables = ["form_record_revisions", "field_string_values", "form_versions", "field_definitions"];
+    private static readonly string[] InsertOnlyTables =
+    [
+        "form_record_revisions", "field_string_values", "field_integer_values", "field_decimal_values", "field_date_values", "field_date_time_values", "field_guid_values", "field_boolean_values", "field_option_values", "field_encrypted_values",
+        "form_versions", "field_definitions", "audit_events", "file_attachment_versions",
+    ];
 
-    private static readonly string[] ProjectionTables = ["tenants", "users", "teams", "team_memberships", "form_definitions", "form_records", "record_shares", "record_share_fields"];
+    private static readonly string[] ProjectionTables =
+    [
+        "tenants", "users", "teams", "team_memberships", "form_definitions", "form_records", "record_shares", "record_share_fields",
+        "form_drafts", "field_options", "form_relationship_definitions", "form_record_relationships",
+        "upload_sessions", "file_attachments", "document_processing_jobs",
+        "organization_brandings", "user_ui_preferences", "organization_security_policies",
+        "field_protection_migrations", "field_protection_migration_items",
+    ];
+
+    /// <summary>
+    /// Narrow column-level UPDATE on otherwise insert-only tables (G08 least privilege): a field's catalog label and
+    /// description are editable metadata; its key, data type, classification and identity can never be changed by the
+    /// runtime role, even by a compromised API process.
+    /// </summary>
+    private static readonly Dictionary<string, string[]> ColumnUpdateGrants = new(StringComparer.Ordinal)
+    {
+        ["field_definitions"] = ["field_display_name", "field_description", "field_definition_revision", "modified_on", "modified_by_user_id", "field_classification", "field_protection_mode", "protection_policy_revision", "protection_changed_on", "protection_changed_by_user_id", "protection_authority_command_id"],
+    };
 
     public static void Apply(DbContext context, string runtimeRole)
     {
@@ -28,9 +49,11 @@ public static class BusinessRuntimeGrants
             "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
             $"GRANT USAGE ON SCHEMA public TO {runtimeRole}",
             $"REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {runtimeRole}",
+            $"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {runtimeRole}",
         };
         statements.AddRange(InsertOnlyTables.Select(t => $"GRANT SELECT, INSERT ON public.{t} TO {runtimeRole}"));
         statements.AddRange(ProjectionTables.Select(t => $"GRANT SELECT, INSERT, UPDATE ON public.{t} TO {runtimeRole}"));
+        statements.AddRange(ColumnUpdateGrants.Select(grant => $"GRANT UPDATE ({string.Join(", ", grant.Value)}) ON public.{grant.Key} TO {runtimeRole}"));
         statements.Add($"GRANT SELECT ON public.\"__EFMigrationsHistory\" TO {runtimeRole}");
         foreach (var statement in statements)
         {

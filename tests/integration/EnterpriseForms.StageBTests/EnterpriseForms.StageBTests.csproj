@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Stage B integration tests (B-10): designer persistence/versioning, parent-child records, multi-document upload
+    (real ClamAV verdicts incl. EICAR rejection), authorization/cross-tenant isolation and tamper-detection regression
+    for the new typed value and attachment tables. They run against the SAME disposable Docker stack as SEC-P01..P12
+    (compose.yaml + compose.security-test.yaml: PostgreSQL x2, SpiceDB, Vault Transit, Azurite, ClamAV, authority, API,
+    worker, attacker-sql). Mocked services are never used (ADR-PB-003).
+    Run: docker compose -f compose.yaml -f compose.security-test.yaml -\-env-file .env up -d -\-build -\-wait (infrastructure/docker)
+         dotnet test -\-project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -\- -\-minimum-expected-tests 10
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <RootNamespace>EnterpriseForms.StageBTests</RootNamespace>
+    <NoWarn>$(NoWarn);CA1812;CA2007;CA1054;CA1056;CA1305;CA1307;CA1310;CA1861;CA1515</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Shared harness sources (Docker CLI driver, raw HTTP clients, synthetic test identity) linked from the Stage A project. -->
+    <Compile Include="../../security/EnterpriseForms.SecurityTests/Harness/ComposeStack.cs" Link="Harness/ComposeStack.cs" />
+    <Compile Include="../../security/EnterpriseForms.SecurityTests/Harness/StageAClients.cs" Link="Harness/StageAClients.cs" />
+    <Compile Include="../../security/EnterpriseForms.SecurityTests/Harness/TestIdentity.cs" Link="Harness/TestIdentity.cs" />
+  </ItemGroup>
+</Project>

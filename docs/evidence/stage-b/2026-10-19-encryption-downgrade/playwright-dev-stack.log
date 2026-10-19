@@ -1,0 +1,11 @@
+### down security-test stack
+ Network enterpriseforms-sectest_trust-edge Removed 
+ Network enterpriseforms-sectest_business-net Removed 
+### up development stack
+ Container enterpriseforms-vault-transit-init-1 Exited 
+ Container enterpriseforms-azurite-1 Healthy 
+ Container enterpriseforms-vault-1 Healthy 
+container enterpriseforms-dev-seed-1 exited (0)
+### playwright against the development stack (5080)
+[1A[2K  18 passed (3.8m)
+### DONE

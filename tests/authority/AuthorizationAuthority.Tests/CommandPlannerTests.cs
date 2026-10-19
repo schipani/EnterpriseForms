@@ -150,6 +150,190 @@ public sealed class CommandPlannerTests
         Assert.False(graph.IsRecordOwner(AttackerUser, Record));
     }
 
+    [Fact]
+    public async Task UpdateFormUsersIsLimitedToFormUserEdgesAndToDesignersOrAdministrators()
+    {
+        var designer = Guid.CreateVersion7();
+        var administrator = Guid.CreateVersion7();
+        var existingUser = Guid.CreateVersion7();
+        var newUser = Guid.CreateVersion7();
+        var newTeam = Guid.CreateVersion7();
+        var scope = new FakeScope(Org);
+        scope.Resources.Add(Resource(ResourceTypeNames.FormDefinition, Form));
+        scope.Resources.Add(Resource(ResourceTypeNames.Team, newTeam));
+        scope.Bindings.Add(new IdentityBinding { OrganizationId = Org, AuthorityUserId = newUser, IdentityBindingEnabled = true });
+        var graph = Graph(
+            Edge(ResourceTypeNames.FormDefinition, Form, "designer", ResourceTypeNames.User, designer),
+            Edge(ResourceTypeNames.FormDefinition, Form, "form_user", ResourceTypeNames.User, existingUser),
+            Edge(ResourceTypeNames.Organization, Org, OrganizationRoleNames.OrganizationOwner, ResourceTypeNames.User, administrator));
+        var request = Command(SecurityCommandKind.UpdateFormUsers, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, grant_user_ids = new[] { newUser }, grant_team_ids = new[] { newTeam }, revoke_user_ids = new[] { existingUser }, revoke_team_ids = Array.Empty<Guid>() });
+
+        var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(designer), request, graph, CancellationToken.None);
+        // Only form_user edges change: no designer, owner, share or organization edge is touched, so no record access is granted or removed.
+        Assert.All(plan.AddEdges, e => Assert.True(e.ResourceType == ResourceTypeNames.FormDefinition && e.Relation == "form_user"));
+        Assert.Contains(plan.AddEdges, e => e.SubjectType == ResourceTypeNames.User && e.SubjectId == newUser && e.SubjectRelation.Length == 0);
+        Assert.Contains(plan.AddEdges, e => e.SubjectType == ResourceTypeNames.Team && e.SubjectId == newTeam && e.SubjectRelation == "participant");
+        var removed = Assert.Single(plan.RemoveEdges);
+        Assert.Equal("form_user", removed.RelationshipName);
+        Assert.Equal(existingUser, removed.SubjectEntityId);
+        Assert.Empty(plan.RegisterResources);
+
+        // An organization administrator may manage form users without being a designer; anyone else may not.
+        await CommandPlanner.PlanAsync(scope, Org, Actor(administrator), request, graph, CancellationToken.None);
+        var denied = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(existingUser), request, graph, CancellationToken.None));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, denied.ErrorCode);
+        var attacker = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(AttackerUser), request, graph, CancellationToken.None));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, attacker.ErrorCode);
+    }
+
+    [Fact]
+    public async Task PublishFormSecurityRevisionIsDesignerOnlyRegistersARequirementAndNeverGrantsOrWeakens()
+    {
+        var scope = new FakeScope(Org);
+        scope.Resources.Add(Resource(ResourceTypeNames.FormDefinition, Form));
+        var designer = Guid.CreateVersion7();
+        var field = Guid.CreateVersion7();
+        var graph = Graph(Edge(ResourceTypeNames.FormDefinition, Form, "designer", ResourceTypeNames.User, designer), Edge(ResourceTypeNames.FormDefinition, Form, "form_user", ResourceTypeNames.User, OwnerUser));
+        var request = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = field, required_protection_mode = "ApplicationEncrypted", protection_policy_revision = 2, field_classification = "Confidential" });
+
+        var plan = await CommandPlanner.PlanAsync(scope, Org, Actor(designer), request, graph, CancellationToken.None);
+        Assert.Empty(plan.AddEdges);
+        Assert.Empty(plan.RemoveEdges);
+        var resource = Assert.Single(plan.RegisterResources);
+        Assert.Equal(ResourceTypeNames.FieldProtectionRequirement, resource.ResourceTypeName);
+        Assert.Equal(field, resource.ResourceEntityId);
+        Assert.Equal(Form, resource.ParentResourceEntityId);
+
+        // A form user (clerk) or an unrelated user cannot publish a requirement.
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), request, graph, CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(AttackerUser), request, graph, CancellationToken.None))).ErrorCode);
+
+        // Weakening is not a command; an unregistered form and a duplicate requirement are refused.
+        // Weakening through the designer path is refused (a designer is never an administrator); an unregistered form is refused;
+        // re-publishing an active requirement re-activates it (records the raised classification) instead of registering twice.
+        var weaken = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = field, required_protection_mode = "Standard", protection_policy_revision = 3, field_classification = "Internal" });
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), weaken, graph, CancellationToken.None))).ErrorCode);
+        var unknownForm = Guid.CreateVersion7();
+        var unregistered = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, unknownForm, new { form_definition_id = unknownForm, field_definition_id = field, required_protection_mode = "ApplicationEncrypted", protection_policy_revision = 2, field_classification = "Confidential" });
+        Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), unregistered, graph, CancellationToken.None))).ErrorCode);
+        var existing = Resource(ResourceTypeNames.FieldProtectionRequirement, field);
+        scope.Resources.Add(existing);
+        var republished = await CommandPlanner.PlanAsync(scope, Org, Actor(designer), request, graph, CancellationToken.None);
+        Assert.Empty(republished.RegisterResources);
+        Assert.Same(existing, Assert.Single(republished.ReactivateResources));
+        var missingClassification = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = Guid.CreateVersion7(), required_protection_mode = "ApplicationEncrypted", protection_policy_revision = 2 });
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), missingClassification, graph, CancellationToken.None))).ErrorCode);
+    }
+
+    [Fact]
+    public async Task EncryptionDowngradeNeedsPolicyAdministratorAndForSensitiveFieldsADistinctDeclassifier()
+    {
+        var scope = new FakeScope(Org);
+        scope.Resources.Add(Resource(ResourceTypeNames.FormDefinition, Form));
+        var designer = Guid.CreateVersion7();
+        var adminA = Guid.CreateVersion7();
+        var adminB = Guid.CreateVersion7();
+        var field = Guid.CreateVersion7();
+        var graph = Graph(
+            Edge(ResourceTypeNames.FormDefinition, Form, "designer", ResourceTypeNames.User, designer),
+            Edge(ResourceTypeNames.Organization, Org, "organization_owner", ResourceTypeNames.User, adminA),
+            Edge(ResourceTypeNames.Organization, Org, "system_administrator", ResourceTypeNames.User, adminB));
+        var actorA = Actor(adminA);
+        var actorB = Actor(adminB);
+        var actorA2 = Actor(adminA); // the same user through a second identity binding
+        scope.Bindings.AddRange([actorA.Binding, actorB.Binding, actorA2.Binding]);
+
+        // The field is encrypted as Confidential according to the authority (publication command recorded).
+        var publication = new SecurityCommand { SecurityCommandId = Guid.CreateVersion7(), OrganizationId = Org, CommandKindName = SecurityCommandKinds.PublishFormSecurityRevision, CommandStateName = SecurityCommandStates.Effective, CommandPayloadJson = "{\"field_classification\":\"Confidential\",\"field_definition_id\":\"" + field.ToString("D") + "\",\"form_definition_id\":\"" + Form.ToString("D") + "\",\"protection_policy_revision\":2,\"required_protection_mode\":\"ApplicationEncrypted\"}", CommandCreatedOn = DateTimeOffset.UtcNow };
+        scope.Commands[publication.SecurityCommandId] = publication;
+        var requirement = Resource(ResourceTypeNames.FieldProtectionRequirement, field);
+        requirement.RegisteredBySecurityCommandId = publication.SecurityCommandId;
+        requirement.ParentResourceEntityId = Form;
+        scope.Resources.Add(requirement);
+
+        var downgrade = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = field, required_protection_mode = "Standard", protection_policy_revision = 3, field_classification = "Internal" });
+        var reclassify = Command(SecurityCommandKind.ReclassifyField, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = field, target_classification = "Internal", approval_reference = "GOV-2026-017" });
+        var policy = Command(SecurityCommandKind.UpdateMandatoryPolicy, ResourceKind.Organization, Org, new { minimum_field_classification = "Internal", plaintext_internal_fields_permitted = true, plaintext_downgrade_permitted = true });
+
+        // No authority-held policy: nothing may be released or reclassified. A designer may not set the policy.
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorA, downgrade, graph, CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorA, reclassify, graph, CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), policy, graph, CancellationToken.None))).ErrorCode);
+
+        var policyPlan = await CommandPlanner.PlanAsync(scope, Org, actorA, policy, graph, CancellationToken.None);
+        Assert.NotNull(policyPlan.ProtectionPolicy);
+        Assert.True(policyPlan.ProtectionPolicyIsNew);
+        Assert.True(policyPlan.ProtectionPolicy!.PlaintextDowngradePermitted);
+        scope.Policy = policyPlan.ProtectionPolicy;
+
+        // A designer can neither release nor declassify; a Confidential field cannot be released without a declassification.
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), downgrade, graph, CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), reclassify, graph, CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorA, downgrade, graph, CancellationToken.None))).ErrorCode);
+
+        // Declassification by admin A (approval reference required), then release by the same admin is refused, by admin B accepted.
+        var noApproval = Command(SecurityCommandKind.ReclassifyField, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = field, target_classification = "Internal", approval_reference = "" });
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorA, noApproval, graph, CancellationToken.None))).ErrorCode);
+        var reclassified = await CommandPlanner.PlanAsync(scope, Org, actorA, reclassify, graph, CancellationToken.None);
+        var pending = Assert.Single(reclassified.RegisterResources);
+        Assert.Equal(ResourceTypeNames.FieldReclassification, pending.ResourceTypeName);
+        var declassification = new SecurityCommand { SecurityCommandId = Guid.CreateVersion7(), OrganizationId = Org, ActorIdentityBindingId = actorA.Binding.IdentityBindingId, CommandKindName = SecurityCommandKinds.ReclassifyField, CommandStateName = SecurityCommandStates.Effective, CommandPayloadJson = reclassified.NormalizedPayloadJson, CommandCreatedOn = DateTimeOffset.UtcNow };
+        scope.Commands[declassification.SecurityCommandId] = declassification;
+        pending.RegisteredBySecurityCommandId = declassification.SecurityCommandId;
+        scope.Resources.Add(pending);
+
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorA, downgrade, graph, CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorA2, downgrade, graph, CancellationToken.None))).ErrorCode); // same user, other binding
+        var released = await CommandPlanner.PlanAsync(scope, Org, actorB, downgrade, graph, CancellationToken.None);
+        Assert.Empty(released.AddEdges);
+        Assert.Contains(released.RevokeResources, r => r.ResourceTypeName == ResourceTypeNames.FieldProtectionRequirement);
+        Assert.Contains(released.RevokeResources, r => r.ResourceTypeName == ResourceTypeNames.FieldReclassification);
+        Assert.Single(released.RegisterResources, r => r.ResourceTypeName == ResourceTypeNames.FieldProtectionRelease);
+        // The plan mutates the tracked resources in the (uncommitted) scope; undo as a rolled-back transaction would.
+        requirement.ResourceLifecycleState = ResourceLifecycleStates.Active;
+        pending.ResourceLifecycleState = ResourceLifecycleStates.Active;
+
+        // A stale declassification (older than 24 h) is refused; a target that does not match the declassification is refused.
+        declassification.CommandCreatedOn = DateTimeOffset.UtcNow.AddHours(-25);
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorB, downgrade, graph, CancellationToken.None))).ErrorCode);
+        declassification.CommandCreatedOn = DateTimeOffset.UtcNow;
+        var asPublic = Command(SecurityCommandKind.PublishFormSecurityRevision, ResourceKind.FormDefinition, Form, new { form_definition_id = Form, field_definition_id = field, required_protection_mode = "Standard", protection_policy_revision = 3, field_classification = "Public" });
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorB, asPublic, graph, CancellationToken.None))).ErrorCode); // below the policy floor (Internal)
+        scope.Policy!.MinimumFieldClassification = "Public";
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorB, asPublic, graph, CancellationToken.None))).ErrorCode);
+
+        // Policy withdrawn: the release is refused even with a valid declassification.
+        scope.Policy!.PlaintextDowngradePermitted = false;
+        Assert.Equal(AuthorityErrorCodes.Forbidden, (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, actorB, downgrade, graph, CancellationToken.None))).ErrorCode);
+    }
+
+    [Fact]
+    public async Task UpdateFormUsersRejectsEmptyContradictoryUnknownAndAlreadyAppliedChanges()
+    {
+        var designer = Guid.CreateVersion7();
+        var existingUser = Guid.CreateVersion7();
+        var stranger = Guid.CreateVersion7();
+        var scope = new FakeScope(Org);
+        scope.Resources.Add(Resource(ResourceTypeNames.FormDefinition, Form));
+        scope.Bindings.Add(new IdentityBinding { OrganizationId = Org, AuthorityUserId = existingUser, IdentityBindingEnabled = true });
+        var graph = Graph(
+            Edge(ResourceTypeNames.FormDefinition, Form, "designer", ResourceTypeNames.User, designer),
+            Edge(ResourceTypeNames.FormDefinition, Form, "form_user", ResourceTypeNames.User, existingUser));
+        var none = Array.Empty<Guid>();
+
+        async Task<string> Rejected(object payload, Guid? resourceId = null, ResourceKind kind = ResourceKind.FormDefinition) =>
+            (await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(designer), Command(SecurityCommandKind.UpdateFormUsers, kind, resourceId ?? Form, payload), graph, CancellationToken.None))).ErrorCode;
+
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = none, grant_team_ids = none, revoke_user_ids = none, revoke_team_ids = none }));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = new[] { existingUser }, grant_team_ids = none, revoke_user_ids = new[] { existingUser }, revoke_team_ids = none }));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = new[] { existingUser }, grant_team_ids = none, revoke_user_ids = none, revoke_team_ids = none })); // already permitted
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = none, grant_team_ids = none, revoke_user_ids = new[] { stranger }, revoke_team_ids = none })); // not currently permitted
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = new[] { stranger }, grant_team_ids = none, revoke_user_ids = none, revoke_team_ids = none })); // not a principal of the organization
+        var unknownForm = Guid.CreateVersion7();
+        Assert.Equal(AuthorityErrorCodes.ResourceNotRegistered, await Rejected(new { form_definition_id = unknownForm, grant_user_ids = new[] { existingUser }, grant_team_ids = none, revoke_user_ids = none, revoke_team_ids = none }, unknownForm));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await Rejected(new { form_definition_id = Form, grant_user_ids = none, grant_team_ids = none, revoke_user_ids = new[] { existingUser }, revoke_team_ids = none }, Record)); // resource reference must match the payload
+    }
+
     private static SecurityCommandRequest Command(SecurityCommandKind kind, ResourceKind resourceKind, Guid resourceId, object payload) =>
         new(Org, kind, new ResourceRef(resourceKind, resourceId), 0, JsonSerializer.SerializeToElement(payload, CanonicalJson.Options));
 
@@ -190,7 +374,11 @@ public sealed class CommandPlannerTests
 
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid commitId, CancellationToken ct) => Task.FromResult(Leaves.TryGetValue(commitId, out var leaves) ? leaves : []);
 
-        public Task<SecurityCommand?> FindCommandAsync(Guid id, CancellationToken ct) => Task.FromResult<SecurityCommand?>(null);
+        public Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken ct) => Task.FromResult<RecordManifestCommit?>(null);
+
+        public Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken ct) => Task.FromResult(Bindings.FirstOrDefault(b => b.IdentityBindingId == identityBindingId));
+
+        public Task<SecurityCommand?> FindCommandAsync(Guid id, CancellationToken ct) => Task.FromResult(Commands.TryGetValue(id, out var command) ? command : null);
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 
@@ -203,6 +391,17 @@ public sealed class CommandPlannerTests
         public void AddIdentityBinding(IdentityBinding binding) => throw new NotSupportedException();
 
         public void AddResource(AuthorityResource resource) => throw new NotSupportedException();
+
+        public OrganizationProtectionPolicy? Policy { get; set; }
+
+        public Dictionary<Guid, SecurityCommand> Commands { get; } = [];
+
+        public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid org, Guid parent, IReadOnlyCollection<string> types, CancellationToken ct) =>
+            Task.FromResult(org == organizationId ? Resources.Where(r => r.ParentResourceEntityId == parent && types.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToList() : []);
+
+        public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid org, CancellationToken ct) => Task.FromResult(org == organizationId ? Policy : null);
+
+        public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => Policy = policy;
 
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 

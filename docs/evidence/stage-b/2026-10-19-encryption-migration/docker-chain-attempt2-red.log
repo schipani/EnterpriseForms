@@ -1,0 +1,11 @@
+### stage-b integration
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.StrengtheningCountsPlaintextThenTheWorkerReprotectsEveryRecordThroughTheAuthorityAndOnlyThenClaimsFullEncryption (3m 05s 684ms)
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AuthorityOutageBlocksAndResumesAndHostileRowTamperingFailsTheRecordWithoutClaimingEncryption (24s 369ms)
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.TheAuthorityRefusesReprotectionWithoutAnEffectiveCommandAndRefusesAnyOtherChangeUnderOne (3m 03s 429ms)
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.ConcurrentUserEditsAndAWorkerRestartNeitherLoseDataNorBlockCompletion (5m 13s 055ms)
+  total: 33
+  failed: 4
+  succeeded: 29
+  skipped: 0
+  duration: 13m 57s 285ms
+### playwright
