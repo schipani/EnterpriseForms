@@ -26,7 +26,7 @@ export function Tabs({ items, label, defaultValue, value, onValueChange, orienta
       orientation={orientation}
       className={vertical ? "flex flex-col gap-4 lg:flex-row lg:items-start" : "flex flex-col gap-3"}
     >
-      <RadixTabs.List aria-label={label} className={vertical ? "flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-line pb-1 lg:w-56 lg:flex-col lg:border-b-0 lg:border-r lg:pb-0 lg:pr-2" : compact ? "flex items-end justify-between gap-1 border-b border-line" : "flex flex-wrap gap-1 border-b border-line"}>
+      <RadixTabs.List aria-label={label} className={vertical ? "flex shrink-0 flex-row gap-1 overflow-x-auto border-b border-line pb-1 lg:w-56 lg:flex-col lg:border-b-0 lg:border-r lg:pb-0 lg:pr-2" : compact ? "flex flex-wrap items-end justify-between gap-x-1 border-b border-line" : "flex flex-wrap gap-1 border-b border-line"}>
         {items.map((item) => (
           <RadixTabs.Trigger
             key={item.value}
