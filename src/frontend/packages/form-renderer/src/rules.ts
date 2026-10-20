@@ -151,7 +151,8 @@ export function splitSelection(wire: string): string[] {
   return [...new Set(wire.split(",").map((part) => part.trim()).filter((part) => part.length > 0))];
 }
 
-const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
+// Alternatives are mutually exclusive (no overlapping quantifiers), so matching is linear in the input length.
+const DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/;
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -44,6 +44,7 @@ Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-05 … C-10**.
 
 * **Owner acceptance:** the reusable dropdown-list workflow only (decision C-11). The owner did **not** perform, and this document does not claim, NVDA / VoiceOver / real-zoom accessibility testing of any Phase C2 UI.
 * **Conditional rules, Show in form, Read-only:** verified against their automated acceptance criteria — the .NET `PhaseC2RulesAndOptionsTests` (incl. the 51 shared rule vectors), the vitest rule-vector, rule-graph, renderer and record-payload tests, Stage B `RulesTests`, and the rules scenarios of Playwright `dropdowns-rules.spec.ts`. Not human-tested by the owner.
+* **Hosted CI findings fixed on the closure commit:** CodeQL flagged a polynomial regular expression in `rules.ts` (decimal parsing; replaced by an unambiguous pattern), and the Stage B jobs could not start because the repository policy allows only GitHub-owned actions while the stack action used `docker/setup-buildx-action` and `docker/bake-action` (removed; compose builds the images — this predates Phase C2).
 * **Authority change** (plaintext dropdown sharing) requires appropriate production security review (C-12).
 * **Still open (unchanged):** G19 (independently verified migration completeness), NVDA/VoiceOver/real 200 %/400 % zoom reviews (PB14-C1) and the PB-14 sign-off record, all production Level 2 requirements (independent cryptographic attestation, Managed HSM, Confidential Ledger, Azure Level B), and G06 search completeness.
 
