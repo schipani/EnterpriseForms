@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ruleConditionSchema, ruleShapeProblem } from "./rules";
 
 /**
  * TypeScript mirror of the server layout contract (Application/FormDefinitions/Layout/FormLayout.cs, schema v2).
@@ -29,13 +30,18 @@ const upload = z
 /** Published declaration of a field's classification and storage protection (ADR-PB-004); informational for the renderer. */
 const protection = z.object({ classification: z.enum(["Public", "Internal", "Confidential", "Restricted"]), protectionMode: z.enum(["Standard", "ApplicationEncrypted"]) }).strict();
 
+/** Option as published (snapshot): stable id and key, the label and order shown at publish time, and whether it was selectable. */
+const optionSnapshot = z.object({ fieldOptionId: z.string().uuid(), optionKey: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), label: z.string().max(200), sortOrder: z.number().int(), isActive: z.boolean() }).strict();
+
+const ruleSchema = ruleConditionSchema.refine((condition) => ruleShapeProblem(condition) === null, "The rule is nested too deeply or has too many conditions");
+
 const safeText = (max: number) => z.string().max(max).refine((text) => !/[<>]/.test(text), "Angle brackets are not permitted in layout text");
 
 const fieldElement = z
   .object({
     kind: z.literal("field"),
     fieldDefinitionId: z.string().uuid(),
-    control: z.enum(["text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select"]).default("text"),
+    control: z.enum(["text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select", "multiselect"]).default("text"),
     label: safeText(200).default(""),
     helpText: safeText(1000).optional(),
     /** Optional input hint shown inside empty text-like controls (presentation only; never a default value). */
@@ -44,6 +50,18 @@ const fieldElement = z
     layout: placement.default({ columnSpan: 4, startOnNewRow: false }),
     validation: validation.optional(),
     protection: protection.optional(),
+    /** Dropdowns: the options as published (snapshot; the designer's draft does not carry it, publishing adds it). */
+    options: z.array(optionSnapshot).max(500).optional(),
+    /** Dropdowns: option keys pre-selected for a new record (a convenience, validated by the server; never a stored value by itself). */
+    defaultOptionKeys: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(100).optional(),
+    /** Presentation only: false removes the field from the data-entry form. It is never an authorization decision. */
+    showInForm: z.boolean().optional(),
+    /** Enforced by the server on every user write. */
+    readOnly: z.boolean().optional(),
+    /** Opt-in: clear the stored value when a visibility rule hides the field (default: retain it). */
+    clearWhenHidden: z.boolean().optional(),
+    visibleWhen: ruleSchema.optional(),
+    requiredWhen: ruleSchema.optional(),
   })
   .strict();
 const documentElement = z

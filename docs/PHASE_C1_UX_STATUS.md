@@ -59,9 +59,9 @@ Frontend code is unchanged since `708c4db` (typecheck/lint clean, vitest 47/47, 
 | Item | Status |
 |---|---|
 | Owner approval of the actual interface | **ACCEPTED** by the owner for continued development, 2026-10-20 (C-02) |
-| Conditional rules (visibility / required-if) | **Not implemented** — no rule engine in the layout schema or server; the Rules view and inspector tab say so and persist nothing |
-| "Show in form" (hidden placement) | **Not implemented** — the layout schema has no hidden-element property |
-| "Read-only" (per-element read-only) | **Not implemented** — the layout schema has no read-only element property |
+| Conditional rules (visibility / required-if) | **Implemented in Phase C2** (`docs/PHASE_C2_STATUS.md`, decisions C-07/C-08) — this row describes the state at C1 closure |
+| "Show in form" (hidden placement) | **Implemented in Phase C2** (`showInForm`, decision C-09) — state at C1 closure shown here |
+| "Read-only" (per-element read-only) | **Implemented in Phase C2** (`readOnly`, decision C-09) — state at C1 closure shown here |
 | NVDA + Chrome/Firefox review of the designer | **PENDING** (human) — PB14-C1 in `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` |
 | VoiceOver + Safari review of the designer | **PENDING** (human) — PB14-C1 |
 | Real browser zoom 200% / 400% | **PENDING** (human) — automated viewport equivalents pass |

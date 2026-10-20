@@ -36,6 +36,10 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
 
     public DbSet<FieldOption> FieldOptions => Set<FieldOption>();
 
+    public DbSet<OptionList> OptionLists => Set<OptionList>();
+
+    public DbSet<OptionListItem> OptionListItems => Set<OptionListItem>();
+
     public DbSet<FieldProtectionMigration> FieldProtectionMigrations => Set<FieldProtectionMigration>();
 
     public DbSet<FieldProtectionMigrationItem> FieldProtectionMigrationItems => Set<FieldProtectionMigrationItem>();

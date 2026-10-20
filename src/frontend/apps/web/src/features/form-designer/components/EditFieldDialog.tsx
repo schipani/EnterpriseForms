@@ -104,8 +104,8 @@ export function EditFieldDialog({ field, location, canEdit, pending, error, onSa
   );
 
   const rulesContent = (
-    <StatusMessage tone="info" title="Conditional rules are not yet available">
-      A declarative conditional-visibility / required-if rule engine is specified (CLAUDE.md §4) but not yet implemented in the layout schema or the server. This tab will show and edit the rule graph, with cycle detection, once that backend support exists. Nothing on this tab is persisted.
+    <StatusMessage tone="info" title="Rules are edited in the field properties">
+      Conditional visibility, required-if, Show in form and Read-only live in the Rules tab of the Field Properties inspector. Close this dialog, select the field on the Design canvas and open its Rules tab.
     </StatusMessage>
   );
 

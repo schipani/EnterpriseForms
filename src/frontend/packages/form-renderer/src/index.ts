@@ -19,5 +19,32 @@ export {
   type RelatedElement,
 } from "./layout";
 export { breakpointForWidth, effectiveSpan, packElements, visibleColumns, type Breakpoint, type PackedCell } from "./packer";
-export { validateValues, type ErrorMap, type RendererField, type ValueMap } from "./validation";
+export { ruleFieldsOf, ruleStatesFor, validateValues, valuesById, type ErrorMap, type RendererField, type RuleContext, type ValueMap } from "./validation";
+export { choicesFor, defaultSelection, describeSelection, initialValues, type ChoiceOption } from "./options";
+export {
+  GROUP_OPERATORS,
+  OPERATOR_LABEL,
+  PRESENCE_OPERATORS,
+  RULE_MAX_CHILDREN,
+  RULE_MAX_DEPTH,
+  RULE_MAX_NODES,
+  SET_OPERATORS,
+  VALUE_OPERATORS,
+  allowedOperators,
+  comparisonsOf,
+  describeCondition,
+  evaluateCondition,
+  evaluateRuleStates,
+  parseCondition,
+  ruleConditionSchema,
+  ruleShapeProblem,
+  splitSelection,
+  type ComparisonOperator,
+  type FieldRuleState,
+  type RuleComparisonCondition,
+  type RuleCondition,
+  type RuleGroupCondition,
+  type RuleElement,
+  type RuleField,
+} from "./rules";
 export { FieldControl, FormRenderer, ReadOnlyValue, displayValue, useContainerBreakpoint, type FormRendererProps } from "./FormRenderer";

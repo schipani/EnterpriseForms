@@ -1,0 +1,891 @@
+{
+  "description": "Shared rule-evaluation vectors: the .NET FormRules and the TypeScript evaluateCondition must agree on every case and both must reject every invalid condition.",
+  "fields": [
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000001",
+      "fieldKey": "status",
+      "fieldDataType": "Option",
+      "optionSelectionMode": "Single"
+    },
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000002",
+      "fieldKey": "tags",
+      "fieldDataType": "Option",
+      "optionSelectionMode": "Multiple"
+    },
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+      "fieldKey": "age",
+      "fieldDataType": "Integer",
+      "optionSelectionMode": "Single"
+    },
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000004",
+      "fieldKey": "amount",
+      "fieldDataType": "Decimal",
+      "optionSelectionMode": "Single"
+    },
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000005",
+      "fieldKey": "dob",
+      "fieldDataType": "Date",
+      "optionSelectionMode": "Single"
+    },
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000006",
+      "fieldKey": "seen",
+      "fieldDataType": "DateTime",
+      "optionSelectionMode": "Single"
+    },
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+      "fieldKey": "note",
+      "fieldDataType": "String",
+      "optionSelectionMode": "Single"
+    },
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000008",
+      "fieldKey": "agreed",
+      "fieldDataType": "Boolean",
+      "optionSelectionMode": "Single"
+    },
+    {
+      "fieldDefinitionId": "00000000-0000-7000-8000-000000000009",
+      "fieldKey": "ref",
+      "fieldDataType": "Guid",
+      "optionSelectionMode": "Single"
+    }
+  ],
+  "cases": [
+    {
+      "name": "string equals matches exactly",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "abc"
+      },
+      "values": {
+        "note": "abc"
+      },
+      "expected": true
+    },
+    {
+      "name": "string equals is case sensitive",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "abc"
+      },
+      "values": {
+        "note": "ABC"
+      },
+      "expected": false
+    },
+    {
+      "name": "string equals on empty is false",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "abc"
+      },
+      "values": {},
+      "expected": false
+    },
+    {
+      "name": "string notEquals on empty is true",
+      "condition": {
+        "op": "notEquals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "abc"
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "string notEquals different",
+      "condition": {
+        "op": "notEquals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "abc"
+      },
+      "values": {
+        "note": "xyz"
+      },
+      "expected": true
+    },
+    {
+      "name": "string contains ignores case",
+      "condition": {
+        "op": "contains",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "bc"
+      },
+      "values": {
+        "note": "aBcd"
+      },
+      "expected": true
+    },
+    {
+      "name": "string contains absent",
+      "condition": {
+        "op": "contains",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "zz"
+      },
+      "values": {
+        "note": "aBcd"
+      },
+      "expected": false
+    },
+    {
+      "name": "string contains on empty is false",
+      "condition": {
+        "op": "contains",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "x"
+      },
+      "values": {},
+      "expected": false
+    },
+    {
+      "name": "string in",
+      "condition": {
+        "op": "in",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "values": [
+          "a",
+          "b"
+        ]
+      },
+      "values": {
+        "note": "b"
+      },
+      "expected": true
+    },
+    {
+      "name": "string in miss",
+      "condition": {
+        "op": "in",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "values": [
+          "a",
+          "b"
+        ]
+      },
+      "values": {
+        "note": "c"
+      },
+      "expected": false
+    },
+    {
+      "name": "string notIn on empty is true",
+      "condition": {
+        "op": "notIn",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "values": [
+          "a",
+          "b"
+        ]
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "string notIn member",
+      "condition": {
+        "op": "notIn",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "values": [
+          "a",
+          "b"
+        ]
+      },
+      "values": {
+        "note": "b"
+      },
+      "expected": false
+    },
+    {
+      "name": "isEmpty on empty",
+      "condition": {
+        "op": "isEmpty",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "isEmpty on value",
+      "condition": {
+        "op": "isEmpty",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+      },
+      "values": {
+        "note": "x"
+      },
+      "expected": false
+    },
+    {
+      "name": "isNotEmpty on value",
+      "condition": {
+        "op": "isNotEmpty",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+      },
+      "values": {
+        "note": "x"
+      },
+      "expected": true
+    },
+    {
+      "name": "integer greaterThan",
+      "condition": {
+        "op": "greaterThan",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+        "value": "17"
+      },
+      "values": {
+        "age": "18"
+      },
+      "expected": true
+    },
+    {
+      "name": "integer greaterThan equal is false",
+      "condition": {
+        "op": "greaterThan",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+        "value": "17"
+      },
+      "values": {
+        "age": "17"
+      },
+      "expected": false
+    },
+    {
+      "name": "integer lessThan is numeric not lexicographic",
+      "condition": {
+        "op": "lessThan",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+        "value": "18"
+      },
+      "values": {
+        "age": "9"
+      },
+      "expected": true
+    },
+    {
+      "name": "integer equals",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+        "value": "5"
+      },
+      "values": {
+        "age": "5"
+      },
+      "expected": true
+    },
+    {
+      "name": "integer equals on empty is false",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+        "value": "5"
+      },
+      "values": {},
+      "expected": false
+    },
+    {
+      "name": "integer greaterThan on empty is false",
+      "condition": {
+        "op": "greaterThan",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+        "value": "5"
+      },
+      "values": {},
+      "expected": false
+    },
+    {
+      "name": "integer notEquals on empty is true",
+      "condition": {
+        "op": "notEquals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+        "value": "5"
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "decimal equals ignores trailing zeros",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000004",
+        "value": "1.50"
+      },
+      "values": {
+        "amount": "1.5"
+      },
+      "expected": true
+    },
+    {
+      "name": "decimal lessThan",
+      "condition": {
+        "op": "lessThan",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000004",
+        "value": "10.0000"
+      },
+      "values": {
+        "amount": "9.9999"
+      },
+      "expected": true
+    },
+    {
+      "name": "date greaterThan",
+      "condition": {
+        "op": "greaterThan",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000005",
+        "value": "2020-01-01"
+      },
+      "values": {
+        "dob": "2020-01-02"
+      },
+      "expected": true
+    },
+    {
+      "name": "date lessThan",
+      "condition": {
+        "op": "lessThan",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000005",
+        "value": "2020-01-01"
+      },
+      "values": {
+        "dob": "2019-12-31"
+      },
+      "expected": true
+    },
+    {
+      "name": "date equals",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000005",
+        "value": "2020-01-01"
+      },
+      "values": {
+        "dob": "2020-01-01"
+      },
+      "expected": true
+    },
+    {
+      "name": "datetime greaterThan",
+      "condition": {
+        "op": "greaterThan",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000006",
+        "value": "2026-01-01T00:00:00Z"
+      },
+      "values": {
+        "seen": "2026-01-01T00:00:01Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "datetime equals compares instants across offsets",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000006",
+        "value": "2026-01-01T05:00:00+05:00"
+      },
+      "values": {
+        "seen": "2026-01-01T00:00:00Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "boolean equals true",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000008",
+        "value": "true"
+      },
+      "values": {
+        "agreed": "true"
+      },
+      "expected": true
+    },
+    {
+      "name": "boolean empty counts as false",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000008",
+        "value": "false"
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "boolean notEquals true on empty",
+      "condition": {
+        "op": "notEquals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000008",
+        "value": "true"
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "boolean equals true on empty is false",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000008",
+        "value": "true"
+      },
+      "values": {},
+      "expected": false
+    },
+    {
+      "name": "option equals",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000001",
+        "value": "open"
+      },
+      "values": {
+        "status": "open"
+      },
+      "expected": true
+    },
+    {
+      "name": "option in",
+      "condition": {
+        "op": "in",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000001",
+        "values": [
+          "open",
+          "new"
+        ]
+      },
+      "values": {
+        "status": "new"
+      },
+      "expected": true
+    },
+    {
+      "name": "option notIn on empty is true",
+      "condition": {
+        "op": "notIn",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000001",
+        "values": [
+          "closed"
+        ]
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "option isEmpty",
+      "condition": {
+        "op": "isEmpty",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000001"
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "multi contains selected",
+      "condition": {
+        "op": "contains",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000002",
+        "value": "a"
+      },
+      "values": {
+        "tags": "a,b"
+      },
+      "expected": true
+    },
+    {
+      "name": "multi contains missing",
+      "condition": {
+        "op": "contains",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000002",
+        "value": "c"
+      },
+      "values": {
+        "tags": "a,b"
+      },
+      "expected": false
+    },
+    {
+      "name": "multi equals is set equality",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000002",
+        "value": "b,a"
+      },
+      "values": {
+        "tags": "a,b"
+      },
+      "expected": true
+    },
+    {
+      "name": "multi in means any overlap",
+      "condition": {
+        "op": "in",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000002",
+        "values": [
+          "c",
+          "b"
+        ]
+      },
+      "values": {
+        "tags": "a,b"
+      },
+      "expected": true
+    },
+    {
+      "name": "multi notIn means no overlap",
+      "condition": {
+        "op": "notIn",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000002",
+        "values": [
+          "c",
+          "d"
+        ]
+      },
+      "values": {
+        "tags": "a,b"
+      },
+      "expected": true
+    },
+    {
+      "name": "multi isEmpty",
+      "condition": {
+        "op": "isEmpty",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000002"
+      },
+      "values": {},
+      "expected": true
+    },
+    {
+      "name": "multi notEquals",
+      "condition": {
+        "op": "notEquals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000002",
+        "value": "a"
+      },
+      "values": {
+        "tags": "a,b"
+      },
+      "expected": true
+    },
+    {
+      "name": "guid equals ignores case",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000009",
+        "value": "0199a2b3-c4d5-7e6f-8123-456789abcdef"
+      },
+      "values": {
+        "ref": "0199A2B3-C4D5-7E6F-8123-456789ABCDEF"
+      },
+      "expected": true
+    },
+    {
+      "name": "and all true",
+      "condition": {
+        "op": "and",
+        "conditions": [
+          {
+            "op": "equals",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+            "value": "x"
+          },
+          {
+            "op": "greaterThan",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+            "value": "5"
+          }
+        ]
+      },
+      "values": {
+        "note": "x",
+        "age": "6"
+      },
+      "expected": true
+    },
+    {
+      "name": "and one false",
+      "condition": {
+        "op": "and",
+        "conditions": [
+          {
+            "op": "equals",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+            "value": "x"
+          },
+          {
+            "op": "greaterThan",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+            "value": "5"
+          }
+        ]
+      },
+      "values": {
+        "note": "x",
+        "age": "5"
+      },
+      "expected": false
+    },
+    {
+      "name": "or one true",
+      "condition": {
+        "op": "or",
+        "conditions": [
+          {
+            "op": "equals",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+            "value": "x"
+          },
+          {
+            "op": "greaterThan",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+            "value": "5"
+          }
+        ]
+      },
+      "values": {
+        "note": "y",
+        "age": "6"
+      },
+      "expected": true
+    },
+    {
+      "name": "or none true",
+      "condition": {
+        "op": "or",
+        "conditions": [
+          {
+            "op": "equals",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+            "value": "x"
+          },
+          {
+            "op": "greaterThan",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+            "value": "5"
+          }
+        ]
+      },
+      "values": {
+        "note": "y",
+        "age": "4"
+      },
+      "expected": false
+    },
+    {
+      "name": "not negates",
+      "condition": {
+        "op": "not",
+        "conditions": [
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          }
+        ]
+      },
+      "values": {
+        "note": "a"
+      },
+      "expected": true
+    },
+    {
+      "name": "nested groups",
+      "condition": {
+        "op": "and",
+        "conditions": [
+          {
+            "op": "or",
+            "conditions": [
+              {
+                "op": "equals",
+                "fieldDefinitionId": "00000000-0000-7000-8000-000000000001",
+                "value": "open"
+              },
+              {
+                "op": "equals",
+                "fieldDefinitionId": "00000000-0000-7000-8000-000000000001",
+                "value": "new"
+              }
+            ]
+          },
+          {
+            "op": "not",
+            "conditions": [
+              {
+                "op": "equals",
+                "fieldDefinitionId": "00000000-0000-7000-8000-000000000008",
+                "value": "true"
+              }
+            ]
+          }
+        ]
+      },
+      "values": {
+        "status": "new",
+        "agreed": "false"
+      },
+      "expected": true
+    }
+  ],
+  "invalid": [
+    {
+      "name": "unknown operator",
+      "condition": {
+        "op": "matches",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "x"
+      }
+    },
+    {
+      "name": "not with two conditions",
+      "condition": {
+        "op": "not",
+        "conditions": [
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty and",
+      "condition": {
+        "op": "and",
+        "conditions": []
+      }
+    },
+    {
+      "name": "comparison without a field",
+      "condition": {
+        "op": "isEmpty"
+      }
+    },
+    {
+      "name": "in without values",
+      "condition": {
+        "op": "in",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "values": []
+      }
+    },
+    {
+      "name": "equals without value",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+      }
+    },
+    {
+      "name": "numeric value instead of text",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000003",
+        "value": 5
+      }
+    },
+    {
+      "name": "markup in value",
+      "condition": {
+        "op": "equals",
+        "fieldDefinitionId": "00000000-0000-7000-8000-000000000007",
+        "value": "<script>"
+      }
+    },
+    {
+      "name": "nested deeper than four levels",
+      "condition": {
+        "op": "and",
+        "conditions": [
+          {
+            "op": "and",
+            "conditions": [
+              {
+                "op": "and",
+                "conditions": [
+                  {
+                    "op": "and",
+                    "conditions": [
+                      {
+                        "op": "and",
+                        "conditions": [
+                          {
+                            "op": "isEmpty",
+                            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "more than ten children",
+      "condition": {
+        "op": "or",
+        "conditions": [
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          },
+          {
+            "op": "isEmpty",
+            "fieldDefinitionId": "00000000-0000-7000-8000-000000000007"
+          }
+        ]
+      }
+    }
+  ]
+}

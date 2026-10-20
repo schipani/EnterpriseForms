@@ -43,6 +43,17 @@ public sealed record LayoutProtection(string Classification, string ProtectionMo
 
 public sealed record LayoutUploadPolicy(bool AllowMultiple, int MaxFiles, long MaxFileSizeBytes, IReadOnlyList<string> AllowedContentTypes);
 
+/// <summary>Option as it was when the version was published (snapshot): stable id and key, the label and order shown then, and whether it was selectable.</summary>
+public sealed record LayoutOption(Guid FieldOptionId, string OptionKey, string Label, int SortOrder, bool IsActive);
+
+/// <summary>
+/// One placed element. The trailing properties are Phase C2 additions and are omitted from the serialized layout when they
+/// hold their default, so layouts written before they existed serialize byte-for-byte as before.
+/// <see cref="ShowInForm"/> is presentation only (never an authorization decision); <see cref="ReadOnly"/> is enforced by
+/// the server on every user write; <see cref="VisibleWhen"/>/<see cref="RequiredWhen"/> are evaluated by the server
+/// (authoritative) and the renderer; <see cref="ClearWhenHidden"/> is the explicit opt-in to clear a value that a
+/// visibility rule hides (the default is to retain it).
+/// </summary>
 public sealed record LayoutElement(
     string Kind,
     Guid? FieldDefinitionId,
@@ -55,12 +66,19 @@ public sealed record LayoutElement(
     LayoutUploadPolicy? Upload,
     IReadOnlyList<string>? SummaryFieldKeys,
     LayoutProtection? Protection = null,
-    string? Placeholder = null);
+    string? Placeholder = null,
+    IReadOnlyList<LayoutOption>? Options = null,
+    IReadOnlyList<string>? DefaultOptionKeys = null,
+    bool ShowInForm = true,
+    bool ReadOnly = false,
+    bool ClearWhenHidden = false,
+    RuleCondition? VisibleWhen = null,
+    RuleCondition? RequiredWhen = null);
 
 public static class FormLayoutCodec
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = false, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
-    private static readonly HashSet<string> Controls = new(StringComparer.Ordinal) { "text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select", "fileUpload" };
+    private static readonly HashSet<string> Controls = new(StringComparer.Ordinal) { "text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select", "multiselect", "fileUpload" };
     private static readonly HashSet<string> Spacing = new(StringComparer.Ordinal) { "none", "small", "medium", "large" };
 
     public static FormLayout Parse(string layoutJson)
@@ -178,6 +196,13 @@ public static class FormLayoutCodec
                     upload = e.Upload is null ? null : new { allowMultiple = e.Upload.AllowMultiple, maxFiles = e.Upload.MaxFiles, maxFileSizeBytes = e.Upload.MaxFileSizeBytes, allowedContentTypes = e.Upload.AllowedContentTypes },
                     summaryFieldKeys = e.SummaryFieldKeys,
                     protection = e.Protection is null ? null : new { classification = e.Protection.Classification, protectionMode = e.Protection.ProtectionMode },
+                    options = e.Options?.Select(o => new { fieldOptionId = o.FieldOptionId, optionKey = o.OptionKey, label = o.Label, sortOrder = o.SortOrder, isActive = o.IsActive }).ToArray(),
+                    defaultOptionKeys = e.DefaultOptionKeys is { Count: > 0 } ? e.DefaultOptionKeys : null,
+                    showInForm = e.ShowInForm ? (bool?)null : false,
+                    readOnly = e.ReadOnly ? true : (bool?)null,
+                    clearWhenHidden = e.ClearWhenHidden ? true : (bool?)null,
+                    visibleWhen = e.VisibleWhen is null ? null : FormRulesCodec.ToJson(e.VisibleWhen),
+                    requiredWhen = e.RequiredWhen is null ? null : FormRulesCodec.ToJson(e.RequiredWhen),
                 }).ToArray(),
             }).ToArray(),
         };
@@ -202,7 +227,9 @@ public static class FormLayoutCodec
                     throw new BusinessException("LAYOUT_INVALID", 422, $"unknown control '{control}'");
                 }
 
-                return new LayoutElement(kind, fieldId, null, control, label, help, placement, validation, null, null, ParseProtection(element), OptionalString(element, "placeholder", 200));
+                return new LayoutElement(kind, fieldId, null, control, label, help, placement, validation, null, null, ParseProtection(element), OptionalString(element, "placeholder", 200),
+                    ParseOptions(element), ParseDefaultOptionKeys(element), OptionalBool(element, "showInForm") ?? true, OptionalBool(element, "readOnly") ?? false, OptionalBool(element, "clearWhenHidden") ?? false,
+                    ParseRule(element, "visibleWhen"), ParseRule(element, "requiredWhen"));
             }
 
             case LayoutElementKinds.DocumentCollection:
@@ -224,6 +251,59 @@ public static class FormLayoutCodec
             default:
                 throw new BusinessException("LAYOUT_INVALID", 422, $"unknown element kind '{kind}'");
         }
+    }
+
+    private static bool? OptionalBool(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : throw new BusinessException("LAYOUT_INVALID", 422, $"{name} must be true or false");
+    }
+
+    private static RuleCondition? ParseRule(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null ? FormRulesCodec.Parse(value) : null;
+
+    private static List<string>? ParseDefaultOptionKeys(JsonElement element)
+    {
+        if (!element.TryGetProperty("defaultOptionKeys", out var keys) || keys.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (keys.ValueKind != JsonValueKind.Array || keys.GetArrayLength() > 100 || keys.EnumerateArray().Any(k => k.ValueKind != JsonValueKind.String || !System.Text.RegularExpressions.Regex.IsMatch(k.GetString()!, "^[a-z][a-z0-9_]{0,63}$")))
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, "defaultOptionKeys must be a list of option keys");
+        }
+
+        return keys.EnumerateArray().Select(k => k.GetString()!).Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private static List<LayoutOption>? ParseOptions(JsonElement element)
+    {
+        if (!element.TryGetProperty("options", out var options) || options.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (options.ValueKind != JsonValueKind.Array || options.GetArrayLength() > 500)
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, "options must be a list of at most 500 option snapshots");
+        }
+
+        var result = new List<LayoutOption>();
+        foreach (var option in options.EnumerateArray())
+        {
+            var key = RequiredString(option, "optionKey", 64);
+            var label = RequiredString(option, "label", 200);
+            var sort = option.TryGetProperty("sortOrder", out var so) && so.ValueKind == JsonValueKind.Number && so.TryGetInt32(out var sortValue) ? sortValue : 0;
+            var active = !option.TryGetProperty("isActive", out var ia) || ia.ValueKind != JsonValueKind.False;
+            result.Add(new LayoutOption(RequiredGuid(option, "fieldOptionId"), key, label, sort, active));
+        }
+
+        return result;
     }
 
     private static LayoutPlacement ParsePlacement(JsonElement element)

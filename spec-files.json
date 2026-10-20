@@ -49,8 +49,13 @@
     },
     {
       "path": "docs/PHASE_C1_UX_STATUS.md",
-      "sha256": "b740df13c50356de1931dd4ab80e7e10a1bc8a37e4f2b224ab1b23e1b1cef46e",
-      "bytes": 47065
+      "sha256": "df1e06d956240e3880b719938640ba456d22de02b8c1d3609190a7f9f6466ecb",
+      "bytes": 47093
+    },
+    {
+      "path": "docs/PHASE_C2_STATUS.md",
+      "sha256": "cf57bf792a5f6195d2218201e3655d4921b8f8f08d7ce448b3de33b9e71c120b",
+      "bytes": 13181
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -94,8 +99,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "5351b8f54b8de25302113fc63399394d9a413bddbcc0cb13eb36d6f6d1fc3cae",
-      "bytes": 7824
+      "sha256": "24d5f668499732eaac4aa825a1aec5b9a25f176e62860c22d94512f48d5079c3",
+      "bytes": 7895
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -189,8 +194,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "9f97b205d073a275081bf4b9516c20b964117bf03bfe464edf5218b1571ae5db",
-      "bytes": 3557
+      "sha256": "1cd6690c62e66857215d03c03e218895f9dc4b5dea6d01ca62f792d4f3d93cf7",
+      "bytes": 11834
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -296,6 +301,11 @@
       "path": "docs/security/stage-a-vault-transit-vectors.json",
       "sha256": "037be3608ab900e9e4da7e1941d6e6303d82d33cdf40b350b08d960a32a9c987",
       "bytes": 5272
+    },
+    {
+      "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
+      "sha256": "6513ffe2b8bb3fd91cbc1a4460271bf416b1f581c4611bdbe049cadc9e5bcc87",
+      "bytes": 5463
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",
@@ -426,6 +436,16 @@
       "path": "scripts/ci/assert_test_totals.py",
       "sha256": "a18433520928387776efc3abd89ecec3830dd7030f939b8f414611158c138248",
       "bytes": 2166
+    },
+    {
+      "path": "scripts/ci/summarize_trx.py",
+      "sha256": "4930175f3aeddcfe285e6d1c53d43cfa487a50dd6702e5c852ca5b299cde4265",
+      "bytes": 1750
+    },
+    {
+      "path": "scripts/dev/test.ps1",
+      "sha256": "62b83648bec77963ceb16771e1e6dc064cfeabc58f4ef6809819d7fb4cab18cd",
+      "bytes": 6804
     },
     {
       "path": "scripts/generate-spec-manifest.py",

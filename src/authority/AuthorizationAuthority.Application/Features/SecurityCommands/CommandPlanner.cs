@@ -643,7 +643,8 @@ public static class CommandPlanner
         }
 
         var leaves = await scope.GetManifestLeavesAsync(head.CurrentRecordManifestCommitId.Value, cancellationToken).ConfigureAwait(false);
-        var committedFieldItems = leaves.Where(l => l.ManifestItemKindCode == (byte)MerkleItemKind.FieldValue).Select(l => l.ManifestItemId).ToHashSet();
+        // A field's committed items are its value leaves and — for plaintext dropdowns / multi-selects — its selection leaves (one per selected option).
+        var committedFieldItems = leaves.Where(l => l.ManifestItemKindCode is (byte)MerkleItemKind.FieldValue or (byte)MerkleItemKind.FieldSelection).Select(l => l.ManifestItemId).ToHashSet();
         var unknown = payload.FieldItemIds.Where(id => !committedFieldItems.Contains(id)).ToList();
         if (unknown.Count > 0)
         {

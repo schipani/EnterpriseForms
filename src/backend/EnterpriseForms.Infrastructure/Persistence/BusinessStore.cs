@@ -80,6 +80,25 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public void AddFieldOption(FieldOption fieldOption) => context.FieldOptions.Add(fieldOption);
 
+        public Task<List<OptionList>> GetOptionListsAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            context.OptionLists.AsNoTracking().Where(l => l.TenantId == tenantId).OrderBy(l => l.OptionListName).ToListAsync(cancellationToken);
+
+        public Task<OptionList?> FindOptionListAsync(Guid tenantId, Guid optionListId, CancellationToken cancellationToken) =>
+            context.OptionLists.FirstOrDefaultAsync(l => l.TenantId == tenantId && l.OptionListId == optionListId, cancellationToken);
+
+        public Task<List<OptionListItem>> GetOptionListItemsAsync(Guid optionListId, CancellationToken cancellationToken) =>
+            context.OptionListItems.Where(i => i.OptionListId == optionListId).OrderBy(i => i.OptionSortOrder).ThenBy(i => i.OptionKey).ToListAsync(cancellationToken);
+
+        public Task<List<OptionListItem>> GetOptionListItemsAsync(IReadOnlyCollection<Guid> optionListIds, CancellationToken cancellationToken) =>
+            context.OptionListItems.AsNoTracking().Where(i => optionListIds.Contains(i.OptionListId)).OrderBy(i => i.OptionSortOrder).ThenBy(i => i.OptionKey).ToListAsync(cancellationToken);
+
+        public async Task<Dictionary<Guid, int>> CountFieldsPerOptionListAsync(IReadOnlyCollection<Guid> optionListIds, CancellationToken cancellationToken) =>
+            (await context.FieldDefinitions.AsNoTracking().Where(f => f.OptionListId != null && optionListIds.Contains(f.OptionListId.Value)).GroupBy(f => f.OptionListId!.Value).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(cancellationToken).ConfigureAwait(false)).ToDictionary(x => x.Key, x => x.Count);
+
+        public void AddOptionList(OptionList optionList) => context.OptionLists.Add(optionList);
+
+        public void AddOptionListItem(OptionListItem item) => context.OptionListItems.Add(item);
+
         public Task<FormVersion?> FindFormVersionAsync(Guid formVersionId, CancellationToken cancellationToken) =>
             context.FormVersions.AsNoTracking().FirstOrDefaultAsync(v => v.FormVersionId == formVersionId, cancellationToken);
 

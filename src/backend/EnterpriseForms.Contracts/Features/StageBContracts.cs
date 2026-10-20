@@ -27,9 +27,9 @@ public sealed record DirectoryUserResponse(Guid UserId, string DisplayName);
 
 public sealed record FormDefinitionSummaryResponse(Guid FormDefinitionId, string FormDefinitionName, string FormDefinitionDescription, string LifecycleStatus, int? CurrentVersionNumber, Guid? CurrentFormVersionId, bool HasDraft, bool CanDesign, bool CanCreateRecord, DateTimeOffset ModifiedOn);
 
-public sealed record FieldDefinitionResponse(Guid FieldDefinitionId, string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, string FieldClassification, string LifecycleStatus, IReadOnlyList<FieldOptionResponse> Options, long FieldDefinitionRevision = 1, string FieldProtectionMode = "Standard", long ProtectionPolicyRevision = 1);
+public sealed record FieldDefinitionResponse(Guid FieldDefinitionId, string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, string FieldClassification, string LifecycleStatus, IReadOnlyList<FieldOptionResponse> Options, long FieldDefinitionRevision = 1, string FieldProtectionMode = "Standard", long ProtectionPolicyRevision = 1, string OptionSelectionMode = "Single", Guid? OptionListId = null);
 
-public sealed record FieldOptionResponse(Guid FieldOptionId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive);
+public sealed record FieldOptionResponse(Guid FieldOptionId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive, Guid? OptionListItemId = null);
 
 public sealed record FormVersionResponse(Guid FormVersionId, int VersionNumber, int LayoutSchemaVersion, string LayoutJson, string ChangeReason, Guid? RestoredFromFormVersionId, DateTimeOffset PublishedOn, Guid PublishedByUserId);
 
@@ -65,7 +65,7 @@ public sealed record FormAccessResponse(Guid FormDefinitionId, long Authorizatio
 public sealed record DirectoryTeamResponse(Guid TeamId, string TeamName);
 
 /// <summary>Classification defaults to Confidential for String/File and Internal otherwise; protection defaults to ApplicationEncrypted for Confidential/Restricted and for String, and may be requested explicitly for Public/Internal. Plaintext requires the organization policy to permit it.</summary>
-public sealed record AddFieldDefinitionRequest(string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, IReadOnlyList<CreateFieldOptionRequest>? Options, string? FieldClassification = null, string? FieldProtectionMode = null);
+public sealed record AddFieldDefinitionRequest(string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, IReadOnlyList<CreateFieldOptionRequest>? Options, string? FieldClassification = null, string? FieldProtectionMode = null, string? OptionSelectionMode = null, Guid? OptionListId = null);
 
 /// <summary>Strengthening only (higher classification and/or Standard → ApplicationEncrypted); a reason is recorded with the audit event.</summary>
 public sealed record StrengthenFieldProtectionRequest(string? TargetClassification, string? TargetProtectionMode, string ChangeReason, long ExpectedProtectionRevision);
@@ -103,6 +103,18 @@ public sealed record UpdateFieldOptionsRequest(IReadOnlyList<FieldOptionChange> 
 
 /// <summary>Add (FieldOptionId null) or update display text/active flag/sort of an existing option; options are never deleted.</summary>
 public sealed record FieldOptionChange(Guid? FieldOptionId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive);
+
+/// <summary>Shared option list (Phase C2): a tenant-wide template whose items are copied into fields on bind.</summary>
+public sealed record OptionListResponse(Guid OptionListId, string OptionListName, string OptionListDescription, string LifecycleStatus, long OptionListRevision, IReadOnlyList<OptionListItemResponse> Items, int BoundFieldCount = 0);
+
+public sealed record OptionListItemResponse(Guid OptionListItemId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive);
+
+public sealed record CreateOptionListRequest(string OptionListName, string? OptionListDescription, IReadOnlyList<CreateFieldOptionRequest> Items);
+
+/// <summary>Add (OptionListItemId null) or update the display text/order/active flag of items; keys are permanent and items are never deleted. The expected revision guards against lost updates.</summary>
+public sealed record UpdateOptionListRequest(long ExpectedOptionListRevision, string? OptionListName, string? OptionListDescription, IReadOnlyList<OptionListItemChange> Changes);
+
+public sealed record OptionListItemChange(Guid? OptionListItemId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive);
 
 public sealed record SaveDraftRequest(long ExpectedDraftRevision, string LayoutJson);
 

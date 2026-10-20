@@ -6,6 +6,8 @@ public static class AuditActions
     public const string FormDraftUpdated = "FORM_DRAFT_UPDATED";
     public const string FormVersionPublished = "FORM_VERSION_PUBLISHED";
     public const string FieldConfigurationChanged = "FIELD_CONFIGURATION_CHANGED";
+    public const string FieldOptionsChanged = "FIELD_OPTIONS_CHANGED";
+    public const string OptionListChanged = "OPTION_LIST_CHANGED";
     public const string FieldProtectionStrengthened = "FIELD_PROTECTION_STRENGTHENED";
     public const string FieldProtectionMigrationStarted = "FIELD_PROTECTION_MIGRATION_STARTED";
     public const string FieldValuesReprotected = "FIELD_VALUES_REPROTECTED";

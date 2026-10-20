@@ -56,6 +56,8 @@ public sealed class FieldDefinitionConfiguration : IEntityTypeConfiguration<Fiel
         builder.Property(f => f.FieldDefinitionRevision).HasDefaultValue(1L);
         builder.Property(f => f.FieldProtectionMode).HasMaxLength(24).HasDefaultValue("Standard");
         builder.Property(f => f.ProtectionPolicyRevision).HasDefaultValue(1L);
+        builder.Property(f => f.OptionSelectionMode).HasMaxLength(10).HasDefaultValue("Single");
+        builder.HasOne<OptionList>().WithMany().HasForeignKey(f => f.OptionListId).HasConstraintName("fk_field_definitions_option_list");
         builder.HasIndex(f => new { f.FormDefinitionId, f.FieldKey }).IsUnique().HasDatabaseName("uq_field_definitions_form_key");
         builder.HasOne<FormDefinition>().WithMany().HasForeignKey(f => f.FormDefinitionId).HasConstraintName("fk_field_definitions_definition");
         builder.ToTable(t =>
@@ -66,6 +68,7 @@ public sealed class FieldDefinitionConfiguration : IEntityTypeConfiguration<Fiel
             // Confidential/Restricted content is never stored as typed plaintext (ADR-PB-004).
             t.HasCheckConstraint("ck_field_definitions_protection_floor", "field_classification IN ('Public','Internal') OR field_protection_mode = 'ApplicationEncrypted'");
             t.HasCheckConstraint("ck_field_definitions_protection_revision_positive", "protection_policy_revision >= 1");
+            t.HasCheckConstraint("ck_field_definitions_option_selection_mode", "option_selection_mode IN ('Single','Multiple')");
             t.HasCheckConstraint("ck_field_definitions_classification", "field_classification IN ('Public','Internal','Confidential','Restricted')");
         });
     }

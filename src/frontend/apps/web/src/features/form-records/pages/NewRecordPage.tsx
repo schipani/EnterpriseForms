@@ -1,5 +1,5 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { FormRenderer, tryParseLayout, validateValues, type ValueMap } from "@enterpriseforms/form-renderer";
+import { FormRenderer, initialValues, tryParseLayout, validateValues, type ValueMap } from "@enterpriseforms/form-renderer";
 import { Button, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -14,7 +14,7 @@ export function NewRecordPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const form = useQuery({ queryKey: ["forms", formDefinitionId], queryFn: () => api.forms.get(formDefinitionId).then((r) => r.result) });
-  const [values, setValues] = useState<ValueMap>({});
+  const [values, setValues] = useState<ValueMap | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const create = useMutation({
     mutationFn: (payload: Record<string, string>) => api.records.create(formDefinitionId, { values: payload, ownerTeamId: null }).then((r) => r.result),
@@ -37,11 +37,14 @@ export function NewRecordPage() {
     return <StatusMessage tone="danger" title="The published layout could not be parsed">{parsed.error}</StatusMessage>;
   }
   const fields = toRendererFields(form.data.fields);
+  // A new record starts with each dropdown's default selection; the server re-validates whatever is sent.
+  const starting = initialValues(parsed.layout, fields);
+  const current = values ?? starting;
   const submit = () => {
-    const validation = validateValues(parsed.layout, fields, values, "create");
+    const validation = validateValues(parsed.layout, fields, current, "create");
     setErrors(validation);
     if (Object.keys(validation).length === 0) {
-      create.mutate(layoutValues(parsed.layout, fields, values));
+      create.mutate(layoutValues(parsed.layout, fields, current, starting));
     }
   };
   return (
@@ -60,7 +63,7 @@ export function NewRecordPage() {
             {Object.keys(errors).length} field(s) need attention.
           </StatusMessage>
         ) : null}
-        <FormRenderer layout={parsed.layout} fields={fields} values={values} errors={errors} onChange={(key, value) => setValues((current) => ({ ...current, [key]: value }))} renderRelatedList={(element) => <p className="text-sm text-muted">{element.label || "Related records"}: available after the record is created.</p>} renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"}: upload after the record is created.</p>} />
+        <FormRenderer layout={parsed.layout} fields={fields} values={current} errors={errors} onChange={(key, value) => setValues((previous) => ({ ...(previous ?? starting), [key]: value }))} renderRelatedList={(element) => <p className="text-sm text-muted">{element.label || "Related records"}: available after the record is created.</p>} renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"}: upload after the record is created.</p>} />
         {create.isError ? <ErrorPanel error={create.error} /> : null}
         <div className="flex gap-2">
           <Button type="submit" busy={create.isPending}>

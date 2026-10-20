@@ -44,11 +44,13 @@ export function EditRecordPage() {
   }
   const fields = toRendererFields(data.fields);
   const conflict = update.isError && presentError(update.error).kind === "conflict";
+  const applyRules = data.permissions.isCompleteProjection;
+  const initial = toValueMap(data.record);
   const submit = () => {
-    const validation = validateValues(layout, fields, values, "edit");
+    const validation = validateValues(layout, fields, values, "edit", { applyRules });
     setErrors(validation);
     if (Object.keys(validation).length === 0) {
-      update.mutate(layoutValues(layout, fields, values));
+      update.mutate(layoutValues(layout, fields, values, initial, applyRules));
     }
   };
   return (
@@ -85,7 +87,7 @@ export function EditRecordPage() {
         ) : update.isError ? (
           <ErrorPanel error={update.error} />
         ) : null}
-        <FormRenderer layout={layout} fields={fields} values={values} errors={errors} onChange={(key, value) => setValues((current) => ({ ...(current ?? {}), [key]: value }))} renderRelatedList={(element) => <p className="text-sm text-muted">{element.label || "Related records"} are managed from the record page.</p>} renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"} are managed from the record page.</p>} />
+        <FormRenderer layout={layout} fields={fields} values={values} errors={errors} applyRules={applyRules} onChange={(key, value) => setValues((current) => ({ ...(current ?? {}), [key]: value }))} renderRelatedList={(element) => <p className="text-sm text-muted">{element.label || "Related records"} are managed from the record page.</p>} renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"} are managed from the record page.</p>} />
         <div className="flex gap-2">
           <Button type="submit" busy={update.isPending}>
             Save changes

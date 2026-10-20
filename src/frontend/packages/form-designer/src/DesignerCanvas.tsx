@@ -426,11 +426,56 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
           ) : null}
         </div>
         <span id={`${key}-desc`} className="sr-only">
-          {kind}, {span} of 4 columns{element.kind !== "relatedFormList" && element.required ? ", required" : ""}, in {sectionTitle(section)}
+          {kind}, {span} of 4 columns{element.kind !== "relatedFormList" && element.required ? ", required" : ""}
+          {behaviorFlags(element).map((flag) => `, ${flag.description}`).join("")}, in {sectionTitle(section)}
         </span>
+        <TileBadges element={element} />
         <TilePreview element={element} field={field} relationship={relationship} />
       </div>
     </li>
+  );
+}
+
+interface BehaviorFlag {
+  key: string;
+  label: string;
+  description: string;
+}
+
+/** Rule and behavior settings that change how a field acts in the data-entry form, as visible (never color-only) text. */
+function behaviorFlags(element: LayoutElement): BehaviorFlag[] {
+  if (element.kind !== "field") {
+    return [];
+  }
+  const flags: BehaviorFlag[] = [];
+  if (element.visibleWhen) {
+    flags.push({ key: "visible-rule", label: "Conditional", description: "shown only when a visibility rule holds" });
+  }
+  if (element.requiredWhen) {
+    flags.push({ key: "required-rule", label: "Required if", description: "required when a rule holds" });
+  }
+  if (element.showInForm === false) {
+    flags.push({ key: "not-in-form", label: "Not in form", description: "not shown in the data-entry form" });
+  }
+  if (element.readOnly) {
+    flags.push({ key: "read-only", label: "Read-only", description: "read-only" });
+  }
+  return flags;
+}
+
+function TileBadges({ element }: { element: LayoutElement }) {
+  const flags = behaviorFlags(element);
+  if (flags.length === 0) {
+    return null;
+  }
+  return (
+    <ul aria-hidden="true" className="flex flex-wrap gap-1" data-tile-flags="true">
+      {flags.map((flag) => (
+        <li key={flag.key} data-flag={flag.key} title={flag.description} className="rounded border border-line bg-page px-1.5 py-0.5 text-xs text-body">
+          {flag.label}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -471,7 +516,7 @@ function TilePreview({ element, field, relationship }: { element: LayoutElement;
       case "Option":
         body = (
           <span className={box}>
-            <span className="truncate">{placeholder || "Select…"}</span>
+            <span className="truncate">{placeholder || (field.optionSelectionMode === "Multiple" ? "Select several…" : "Select…")}</span>
             <Chevron open />
           </span>
         );

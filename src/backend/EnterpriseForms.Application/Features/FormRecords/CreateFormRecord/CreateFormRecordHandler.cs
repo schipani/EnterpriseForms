@@ -92,7 +92,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         var now = clock.GetUtcNow();
         var formRecordId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "record");
         // Validate before any authority command so a bad request never registers a phantom resource.
-        var candidateValues = CandidateBuilder.ApplyValues([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption);
+        var candidateValues = CandidateBuilder.ApplyValues([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption, creating: true);
 
         if (child is null)
         {

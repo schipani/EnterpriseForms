@@ -2,6 +2,7 @@ using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Api.Features.FormDefinitions;
 using EnterpriseForms.Application.Features.FormDefinitions.FormAccess;
 using EnterpriseForms.Application.Features.FormDesigner;
+using EnterpriseForms.Application.Features.FormDesigner.OptionLists;
 using EnterpriseForms.Contracts.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -109,6 +110,11 @@ public static class FormDesignerEndpoints
             .WithName("RestoreVersionToDraft")
             .WithSummary("Copies a published version into the draft; publishing creates a NEW version (history is never rewritten).");
 
+        group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/options/sync", static async Task<Ok<FieldDefinitionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.SyncOptionsFromListAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)))
+            .WithName("SyncFieldOptionsFromList")
+            .WithSummary("Pulls the shared option list into the field: adds new items, follows labels, deactivates items the list deactivated. Keys and ids never change; nothing is deleted.");
+
         group.MapGet("/{formDefinitionId:guid}/versions", static async Task<Ok<IReadOnlyList<FormVersionResponse>>> (Guid formDefinitionId, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.ListVersionsAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, cancellationToken).ConfigureAwait(false)))
             .WithName("ListFormVersions");
@@ -120,6 +126,26 @@ public static class FormDesignerEndpoints
             })
             .WithName("CreateRelationshipDefinition")
             .WithSummary("Defines a reusable related-form list (e.g. AccusedAddressList): parent → child form, bounds, cycle-checked.");
+
+        var lists = endpoints.MapGroup(ApiVersions.V1Prefix + "/option-lists").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+
+        lists.MapGet("/", static async Task<Ok<IReadOnlyList<OptionListResponse>>> (HttpContext http, OptionListHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.ListAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false)))
+            .WithName("ListOptionLists")
+            .WithSummary("Shared dropdown option lists of the organization (designers only).");
+
+        lists.MapPost("/", static async Task<Created<OptionListResponse>> (CreateOptionListRequest request, HttpContext http, OptionListHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                var response = await handlers.CreateAsync(BusinessAuthentication.RequireContext(http), request, cancellationToken).ConfigureAwait(false);
+                return TypedResults.Created($"{ApiVersions.V1Prefix}/option-lists/{response.OptionListId:D}", response);
+            })
+            .WithName("CreateOptionList")
+            .WithSummary("Creates a reusable option list; binding it to a field copies its items into the field.");
+
+        lists.MapPut("/{optionListId:guid}", static async Task<Ok<OptionListResponse>> (Guid optionListId, UpdateOptionListRequest request, HttpContext http, OptionListHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.UpdateAsync(BusinessAuthentication.RequireContext(http), optionListId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("UpdateOptionList")
+            .WithSummary("Renames a list and adds, relabels, reorders or deactivates its items (expected revision required; keys permanent, nothing deleted). Fields and published versions are unaffected until a field syncs.");
 
         return endpoints;
     }
