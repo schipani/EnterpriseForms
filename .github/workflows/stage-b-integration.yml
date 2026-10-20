@@ -2,7 +2,12 @@
 # Brings up the same disposable security-test stack as security-gate-a PLUS the Stage B services (ClamAV clamd, durable
 # worker, Azurite documents account, dev-seed personas) and runs tests/integration/EnterpriseForms.StageBTests against it,
 # then the browser end-to-end workflow with Playwright against the Vite dev server proxying to that stack.
-# Zero discovered tests is a failed run. Manual/scheduled only; synthetic credentials only; no customer data.
+# Zero discovered tests is a failed run. Synthetic credentials only; no customer data.
+#
+# Structure (CI-speed work): the integration tests and the browser tests are independent (the e2e specs create uniquely
+# named forms), so they run CONCURRENTLY, each against its OWN freshly started, clean-state stack. The job named
+# "Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e" is kept as the aggregate
+# result so the existing status-check name is unchanged; it succeeds only when BOTH parallel jobs executed and passed.
 name: stage-b-integration
 
 on:
@@ -15,11 +20,16 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same PR supersedes an obsolete run; scheduled and manual runs are never cancelled.
+concurrency:
+  group: stage-b-integration-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  stage-b:
-    name: Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e
+  integration:
+    name: Stage B integration tests (real stack)
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 60
     env:
       DOTNET_NOLOGO: "1"
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
@@ -28,35 +38,25 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          node-version: "22.20.0"
-          cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
+          python-version: "3.12"
       - name: Build the Stage B integration test project (zero tests must never pass silently)
         run: dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release
       - name: Start the disposable stack with Stage B services (synthetic credentials)
-        working-directory: infrastructure/docker
-        run: |
-          cp env.example .env
-          docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait
-          docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env ps
+        uses: ./.github/actions/start-stack
+        with:
+          early-services: clamav
+          cache-scope: stage-b
       - name: Run Stage B integration tests
         run: >
           dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj
           --no-build -c Release
           --results-directory artifacts/stage-b/test-results --report-xunit-trx
           -- --minimum-expected-tests 10
-      - name: Frontend install and Playwright browser
-        working-directory: src/frontend
-        run: |
-          npm ci --ignore-scripts
-          npx playwright install --with-deps chromium
-      - name: Browser end-to-end Accused workflow (Vite dev server → security-test API on 5180)
-        working-directory: src/frontend
-        env:
-          API_TARGET: http://127.0.0.1:5180
-        run: npx playwright test
+      - name: Slowest tests (timing visibility only)
+        if: always()
+        run: python scripts/ci/summarize_trx.py artifacts/stage-b/test-results
       - name: Collect service logs (sanitized by the services; no secrets are logged)
         if: always()
         working-directory: infrastructure/docker
@@ -75,3 +75,79 @@ jobs:
         if: always()
         working-directory: infrastructure/docker
         run: docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env down -v --remove-orphans
+
+  browser:
+    name: Stage B browser end-to-end (real stack)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.20.0"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: Start the disposable stack with Stage B services (synthetic credentials)
+        uses: ./.github/actions/start-stack
+        with:
+          early-services: clamav
+          cache-scope: stage-b
+      - name: Frontend install
+        working-directory: src/frontend
+        run: npm ci --ignore-scripts
+      - name: Resolve Playwright version
+        id: playwright
+        working-directory: src/frontend
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browser binaries
+        id: playwright-cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Install Playwright Chromium
+        working-directory: src/frontend
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Browser end-to-end Accused workflow (Vite dev server → security-test API on 5180)
+        working-directory: src/frontend
+        env:
+          API_TARGET: http://127.0.0.1:5180
+        run: npx playwright test
+      - name: Collect service logs (sanitized by the services; no secrets are logged)
+        if: always()
+        working-directory: infrastructure/docker
+        run: |
+          mkdir -p ../../artifacts/stage-b/logs
+          for s in authority api worker clamav business-migrate; do
+            docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env logs --no-color $s > ../../artifacts/stage-b/logs/$s.log 2>&1 || true
+          done
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with:
+          name: stage-b-browser-evidence
+          path: artifacts/stage-b
+          if-no-files-found: error
+      - name: Tear down
+        if: always()
+        working-directory: infrastructure/docker
+        run: docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env down -v --remove-orphans
+
+  stage-b:
+    name: Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e
+    needs: [integration, browser]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Both parallel jobs must have executed and succeeded (skipped, cancelled or failed all fail this gate)
+        env:
+          INTEGRATION: ${{ needs.integration.result }}
+          BROWSER: ${{ needs.browser.result }}
+        run: |
+          echo "integration=$INTEGRATION browser=$BROWSER"
+          [ "$INTEGRATION" = "success" ] && [ "$BROWSER" = "success" ]

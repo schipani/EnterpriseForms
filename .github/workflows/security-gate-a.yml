@@ -13,6 +13,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same PR supersedes an obsolete run; scheduled and manual runs are never cancelled.
+concurrency:
+  group: security-gate-a-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   gate-a:
     name: SEC-P01..SEC-P12 against the isolated Docker stack
@@ -32,12 +37,11 @@ jobs:
       - name: Build the security test project (zero tests must never pass silently)
         run: dotnet build tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj -c Release
       - name: Start disposable security-test stack (synthetic credentials)
-        working-directory: infrastructure/docker
-        run: |
-          cp env.example .env
-          docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait \
-            business-db authority-db spicedb vault vault-transit-init archive-store azurite authority-migrate authority business-migrate api attacker-sql
-          docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env ps
+        uses: ./.github/actions/start-stack
+        with:
+          services: business-db authority-db spicedb vault vault-transit-init archive-store azurite authority-migrate authority business-migrate api attacker-sql
+          targets: authority,api
+          cache-scope: gate-a
       - name: Run Stage A adversarial tests (12 mandatory + harness guard; zero or fewer discovered tests fails)
         run: >
           dotnet test --project tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj

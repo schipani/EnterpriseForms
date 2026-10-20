@@ -12,6 +12,8 @@
 #   authority-net: authority <-> authority-db, spicedb, vault, archive-store   (no business service is attached)
 #   web-net      : web -> api
 #
+# Images that two services share (authority/authority-migrate, api/business-migrate) carry one explicit tag so they are built once and
+# CI can pre-build them with BuildKit layer caching (.github/actions/start-stack) without compose rebuilding them.
 # Least privilege: each database has an admin (migration) identity and a runtime identity. The api/authority containers
 # run with the runtime identities; one-shot *-migrate services apply EF migrations and grants with the admin identity.
 name: enterpriseforms
@@ -162,6 +164,7 @@ services:
   dev-seed:
     # Development/Testing only: bootstraps a synthetic organization and personas through the authority OPERATOR plane and
     # writes dev-personas.json for the business API's development login. Holds the operator key; the api container does not.
+    image: enterpriseforms/dev-seed:local
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.devseed
@@ -182,6 +185,7 @@ services:
     restart: "no"
 
   authority-migrate:
+    image: enterpriseforms/authority:local
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.authority
@@ -196,6 +200,7 @@ services:
     restart: "no"
 
   authority:
+    image: enterpriseforms/authority:local
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.authority
@@ -243,6 +248,7 @@ services:
       retries: 40
 
   business-migrate:
+    image: enterpriseforms/api:local
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.api
@@ -257,6 +263,7 @@ services:
     restart: "no"
 
   api:
+    image: enterpriseforms/api:local
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.api
@@ -301,6 +308,7 @@ services:
       retries: 30
 
   worker:
+    image: enterpriseforms/worker:local
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.worker
@@ -333,6 +341,7 @@ services:
     networks: [business-net, trust-edge]
 
   web:
+    image: enterpriseforms/web:local
     build:
       context: ../..
       dockerfile: infrastructure/docker/Dockerfile.web
