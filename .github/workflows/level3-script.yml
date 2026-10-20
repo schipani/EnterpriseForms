@@ -12,6 +12,10 @@ on:
     paths:
       - scripts/dev/test.ps1
       - .github/workflows/level3-script.yml
+      # The script starts the stack from these files.
+      - infrastructure/docker/compose.yaml
+      - infrastructure/docker/compose.security-test.yaml
+      - infrastructure/docker/env.example
 
 permissions:
   contents: read

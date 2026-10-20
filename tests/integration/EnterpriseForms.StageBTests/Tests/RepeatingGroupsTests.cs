@@ -137,7 +137,8 @@ public sealed class RepeatingGroupsTests(StageBFixture fixture)
         string Accepted(string table) => fixture.Stack.AttackerSql($"SELECT count(*) FROM {table} WHERE form_record_id = '{record:D}' AND content_change_operation_id = (SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}');").Trim();
         Assert.Equal("2", Accepted("form_record_group_revisions"));
         Assert.Equal("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_string_values WHERE form_record_id = '{record:D}';").Trim());
-        Assert.Equal("4", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values WHERE form_record_id = '{record:D}' AND form_record_group_id IS NOT NULL AND content_change_operation_id = (SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}');").Trim());
+        // Ada's name, Bo's name and Bo's notes (text is Confidential + encrypted); the Role dropdown is Internal plaintext under the development policy.
+        Assert.Equal("3", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values WHERE form_record_id = '{record:D}' AND form_record_group_id IS NOT NULL AND content_change_operation_id = (SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}');").Trim());
         Assert.DoesNotContain("Synthetic", fixture.Stack.AttackerSql($"SELECT encode(encrypted_value_bytes,'escape') FROM field_encrypted_values WHERE form_record_id = '{record:D}';"), StringComparison.Ordinal);
 
         // Reorder and edit: identities stay, values follow their entry.
@@ -201,6 +202,7 @@ public sealed class RepeatingGroupsTests(StageBFixture fixture)
         // Concurrent edits: the second writer with the same expected revision gets a conflict, nothing is lost silently.
         var winner = await EditAsync(s, record, [], People(Entry(entries[0].Id, ("person_name", "Ada One")), Entry(entries[1].Id)), revision);
         Assert.True(winner.IsSuccess, winner.Body);
+        await s.WaitProjectionAsync(s.Clerk, record); // reads answer 503 until the winner's archive receipt exists
         var loser = await EditAsync(s, record, [], People(Entry(entries[0].Id, ("person_name", "Ada Two")), Entry(entries[1].Id)), revision);
         Assert.Equal(HttpStatusCode.Conflict, loser.Status);
         var after = Entries((await s.WaitProjectionAsync(s.Clerk, record)).Root);
@@ -239,7 +241,8 @@ public sealed class RepeatingGroupsTests(StageBFixture fixture)
 
         // (a) Reordering entries directly in the database (signed sort order) is detected.
         var reorder = await NewRecordAsync();
-        fixture.Stack.AttackerSql($"UPDATE form_record_group_revisions SET group_sort_order = 1 - group_sort_order WHERE form_record_id = '{reorder:D}';");
+        // A swap in two steps (the position index is unique per operation): 0,1 → 100,101 → 1,0.
+        fixture.Stack.AttackerSql($"UPDATE form_record_group_revisions SET group_sort_order = group_sort_order + 100 WHERE form_record_id = '{reorder:D}'; UPDATE form_record_group_revisions SET group_sort_order = 101 - group_sort_order WHERE form_record_id = '{reorder:D}';");
         var read = await s.ProjectionAsync(s.Clerk, reorder);
         Assert.Equal(HttpStatusCode.Locked, read.Status);
         Assert.Equal("INTEGRITY_VERIFICATION_FAILED", read.ErrorCode);
