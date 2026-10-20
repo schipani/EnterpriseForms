@@ -43,7 +43,7 @@ Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-05 … C-10**.
 ## Closure record
 
 * **Owner acceptance:** the reusable dropdown-list workflow only (decision C-11). The owner did **not** perform, and this document does not claim, NVDA / VoiceOver / real-zoom accessibility testing of any Phase C2 UI.
-* **Conditional rules, Show in form, Read-only:** verified against their automated acceptance criteria — 20 .NET unit tests (incl. the 51 shared rule vectors), 6 renderer + 4 payload + 25 rule-graph/vector vitest cases, Stage B `RulesTests` (3), Playwright `dropdowns-rules.spec.ts` (rules scenarios 2 of 5). Not human-tested by the owner.
+* **Conditional rules, Show in form, Read-only:** verified against their automated acceptance criteria — the .NET `PhaseC2RulesAndOptionsTests` (incl. the 51 shared rule vectors), the vitest rule-vector, rule-graph, renderer and record-payload tests, Stage B `RulesTests`, and the rules scenarios of Playwright `dropdowns-rules.spec.ts`. Not human-tested by the owner.
 * **Authority change** (plaintext dropdown sharing) requires appropriate production security review (C-12).
 * **Still open (unchanged):** G19 (independently verified migration completeness), NVDA/VoiceOver/real 200 %/400 % zoom reviews (PB14-C1) and the PB-14 sign-off record, all production Level 2 requirements (independent cryptographic attestation, Managed HSM, Confidential Ledger, Azure Level B), and G06 search completeness.
 
