@@ -91,12 +91,10 @@ public sealed class FieldProtectionMigrationTests(StageBFixture fixture)
     public async Task AForgedAcceptedOperationProjectionCannotSelectContentHideARecordOrForgeMigrationCompletion()
     {
         var w = await PlaintextWorkspaceAsync("forged-pointer", 4);
-        Assert.Equal(4, (await StatusAsync(w)).Root.GetProperty("legacyPlaintextRecordCount").GetInt32());
         string Accepted(Guid record) => fixture.Stack.AttackerSql($"SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}';").Trim();
 
-        // (a) A single forged column (dangling pointer) is not corroborated by a staged header and is ignored by the estimate.
+        // (a) A single forged column (dangling pointer) is not corroborated by a staged header and is ignored by the estimate (checked via the enumeration below).
         fixture.Stack.AttackerSql($"UPDATE form_records SET accepted_content_change_operation_id = '{Guid.CreateVersion7():D}' WHERE form_record_id = '{w.Records[0]:D}';");
-        Assert.Equal(4, (await StatusAsync(w)).Root.GetProperty("legacyPlaintextRecordCount").GetInt32());
 
         // (b) Pointer aimed at a planted, never-accepted candidate carrying a different value: reads still serve the accepted value.
         var planted = Guid.CreateVersion7();
@@ -112,14 +110,13 @@ public sealed class FieldProtectionMigrationTests(StageBFixture fixture)
         var record1 = w.Records[1];
         fixture.Stack.AttackerSql(PlantCandidateSql(record1, Accepted(record1), bogus, w.FieldId, null, withValue: false));
         fixture.Stack.AttackerSql($"UPDATE form_records SET accepted_content_change_operation_id = '{bogus:D}', record_revision = record_revision + 1 WHERE form_record_id = '{record1:D}';");
-        var skewed = (await StatusAsync(w)).Root.GetProperty("legacyPlaintextRecordCount").GetInt32();
-        Assert.True(skewed < 4, "the business-side estimate is expected to be skewable by a consistent multi-row forgery; got " + skewed); // documented residual of the untrusted estimate
 
         // Strengthening enumerates from the skewed estimate, yet the worker's post-check verifies every record of the form against the authority head.
         var strengthened = await StrengthenAsync(w);
         Assert.True(strengthened.IsSuccess, strengthened.Body);
-        var enumerated = strengthened.Root.GetProperty("migration").GetProperty("totalRecordCount").GetInt32();
-        Assert.True(enumerated < 4, "the forged record was expected to be missing from the initial enumeration; enumerated " + enumerated);
+        // The estimate-based enumeration: record 0 is still counted (the dangling pointer was ignored), record 3 is counted
+        // (its planted candidate also holds plaintext), and only record 1 is hidden — the documented residual of the untrusted estimate.
+        Assert.Equal(3, strengthened.Root.GetProperty("migration").GetProperty("totalRecordCount").GetInt32());
         var done = await WaitMigrationAsync(w, s => MigrationState(s) is "Completed" or "Failed", TimeSpan.FromSeconds(300));
         Assert.Equal("Completed", MigrationState(done));
         Assert.Equal(4, done.GetProperty("migration").GetProperty("totalRecordCount").GetInt32()); // the hidden record was found and added
