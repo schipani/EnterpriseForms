@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export type Persona = "owner" | "designer" | "clerk" | "reader";
 
@@ -81,6 +81,22 @@ export async function publish(page: Page, reason: string) {
   await dialog.getByLabel("Change reason").fill(reason);
   await dialog.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(dialog).toBeHidden();
+}
+
+/**
+ * Selects a tile (same as `selectTile`), then opens the Configure Field modal from the quick inspector's prominent
+ * button and, if given, switches to `tab` (General / Validation / Rules / Security & Encryption / Advanced). Returns
+ * the modal dialog locator (Phase C3 designer UX refinement).
+ */
+export async function openFieldConfig(page: Page, label: string, tab?: string): Promise<Locator> {
+  const quick = await selectTile(page, label);
+  await quick.getByRole("button", { name: "Configure Field" }).click();
+  const modal = page.getByRole("dialog", { name: new RegExp(`^Configure `) });
+  await expect(modal).toBeVisible();
+  if (tab) {
+    await modal.getByRole("tab", { name: tab }).click();
+  }
+  return modal;
 }
 
 export function formIdFromUrl(url: string): string {

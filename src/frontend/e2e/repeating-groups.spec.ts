@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { formIdFromUrl, placeFromPicker, saveAndPublish, selectTile, signIn, signOut } from "./support";
+import { formIdFromUrl, openFieldConfig, placeFromPicker, saveAndPublish, signIn, signOut } from "./support";
 
 /**
  * Phase C3, through the real application and API (no mocks):
@@ -92,26 +92,29 @@ test.describe.serial("Phase C3: repeating groups and dependent dropdowns", () =>
 
     await addEntryField(page, "People", "Person name");
     await addEntryField(page, "People", "Role", ["Witness", "Suspect"]);
-    let inspector = await selectTile(page, "Person name");
-    await inspector.getByRole("checkbox", { name: "Required" }).click();
+    let modal = await openFieldConfig(page, "Person name");
+    await modal.getByRole("checkbox", { name: "Required" }).click();
     // Entry fields stay in their section: the Section picker offers only that section.
-    await inspector.getByRole("combobox", { name: "Section" }).click();
+    await modal.getByRole("combobox", { name: "Section" }).click();
     await expect(page.getByRole("option")).toHaveText(["People"]);
     await page.keyboard.press("Escape");
+    await modal.getByRole("button", { name: "Apply Changes" }).click();
+    await expect(modal).toBeHidden();
     // With fields inside, the section cannot stop allowing multiple entries.
     await canvas(page).getByRole("button", { name: "People", exact: true }).click();
     await expect(sectionInspector.getByRole("checkbox", { name: "Allow multiple entries" })).toBeDisabled();
 
     // Province depends on Country (stable option keys; a choice with nothing ticked is always available).
-    inspector = await selectTile(page, "Province");
-    await inspector.getByRole("tab", { name: "Rules" }).click();
-    const dependent = inspector.getByRole("region", { name: "Dependent choices" });
+    modal = await openFieldConfig(page, "Province", "Rules");
+    const dependent = modal.getByRole("region", { name: "Dependent choices" });
     await dependent.getByRole("checkbox", { name: "Filter the choices by another dropdown" }).click();
     await expect(dependent.getByLabel("Depends on")).toContainText("Country");
     await dependent.getByRole("checkbox", { name: "Ontario when Canada" }).click();
     await dependent.getByRole("checkbox", { name: "Quebec when Canada" }).click();
     await dependent.getByRole("checkbox", { name: "Texas when USA" }).click();
     await expect(dependent.locator('[data-dependent-choice="texas"] legend')).toHaveText("Texas — available when Country is USA");
+    await modal.getByRole("button", { name: "Apply Changes" }).click();
+    await expect(modal).toBeHidden();
 
     // Preview: the section starts with no entries; adding one shows its fields; Province follows Country.
     await page.getByRole("tab", { name: "Preview" }).click();

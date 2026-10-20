@@ -9,8 +9,9 @@ import { Link, useBlocker, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ErrorPanel } from "../../support";
 import { AddFieldDialog, toKey } from "../components/AddFieldDialog";
-import { DesignerInspector, newElementFor, type PlacementTarget } from "../components/DesignerInspector";
+import { DesignerInspector, newElementFor, type DesignerInspectorProps, type PlacementTarget } from "../components/DesignerInspector";
 import { EditFieldDialog, type FieldEditSubmission } from "../components/EditFieldDialog";
+import { FieldConfigModal } from "../components/FieldConfigModal";
 import { OptionListsDialog } from "../components/OptionListsDialog";
 import { FormAccessPanel } from "../components/FormAccessPanel";
 import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
@@ -84,7 +85,9 @@ export function DesignerPage() {
   const [createAt, setCreateAt] = useState<{ kind: "field" | "documents"; target: PlacementTarget | null } | null>(null);
   const [editFieldId, setEditFieldId] = useState<string | null>(null);
   const [optionListsOpen, setOptionListsOpen] = useState(false);
-  const [inspectorTab, setInspectorTab] = useState<string | undefined>(undefined);
+  // Phase C3 designer UX refinement: the quick inspector has no tabs of its own any more; "Configure Field" and the
+  // Rules overview both open the full workspace in FieldConfigModal, landing on the tab named here.
+  const [configTarget, setConfigTarget] = useState<{ key: string; tab: string } | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [changeReason, setChangeReason] = useState("");
   const [relationshipOpen, setRelationshipOpen] = useState(false);
@@ -288,6 +291,20 @@ export function DesignerPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [view]);
 
+  // Phase C3 designer UX refinement: the header + toolbar pin to the top of the page (one scroll surface for the
+  // whole designer, not a second one inside it); the nav list and quick inspector stick just below it. The offset is
+  // measured, not guessed, so it stays correct however the header wraps (long form names, narrow widths, 400% zoom).
+  const pinnedRef = useRef<HTMLDivElement>(null);
+  const [pinnedHeight, setPinnedHeight] = useState(0);
+  useEffect(() => {
+    if (!pinnedRef.current || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => setPinnedHeight(entries[0]?.contentRect.height ?? 0));
+    observer.observe(pinnedRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   if (detail.isPending) {
     return <LoadingBlock label="Loading form" />;
   }
@@ -381,6 +398,49 @@ export function DesignerPage() {
     return found ? (layout!.sections[found.sectionIndex]!.title ?? "") : null;
   };
 
+  // Shared by the quick inspector and the Configure Field modal (Phase C3 designer UX refinement) so the two never
+  // drift: the modal gets the exact same callbacks, just with layout/onChange later overridden to a local draft.
+  const inspectorProps: DesignerInspectorProps | null = layout
+    ? {
+        layout,
+        onChange: setLayoutTracked,
+        selection,
+        onSelect: (next) => {
+          setSelection(next);
+          setNotice(null);
+        },
+        fields: form.fields,
+        relationships: form.relationships,
+        formDefinitionId,
+        canDesign,
+        collapsed,
+        onToggleCollapse: toggleCollapse,
+        onRequestRemoveSection: setRemoveSectionIndex,
+        onMoveSection: (sectionIndex, delta) => setLayoutTracked(moveSection(layout, sectionIndex, sectionIndex + delta)),
+        onDuplicateSection: (sectionIndex) => {
+          const key = newSectionKey(layout);
+          setLayoutTracked(duplicateSection(layout, sectionIndex, key));
+          setSelection({ kind: "section", sectionKey: key });
+        },
+        onOpenFieldEditor: (fieldId) => {
+          editField.reset();
+          setEditFieldId(fieldId);
+        },
+        onCreateAt: (kind, target) => setCreateAt({ kind, target }),
+        onPlacedAt: consumeSlot,
+        onOpenRelatedForms: () => setView("relationships"),
+        onStrengthen: (fieldId, request) => strengthen.mutate({ fieldId, request }),
+        strengthenPending: strengthen.isPending,
+        strengthenError: strengthen.error,
+        announce,
+        onOpenConfig: (key, tab) => setConfigTarget({ key, tab: tab ?? "general" }),
+        groups: form.groups ?? [],
+        onEnableRepeat: (sectionIndex, existingGroupDefinitionId) => enableRepeat.mutate({ sectionIndex, existingGroupDefinitionId }),
+        enableRepeatPending: enableRepeat.isPending,
+        enableRepeatError: enableRepeat.error,
+      }
+    : null;
+
   const toolbar = (
     <div role="group" aria-label="Designer actions" className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2">
       {canDesign ? (
@@ -470,42 +530,10 @@ export function DesignerPage() {
             announce={announce}
           />
         </div>
-        <div className={`min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto ${pane === "properties" ? "" : "hidden lg:block"}`}>
-          <DesignerInspector
-            layout={layout}
-            onChange={setLayoutTracked}
-            selection={selection}
-            onSelect={setSelection}
-            fields={form.fields}
-            relationships={form.relationships}
-            formDefinitionId={formDefinitionId}
-            canDesign={canDesign}
-            collapsed={collapsed}
-            onToggleCollapse={toggleCollapse}
-            onRequestRemoveSection={setRemoveSectionIndex}
-            onMoveSection={(sectionIndex, delta) => setLayoutTracked(moveSection(layout, sectionIndex, sectionIndex + delta))}
-            onDuplicateSection={(sectionIndex) => {
-              const key = newSectionKey(layout);
-              setLayoutTracked(duplicateSection(layout, sectionIndex, key));
-              setSelection({ kind: "section", sectionKey: key });
-            }}
-            onOpenFieldEditor={(fieldId) => {
-              editField.reset();
-              setEditFieldId(fieldId);
-            }}
-            onCreateAt={(kind, target) => setCreateAt({ kind, target })}
-            onPlacedAt={consumeSlot}
-            onOpenRelatedForms={() => setView("relationships")}
-            onStrengthen={(fieldId, request) => strengthen.mutate({ fieldId, request })}
-            strengthenPending={strengthen.isPending}
-            strengthenError={strengthen.error}
-            announce={announce}
-            requestedTab={inspectorTab}
-            groups={form.groups ?? []}
-            onEnableRepeat={(sectionIndex, existingGroupDefinitionId) => enableRepeat.mutate({ sectionIndex, existingGroupDefinitionId })}
-            enableRepeatPending={enableRepeat.isPending}
-            enableRepeatError={enableRepeat.error}
-          />
+        {/* Sticky, not scroll-capped: the quick panel is short by design (Phase C3 designer UX refinement), so it never
+            needs a scrollbar of its own — it just stays in view, offset below the pinned header, while the canvas scrolls. */}
+        <div className={`min-w-0 lg:sticky ${pane === "properties" ? "" : "hidden lg:block"}`} style={{ top: pinnedHeight + 16 }}>
+          <DesignerInspector {...inspectorProps!} />
         </div>
       </div>
     </div>
@@ -597,7 +625,7 @@ export function DesignerPage() {
   const views: Array<{ value: View; label: ReactNode; icon: ReactNode; content: ReactNode }> = [
     { value: "design", label: "Design", icon: <NavIcon d="M4 20h4L18.5 9.5a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" />, content: designView },
     { value: "fields", label: <>Fields <Count n={form.fields.length} /></>, icon: <NavIcon d="M3 5h18v14H3zM3 10h18M3 15h18M9 5v14" />, content: fieldsView },
-    { value: "rules", label: "Rules", icon: <NavIcon d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" />, content: layout ? <RulesView layout={layout} fields={form.fields} onEdit={(key) => { setInspectorTab("rules"); setSelection({ kind: "element", key }); setPane("properties"); setView("design"); }} /> : <LoadingBlock /> },
+    { value: "rules", label: "Rules", icon: <NavIcon d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" />, content: layout ? <RulesView layout={layout} fields={form.fields} onEdit={(key) => { setSelection({ kind: "element", key }); setPane("properties"); setView("design"); setConfigTarget({ key, tab: "rules" }); }} /> : <LoadingBlock /> },
     {
       value: "preview",
       label: "Preview",
@@ -747,18 +775,28 @@ export function DesignerPage() {
         {announcement}
       </div>
       {parseError ? <StatusMessage tone="danger" title="The stored layout could not be parsed">{parseError}</StatusMessage> : null}
+      {/* Phase C3 designer UX refinement: the form name, draft status and primary actions stay reachable while the
+          canvas (or any tab's content) scrolls, without a second independently-scrolling box. Height is measured
+          (pinnedRef) so the nav list and quick inspector below can offset by exactly this much. */}
+      {/* max-h/overflow-y-auto is a safety net, not the normal case: at ordinary widths and zoom this content fits and
+          never scrolls. Only when the header and toolbar together would be taller than most of a very short viewport
+          (e.g. 400% zoom) does this bar get its own short scroll, so Save draft/Publish stay reachable instead of
+          being permanently covered — never content "inaccessible" the way an un-clamped sticky block would leave it. */}
+      <div ref={pinnedRef} className="sticky top-0 z-20 -mx-4 flex max-h-[70vh] flex-col gap-2 overflow-y-auto bg-page px-4 pb-2 pt-2 sm:-mx-0 sm:px-0 sm:pt-0">
+        {header}
+        {toolbar}
+      </div>
       <SideNavTabs
         label="Form designer"
-        header={header}
         value={view}
         onValueChange={(next) => setView(next as View)}
+        stickyTop={pinnedHeight + 16}
         items={views.map((item) => ({
           value: item.value,
           label: item.label,
           icon: item.icon,
           content: (
-            <div className="flex min-w-0 flex-col gap-3">
-              {toolbar}
+            <div className="flex min-w-0 flex-col gap-3 pt-3">
               {notice && item.value === "design" ? (
                 <StatusMessage tone="info" title="Layout grid">
                   {notice}
@@ -771,6 +809,7 @@ export function DesignerPage() {
           ),
         }))}
       />
+      {configTarget && inspectorProps ? <FieldConfigModal {...inspectorProps} open configKey={configTarget.key} initialTab={configTarget.tab} onClose={() => setConfigTarget(null)} /> : null}
 
       {removeSectionIndex !== null && layout ? (
         <RemoveSectionDialog

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { placeFromPicker, selectTile } from "./support";
+import { openFieldConfig, placeFromPicker } from "./support";
 
 /**
  * Full Accused vertical slice in a real browser: designer sign-in → create and publish AccusedAddress and Accused forms
@@ -110,19 +110,27 @@ test.describe.serial("Stage B Accused workflow", () => {
     await placeFromPicker(page, "Add field", /External reference/);
     await placeFromPicker(page, "Add related list", /Addresses/);
     await placeFromPicker(page, "Add document collection", /Case documents/);
-    const documents = await selectTile(page, "Case documents");
-    await documents.getByRole("tab", { name: "Validation" }).click();
-    await documents.getByLabel("Maximum files").fill("10");
-    await documents.getByLabel("Maximum file size (MB)").fill("20");
-    await documents.getByLabel("Allowed content types").fill("application/pdf, text/plain");
+    let modal = await openFieldConfig(page, "Case documents", "Validation");
+    await modal.getByLabel("Maximum files").fill("10");
+    await modal.getByLabel("Maximum file size (MB)").fill("20");
+    await modal.getByLabel("Allowed content types").fill("application/pdf, text/plain");
+    await modal.getByRole("button", { name: "Apply Changes" }).click();
+    await expect(modal).toBeHidden();
+
     // Two half-width name fields on one row, required.
-    const given = await selectTile(page, "Given name");
-    await given.getByLabel("Field width").click();
+    modal = await openFieldConfig(page, "Given name");
+    await modal.getByLabel("Field width").click();
     await page.getByRole("option", { name: "2 columns" }).click();
-    await given.getByRole("checkbox", { name: "Required" }).check();
-    const family = await selectTile(page, "Family name");
-    await family.getByLabel("Field width").click();
+    await modal.getByRole("checkbox", { name: "Required" }).check();
+    await modal.getByRole("button", { name: "Apply Changes" }).click();
+    await expect(modal).toBeHidden();
+
+    modal = await openFieldConfig(page, "Family name");
+    await modal.getByLabel("Field width").click();
     await page.getByRole("option", { name: "2 columns" }).click();
+    await modal.getByRole("button", { name: "Apply Changes" }).click();
+    await expect(modal).toBeHidden();
+
     await saveAndPublish(page, "initial accused layout");
     await signOut(page);
   });

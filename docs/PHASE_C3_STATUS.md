@@ -80,15 +80,51 @@ Local (Windows, this branch, before commit):
 
 Finding fixed during verification: axe `label-content-name-mismatch` (WCAG 2.5.3) — the entry "Move up/down" buttons' accessible names did not contain their visible text; they are now "Move up, People 1".
 
-Hosted (isolated, disposable runners) — filled in from the actual runs on the pushed commit; see the PR:
+Hosted (isolated, disposable runners), on commit `be5566b` (fixes to the three `RepeatingGroupsTests` cases that the first hosted run on `666c314` caught — see decision log and PR history for what each fix was):
 
 | Gate | Commit | Result |
 |---|---|---|
-| ci (specs, .NET, frontend, compose) | *pending* | *pending* |
-| stage-b-integration (Stage B integration incl. `RepeatingGroupsTests`, all Playwright projects) | *pending* | *pending* |
-| security-gate-a (SEC-P01..SEC-P12) | *pending* | *pending* |
-| level3-script (the Level 3 script, unchanged, on its own clean stack) | *pending* | *pending* |
+| ci (specs, .NET, frontend, compose) | `be5566b` | **success** |
+| stage-b-integration (Stage B integration incl. `RepeatingGroupsTests`, all Playwright projects) | `be5566b` | **success** |
+| security-gate-a (SEC-P01..SEC-P12) | `be5566b` | **success** |
+| level3-script (the Level 3 script, unchanged, on its own clean stack) | `be5566b` | **success** |
 
 ### What this does not show
 
 No manual screen-reader or zoom review, no independent security review of the C3 changes, no Azure staging evidence, and no production certification of any kind.
+
+## Addendum: Form Designer UX refinement (owner-requested, after the C3 review above)
+
+The owner reviewed the running designer and asked for fewer visible scrollbars and a smaller, less crowded Field Properties panel. This addendum covers that request; it changes the **frontend only** (no schema, Authority, encryption, integrity, published-version, rule-engine or repeating-group change). See `docs/decisions/PHASE_C_DECISION_LOG.md` **C-22**.
+
+### What changed
+
+- **Pinned header.** The form name, draft status and the toolbar (Add Field/Row/Column, Undo/Redo, Preview, Save draft, Publish) now sit in one bar pinned to the top of the page (`position: sticky`) instead of scrolling away inside the Design tab. There is exactly one scroll surface for the whole designer (the page itself); the two boxes that used to force their own inner scrollbar (the left-hand section nav and the right-hand inspector) are now `sticky` without a height cap, so they stay in view without a scrollbar of their own. The pinned bar's own height is measured (not guessed) so the nav and inspector sit exactly below it at any width. As a defensive bound only — not the normal case — the pinned bar itself caps at 70% of the viewport height with its own scroll, so at very short viewports (400% zoom) its buttons stay reachable instead of being able to cover the whole screen; this was found and fixed during verification (below), not assumed safe.
+- **Short Field Properties panel.** Selecting a field or document collection now shows only **Field label**, **Field type** (still permanent/read-only), **Help text** and **Placeholder**, plus a **Configure Field** button (gear icon). A section's own properties (title, description, "Allow multiple entries", move/duplicate/remove) are unchanged — they were never part of the crowding complaint and stay inline.
+- **Configure Field modal.** Clicking it opens the previous General / Validation / Rules / Security & Encryption / Advanced workspace unchanged in content, now in a large dialog (~90vw up to 1200px, ~85vh, full-screen below `sm`) with a vertical tab list (more room, same `role=tab`/`role=tablist` semantics) and a pinned header/footer around one scrolling middle region. **Apply Changes** commits the field's edits (label, type-appropriate validation, rules, placement) to the draft as one undo step; **Cancel**, Escape, the overlay and the × button all discard them the same way — this is new: the old inline panel applied every keystroke immediately, which is what made Cancel meaningless before. Security & Encryption and "Edit catalog name and description…" are unaffected: those already acted immediately through their own server calls (Authority-backed strengthening; a separate catalog save), and still do — Cancel never rolls them back, because they were never part of the draft layout.
+- `Dialog` (`packages/ui`) gained an opt-in `size="large"` variant for this; every existing caller is unchanged (`size` defaults to the old behaviour). `SideNavTabs` dropped its `header` prop (folded into the page's own pinned bar, its only consumer) and its forced inner scrollbar.
+
+### Required regressions re-run after the change
+
+Every existing spec that used to reach General/Validation/Rules/Security/Advanced inline (`designer-ux.spec.ts`, `dropdowns-rules.spec.ts`, `accused-workflow.spec.ts`, `form-management.spec.ts`, `repeating-groups.spec.ts`, `reusable-dropdown-list.spec.ts`, `pb14-accessibility.spec.ts`) was updated to open Configure Field first, via a new `openFieldConfig` helper in `e2e/support.ts`, and re-run end to end against the development stack:
+
+| Spec | Result |
+|---|---|
+| `designer-layout-refinement.spec.ts` (new; pinned header, 4-field quick panel + empty state, modal open/tabs/Apply/Cancel/Escape sync, keyboard-only nav, axe) | **5 / 5** passed |
+| `designer-ux.spec.ts` | **5 / 5** passed |
+| `dropdowns-rules.spec.ts` | **5 / 5** passed |
+| `form-management.spec.ts` | **3 / 3** passed |
+| `reusable-dropdown-list.spec.ts` | **2 / 2** passed |
+| `accused-workflow.spec.ts` | **2 / 2** passed |
+| `repeating-groups.spec.ts` | **2 / 2** passed |
+| `encryption.spec.ts` + `encryption-downgrade.spec.ts` (unchanged files; confirm `Dialog`'s default size is pixel-identical) | **8 / 8** passed |
+| `pb14-accessibility.spec.ts` (axe at 320/768/1440/720/320×256; keyboard-only; forced-colors/reduced-motion) | **3 / 3** passed, after one real fix (below) |
+| Vitest (all packages) / lint / typecheck / production build | clean |
+
+Two real problems were found and fixed by this verification, not assumed away:
+1. **Target-size false attribution.** The new quick-panel axe scan initially reported a `target-size` (WCAG 2.5.8) finding on the canvas tile's own rename button — a **pre-existing** issue from Phase C1 (that button is untouched by this change) that a page-wide scan picks up incidentally whenever a tile is selected. The scan is now scoped to the inspector panel under test (`AxeBuilder.include`), and the pre-existing finding is left as a separate, tracked gap rather than silently working around it by disabling the rule.
+2. **Pinned bar could cover the whole short viewport.** At the 200%-zoom-equivalent width (720×600), the header + full toolbar wrapped across enough rows to be taller than the viewport, and — because `position: sticky` keeps occupying that space at every scroll position — the canvas became permanently unclickable underneath it (242 failed click retries in `pb14-accessibility.spec.ts`, not a flaky timeout). This is exactly the "content becomes inaccessible" failure mode the task asked to avoid, and it was only caught by actually running the test at that viewport. Fixed by bounding the pinned bar to `max-h-[70vh]` with its own scroll as a fallback (described above); re-run confirmed clean.
+
+### What this addendum does not show
+
+No manual NVDA/VoiceOver review was performed for the new modal (automated axe only, as instructed). The pre-existing canvas-tile target-size finding above is not fixed here (out of scope for this refinement) and should get its own follow-up.
