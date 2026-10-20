@@ -27,4 +27,7 @@ public static class FaultNames
     public const string CrashAfterJournalCommit = "CrashAfterJournalCommit";
     public const string CrashAfterProjectionWrite = "CrashAfterProjectionWrite";
     public const string CrashAfterContentHeadCommit = "CrashAfterContentHeadCommit";
+
+    /// <summary>Testing only: terminate after a prepared content operation is durably stored, before the response is sent (the caller sees a transport failure and retries).</summary>
+    public const string CrashAfterPrepareCommit = "CrashAfterPrepareCommit";
 }

@@ -182,6 +182,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         scope.AddCandidateLeaves(candidateLeaves);
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        faultInjector.CrashIfArmed(FaultNames.CrashAfterPrepareCommit);
         return ToPrepared(operation, candidateLeaves, correlationId);
     }
 

@@ -151,6 +151,46 @@ BEGIN
   END IF;
 END $$;";
 
+    /// <summary>
+    /// Regression (InterruptedAndTampered… intermittent failure): the authority stores a prepared reprotection operation
+    /// and dies before answering. The worker sees a transport failure, parks the migration and retries; its rebuilt
+    /// candidate differs from the stored one (fresh row identities, fresh ciphertext), so reusing the attempt's
+    /// idempotency key is refused with IDEMPOTENCY_CONFLICT. That must move the record to a fresh attempt — never fail
+    /// a healthy record — and the field must end fully encrypted through the authority. Deterministic: one-shot,
+    /// Testing-only crash point CrashAfterPrepareCommit (same mechanism as SEC-P09).
+    /// </summary>
+    [Fact]
+    public async Task AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation()
+    {
+        var w = await PlaintextWorkspaceAsync("interrupted-prepare", 3);
+        var arm = await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "CrashAfterPrepareCommit" });
+        Assert.True(arm.IsSuccess, arm.Body);
+        try
+        {
+            var strengthened = await StrengthenAsync(w);
+            Assert.True(strengthened.IsSuccess, strengthened.Body);
+            await w.Scenario.WaitGateReadyAsync();
+            var done = await WaitMigrationAsync(w, s => MigrationState(s) is "Completed" or "Failed", TimeSpan.FromSeconds(300));
+            var items = fixture.Stack.AttackerSql($@"SELECT string_agg(i.item_state || '|' || i.attempt_count || '|' || coalesce(i.last_error_code, ''), ' ; ') FROM field_protection_migration_items i JOIN field_protection_migrations m ON m.field_protection_migration_id = i.field_protection_migration_id WHERE m.field_definition_id = '{w.FieldId:D}';").Trim();
+            Assert.True(MigrationState(done) == "Completed", "migration did not complete; items: " + items + "; status: " + done.GetRawText());
+            Assert.Equal(3, done.GetProperty("migration").GetProperty("completedRecordCount").GetInt32());
+            Assert.Equal(0, done.GetProperty("migration").GetProperty("failedRecordCount").GetInt32());
+            // The interrupted record needed more than one attempt: the crash really happened between Prepare and its response.
+            Assert.True(int.Parse(fixture.Stack.AttackerSql($@"SELECT max(i.attempt_count) FROM field_protection_migration_items i JOIN field_protection_migrations m ON m.field_protection_migration_id = i.field_protection_migration_id WHERE m.field_definition_id = '{w.FieldId:D}';").Trim(), System.Globalization.CultureInfo.InvariantCulture) >= 2, "expected a retried item; items: " + items);
+            var verified = await WaitMigrationAsync(w, s => s.GetProperty("fullyEncrypted").GetBoolean());
+            Assert.Equal("Encrypted", verified.GetProperty("migrationState").GetString());
+            foreach (var record in w.Records)
+            {
+                var projection = await w.Scenario.WaitProjectionAsync(w.Scenario.Clerk, record);
+                Assert.True(projection.Root.GetProperty("record").GetProperty("values").EnumerateArray().Single(v => v.GetProperty("fieldKey").GetString() == "plain_note").GetProperty("applicationEncrypted").GetBoolean());
+            }
+        }
+        finally
+        {
+            await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "None" }); // disarm if the crash point was never reached
+        }
+    }
+
     [Fact]
     public async Task StrengtheningCountsPlaintextThenTheWorkerReprotectsEveryRecordThroughTheAuthorityAndOnlyThenClaimsFullEncryption()
     {
