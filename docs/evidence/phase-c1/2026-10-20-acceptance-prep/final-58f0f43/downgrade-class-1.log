@@ -1,0 +1,12 @@
+running... 2 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored
+[slow] still running after 1m 00s: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored (EnterpriseForms.StageBTests.dll|net10.0|x64)
+
+  In process file artifacts produced:
+    - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\artifacts\c1-acceptance-final\downgrade-class-1\tsch_DESKTOP-ULURP9A_2026-10-20_03_10_30.748684.trx
+
+Test run summary: Passed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  total: 7
+  failed: 0
+  succeeded: 7
+  skipped: 0
+  duration: 2m 09s 814ms

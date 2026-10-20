@@ -4,7 +4,62 @@
 
 **Scope:** `docs/ui/c1-designer-rebuild/` (owner handoff: `TARGET_DESIGN.png` normative, `CURRENT_IMPLEMENTATION.png` to replace, `DESIGN_AND_BEHAVIOR_CONTRACT.md`, `ACCEPTANCE_TEST_MATRIX.md`). This supersedes the first C1-UX iteration described further below, which the owner rejected (card-based canvas). **Milestone status: implemented and tested; NOT accepted — awaiting owner visual acceptance of the real UI and the human accessibility reviews listed under Limitations.**
 
-**Commits on `phase-c/form-platform-expansion`:** `687d6a7` (designer rebuild), `79b8030` (inspector tabs wrap at 320 px — found by the PB-14 reflow scan), `bddc387` (fix of the `CancellingAReleaseReEncrypts…` integration failure, see below), `708c4db` (owner review feedback: encryption notice below the input), `2681511` (status count also reads the accepted head), plus this documentation commit.
+**Commits on `phase-c/form-platform-expansion`:** `687d6a7` (designer rebuild), `79b8030` (inspector tabs wrap at 320 px — found by the PB-14 reflow scan), `bddc387` (fix of the `CancellingAReleaseReEncrypts…` integration failure, see below), `708c4db` (owner review feedback: encryption notice below the input), `2681511` (status count also reads the accepted head), then `a0beeea`, `64bed7e`, `58f0f43` (acceptance preparation, below), plus documentation commits.
+
+### C1 acceptance preparation (2026-10-20) — recovery defect, projection hardening, final evidence
+
+**Milestone status unchanged: NOT accepted.** The interface awaits the owner's approval; PR #11 must not be merged before it.
+
+#### `InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored` intermittent failure — genuine recovery defect (fixed, `a0beeea`)
+
+- **Evidence.** On a fresh security-test stack at `2681511` the test failed in 1 of 8 isolated runs (`docs/evidence/phase-c1/2026-10-20-acceptance-prep/baseline-2681511/run-6.log`). The diagnostic added to the test showed a healthy record `Failed` after 5 attempts with `IDEMPOTENCY_CONFLICT: idempotency key reused with a different request or actor`, next to the deliberately tampered record (`DEPROTECT_AUTHENTICATION_FAILED`).
+- **Root cause.** The worker derived its reprotection idempotency key (and so the authority operation id) only from (migration, record, accepted revision). When the authority is paused mid-request the worker times out and parks the migration, but the buffered `Prepare` is processed after unpause and stores a prepared operation under that key. Every retry rebuilds the candidate with fresh row identities (and, when encrypting, fresh ciphertext), so the authority correctly refuses to reuse the key; the record failed permanently. Not a harness timing problem: a real interruption (authority restart, network loss after the request is sent) produces it.
+- **Fix.** The key includes the item's persisted attempt number: a crash or replay within one attempt keeps the same operation (the authority returns it, or the head has moved and the item completes as a no-op), while a new attempt gets a fresh operation and the abandoned one expires unused. `IDEMPOTENCY_CONFLICT` on a reprotection prepare is retried as the next attempt rather than counted as a record failure. No timeout or retry budget was increased; every attempt still passes the same authority Prepare/Commit rules and the content-head CAS; the tampered record still fails closed.
+- **Deterministic regression (`64bed7e`).** A Testing-only, one-shot authority crash point `CrashAfterPrepareCommit` (same `IFaultInjector` mechanism and environment restriction as the SEC-P09 crash points; NoOp in every other environment) and the test `AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation`. **Revert check:** with the pre-fix worker code temporarily restored, the test failed 2 of 2 runs with exactly the field symptom (`Failed|5|IDEMPOTENCY_CONFLICT…`, `legacyPlaintextRecordCount=1`); with the fix it passes (see below).
+
+#### `form_records.accepted_content_change_operation_id` vs. a hostile business PostgreSQL administrator (hardened, `a0beeea`, `58f0f43`)
+
+| Question | Finding |
+|---|---|
+| Can it select unaccepted content for a read, projection, download or export? | **No.** The column is read only by the local legacy-plaintext/encrypted estimate in `BusinessStore`; every protected read verifies the observed rows against the authority's accepted head (VerifyRecordProjection). Test (b): a pointer aimed at a planted candidate with a different value — the record still reads the accepted value. |
+| Can it bypass authority verification? | **No.** No authority call takes it as input; the reprotection worker reads the authority head for every item, and the migration post-check now counts old-form rows in the operation **the authority reports**. |
+| Can it forge migration completion? | **No (fixed).** Before: the post-check verified tracked items plus the business estimate, so a record hidden from the estimate could be skipped. Now `FinalizeAsync` verifies every business record of the form against its authority head and adds any that still hold old-form rows; completion requires zero. Test (c): a consistent forgery (bogus staged header + `record_revision` + pointer) hides a record from the initial enumeration (3 of 4 enumerated) — the migration still ends with 4 of 4 records re-protected in their authority heads. |
+| Can a single forged column skew the estimate? | **No (fixed).** The pointer is honoured only when a staged header of the same record with that operation exists at the projected `record_revision`; otherwise the previous rule applies. Test (a): a dangling pointer does not hide the record. The authority's commit response also replaces a stale or forged pointer at the same revision. |
+
+**Residual (documented, not new):** the local estimate and the status flags `fullyEncrypted` / `fullyPlaintext` remain business-database projections. An administrator who writes several tables consistently (bogus headers, revisions, pointers, migration rows) can still make the *status display* wrong — exactly as before this column existed (inserting a bogus higher revision had the same effect). These flags are never used for any authorization, decryption, read or search decision. The migration post-check's record list also comes from the business database; a record removed from `form_records` is not enumerated, because the authority offers no workload enumeration of a form's records (tracked with G06).
+
+#### Final verification on `58f0f43`
+
+Fresh security-test stack (`down -v`, images rebuilt from `58f0f43`; real PostgreSQL ×2, SpiceDB, Vault Transit, Trust Authority, Azurite, ClamAV, hostile `attacker-sql`). Evidence: `docs/evidence/phase-c1/2026-10-20-acceptance-prep/final-58f0f43/` (`gate-summary.txt`, logs, TRX, Playwright JUnit).
+
+| Check | Result |
+|---|---|
+| `AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation` (deterministic, ×3) | **3/3** (pre-fix revert check: 0/2) |
+| `InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored` (×5) | **5/5** (plus 10/10 on `a0beeea`; baseline `2681511`: 7/8) |
+| `AForgedAcceptedOperationProjectionCannotSelectContentHideARecordOrForgeMigrationCompletion` (×3) | **3/3** |
+| `CancellingAReleaseReEncryptsConvertedValuesAndRecordsTheIrreversibleExposureWindow` (×2) | **2/2** (plus 3/3 on `a0beeea`) |
+| Stage B integration suite (complete) | **42/42** |
+| `FieldProtectionDowngradeTests` class (×2) | **7/7, 7/7** |
+| `FieldProtectionMigrationTests` class (×2) | **6/6, 6/6** |
+| Playwright, all specs (incl. `designer-ux`, `pb14-accessibility` axe + reflow at 320/768/1440 and 720/320 zoom equivalents, `accused-workflow`, `form-management`, `encryption`, `encryption-downgrade`) | **23/23** |
+| SEC-P01–SEC-P12 + harness guard (adversarial) | **13/13** |
+| `.NET` solution tests | **166/166** |
+
+Frontend code is unchanged since `708c4db` (typecheck/lint clean, vitest 47/47, build OK there). Hosted CI on the pushed head is recorded in the PR.
+
+#### Unfinished features and open acceptance items (tracked, not claimed)
+
+| Item | Status |
+|---|---|
+| Owner approval of the actual interface | **PENDING** — required before merging PR #11 |
+| Conditional rules (visibility / required-if) | **Not implemented** — no rule engine in the layout schema or server; the Rules view and inspector tab say so and persist nothing |
+| "Show in form" (hidden placement) | **Not implemented** — the layout schema has no hidden-element property |
+| "Read-only" (per-element read-only) | **Not implemented** — the layout schema has no read-only element property |
+| NVDA + Chrome/Firefox review of the designer | **PENDING** (human) — PB14-C1 in `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` |
+| VoiceOver + Safari review of the designer | **PENDING** (human) — PB14-C1 |
+| Real browser zoom 200% / 400% | **PENDING** (human) — automated viewport equivalents pass |
+| Product/design sign-off (PB-14) | **PENDING** |
+| Production Level 2 certification | **Outstanding** (unchanged by this work) |
 
 ### Screenshot comparison (target vs. what was replaced vs. what was built)
 
@@ -41,7 +96,7 @@ Evidence: `docs/evidence/phase-c1/2026-10-20-designer-rebuild/` (screenshots, lo
 |---|---|---|---|---|
 | 1 (`687d6a7`) | 38/39 — `CancellingAReleaseReEncrypts…` | — | 22/23 — inspector tabs overflowed at 320 px (fixed in `79b8030`) | 13/13 |
 | 2 (`79b8030`) | 38/39 — `CancellingAReleaseReEncrypts…` again (rollback Completed, `legacyPlaintextRecordCount=1`) | — | **23/23** | 13/13 |
-| 3 (`708c4db`, includes `bddc387`) | 39/40 — only the new regression test, which exposed a third copy of the max-revision logic (fixed in `2681511`) | 5/7 and 6/7 (regression test; once `InterruptedAndTampered…`, a worker-restart test of the lease-timing family noted in the first C1 round, which passed in the full suite and in the other repeat) | **23/23** | 13/13 |
+| 3 (`708c4db`, includes `bddc387`) | 39/40 — only the new regression test, which exposed a third copy of the max-revision logic (fixed in `2681511`) | 5/7 and 6/7 (regression test; once `InterruptedAndTampered…` — at the time attributed to worker-restart timing; later diagnosed as a genuine interrupted-Prepare recovery defect and fixed in `a0beeea`, see "C1 acceptance preparation" above) | **23/23** | 13/13 |
 | **Final (`2681511`)** | **40/40** | **7/7, 7/7** | not re-run: `2681511` changes one backend store method only; no frontend change since run 3 | **13/13** |
 
 Also on the final code: `.NET` solution tests (`dotnet test --solution EnterpriseForms.All.slnx`) **165/165**; frontend `npm run typecheck` 0 errors, `npm run lint` 0 problems, `npx vitest run` **47/47**, `npm run build` succeeded; `python scripts/validate-specifications.py --strict` PASS after `python scripts/generate-spec-manifest.py`.

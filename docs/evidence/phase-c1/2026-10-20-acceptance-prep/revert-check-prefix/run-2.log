@@ -1,0 +1,13 @@
+running... 0 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation (36s 080ms)
+  migration did not complete; items: Failed|5|IDEMPOTENCY_CONFLICT: idempotency key reused with a different request or actor ; Completed|1| ; Completed|1|; status: {"fieldDefinitionId":"01a1573a-336f-794a-993c-4574a9e134c4","fieldKey":"plain_note","fieldClassification":"Confidential","fieldProtectionMode":"ApplicationEncrypted","protectionPolicyRevision":2,"protectionChangedOn":"2026-10-20T02:53:16.937014+00:00","migrationState":"EncryptionMigrationFailed","legacyPlaintextRecordCount":1,"searchImpact":"Encrypted for privacy - not searchable in V1 (ADR-PB-004). Authorized users see the value on the record; no plaintext copy exists in the business database.","organizationMinimumClassification":"Internal","organizationPermitsPlaintext":true,"fullyEncrypted":false,"migration":{"fieldProtectionMigrationId":"01a1573a-3d0a-7b56-b62e-783d3821fd8a","migrationState":"Failed","totalRecordCount":3,"totalValueCount":3,"completedRecordCount":2,"failedRecordCount":1,"pendingRecordCount":0,"lastErrorCode":null,"startedOn":"2026-10-20T02:53:16.937014+00:00","completedOn":null,"verifiedOn":null,"authorityCommandId":"01a1573a-3bc4-733f-8939-0ddf118cd76d","migrationDirection":"Encrypt","cancelledOn":null,"rollbackOfMigrationId":null},"fullyPlaintext":false,"legacyEncryptedRecordCount":0}
+    at EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation() in C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\Tests\FieldProtectionMigrationTests.cs:172
+    at EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation() in C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\Tests\FieldProtectionMigrationTests.cs:187
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  total: 1
+  failed: 1
+  succeeded: 0
+  skipped: 0
+  duration: 37s 201ms
