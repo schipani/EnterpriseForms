@@ -80,7 +80,7 @@ export function FormAccessPanel({ formDefinitionId, canManage }: { formDefinitio
             { key: "name", header: "Name", isRowHeader: true, render: (row) => row.displayName },
             { key: "kind", header: "Type", render: (row) => row.subjectKind },
             { key: "effective", header: "Effective permission", render: () => "Create records" },
-            { key: "actions", header: "Actions", render: (row) => <Button size="sm" variant="ghost" aria-label={`Revoke ${row.displayName}`} onClick={() => setRevokeTarget(row)}>Revoke</Button> },
+            { key: "actions", header: "Actions", isActions: true, render: (row) => <Button size="sm" variant="ghost" aria-label={`Revoke ${row.displayName}`} onClick={() => setRevokeTarget(row)}>Revoke</Button> },
           ]}
         />
         <StatusMessage tone="info" title="What this changes">

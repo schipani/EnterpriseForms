@@ -1,0 +1,15 @@
+running... 14 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored
+running... 14 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored
+[slow] still running after 1m 00s: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored (EnterpriseForms.StageBTests.dll|net10.0|x64)
+running... 35 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation
+running... 36 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AuthorityOutageBlocksAndResumesAndHostileRowTamperingFailsTheRecordWithoutClaimingEncryption
+
+  In process file artifacts produced:
+    - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\artifacts\c1-acceptance-final\stageb-full\tsch_DESKTOP-ULURP9A_2026-10-20_03_03_31.361436.trx
+
+Test run summary: Passed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  total: 42
+  failed: 0
+  succeeded: 42
+  skipped: 0
+  duration: 6m 58s 624ms

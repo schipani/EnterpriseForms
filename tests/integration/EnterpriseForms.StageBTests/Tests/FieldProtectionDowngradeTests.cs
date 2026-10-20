@@ -94,17 +94,71 @@ public sealed class FieldProtectionDowngradeTests(StageBFixture fixture)
         throw new TimeoutException("migration did not reach the expected state: " + last.GetRawText());
     }
 
+    /// <summary>All items of the field's migrations as "record|state|attempts|last_error" lines (test diagnostics only).</summary>
+    private string MigrationItemsDiagnostic(Guid fieldId) =>
+        fixture.Stack.AttackerSql($@"SELECT string_agg(i.form_record_id || '|' || i.item_state || '|' || i.attempt_count || '|' || coalesce(i.last_error_code, ''), ' ; ' ORDER BY i.form_record_id) FROM field_protection_migration_items i JOIN field_protection_migrations m ON m.field_protection_migration_id = i.field_protection_migration_id WHERE m.field_definition_id = '{fieldId:D}';", throwOnError: false).Trim();
+
     private static string MigrationState(JsonElement status) => status.GetProperty("migration").GetProperty("migrationState").GetString()!;
 
     private string EncryptedRowsInLatestSnapshots(Workspace w, Guid fieldId) =>
-        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_encrypted_values v WHERE v.field_definition_id = '{fieldId:D}' AND v.content_change_operation_id = (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1);").Trim();
+        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_encrypted_values v WHERE v.field_definition_id = '{fieldId:D}' AND v.content_change_operation_id = (SELECT COALESCE(f.accepted_content_change_operation_id, (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1)) FROM form_records f WHERE f.form_record_id = v.form_record_id);").Trim();
 
     private string PlaintextRowsInLatestSnapshots(Workspace w, Guid fieldId) =>
-        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_string_values v WHERE v.field_definition_id = '{fieldId:D}' AND v.content_change_operation_id = (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1);").Trim();
+        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_string_values v WHERE v.field_definition_id = '{fieldId:D}' AND v.content_change_operation_id = (SELECT COALESCE(f.accepted_content_change_operation_id, (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1)) FROM form_records f WHERE f.form_record_id = v.form_record_id);").Trim();
 
     /// <summary>The activity feed is actor-scoped; service events of a migration are attributed to the administrator who started it.</summary>
     private async Task<List<string?>> ActionsAsync(Workspace w, TestUser? user = null) =>
         (await fixture.Api.GetAsync("/api/v1/my-activity?limit=300", w.Scenario.Token(user ?? w.Scenario.Designer))).Root.EnumerateArray().Select(e => e.GetProperty("eventAction").GetString()).ToList();
+
+    /// <summary>
+    /// Regression (CancellingAReleaseReEncrypts… flake, C1 round): staged candidates are insert-only, so a candidate the
+    /// authority rejects — e.g. a decrypt prepared just before a cancel superseded its command — stays in the business
+    /// tables at a higher content revision than the accepted head. The local estimates must read the accepted head's rows,
+    /// not the highest staged revision, or the field can never be reported fully encrypted again. Planted
+    /// deterministically through the hostile business-DBA connection instead of relying on the race.
+    /// </summary>
+    [Fact]
+    public async Task ARejectedCandidateLeftInTheInsertOnlyTablesIsNeverMistakenForTheRecordsState()
+    {
+        var w = await EncryptedWorkspaceAsync("orphan-candidate", 2);
+        var before = await StatusAsync(w, w.InternalId);
+        Assert.True(before.IsSuccess, before.Body);
+        Assert.Equal(0, before.Root.GetProperty("legacyPlaintextRecordCount").GetInt32());
+        var fullyEncryptedBefore = before.Root.GetProperty("fullyEncrypted").GetBoolean();
+        var record = w.Records[0];
+        var accepted = fixture.Stack.AttackerSql($"SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}';").Trim();
+        Assert.True(Guid.TryParse(accepted, out _), "the accepted head is projected on every accepted commit: " + accepted);
+
+        // Plant a never-accepted candidate one revision ahead: a copy of the accepted header plus a plaintext copy of the encrypted value.
+        var orphan = Guid.CreateVersion7();
+        fixture.Stack.AttackerSql($@"DO $$
+DECLARE header_cols text; value_cols text;
+BEGIN
+  SELECT string_agg(quote_ident(column_name), ',') INTO header_cols FROM information_schema.columns
+   WHERE table_schema = current_schema() AND table_name = 'form_record_revisions' AND column_name NOT IN ('form_record_revision_id','content_change_operation_id','content_revision','row_revision','candidate_state');
+  EXECUTE format('INSERT INTO form_record_revisions (form_record_revision_id, content_change_operation_id, content_revision, row_revision, candidate_state, %s) SELECT %L::uuid, %L::uuid, content_revision + 1, row_revision + 1, ''Staged'', %s FROM form_record_revisions WHERE form_record_id = %L::uuid AND content_change_operation_id = %L::uuid',
+    header_cols, '{Guid.CreateVersion7():D}', '{orphan:D}', header_cols, '{record:D}', '{accepted}');
+  SELECT string_agg(quote_ident(c.column_name), ',') INTO value_cols FROM information_schema.columns c
+   WHERE c.table_schema = current_schema() AND c.table_name = 'field_string_values' AND c.column_name NOT IN ('field_string_value_id','content_change_operation_id','content_revision','row_revision','string_value')
+     AND c.column_name IN (SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'field_encrypted_values');
+  EXECUTE format('INSERT INTO field_string_values (field_string_value_id, content_change_operation_id, content_revision, row_revision, string_value, %s) SELECT %L::uuid, %L::uuid, content_revision + 1, row_revision + 1, %L, %s FROM field_encrypted_values WHERE form_record_id = %L::uuid AND field_definition_id = %L::uuid AND content_change_operation_id = %L::uuid',
+    value_cols, '{Guid.CreateVersion7():D}', '{orphan:D}', 'orphaned plaintext candidate', value_cols, '{record:D}', '{w.InternalId:D}', '{accepted}');
+END $$;");
+        Assert.Equal("1", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_string_values WHERE content_change_operation_id = '{orphan:D}';").Trim());
+        Assert.Equal(orphan.ToString("D"), fixture.Stack.AttackerSql($"SELECT content_change_operation_id FROM form_record_revisions WHERE form_record_id = '{record:D}' ORDER BY content_revision DESC LIMIT 1;").Trim()); // it is the highest staged revision
+
+        var after = await StatusAsync(w, w.InternalId);
+        Assert.True(after.IsSuccess, after.Body);
+        Assert.Equal(0, after.Root.GetProperty("legacyPlaintextRecordCount").GetInt32());
+        Assert.Equal(fullyEncryptedBefore, after.Root.GetProperty("fullyEncrypted").GetBoolean());
+        Assert.Equal("0", PlaintextRowsInLatestSnapshots(w, w.InternalId));
+
+        // Reads follow the authority head, never the orphan: the record still shows the accepted, encrypted value.
+        var projection = await w.Scenario.WaitProjectionAsync(w.Scenario.Clerk, record);
+        var note = projection.Root.GetProperty("record").GetProperty("values").EnumerateArray().Single(v => v.GetProperty("fieldKey").GetString() == "sealed_note");
+        Assert.Equal($"sealed 0 of {w.Scenario.Name}", note.GetProperty("stringValue").GetString());
+        Assert.True(note.GetProperty("applicationEncrypted").GetBoolean());
+    }
 
     [Fact]
     public async Task NothingIsReleasedUntilTheOwnerPublishesThePolicyAndDesignersClerksReadersAndOtherTenantsNeverCan()
@@ -422,8 +476,10 @@ public sealed class FieldProtectionDowngradeTests(StageBFixture fixture)
         Assert.Equal("Failed", MigrationState(ended));
         Assert.Equal("DecryptionMigrationFailed", ended.GetProperty("migrationState").GetString());
         Assert.False(ended.GetProperty("fullyPlaintext").GetBoolean());
-        Assert.Equal(4, ended.GetProperty("migration").GetProperty("completedRecordCount").GetInt32());
-        Assert.Equal(1, ended.GetProperty("migration").GetProperty("failedRecordCount").GetInt32());
+        // On failure, report every item (record, state, attempts, last error) so a recovery defect is diagnosable from the run log.
+        var items = MigrationItemsDiagnostic(w.InternalId);
+        Assert.True(ended.GetProperty("migration").GetProperty("completedRecordCount").GetInt32() == 4, "expected 4 completed records; tampered=" + tampered.ToString("D") + "; items: " + items + "; status: " + ended.GetRawText());
+        Assert.True(ended.GetProperty("migration").GetProperty("failedRecordCount").GetInt32() == 1, "expected 1 failed record; items: " + items);
         Assert.Equal(1, ended.GetProperty("legacyEncryptedRecordCount").GetInt32());
         Assert.Equal("Failed", fixture.Stack.AttackerSql($"SELECT item_state FROM field_protection_migration_items WHERE form_record_id = '{tampered:D}';").Trim());
         Assert.Contains(await ActionsAsync(w, w.Scenario.Administrator), a => a == "FIELD_PROTECTION_MIGRATION_FAILED");

@@ -799,7 +799,11 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
     /// <summary>
     /// Status: <c>FullyEncrypted</c> is true only when the field is application-encrypted, no latest snapshot holds a plaintext
     /// copy (recomputed now, never read from the migration row alone) and, when an encrypt migration exists, it completed
-    /// and was verified. <c>FullyPlaintext</c> mirrors this for a released field. A forged "Completed" row cannot make either claim.
+    /// and the worker's post-check recorded it. <c>FullyPlaintext</c> mirrors this for a released field. A forged "Completed"
+    /// row alone cannot make either claim, but both rest on business-database data: an administrator who writes several
+    /// tables consistently, or removes records from form_records, can make them wrong. They are display/status flags only —
+    /// never used for authorization, decryption, reads or search — and NOT an independently verified completeness
+    /// guarantee; Authority-backed completeness verification is open security finding G19 (SECURITY_GAP_ASSESSMENT.md).
     /// </summary>
     private static async Task<FieldProtectionResponse> ProtectionResponseAsync(IBusinessScope scope, FieldDefinition field, Domain.Features.Organizations.OrganizationSecurityPolicy policy, CancellationToken cancellationToken)
     {

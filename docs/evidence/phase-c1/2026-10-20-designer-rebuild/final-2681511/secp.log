@@ -1,0 +1,11 @@
+running... 5 completed, 0 failed | active: EnterpriseForms.SecurityTests.Tests.SigningBoundaryTests.SecP11_BusinessIdentitiesCannotSignOrReachKeyMaterial
+
+  In process file artifacts produced:
+    - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\artifacts\c1-designer-rebuild-final\secp\tsch_DESKTOP-ULURP9A_2026-10-20_02_13_43.341258.trx
+
+Test run summary: Passed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\security\EnterpriseForms.SecurityTests\bin\Release\net10.0\EnterpriseForms.SecurityTests.dll (net10.0|x64)
+  total: 13
+  failed: 0
+  succeeded: 13
+  skipped: 0
+  duration: 2m 00s 970ms

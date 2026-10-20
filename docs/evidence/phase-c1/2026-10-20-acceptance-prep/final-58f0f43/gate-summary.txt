@@ -1,0 +1,44 @@
+STEP stack
+STEP interrupted-prepare-1 exit 0
+  total: 1   failed: 0 
+STEP interrupted-prepare-2 exit 0
+  total: 1   failed: 0 
+STEP interrupted-prepare-3 exit 0
+  total: 1   failed: 0 
+STEP interrupted-1 exit 0
+  total: 1   failed: 0 
+STEP interrupted-2 exit 0
+  total: 1   failed: 0 
+STEP interrupted-3 exit 0
+  total: 1   failed: 0 
+STEP interrupted-4 exit 0
+  total: 1   failed: 0 
+STEP interrupted-5 exit 0
+  total: 1   failed: 0 
+STEP forged-pointer-1 exit 0
+  total: 1   failed: 0 
+STEP forged-pointer-2 exit 0
+  total: 1   failed: 0 
+STEP forged-pointer-3 exit 0
+  total: 1   failed: 0 
+STEP cancelling-1 exit 0
+  total: 1   failed: 0 
+STEP cancelling-2 exit 0
+  total: 1   failed: 0 
+STEP stageb-full exit 0
+  total: 42   failed: 0 
+STEP downgrade-class-1 exit 0
+  total: 7   failed: 0 
+STEP downgrade-class-2 exit 0
+  total: 7   failed: 0 
+STEP migration-class-1 exit 0
+  total: 6   failed: 0 
+STEP migration-class-2 exit 0
+  total: 6   failed: 0 
+STEP playwright
+STEP playwright exit 0
+  23 passed (4.7m)
+STEP secp
+STEP secp exit 0
+  total: 13   failed: 0 
+STEP done

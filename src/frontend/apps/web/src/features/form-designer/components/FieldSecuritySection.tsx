@@ -79,7 +79,16 @@ const MIGRATION_LABELS: Record<string, { tone: "info" | "warning" | "danger" | "
   Cancelled: { tone: "warning", label: "migration cancelled" },
 };
 
-/** Progress of the background re-encryption (B-28) or decryption (Amendment A1) of existing values. Shown until the server reports the field as fully encrypted / fully plaintext and verified. */
+/**
+ * What the "all listed records" badges do and do not establish (security finding G19, SECURITY_GAP_ASSESSMENT.md):
+ * the migration worker checked the Authority-accepted version of every record the business database lists for this
+ * form. A hostile business-database administrator can hide records from that list, so this is not an independently
+ * verified completeness guarantee; Authority-backed completeness verification is an open requirement.
+ */
+const COMPLETENESS_NOTE =
+  "Checked by the migration worker against the Authorization Authority's accepted version of every record the business database lists for this form. This is not an independently verified completeness guarantee: a record hidden from the business database would not be covered (security finding G19).";
+
+/** Progress of the background re-encryption (B-28) or decryption (Amendment A1) of existing values. Shown until the server reports every listed record as converted (see COMPLETENESS_NOTE: not an independent completeness proof). */
 function MigrationProgress({ migration, legacyRecords, canRetry, onRetry, retrying, retryError }: { migration: FieldProtectionMigrationResponse; legacyRecords: number; canRetry: boolean; onRetry: () => void; retrying: boolean; retryError: unknown }) {
   const decrypting = migration.migrationDirection === "Decrypt";
   const noun = decrypting ? "Decryption" : "Encryption";
@@ -101,8 +110,8 @@ function MigrationProgress({ migration, legacyRecords, canRetry, onRetry, retryi
       </div>
       <p className="text-xs text-muted">
         {decrypting
-          ? `Existing ciphertext is rewritten as typed plaintext one record at a time through the Authorization Authority; every step is audited. Until this finishes and is verified, ${legacyRecords} record(s) still hold an encrypted copy and the field is not reported as fully migrated to plaintext.`
-          : `Existing values are re-sealed one record at a time through the Authorization Authority; every step is audited. Until this finishes and is verified, ${legacyRecords} record(s) still hold a plaintext copy and the field is not reported as fully encrypted.`}
+          ? `Existing ciphertext is rewritten as typed plaintext one record at a time through the Authorization Authority; every step is audited. Until this finishes and the worker's check passes, ${legacyRecords} record(s) still hold an encrypted copy.`
+          : `Existing values are re-sealed one record at a time through the Authorization Authority; every step is audited. Until this finishes and the worker's check passes, ${legacyRecords} record(s) still hold a plaintext copy.`}
         {migration.lastErrorCode ? ` Last error: ${migration.lastErrorCode}.` : ""}
       </p>
       {migration.migrationState === "Failed" || migration.migrationState === "Blocked" ? (
@@ -135,7 +144,7 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
   const status = useQuery({
     queryKey: statusKey,
     queryFn: () => api.forms.protection(formDefinitionId, field.fieldDefinitionId).then((r) => r.result),
-    // A running migration is polled; the claims "Fully encrypted" / "Fully migrated to plaintext" only ever come from the server's verified status.
+    // A running migration is polled; the "all listed records" claims only ever come from the server status (worker check against the Authority heads of the records the business database lists — not an independent completeness proof, G19).
     refetchInterval: (query) => (query.state.data?.migration && ["Queued", "Running", "Blocked"].includes(query.state.data.migration.migrationState) ? 2000 : false),
   });
   const refresh = async () => {
@@ -195,11 +204,12 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         <Badge tone="neutral">{field.fieldClassification}</Badge>
         <span>Application-level encryption</span>
         <Badge tone={encrypted ? "success" : "warning"}>{encrypted ? "Enabled" : "Off — plaintext"}</Badge>
-        {status.data?.fullyEncrypted ? <Badge tone="success">Fully encrypted · verified</Badge> : null}
-        {status.data?.fullyPlaintext ? <Badge tone="warning">Fully migrated to plaintext · verified</Badge> : null}
+        {status.data?.fullyEncrypted ? <Badge tone="success">All listed records encrypted</Badge> : null}
+        {status.data?.fullyPlaintext ? <Badge tone="warning">All listed records migrated to plaintext</Badge> : null}
         {status.data?.migrationState === "EncryptionPendingRewrite" ? <Badge tone="warning">{status.data.legacyPlaintextRecordCount} record(s) still hold a plaintext copy until their next save</Badge> : null}
         {status.data?.migrationState === "DecryptionPendingRewrite" ? <Badge tone="warning">{status.data.legacyEncryptedRecordCount} record(s) still hold an encrypted copy</Badge> : null}
       </div>
+      {status.data?.fullyEncrypted || status.data?.fullyPlaintext ? <p className="text-xs text-muted">{COMPLETENESS_NOTE}</p> : null}
       {migration && !status.data?.fullyEncrypted && !status.data?.fullyPlaintext && migration.migrationState !== "Cancelled" ? (
         <MigrationProgress migration={migration} legacyRecords={Number(migration.migrationDirection === "Decrypt" ? status.data?.legacyEncryptedRecordCount : status.data?.legacyPlaintextRecordCount)} canRetry={migration.migrationDirection === "Decrypt" ? administrator : canEdit} onRetry={() => retry.mutate()} retrying={retry.isPending} retryError={retry.error} />
       ) : null}

@@ -34,7 +34,7 @@ public static class OperatorEndpoints
                     return TypedResults.Problem(title: "Fault injection disabled", detail: "FaultInjection:Enabled is honoured only in the Testing environment.", statusCode: StatusCodes.Status403Forbidden);
                 }
 
-                if (request.FaultName is not (FaultNames.None or FaultNames.CrashAfterJournalCommit or FaultNames.CrashAfterProjectionWrite or FaultNames.CrashAfterContentHeadCommit))
+                if (request.FaultName is not (FaultNames.None or FaultNames.CrashAfterJournalCommit or FaultNames.CrashAfterProjectionWrite or FaultNames.CrashAfterContentHeadCommit or FaultNames.CrashAfterPrepareCommit))
                 {
                     throw AuthorityException.Invalid("unknown fault name");
                 }

@@ -113,6 +113,7 @@ export function UploadCenterPage() {
                 {
                   key: "actions",
                   header: "Actions",
+                  isActions: true,
                   render: (row) =>
                     row.sessionState === "Open" ? (
                       <Button

@@ -1,0 +1,12 @@
+running... 0 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored
+running... 0 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored
+
+  In process file artifacts produced:
+    - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\artifacts\c1-acceptance-prep\interrupted-7\tsch_DESKTOP-ULURP9A_2026-10-20_02_44_40.315070.trx
+
+Test run summary: Passed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  total: 1
+  failed: 0
+  succeeded: 1
+  skipped: 0
+  duration: 1m 01s 444ms

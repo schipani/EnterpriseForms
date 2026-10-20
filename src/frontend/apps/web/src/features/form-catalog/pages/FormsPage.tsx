@@ -1,5 +1,5 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, DataTable, LoadingBlock, PageHeader } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, LoadingBlock, PageHeader, RowActions } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ErrorPanel } from "../../support";
@@ -44,28 +44,41 @@ export function FormsPage() {
               {
                 key: "actions",
                 header: "Actions",
+                isActions: true,
                 render: (row) => (
-                  <div className="flex flex-wrap gap-2">
-                    {row.canDesign ? (
-                      <Link to="/app/forms/$formDefinitionId/design" params={{ formDefinitionId: row.formDefinitionId }}>
-                        <Button size="sm" variant="secondary">
-                          Design
-                        </Button>
-                      </Link>
-                    ) : null}
-                    {row.canCreateRecord && row.currentVersionNumber !== null ? (
-                      <Link to="/app/forms/$formDefinitionId/records/new" params={{ formDefinitionId: row.formDefinitionId }}>
-                        <Button size="sm">New record</Button>
-                      </Link>
-                    ) : null}
-                    {row.currentVersionNumber !== null ? (
-                      <Link to="/app/records" search={{ form: row.formDefinitionId }}>
-                        <Button size="sm" variant="ghost">
-                          Records
-                        </Button>
-                      </Link>
-                    ) : null}
-                  </div>
+                  <RowActions
+                    overflowLabel={`More actions for ${row.formDefinitionName}`}
+                    primary={
+                      <>
+                        {row.canDesign ? (
+                          <Link to="/app/forms/$formDefinitionId/design" params={{ formDefinitionId: row.formDefinitionId }}>
+                            <Button size="sm" variant="secondary">
+                              Design
+                            </Button>
+                          </Link>
+                        ) : null}
+                        {row.canCreateRecord && row.currentVersionNumber !== null ? (
+                          <Link to="/app/forms/$formDefinitionId/records/new" params={{ formDefinitionId: row.formDefinitionId }}>
+                            <Button size="sm">New record</Button>
+                          </Link>
+                        ) : null}
+                      </>
+                    }
+                    overflow={
+                      row.currentVersionNumber !== null
+                        ? [
+                            {
+                              key: "records",
+                              content: (
+                                <Link to="/app/records" search={{ form: row.formDefinitionId }}>
+                                  Records using this form
+                                </Link>
+                              ),
+                            },
+                          ]
+                        : []
+                    }
+                  />
                 ),
               },
             ]}

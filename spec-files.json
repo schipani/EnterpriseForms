@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "9c672c83875172681df724f1adb1a5d53d53e0657d3ce503851b12fa4015e49a",
-      "bytes": 25271
+      "sha256": "82d7040c5dbbb1722ce69a9e6927ea8d24be3d7fc96b63cbf5b70b58d87ad93e",
+      "bytes": 26275
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -48,9 +48,19 @@
       "bytes": 25771
     },
     {
+      "path": "docs/PHASE_C1_UX_STATUS.md",
+      "sha256": "b740df13c50356de1931dd4ab80e7e10a1bc8a37e4f2b224ab1b23e1b1cef46e",
+      "bytes": 47065
+    },
+    {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
       "sha256": "94aed64050704da8ec31a90ad594b98345b719ca94a8fa3dc9dd5093211d1fd9",
       "bytes": 3799
+    },
+    {
+      "path": "docs/SHA256SUMS.txt",
+      "sha256": "7c0420eed38fad959904b7f2b9a04e4a17c66c73a95560c4490d05b9ddce4fc5",
+      "bytes": 658
     },
     {
       "path": "docs/STAGE_A_CHANGE_REVIEW.md",
@@ -176,6 +186,11 @@
       "path": "docs/decisions/PHASE0_DECISION_LOG.md",
       "sha256": "6137949b9093de4013767e4401f2c3a908b72c7f2fae97cc04d213e66772aa92",
       "bytes": 6884
+    },
+    {
+      "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
+      "sha256": "9f97b205d073a275081bf4b9516c20b964117bf03bfe464edf5218b1571ae5db",
+      "bytes": 3557
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -313,6 +328,16 @@
       "bytes": 4288
     },
     {
+      "path": "docs/ui/C1_DESIGNER_UX_IMPLEMENTATION_BRIEF.md",
+      "sha256": "7430bb2e70971ebaecfece5989f8ac7fcb57dd0dab45f36c206c1657d4168895",
+      "bytes": 10429
+    },
+    {
+      "path": "docs/ui/C1_DESIGNER_UX_VISUAL_REFERENCE.png",
+      "sha256": "cec0999216be7fc615843894cb873b98a3e33d6f0e051eb802c5fe899be78943",
+      "bytes": 1824577
+    },
+    {
       "path": "docs/ui/PB14_COLOR_CONTRAST.reference.ts",
       "sha256": "2a53104e14b382a153c9a2303a3965b520aed97fbbe8f1edaddfdab67ac199a4",
       "bytes": 1656
@@ -324,13 +349,13 @@
     },
     {
       "path": "docs/ui/PB14_ENTERPRISE_DESIGN_VALIDATION_STANDARD.md",
-      "sha256": "58323f8071182549f38e039ee09cf403397323a60ff603681d1ba1b7311e52eb",
-      "bytes": 5991
+      "sha256": "6bc5de2e62f859b6f6d1d86f5a41dd9f6b5af3e1197f83a20179bcd80c96a839",
+      "bytes": 8821
     },
     {
       "path": "docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md",
-      "sha256": "173e85138c5b11143b74a2417c4e3c890ee3d21c1a3554d77ab6d26d4c8d1999",
-      "bytes": 7455
+      "sha256": "facf36c326ade2a2cc45f1115d39ef5d37bd81db5d917db59de64ec35076db96",
+      "bytes": 8237
     },
     {
       "path": "docs/ui/PB14_REPRESENTATIVE_SCREEN_CONTRACTS.md",
@@ -341,6 +366,31 @@
       "path": "docs/ui/SCREEN_IMPLEMENTATION_MATRIX.md",
       "sha256": "b9df949a16445a9a7a4ef87727a69b84f5360f27789e7de86243093f36610469",
       "bytes": 7825
+    },
+    {
+      "path": "docs/ui/c1-designer-rebuild/ACCEPTANCE_TEST_MATRIX.md",
+      "sha256": "2c81178f286bea1e4c3713a6907f33b8f01025259a6385de6f18b3f9df68b2fb",
+      "bytes": 3355
+    },
+    {
+      "path": "docs/ui/c1-designer-rebuild/CURRENT_IMPLEMENTATION.png",
+      "sha256": "fa1069b2896011f71fdf24502d7e4f9412c08c891ad8692fb59321a5306ba9f4",
+      "bytes": 117718
+    },
+    {
+      "path": "docs/ui/c1-designer-rebuild/DESIGN_AND_BEHAVIOR_CONTRACT.md",
+      "sha256": "9b7742d838fab2080a0d51fd7f938d567a0a86b131cdfad188225d82ba55c8fc",
+      "bytes": 11853
+    },
+    {
+      "path": "docs/ui/c1-designer-rebuild/PACKAGE_SHA256SUMS.txt",
+      "sha256": "0d664d32c0118eb8bb27fdbbf3ebc55c2851477b0c6699f4df4ac2d822f236c2",
+      "bytes": 658
+    },
+    {
+      "path": "docs/ui/c1-designer-rebuild/TARGET_DESIGN.png",
+      "sha256": "3992f7389ba5f5a1995830336c26ef2a8a0747e271eea3df9f6e173920b447e7",
+      "bytes": 470486
     },
     {
       "path": "form_model/RELATED_FORM_COLLECTIONS.md",

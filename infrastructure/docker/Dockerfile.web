@@ -5,7 +5,11 @@ COPY src/frontend/package.json src/frontend/package-lock.json ./
 COPY src/frontend/apps/web/package.json apps/web/
 COPY src/frontend/packages/design-tokens/package.json packages/design-tokens/
 COPY src/frontend/packages/api-client/package.json packages/api-client/
-RUN npm ci --ignore-scripts
+# npm ci can fail to materialize platform-specific optional native bindings (e.g. rolldown's
+# linux-x64-musl build) when package-lock.json was generated on a different OS; this is the
+# documented npm bug https://github.com/npm/cli/issues/4828. `npm install` re-resolves optional
+# dependencies for the actual build platform instead of trusting the cross-platform lockfile entry.
+RUN npm install --ignore-scripts
 COPY src/frontend/ ./
 COPY contracts/ /contracts/
 RUN npm run build -w apps/web

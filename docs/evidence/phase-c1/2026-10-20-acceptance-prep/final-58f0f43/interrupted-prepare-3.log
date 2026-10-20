@@ -1,0 +1,11 @@
+running... 0 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionMigrationTests.AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation
+
+  In process file artifacts produced:
+    - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\artifacts\c1-acceptance-final\interrupted-prepare-3\tsch_DESKTOP-ULURP9A_2026-10-20_02_56_47.624920.trx
+
+Test run summary: Passed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  total: 1
+  failed: 0
+  succeeded: 1
+  skipped: 0
+  duration: 37s 940ms

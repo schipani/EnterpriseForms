@@ -2000,6 +2000,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("form_record_id");
 
+                    b.Property<Guid?>("AcceptedContentChangeOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("accepted_content_change_operation_id");
+
                     b.Property<Guid?>("AuthorityCommandId")
                         .HasColumnType("uuid")
                         .HasColumnName("authority_command_id");

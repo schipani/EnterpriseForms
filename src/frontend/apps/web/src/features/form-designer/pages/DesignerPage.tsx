@@ -1,19 +1,27 @@
+import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { DesignerCanvas, locateField, updateElement } from "@enterpriseforms/form-designer";
-import { emptyLayout, serializeLayout, tryParseLayout, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, PageHeader, Select, StatusMessage, Tabs, TextInput } from "@enterpriseforms/ui";
+import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
+import { FormRenderer, emptyLayout, serializeLayout, tryParseLayout, type Breakpoint, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
+import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Link, useBlocker, useParams } from "@tanstack/react-router";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ErrorPanel } from "../../support";
 import { AddFieldDialog, toKey } from "../components/AddFieldDialog";
-import type { StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
+import { DesignerInspector, newElementFor, type PlacementTarget } from "../components/DesignerInspector";
 import { EditFieldDialog, type FieldEditSubmission } from "../components/EditFieldDialog";
 import { FormAccessPanel } from "../components/FormAccessPanel";
+import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
+
+type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" | "access" | "relationships";
 
 /**
- * PG-033/037 designer: fields catalog, relationships, draft layout canvas with save (draft revision CAS), publish
- * (draft + current version CAS), version history and restore-to-draft. The server validates every layout again.
+ * PG-033/037 Form Designer (C1 designer rebuild, docs/ui/c1-designer-rebuild): a left designer navigation, a centre
+ * toolbar + canvas of titled sections with compact field previews, and a persistent right inspector. "+ Add Row"
+ * creates a titled section (an existing layout-v2 `section`, not a line-break flag); fields are placed into exact
+ * cells, moved between sections and edited in the inspector. Save draft uses the draft revision CAS, Publish the draft
+ * + current version CAS; the server validates every layout again and published versions stay immutable.
  */
 export function DesignerPage() {
   const { formDefinitionId } = useParams({ from: "/app/forms/$formDefinitionId/design" });
@@ -26,8 +34,53 @@ export function DesignerPage() {
   const [layout, setLayout] = useState<FormLayout | null>(null);
   const [baseJson, setBaseJson] = useState<string>("");
   const [parseError, setParseError] = useState<string | null>(null);
-  const [addField, setAddField] = useState(false);
-  const [addDocuments, setAddDocuments] = useState(false);
+  // Undo/redo over the draft layout: `setLayoutTracked` is the single mutation path for the canvas and inspector, so
+  // every layout change — sections, placements, moves, spans, labels and validation — is undoable.
+  const undoStack = useRef<FormLayout[]>([]);
+  const redoStack = useRef<FormLayout[]>([]);
+  const [, setHistoryTick] = useState(0);
+  const setLayoutTracked = useCallback((next: FormLayout | ((current: FormLayout | null) => FormLayout | null)) => {
+    setLayout((current) => {
+      const resolved = typeof next === "function" ? (next as (c: FormLayout | null) => FormLayout | null)(current) : next;
+      if (current && resolved && serializeLayout(resolved) !== serializeLayout(current)) {
+        undoStack.current = [...undoStack.current, current].slice(-100);
+        redoStack.current = [];
+        setHistoryTick((tick) => tick + 1);
+      }
+      return resolved;
+    });
+  }, []);
+  const undo = () => {
+    const previous = undoStack.current.at(-1);
+    if (!previous || !layout) {
+      return;
+    }
+    undoStack.current = undoStack.current.slice(0, -1);
+    redoStack.current = [...redoStack.current, layout];
+    setLayout(previous);
+    setHistoryTick((tick) => tick + 1);
+    announce("Undone");
+  };
+  const redo = () => {
+    const next = redoStack.current.at(-1);
+    if (!next || !layout) {
+      return;
+    }
+    redoStack.current = redoStack.current.slice(0, -1);
+    undoStack.current = [...undoStack.current, layout];
+    setLayout(next);
+    setHistoryTick((tick) => tick + 1);
+    announce("Redone");
+  };
+
+  const [view, setView] = useState<View>("design");
+  const [selection, setSelection] = useState<DesignerSelection>(null);
+  const [extraSlots, setExtraSlots] = useState<Record<string, number[]>>({});
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed(formDefinitionId));
+  const [renamingSectionKey, setRenamingSectionKey] = useState<string | null>(null);
+  const [pane, setPane] = useState<"canvas" | "properties">("canvas");
+  const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null);
+  const [createAt, setCreateAt] = useState<{ kind: "field" | "documents"; target: PlacementTarget | null } | null>(null);
   const [editFieldId, setEditFieldId] = useState<string | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [changeReason, setChangeReason] = useState("");
@@ -35,18 +88,28 @@ export function DesignerPage() {
   const [childFormId, setChildFormId] = useState<string | undefined>(undefined);
   const [relationshipName, setRelationshipName] = useState("");
   const [maxChildren, setMaxChildren] = useState("50");
+  const [announcement, setAnnouncement] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const announce = useCallback((message: string) => setAnnouncement((current) => (current === message ? `${message} ` : message)), []);
+
+  const resetHistory = () => {
+    undoStack.current = [];
+    redoStack.current = [];
+  };
 
   useEffect(() => {
     if (!detail.data || layout) {
       return;
     }
+    resetHistory();
     const source = detail.data.draft?.layoutJson ?? detail.data.currentVersion?.layoutJson;
     if (!source) {
-      const fresh = emptyLayout(detail.data.summary.formDefinitionName);
-      setLayout(fresh);
+      setLayout(emptyLayout(detail.data.summary.formDefinitionName));
       setBaseJson("");
       return;
     }
+    // Layouts written before sections were editable already carry one section (the form-title section created with the
+    // form); they are read unchanged — no migration rewrites a stored or published layout.
     const parsed = tryParseLayout(source);
     if (parsed.ok) {
       setLayout(parsed.layout);
@@ -56,8 +119,47 @@ export function DesignerPage() {
     }
   }, [detail.data, layout]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(`ef.designer.collapsed.${formDefinitionId}`, JSON.stringify([...collapsed]));
+    } catch {
+      // Per-viewer convenience only; the designer works without storage.
+    }
+  }, [collapsed, formDefinitionId]);
+
   const invalidate = () => Promise.all([queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId] }), queryClient.invalidateQueries({ queryKey: ["forms"] })]);
-  const addFieldMutation = useMutation({ mutationFn: (request: Parameters<typeof api.forms.addField>[1]) => api.forms.addField(formDefinitionId, request).then((r) => r.result), onSuccess: async () => { setAddField(false); setAddDocuments(false); await invalidate(); } });
+  const consumeSlot = (target: PlacementTarget) =>
+    setExtraSlots((current) => {
+      const slots = current[target.sectionKey];
+      if (!slots) {
+        return current;
+      }
+      const at = slots.indexOf(target.insertIndex);
+      const remaining = (at >= 0 ? slots.filter((_, index) => index !== at) : slots).map((index) => (index >= target.insertIndex ? index + 1 : index));
+      return { ...current, [target.sectionKey]: remaining };
+    });
+  const addFieldMutation = useMutation({
+    mutationFn: (request: Parameters<typeof api.forms.addField>[1]) => api.forms.addField(formDefinitionId, request).then((r) => r.result),
+    onSuccess: async (field) => {
+      const target = createAt?.target ?? null;
+      setCreateAt(null);
+      if (target) {
+        const element = newElementFor(field, 1);
+        setLayoutTracked((current) => {
+          if (!current) {
+            return current;
+          }
+          const sectionIndex = current.sections.findIndex((section) => section.sectionKey === target.sectionKey);
+          return sectionIndex >= 0 ? insertElement(current, sectionIndex, target.insertIndex, element) : current;
+        });
+        consumeSlot(target);
+        setSelection({ kind: "element", key: elementKey(element) });
+        setView("design");
+        announce(`${field.fieldDisplayName} created and placed`);
+      }
+      await invalidate();
+    },
+  });
   const editField = useMutation({
     mutationFn: async ({ fieldId, submission }: { fieldId: string; submission: FieldEditSubmission }) => {
       const field = detail.data!.fields.find((candidate) => candidate.fieldDefinitionId === fieldId)!;
@@ -100,6 +202,7 @@ export function DesignerPage() {
         setLayout(parsed.layout);
         setBaseJson(serializeLayout(parsed.layout));
       }
+      announce(`Draft saved (revision ${draft.draftRevision})`);
       await invalidate();
     },
   });
@@ -109,6 +212,7 @@ export function DesignerPage() {
       setPublishOpen(false);
       setChangeReason("");
       setLayout(null);
+      setSelection(null);
       await invalidate();
       await queryClient.invalidateQueries({ queryKey: ["forms", formDefinitionId, "versions"] });
     },
@@ -117,6 +221,7 @@ export function DesignerPage() {
     mutationFn: (fromFormVersionId: string) => api.forms.restoreDraft(formDefinitionId, { fromFormVersionId }).then((r) => r.result),
     onSuccess: async () => {
       setLayout(null);
+      setSelection(null);
       await invalidate();
     },
   });
@@ -129,6 +234,35 @@ export function DesignerPage() {
     },
   });
 
+  // Unsaved layout changes block accidental SPA navigation (and tab close) until the designer confirms.
+  const dirtyRef = useRef(false);
+  const blocker = useBlocker({ shouldBlockFn: () => dirtyRef.current, enableBeforeUnload: () => dirtyRef.current, withResolver: true });
+
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z / Ctrl+Y on the Design view, outside text inputs (which keep native undo).
+  const shortcuts = useRef({ undo, redo });
+  shortcuts.current = { undo, redo };
+  useEffect(() => {
+    if (view !== "design") {
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!(event.ctrlKey || event.metaKey) || target?.closest("input,textarea,select,[contenteditable=true],[role=dialog]")) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        shortcuts.current.undo();
+      } else if ((key === "z" && event.shiftKey) || key === "y") {
+        event.preventDefault();
+        shortcuts.current.redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view]);
+
   if (detail.isPending) {
     return <LoadingBlock label="Loading form" />;
   }
@@ -136,143 +270,493 @@ export function DesignerPage() {
     return <ErrorPanel error={detail.error} onRetry={() => void detail.refetch()} />;
   }
   const form = detail.data;
-  const fields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })) }));
+  const canDesign = form.summary.canDesign;
+  const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted" }));
+  const relationships = form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }));
   const dirty = layout !== null && serializeLayout(layout) !== baseJson;
+  dirtyRef.current = dirty;
   const canPublish = form.draft !== null && !dirty;
   const childCandidates = (forms.data ?? []).filter((candidate) => candidate.formDefinitionId !== formDefinitionId && candidate.currentVersionNumber !== null);
 
-  return (
-    <>
-      <PageHeader
-        title={form.summary.formDefinitionName}
-        lead={form.summary.formDefinitionDescription || "Design the layout, save a draft, then publish an immutable version."}
-        actions={
+  const sectionOfSelection = (): number | null => {
+    if (!layout || !selection) {
+      return null;
+    }
+    if (selection.kind === "element") {
+      return findElement(layout, selection.key)?.sectionIndex ?? null;
+    }
+    const index = layout.sections.findIndex((section) => section.sectionKey === selection.sectionKey);
+    return index >= 0 ? index : null;
+  };
+  const addRow = () => {
+    if (!layout) {
+      return;
+    }
+    if (layout.sections.length >= 50) {
+      setNotice("A form can have at most 50 sections.");
+      return;
+    }
+    const key = newSectionKey(layout);
+    setLayoutTracked(insertSection(layout, sectionOfSelection(), key, "New section"));
+    setView("design");
+    setPane("canvas");
+    setSelection({ kind: "section", sectionKey: key });
+    setRenamingSectionKey(key);
+    setNotice(null);
+    announce("New section added. Type its title and press Enter.");
+  };
+  const addColumn = () => {
+    if (!layout) {
+      return;
+    }
+    const target = columnSlotFor(layout, selection);
+    if (!target) {
+      return;
+    }
+    const section = layout.sections.find((candidate) => candidate.sectionKey === target.sectionKey)!;
+    const existing = extraSlots[target.sectionKey] ?? [];
+    setView("design");
+    if (existing.length >= 3) {
+      setNotice(`“${section.title ?? section.sectionKey}” already shows four empty cells. Sections use the standard four-column grid; place a field in an empty cell first.`);
+      return;
+    }
+    setExtraSlots((current) => ({ ...current, [target.sectionKey]: [...(current[target.sectionKey] ?? []), target.insertIndex] }));
+    setSelection({ kind: "slot", sectionKey: target.sectionKey, insertIndex: target.insertIndex });
+    setNotice(`Empty cell added in “${section.title ?? section.sectionKey}”. Sections keep the four-column grid; a full row continues on the next row.`);
+    announce("Empty cell added");
+  };
+  const placeExisting = () => {
+    if (!layout) {
+      return;
+    }
+    const sectionIndex = sectionOfSelection() ?? layout.sections.length - 1;
+    const section = layout.sections[sectionIndex]!;
+    setView("design");
+    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex: section.elements.length });
+    setPane("properties");
+  };
+  const showProperties = () => {
+    setPane("properties");
+    window.setTimeout(() => document.getElementById("designer-inspector-heading")?.focus(), 0);
+  };
+  const toggleCollapse = (sectionKey: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(sectionKey)) {
+        next.delete(sectionKey);
+      } else {
+        next.add(sectionKey);
+      }
+      return next;
+    });
+
+  const placement = layout ? placedIds(layout) : { fieldIds: new Set<string>(), relationshipIds: new Set<string>() };
+  const sectionNameOf = (fieldId: string) => {
+    const found = layout ? locateField(layout, fieldId) : null;
+    return found ? (layout!.sections[found.sectionIndex]!.title ?? "") : null;
+  };
+
+  const toolbar = (
+    <div role="group" aria-label="Designer actions" className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2">
+      {canDesign ? (
+        <>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button variant="secondary">
+                <span aria-hidden="true">+</span> Add Field <Caret />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="start" sideOffset={6} className="z-50 min-w-56 rounded border border-input bg-surface p-1 shadow-lg">
+                {[
+                  { key: "new", label: "New field…", run: () => setCreateAt({ kind: "field", target: layout ? columnSlotFor(layout, selection) : null }) },
+                  { key: "documents", label: "New document collection…", run: () => setCreateAt({ kind: "documents", target: layout ? columnSlotFor(layout, selection) : null }) },
+                  { key: "existing", label: "Place an existing field…", run: placeExisting },
+                ].map((item) => (
+                  <DropdownMenu.Item key={item.key} onSelect={item.run} className="flex min-h-10 cursor-default items-center rounded px-3 text-base outline-none data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground">
+                    {item.label}
+                  </DropdownMenu.Item>
+                ))}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+          <Button variant="secondary" onClick={addRow} disabled={!layout}>
+            <span aria-hidden="true">+</span> Add Row
+          </Button>
+          <Button variant="secondary" onClick={addColumn} disabled={!layout}>
+            <span aria-hidden="true">+</span> Add Column
+          </Button>
+          <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-line sm:inline-block" />
+          <Button variant="ghost" disabled={undoStack.current.length === 0} onClick={undo} aria-label="Undo last layout change" title="Undo (Ctrl+Z)">
+            <UndoIcon /> Undo
+          </Button>
+          <Button variant="ghost" disabled={redoStack.current.length === 0} onClick={redo} aria-label="Redo last undone layout change" title="Redo (Ctrl+Shift+Z)">
+            <UndoIcon flip /> Redo
+          </Button>
+        </>
+      ) : null}
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <Button variant="secondary" aria-pressed={view === "preview"} onClick={() => setView(view === "preview" ? "design" : "preview")}>
+          <EyeIcon /> Preview
+        </Button>
+        {canDesign ? (
           <>
-            <Link to="/app/forms">
-              <Button variant="ghost">All forms</Button>
-            </Link>
-            <Button variant="secondary" busy={saveDraft.isPending} disabled={!layout || !dirty || !form.summary.canDesign} onClick={() => layout && saveDraft.mutate(layout)}>
-              Save draft
+            <Button busy={saveDraft.isPending} disabled={!layout || !dirty} onClick={() => layout && saveDraft.mutate(layout)}>
+              <SaveIcon /> Save draft
             </Button>
-            <Button disabled={!canPublish || !form.summary.canDesign} onClick={() => setPublishOpen(true)}>
+            <Button variant="secondary" disabled={!canPublish} onClick={() => setPublishOpen(true)} title={dirty ? "Save the draft before publishing" : undefined}>
               Publish…
             </Button>
           </>
-        }
-      />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Badge tone={form.summary.currentVersionNumber === null ? "neutral" : "success"}>{form.summary.currentVersionNumber === null ? "Not published" : `Published v${form.summary.currentVersionNumber}`}</Badge>
-        <Badge tone={form.draft ? "warning" : "neutral"}>{form.draft ? `Draft revision ${form.draft.draftRevision}` : "No draft"}</Badge>
-        {dirty ? <Badge tone="info">Unsaved changes</Badge> : null}
-        {!form.summary.canDesign ? <Badge tone="danger">Read-only: you cannot design this form</Badge> : null}
+        ) : null}
       </div>
-      {parseError ? <StatusMessage tone="danger" title="The stored layout could not be parsed">{parseError}</StatusMessage> : null}
-      {saveDraft.isError ? <ErrorPanel error={saveDraft.error} /> : null}
-      {restore.isError ? <ErrorPanel error={restore.error} /> : null}
-      <Tabs
-        label="Designer sections"
-        items={[
+    </div>
+  );
+
+  const designView = layout ? (
+    <div className="flex flex-col gap-3">
+      <div role="group" aria-label="Designer panes" className="flex gap-1 rounded-lg border border-line bg-surface p-1 lg:hidden">
+        {(["canvas", "properties"] as const).map((option) => (
+          <button key={option} type="button" aria-pressed={pane === option} onClick={() => setPane(option)} className={`min-h-11 flex-1 rounded px-3 text-base font-medium ${pane === option ? "bg-primary text-primary-foreground" : "text-body hover:bg-page"}`}>
+            {option === "canvas" ? "Canvas" : "Properties"}
+          </button>
+        ))}
+      </div>
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className={`min-w-0 ${pane === "canvas" ? "" : "hidden lg:block"}`} aria-label="Form canvas" role="region">
+          <DesignerCanvas
+            layout={layout}
+            onChange={setLayoutTracked}
+            fields={rendererFields}
+            relationships={relationships}
+            readOnly={!canDesign}
+            selection={selection}
+            onSelect={(next) => {
+              setSelection(next);
+              setNotice(null);
+            }}
+            extraSlots={extraSlots}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            renamingSectionKey={renamingSectionKey}
+            onRenamingSectionChange={setRenamingSectionKey}
+            onRequestRemoveSection={setRemoveSectionIndex}
+            onShowProperties={showProperties}
+            announce={announce}
+          />
+        </div>
+        <div className={`min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto ${pane === "properties" ? "" : "hidden lg:block"}`}>
+          <DesignerInspector
+            layout={layout}
+            onChange={setLayoutTracked}
+            selection={selection}
+            onSelect={setSelection}
+            fields={form.fields}
+            relationships={form.relationships}
+            formDefinitionId={formDefinitionId}
+            canDesign={canDesign}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            onRequestRemoveSection={setRemoveSectionIndex}
+            onMoveSection={(sectionIndex, delta) => setLayoutTracked(moveSection(layout, sectionIndex, sectionIndex + delta))}
+            onDuplicateSection={(sectionIndex) => {
+              const key = newSectionKey(layout);
+              setLayoutTracked(duplicateSection(layout, sectionIndex, key));
+              setSelection({ kind: "section", sectionKey: key });
+            }}
+            onOpenFieldEditor={(fieldId) => {
+              editField.reset();
+              setEditFieldId(fieldId);
+            }}
+            onCreateAt={(kind, target) => setCreateAt({ kind, target })}
+            onPlacedAt={consumeSlot}
+            onOpenRelatedForms={() => setView("relationships")}
+            onStrengthen={(fieldId, request) => strengthen.mutate({ fieldId, request })}
+            strengthenPending={strengthen.isPending}
+            strengthenError={strengthen.error}
+            announce={announce}
+          />
+        </div>
+      </div>
+    </div>
+  ) : (
+    <LoadingBlock />
+  );
+
+  const fieldsView = (
+    <Card
+      title="Field catalog"
+      actions={
+        canDesign ? (
+          <>
+            <Button size="sm" variant="secondary" onClick={() => setCreateAt({ kind: "documents", target: null })}>
+              Add document collection
+            </Button>
+            <Button size="sm" onClick={() => setCreateAt({ kind: "field", target: null })}>
+              Add field
+            </Button>
+          </>
+        ) : null
+      }
+    >
+      <p className="text-sm text-muted">Fields are permanent identities with an immutable storage type. Placing, moving or removing one on the canvas never changes its id or stored values.</p>
+      <DataTable
+        caption="Fields"
+        rowKey={(row) => row.fieldDefinitionId}
+        rows={form.fields}
+        emptyMessage="No fields yet. Add the first field, then place it on the canvas."
+        columns={[
+          { key: "name", header: "Field", isRowHeader: true, render: (row) => row.fieldDisplayName },
+          { key: "key", header: "Key", render: (row) => <code>{row.fieldKey}</code> },
+          { key: "type", header: "Type", render: (row) => row.fieldDataType },
+          { key: "placement", header: "Section", render: (row) => sectionNameOf(row.fieldDefinitionId) ?? <span className="text-muted">Not placed</span> },
+          { key: "protection", header: "Protection", render: (row) => (row.fieldProtectionMode === "ApplicationEncrypted" ? <Badge tone="success">{row.fieldClassification} · Encrypted</Badge> : <Badge tone="warning">{row.fieldClassification} · Plaintext</Badge>) },
+          { key: "options", header: "Options", render: (row) => (row.options.length === 0 ? "" : row.options.map((option) => `${option.optionDisplayText}${option.isActive ? "" : " (inactive)"}`).join(", ")) },
+          { key: "status", header: "Status", render: (row) => <Badge tone="neutral">{row.lifecycleStatus}</Badge> },
           {
-            value: "layout",
-            label: "Layout",
-            content: layout ? <DesignerCanvas layout={layout} onChange={setLayout} fields={fields} relationships={form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }))} readOnly={!form.summary.canDesign} /> : <LoadingBlock />,
-          },
-          {
-            value: "fields",
-            label: `Fields (${form.fields.length})`,
-            content: (
-              <Card
-                title="Field catalog"
-                actions={
-                  form.summary.canDesign ? (
-                    <>
-                      <Button size="sm" variant="secondary" onClick={() => setAddDocuments(true)}>
-                        Add document collection
-                      </Button>
-                      <Button size="sm" onClick={() => setAddField(true)}>
-                        Add field
-                      </Button>
-                    </>
-                  ) : null
+            key: "actions",
+            header: "Actions",
+            isActions: true,
+            render: (row) => (
+              <RowActions
+                overflowLabel={`More actions for ${row.fieldDisplayName}`}
+                primary={
+                  <Button size="sm" variant="secondary" aria-label={`${canDesign ? "Edit" : "View"} ${row.fieldDisplayName}`} onClick={() => { editField.reset(); setEditFieldId(row.fieldDefinitionId); }}>
+                    {canDesign ? "Edit" : "View"}
+                  </Button>
                 }
-              >
-                <DataTable
-                  caption="Fields"
-                  rowKey={(row) => row.fieldDefinitionId}
-                  rows={form.fields}
-                  emptyMessage="No fields yet. Add the first field to start the layout."
-                  columns={[
-                    { key: "name", header: "Field", isRowHeader: true, render: (row) => row.fieldDisplayName },
-                    { key: "key", header: "Key", render: (row) => <code>{row.fieldKey}</code> },
-                    { key: "edit", header: "Actions", render: (row) => <Button size="sm" variant="secondary" aria-label={`${form.summary.canDesign ? "Edit" : "View"} ${row.fieldDisplayName}`} onClick={() => { editField.reset(); setEditFieldId(row.fieldDefinitionId); }}>{form.summary.canDesign ? "Edit" : "View"}</Button> },
-                    { key: "type", header: "Type", render: (row) => row.fieldDataType },
-                    { key: "protection", header: "Protection", render: (row) => (row.fieldProtectionMode === "ApplicationEncrypted" ? <Badge tone="success">{row.fieldClassification} · Encrypted</Badge> : <Badge tone="warning">{row.fieldClassification} · Plaintext</Badge>) },
-                    { key: "options", header: "Options", render: (row) => (row.options.length === 0 ? "" : row.options.map((option) => `${option.optionDisplayText}${option.isActive ? "" : " (inactive)"}`).join(", ")) },
-                    { key: "status", header: "Status", render: (row) => <Badge tone="neutral">{row.lifecycleStatus}</Badge> },
-                  ]}
-                />
-              </Card>
-            ),
-          },
-          {
-            value: "access",
-            label: "Form permissions",
-            content: <FormAccessPanel formDefinitionId={formDefinitionId} canManage={form.summary.canDesign} />,
-          },
-          {
-            value: "relationships",
-            label: `Related forms (${form.relationships.length})`,
-            content: (
-              <Card title="Child record lists" actions={form.summary.canDesign ? <Button size="sm" onClick={() => setRelationshipOpen(true)}>Add relationship</Button> : null}>
-                <p className="text-sm text-muted">A relationship hosts a reusable child form (for example AccusedAddress) as a list of independent child records.</p>
-                <DataTable
-                  caption="Relationships"
-                  rowKey={(row) => row.formRelationshipDefinitionId}
-                  rows={form.relationships}
-                  emptyMessage="No relationships yet."
-                  columns={[
-                    { key: "name", header: "List", isRowHeader: true, render: (row) => row.relationshipDisplayName },
-                    { key: "child", header: "Child form", render: (row) => row.childFormDefinitionName },
-                    { key: "bounds", header: "Bounds", render: (row) => `${row.minimumChildCount}–${row.maximumChildCount}` },
-                    { key: "status", header: "Status", render: (row) => <Badge tone="neutral">{row.lifecycleStatus}</Badge> },
-                  ]}
-                />
-              </Card>
-            ),
-          },
-          {
-            value: "versions",
-            label: "Versions",
-            content: (
-              <Card title="Published versions">
-                {versions.isPending ? <LoadingBlock label="Loading versions" /> : null}
-                {versions.isError ? <ErrorPanel error={versions.error} onRetry={() => void versions.refetch()} /> : null}
-                {versions.data ? (
-                  <DataTable
-                    caption="Versions"
-                    rowKey={(row) => row.formVersionId}
-                    rows={versions.data}
-                    emptyMessage="Nothing published yet."
-                    columns={[
-                      { key: "v", header: "Version", isRowHeader: true, render: (row) => `v${row.versionNumber}` },
-                      { key: "reason", header: "Change reason", render: (row) => row.changeReason },
-                      { key: "published", header: "Published", render: (row) => new Date(row.publishedOn).toLocaleString() },
-                      { key: "restored", header: "Restored from", render: (row) => (row.restoredFromFormVersionId ? "earlier version" : "") },
-                      { key: "actions", header: "Actions", render: (row) => (form.summary.canDesign ? <Button size="sm" variant="secondary" busy={restore.isPending} onClick={() => restore.mutate(row.formVersionId)}>Restore to draft</Button> : null) },
-                    ]}
-                  />
-                ) : null}
-              </Card>
+                overflow={fieldOverflow(row)}
+              />
             ),
           },
         ]}
       />
+    </Card>
+  );
 
+  function fieldOverflow(row: FieldDefinitionResponse) {
+    if (!layout) {
+      return [];
+    }
+    const placed = placement.fieldIds.has(row.fieldDefinitionId);
+    const key = elementKey(newElementFor(row, 1));
+    const items: Array<{ key: string; label: string; run: () => void }> = placed
+      ? [{ key: "show", label: "Show on canvas", run: () => { setSelection({ kind: "element", key }); setView("design"); } }]
+      : canDesign
+        ? [{ key: "place", label: "Place on canvas…", run: placeExisting }]
+        : [];
+    if (placed && canDesign) {
+      items.push({
+        key: "unplace",
+        label: "Remove from layout",
+        run: () => {
+          const found = findElement(layout, key);
+          if (found) {
+            setLayoutTracked(removeElement(layout, found.sectionIndex, found.index));
+            announce(`${row.fieldDisplayName} removed from the layout; the field and its values are kept`);
+          }
+        },
+      });
+    }
+    return items.map((item) => ({ key: item.key, content: <button type="button" onClick={item.run}>{item.label}</button> }));
+  }
+
+  const views: Array<{ value: View; label: ReactNode; icon: ReactNode; content: ReactNode }> = [
+    { value: "design", label: "Design", icon: <NavIcon d="M4 20h4L18.5 9.5a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" />, content: designView },
+    { value: "fields", label: <>Fields <Count n={form.fields.length} /></>, icon: <NavIcon d="M3 5h18v14H3zM3 10h18M3 15h18M9 5v14" />, content: fieldsView },
+    { value: "rules", label: "Rules", icon: <NavIcon d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" />, content: <RulesView /> },
+    {
+      value: "preview",
+      label: "Preview",
+      icon: <NavIcon d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />,
+      content: layout ? <PreviewView layout={layout} fields={rendererFields} /> : <LoadingBlock />,
+    },
+    {
+      value: "versions",
+      label: "Versions",
+      icon: <NavIcon d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 3" />,
+      content: (
+        <Card title="Published versions">
+          <p className="text-sm text-muted">Published versions are immutable. Restoring copies a version into the draft; publishing it creates a new version.</p>
+          {versions.isPending ? <LoadingBlock label="Loading versions" /> : null}
+          {versions.isError ? <ErrorPanel error={versions.error} onRetry={() => void versions.refetch()} /> : null}
+          {versions.data ? (
+            <DataTable
+              caption="Versions"
+              rowKey={(row) => row.formVersionId}
+              rows={versions.data}
+              emptyMessage="Nothing published yet."
+              columns={[
+                { key: "v", header: "Version", isRowHeader: true, render: (row) => `v${row.versionNumber}` },
+                { key: "reason", header: "Change reason", render: (row) => row.changeReason },
+                { key: "published", header: "Published", render: (row) => new Date(row.publishedOn).toLocaleString() },
+                { key: "restored", header: "Restored from", render: (row) => (row.restoredFromFormVersionId ? "earlier version" : "") },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  isActions: true,
+                  render: (row) => <RowActions overflowLabel={`More actions for version ${row.versionNumber}`} primary={canDesign ? <Button size="sm" variant="secondary" busy={restore.isPending} onClick={() => restore.mutate(row.formVersionId)}>Restore to draft</Button> : null} />,
+                },
+              ]}
+            />
+          ) : null}
+        </Card>
+      ),
+    },
+    {
+      value: "settings",
+      label: "Settings",
+      icon: <NavIcon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15l1.6 1-2 3.5-1.8-.7a7 7 0 0 1-2.2 1.3L14.7 22h-4l-.3-1.9a7 7 0 0 1-2.2-1.3l-1.8.7-2-3.5 1.6-1a7 7 0 0 1 0-2.6L4.4 11l2-3.5 1.8.7a7 7 0 0 1 2.2-1.3L10.7 3h4l.3 1.9a7 7 0 0 1 2.2 1.3l1.8-.7 2 3.5-1.6 1a7 7 0 0 1 0 2.6z" />,
+      content: (
+        <Card title="Form settings">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[12rem_1fr]">
+            <dt className="font-medium">Form name</dt>
+            <dd>{form.summary.formDefinitionName}</dd>
+            <dt className="font-medium">Description</dt>
+            <dd>{form.summary.formDefinitionDescription || <span className="text-muted">None</span>}</dd>
+            <dt className="font-medium">Current version</dt>
+            <dd>{form.summary.currentVersionNumber === null ? "Not published" : `v${form.summary.currentVersionNumber}`}</dd>
+            <dt className="font-medium">Draft</dt>
+            <dd>{form.draft ? `Revision ${form.draft.draftRevision}` : "No draft"}</dd>
+            <dt className="font-medium">Form identity</dt>
+            <dd>
+              <code className="break-all">{formDefinitionId}</code>
+            </dd>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setView("access")}>
+              Form permissions
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setView("relationships")}>
+              Related forms
+            </Button>
+          </div>
+        </Card>
+      ),
+    },
+    { value: "access", label: "Form permissions", icon: <NavIcon d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4" />, content: <FormAccessPanel formDefinitionId={formDefinitionId} canManage={canDesign} /> },
+    {
+      value: "relationships",
+      label: <>Related forms <Count n={form.relationships.length} /></>,
+      icon: <NavIcon d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />,
+      content: (
+        <Card title="Child record lists" actions={canDesign ? <Button size="sm" onClick={() => setRelationshipOpen(true)}>Add relationship</Button> : null}>
+          <p className="text-sm text-muted">A relationship hosts a reusable child form (for example AccusedAddress) as a list of independent child records. Place it in any section from the canvas.</p>
+          <DataTable
+            caption="Relationships"
+            rowKey={(row) => row.formRelationshipDefinitionId}
+            rows={form.relationships}
+            emptyMessage="No relationships yet."
+            columns={[
+              { key: "name", header: "List", isRowHeader: true, render: (row) => row.relationshipDisplayName },
+              { key: "child", header: "Child form", render: (row) => row.childFormDefinitionName },
+              { key: "bounds", header: "Bounds", render: (row) => `${row.minimumChildCount}–${row.maximumChildCount}` },
+              { key: "placement", header: "Placed", render: (row) => (placement.relationshipIds.has(row.formRelationshipDefinitionId) ? "On canvas" : <span className="text-muted">Not placed</span>) },
+              { key: "status", header: "Status", render: (row) => <Badge tone="neutral">{row.lifecycleStatus}</Badge> },
+              {
+                key: "actions",
+                header: "Actions",
+                isActions: true,
+                render: (row) => {
+                  const key = `rel:${row.formRelationshipDefinitionId}`;
+                  const placed = placement.relationshipIds.has(row.formRelationshipDefinitionId);
+                  return (
+                    <RowActions
+                      overflowLabel={`More actions for ${row.relationshipDisplayName}`}
+                      primary={
+                        placed ? (
+                          <Button size="sm" variant="secondary" aria-label={`Show ${row.relationshipDisplayName} on canvas`} onClick={() => { setSelection({ kind: "element", key }); setView("design"); }}>
+                            View
+                          </Button>
+                        ) : canDesign ? (
+                          <Button size="sm" variant="secondary" aria-label={`Place ${row.relationshipDisplayName} on canvas`} onClick={placeExisting}>
+                            Place
+                          </Button>
+                        ) : null
+                      }
+                    />
+                  );
+                },
+              },
+            ]}
+          />
+        </Card>
+      ),
+    },
+  ];
+
+  const header = (
+    <div className="flex flex-col gap-2">
+      <Link to="/app/forms" className="inline-flex min-h-9 items-center gap-1 self-start rounded text-sm font-medium text-muted underline-offset-4 hover:text-body hover:underline">
+        <span aria-hidden="true">←</span> All forms
+      </Link>
+      <p className="text-xl font-bold leading-tight">Form Designer</p>
+      <h1 className="break-words text-base font-semibold leading-snug">{form.summary.formDefinitionName}</h1>
+      <div className="flex flex-wrap gap-1.5">
+        <Badge tone={form.draft ? "success" : "neutral"}>{form.draft ? `Draft revision ${form.draft.draftRevision}` : "No draft"}</Badge>
+        <Badge tone={form.summary.currentVersionNumber === null ? "neutral" : "info"}>{form.summary.currentVersionNumber === null ? "Not published" : `Published v${form.summary.currentVersionNumber}`}</Badge>
+        {!canDesign ? <Badge tone="danger">Read-only</Badge> : null}
+      </div>
+      <div role="status" aria-live="polite" className="min-h-0">
+        {dirty ? (
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-body">
+            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#b45309]" />
+            Unsaved changes
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </div>
+      {parseError ? <StatusMessage tone="danger" title="The stored layout could not be parsed">{parseError}</StatusMessage> : null}
+      <SideNavTabs
+        label="Form designer"
+        header={header}
+        value={view}
+        onValueChange={(next) => setView(next as View)}
+        items={views.map((item) => ({
+          value: item.value,
+          label: item.label,
+          icon: item.icon,
+          content: (
+            <div className="flex min-w-0 flex-col gap-3">
+              {toolbar}
+              {notice && item.value === "design" ? (
+                <StatusMessage tone="info" title="Layout grid">
+                  {notice}
+                </StatusMessage>
+              ) : null}
+              {saveDraft.isError ? <ErrorPanel error={saveDraft.error} /> : null}
+              {restore.isError ? <ErrorPanel error={restore.error} /> : null}
+              {item.content}
+            </div>
+          ),
+        }))}
+      />
+
+      {removeSectionIndex !== null && layout ? (
+        <RemoveSectionDialog
+          layout={layout}
+          sectionIndex={removeSectionIndex}
+          onClose={() => setRemoveSectionIndex(null)}
+          onConfirm={(next, message) => {
+            setLayoutTracked(next);
+            setRemoveSectionIndex(null);
+            setSelection(null);
+            announce(message);
+          }}
+        />
+      ) : null}
       {editFieldId !== null && form.fields.some((candidate) => candidate.fieldDefinitionId === editFieldId) ? (
         <EditFieldDialog
           field={form.fields.find((candidate) => candidate.fieldDefinitionId === editFieldId)!}
           location={layout ? locateField(layout, editFieldId) : null}
-          canEdit={form.summary.canDesign}
+          canEdit={canDesign}
           pending={editField.isPending}
           error={editField.error}
           onSave={(submission) => editField.mutate({ fieldId: editFieldId, submission })}
@@ -283,14 +767,22 @@ export function DesignerPage() {
           strengthenError={strengthen.error}
         />
       ) : null}
-      <AddFieldDialog open={addField} onOpenChange={setAddField} pending={addFieldMutation.isPending} error={addFieldMutation.error} onSubmit={(request) => addFieldMutation.mutate(request)} />
-      {addDocuments ? <AddFieldDialog kind="documents" open onOpenChange={setAddDocuments} pending={addFieldMutation.isPending} error={addFieldMutation.error} onSubmit={(request) => addFieldMutation.mutate(request)} /> : null}
+      {createAt ? (
+        <AddFieldDialog
+          kind={createAt.kind}
+          open
+          onOpenChange={(open) => (open ? undefined : setCreateAt(null))}
+          pending={addFieldMutation.isPending}
+          error={addFieldMutation.error}
+          onSubmit={(request) => addFieldMutation.mutate(request)}
+        />
+      ) : null}
 
       <Dialog
         open={publishOpen}
         onOpenChange={setPublishOpen}
         title="Publish a new version"
-        description={`This publishes draft revision ${form.draft?.draftRevision ?? 0} as version ${Number(form.summary.currentVersionNumber ?? 0) + 1}. Published versions are immutable; existing records keep their values.`}
+        description={`This publishes draft revision ${form.draft?.draftRevision ?? 0} as version ${Number(form.summary.currentVersionNumber ?? 0) + 1}, with ${layout?.sections.length ?? 0} ${layout?.sections.length === 1 ? "section" : "sections"}. Published versions are immutable; existing records keep their values.`}
         locked={publish.isPending}
         footer={
           <>
@@ -329,6 +821,134 @@ export function DesignerPage() {
         <TextInput label="Maximum items" value={maxChildren} inputMode="numeric" onChange={(event) => setMaxChildren(event.target.value)} />
         {createRelationship.isError ? <ErrorPanel error={createRelationship.error} /> : null}
       </Dialog>
+
+      <Dialog
+        open={blocker.status === "blocked"}
+        onOpenChange={(open) => (open ? undefined : blocker.reset?.())}
+        title="Discard unsaved layout changes?"
+        description="This draft layout has changes that have not been saved. Leaving now discards them; the last saved draft (or published version) is unaffected."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => blocker.reset?.()}>
+              Stay and keep editing
+            </Button>
+            <Button variant="danger" onClick={() => blocker.proceed?.()}>
+              Discard changes and leave
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted">Use Save draft first if you want to keep this layout.</p>
+      </Dialog>
     </>
+  );
+}
+
+function readCollapsed(formDefinitionId: string): Set<string> {
+  try {
+    const stored = window.localStorage.getItem(`ef.designer.collapsed.${formDefinitionId}`);
+    const parsed: unknown = stored ? JSON.parse(stored) : [];
+    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function PreviewView({ layout, fields }: { layout: FormLayout; fields: RendererField[] }) {
+  const [breakpoint, setBreakpoint] = useState<Breakpoint>("desktop");
+  const [values, setValues] = useState<Record<string, string>>({});
+  const width = breakpoint === "phone" ? "max-w-[320px]" : breakpoint === "tablet" ? "max-w-[768px]" : "max-w-full";
+  return (
+    <Card
+      title="Preview"
+      actions={
+        <div role="group" aria-label="Preview width" className="flex flex-wrap gap-1">
+          {(["phone", "tablet", "desktop"] as const).map((option) => (
+            <Button key={option} size="sm" variant={breakpoint === option ? "primary" : "secondary"} aria-pressed={breakpoint === option} onClick={() => setBreakpoint(option)}>
+              {option === "phone" ? "Phone 320" : option === "tablet" ? "Tablet 768" : "Desktop"}
+            </Button>
+          ))}
+        </div>
+      }
+    >
+      <p className="text-sm text-muted">The draft as people will see it, with the same renderer the record page uses. Synthetic values only — nothing typed here is saved.</p>
+      <div className={`w-full ${width} rounded border border-dashed border-input bg-page p-3`}>
+        <FormRenderer
+          layout={layout}
+          fields={fields}
+          values={values}
+          breakpoint={breakpoint}
+          onChange={(key, value) => setValues((current) => ({ ...current, [key]: value }))}
+          renderRelatedList={(element) => <PreviewSlot label={element.label || "Related records"} detail="Child records list (rendered on the record page)" />}
+          renderDocumentCollection={(element) => <PreviewSlot label={element.label || "Documents"} detail={`Up to ${element.upload?.maxFiles ?? 20} files`} />}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function PreviewSlot({ label, detail }: { label: string; detail: string }) {
+  return (
+    <div className="rounded border border-dashed border-input bg-surface p-3">
+      <p className="font-medium">{label}</p>
+      <p className="text-sm text-muted">{detail}</p>
+    </div>
+  );
+}
+
+function RulesView() {
+  return (
+    <Card title="Rules">
+      <StatusMessage tone="info" title="Conditional rules are not yet available">
+        Conditional visibility and required-if rules are specified (CLAUDE.md §4, declarative allow-listed operators evaluated on client and server) but are not yet implemented in the layout schema or the server. Nothing can be configured here yet; this view will list the rule graph with cycle detection once backend support exists.
+      </StatusMessage>
+    </Card>
+  );
+}
+
+function Count({ n }: { n: number }) {
+  return <span className="ml-1 rounded-full bg-page px-1.5 text-xs font-medium text-muted">{n}</span>;
+}
+
+const iconProps = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+
+function NavIcon({ d }: { d: string }) {
+  return (
+    <svg {...iconProps}>
+      <path d={d} />
+    </svg>
+  );
+}
+
+function Caret() {
+  return (
+    <svg {...iconProps} width={14} height={14}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function UndoIcon({ flip = false }: { flip?: boolean }) {
+  return (
+    <svg {...iconProps} width={16} height={16} className={flip ? "-scale-x-100" : undefined}>
+      <path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg {...iconProps} width={16} height={16}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function SaveIcon() {
+  return (
+    <svg {...iconProps} width={16} height={16}>
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8" />
+    </svg>
   );
 }

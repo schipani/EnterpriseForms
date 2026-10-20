@@ -143,6 +143,13 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
                 attachment.AttachmentModifiedByUserId = context.LocalUserId;
             }
 
+            var record = await scope.FindFormRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+            if (record is not null && accepted.CommittedOperationId is { } acceptedOperation && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
+            {
+                record.ModifiedOn = clock.GetUtcNow();
+                record.ModifiedByUserId = context.LocalUserId;
+            }
+
             AuditRecorder.Record(scope, context, clock, AuditCategories.Document, AuditActions.DocumentRemoved, "document removed from the accepted content (bytes retained)", formRecordId, fileAttachmentId: fileAttachmentId, metadata: new { reason = request.RemovalReason, contentRevision = accepted.CommittedContentRevision });
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }

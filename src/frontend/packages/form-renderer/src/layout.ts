@@ -38,6 +38,8 @@ const fieldElement = z
     control: z.enum(["text", "textarea", "number", "decimal", "date", "dateTime", "guid", "checkbox", "select"]).default("text"),
     label: safeText(200).default(""),
     helpText: safeText(1000).optional(),
+    /** Optional input hint shown inside empty text-like controls (presentation only; never a default value). */
+    placeholder: safeText(200).optional(),
     required: z.boolean().default(false),
     layout: placement.default({ columnSpan: 4, startOnNewRow: false }),
     validation: validation.optional(),
@@ -77,6 +79,8 @@ export const layoutSectionSchema = z
   .object({
     sectionKey: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
     title: safeText(200).optional(),
+    /** Optional section description (C1 designer rebuild); omitted when absent so older layouts are unchanged. */
+    description: safeText(1000).optional(),
     gridColumns: z.literal(4).default(4),
     layout: z.object({ columnGap: z.enum(["small", "medium", "large"]).optional(), rowGap: z.enum(["small", "medium", "large"]).optional() }).strict().optional(),
     elements: z.array(layoutElementSchema).max(250),

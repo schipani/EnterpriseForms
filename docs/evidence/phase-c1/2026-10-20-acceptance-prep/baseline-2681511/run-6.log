@@ -1,0 +1,12 @@
+running... 0 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored (58s 957ms)
+  expected 4 completed records; tampered=e270d669-acfd-8bdf-a28a-1d7ae3ae3dfd; items: 18d12490-4ef0-810b-aff0-0106ec3dd69e|Completed|1| ; 6c2212e1-962b-83f9-bc3d-41360986f51d|Failed|5|IDEMPOTENCY_CONFLICT: idempotency key reused with a different request or actor ; 6cf0e22e-7587-8fb4-95be-bfe7f36f7e4c|Completed|1| ; e270d669-acfd-8bdf-a28a-1d7ae3ae3dfd|Failed|5|DEPROTECT_AUTHENTICATION_FAILED ; e8f7b09a-20e7-89cb-8450-1bb4f0018a55|Completed|1|; status: {"fieldDefinitionId":"01a15728-40c2-739c-b988-d73c2b51fbf8","fieldKey":"sealed_note","fieldClassification":"Internal","fieldProtectionMode":"Standard","protectionPolicyRevision":2,"protectionChangedOn":"2026-10-20T02:33:52.830636+00:00","migrationState":"DecryptionMigrationFailed","legacyPlaintextRecordCount":0,"searchImpact":"Plaintext: searchable within authorization, and readable by a database administrator.","organizationMinimumClassification":"Internal","organizationPermitsPlaintext":true,"fullyEncrypted":false,"migration":{"fieldProtectionMigrationId":"01a15728-79c0-7937-88d1-cfec6c6cf2a5","migrationState":"Failed","totalRecordCount":5,"totalValueCount":5,"completedRecordCount":3,"failedRecordCount":2,"pendingRecordCount":0,"lastErrorCode":null,"startedOn":"2026-10-20T02:33:52.830636+00:00","completedOn":null,"verifiedOn":null,"authorityCommandId":"01a15728-7913-7b48-ba25-52dbcad454b8","migrationDirection":"Decrypt","cancelledOn":null,"rollbackOfMigrationId":null},"fullyPlaintext":false,"legacyEncryptedRecordCount":2}
+    at EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored() in C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\Tests\FieldProtectionDowngradeTests.cs:481
+    --- End of stack trace from previous location ---
+
+Test run summary: Failed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  total: 1
+  failed: 1
+  succeeded: 0
+  skipped: 0
+  duration: 59s 805ms

@@ -30,7 +30,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     formId = formIdFromUrl(page.url());
 
     await page.getByRole("tab", { name: /^Fields/ }).click();
-    await page.getByRole("button", { name: "Add field" }).first().click();
+    await page.getByRole("button", { name: "Add field", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Add field" });
     await dialog.getByLabel("Display name").fill("Case notes");
     const security = dialog.getByRole("group", { name: "Security & Encryption" });
@@ -44,7 +44,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await expect(page.getByRole("row", { name: /Case notes/ })).toContainText("Confidential · Encrypted");
 
     // A structured value defaults to Internal + plaintext (permitted by the development policy), with the DBA warning.
-    await page.getByRole("button", { name: "Add field" }).first().click();
+    await page.getByRole("button", { name: "Add field", exact: true }).click();
     const second = page.getByRole("dialog", { name: "Add field" });
     await second.getByLabel("Display name").fill("Exhibit count");
     await second.getByLabel("Storage type").click();
@@ -59,7 +59,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await expect(page.getByRole("row", { name: /Exhibit count/ })).toContainText("Internal · Plaintext");
 
     // Restricted cannot be made plaintext: choosing it hides the opt-out and shows encryption as required.
-    await page.getByRole("button", { name: "Add field" }).first().click();
+    await page.getByRole("button", { name: "Add field", exact: true }).click();
     const third = page.getByRole("dialog", { name: "Add field" });
     await third.getByLabel("Storage type").click();
     await page.getByRole("option", { name: /^Integer$/ }).click();
@@ -104,6 +104,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await page.getByRole("tab", { name: /^Fields/ }).click();
     await page.getByRole("button", { name: "Edit Exhibit count" }).click();
     const dialog = page.getByRole("dialog", { name: "Edit field" });
+    await dialog.getByRole("tab", { name: "Security & Encryption" }).click();
     const security = dialog.getByRole("group", { name: "Security & Encryption" });
     await expect(security.getByText("Off — plaintext")).toBeVisible();
     await security.getByRole("button", { name: /Strengthen protection/ }).click();
@@ -115,15 +116,18 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await security.getByRole("button", { name: "Apply strengthening" }).click();
     await expect(security.getByText("Enabled", { exact: true })).toBeVisible();
     // The background migration may already have re-encrypted the single record by now: either the pending count or the verified badge is correct.
-    await expect(security.getByText(/1 record\(s\) still hold a plaintext copy|Fully encrypted · verified/).first()).toBeVisible();
+    await expect(security.getByText(/1 record\(s\) still hold a plaintext copy|All listed records encrypted/).first()).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("row", { name: /Exhibit count/ })).toContainText("Confidential · Encrypted");
     await page.getByRole("button", { name: "Edit Exhibit count" }).click();
+    await page.getByRole("dialog", { name: "Edit field" }).getByRole("tab", { name: "Security & Encryption" }).click();
     const reopened = page.getByRole("dialog", { name: "Edit field" }).getByRole("group", { name: "Security & Encryption" });
     await expect(reopened.getByText("Enabled", { exact: true })).toBeVisible();
     // The background migration re-encrypts the clerk's existing record through the Authority; only then is the field reported as fully encrypted.
-    await expect(reopened.getByText("Fully encrypted · verified")).toBeVisible({ timeout: 120_000 });
+    await expect(reopened.getByText("All listed records encrypted")).toBeVisible({ timeout: 120_000 });
+    // The badge must not be read as an independent completeness proof (security finding G19): the caveat is shown with it.
+    await expect(reopened.getByText(/not an independently verified completeness guarantee/)).toBeVisible();
     await expect(reopened.getByRole("group", { name: "Encryption migration progress" })).toHaveCount(0);
     await reopened.getByRole("button", { name: /Strengthen protection/ }).click();
     await expect(reopened.getByRole("checkbox", { name: /Switch to application-level encryption/ })).toHaveCount(0);
@@ -155,7 +159,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
       await signIn(page, "designer");
       await page.goto(`/app/forms/${formId}/design`);
       await page.getByRole("tab", { name: /^Fields/ }).click();
-      await page.getByRole("button", { name: "Add field" }).first().click();
+      await page.getByRole("button", { name: "Add field", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: "Add field" });
       await dialog.getByLabel("Display name").fill("Plain attempt");
       await dialog.getByLabel("Storage type").click();

@@ -46,9 +46,8 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             var record = await scope.FindFormRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
-            if (record is not null && record.RecordRevision < accepted.CommittedContentRevision)
+            if (record is not null && accepted.CommittedOperationId is { } acceptedOperation && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
             {
-                record.RecordRevision = accepted.CommittedContentRevision;
                 record.ModifiedOn = now;
                 record.ModifiedByUserId = context.LocalUserId;
                 record.LastEditedFormVersionId = verified.LayoutVersion.FormVersionId;

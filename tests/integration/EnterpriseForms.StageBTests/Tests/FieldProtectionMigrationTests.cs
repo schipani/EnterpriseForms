@@ -78,7 +78,115 @@ public sealed class FieldProtectionMigrationTests(StageBFixture fixture)
     private static string MigrationState(JsonElement status) => status.GetProperty("migration").GetProperty("migrationState").GetString()!;
 
     private string PlaintextRowsInLatestSnapshots(Workspace w) =>
-        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_string_values v WHERE v.field_definition_id = '{w.FieldId:D}' AND v.content_change_operation_id = (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1);").Trim();
+        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_string_values v WHERE v.field_definition_id = '{w.FieldId:D}' AND v.content_change_operation_id = (SELECT COALESCE(f.accepted_content_change_operation_id, (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1)) FROM form_records f WHERE f.form_record_id = v.form_record_id);").Trim();
+
+    /// <summary>
+    /// form_records.accepted_content_change_operation_id is an untrusted business projection. A hostile business
+    /// PostgreSQL administrator who forges it — alone, or consistently with record_revision and a bogus staged header —
+    /// can at most skew the local "legacy plaintext" estimate. It never selects the content that is served (reads verify
+    /// against the authority head), and it cannot make a migration claim completion: the post-check verifies every record
+    /// of the form against its authority-accepted head and picks up the record the forgery hid from the enumeration.
+    /// </summary>
+    [Fact]
+    public async Task AForgedAcceptedOperationProjectionCannotSelectContentHideARecordOrForgeMigrationCompletion()
+    {
+        var w = await PlaintextWorkspaceAsync("forged-pointer", 4);
+        string Accepted(Guid record) => fixture.Stack.AttackerSql($"SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}';").Trim();
+
+        // (a) A single forged column (dangling pointer) is not corroborated by a staged header and is ignored by the estimate (checked via the enumeration below).
+        fixture.Stack.AttackerSql($"UPDATE form_records SET accepted_content_change_operation_id = '{Guid.CreateVersion7():D}' WHERE form_record_id = '{w.Records[0]:D}';");
+
+        // (b) Pointer aimed at a planted, never-accepted candidate carrying a different value: reads still serve the accepted value.
+        var planted = Guid.CreateVersion7();
+        var record3 = w.Records[3];
+        var accepted3 = Accepted(record3);
+        fixture.Stack.AttackerSql(PlantCandidateSql(record3, accepted3, planted, w.FieldId, "forged note value", withValue: true));
+        fixture.Stack.AttackerSql($"UPDATE form_records SET accepted_content_change_operation_id = '{planted:D}', record_revision = record_revision + 1 WHERE form_record_id = '{record3:D}';");
+        var read3 = await w.Scenario.WaitProjectionAsync(w.Scenario.Clerk, record3);
+        Assert.Equal($"note 3 of {w.Scenario.Name}", read3.Root.GetProperty("record").GetProperty("values").EnumerateArray().Single(v => v.GetProperty("fieldKey").GetString() == "plain_note").GetProperty("stringValue").GetString());
+
+        // (c) Consistent forgery that hides record 1 from the estimate: a bogus header without the field's row, record_revision and pointer aligned to it.
+        var bogus = Guid.CreateVersion7();
+        var record1 = w.Records[1];
+        fixture.Stack.AttackerSql(PlantCandidateSql(record1, Accepted(record1), bogus, w.FieldId, null, withValue: false));
+        fixture.Stack.AttackerSql($"UPDATE form_records SET accepted_content_change_operation_id = '{bogus:D}', record_revision = record_revision + 1 WHERE form_record_id = '{record1:D}';");
+
+        // Strengthening enumerates from the skewed estimate, yet the worker's post-check verifies every record of the form against the authority head.
+        var strengthened = await StrengthenAsync(w);
+        Assert.True(strengthened.IsSuccess, strengthened.Body);
+        // The estimate-based enumeration: record 0 is still counted (the dangling pointer was ignored), record 3 is counted
+        // (its planted candidate also holds plaintext), and only record 1 is hidden — the documented residual of the untrusted estimate.
+        Assert.Equal(3, strengthened.Root.GetProperty("migration").GetProperty("totalRecordCount").GetInt32());
+        var done = await WaitMigrationAsync(w, s => MigrationState(s) is "Completed" or "Failed", TimeSpan.FromSeconds(300));
+        Assert.Equal("Completed", MigrationState(done));
+        Assert.Equal(4, done.GetProperty("migration").GetProperty("totalRecordCount").GetInt32()); // the hidden record was found and added
+        Assert.Equal(4, done.GetProperty("migration").GetProperty("completedRecordCount").GetInt32());
+
+        // Every record — including the hidden one and the one with a planted candidate — is encrypted in its authority-accepted head.
+        foreach (var record in w.Records)
+        {
+            var projection = await w.Scenario.WaitProjectionAsync(w.Scenario.Clerk, record);
+            var note = projection.Root.GetProperty("record").GetProperty("values").EnumerateArray().Single(v => v.GetProperty("fieldKey").GetString() == "plain_note");
+            Assert.True(note.GetProperty("applicationEncrypted").GetBoolean(), "record " + record.ToString("D") + " is not encrypted in its accepted head");
+            Assert.StartsWith("note ", note.GetProperty("stringValue").GetString(), StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>Hostile-DBA SQL: copies the record's accepted header (and optionally its value row of the field with a new value) under a new operation one revision ahead.</summary>
+    private static string PlantCandidateSql(Guid record, string acceptedOperation, Guid newOperation, Guid fieldId, string? value, bool withValue) => $@"DO $$
+DECLARE header_cols text; value_cols text;
+BEGIN
+  SELECT string_agg(quote_ident(column_name), ',') INTO header_cols FROM information_schema.columns
+   WHERE table_schema = current_schema() AND table_name = 'form_record_revisions' AND column_name NOT IN ('form_record_revision_id','content_change_operation_id','content_revision','row_revision','candidate_state');
+  EXECUTE format('INSERT INTO form_record_revisions (form_record_revision_id, content_change_operation_id, content_revision, row_revision, candidate_state, %s) SELECT %L::uuid, %L::uuid, content_revision + 1, row_revision + 1, ''Staged'', %s FROM form_record_revisions WHERE form_record_id = %L::uuid AND content_change_operation_id = %L::uuid',
+    header_cols, '{Guid.CreateVersion7():D}', '{newOperation:D}', header_cols, '{record:D}', '{acceptedOperation}');
+  IF {(withValue ? "true" : "false")} THEN
+    SELECT string_agg(quote_ident(column_name), ',') INTO value_cols FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'field_string_values' AND column_name NOT IN ('field_string_value_id','content_change_operation_id','content_revision','row_revision','string_value');
+    EXECUTE format('INSERT INTO field_string_values (field_string_value_id, content_change_operation_id, content_revision, row_revision, string_value, %s) SELECT %L::uuid, %L::uuid, content_revision + 1, row_revision + 1, %L, %s FROM field_string_values WHERE form_record_id = %L::uuid AND field_definition_id = %L::uuid AND content_change_operation_id = %L::uuid',
+      value_cols, '{Guid.CreateVersion7():D}', '{newOperation:D}', '{value ?? string.Empty}', value_cols, '{record:D}', '{fieldId:D}', '{acceptedOperation}');
+  END IF;
+END $$;";
+
+    /// <summary>
+    /// Regression (InterruptedAndTampered… intermittent failure): the authority stores a prepared reprotection operation
+    /// and dies before answering. The worker sees a transport failure, parks the migration and retries; its rebuilt
+    /// candidate differs from the stored one (fresh row identities, fresh ciphertext), so reusing the attempt's
+    /// idempotency key is refused with IDEMPOTENCY_CONFLICT. That must move the record to a fresh attempt — never fail
+    /// a healthy record — and the field must end fully encrypted through the authority. Deterministic: one-shot,
+    /// Testing-only crash point CrashAfterPrepareCommit (same mechanism as SEC-P09).
+    /// </summary>
+    [Fact]
+    public async Task AnInterruptedPrepareNeverFailsAHealthyRecordTheNextAttemptUsesAFreshOperation()
+    {
+        var w = await PlaintextWorkspaceAsync("interrupted-prepare", 3);
+        var arm = await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "CrashAfterPrepareCommit" });
+        Assert.True(arm.IsSuccess, arm.Body);
+        try
+        {
+            var strengthened = await StrengthenAsync(w);
+            Assert.True(strengthened.IsSuccess, strengthened.Body);
+            await w.Scenario.WaitGateReadyAsync();
+            var done = await WaitMigrationAsync(w, s => MigrationState(s) is "Completed" or "Failed", TimeSpan.FromSeconds(300));
+            var items = fixture.Stack.AttackerSql($@"SELECT string_agg(i.item_state || '|' || i.attempt_count || '|' || coalesce(i.last_error_code, ''), ' ; ') FROM field_protection_migration_items i JOIN field_protection_migrations m ON m.field_protection_migration_id = i.field_protection_migration_id WHERE m.field_definition_id = '{w.FieldId:D}';").Trim();
+            Assert.True(MigrationState(done) == "Completed", "migration did not complete; items: " + items + "; status: " + done.GetRawText());
+            Assert.Equal(3, done.GetProperty("migration").GetProperty("completedRecordCount").GetInt32());
+            Assert.Equal(0, done.GetProperty("migration").GetProperty("failedRecordCount").GetInt32());
+            // The interrupted record needed more than one attempt: the crash really happened between Prepare and its response.
+            Assert.True(int.Parse(fixture.Stack.AttackerSql($@"SELECT max(i.attempt_count) FROM field_protection_migration_items i JOIN field_protection_migrations m ON m.field_protection_migration_id = i.field_protection_migration_id WHERE m.field_definition_id = '{w.FieldId:D}';").Trim(), System.Globalization.CultureInfo.InvariantCulture) >= 2, "expected a retried item; items: " + items);
+            var verified = await WaitMigrationAsync(w, s => s.GetProperty("fullyEncrypted").GetBoolean());
+            Assert.Equal("Encrypted", verified.GetProperty("migrationState").GetString());
+            foreach (var record in w.Records)
+            {
+                var projection = await w.Scenario.WaitProjectionAsync(w.Scenario.Clerk, record);
+                Assert.True(projection.Root.GetProperty("record").GetProperty("values").EnumerateArray().Single(v => v.GetProperty("fieldKey").GetString() == "plain_note").GetProperty("applicationEncrypted").GetBoolean());
+            }
+        }
+        finally
+        {
+            await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "None" }); // disarm if the crash point was never reached
+        }
+    }
 
     [Fact]
     public async Task StrengtheningCountsPlaintextThenTheWorkerReprotectsEveryRecordThroughTheAuthorityAndOnlyThenClaimsFullEncryption()

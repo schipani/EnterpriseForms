@@ -267,21 +267,9 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public void AddSecurityPolicy(OrganizationSecurityPolicy policy) => context.OrganizationSecurityPolicies.Add(policy);
 
         /// <summary>Records whose latest staged copy of this field is still a typed plaintext row (projection estimate for the migration status: the local store holds every staged revision, highest revision last; the authority head decides what is current).</summary>
-        public async Task<int> CountLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken)
-        {
-            var plaintext = context.FieldStringValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId })
-                .Concat(context.FieldIntegerValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldDecimalValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldDateValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldDateTimeValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldGuidValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldBooleanValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldOptionValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }));
-            var rows = await plaintext.ToListAsync(cancellationToken).ConfigureAwait(false);
-            var latest = await context.FormRecordRevisions.Where(r => rows.Select(x => x.FormRecordId).Distinct().Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
-            return rows.Count(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId);
-        }
+        /// <summary>Plaintext rows of the field in each record's accepted head (same row-count semantics as before; see <see cref="CurrentOperationsAsync"/>).</summary>
+        public async Task<int> CountLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken) =>
+            (await GetLegacyPlaintextRecordsAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false)).Sum(r => r.PlaintextValueCount);
 
         public async Task<List<LegacyPlaintextRecord>> GetLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken)
         {
@@ -299,15 +287,48 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                 return [];
             }
 
-            var recordIds = rows.Select(r => r.FormRecordId).Distinct().ToList();
-            var latest = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
+            var latestByRecord = await CurrentOperationsAsync(rows.Select(r => r.FormRecordId).Distinct().ToList(), cancellationToken).ConfigureAwait(false);
             return rows.Where(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId)
                 .GroupBy(r => r.FormRecordId)
                 .Select(g => new LegacyPlaintextRecord(g.Key, g.Count()))
                 .OrderBy(r => r.FormRecordId)
                 .ToList();
         }
+
+        /// <summary>
+        /// The operation each record's local estimate reads: the projected authority-accepted head
+        /// (form_records.accepted_content_change_operation_id), never merely the highest staged revision — a candidate the
+        /// authority rejected stays in the insert-only tables and must not be mistaken for the record's state.
+        /// The projection is an untrusted hint: it is honoured only when a staged revision header of the same record with
+        /// that operation exists at the projected revision (form_records.record_revision). A pointer that is missing,
+        /// dangling or inconsistent falls back to the highest staged revision, so a single forged column cannot hide a
+        /// record from the estimate. Nothing here is an authorization or integrity decision: content reads and migration
+        /// completion verify against the authority head (FieldProtectionMigrationService.FinalizeAsync).
+        /// </summary>
+        private async Task<Dictionary<Guid, Guid>> CurrentOperationsAsync(List<Guid> recordIds, CancellationToken cancellationToken)
+        {
+            var projected = (await context.FormRecords.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.AcceptedContentChangeOperationId, r.RecordRevision }).ToListAsync(cancellationToken).ConfigureAwait(false))
+                .ToDictionary(r => r.FormRecordId);
+            var revisions = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
+            var result = new Dictionary<Guid, Guid>();
+            foreach (var group in revisions.GroupBy(r => r.FormRecordId))
+            {
+                if (projected.TryGetValue(group.Key, out var record) && record.AcceptedContentChangeOperationId is { } pointer
+                    && group.Any(r => r.ContentChangeOperationId == pointer && r.ContentRevision == record.RecordRevision))
+                {
+                    result[group.Key] = pointer;
+                }
+                else
+                {
+                    result[group.Key] = group.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId;
+                }
+            }
+
+            return result;
+        }
+
+        public async Task<List<Guid>> GetFormRecordIdsOfFormAsync(Guid formDefinitionId, CancellationToken cancellationToken) =>
+            await context.FormRecords.AsNoTracking().Where(r => r.FormDefinitionId == formDefinitionId).Select(r => r.FormRecordId).ToListAsync(cancellationToken).ConfigureAwait(false);
 
         public async Task<int> CountPlaintextRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken)
         {
@@ -331,9 +352,7 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                 return [];
             }
 
-            var recordIds = rows.Select(r => r.FormRecordId).Distinct().ToList();
-            var latest = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
+            var latestByRecord = await CurrentOperationsAsync(rows.Select(r => r.FormRecordId).Distinct().ToList(), cancellationToken).ConfigureAwait(false);
             return rows.Where(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId)
                 .GroupBy(r => r.FormRecordId)
                 .Select(g => new LegacyPlaintextRecord(g.Key, g.Count()))

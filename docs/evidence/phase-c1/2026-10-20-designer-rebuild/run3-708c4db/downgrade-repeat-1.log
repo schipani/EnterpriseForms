@@ -1,0 +1,25 @@
+running... 2 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored
+running... 2 completed, 0 failed | active: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored
+[slow] still running after 1m 00s: EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored (EnterpriseForms.StageBTests.dll|net10.0|x64)
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored (1m 01s 058ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 4
+  Actual:   3
+    at EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored() in C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\Tests\FieldProtectionDowngradeTests.cs:475
+    --- End of stack trace from previous location ---
+failed EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.ARejectedCandidateLeftInTheInsertOnlyTablesIsNeverMistakenForTheRecordsState (3s 784ms)
+  Assert.Equal() Failure: Values differ
+  Expected: 0
+  Actual:   1
+    at EnterpriseForms.StageBTests.Tests.FieldProtectionDowngradeTests.ARejectedCandidateLeftInTheInsertOnlyTablesIsNeverMistakenForTheRecordsState() in C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\Tests\FieldProtectionDowngradeTests.cs:148
+    --- End of stack trace from previous location ---
+
+  In process file artifacts produced:
+    - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\artifacts\c1-designer-rebuild\downgrade-repeat-1\tsch_DESKTOP-ULURP9A_2026-10-20_01_50_21.646277.trx
+
+Test run summary: Failed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  total: 7
+  failed: 2
+  succeeded: 5
+  skipped: 0
+  duration: 2m 08s 904ms

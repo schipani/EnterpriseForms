@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addDocumentCollection, addField, formIdFromUrl, placeFromPicker, publish, saveAndPublish, signIn, signOut } from "./support";
+import { addDocumentCollection, addField, formIdFromUrl, placeFromPicker, publish, saveAndPublish, selectTile, signIn, signOut } from "./support";
 
 /**
  * Owner acceptance defects, exercised exactly as a person would:
@@ -31,10 +31,11 @@ test.describe.serial("Form management: edit fields and form permissions", () => 
     await addDocumentCollection(page, "Case documents");
     await placeFromPicker(page, "Add field", /Given name/);
     await placeFromPicker(page, "Add document collection", /Case documents/);
-    const documents = page.getByRole("listitem").filter({ hasText: "Documents: Case documents" });
+    const documents = await selectTile(page, "Case documents");
+    await documents.getByRole("tab", { name: "Validation" }).click();
     await documents.getByLabel("Maximum files").fill("10");
     await documents.getByLabel("Allowed content types").fill("text/plain");
-    const given = page.getByRole("listitem").filter({ hasText: "Field: Given name" });
+    const given = await selectTile(page, "Given name");
     await given.getByRole("checkbox", { name: "Required" }).check();
     await saveAndPublish(page, "initial intake layout");
     await expect(page.getByText("Published v1")).toBeVisible();
@@ -70,7 +71,9 @@ test.describe.serial("Form management: edit fields and form permissions", () => 
     await dialog.getByLabel("Display label").fill("Forename");
     await dialog.getByLabel("Description").fill("Legal first name");
     await dialog.getByLabel("Help text").fill("As on the charge sheet");
-    // Incompatible values are explained before saving.
+    // Incompatible values are explained before saving; validation constraints live on their own tab, and switching
+    // tabs must not lose the General-tab edits made above (C1-UX §C).
+    await dialog.getByRole("tab", { name: "Validation" }).click();
     await dialog.getByLabel("Maximum length").fill("abc");
     await expect(dialog.getByText("Enter a whole number from 1 to 4000")).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Save changes" })).toBeDisabled();
@@ -79,6 +82,11 @@ test.describe.serial("Form management: edit fields and form permissions", () => 
     await expect(dialog.getByText("The minimum length cannot exceed the maximum length")).toBeVisible();
     await dialog.getByLabel("Minimum length").fill("1");
     await dialog.getByLabel("Maximum length").fill("60");
+    // Switching back to General must not have lost the unsaved edits made there before Validation was opened.
+    await dialog.getByRole("tab", { name: "General" }).click();
+    await expect(dialog.getByLabel("Display label")).toHaveValue("Forename");
+    await expect(dialog.getByLabel("Description")).toHaveValue("Legal first name");
+    await expect(dialog.getByLabel("Help text")).toHaveValue("As on the charge sheet");
     await dialog.getByRole("button", { name: "Save changes" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("rowheader", { name: "Forename" })).toBeVisible();
@@ -91,6 +99,7 @@ test.describe.serial("Form management: edit fields and form permissions", () => 
     const collection = page.getByRole("dialog", { name: "Edit document collection" });
     await expect(collection.getByLabel("Storage type")).toHaveValue("File (document collection)");
     await collection.getByLabel("Display label").fill("Evidence");
+    await collection.getByRole("tab", { name: "Validation" }).click();
     await collection.getByLabel("Maximum files").fill("5");
     await collection.getByLabel("Maximum file size (MB)").fill("8");
     await collection.getByLabel("Allowed content types").fill("text/plain");

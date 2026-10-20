@@ -213,15 +213,14 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
         rows.AddRange(snapshot.Rows.OfType<FileAttachmentVersion>().Select(a => CandidateBuilder.CloneAttachment(a)));
 
         // 4. Prepare (with the verified current snapshot) → stage → read back → commit, as a reprotection operation.
-        var idempotencyKey = $"reprotect:{migration.FieldProtectionMigrationId:N}:{item.FormRecordId:N}:{head.CommittedContentRevision}";
+        var idempotencyKey = ReprotectionIdempotencyKey(migration.FieldProtectionMigrationId, item.FormRecordId, head.CommittedContentRevision, item.AttemptCount);
         try
         {
             var accepted = await stager.StageAndCommitReprotectionAsync(migration.TenantId, head, snapshot.Items, new RecordCandidateStager.CandidateInput(header, rows), migration.AuthorityCommandId, idempotencyKey, cancellationToken).ConfigureAwait(false);
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
             var record = await scope.FindFormRecordAsync(migration.TenantId, item.FormRecordId, cancellationToken).ConfigureAwait(false);
-            if (record is not null && record.RecordRevision < accepted.CommittedContentRevision)
+            if (record is not null && accepted.CommittedOperationId is { } acceptedOperation && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
             {
-                record.RecordRevision = accepted.CommittedContentRevision;
                 record.ModifiedOn = clock.GetUtcNow();
             }
 
@@ -232,6 +231,15 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
         catch (AuthorityClientException ex) when (ex.ErrorCode is "CONTENT_REVISION_CONFLICT" or "STALE_AUTHORIZATION_REVISION" or "OPERATION_STATE_INVALID" or "OPERATION_EXPIRED")
         {
             // A user committed concurrently (their write re-protected the field) or the authorization revision moved: re-read next pass.
+            return new ItemOutcome(FieldProtectionMigrationItemStates.Pending, ex.ErrorCode, null, null, false, Retry: true);
+        }
+        catch (AuthorityClientException ex) when (ex.ErrorCode is "IDEMPOTENCY_CONFLICT")
+        {
+            // An earlier, interrupted attempt left a prepared operation under this attempt's key (e.g. its Prepare was still
+            // buffered in a paused authority and processed after the worker had given up). The rebuilt candidate differs
+            // (fresh row identities, fresh ciphertext), so the authority rightly refuses to reuse the key. Recording this
+            // attempt moves the item to the next attempt number and therefore a fresh operation; the abandoned operation
+            // expires unused. Not a record failure: nothing about the record's content is wrong.
             return new ItemOutcome(FieldProtectionMigrationItemStates.Pending, ex.ErrorCode, null, null, false, Retry: true);
         }
         catch (AuthorityClientException ex) when (!ex.Retryable)
@@ -247,6 +255,16 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
         var text = string.IsNullOrWhiteSpace(ex.Message) || ex.Message == ex.ErrorCode ? ex.ErrorCode : ex.ErrorCode + ": " + ex.Message;
         return text.Length <= 200 ? text : text[..200];
     }
+
+    /// <summary>
+    /// Idempotency key (and so the derived operation id) of one reprotection attempt for one record. Bound to the
+    /// migration, the record, the accepted head it builds on and the item's persisted attempt number: a crash or replay
+    /// within an attempt reuses the same operation (the authority returns it, or the head already moved and the item
+    /// completes as a no-op), while every new attempt gets a fresh operation, so an operation abandoned by an interrupted
+    /// attempt can never block the record. Commits stay CAS-protected on the accepted head revision either way.
+    /// </summary>
+    public static string ReprotectionIdempotencyKey(Guid migrationId, Guid formRecordId, long acceptedContentRevision, int attemptNumber) =>
+        $"reprotect:{migrationId:N}:{formRecordId:N}:{acceptedContentRevision}:{attemptNumber}";
 
     private static ItemOutcome Failure(FieldProtectionMigrationItem item, string code) =>
         item.AttemptCount + 1 >= MaxItemAttempts
@@ -289,30 +307,53 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
     }
 
     /// <summary>
-    /// No pending item left: the post-check asks the authority for every tracked record's accepted head and counts plaintext
-    /// rows of the field in exactly that operation (never in a staged-but-unaccepted candidate), then re-enumerates the
-    /// projection for records that became plaintext holders after the enumeration. Only zero (and no failed item) completes.
+    /// No pending item left: the post-check asks the authority for the accepted head of every tracked record AND of every
+    /// business record of the form, and counts rows of the old form in exactly the operation the authority reports (never
+    /// in a staged-but-unaccepted candidate, and never through the business projection of the accepted operation). Records
+    /// found this way that the migration does not track are added and processed. Only zero (and no failed item) completes,
+    /// so neither the business estimate nor a forged accepted-operation projection can make a migration claim completion.
+    /// Residual: the record list itself comes from the business database; a record a hostile administrator removes from
+    /// form_records is not enumerated here (the authority offers no workload enumeration of a form's records; G06).
     /// </summary>
     private async Task FinalizeAsync(FieldProtectionMigration leased, FieldDefinition field, CancellationToken cancellationToken)
     {
         HashSet<Guid> tracked;
+        List<Guid> formRecords;
         await using (var readScope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             tracked = await readScope.GetProtectionMigrationItemRecordIdsAsync(leased.FieldProtectionMigrationId, cancellationToken).ConfigureAwait(false);
+            formRecords = await readScope.GetFormRecordIdsOfFormAsync(field.FormDefinitionId, cancellationToken).ConfigureAwait(false);
         }
 
         var decrypting = leased.MigrationDirection == FieldProtectionMigrationDirections.Decrypt;
-        var stillPlaintext = 0; // records whose authority-accepted head still holds rows of the old form
-        foreach (var recordId in tracked)
+        var stillPlaintext = 0; // tracked records whose authority-accepted head still holds rows of the old form
+        var authorityUntracked = new List<LegacyPlaintextRecord>(); // untracked records whose authority-accepted head holds rows of the old form
+        foreach (var recordId in tracked.Union(formRecords))
         {
-            var head = await authority.GetCommittedContentRevisionForReprotectionAsync(leased.TenantId, recordId, leased.AuthorityCommandId, cancellationToken).ConfigureAwait(false);
+            AcceptedContentRevision head;
+            try
+            {
+                head = await authority.GetCommittedContentRevisionForReprotectionAsync(leased.TenantId, recordId, leased.AuthorityCommandId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (AuthorityClientException ex) when (!ex.Retryable && ex.HttpStatusCode == 404 && !tracked.Contains(recordId))
+            {
+                continue; // no accepted content of this form in the authority (e.g. a record whose creation never committed)
+            }
+
             if (head.CommittedOperationId is { } accepted)
             {
                 await using var countScope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
                 var oldForm = decrypting
                     ? await countScope.CountEncryptedRowsInOperationAsync(field.FieldDefinitionId, recordId, accepted, cancellationToken).ConfigureAwait(false)
                     : await countScope.CountPlaintextRowsInOperationAsync(field.FieldDefinitionId, recordId, accepted, cancellationToken).ConfigureAwait(false);
-                stillPlaintext += oldForm > 0 ? 1 : 0;
+                if (oldForm > 0 && tracked.Contains(recordId))
+                {
+                    stillPlaintext++;
+                }
+                else if (oldForm > 0)
+                {
+                    authorityUntracked.Add(new LegacyPlaintextRecord(recordId, oldForm));
+                }
             }
         }
 
@@ -327,7 +368,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
         var remaining = decrypting
             ? await scope.GetLegacyEncryptedRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false)
             : await scope.GetLegacyPlaintextRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
-        var untracked = remaining.Where(r => !tracked.Contains(r.FormRecordId)).ToList();
+        var untracked = remaining.Where(r => !tracked.Contains(r.FormRecordId)).Concat(authorityUntracked).GroupBy(r => r.FormRecordId).Select(g => g.MaxBy(r => r.PlaintextValueCount)!).ToList();
         if (untracked.Count > 0)
         {
             // Records that became plaintext holders after enumeration (e.g. a commit that raced the strengthening): track and process them too.
@@ -362,7 +403,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             migration.MigrationVerifiedOn = now;
             migration.LastErrorCode = null;
             migration.NextAttemptOn = DateTimeOffset.MaxValue;
-            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationCompleted, "Success", decrypting ? "every record decrypted through the authority; post-check against the authority-accepted heads found no encrypted row of the field (Amendment A1)" : "every record re-protected through the authority; post-check against the authority-accepted heads found no plaintext copy of the field", null, new { migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, verifiedRecords = tracked.Count, direction = migration.MigrationDirection }));
+            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationCompleted, "Success", decrypting ? "every listed record decrypted through the authority; post-check against the authority-accepted heads of the records the business database lists found no encrypted row of the field (Amendment A1; not an independent completeness proof, G19)" : "every listed record re-protected through the authority; post-check against the authority-accepted heads of the records the business database lists found no plaintext copy of the field (not an independent completeness proof, G19)", null, new { migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, verifiedRecords = tracked.Count, direction = migration.MigrationDirection }));
         }
 
         migration.LeaseOwnerName = null;

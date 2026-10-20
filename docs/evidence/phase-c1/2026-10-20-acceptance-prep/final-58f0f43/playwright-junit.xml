@@ -1,0 +1,64 @@
+<testsuites id="" name="" tests="23" failures="0" skipped="0" errors="0" time="279.473196">
+<testsuite name="accused-workflow.spec.ts" timestamp="2026-10-20T03:19:46.451Z" hostname="chromium-desktop" tests="2" failures="0" skipped="0" time="44.105" errors="0">
+<testcase name="Stage B Accused workflow › designer publishes AccusedAddress and Accused with a related list and document collection" classname="accused-workflow.spec.ts" time="19.448">
+</testcase>
+<testcase name="Stage B Accused workflow › clerk creates an Accused, adds addresses, uploads documents across navigation and reviews activity" classname="accused-workflow.spec.ts" time="24.657">
+</testcase>
+</testsuite>
+<testsuite name="branding.spec.ts" timestamp="2026-10-20T03:19:46.451Z" hostname="chromium-desktop" tests="1" failures="0" skipped="0" time="1.79" errors="0">
+<testcase name="owner uploads a PNG logo and it appears top-left" classname="branding.spec.ts" time="1.79">
+</testcase>
+</testsuite>
+<testsuite name="designer-ux.spec.ts" timestamp="2026-10-20T03:19:46.451Z" hostname="chromium-desktop" tests="5" failures="0" skipped="0" time="24.434" errors="0">
+<testcase name="C1 designer rebuild: sections (Add Row), placement, inspector, persistence and publish › designer builds titled sections with fields, moves and renames them, and the layout survives save and reload" classname="designer-ux.spec.ts" time="14.9">
+</testcase>
+<testcase name="C1 designer rebuild: sections (Add Row), placement, inspector, persistence and publish › the clerk&apos;s record page renders the published sections with their fields" classname="designer-ux.spec.ts" time="1.593">
+</testcase>
+<testcase name="C1 designer rebuild: sections (Add Row), placement, inspector, persistence and publish › unsaved changes block navigation until the designer confirms or saves" classname="designer-ux.spec.ts" time="2.718">
+</testcase>
+<testcase name="C1 designer rebuild: sections (Add Row), placement, inspector, persistence and publish › Actions columns are rightmost with one visible action plus an overflow menu" classname="designer-ux.spec.ts" time="2.977">
+</testcase>
+<testcase name="C1 designer rebuild: sections (Add Row), placement, inspector, persistence and publish › UX-12: default theme is black and the designer&apos;s semantic controls follow the theme tokens" classname="designer-ux.spec.ts" time="2.246">
+</testcase>
+</testsuite>
+<testsuite name="encryption-downgrade.spec.ts" timestamp="2026-10-20T03:19:46.451Z" hostname="chromium-desktop" tests="4" failures="0" skipped="0" time="21.809" errors="0">
+<testcase name="Field encryption removal: policy switch, administrator-only controls, verified plaintext migration › owner permits removal of encryption on the data-protection policy" classname="encryption-downgrade.spec.ts" time="2.131">
+</testcase>
+<testcase name="Field encryption removal: policy switch, administrator-only controls, verified plaintext migration › owner publishes a form with an encrypted Internal field; a designer-only user has no control to remove encryption" classname="encryption-downgrade.spec.ts" time="11.054">
+</testcase>
+<testcase name="Field encryption removal: policy switch, administrator-only controls, verified plaintext migration › owner removes encryption; the value stays readable and the field is reported as fully migrated only after verification" classname="encryption-downgrade.spec.ts" time="6.573">
+</testcase>
+<testcase name="Field encryption removal: policy switch, administrator-only controls, verified plaintext migration › the development organization&apos;s policy is restored" classname="encryption-downgrade.spec.ts" time="2.051">
+</testcase>
+</testsuite>
+<testsuite name="encryption.spec.ts" timestamp="2026-10-20T03:19:46.451Z" hostname="chromium-desktop" tests="4" failures="0" skipped="0" time="23.254" errors="0">
+<testcase name="Field encryption: designer configuration, record display, strengthening, organization policy › designer sees secure defaults, creates an encrypted and a plaintext field, and publishes" classname="encryption.spec.ts" time="5.627">
+</testcase>
+<testcase name="Field encryption: designer configuration, record display, strengthening, organization policy › clerk sees the decrypted value with an Encrypted badge; the reader is denied" classname="encryption.spec.ts" time="4.798">
+</testcase>
+<testcase name="Field encryption: designer configuration, record display, strengthening, organization policy › designer strengthens the plaintext field to encrypted; the change is one-way" classname="encryption.spec.ts" time="6.828">
+</testcase>
+<testcase name="Field encryption: designer configuration, record display, strengthening, organization policy › organization owner tightens the data-protection policy; the designer is then refused plaintext" classname="encryption.spec.ts" time="6.001">
+</testcase>
+</testsuite>
+<testsuite name="form-management.spec.ts" timestamp="2026-10-20T03:19:46.451Z" hostname="chromium-desktop" tests="3" failures="0" skipped="0" time="32.807" errors="0">
+<testcase name="Form management: edit fields and form permissions › designer builds and publishes a form with a document collection; the clerk records data and uploads a document" classname="form-management.spec.ts" time="11.845">
+</testcase>
+<testcase name="Form management: edit fields and form permissions › designer edits an existing field and the document collection, then publishes the next version; data and attachments are preserved" classname="form-management.spec.ts" time="8.467">
+</testcase>
+<testcase name="Form management: edit fields and form permissions › designer changes who can create records after the form is saved: grant, effective access, revocation, no new version" classname="form-management.spec.ts" time="12.495">
+</testcase>
+</testsuite>
+<testsuite name="pb14-accessibility.spec.ts" timestamp="2026-10-20T03:19:46.451Z" hostname="chromium-desktop" tests="3" failures="0" skipped="0" time="123.306" errors="0">
+<testcase name="PB-14 automated accessibility and responsive validation › login, dashboard, records, record, uploads, gallery and designer pass axe WCAG 2.2 AA at every width (PB14-10..14, 22, 23, 32)" classname="pb14-accessibility.spec.ts" time="116.259">
+</testcase>
+<testcase name="PB-14 automated accessibility and responsive validation › keyboard only: skip link, tabs, dialog focus trap and designer reorder (PB14-15, 25, 29)" classname="pb14-accessibility.spec.ts" time="5.59">
+</testcase>
+<testcase name="PB-14 automated accessibility and responsive validation › forced-colors and prefers-reduced-motion do not hide focus or state (PB14-30)" classname="pb14-accessibility.spec.ts" time="1.457">
+</testcase>
+</testsuite>
+<testsuite name="responsive.spec.ts" timestamp="2026-10-20T03:19:46.451Z" hostname="chromium-phone" tests="1" failures="0" skipped="0" time="2.461" errors="0">
+<testcase name="gallery reflows at 320px without horizontal scroll and every control is keyboard reachable" classname="responsive.spec.ts" time="2.461">
+</testcase>
+</testsuite>
+</testsuites>
