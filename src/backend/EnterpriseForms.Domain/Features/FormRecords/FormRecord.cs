@@ -38,6 +38,28 @@ public sealed class FormRecord
 
     public Guid? AuthorityCommandId { get; set; }
 
+    /// <summary>
+    /// Local projection of the operation the authority accepted as this record's head at <see cref="RecordRevision"/>.
+    /// Staged candidates are insert-only and stay in the business tables even when the authority rejects them (a
+    /// superseded reprotection, a revoked permission), so "the highest staged revision" is not the record's state; local
+    /// estimates (legacy plaintext/encrypted counts) read the field rows of this operation instead. It is an untrusted
+    /// hint like every business row — protected reads and migration post-checks still verify against the authority head.
+    /// </summary>
+    public Guid? AcceptedContentChangeOperationId { get; set; }
+
+    /// <summary>Records an authority-accepted head; never moves the projection backwards when commits finish out of order.</summary>
+    public bool RecordAcceptedContent(long contentRevision, Guid operationId)
+    {
+        if (contentRevision < RecordRevision || (contentRevision == RecordRevision && AcceptedContentChangeOperationId is not null))
+        {
+            return false;
+        }
+
+        RecordRevision = contentRevision;
+        AcceptedContentChangeOperationId = operationId;
+        return true;
+    }
+
     /// <summary>Local projection of the authority parent edge (child records); the signed header binds the link (schema v3).</summary>
     public Guid? ParentFormRecordId { get; set; }
 

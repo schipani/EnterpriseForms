@@ -219,9 +219,8 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             var accepted = await stager.StageAndCommitReprotectionAsync(migration.TenantId, head, snapshot.Items, new RecordCandidateStager.CandidateInput(header, rows), migration.AuthorityCommandId, idempotencyKey, cancellationToken).ConfigureAwait(false);
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
             var record = await scope.FindFormRecordAsync(migration.TenantId, item.FormRecordId, cancellationToken).ConfigureAwait(false);
-            if (record is not null && record.RecordRevision < accepted.CommittedContentRevision)
+            if (record is not null && accepted.CommittedOperationId is { } acceptedOperation && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
             {
-                record.RecordRevision = accepted.CommittedContentRevision;
                 record.ModifiedOn = clock.GetUtcNow();
             }
 

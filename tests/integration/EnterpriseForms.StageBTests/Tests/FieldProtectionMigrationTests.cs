@@ -78,7 +78,7 @@ public sealed class FieldProtectionMigrationTests(StageBFixture fixture)
     private static string MigrationState(JsonElement status) => status.GetProperty("migration").GetProperty("migrationState").GetString()!;
 
     private string PlaintextRowsInLatestSnapshots(Workspace w) =>
-        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_string_values v WHERE v.field_definition_id = '{w.FieldId:D}' AND v.content_change_operation_id = (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1);").Trim();
+        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_string_values v WHERE v.field_definition_id = '{w.FieldId:D}' AND v.content_change_operation_id = (SELECT COALESCE(f.accepted_content_change_operation_id, (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1)) FROM form_records f WHERE f.form_record_id = v.form_record_id);").Trim();
 
     [Fact]
     public async Task StrengtheningCountsPlaintextThenTheWorkerReprotectsEveryRecordThroughTheAuthorityAndOnlyThenClaimsFullEncryption()

@@ -182,6 +182,16 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         };
 
         var accepted = await stager.StageAndCommitAsync(context, head, new RecordCandidateStager.CandidateInput(header, candidateValues.Cast<ISignedContentRow>().ToList()), idempotencyKey, cancellationToken).ConfigureAwait(false);
+        if (accepted.CommittedOperationId is { } acceptedOperation)
+        {
+            await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+            var record = await scope.FindFormRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+            if (record is not null && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
+            {
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         var fieldsById = fields.ToDictionary(f => f.FieldDefinitionId);
         var optionsById = options.ToDictionary(o => o.FieldOptionId);
         return new FormRecordResponse(formRecordId, context.OrganizationId, formDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true,

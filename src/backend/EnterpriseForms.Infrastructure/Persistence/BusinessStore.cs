@@ -299,14 +299,35 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                 return [];
             }
 
-            var recordIds = rows.Select(r => r.FormRecordId).Distinct().ToList();
-            var latest = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
+            var latestByRecord = await CurrentOperationsAsync(rows.Select(r => r.FormRecordId).Distinct().ToList(), cancellationToken).ConfigureAwait(false);
             return rows.Where(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId)
                 .GroupBy(r => r.FormRecordId)
                 .Select(g => new LegacyPlaintextRecord(g.Key, g.Count()))
                 .OrderBy(r => r.FormRecordId)
                 .ToList();
+        }
+
+        /// <summary>
+        /// The operation each record's local estimate reads: the projected authority-accepted head
+        /// (form_records.accepted_content_change_operation_id), never merely the highest staged revision — a candidate the
+        /// authority rejected stays in the insert-only tables and must not be mistaken for the record's state. Records
+        /// without a projected head (written before the projection existed) fall back to the highest staged revision.
+        /// </summary>
+        private async Task<Dictionary<Guid, Guid>> CurrentOperationsAsync(List<Guid> recordIds, CancellationToken cancellationToken)
+        {
+            var accepted = await context.FormRecords.Where(r => recordIds.Contains(r.FormRecordId) && r.AcceptedContentChangeOperationId != null).Select(r => new { r.FormRecordId, r.AcceptedContentChangeOperationId }).ToListAsync(cancellationToken).ConfigureAwait(false);
+            var result = accepted.ToDictionary(r => r.FormRecordId, r => r.AcceptedContentChangeOperationId!.Value);
+            var missing = recordIds.Where(id => !result.ContainsKey(id)).ToList();
+            if (missing.Count > 0)
+            {
+                var latest = await context.FormRecordRevisions.Where(r => missing.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
+                foreach (var group in latest.GroupBy(r => r.FormRecordId))
+                {
+                    result[group.Key] = group.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId;
+                }
+            }
+
+            return result;
         }
 
         public async Task<int> CountPlaintextRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken)
@@ -331,9 +352,7 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                 return [];
             }
 
-            var recordIds = rows.Select(r => r.FormRecordId).Distinct().ToList();
-            var latest = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var latestByRecord = latest.GroupBy(r => r.FormRecordId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId);
+            var latestByRecord = await CurrentOperationsAsync(rows.Select(r => r.FormRecordId).Distinct().ToList(), cancellationToken).ConfigureAwait(false);
             return rows.Where(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId)
                 .GroupBy(r => r.FormRecordId)
                 .Select(g => new LegacyPlaintextRecord(g.Key, g.Count()))

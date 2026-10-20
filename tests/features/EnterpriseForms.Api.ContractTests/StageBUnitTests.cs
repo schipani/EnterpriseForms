@@ -73,6 +73,21 @@ public sealed class StageBUnitTests
     }
 
     [Fact]
+    public void AcceptedContentProjectionNeverMovesBackwardsWhenCommitsFinishOutOfOrder()
+    {
+        var record = new FormRecord { RecordRevision = 1 };
+        var first = Guid.CreateVersion7();
+        var third = Guid.CreateVersion7();
+        Assert.True(record.RecordAcceptedContent(1, first)); // creation: revision 1, no projected operation yet
+        Assert.Equal(first, record.AcceptedContentChangeOperationId);
+        Assert.True(record.RecordAcceptedContent(3, third));
+        Assert.False(record.RecordAcceptedContent(2, Guid.CreateVersion7())); // a slower commit of an older revision finishes last
+        Assert.False(record.RecordAcceptedContent(3, Guid.CreateVersion7())); // the projected head is not replaced at the same revision
+        Assert.Equal(3, record.RecordRevision);
+        Assert.Equal(third, record.AcceptedContentChangeOperationId);
+    }
+
+    [Fact]
     public void TypedValueCodecValidatesAndRoundTripsEveryStageBType()
     {
         var record = Guid.CreateVersion7();
