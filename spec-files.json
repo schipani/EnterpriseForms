@@ -49,8 +49,8 @@
     },
     {
       "path": "docs/PHASE_C1_UX_STATUS.md",
-      "sha256": "a6ff391b2a29454b45c19911cdfd6ff510ef541f3ba5969bd086c98408306cd3",
-      "bytes": 24605
+      "sha256": "569af35158a1c2451499fb09447ab36958a4cc535b9f66ad085b096fac6867fd",
+      "bytes": 36889
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -349,8 +349,8 @@
     },
     {
       "path": "docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md",
-      "sha256": "173e85138c5b11143b74a2417c4e3c890ee3d21c1a3554d77ab6d26d4c8d1999",
-      "bytes": 7455
+      "sha256": "facf36c326ade2a2cc45f1115d39ef5d37bd81db5d917db59de64ec35076db96",
+      "bytes": 8237
     },
     {
       "path": "docs/ui/PB14_REPRESENTATIVE_SCREEN_CONTRACTS.md",

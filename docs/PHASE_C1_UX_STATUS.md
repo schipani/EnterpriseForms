@@ -1,5 +1,69 @@
 # Phase C1-UX — status
 
+## C1 designer rebuild (2026-10-19/20) — current state
+
+**Scope:** `docs/ui/c1-designer-rebuild/` (owner handoff: `TARGET_DESIGN.png` normative, `CURRENT_IMPLEMENTATION.png` to replace, `DESIGN_AND_BEHAVIOR_CONTRACT.md`, `ACCEPTANCE_TEST_MATRIX.md`). This supersedes the first C1-UX iteration described further below, which the owner rejected (card-based canvas). **Milestone status: implemented and tested; NOT accepted — awaiting owner visual acceptance of the real UI and the human accessibility reviews listed under Limitations.**
+
+**Commits on `phase-c/form-platform-expansion`:** `687d6a7` (designer rebuild), `79b8030` (inspector tabs wrap at 320 px — found by the PB-14 reflow scan), `bddc387` (fix of the `CancellingAReleaseReEncrypts…` integration failure, see below), `708c4db` (owner review feedback: encryption notice below the input), `2681511` (status count also reads the accepted head), plus this documentation commit.
+
+### Screenshot comparison (target vs. what was replaced vs. what was built)
+
+| Area | TARGET_DESIGN.png | CURRENT_IMPLEMENTATION.png (replaced) | Built |
+|---|---|---|---|
+| Frame | Left designer nav, centre toolbar + canvas, right inspector | Horizontal tabs, canvas + separate Preview card | Three panes below the unchanged global header; designer route widened to 100rem |
+| Left pane | "Form Designer", form name, Draft chip, Design/Fields/Rules/Preview/Versions/Settings | None | Same, plus Form permissions and Related forms (preserved features), All forms link, Unsaved-changes indicator |
+| Toolbar | + Add Field ▾, + Add Row, + Add Column, Undo, Redo, Preview, black Save | Undo/Redo/Save draft/Publish in page header | Same row; Save draft is the black primary action; Publish… is a distinct secondary action |
+| Canvas | Titled collapsible sections, 4-column compact field previews, "+ Add Field" cell | One section of large per-field configuration cards (Up/Down/Narrower/Wider/Configure/Remove, Label/Width/Required inputs) | Titled collapsible sections, each its own 4-column grid of inert compact previews; exact-cell "+ Add Field" slots; per-card controls removed |
+| Selection | Blue outline, small icons on the selected tile | Not present | Blue focus-token outline + `aria-pressed`; floating properties / `…` / remove icons on the selected tile only |
+| Inspector | Field Properties: General/Validation/Rules/Security/Advanced; label, type, help, width | "Properties" hint + unconnected Preview | Field Properties with the five stable tabs (black active underline), Section Properties, Add Field options |
+
+Live 1440×900 screenshots and a side-by-side composite were captured from the running app (dev stack + Vite) and inspected; structural discrepancies found in that comparison were corrected (canvas drew 2 columns at 1440 → canvas breakpoint fixed; inspector tabs collided → compact tab density; selected-tile icons truncated the label → floating action bar; global header misaligned with the wide workspace → widened together). **Remaining visual differences (deliberate):** the "Unsaved changes" indicator lives in the left pane (one indicator across all designer views) rather than the inspector header; the target's "Show in form" / "Read-only" checkboxes are not shown because the layout schema has no such properties (Required and Start-on-new-row are shown instead); chips read "Draft revision N" / "Published vN".
+
+### What changed
+
+- **Sections ("+ Add Row")** are the existing layout-schema-v2 `sections[]` (stable `sectionKey` `section_<hex>`, `title`) — no new entity and no `startOnNewRow` substitute. Inserted after the selected section, titled "New section", focused for renaming. Rename (double-click, inspector, `…` menu), optional description, reorder, collapse (per viewer, browser storage), duplicate (without fields — a field can be placed once), remove with an explicit disposition (`RemoveSectionDialog`: move the items to another section, or un-place them from the layout; an empty section just confirms). Never deletes field definitions, values, child links or documents.
+- **Placement:** exact-cell "+ Add Field" slots; the inspector's Add Field options place an existing field / document collection / related list, or create a new field / document collection that is placed in that cell once the server confirms it. "+ Add Column" adds another empty cell in the selected section (at most four shown) and explains the fixed four-column grid. Moves: drag-and-drop within and between sections, Alt+Arrow on the focused tile (crosses section boundaries), the tile `…` menu (Move earlier/later, Move to section, Narrower/Wider, Rename, Remove from layout), and the inspector (Section, Field width, Start on a new row, Move earlier/later). Undo/Redo (toolbar, Ctrl/Cmd+Z, Ctrl+Shift+Z / Ctrl+Y) covers every layout change.
+- **Inspector** (`DesignerInspector.tsx`): General (Field label, Field type, Help text, Placeholder, Control, Required, placement), Validation (type-specific constraints and document upload limits; input that does not validate is held locally and never applied), Rules (honest "not yet available"), Security & Encryption (the existing Authority-backed `CurrentProtectionSection`, unchanged), Advanced (UUID, key, catalog name, revision, lifecycle, "Edit catalog name and description…" → existing tabbed dialog).
+- **Backend (additive):** optional `description` on sections and `placeholder` on field elements in `FormLayoutCodec`; null-omitted, so existing and published layouts serialize byte-for-byte as before (unit test). No migration of stored layouts was needed: every stored layout already has at least one titled section, which the designer shows as is.
+- **Theme:** primary/checked/active states use the `--ui-primary-*` tokens (default `#111111`); blue only for selection and focus. Organization branding overrides apply unchanged (the UX-12 test proves the designer follows the token).
+- **Tables:** the Fields, Versions and Related forms tables use the rightmost `Actions` column with one visible action plus `…` (`RowActions`).
+- **Owner review feedback (`708c4db`):** "Encrypted for privacy — not searchable." now renders below the input (new `note` slot in `FieldShell`, announced via `aria-describedby`); designer help text stays above the input.
+
+### Integration failure fixed: `FieldProtectionDowngradeTests.CancellingAReleaseReEncryptsConvertedValuesAndRecordsTheIrreversibleExposureWindow`
+
+Failed in both full gate runs of this round (passed in isolation). Root cause (`bddc387`): staged candidates are insert-only for the business runtime (G08). A decrypt candidate prepared just before a cancel superseded its release command is correctly refused by the authority, but its plaintext rows remain at a higher content revision than the accepted head; the business "legacy plaintext/encrypted" estimates used the highest staged revision as the record's state, so the field could never report fully encrypted again (rollback migration Completed, `legacyPlaintextRecordCount=1`). The authority behaved correctly throughout (content commits and security commands serialize on the organization row; superseded commands are refused); nothing unaccepted was ever served. Fix: `form_records.accepted_content_change_operation_id` (migration `BusinessRecordAcceptedOperation`, best-effort backfill), set on every accepted commit through `FormRecord.RecordAcceptedContent` (never moves backwards); the estimates read the accepted head's rows. The insert-only privilege is unchanged; the orphaned decrypt candidate's plaintext remains part of the Amendment A1 exposure-window residual that the test already asserts. A new deterministic regression test plants an orphan candidate through the hostile business-DBA connection.
+
+### Verification (real runs)
+
+Evidence: `docs/evidence/phase-c1/2026-10-20-designer-rebuild/` (screenshots, logs, TRX, Playwright JUnit). Docker runs used the security-test profile recreated with `down -v` before each run (real PostgreSQL ×2, SpiceDB, Vault Transit, Trust Authority, Azurite, ClamAV, hostile `attacker-sql`), API :5180; Playwright drove a Vite dev server against it.
+
+| Run (commit) | Stage B integration | Encryption-removal class repeats | Playwright (all specs) | SEC-P01–P12 + guard |
+|---|---|---|---|---|
+| 1 (`687d6a7`) | 38/39 — `CancellingAReleaseReEncrypts…` | — | 22/23 — inspector tabs overflowed at 320 px (fixed in `79b8030`) | 13/13 |
+| 2 (`79b8030`) | 38/39 — `CancellingAReleaseReEncrypts…` again (rollback Completed, `legacyPlaintextRecordCount=1`) | — | **23/23** | 13/13 |
+| 3 (`708c4db`, includes `bddc387`) | 39/40 — only the new regression test, which exposed a third copy of the max-revision logic (fixed in `2681511`) | 5/7 and 6/7 (regression test; once `InterruptedAndTampered…`, a worker-restart test of the lease-timing family noted in the first C1 round, which passed in the full suite and in the other repeat) | **23/23** | 13/13 |
+| **Final (`2681511`)** | **40/40** | **7/7, 7/7** | not re-run: `2681511` changes one backend store method only; no frontend change since run 3 | **13/13** |
+
+Also on the final code: `.NET` solution tests (`dotnet test --solution EnterpriseForms.All.slnx`) **165/165**; frontend `npm run typecheck` 0 errors, `npm run lint` 0 problems, `npx vitest run` **47/47**, `npm run build` succeeded; `python scripts/validate-specifications.py --strict` PASS after `python scripts/generate-spec-manifest.py`.
+
+**Acceptance matrix coverage (automated):** UX-01/02/03/04/05/06/07/08/09/10/11/13/14 in `e2e/designer-ux.spec.ts` (sections, placement, move, rename, collapse/reorder, removal disposition, save + reload, preview, publish, clerk record page, tabs, Actions columns, keyboard-only moves, navigation guard, undo/redo); UX-12 in the same spec (default black, token-driven); UX-15 in `e2e/pb14-accessibility.spec.ts` (axe WCAG 2.2 AA + no horizontal overflow at 320/768/1440 and the 720/320 px zoom equivalents, including every inspector tab); UX-16 SEC-P + Stage B integration above; UX-17 live 1440 screenshot and side-by-side (`screenshots/side-by-side.png`); UX-18 version-safe rename (field key unchanged after a label rename; published versions immutable). Stage B workflows (`accused-workflow`, `form-management`, `encryption`, `encryption-downgrade`) were migrated to the new placement/inspector helpers and pass.
+
+**Browser demonstration (real dev stack, owner-reproducible):** sign in as `designer` → Forms → Accused → Design. The demo form was built through the UI: default section renamed "Personal Information", `+ Add Row` → "Contact Information", Address Line 1/2 and City placed into its cells, saved, reloaded, previewed, published; `clerk` → New record shows both sections (`screenshots/record-page-1440.png`).
+
+### Limitations and pending human reviews
+
+- **Owner visual/product acceptance of the rendered UI: PENDING.** Do not treat this milestone as accepted on the strength of tests or screenshots.
+- **NVDA / VoiceOver and real browser zoom (200%/400%): PENDING** — new row PB14-C1 in `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md`. Automated axe scans and 320/720/768/1440 px reflow checks pass; they do not replace human review.
+- **Rules:** no conditional-visibility / required-if engine exists in the schema or server; the Rules view and tab say so and persist nothing.
+- **"Show in form" / "Read-only"** (target screenshot) are not implemented: the layout schema has no hidden/read-only element properties.
+- **Drag-and-drop** uses native HTML5 events (desktop pointer); touch devices use the alternatives (tile `…` menu, inspector). Drag-to-resize is not implemented (width is set in the inspector or `…` menu).
+- **"+ Add Column"** adds designer-only empty cells (not persisted); the grid stays the standard four columns by design (§4I).
+- Section collapse state is per viewer (browser storage), not part of the published form.
+- During this round `src/frontend/node_modules` was found mostly emptied by an unidentified, interrupted reinstall; it was restored with `npm ci` from the unchanged lockfile before the final runs.
+- Production Level 2 certification remains outstanding (unchanged by this work).
+
+## First C1-UX iteration (superseded; kept for history)
+
 **Branch:** `phase-c/form-platform-expansion`. **Base commit before this work:** `556c562f57f0e7b5335e34e4da1c9bb60b2e723c`.
 **Scope:** `docs/ui/C1_DESIGNER_UX_IMPLEMENTATION_BRIEF.md` (normative) plus `docs/ui/C1_DESIGNER_UX_VISUAL_REFERENCE.png` (non-normative visual direction; black primary buttons, per the brief, were already correct in `packages/ui/src/Button.tsx` and were not changed).
 
