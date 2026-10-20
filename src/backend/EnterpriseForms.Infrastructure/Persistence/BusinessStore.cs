@@ -298,18 +298,27 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         /// <summary>
         /// The operation each record's local estimate reads: the projected authority-accepted head
         /// (form_records.accepted_content_change_operation_id), never merely the highest staged revision — a candidate the
-        /// authority rejected stays in the insert-only tables and must not be mistaken for the record's state. Records
-        /// without a projected head (written before the projection existed) fall back to the highest staged revision.
+        /// authority rejected stays in the insert-only tables and must not be mistaken for the record's state.
+        /// The projection is an untrusted hint: it is honoured only when a staged revision header of the same record with
+        /// that operation exists at the projected revision (form_records.record_revision). A pointer that is missing,
+        /// dangling or inconsistent falls back to the highest staged revision, so a single forged column cannot hide a
+        /// record from the estimate. Nothing here is an authorization or integrity decision: content reads and migration
+        /// completion verify against the authority head (FieldProtectionMigrationService.FinalizeAsync).
         /// </summary>
         private async Task<Dictionary<Guid, Guid>> CurrentOperationsAsync(List<Guid> recordIds, CancellationToken cancellationToken)
         {
-            var accepted = await context.FormRecords.Where(r => recordIds.Contains(r.FormRecordId) && r.AcceptedContentChangeOperationId != null).Select(r => new { r.FormRecordId, r.AcceptedContentChangeOperationId }).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var result = accepted.ToDictionary(r => r.FormRecordId, r => r.AcceptedContentChangeOperationId!.Value);
-            var missing = recordIds.Where(id => !result.ContainsKey(id)).ToList();
-            if (missing.Count > 0)
+            var projected = (await context.FormRecords.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.AcceptedContentChangeOperationId, r.RecordRevision }).ToListAsync(cancellationToken).ConfigureAwait(false))
+                .ToDictionary(r => r.FormRecordId);
+            var revisions = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
+            var result = new Dictionary<Guid, Guid>();
+            foreach (var group in revisions.GroupBy(r => r.FormRecordId))
             {
-                var latest = await context.FormRecordRevisions.Where(r => missing.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
-                foreach (var group in latest.GroupBy(r => r.FormRecordId))
+                if (projected.TryGetValue(group.Key, out var record) && record.AcceptedContentChangeOperationId is { } pointer
+                    && group.Any(r => r.ContentChangeOperationId == pointer && r.ContentRevision == record.RecordRevision))
+                {
+                    result[group.Key] = pointer;
+                }
+                else
                 {
                     result[group.Key] = group.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId;
                 }
@@ -317,6 +326,9 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
             return result;
         }
+
+        public async Task<List<Guid>> GetFormRecordIdsOfFormAsync(Guid formDefinitionId, CancellationToken cancellationToken) =>
+            await context.FormRecords.AsNoTracking().Where(r => r.FormDefinitionId == formDefinitionId).Select(r => r.FormRecordId).ToListAsync(cancellationToken).ConfigureAwait(false);
 
         public async Task<int> CountPlaintextRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken)
         {

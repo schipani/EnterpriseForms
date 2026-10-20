@@ -47,10 +47,14 @@ public sealed class FormRecord
     /// </summary>
     public Guid? AcceptedContentChangeOperationId { get; set; }
 
-    /// <summary>Records an authority-accepted head; never moves the projection backwards when commits finish out of order.</summary>
+    /// <summary>
+    /// Records an authority-accepted head (taken from the authority's commit response, never from business rows); never
+    /// moves the projection backwards when commits finish out of order. At an equal revision the authority's answer wins:
+    /// two accepted operations cannot share a revision, so a different stored pointer there is stale or forged.
+    /// </summary>
     public bool RecordAcceptedContent(long contentRevision, Guid operationId)
     {
-        if (contentRevision < RecordRevision || (contentRevision == RecordRevision && AcceptedContentChangeOperationId is not null))
+        if (contentRevision < RecordRevision || (contentRevision == RecordRevision && AcceptedContentChangeOperationId == operationId))
         {
             return false;
         }

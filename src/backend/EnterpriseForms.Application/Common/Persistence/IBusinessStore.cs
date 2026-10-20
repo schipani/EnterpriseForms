@@ -186,6 +186,9 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<HashSet<Guid>> GetProtectionMigrationItemRecordIdsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
 
+    /// <summary>Every business record of a form (migration post-check scope; untrusted list, verified record-by-record against the authority).</summary>
+    Task<List<Guid>> GetFormRecordIdsOfFormAsync(Guid formDefinitionId, CancellationToken cancellationToken);
+
     Task<List<FieldProtectionMigrationItem>> GetFailedProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
 
     Task<int> CountPendingProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);

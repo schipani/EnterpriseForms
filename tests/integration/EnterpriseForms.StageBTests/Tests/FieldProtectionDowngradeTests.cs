@@ -94,6 +94,10 @@ public sealed class FieldProtectionDowngradeTests(StageBFixture fixture)
         throw new TimeoutException("migration did not reach the expected state: " + last.GetRawText());
     }
 
+    /// <summary>All items of the field's migrations as "record|state|attempts|last_error" lines (test diagnostics only).</summary>
+    private string MigrationItemsDiagnostic(Guid fieldId) =>
+        fixture.Stack.AttackerSql($@"SELECT string_agg(i.form_record_id || '|' || i.item_state || '|' || i.attempt_count || '|' || coalesce(i.last_error_code, ''), ' ; ' ORDER BY i.form_record_id) FROM field_protection_migration_items i JOIN field_protection_migrations m ON m.field_protection_migration_id = i.field_protection_migration_id WHERE m.field_definition_id = '{fieldId:D}';", throwOnError: false).Trim();
+
     private static string MigrationState(JsonElement status) => status.GetProperty("migration").GetProperty("migrationState").GetString()!;
 
     private string EncryptedRowsInLatestSnapshots(Workspace w, Guid fieldId) =>
@@ -472,8 +476,10 @@ END $$;");
         Assert.Equal("Failed", MigrationState(ended));
         Assert.Equal("DecryptionMigrationFailed", ended.GetProperty("migrationState").GetString());
         Assert.False(ended.GetProperty("fullyPlaintext").GetBoolean());
-        Assert.Equal(4, ended.GetProperty("migration").GetProperty("completedRecordCount").GetInt32());
-        Assert.Equal(1, ended.GetProperty("migration").GetProperty("failedRecordCount").GetInt32());
+        // On failure, report every item (record, state, attempts, last error) so a recovery defect is diagnosable from the run log.
+        var items = MigrationItemsDiagnostic(w.InternalId);
+        Assert.True(ended.GetProperty("migration").GetProperty("completedRecordCount").GetInt32() == 4, "expected 4 completed records; tampered=" + tampered.ToString("D") + "; items: " + items + "; status: " + ended.GetRawText());
+        Assert.True(ended.GetProperty("migration").GetProperty("failedRecordCount").GetInt32() == 1, "expected 1 failed record; items: " + items);
         Assert.Equal(1, ended.GetProperty("legacyEncryptedRecordCount").GetInt32());
         Assert.Equal("Failed", fixture.Stack.AttackerSql($"SELECT item_state FROM field_protection_migration_items WHERE form_record_id = '{tampered:D}';").Trim());
         Assert.Contains(await ActionsAsync(w, w.Scenario.Administrator), a => a == "FIELD_PROTECTION_MIGRATION_FAILED");

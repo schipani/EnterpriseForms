@@ -82,9 +82,24 @@ public sealed class StageBUnitTests
         Assert.Equal(first, record.AcceptedContentChangeOperationId);
         Assert.True(record.RecordAcceptedContent(3, third));
         Assert.False(record.RecordAcceptedContent(2, Guid.CreateVersion7())); // a slower commit of an older revision finishes last
-        Assert.False(record.RecordAcceptedContent(3, Guid.CreateVersion7())); // the projected head is not replaced at the same revision
+        Assert.False(record.RecordAcceptedContent(3, third)); // replaying the same accepted head changes nothing
         Assert.Equal(3, record.RecordRevision);
         Assert.Equal(third, record.AcceptedContentChangeOperationId);
+        var authoritative = Guid.CreateVersion7();
+        Assert.True(record.RecordAcceptedContent(3, authoritative)); // a stale or forged pointer at the same revision yields to the authority's answer
+        Assert.Equal(authoritative, record.AcceptedContentChangeOperationId);
+    }
+
+    [Fact]
+    public void ReprotectionAttemptsGetFreshOperationsButAReplayWithinAnAttemptDoesNot()
+    {
+        var migration = Guid.CreateVersion7();
+        var record = Guid.CreateVersion7();
+        var first = EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService.ReprotectionIdempotencyKey(migration, record, 7, 0);
+        Assert.Equal(first, EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService.ReprotectionIdempotencyKey(migration, record, 7, 0)); // crash/replay within an attempt: same operation
+        Assert.NotEqual(first, EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService.ReprotectionIdempotencyKey(migration, record, 7, 1)); // next attempt after an abandoned prepare: fresh operation
+        Assert.NotEqual(first, EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService.ReprotectionIdempotencyKey(migration, record, 8, 0)); // a moved head is a different operation
+        Assert.InRange(("content:" + EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionMigrationService.ReprotectionIdempotencyKey(migration, record, long.MaxValue, int.MaxValue)).Length, 8, 128); // authority Idempotency-Key bounds
     }
 
     [Fact]
