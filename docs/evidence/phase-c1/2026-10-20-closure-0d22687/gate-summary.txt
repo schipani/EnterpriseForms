@@ -1,0 +1,10 @@
+STEP stack
+STEP stageb-full exit 0
+  total: 42   failed: 0 
+STEP playwright
+STEP playwright exit 0
+  23 passed (5.2m)
+STEP secp
+STEP secp exit 0
+  total: 13   failed: 0 
+STEP done

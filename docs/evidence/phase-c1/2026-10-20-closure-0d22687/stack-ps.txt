@@ -1,0 +1,12 @@
+api Up 6 seconds (healthy)
+archive-store Up 25 seconds
+attacker-sql Up 19 seconds
+authority Up 12 seconds (healthy)
+authority-db Up 25 seconds (healthy)
+azurite Up 25 seconds
+business-db Up 25 seconds (healthy)
+clamav Up 25 seconds (healthy)
+spicedb Up 18 seconds (healthy)
+spicedb-db Up 25 seconds (healthy)
+vault Up 25 seconds (healthy)
+worker Up 4 seconds
