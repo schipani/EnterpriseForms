@@ -34,6 +34,17 @@ function Step([string]$Name, [scriptblock]$Body) {
 }
 function InDir([string]$Dir, [scriptblock]$Body) { Push-Location $Dir; try { & $Body } finally { Pop-Location } }
 function Stack([string[]]$ComposeArgs) { InDir $docker { if (-not (Test-Path .env)) { Copy-Item env.example .env }; docker @compose @ComposeArgs } }
+# Whole-stack start. `up --wait` on the full profile reports failure when a one-shot service (dev-seed, *-migrate, vault-transit-init)
+# exits 0, although the stack is healthy. Start everything, then wait only on the long-running services; one-shot services
+# must have exited with code 0 (a non-zero exit still fails the step).
+function StackUpAll {
+  Stack @('up', '-d', '--build'); if ($LASTEXITCODE -ne 0) { return }
+  $oneShot = '^(dev-seed|vault-transit-init|.*-migrate)$'
+  $services = @(InDir $docker { docker @compose config --services } | Where-Object { $_ -notmatch $oneShot })
+  Stack (@('up', '-d', '--wait') + $services); if ($LASTEXITCODE -ne 0) { return }
+  $failed = @(InDir $docker { docker @compose ps -a --status exited --format '{{.Service}} {{.ExitCode}}' } | Where-Object { $_ -match $oneShot -and $_ -notmatch ' 0$' })
+  if ($failed.Count -gt 0) { Write-Host "one-shot service failed: $failed" -ForegroundColor Red; $global:LASTEXITCODE = 1 }
+}
 
 try {
   if ($Level -eq 1) {
@@ -47,7 +58,7 @@ try {
   if ($Level -eq 2) {
     if (-not $NoRebuild) {
       # Incremental: BuildKit reuses unchanged layers and compose recreates only containers whose image changed.
-      Step 'Stack up (incremental build, stays running)' { Stack @('up', '-d', '--build', '--wait') }
+      Step 'Stack up (incremental build, stays running)' { StackUpAll }
     }
     if ($Class -or -not ($Spec -or $Browser)) {
       Step 'Stage B integration tests' {
@@ -102,7 +113,7 @@ try {
     }
     # The Stage B stack must start from empty volumes: a stack reused after the tamper tests can quarantine (ARCHIVE_BODY_MISMATCH).
     Step 'Stage B: clean stack' { Stack @('down', '-v', '--remove-orphans') }
-    Step 'Stage B: start full stack' { Stack @('up', '-d', '--build', '--wait') }
+    Step 'Stage B: start full stack' { StackUpAll }
     Step 'Stage B: integration tests' {
       InDir $root { dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release --results-directory artifacts/stage-b/test-results --report-xunit-trx -- --minimum-expected-tests 10 }
     }

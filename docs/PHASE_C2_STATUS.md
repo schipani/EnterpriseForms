@@ -1,6 +1,6 @@
 # Phase C2 — Dropdowns, multi-select, conditional rules and field behavior
 
-Branch `phase-c/form-platform-features` (from main `0cd1367`). **Status: implemented and verified locally; not merged; awaiting owner review.** Nothing here is an accessibility certification, an independent review or a production security certification; the open items below remain open.
+Branch `phase-c/form-platform-features` (from main `0cd1367`). **Status: CLOSED for continued development (2026-10-20).** The owner personally tested and accepted the reusable dropdown-list workflow (C-11). Nothing here is an accessibility certification, an independent review or a production security certification; the open items below remain open.
 
 Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-05 … C-10**.
 
@@ -39,6 +39,13 @@ Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-05 … C-10**.
 * A partial (shared) projection never includes rule properties and never evaluates rules; a field-scoped contributor cannot change a multi-selection or a read-only field.
 * The Authorization Authority change is small and read-only in effect: field shares may now name **selection leaves** (plaintext dropdown values), previously silently unshareable. Contributor edits of selection leaves remain forbidden by the authority.
 * Migration `PhaseC2OptionListsAndSelectionMode`: two new tables (runtime role: select/insert/update, no delete), two new `field_definitions` columns (insert-only table, columns written at creation), occurrence unique indexes of the option and encrypted value tables now include the item id.
+
+## Closure record
+
+* **Owner acceptance:** the reusable dropdown-list workflow only (decision C-11). The owner did **not** perform, and this document does not claim, NVDA / VoiceOver / real-zoom accessibility testing of any Phase C2 UI.
+* **Conditional rules, Show in form, Read-only:** verified against their automated acceptance criteria — 20 .NET unit tests (incl. the 51 shared rule vectors), 6 renderer + 4 payload + 25 rule-graph/vector vitest cases, Stage B `RulesTests` (3), Playwright `dropdowns-rules.spec.ts` (rules scenarios 2 of 5). Not human-tested by the owner.
+* **Authority change** (plaintext dropdown sharing) requires appropriate production security review (C-12).
+* **Still open (unchanged):** G19 (independently verified migration completeness), NVDA/VoiceOver/real 200 %/400 % zoom reviews (PB14-C1) and the PB-14 sign-off record, all production Level 2 requirements (independent cryptographic attestation, Managed HSM, Confidential Ledger, Azure Level B), and G06 search completeness.
 
 ## Known limits (tracked, not hidden)
 
@@ -93,7 +100,7 @@ Run locally on 2026-10-20 against the working tree that became the Phase C2 comm
 
 Notes:
 
-* `scripts/dev/test.ps1 -Level 3` stopped at *Stage B: start full stack* with `FAILED … (exit 1)` although every container was healthy: the script's `compose up --wait` treats the one-shot `dev-seed` container exiting 0 as a failure (already documented for Level 2). The remaining Level 3 steps (full Stage B integration, full Playwright, teardown) were then run by hand with the script's own commands against that healthy stack. The first Level 3 attempt stopped earlier at `npm ci` because stray Vite dev servers held the Tailwind native module open; they were stopped.
+* (Fixed afterwards, C-13.) `scripts/dev/test.ps1 -Level 3` stopped at *Stage B: start full stack* with `FAILED … (exit 1)` although every container was healthy: the script's `compose up --wait` treats the one-shot `dev-seed` container exiting 0 as a failure (already documented for Level 2). The remaining Level 3 steps (full Stage B integration, full Playwright, teardown) were then run by hand with the script's own commands against that healthy stack. The first Level 3 attempt stopped earlier at `npm ci` because stray Vite dev servers held the Tailwind native module open; they were stopped.
 * The local dev stack (`docker compose … compose.dev.yaml`) was stopped and its containers/networks removed (volumes untouched) because the security-test stack pins the same subnets. Rebuild it with the README command to browse the new features (the API image must be rebuilt: this phase adds a migration).
 
 ### What this does not show
