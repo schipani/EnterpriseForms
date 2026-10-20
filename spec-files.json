@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "9c672c83875172681df724f1adb1a5d53d53e0657d3ce503851b12fa4015e49a",
-      "bytes": 25271
+      "sha256": "82d7040c5dbbb1722ce69a9e6927ea8d24be3d7fc96b63cbf5b70b58d87ad93e",
+      "bytes": 26275
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -49,8 +49,8 @@
     },
     {
       "path": "docs/PHASE_C1_UX_STATUS.md",
-      "sha256": "e7708bc178e58aec8ff4f476f27b8fc166904cf8fbdf55fa3181bd25787e6980",
-      "bytes": 44756
+      "sha256": "d6547173318dfe60b96fd4f03e01c5ea5a76b912a83bcb04ef5661e4ba13c781",
+      "bytes": 46685
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -186,6 +186,11 @@
       "path": "docs/decisions/PHASE0_DECISION_LOG.md",
       "sha256": "6137949b9093de4013767e4401f2c3a908b72c7f2fae97cc04d213e66772aa92",
       "bytes": 6884
+    },
+    {
+      "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
+      "sha256": "9f97b205d073a275081bf4b9516c20b964117bf03bfe464edf5218b1571ae5db",
+      "bytes": 3557
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

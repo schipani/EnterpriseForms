@@ -403,7 +403,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             migration.MigrationVerifiedOn = now;
             migration.LastErrorCode = null;
             migration.NextAttemptOn = DateTimeOffset.MaxValue;
-            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationCompleted, "Success", decrypting ? "every record decrypted through the authority; post-check against the authority-accepted heads found no encrypted row of the field (Amendment A1)" : "every record re-protected through the authority; post-check against the authority-accepted heads found no plaintext copy of the field", null, new { migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, verifiedRecords = tracked.Count, direction = migration.MigrationDirection }));
+            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationCompleted, "Success", decrypting ? "every listed record decrypted through the authority; post-check against the authority-accepted heads of the records the business database lists found no encrypted row of the field (Amendment A1; not an independent completeness proof, G19)" : "every listed record re-protected through the authority; post-check against the authority-accepted heads of the records the business database lists found no plaintext copy of the field (not an independent completeness proof, G19)", null, new { migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, verifiedRecords = tracked.Count, direction = migration.MigrationDirection }));
         }
 
         migration.LeaseOwnerName = null;

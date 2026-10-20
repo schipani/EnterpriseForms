@@ -2,13 +2,20 @@
 
 ## C1 designer rebuild (2026-10-19/20) — current state
 
-**Scope:** `docs/ui/c1-designer-rebuild/` (owner handoff: `TARGET_DESIGN.png` normative, `CURRENT_IMPLEMENTATION.png` to replace, `DESIGN_AND_BEHAVIOR_CONTRACT.md`, `ACCEPTANCE_TEST_MATRIX.md`). This supersedes the first C1-UX iteration described further below, which the owner rejected (card-based canvas). **Milestone status: implemented and tested; NOT accepted — awaiting owner visual acceptance of the real UI and the human accessibility reviews listed under Limitations.**
+### Phase C1 closure (2026-10-20)
+
+- **Owner visual acceptance:** the project owner personally tested, visually reviewed and **approved** the redesigned Form Designer and authorized the squash-merge of PR #11 (C-02). Recorded as *owner visually accepted for continued development*.
+- **Status-wording correction (C-03, security finding G19):** the field-protection badges "Fully encrypted · verified" / "Fully migrated to plaintext · verified" are replaced by "All listed records encrypted" / "All listed records migrated to plaintext" with an explicit caveat that the check covers the records the business database lists and is **not an independently verified completeness guarantee**; the migration-completed audit text and API documentation say the same. No authorization, decryption, integrity or Authority check changed. Authority-backed completeness verification is open gap **G19** (P1) in `SECURITY_GAP_ASSESSMENT.md`.
+- **Still outstanding (not passed, not waived):** NVDA + Chrome/Firefox and VoiceOver + Safari reviews, real browser zoom 200%/400% (PB14-C1), PB-14 product/design sign-off records, conditional rules, "Show in form", "Read-only", G19 / G06 completeness, and all production Level 2 requirements (independent cryptographic attestation, Managed HSM, Confidential Ledger, Azure Level B).
+- **Closure verification:** CLOSURE_RESULTS_PLACEHOLDER
+
+**Scope:** `docs/ui/c1-designer-rebuild/` (owner handoff: `TARGET_DESIGN.png` normative, `CURRENT_IMPLEMENTATION.png` to replace, `DESIGN_AND_BEHAVIOR_CONTRACT.md`, `ACCEPTANCE_TEST_MATRIX.md`). This supersedes the first C1-UX iteration described further below, which the owner rejected (card-based canvas). **Milestone status: OWNER VISUALLY ACCEPTED FOR CONTINUED DEVELOPMENT (2026-10-20, decision C-02 in `docs/decisions/PHASE_C_DECISION_LOG.md`).** This is the project owner's acceptance after personally testing and visually reviewing the designer; it is not an accessibility certification, an independent review or a production security certification — see the open items below.**
 
 **Commits on `phase-c/form-platform-expansion`:** `687d6a7` (designer rebuild), `79b8030` (inspector tabs wrap at 320 px — found by the PB-14 reflow scan), `bddc387` (fix of the `CancellingAReleaseReEncrypts…` integration failure, see below), `708c4db` (owner review feedback: encryption notice below the input), `2681511` (status count also reads the accepted head), then `a0beeea`, `64bed7e`, `58f0f43` (acceptance preparation, below), plus documentation commits.
 
 ### C1 acceptance preparation (2026-10-20) — recovery defect, projection hardening, final evidence
 
-**Milestone status unchanged: NOT accepted.** The interface awaits the owner's approval; PR #11 must not be merged before it.
+*(At the time of this preparation the milestone was not yet accepted; the owner accepted it afterwards — see Phase C1 closure above.)*
 
 #### `InterruptedAndTamperedMigrationsNeverClaimPlaintextAndForgedCompletionIsIgnored` intermittent failure — genuine recovery defect (fixed, `a0beeea`)
 
@@ -26,7 +33,7 @@
 | Can it forge migration completion? | **No (fixed).** Before: the post-check verified tracked items plus the business estimate, so a record hidden from the estimate could be skipped. Now `FinalizeAsync` verifies every business record of the form against its authority head and adds any that still hold old-form rows; completion requires zero. Test (c): a consistent forgery (bogus staged header + `record_revision` + pointer) hides a record from the initial enumeration (3 of 4 enumerated) — the migration still ends with 4 of 4 records re-protected in their authority heads. |
 | Can a single forged column skew the estimate? | **No (fixed).** The pointer is honoured only when a staged header of the same record with that operation exists at the projected `record_revision`; otherwise the previous rule applies. Test (a): a dangling pointer does not hide the record. The authority's commit response also replaces a stale or forged pointer at the same revision. |
 
-**Residual (documented, not new):** the local estimate and the status flags `fullyEncrypted` / `fullyPlaintext` remain business-database projections. An administrator who writes several tables consistently (bogus headers, revisions, pointers, migration rows) can still make the *status display* wrong — exactly as before this column existed (inserting a bogus higher revision had the same effect). These flags are never used for any authorization, decryption, read or search decision. The migration post-check's record list also comes from the business database; a record removed from `form_records` is not enumerated, because the authority offers no workload enumeration of a form's records (tracked with G06).
+**Residual (documented; now tracked as security finding G19, decision C-03):** the local estimate and the status flags `fullyEncrypted` / `fullyPlaintext` remain business-database projections. An administrator who writes several tables consistently (bogus headers, revisions, pointers, migration rows) can still make the *status display* wrong — exactly as before this column existed (inserting a bogus higher revision had the same effect). These flags are never used for any authorization, decryption, read or search decision. The migration post-check's record list also comes from the business database; a record removed from `form_records` is not enumerated, because the authority offers no workload enumeration of a form's records (tracked with G06).
 
 #### Final verification on `58f0f43`
 
@@ -51,14 +58,15 @@ Frontend code is unchanged since `708c4db` (typecheck/lint clean, vitest 47/47, 
 
 | Item | Status |
 |---|---|
-| Owner approval of the actual interface | **PENDING** — required before merging PR #11 |
+| Owner approval of the actual interface | **ACCEPTED** by the owner for continued development, 2026-10-20 (C-02) |
 | Conditional rules (visibility / required-if) | **Not implemented** — no rule engine in the layout schema or server; the Rules view and inspector tab say so and persist nothing |
 | "Show in form" (hidden placement) | **Not implemented** — the layout schema has no hidden-element property |
 | "Read-only" (per-element read-only) | **Not implemented** — the layout schema has no read-only element property |
 | NVDA + Chrome/Firefox review of the designer | **PENDING** (human) — PB14-C1 in `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md` |
 | VoiceOver + Safari review of the designer | **PENDING** (human) — PB14-C1 |
 | Real browser zoom 200% / 400% | **PENDING** (human) — automated viewport equivalents pass |
-| Product/design sign-off (PB-14) | **PENDING** |
+| Product/design sign-off (PB-14) | **PENDING** — owner visual acceptance (C-02) recorded; formal PB-14 sign-off record outstanding |
+| Independently verified migration completeness (G19) | **OPEN** — status shows "All listed records …" with a caveat (C-03); Authority-backed completeness verification required |
 | Production Level 2 certification | **Outstanding** (unchanged by this work) |
 
 ### Screenshot comparison (target vs. what was replaced vs. what was built)
@@ -107,7 +115,7 @@ Also on the final code: `.NET` solution tests (`dotnet test --solution Enterpris
 
 ### Limitations and pending human reviews
 
-- **Owner visual/product acceptance of the rendered UI: PENDING.** Do not treat this milestone as accepted on the strength of tests or screenshots.
+- **Owner visual acceptance:** recorded 2026-10-20 (C-02). Formal PB-14 product/design sign-off and the human accessibility reviews remain outstanding.
 - **NVDA / VoiceOver and real browser zoom (200%/400%): PENDING** — new row PB14-C1 in `docs/ui/PB14_MANUAL_ACCEPTANCE_CHECKLIST.md`. Automated axe scans and 320/720/768/1440 px reflow checks pass; they do not replace human review.
 - **Rules:** no conditional-visibility / required-if engine exists in the schema or server; the Rules view and tab say so and persist nothing.
 - **"Show in form" / "Read-only"** (target screenshot) are not implemented: the layout schema has no hidden/read-only element properties.

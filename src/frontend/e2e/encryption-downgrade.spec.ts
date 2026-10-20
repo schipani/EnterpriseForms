@@ -7,7 +7,7 @@ import { formIdFromUrl, placeFromPicker, saveAndPublish, signIn, signOut } from 
  *  2. The owner (organization owner + designer) builds a form with an encrypted Internal field; a designer-only user,
  *     on a form of their own, never sees a way to remove encryption.
  *  3. The owner removes encryption: the clerk's record keeps its value, the background migration runs, and only then
- *     does the dialog say "Fully migrated to plaintext · verified".
+ *     does the dialog say "All listed records migrated to plaintext".
  *  4. The shared development organization's policy is restored at the end.
  */
 const run = Date.now().toString(36);
@@ -97,7 +97,7 @@ test.describe.serial("Field encryption removal: policy switch, administrator-onl
     const dialog = page.getByRole("dialog", { name: "Edit field" });
     await dialog.getByRole("tab", { name: "Security & Encryption" }).click();
     const security = dialog.getByRole("group", { name: "Security & Encryption" });
-    await expect(security.getByText("Fully encrypted · verified")).toBeVisible();
+    await expect(security.getByText("All listed records encrypted")).toBeVisible();
     await security.getByRole("button", { name: /Remove encryption…/ }).click();
     const panel = security.getByRole("group", { name: "Remove encryption" });
     await expect(panel.getByText(/cannot be taken back by re-encrypting later/)).toBeVisible();
@@ -105,7 +105,7 @@ test.describe.serial("Field encryption removal: policy switch, administrator-onl
     await panel.getByLabel("Reason").fill("Badge numbers are an Internal lookup key; governance approved plaintext");
     await panel.getByRole("button", { name: "Remove encryption", exact: true }).click();
     await expect(security.getByText("Off — plaintext")).toBeVisible();
-    await expect(security.getByText("Fully migrated to plaintext · verified")).toBeVisible({ timeout: 120_000 });
+    await expect(security.getByText("All listed records migrated to plaintext")).toBeVisible({ timeout: 120_000 });
     await expect(security.getByRole("group", { name: "Decryption migration progress" })).toHaveCount(0);
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
