@@ -53,7 +53,7 @@ export function EditFieldDialog({ field, location, canEdit, pending, error, onSa
     <div className="flex flex-col gap-3">
       <TextInput label="Display label" value={values.label} required maxLength={200} disabled={!canEdit} error={errorFor("label")} helpText="Shown on forms, lists and in this catalog. Changing it never changes the field key." onChange={(event) => set("label", event.target.value)} />
       <TextInput label="Field key" value={field.fieldKey} readOnly helpText="Permanent identifier used by records, searches and integrations. It cannot be renamed: add a new field if you need a different key." />
-      <TextInput label="Storage type" value={isDocuments ? "File (document collection)" : field.fieldDataType} readOnly helpText="Permanent: changing it would reinterpret stored values. Add a new field of the new type and migrate deliberately." />
+      <TextInput label="Storage type" value={isDocuments ? "File (document collection)" : field.fieldDataType === "Option" ? (field.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : field.fieldDataType} readOnly helpText="Permanent: changing it would reinterpret stored values. Add a new field of the new type and migrate deliberately." />
       <TextArea label="Description" value={description} rows={2} maxLength={1000} disabled={!canEdit} onChange={(event) => setDescription(event.target.value)} />
       {location ? (
         <TextInput label="Help text" value={values.helpText} maxLength={1000} disabled={!canEdit} error={errorFor("helpText")} onChange={(event) => set("helpText", event.target.value)} />
@@ -104,8 +104,8 @@ export function EditFieldDialog({ field, location, canEdit, pending, error, onSa
   );
 
   const rulesContent = (
-    <StatusMessage tone="info" title="Conditional rules are not yet available">
-      A declarative conditional-visibility / required-if rule engine is specified (CLAUDE.md §4) but not yet implemented in the layout schema or the server. This tab will show and edit the rule graph, with cycle detection, once that backend support exists. Nothing on this tab is persisted.
+    <StatusMessage tone="info" title="Rules are edited in the field properties">
+      Conditional visibility, required-if, Show in form and Read-only live in the Rules tab of the Field Properties inspector. Close this dialog, select the field on the Design canvas and open its Rules tab.
     </StatusMessage>
   );
 

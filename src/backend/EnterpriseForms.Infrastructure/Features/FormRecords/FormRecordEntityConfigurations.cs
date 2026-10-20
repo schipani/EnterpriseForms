@@ -57,13 +57,22 @@ public sealed class FormRecordRevisionConfiguration : IEntityTypeConfiguration<F
 /// <summary>Shared mapping of the typed value tables: signed envelope, occurrence uniqueness per operation, tenant/record/field keys.</summary>
 internal static class FieldValueConfiguration
 {
-    public static void ConfigureValueRow<TRow>(EntityTypeBuilder<TRow> builder, string table, string prefix)
+    /// <param name="occurrencePerItem">Option and encrypted rows: a multi-select field stores one row per selected option, so the occurrence key includes the stable item id (single-select / scalar uniqueness is enforced by the write path; option membership uniqueness by a separate index).</param>
+    public static void ConfigureValueRow<TRow>(EntityTypeBuilder<TRow> builder, string table, string prefix, bool occurrencePerItem = false)
         where TRow : FieldValueRowBase
     {
         builder.MapSnakeCase(table);
         builder.Ignore(v => v.EntityKind).Ignore(v => v.ItemKindCode).Ignore(v => v.ItemId).Ignore(v => v.RowPrimaryKey);
         // One occurrence per (operation, record, field, group) — NULLS NOT DISTINCT so top-level duplicates are rejected (CLAUDE.md §2.4).
-        builder.HasIndex(v => new { v.ContentChangeOperationId, v.FormRecordId, v.FieldDefinitionId, v.FormRecordGroupId }).IsUnique().AreNullsDistinct(false).HasDatabaseName($"uq_{prefix}_occurrence");
+        if (occurrencePerItem)
+        {
+            builder.HasIndex(v => new { v.ContentChangeOperationId, v.FormRecordId, v.FieldDefinitionId, v.FormRecordGroupId, v.FieldValueItemId }).IsUnique().AreNullsDistinct(false).HasDatabaseName($"uq_{prefix}_occurrence");
+        }
+        else
+        {
+            builder.HasIndex(v => new { v.ContentChangeOperationId, v.FormRecordId, v.FieldDefinitionId, v.FormRecordGroupId }).IsUnique().AreNullsDistinct(false).HasDatabaseName($"uq_{prefix}_occurrence");
+        }
+
         builder.HasIndex(v => new { v.FormRecordId, v.ContentChangeOperationId }).HasDatabaseName($"ix_{prefix}_record_operation");
         builder.HasOne<FormRecord>().WithMany().HasForeignKey(v => v.FormRecordId).HasConstraintName($"fk_{prefix}_record");
         builder.HasOne<FieldDefinition>().WithMany().HasForeignKey(v => v.FieldDefinitionId).HasConstraintName($"fk_{prefix}_field");
@@ -143,7 +152,7 @@ public sealed class FieldEncryptedValueConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<FieldEncryptedValue> builder)
     {
-        FieldValueConfiguration.ConfigureValueRow(builder, "field_encrypted_values", "field_encrypted_values");
+        FieldValueConfiguration.ConfigureValueRow(builder, "field_encrypted_values", "field_encrypted_values", occurrencePerItem: true);
         builder.HasKey(v => v.FieldEncryptedValueId);
         builder.Property(v => v.EncryptionAlgorithmName).HasMaxLength(32);
         builder.Property(v => v.EncryptionKeyReference).HasMaxLength(200);
@@ -173,8 +182,10 @@ public sealed class FieldOptionValueConfiguration : IEntityTypeConfiguration<Fie
 {
     public void Configure(EntityTypeBuilder<FieldOptionValue> builder)
     {
-        FieldValueConfiguration.ConfigureValueRow(builder, "field_option_values", "field_option_values");
+        FieldValueConfiguration.ConfigureValueRow(builder, "field_option_values", "field_option_values", occurrencePerItem: true);
         builder.HasKey(v => v.FieldOptionValueId);
+        // A selected option appears once per field occurrence and operation (multi-select membership).
+        builder.HasIndex(v => new { v.ContentChangeOperationId, v.FormRecordId, v.FieldDefinitionId, v.FormRecordGroupId, v.FieldOptionId }).IsUnique().AreNullsDistinct(false).HasDatabaseName("uq_field_option_values_option");
         builder.HasOne<FieldOption>().WithMany().HasForeignKey(v => v.FieldOptionId).HasConstraintName("fk_field_option_values_option");
         builder.HasIndex(v => new { v.FieldDefinitionId, v.FieldOptionId, v.FormRecordId }).HasDatabaseName("ix_field_option_values_lookup");
     }

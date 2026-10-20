@@ -68,6 +68,7 @@ export function RecordPage() {
                 fields={fields}
                 values={values}
                 readOnly
+                applyRules={data.permissions.isCompleteProjection}
                 renderRelatedList={(element) => {
                   const relationship = relationshipsById.get(element.formRelationshipDefinitionId);
                   return relationship ? <ChildRecordList parentFormRecordId={formRecordId} relationship={relationship} label={element.label} canEdit={data.permissions.canEdit} summaryFieldKeys={element.summaryFieldKeys} /> : <p className="text-sm text-muted">{element.label}: relationship not available.</p>;

@@ -67,7 +67,7 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
         var options = verified.Options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive)).ToList());
         var fields = verified.Fields
             .Where(f => authorizedFieldIds is null || authorizedFieldIds.Contains(f.FieldDefinitionId) || authorizedDocumentFieldIds!.Contains(f.FieldDefinitionId))
-            .Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, options.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision))
+            .Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, options.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision, f.OptionSelectionMode))
             .ToList();
         var version = verified.LayoutVersion;
         return new RecordProjectionResponse(
@@ -83,7 +83,12 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             verified.ETag);
     }
 
-    /// <summary>Keeps field elements the caller may read, document collections with at least one authorized version, no child lists (a parent share never covers children, §4S.4), and drops sections left empty.</summary>
+    /// <summary>
+    /// Keeps field elements the caller may read, document collections with at least one authorized version, no child lists
+    /// (a parent share never covers children, §4S.4), and drops sections left empty. Conditional rules are removed from every
+    /// remaining element: a rule names fields (and comparison values) the viewer may not be allowed to see, and a partial
+    /// projection never evaluates rules, so shipping them would only disclose layout structure.
+    /// </summary>
     public static FormLayout AuthorizedLayout(FormLayout layout, IReadOnlySet<Guid> authorizedFieldIds, IReadOnlySet<Guid> authorizedDocumentFieldIds)
     {
         var sections = layout.Sections
@@ -94,7 +99,7 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
                     LayoutElementKinds.Field => e.FieldDefinitionId is { } id && authorizedFieldIds.Contains(id),
                     LayoutElementKinds.DocumentCollection => e.FieldDefinitionId is { } id && authorizedDocumentFieldIds.Contains(id),
                     _ => false,
-                }).ToList(),
+                }).Select(e => e with { VisibleWhen = null, RequiredWhen = null, ClearWhenHidden = false }).ToList(),
             })
             .Where(section => section.Elements.Count > 0)
             .ToList();

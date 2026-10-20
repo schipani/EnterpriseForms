@@ -662,6 +662,18 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on");
 
+                    b.Property<Guid?>("OptionListId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_list_id");
+
+                    b.Property<string>("OptionSelectionMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Single")
+                        .HasColumnName("option_selection_mode");
+
                     b.Property<Guid?>("ProtectionAuthorityCommandId")
                         .HasColumnType("uuid")
                         .HasColumnName("protection_authority_command_id");
@@ -682,6 +694,8 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
 
                     b.HasKey("FieldDefinitionId");
 
+                    b.HasIndex("OptionListId");
+
                     b.HasIndex("FormDefinitionId", "FieldKey")
                         .IsUnique()
                         .HasDatabaseName("uq_field_definitions_form_key");
@@ -691,6 +705,8 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_field_definitions_classification", "field_classification IN ('Public','Internal','Confidential','Restricted')");
 
                             t.HasCheckConstraint("ck_field_definitions_data_type", "field_data_type IN ('String','Integer','Decimal','Date','DateTime','Boolean','Guid','Option','File')");
+
+                            t.HasCheckConstraint("ck_field_definitions_option_selection_mode", "option_selection_mode IN ('Single','Multiple')");
 
                             t.HasCheckConstraint("ck_field_definitions_protection_floor", "field_classification IN ('Public','Internal') OR field_protection_mode = 'ApplicationEncrypted'");
 
@@ -745,11 +761,17 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("option_key");
 
+                    b.Property<Guid?>("OptionListItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_list_item_id");
+
                     b.Property<int>("OptionSortOrder")
                         .HasColumnType("integer")
                         .HasColumnName("option_sort_order");
 
                     b.HasKey("FieldOptionId");
+
+                    b.HasIndex("OptionListItemId");
 
                     b.HasIndex("FieldDefinitionId", "OptionKey")
                         .IsUnique()
@@ -1151,6 +1173,127 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_form_versions_number_positive", "version_number > 0 AND layout_schema_version > 0");
                         });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.OptionList", b =>
+                {
+                    b.Property<Guid>("OptionListId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_list_id");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<string>("LifecycleStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("lifecycle_status");
+
+                    b.Property<Guid>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on");
+
+                    b.Property<string>("OptionListDescription")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("option_list_description");
+
+                    b.Property<string>("OptionListName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("option_list_name");
+
+                    b.Property<long>("OptionListRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("option_list_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("OptionListId");
+
+                    b.HasIndex("TenantId", "OptionListName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_option_lists_tenant_name");
+
+                    b.ToTable("option_lists", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_option_lists_lifecycle", "lifecycle_status IN ('Active','Archived')");
+
+                            t.HasCheckConstraint("ck_option_lists_revision_positive", "option_list_revision >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.OptionListItem", b =>
+                {
+                    b.Property<Guid>("OptionListItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_list_item_id");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<Guid>("ModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on");
+
+                    b.Property<string>("OptionDisplayText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("option_display_text");
+
+                    b.Property<string>("OptionKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("option_key");
+
+                    b.Property<Guid>("OptionListId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_list_id");
+
+                    b.Property<int>("OptionSortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("option_sort_order");
+
+                    b.HasKey("OptionListItemId");
+
+                    b.HasIndex("OptionListId", "OptionKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_option_list_items_list_key");
+
+                    b.ToTable("option_list_items", (string)null);
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldBooleanValue", b =>
@@ -1616,11 +1759,11 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.HasIndex("FormRecordId", "ContentChangeOperationId")
                         .HasDatabaseName("ix_field_encrypted_values_record_operation");
 
-                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId")
+                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId", "FieldValueItemId")
                         .IsUnique()
                         .HasDatabaseName("uq_field_encrypted_values_occurrence");
 
-                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId"), false);
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId", "FieldValueItemId"), false);
 
                     b.ToTable("field_encrypted_values", null, t =>
                         {
@@ -1890,11 +2033,17 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.HasIndex("FieldDefinitionId", "FieldOptionId", "FormRecordId")
                         .HasDatabaseName("ix_field_option_values_lookup");
 
-                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId")
+                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId", "FieldOptionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_field_option_values_option");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId", "FieldOptionId"), false);
+
+                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId", "FieldValueItemId")
                         .IsUnique()
                         .HasDatabaseName("uq_field_option_values_occurrence");
 
-                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId"), false);
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ContentChangeOperationId", "FormRecordId", "FieldDefinitionId", "FormRecordGroupId", "FieldValueItemId"), false);
 
                     b.ToTable("field_option_values", null, t =>
                         {
@@ -3003,6 +3152,11 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_field_definitions_definition");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.OptionList", null)
+                        .WithMany()
+                        .HasForeignKey("OptionListId")
+                        .HasConstraintName("fk_field_definitions_option_list");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FieldOption", b =>
@@ -3013,6 +3167,11 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_field_options_field");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.OptionListItem", null)
+                        .WithMany()
+                        .HasForeignKey("OptionListItemId")
+                        .HasConstraintName("fk_field_options_list_item");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionMigration", b =>
@@ -3094,6 +3253,26 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("RestoredFromFormVersionId")
                         .HasConstraintName("fk_form_versions_restored_from");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.OptionList", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_lists_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.OptionListItem", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.OptionList", null)
+                        .WithMany()
+                        .HasForeignKey("OptionListId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_list_items_list");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FieldBooleanValue", b =>

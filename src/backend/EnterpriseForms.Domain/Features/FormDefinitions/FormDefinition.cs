@@ -113,4 +113,10 @@ public sealed class FieldDefinition
     public DateTimeOffset? ModifiedOn { get; set; }
 
     public Guid? ModifiedByUserId { get; set; }
+
+    /// <summary>Single or Multiple selection for Option fields; permanent (a published control and stored rows depend on it).</summary>
+    public string OptionSelectionMode { get; set; } = OptionSelectionModes.Single;
+
+    /// <summary>The shared option list the field's options were copied from, when created from one.</summary>
+    public Guid? OptionListId { get; set; }
 }

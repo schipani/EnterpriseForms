@@ -1,0 +1,48 @@
+# Starts the disposable security-test Docker stack (synthetic credentials only) as fast as is safe.
+#   1. ClamAV (30-90 s signature load) is started FIRST so it loads while the images build.
+#   2. Third-party images are pulled in the background while BuildKit builds the four first-party images.
+#   3. First-party images are built by compose (`up --build`): the repository policy allows only GitHub-owned actions, so the
+#      docker/setup-buildx and docker/bake actions (and their layer cache) are not used; runs are slower, never different.
+#      the missing images itself and the run is slower, never different.
+#   4. `up --wait` starts every service on EMPTY volumes (tmpfs), so each run begins from a clean state.
+name: Start disposable stack
+description: Cached image build plus clean-state docker compose up --wait for the security-test profile
+inputs:
+  services:
+    description: Space-separated services to start (empty = the whole profile)
+    default: ""
+  early-services:
+    description: Services with no build step to start before the image build (hides their startup latency)
+    default: ""
+  targets:
+    description: Comma-separated first-party images to pre-build (compose service names that own a build)
+    default: authority,api,worker,dev-seed
+  cache-scope:
+    description: Prefix for the BuildKit layer cache scopes
+    default: stack
+runs:
+  using: composite
+  steps:
+    - name: Prepare synthetic environment
+      shell: bash
+      working-directory: infrastructure/docker
+      run: |
+        # bake reads this .env from its working directory for compose interpolation; it is not exported to later steps.
+        cp env.example .env
+    - name: Start slow-initialising services and pull third-party images in the background
+      shell: bash
+      working-directory: infrastructure/docker
+      run: |
+        compose="docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env"
+        if [ -n "${{ inputs.early-services }}" ]; then $compose up -d ${{ inputs.early-services }}; fi
+        ( $compose pull --quiet --ignore-buildable ${{ inputs.services }} > /tmp/pull.log 2>&1 ; echo $? > /tmp/pull.status ) &
+    - name: Start the stack on clean volumes and wait for health
+      shell: bash
+      working-directory: infrastructure/docker
+      run: |
+        for i in $(seq 1 60); do [ -f /tmp/pull.status ] && break; sleep 2; done
+        cat /tmp/pull.log 2>/dev/null || true
+        compose="docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env"
+        # Repository policy allows only GitHub-owned actions, so images are built by compose itself (no buildx/bake cache action).
+        $compose up -d --build --wait ${{ inputs.services }}
+        $compose ps

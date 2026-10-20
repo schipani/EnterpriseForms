@@ -58,6 +58,40 @@ public static class FieldValueCodec
         return row;
     }
 
+    /// <summary>A multi-select dropdown stores one row per selected option (wire value: option keys joined by comma).</summary>
+    public static bool IsMultiSelect(FieldDefinition field) =>
+        field.FieldDataType == FieldDataTypes.Option && field.OptionSelectionMode == OptionSelectionModes.Multiple;
+
+    /// <summary>One typed row per selected option of a multi-select field; every key must name an active option of the field and appear once.</summary>
+    public static List<FieldValueRowBase> CreateSelectionRows(FieldDefinition field, LayoutElement? element, IReadOnlyList<FieldOption> options, IReadOnlyList<string> keys, Guid tenantId, Guid formRecordId, DateTimeOffset now, Guid actorUserId, Func<string, Guid>? existingItemIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(keys);
+        var rows = new List<FieldValueRowBase>();
+        foreach (var key in keys)
+        {
+            var itemId = existingItemIds?.Invoke(key) ?? Guid.CreateVersion7();
+            rows.Add(CreateRow(field, element, options, key, tenantId, formRecordId, itemId, now, actorUserId));
+        }
+
+        return rows;
+    }
+
+    /// <summary>Wire value of a field from its stored rows: the single value, or for a multi-select the option keys in the options' display order joined by comma.</summary>
+    public static string FormatField(FieldDefinition field, IEnumerable<FieldValueRowBase> rows, IReadOnlyDictionary<Guid, FieldOption> optionsById, Encryption.IFieldEncryptionService? encryption)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(rows);
+        var wires = rows.Select(r => Format(r, optionsById, encryption)).ToList();
+        if (!IsMultiSelect(field))
+        {
+            return wires.FirstOrDefault() ?? string.Empty;
+        }
+
+        var order = optionsById.Values.Where(o => o.FieldDefinitionId == field.FieldDefinitionId).ToDictionary(o => o.OptionKey, o => (o.OptionSortOrder, o.OptionKey), StringComparer.Ordinal);
+        return string.Join(',', wires.Distinct(StringComparer.Ordinal).OrderBy(k => order.TryGetValue(k, out var o) ? o.OptionSortOrder : int.MaxValue).ThenBy(k => k, StringComparer.Ordinal));
+    }
+
     /// <summary>
     /// Applies the field's storage protection to a validated typed row: an ApplicationEncrypted field stores the
     /// canonical wire string as an AES-GCM envelope (no typed plaintext row is ever persisted for it); a Standard field

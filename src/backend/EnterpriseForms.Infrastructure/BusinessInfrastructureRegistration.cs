@@ -9,6 +9,7 @@ using EnterpriseForms.Application.Features.Documents.UploadSessions;
 using EnterpriseForms.Application.Features.FormDefinitions.CreateFormDefinition;
 using EnterpriseForms.Application.Features.FormDefinitions.FormAccess;
 using EnterpriseForms.Application.Features.FormDesigner;
+using EnterpriseForms.Application.Features.FormDesigner.OptionLists;
 using EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 using EnterpriseForms.Application.Features.FormRecords.GetFormRecord;
 using EnterpriseForms.Application.Features.FormRecords.ListRecords;
@@ -54,6 +55,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<EnsureIdentityProjectionHandler>();
         services.AddSingleton<CreateFormDefinitionHandler>();
         services.AddSingleton<FormDesignerHandlers>();
+        services.AddSingleton<OptionListHandlers>();
         services.AddSingleton<FormAccessHandlers>();
         services.AddSingleton<SecurityPolicyHandlers>();
         services.AddSingleton<CreateFormRecordHandler>();

@@ -187,6 +187,12 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             throw new BusinessException("INVALID_REQUEST", 422, "snake_case field key, display name (max 200) and a supported data type (String, Integer, Decimal, Date, Boolean, Option, File) are required");
         }
 
+        var selectionMode = string.IsNullOrWhiteSpace(request.OptionSelectionMode) ? OptionSelectionModes.Single : request.OptionSelectionMode.Trim();
+        if (selectionMode is not (OptionSelectionModes.Single or OptionSelectionModes.Multiple) || (request.FieldDataType != FieldDataTypes.Option && (selectionMode != OptionSelectionModes.Single || request.OptionListId is not null)))
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, "option selection (Single or Multiple) and a shared option list apply to dropdown (Option) fields only");
+        }
+
         string classification;
         string protectionMode;
         await using (var check = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
@@ -244,13 +250,41 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             LifecycleStatus = "Available",
             CreatedOn = now,
             CreatedByUserId = context.LocalUserId,
+            OptionSelectionMode = selectionMode,
         };
-        scope.AddFieldDefinition(field);
         var options = new List<FieldOption>();
-        if (request.FieldDataType == FieldDataTypes.Option)
+        if (request.FieldDataType == FieldDataTypes.Option && request.OptionListId is { } optionListId)
+        {
+            // Bind a shared list: copy its items (stable ids of their own) so published versions and stored values never depend on later list edits.
+            if (await scope.FindOptionListAsync(context.OrganizationId, optionListId, cancellationToken).ConfigureAwait(false) is not { LifecycleStatus: "Active" })
+            {
+                throw new BusinessException("NOT_FOUND", 404, "option list not found");
+            }
+
+            var items = await scope.GetOptionListItemsAsync(optionListId, cancellationToken).ConfigureAwait(false);
+            if (items.Count == 0)
+            {
+                throw new BusinessException("INVALID_REQUEST", 422, "the option list has no items");
+            }
+
+            field.OptionListId = optionListId;
+            scope.AddFieldDefinition(field);
+            foreach (var item in items)
+            {
+                var option = new FieldOption { FieldOptionId = Guid.CreateVersion7(), FieldDefinitionId = field.FieldDefinitionId, OptionKey = item.OptionKey, OptionDisplayText = item.OptionDisplayText, OptionSortOrder = item.OptionSortOrder, IsActive = item.IsActive, OptionListItemId = item.OptionListItemId, CreatedOn = now, CreatedByUserId = context.LocalUserId, ModifiedOn = now, ModifiedByUserId = context.LocalUserId };
+                scope.AddFieldOption(option);
+                options.Add(option);
+            }
+        }
+        else
+        {
+            scope.AddFieldDefinition(field);
+        }
+
+        if (request.FieldDataType == FieldDataTypes.Option && request.OptionListId is null)
         {
             var requested = request.Options ?? [];
-            if (requested.Count is 0 or > 500 || requested.Select(o => o.OptionKey).Distinct(StringComparer.Ordinal).Count() != requested.Count || requested.Any(o => !KeyPattern().IsMatch(o.OptionKey ?? string.Empty) || string.IsNullOrWhiteSpace(o.OptionDisplayText) || o.OptionDisplayText.Length > 200))
+            if (requested.Count is 0 or > 500 || requested.Select(o => o.OptionKey).Distinct(StringComparer.Ordinal).Count() != requested.Count || requested.Any(o => !KeyPattern().IsMatch(o.OptionKey ?? string.Empty) || string.IsNullOrWhiteSpace(o.OptionDisplayText) || o.OptionDisplayText.Length > 200 || o.OptionDisplayText.Contains('<', StringComparison.Ordinal)))
             {
                 throw new BusinessException("INVALID_REQUEST", 422, "option fields need 1..500 options with unique snake_case keys and display text");
             }
@@ -264,7 +298,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             }
         }
 
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormDraftUpdated, "field definition added", formDefinitionId: formDefinitionId, fieldDefinitionId: field.FieldDefinitionId, metadata: new { fieldKey = field.FieldKey, dataType = field.FieldDataType, classification = field.FieldClassification, protectionMode = field.FieldProtectionMode, authorityCommandId = requirementCommandId });
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormDraftUpdated, "field definition added", formDefinitionId: formDefinitionId, fieldDefinitionId: field.FieldDefinitionId, metadata: new { fieldKey = field.FieldKey, dataType = field.FieldDataType, classification = field.FieldClassification, protectionMode = field.FieldProtectionMode, authorityCommandId = requirementCommandId, optionSelectionMode = field.OptionSelectionMode, optionListId = field.OptionListId });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToFieldResponses([field], options)[0];
     }
@@ -852,6 +886,12 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, fullyEncrypted, progress, fullyPlaintext, legacyEncrypted);
     }
 
+    /// <summary>
+    /// Adds, relabels, reorders or deactivates options of a dropdown field. Option ids and keys are permanent and nothing is
+    /// ever deleted, so stored selections keep pointing at the same option; a deactivated option stays visible (marked) on
+    /// the records that hold it and cannot be chosen for new saves. An option copied from a shared list keeps the list's
+    /// label (use the list to relabel); order and activation remain local to the field.
+    /// </summary>
     public async Task<FieldDefinitionResponse> UpdateOptionsAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, UpdateFieldOptionsRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -866,12 +906,22 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             throw new BusinessException("INVALID_REQUEST", 422, "only option fields have options");
         }
 
-        var existing = (await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).Where(o => o.FieldDefinitionId == fieldDefinitionId).ToList();
-        foreach (var change in request.Changes ?? [])
+        var changes = request.Changes ?? [];
+        if (changes.Count > 500 || changes.GroupBy(c => c.OptionKey, StringComparer.Ordinal).Any(g => g.Count() > 1))
         {
-            if (!KeyPattern().IsMatch(change.OptionKey ?? string.Empty) || string.IsNullOrWhiteSpace(change.OptionDisplayText) || change.OptionDisplayText.Length > 200)
+            throw new BusinessException("INVALID_REQUEST", 422, "at most 500 changes, one per option key");
+        }
+
+        var existing = (await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).Where(o => o.FieldDefinitionId == fieldDefinitionId).ToList();
+        var added = new List<string>();
+        var relabeled = new List<string>();
+        var deactivated = new List<string>();
+        var reactivated = new List<string>();
+        foreach (var change in changes)
+        {
+            if (!KeyPattern().IsMatch(change.OptionKey ?? string.Empty) || string.IsNullOrWhiteSpace(change.OptionDisplayText) || change.OptionDisplayText.Length > 200 || change.OptionDisplayText.Contains('<', StringComparison.Ordinal) || change.OptionSortOrder is < 0 or > 100_000)
             {
-                throw new BusinessException("INVALID_REQUEST", 422, "option key must be snake_case and display text 1..200 chars");
+                throw new BusinessException("INVALID_REQUEST", 422, "option key must be snake_case, display text 1..200 chars without markup and sort order 0..100000");
             }
 
             var option = change.FieldOptionId is { } id ? existing.FirstOrDefault(o => o.FieldOptionId == id) : null;
@@ -882,13 +932,41 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                     throw new BusinessException("INVALID_REQUEST", 422, $"option key '{change.OptionKey}' already exists (keys are immutable)");
                 }
 
+                if (existing.Count >= 500)
+                {
+                    throw new BusinessException("LIMIT_EXCEEDED", 422, "a dropdown may have at most 500 options");
+                }
+
                 option = new FieldOption { FieldOptionId = Guid.CreateVersion7(), FieldDefinitionId = fieldDefinitionId, OptionKey = change.OptionKey!, CreatedOn = now, CreatedByUserId = context.LocalUserId };
                 scope.AddFieldOption(option);
                 existing.Add(option);
+                added.Add(option.OptionKey);
             }
             else if (option.OptionKey != change.OptionKey)
             {
                 throw new BusinessException("INVALID_REQUEST", 422, "option keys are immutable; deactivate and add a new option instead");
+            }
+            else
+            {
+                var newText = change.OptionDisplayText.Trim();
+                if (option.OptionListItemId is not null && !string.Equals(option.OptionDisplayText, newText, StringComparison.Ordinal))
+                {
+                    throw new BusinessException("OPTION_MANAGED_BY_LIST", 422, $"option '{option.OptionKey}' comes from a shared option list; change its label in the list and sync it into the field");
+                }
+
+                if (!string.Equals(option.OptionDisplayText, newText, StringComparison.Ordinal))
+                {
+                    relabeled.Add(option.OptionKey);
+                }
+
+                if (option.IsActive && !change.IsActive)
+                {
+                    deactivated.Add(option.OptionKey);
+                }
+                else if (!option.IsActive && change.IsActive)
+                {
+                    reactivated.Add(option.OptionKey);
+                }
             }
 
             option.OptionDisplayText = change.OptionDisplayText.Trim();
@@ -898,7 +976,70 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             option.ModifiedByUserId = context.LocalUserId;
         }
 
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormDraftUpdated, "field options updated", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, metadata: new { changes = (request.Changes ?? []).Count });
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FieldOptionsChanged, "dropdown options changed (ids and keys unchanged; nothing deleted; stored selections untouched)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, metadata: new { fieldKey = field.FieldKey, changes = changes.Count, added, relabeled, deactivated, reactivated });
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return ToFieldResponses([field], existing)[0];
+    }
+
+    /// <summary>
+    /// Pulls the current state of the field's shared option list into the field: new items are added, labels follow the
+    /// list, and items deactivated in the list are deactivated here. Keys and ids never change, nothing is deleted or
+    /// reactivated, and stored selections are untouched; published versions keep their own option snapshot.
+    /// </summary>
+    public async Task<FieldDefinitionResponse> SyncOptionsFromListAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        var now = clock.GetUtcNow();
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var field = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false) ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
+        if (field.OptionListId is not { } listId)
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, "this field does not use a shared option list");
+        }
+
+        var list = await scope.FindOptionListAsync(context.OrganizationId, listId, cancellationToken).ConfigureAwait(false) ?? throw new BusinessException("NOT_FOUND", 404, "option list not found");
+        var items = await scope.GetOptionListItemsAsync(list.OptionListId, cancellationToken).ConfigureAwait(false);
+        var existing = (await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).Where(o => o.FieldDefinitionId == fieldDefinitionId).ToList();
+        var added = new List<string>();
+        var relabeled = new List<string>();
+        var deactivated = new List<string>();
+        var nextSort = existing.Count == 0 ? 0 : existing.Max(o => o.OptionSortOrder) + 1;
+        foreach (var item in items)
+        {
+            var option = existing.FirstOrDefault(o => o.OptionListItemId == item.OptionListItemId);
+            if (option is null)
+            {
+                option = new FieldOption { FieldOptionId = Guid.CreateVersion7(), FieldDefinitionId = fieldDefinitionId, OptionKey = item.OptionKey, OptionDisplayText = item.OptionDisplayText, OptionSortOrder = nextSort++, IsActive = item.IsActive, OptionListItemId = item.OptionListItemId, CreatedOn = now, CreatedByUserId = context.LocalUserId, ModifiedOn = now, ModifiedByUserId = context.LocalUserId };
+                scope.AddFieldOption(option);
+                existing.Add(option);
+                added.Add(option.OptionKey);
+                continue;
+            }
+
+            var touched = false;
+            if (!string.Equals(option.OptionDisplayText, item.OptionDisplayText, StringComparison.Ordinal))
+            {
+                option.OptionDisplayText = item.OptionDisplayText;
+                relabeled.Add(option.OptionKey);
+                touched = true;
+            }
+
+            if (option.IsActive && !item.IsActive)
+            {
+                option.IsActive = false;
+                deactivated.Add(option.OptionKey);
+                touched = true;
+            }
+
+            if (touched)
+            {
+                option.ModifiedOn = now;
+                option.ModifiedByUserId = context.LocalUserId;
+            }
+        }
+
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FieldOptionsChanged, "dropdown options synchronized from the shared option list", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, metadata: new { fieldKey = field.FieldKey, optionListId = listId, optionListRevision = list.OptionListRevision, added, relabeled, deactivated });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToFieldResponses([field], existing)[0];
     }
@@ -972,7 +1113,8 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         // changes when the catalog name is edited later.
         var catalogFields = (await scope.GetFieldDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(f => f.FieldDefinitionId);
         var catalogRelationships = (await scope.GetRelationshipDefinitionsAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(r => r.FormRelationshipDefinitionId);
-        layout = SnapshotLabels(layout, catalogFields, catalogRelationships);
+        var catalogOptions = (await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.ToList());
+        layout = SnapshotLabels(layout, catalogFields, catalogRelationships, catalogOptions);
         var canonical = FormLayoutCodec.Serialize(layout with { LayoutSchemaVersion = FormLayout.CurrentSchemaVersion });
         var currentVersion = versions.FirstOrDefault(v => v.VersionNumber == currentNumber);
         if (currentVersion is not null && FormLayoutCodec.Serialize(FormLayoutCodec.Parse(currentVersion.LayoutJson)) == canonical)
@@ -1137,6 +1279,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
     {
         var fields = (await scope.GetFieldDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(f => f.FieldDefinitionId);
         var relationships = (await scope.GetRelationshipDefinitionsAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)).ToDictionary(r => r.FormRelationshipDefinitionId);
+        var optionsByField = (await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.ToList());
         foreach (var element in layout.Elements)
         {
             if (element.FieldDefinitionId is { } fieldId)
@@ -1160,7 +1303,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                     FieldDataTypes.DateTime => ["dateTime"],
                     FieldDataTypes.Guid => ["guid"],
                     FieldDataTypes.Boolean => ["checkbox"],
-                    FieldDataTypes.Option => ["select"],
+                    FieldDataTypes.Option => field.OptionSelectionMode == OptionSelectionModes.Multiple ? ["multiselect"] : ["select"],
                     _ => ["fileUpload"],
                 };
                 if (!expectedControls.Contains(element.Control, StringComparer.Ordinal))
@@ -1169,12 +1312,54 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                 }
 
                 ValidateRuleCompatibility(element.Validation, field);
+                ValidateOptionSettings(element, field, optionsByField.GetValueOrDefault(field.FieldDefinitionId) ?? []);
             }
 
             if (element.FormRelationshipDefinitionId is { } relId && !relationships.ContainsKey(relId))
             {
                 throw new BusinessException("LAYOUT_INVALID", 422, "layout references a relationship that does not belong to this form");
             }
+        }
+
+        FormRules.ValidateLayout(layout, fields, optionsByField);
+    }
+
+    /// <summary>Default selections and the options snapshot only make sense for a dropdown: defaults must name active options of the field (at most one for a single-select), and a required dropdown needs something to choose.</summary>
+    public static void ValidateOptionSettings(LayoutElement element, FieldDefinition field, List<FieldOption> options)
+    {
+        if (field.FieldDataType != FieldDataTypes.Option)
+        {
+            if (element.DefaultOptionKeys is { Count: > 0 } || element.Options is not null)
+            {
+                throw new BusinessException("LAYOUT_INVALID", 422, $"'{field.FieldKey}': default selections and option snapshots apply to dropdown fields only");
+            }
+
+            return;
+        }
+
+        var defaults = element.DefaultOptionKeys ?? [];
+        if (defaults.Count > 1 && field.OptionSelectionMode != OptionSelectionModes.Multiple)
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, $"'{field.FieldKey}' is a single-select dropdown; it can have only one default selection");
+        }
+
+        foreach (var key in defaults)
+        {
+            var option = options.FirstOrDefault(o => o.OptionKey == key);
+            if (option is null)
+            {
+                throw new BusinessException("LAYOUT_INVALID", 422, $"'{field.FieldKey}': the default '{key}' is not an option of this field");
+            }
+
+            if (!option.IsActive)
+            {
+                throw new BusinessException("LAYOUT_INVALID", 422, $"'{field.FieldKey}': the default '{key}' is deactivated; choose an active option");
+            }
+        }
+
+        if (element.Validation.Required && !options.Any(o => o.IsActive))
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, $"'{field.FieldKey}' is required but has no active option to choose");
         }
     }
 
@@ -1204,7 +1389,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         }
     }
 
-    internal static FormLayout SnapshotLabels(FormLayout layout, IReadOnlyDictionary<Guid, FieldDefinition> fields, IReadOnlyDictionary<Guid, FormRelationshipDefinition> relationships) =>
+    public static FormLayout SnapshotLabels(FormLayout layout, IReadOnlyDictionary<Guid, FieldDefinition> fields, IReadOnlyDictionary<Guid, FormRelationshipDefinition> relationships, IReadOnlyDictionary<Guid, List<FieldOption>>? options = null) =>
         layout with
         {
             Sections = layout.Sections.Select(section => section with
@@ -1225,9 +1410,17 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                 }).Select(element =>
                 {
                     // The published version declares each field's classification/protection as of publish (ADR-PB-004).
-                    return element.FieldDefinitionId is { } fieldId && fields.TryGetValue(fieldId, out var field)
-                        ? element with { Protection = new LayoutProtection(field.FieldClassification, field.FieldProtectionMode) }
-                        : element;
+                    if (element.FieldDefinitionId is { } fieldId && fields.TryGetValue(fieldId, out var field))
+                    {
+                        var snapshot = element with { Protection = new LayoutProtection(field.FieldClassification, field.FieldProtectionMode) };
+                        // A dropdown's published version carries the options as they were at publish (ids, keys, labels, order,
+                        // availability), so the version renders the same way after the catalog changes.
+                        return field.FieldDataType == FieldDataTypes.Option
+                            ? snapshot with { Options = (options?.GetValueOrDefault(fieldId) ?? []).OrderBy(o => o.OptionSortOrder).ThenBy(o => o.OptionKey, StringComparer.Ordinal).Select(o => new LayoutOption(o.FieldOptionId, o.OptionKey, o.OptionDisplayText.Replace("<", string.Empty, StringComparison.Ordinal).Replace(">", string.Empty, StringComparison.Ordinal), o.OptionSortOrder, o.IsActive)).ToList() }
+                            : snapshot;
+                    }
+
+                    return element;
                 }).ToList(),
             }).ToList(),
         };
@@ -1244,7 +1437,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
     {
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(options);
-        var byField = options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.OrderBy(o => o.OptionSortOrder).ThenBy(o => o.OptionKey, StringComparer.Ordinal).Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive)).ToList());
-        return fields.OrderBy(f => f.FieldKey, StringComparer.Ordinal).Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, byField.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision)).ToList();
+        var byField = options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.OrderBy(o => o.OptionSortOrder).ThenBy(o => o.OptionKey, StringComparer.Ordinal).Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive, o.OptionListItemId)).ToList());
+        return fields.OrderBy(f => f.FieldKey, StringComparer.Ordinal).Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, byField.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision, f.OptionSelectionMode, f.OptionListId)).ToList();
     }
 }

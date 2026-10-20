@@ -48,6 +48,25 @@ public interface IBusinessScope : IAsyncDisposable
 
     void AddFieldOption(FieldOption fieldOption);
 
+    // Shared option lists (Phase C2): tenant-scoped templates copied into fields on bind.
+    Task<List<OptionList>> GetOptionListsAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked lookup (the list is edited through it).</summary>
+    Task<OptionList?> FindOptionListAsync(Guid tenantId, Guid optionListId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked items of one list ordered by sort order then key.</summary>
+    Task<List<OptionListItem>> GetOptionListItemsAsync(Guid optionListId, CancellationToken cancellationToken);
+
+    /// <summary>Items of every listed list (untracked), for the list catalog.</summary>
+    Task<List<OptionListItem>> GetOptionListItemsAsync(IReadOnlyCollection<Guid> optionListIds, CancellationToken cancellationToken);
+
+    /// <summary>How many fields were created from each list (informational, shown to designers).</summary>
+    Task<Dictionary<Guid, int>> CountFieldsPerOptionListAsync(IReadOnlyCollection<Guid> optionListIds, CancellationToken cancellationToken);
+
+    void AddOptionList(OptionList optionList);
+
+    void AddOptionListItem(OptionListItem item);
+
     Task<FormVersion?> FindFormVersionAsync(Guid formVersionId, CancellationToken cancellationToken);
 
     Task<List<FormVersion>> GetFormVersionsAsync(Guid formDefinitionId, CancellationToken cancellationToken);

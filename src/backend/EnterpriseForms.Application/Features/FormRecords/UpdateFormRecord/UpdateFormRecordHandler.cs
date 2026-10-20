@@ -38,7 +38,8 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var now = clock.GetUtcNow();
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var currentValues = verified.AllRows.OfType<FieldValueRowBase>().ToList();
-        var candidateValues = CandidateBuilder.ApplyValues(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, editable, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption);
+        var applied = CandidateBuilder.ApplyValuesDetailed(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, editable, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption);
+        var candidateValues = applied.Rows;
         var rows = new List<ISignedContentRow>(candidateValues);
         rows.AddRange(verified.AllRows.OfType<Domain.Features.Documents.FileAttachmentVersion>().Select(a => CandidateBuilder.CloneAttachment(a)));
 
@@ -54,7 +55,7 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
             }
 
             AuditRecorder.Record(scope, context, clock, AuditCategories.Record, AuditActions.RecordUpdated, "record content revision committed", formRecordId, verified.Definition.FormDefinitionId,
-                metadata: new { contentRevision = accepted.CommittedContentRevision, changedFieldKeys = request.Values.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(), complete = verified.IsComplete });
+                metadata: new { contentRevision = accepted.CommittedContentRevision, changedFieldKeys = request.Values.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(), complete = verified.IsComplete, clearedByRule = applied.ClearedByRuleFieldKeys });
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 

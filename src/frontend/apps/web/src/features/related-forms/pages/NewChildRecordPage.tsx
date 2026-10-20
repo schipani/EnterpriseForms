@@ -1,5 +1,5 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { FormRenderer, tryParseLayout, validateValues, type ValueMap } from "@enterpriseforms/form-renderer";
+import { FormRenderer, initialValues, tryParseLayout, validateValues, type ValueMap } from "@enterpriseforms/form-renderer";
 import { Button, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
@@ -16,7 +16,7 @@ export function NewChildRecordPage() {
   const parent = useQuery({ queryKey: ["records", "projection", formRecordId], queryFn: () => api.records.projection(formRecordId).then((r) => r.result) });
   const relationship = parent.data?.relationships.find((candidate) => candidate.formRelationshipDefinitionId === formRelationshipDefinitionId);
   const childForm = useQuery({ queryKey: ["forms", relationship?.childFormDefinitionId], queryFn: () => api.forms.get(relationship!.childFormDefinitionId).then((r) => r.result), enabled: Boolean(relationship) });
-  const [values, setValues] = useState<ValueMap>({});
+  const [values, setValues] = useState<ValueMap | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const create = useMutation({
     mutationFn: (payload: Record<string, string>) => api.related.create(formRecordId, { formRelationshipDefinitionId, values: payload }).then((r) => r.result),
@@ -47,11 +47,14 @@ export function NewChildRecordPage() {
     return <StatusMessage tone="danger" title="Child layout could not be parsed">{parsed.error}</StatusMessage>;
   }
   const fields = toRendererFields(child.fields);
+  // A new child starts with each dropdown's default selection; the server re-validates whatever is sent.
+  const starting = initialValues(parsed.layout, fields);
+  const current = values ?? starting;
   const submit = () => {
-    const validation = validateValues(parsed.layout, fields, values, "create");
+    const validation = validateValues(parsed.layout, fields, current, "create");
     setErrors(validation);
     if (Object.keys(validation).length === 0) {
-      create.mutate(layoutValues(parsed.layout, fields, values));
+      create.mutate(layoutValues(parsed.layout, fields, current, starting));
     }
   };
   return (
@@ -65,7 +68,7 @@ export function NewChildRecordPage() {
           submit();
         }}
       >
-        <FormRenderer layout={parsed.layout} fields={fields} values={values} errors={errors} onChange={(key, value) => setValues((current) => ({ ...current, [key]: value }))} />
+        <FormRenderer layout={parsed.layout} fields={fields} values={current} errors={errors} onChange={(key, value) => setValues((previous) => ({ ...(previous ?? starting), [key]: value }))} />
         {create.isError ? <ErrorPanel error={create.error} /> : null}
         <div className="flex gap-2">
           <Button type="submit" busy={create.isPending}>

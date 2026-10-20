@@ -1,7 +1,7 @@
 import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
-import { FormRenderer, emptyLayout, serializeLayout, tryParseLayout, type Breakpoint, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
+import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
+import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
 import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { ErrorPanel } from "../../support";
 import { AddFieldDialog, toKey } from "../components/AddFieldDialog";
 import { DesignerInspector, newElementFor, type PlacementTarget } from "../components/DesignerInspector";
 import { EditFieldDialog, type FieldEditSubmission } from "../components/EditFieldDialog";
+import { OptionListsDialog } from "../components/OptionListsDialog";
 import { FormAccessPanel } from "../components/FormAccessPanel";
 import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
 
@@ -82,6 +83,8 @@ export function DesignerPage() {
   const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null);
   const [createAt, setCreateAt] = useState<{ kind: "field" | "documents"; target: PlacementTarget | null } | null>(null);
   const [editFieldId, setEditFieldId] = useState<string | null>(null);
+  const [optionListsOpen, setOptionListsOpen] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<string | undefined>(undefined);
   const [publishOpen, setPublishOpen] = useState(false);
   const [changeReason, setChangeReason] = useState("");
   const [relationshipOpen, setRelationshipOpen] = useState(false);
@@ -271,7 +274,7 @@ export function DesignerPage() {
   }
   const form = detail.data;
   const canDesign = form.summary.canDesign;
-  const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted" }));
+  const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, optionSelectionMode: field.optionSelectionMode, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted" }));
   const relationships = form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }));
   const dirty = layout !== null && serializeLayout(layout) !== baseJson;
   dirtyRef.current = dirty;
@@ -475,6 +478,7 @@ export function DesignerPage() {
             strengthenPending={strengthen.isPending}
             strengthenError={strengthen.error}
             announce={announce}
+            requestedTab={inspectorTab}
           />
         </div>
       </div>
@@ -489,6 +493,9 @@ export function DesignerPage() {
       actions={
         canDesign ? (
           <>
+            <Button size="sm" variant="secondary" onClick={() => setOptionListsOpen(true)}>
+              Option lists
+            </Button>
             <Button size="sm" variant="secondary" onClick={() => setCreateAt({ kind: "documents", target: null })}>
               Add document collection
             </Button>
@@ -508,7 +515,7 @@ export function DesignerPage() {
         columns={[
           { key: "name", header: "Field", isRowHeader: true, render: (row) => row.fieldDisplayName },
           { key: "key", header: "Key", render: (row) => <code>{row.fieldKey}</code> },
-          { key: "type", header: "Type", render: (row) => row.fieldDataType },
+          { key: "type", header: "Type", render: (row) => (row.fieldDataType === "Option" ? (row.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : row.fieldDataType) },
           { key: "placement", header: "Section", render: (row) => sectionNameOf(row.fieldDefinitionId) ?? <span className="text-muted">Not placed</span> },
           { key: "protection", header: "Protection", render: (row) => (row.fieldProtectionMode === "ApplicationEncrypted" ? <Badge tone="success">{row.fieldClassification} · Encrypted</Badge> : <Badge tone="warning">{row.fieldClassification} · Plaintext</Badge>) },
           { key: "options", header: "Options", render: (row) => (row.options.length === 0 ? "" : row.options.map((option) => `${option.optionDisplayText}${option.isActive ? "" : " (inactive)"}`).join(", ")) },
@@ -564,7 +571,7 @@ export function DesignerPage() {
   const views: Array<{ value: View; label: ReactNode; icon: ReactNode; content: ReactNode }> = [
     { value: "design", label: "Design", icon: <NavIcon d="M4 20h4L18.5 9.5a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" />, content: designView },
     { value: "fields", label: <>Fields <Count n={form.fields.length} /></>, icon: <NavIcon d="M3 5h18v14H3zM3 10h18M3 15h18M9 5v14" />, content: fieldsView },
-    { value: "rules", label: "Rules", icon: <NavIcon d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" />, content: <RulesView /> },
+    { value: "rules", label: "Rules", icon: <NavIcon d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" />, content: layout ? <RulesView layout={layout} fields={form.fields} onEdit={(key) => { setInspectorTab("rules"); setSelection({ kind: "element", key }); setPane("properties"); setView("design"); }} /> : <LoadingBlock /> },
     {
       value: "preview",
       label: "Preview",
@@ -767,6 +774,7 @@ export function DesignerPage() {
           strengthenError={strengthen.error}
         />
       ) : null}
+      {optionListsOpen ? <OptionListsDialog open onOpenChange={setOptionListsOpen} canDesign={canDesign} /> : null}
       {createAt ? (
         <AddFieldDialog
           kind={createAt.kind}
@@ -856,7 +864,8 @@ function readCollapsed(formDefinitionId: string): Set<string> {
 
 function PreviewView({ layout, fields }: { layout: FormLayout; fields: RendererField[] }) {
   const [breakpoint, setBreakpoint] = useState<Breakpoint>("desktop");
-  const [values, setValues] = useState<Record<string, string>>({});
+  // A new record starts with each dropdown's default selection; everything else is synthetic input.
+  const [values, setValues] = useState<Record<string, string>>(() => initialValues(layout, fields));
   const width = breakpoint === "phone" ? "max-w-[320px]" : breakpoint === "tablet" ? "max-w-[768px]" : "max-w-full";
   return (
     <Card
@@ -871,7 +880,7 @@ function PreviewView({ layout, fields }: { layout: FormLayout; fields: RendererF
         </div>
       }
     >
-      <p className="text-sm text-muted">The draft as people will see it, with the same renderer the record page uses. Synthetic values only — nothing typed here is saved.</p>
+      <p className="text-sm text-muted">The draft as people will see it in the data-entry form, with the same renderer the record page uses. Fields marked Not in form are left out. Type synthetic values to try the visibility and required-if rules; nothing typed here is saved.</p>
       <div className={`w-full ${width} rounded border border-dashed border-input bg-page p-3`}>
         <FormRenderer
           layout={layout}
@@ -896,12 +905,34 @@ function PreviewSlot({ label, detail }: { label: string; detail: string }) {
   );
 }
 
-function RulesView() {
+function RulesView({ layout, fields, onEdit }: { layout: FormLayout; fields: readonly FieldDefinitionResponse[]; onEdit: (elementKey: string) => void }) {
+  const sources = new Map(fields.map((field) => [field.fieldDefinitionId, { fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDataType: field.fieldDataType, optionSelectionMode: field.optionSelectionMode, fieldDisplayName: field.fieldDisplayName }]));
+  const optionLabel = (fieldId: string, key: string) => fields.find((field) => field.fieldDefinitionId === fieldId)?.options.find((option) => option.optionKey === key)?.optionDisplayText ?? key;
+  const rows = layout.sections
+    .flatMap((section) => section.elements.map((element) => ({ section, element })))
+    .filter((entry): entry is { section: FormLayout["sections"][number]; element: FieldElement } => entry.element.kind === "field" && (entry.element.visibleWhen !== undefined || entry.element.requiredWhen !== undefined || entry.element.readOnly === true || entry.element.showInForm === false));
+  const cycle = findRuleCycle(layout);
   return (
-    <Card title="Rules">
-      <StatusMessage tone="info" title="Conditional rules are not yet available">
-        Conditional visibility and required-if rules are specified (CLAUDE.md §4, declarative allow-listed operators evaluated on client and server) but are not yet implemented in the layout schema or the server. Nothing can be configured here yet; this view will list the rule graph with cycle detection once backend support exists.
-      </StatusMessage>
+    <Card title="Rules and field behavior">
+      <p className="text-sm text-muted">Every field with a condition, Read-only or Not-in-form setting in the draft. Select a row to edit it in the Rules tab of the field properties; there is no separate rules editor.</p>
+      {cycle ? (
+        <StatusMessage tone="danger" title="Circular rule dependency">
+          {cycle.map((id) => fields.find((field) => field.fieldDefinitionId === id)?.fieldDisplayName ?? id).join(" → ")}. The draft cannot be saved until the loop is removed.
+        </StatusMessage>
+      ) : null}
+      <DataTable
+        caption="Fields with rules or behavior settings"
+        rowKey={(row) => row.element.fieldDefinitionId}
+        rows={rows}
+        emptyMessage="No field has a rule yet. Select a field on the Design canvas and open its Rules tab."
+        columns={[
+          { key: "field", header: "Field", isRowHeader: true, render: (row) => row.element.label || (fields.find((field) => field.fieldDefinitionId === row.element.fieldDefinitionId)?.fieldDisplayName ?? "Unknown field") },
+          { key: "visible", header: "Shown when", render: (row) => (row.element.visibleWhen ? describeCondition(row.element.visibleWhen, sources, optionLabel) : <span className="text-muted">Always</span>) },
+          { key: "required", header: "Required", render: (row) => (row.element.required ? "Always" : row.element.requiredWhen ? `When ${describeCondition(row.element.requiredWhen, sources, optionLabel)}` : <span className="text-muted">No</span>) },
+          { key: "flags", header: "Behavior", render: (row) => [row.element.readOnly ? "Read-only" : null, row.element.showInForm === false ? "Not in form" : null, row.element.clearWhenHidden ? "Clears when hidden" : null].filter(Boolean).join(", ") || <span className="text-muted">Standard</span> },
+          { key: "actions", header: "Actions", isActions: true, render: (row) => <Button size="sm" variant="secondary" aria-label={`Edit rules of ${row.element.label || "field"}`} onClick={() => onEdit(elementKey(row.element))}>Edit rules</Button> },
+        ]}
+      />
     </Card>
   );
 }

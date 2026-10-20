@@ -46,9 +46,14 @@ public sealed class CreateShareHandler(IBusinessStore store, IAuthorizationAutho
                 throw new BusinessException("INVALID_REQUEST", 422, $"unknown field key '{key}'");
             }
 
-            var value = values.FirstOrDefault(v => v.FieldDefinitionId == field.FieldDefinitionId)
-                        ?? throw new BusinessException("INVALID_REQUEST", 422, $"field '{key}' has no persisted value to share");
-            items.Add((field.FieldDefinitionId, value.FieldValueItemId));
+            // A multi-select dropdown holds one row (item) per selected option: sharing the field shares every current selection.
+            var fieldRows = values.Where(v => v.FieldDefinitionId == field.FieldDefinitionId).ToList();
+            if (fieldRows.Count == 0)
+            {
+                throw new BusinessException("INVALID_REQUEST", 422, $"field '{key}' has no persisted value to share");
+            }
+
+            items.AddRange(fieldRows.Select(r => (field.FieldDefinitionId, r.FieldValueItemId)));
         }
 
         var recordShareId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "share");

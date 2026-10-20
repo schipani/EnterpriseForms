@@ -46,6 +46,12 @@ export type FormAccessResponse = S["FormAccessResponse"];
 export type FormAccessSubjectResponse = S["FormAccessSubjectResponse"];
 export type DirectoryTeamResponse = S["DirectoryTeamResponse"];
 export type UpdateFieldOptionsRequest = S["UpdateFieldOptionsRequest"];
+export type FieldOptionChange = S["FieldOptionChange"];
+export type OptionListResponse = S["OptionListResponse"];
+export type OptionListItemResponse = S["OptionListItemResponse"];
+export type CreateOptionListRequest = S["CreateOptionListRequest"];
+export type UpdateOptionListRequest = S["UpdateOptionListRequest"];
+export type OptionListItemChange = S["OptionListItemChange"];
 export type SaveDraftRequest = S["SaveDraftRequest"];
 export type PublishFormRequest = S["PublishFormRequest"];
 export type RestoreVersionRequest = S["RestoreVersionRequest"];
@@ -129,11 +135,17 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       access: (formDefinitionId: string, signal?: AbortSignal) => read<FormAccessResponse>("forms.access", { formDefinitionId }, undefined, "interactive-read", signal),
       updateAccess: (formDefinitionId: string, request: UpdateFormAccessRequest) => write<FormAccessResponse>("POST", "forms.updateAccess", { formDefinitionId }, request, { idempotent: true, resourceKey: `form-access:${formDefinitionId}` }),
       updateOptions: (formDefinitionId: string, fieldDefinitionId: string, request: UpdateFieldOptionsRequest) => write<FieldDefinitionResponse>("PUT", "forms.updateOptions", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      syncOptions: (formDefinitionId: string, fieldDefinitionId: string) => write<FieldDefinitionResponse>("POST", "forms.syncOptions", { formDefinitionId, fieldDefinitionId }, {}, { resourceKey: `form:${formDefinitionId}` }),
       saveDraft: (formDefinitionId: string, request: SaveDraftRequest) => write<FormDraftResponse>("PUT", "forms.saveDraft", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       publish: (formDefinitionId: string, request: PublishFormRequest) => write<FormVersionResponse>("POST", "forms.publish", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       restoreDraft: (formDefinitionId: string, request: RestoreVersionRequest) => write<FormDraftResponse>("POST", "forms.restoreDraft", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       versions: (formDefinitionId: string, signal?: AbortSignal) => read<FormVersionResponse[]>("forms.versions", { formDefinitionId }, undefined, "interactive-read", signal),
       createRelationship: (formDefinitionId: string, request: CreateRelationshipDefinitionRequest) => write<RelationshipDefinitionResponse>("POST", "forms.createRelationship", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+    },
+    optionLists: {
+      list: (signal?: AbortSignal) => read<OptionListResponse[]>("optionLists.list", undefined, undefined, "interactive-read", signal),
+      create: (request: CreateOptionListRequest) => write<OptionListResponse>("POST", "optionLists.create", undefined, request, { resourceKey: "option-lists" }),
+      update: (optionListId: string, request: UpdateOptionListRequest) => write<OptionListResponse>("PUT", "optionLists.update", { optionListId }, request, { resourceKey: `option-list:${optionListId}` }),
     },
     records: {
       list: (query: { formDefinitionId?: string; includeChildren?: boolean; pageSize?: number; continuationToken?: string }, signal?: AbortSignal) => read<RecordListResponse>("records.list", undefined, query, "interactive-read", signal),

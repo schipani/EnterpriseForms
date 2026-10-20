@@ -4,6 +4,8 @@ import { CONTROLS_BY_TYPE, type DocumentElement, type FieldDataType, type FieldE
 import { Badge, Button, Checkbox, Select, StatusMessage, Tabs, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useState, type ReactNode } from "react";
 import { CurrentProtectionSection } from "./FieldSecuritySection";
+import { OptionsEditor } from "./OptionsEditor";
+import { RulesTab } from "./RulesTab";
 
 export interface PlacementTarget {
   sectionKey: string;
@@ -35,6 +37,8 @@ export interface DesignerInspectorProps {
   strengthenPending: boolean;
   strengthenError: unknown;
   announce: (message: string) => void;
+  /** Tab to open when a field is selected from elsewhere (e.g. the Rules overview). */
+  requestedTab?: string | undefined;
 }
 
 const WIDTH_OPTIONS = [
@@ -44,7 +48,7 @@ const WIDTH_OPTIONS = [
   { value: "4", label: "4 columns (full row)" },
 ];
 
-const TYPE_LABEL: Record<string, string> = { String: "Text (String)", Integer: "Whole number (Integer)", Decimal: "Decimal", Date: "Date", DateTime: "Date and time", Guid: "Identifier (Guid)", Boolean: "Yes/No (Boolean)", Option: "Dropdown (Option)", File: "File (document collection)" };
+const TYPE_LABEL: Record<string, string> = { String: "Text (String)", Integer: "Whole number (Integer)", Decimal: "Decimal", Date: "Date", DateTime: "Date and time", Guid: "Identifier (Guid)", Boolean: "Yes/No (Boolean)", Option: "Dropdown", File: "File (document collection)" };
 
 /**
  * Right-hand inspector (C1 designer rebuild §2): the single place where a selection is edited. A placed field or
@@ -156,7 +160,7 @@ function placementControls({ layout, onChange, onSelect, announce, canDesign }: 
 
 function ElementProperties(props: DesignerInspectorProps & { element: LayoutElement; sectionIndex: number; index: number }) {
   const { element } = props;
-  const [tab, setTab] = useState("general");
+  const [tab, setTab] = useState(props.requestedTab ?? "general");
   if (element.kind === "relatedFormList") {
     return <RelatedListProperties {...props} element={element} tab={tab} setTab={setTab} />;
   }
@@ -194,7 +198,7 @@ function FieldProperties(props: DesignerInspectorProps & { element: FieldElement
   const general = (
     <div className="flex flex-col gap-3">
       <TextInput label="Field label" value={values.label} required maxLength={200} disabled={!canDesign} error={errors.label} onChange={(event) => set("label", event.target.value)} />
-      <TextInput label="Field type" value={TYPE_LABEL[dataType] ?? dataType} readOnly />
+      <TextInput label="Field type" value={dataType === "Option" ? (field.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : (TYPE_LABEL[dataType] ?? dataType)} readOnly />
       <TextArea label="Help text" value={values.helpText} rows={2} maxLength={1000} disabled={!canDesign} error={errors.helpText} onChange={(event) => set("helpText", event.target.value)} />
       {supportsPlaceholder ? (
         <TextInput
@@ -220,6 +224,9 @@ function FieldProperties(props: DesignerInspectorProps & { element: FieldElement
             );
           }}
         />
+      ) : null}
+      {dataType === "Option" && element.kind === "field" ? (
+        <OptionsEditor formDefinitionId={props.formDefinitionId} field={field} element={element} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} />
       ) : null}
       {controls.length > 1 && element.kind === "field" ? (
         <Select label="Control" value={element.control} disabled={!canDesign} options={controls.map((control) => ({ value: control, label: control === "textarea" ? "Multi-line text" : "Single-line text" }))} onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => (current.kind === "field" ? { ...current, control: value as FieldElement["control"] } : current)))} />
@@ -256,7 +263,7 @@ function FieldProperties(props: DesignerInspectorProps & { element: FieldElement
           <TextInput label="Allowed content types" value={values.allowedContentTypes} disabled={!canDesign} helpText="Comma-separated MIME types, e.g. application/pdf, text/plain. Documents already stored are never removed." onChange={(event) => set("allowedContentTypes", event.target.value)} />
         </>
       ) : null}
-      {dataType === "Boolean" || dataType === "Option" || dataType === "Guid" ? <p className="text-sm text-muted">This storage type has no extra constraints beyond Required (General tab) and its type rules, which the server enforces.</p> : null}
+      {dataType === "Boolean" || dataType === "Option" || dataType === "Guid" ? <p className="text-sm text-muted">{dataType === "Option" ? "A dropdown accepts only its active options (the server enforces this on every save). Use Required (General tab) to demand a choice." : "This storage type has no extra constraints beyond Required (General tab) and its type rules, which the server enforces."}</p> : null}
       <p className="text-xs text-muted">Rules apply to new saves after publishing; stored values and documents are never rewritten.</p>
     </div>
   );
@@ -264,7 +271,11 @@ function FieldProperties(props: DesignerInspectorProps & { element: FieldElement
   const items = [
     { value: "general", label: "General", content: general },
     { value: "validation", label: "Validation", content: validation },
-    { value: "rules", label: "Rules", content: <RulesNotice /> },
+    {
+      value: "rules",
+      label: "Rules",
+      content: element.kind === "field" ? <RulesTab layout={layout} element={element} field={field} fields={props.fields} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} /> : <RulesNotice />,
+    },
     {
       value: "security",
       label: "Security & Encryption",
@@ -336,8 +347,8 @@ function RelatedListProperties(props: DesignerInspectorProps & { element: Relate
 
 function RulesNotice() {
   return (
-    <StatusMessage tone="info" title="Conditional rules are not yet available">
-      Conditional visibility and required-if rules are specified (CLAUDE.md §4) but not yet implemented in the layout schema or the server. Nothing on this tab is saved.
+    <StatusMessage tone="info" title="Rules apply to fields">
+      Conditional visibility, required-if, Show in form and Read-only are available on data fields. Document collections and related lists are always shown; their access is decided by authorization.
     </StatusMessage>
   );
 }
@@ -445,10 +456,11 @@ function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; tar
 }
 
 /** The draft element for a newly placed catalog field (documents get a document-collection element with safe upload defaults). */
-export function newElementFor(field: Pick<FieldDefinitionResponse, "fieldDefinitionId" | "fieldDisplayName" | "fieldDataType">, columnSpan: 1 | 2 | 3 | 4): LayoutElement {
+export function newElementFor(field: Pick<FieldDefinitionResponse, "fieldDefinitionId" | "fieldDisplayName" | "fieldDataType"> & { optionSelectionMode?: string | undefined }, columnSpan: 1 | 2 | 3 | 4): LayoutElement {
   if (field.fieldDataType === "File") {
     return { kind: "documentCollection", fieldDefinitionId: field.fieldDefinitionId, label: field.fieldDisplayName, required: false, layout: { columnSpan, startOnNewRow: false }, upload: { allowMultiple: true, maxFiles: 20, maxFileSizeBytes: 50 * 1024 * 1024, allowedContentTypes: ["application/pdf", "image/png", "image/jpeg"] } };
   }
-  const control = CONTROLS_BY_TYPE[field.fieldDataType as FieldDataType]?.[0] ?? "text";
+  // The control of a dropdown follows the field's permanent selection mode: choose-one is a select, choose-several a multiselect.
+  const control = field.fieldDataType === "Option" && field.optionSelectionMode === "Multiple" ? "multiselect" : (CONTROLS_BY_TYPE[field.fieldDataType as FieldDataType]?.[0] ?? "text");
   return { kind: "field", fieldDefinitionId: field.fieldDefinitionId, control, label: field.fieldDisplayName, required: false, layout: { columnSpan, startOnNewRow: false } };
 }

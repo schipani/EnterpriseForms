@@ -487,10 +487,11 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
         else
         {
-            var fieldLeaves = expected.Where(l => l.ManifestItemKindCode == (byte)ManifestItemKind.FieldValue).ToList();
+            // Field-level shares scope value leaves and selection leaves (a plaintext dropdown / multi-select stores one selection leaf per option) by the same field-item edges.
+            var fieldLeaves = expected.Where(l => l.ManifestItemKindCode is (byte)ManifestItemKind.FieldValue or (byte)ManifestItemKind.FieldSelection).ToList();
             var checks = fieldLeaves.Select(l => new SpiceDbCheck(ResourceTypeNames.FieldItem, l.ManifestItemId.ToString("D"), request.RequestedAction == RequestedAction.Edit ? "edit" : "read", ResourceTypeNames.User, subject)).ToList();
             var outcomes = checks.Count == 0 ? [] : await spiceDb.CheckBulkAsync(checks, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
-            authorized = fieldLeaves.Where((_, i) => outcomes[i] == SpiceDbCheckOutcome.Allowed).Select(l => new VerifiedProjectionItem(ManifestItemKind.FieldValue, l.ManifestItemId)).ToList();
+            authorized = fieldLeaves.Where((_, i) => outcomes[i] == SpiceDbCheckOutcome.Allowed).Select(l => new VerifiedProjectionItem((ManifestItemKind)l.ManifestItemKindCode, l.ManifestItemId)).ToList();
         }
 
         var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);

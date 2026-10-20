@@ -933,6 +933,47 @@
         }
       }
     },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/options/sync": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Pulls the shared option list into the field: adds new items, follows labels, deactivates items the list deactivated. Keys and ids never change; nothing is deleted.",
+        "operationId": "SyncFieldOptionsFromList",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions/{formDefinitionId}/versions": {
       "get": {
         "tags": [
@@ -1002,6 +1043,101 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RelationshipDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/option-lists": {
+      "get": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Shared dropdown option lists of the organization (designers only).",
+        "operationId": "ListOptionLists",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OptionListResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Creates a reusable option list; binding it to a field copies its items into the field.",
+        "operationId": "CreateOptionList",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOptionListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/option-lists/{optionListId}": {
+      "put": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Renames a list and adds, relabels, reorders or deactivates its items (expected revision required; keys permanent, nothing deleted). Fields and published versions are unaffected until a field syncs.",
+        "operationId": "UpdateOptionList",
+        "parameters": [
+          {
+            "name": "optionListId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOptionListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionListResponse"
                 }
               }
             }
@@ -2434,6 +2570,19 @@
               "null",
               "string"
             ]
+          },
+          "optionSelectionMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "optionListId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -2898,6 +3047,31 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "CreateOptionListRequest": {
+        "required": [
+          "optionListName",
+          "optionListDescription",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "optionListName": {
+            "type": "string"
+          },
+          "optionListDescription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateFieldOptionRequest"
+            }
           }
         }
       },
@@ -3399,6 +3573,17 @@
             ],
             "format": "int64",
             "default": 1
+          },
+          "optionSelectionMode": {
+            "type": "string",
+            "default": "Single"
+          },
+          "optionListId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -3468,6 +3653,13 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "optionListItemId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -4122,6 +4314,124 @@
           "publishedByUserId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "OptionListItemChange": {
+        "required": [
+          "optionListItemId",
+          "optionKey",
+          "optionDisplayText",
+          "optionSortOrder",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "optionListItemId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "optionKey": {
+            "type": "string"
+          },
+          "optionDisplayText": {
+            "type": "string"
+          },
+          "optionSortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OptionListItemResponse": {
+        "required": [
+          "optionListItemId",
+          "optionKey",
+          "optionDisplayText",
+          "optionSortOrder",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "optionListItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "optionKey": {
+            "type": "string"
+          },
+          "optionDisplayText": {
+            "type": "string"
+          },
+          "optionSortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OptionListResponse": {
+        "required": [
+          "optionListId",
+          "optionListName",
+          "optionListDescription",
+          "lifecycleStatus",
+          "optionListRevision",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "optionListId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "optionListName": {
+            "type": "string"
+          },
+          "optionListDescription": {
+            "type": "string"
+          },
+          "lifecycleStatus": {
+            "type": "string"
+          },
+          "optionListRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionListItemResponse"
+            }
+          },
+          "boundFieldCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
           }
         }
       },
@@ -5096,6 +5406,43 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
+            }
+          }
+        }
+      },
+      "UpdateOptionListRequest": {
+        "required": [
+          "expectedOptionListRevision",
+          "optionListName",
+          "optionListDescription",
+          "changes"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedOptionListRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "optionListName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "optionListDescription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionListItemChange"
             }
           }
         }

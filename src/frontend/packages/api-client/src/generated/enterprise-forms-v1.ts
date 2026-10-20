@@ -396,6 +396,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/options/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pulls the shared option list into the field: adds new items, follows labels, deactivates items the list deactivated. Keys and ids never change; nothing is deleted. */
+        post: operations["SyncFieldOptionsFromList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/{formDefinitionId}/versions": {
         parameters: {
             query?: never;
@@ -423,6 +440,41 @@ export interface paths {
         put?: never;
         /** Defines a reusable related-form list (e.g. AccusedAddressList): parent → child form, bounds, cycle-checked. */
         post: operations["CreateRelationshipDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/option-lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shared dropdown option lists of the organization (designers only). */
+        get: operations["ListOptionLists"];
+        put?: never;
+        /** Creates a reusable option list; binding it to a field copies its items into the field. */
+        post: operations["CreateOptionList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/option-lists/{optionListId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Renames a list and adds, relabels, reorders or deactivates its items (expected revision required; keys permanent, nothing deleted). Fields and published versions are unaffected until a field syncs. */
+        put: operations["UpdateOptionList"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -979,6 +1031,9 @@ export interface components {
             options: null | components["schemas"]["CreateFieldOptionRequest"][];
             fieldClassification?: null | string;
             fieldProtectionMode?: null | string;
+            optionSelectionMode?: null | string;
+            /** Format: uuid */
+            optionListId?: null | string;
         };
         AuditEventResponse: {
             /** Format: uuid */
@@ -1098,6 +1153,11 @@ export interface components {
             };
             /** Format: uuid */
             ownerTeamId?: null | string;
+        };
+        CreateOptionListRequest: {
+            optionListName: string;
+            optionListDescription: null | string;
+            items: components["schemas"]["CreateFieldOptionRequest"][];
         };
         CreateRelationshipDefinitionRequest: {
             /** Format: uuid */
@@ -1237,6 +1297,10 @@ export interface components {
              * @default 1
              */
             protectionPolicyRevision: number | string;
+            /** @default Single */
+            optionSelectionMode: string;
+            /** Format: uuid */
+            optionListId?: null | string;
         };
         FieldOptionChange: {
             /** Format: uuid */
@@ -1255,6 +1319,8 @@ export interface components {
             /** Format: int32 */
             optionSortOrder: number | string;
             isActive: boolean;
+            /** Format: uuid */
+            optionListItemId?: null | string;
         };
         FieldProtectionMigrationResponse: {
             /** Format: uuid */
@@ -1432,6 +1498,39 @@ export interface components {
             publishedOn: string;
             /** Format: uuid */
             publishedByUserId: string;
+        };
+        OptionListItemChange: {
+            /** Format: uuid */
+            optionListItemId: null | string;
+            optionKey: string;
+            optionDisplayText: string;
+            /** Format: int32 */
+            optionSortOrder: number | string;
+            isActive: boolean;
+        };
+        OptionListItemResponse: {
+            /** Format: uuid */
+            optionListItemId: string;
+            optionKey: string;
+            optionDisplayText: string;
+            /** Format: int32 */
+            optionSortOrder: number | string;
+            isActive: boolean;
+        };
+        OptionListResponse: {
+            /** Format: uuid */
+            optionListId: string;
+            optionListName: string;
+            optionListDescription: string;
+            lifecycleStatus: string;
+            /** Format: int64 */
+            optionListRevision: number | string;
+            items: components["schemas"]["OptionListItemResponse"][];
+            /**
+             * Format: int32
+             * @default 0
+             */
+            boundFieldCount: number | string;
         };
         OrganizationSecurityPolicyResponse: {
             minimumFieldClassification: string;
@@ -1675,6 +1774,13 @@ export interface components {
             values: {
                 [key: string]: string;
             };
+        };
+        UpdateOptionListRequest: {
+            /** Format: int64 */
+            expectedOptionListRevision: number | string;
+            optionListName: null | string;
+            optionListDescription: null | string;
+            changes: components["schemas"]["OptionListItemChange"][];
         };
         UpdateOrganizationSecurityPolicyRequest: {
             minimumFieldClassification: string;
@@ -2360,6 +2466,29 @@ export interface operations {
             };
         };
     };
+    SyncFieldOptionsFromList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldDefinitionResponse"];
+                };
+            };
+        };
+    };
     ListFormVersions: {
         parameters: {
             query?: never;
@@ -2404,6 +2533,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RelationshipDefinitionResponse"];
+                };
+            };
+        };
+    };
+    ListOptionLists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionListResponse"][];
+                };
+            };
+        };
+    };
+    CreateOptionList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOptionListRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionListResponse"];
+                };
+            };
+        };
+    };
+    UpdateOptionList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                optionListId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOptionListRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionListResponse"];
                 };
             };
         };
