@@ -1,11 +1,17 @@
 # Runs the developer Level 3 script (scripts/dev/test.ps1 -Level 3) unchanged on a disposable hosted runner, so the script
 # itself is verified end to end in an isolated environment: its own clean security-test stack, SEC-P01..SEC-P12, the Stage B
-# integration tests and every Playwright project, then teardown. Manual dispatch only; synthetic credentials only. It does
-# not replace the security-gate-a / stage-b-integration gates (which remain the required evidence) — it checks the script.
+# integration tests and every Playwright project, then teardown. Runs on manual dispatch and on pull requests that change
+# the script (or this workflow); synthetic credentials only. It does not replace the security-gate-a / stage-b-integration
+# gates (which remain the required evidence) — it checks the script.
 name: level3-script
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/dev/test.ps1
+      - .github/workflows/level3-script.yml
 
 permissions:
   contents: read
