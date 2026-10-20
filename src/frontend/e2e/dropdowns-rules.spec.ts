@@ -27,11 +27,7 @@ async function addOptionField(page: Page, name: string, options: string[], mode:
   const dialog = page.getByRole("dialog", { name: "Add field" });
   await dialog.getByLabel("Display name").fill(name);
   await dialog.getByLabel("Storage type").click();
-  await page.getByRole("option", { name: /^Option$/ }).click();
-  if (mode === "Multiple") {
-    await dialog.getByLabel("Selection").click();
-    await page.getByRole("option", { name: /Multi-select/ }).click();
-  }
+  await page.getByRole("option", { name: mode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)", exact: true }).click();
   await dialog.getByLabel(/Options \(one per line\)/).fill(options.join("\n"));
   await dialog.getByRole("button", { name: "Add field" }).click();
   await expect(dialog).toBeHidden();

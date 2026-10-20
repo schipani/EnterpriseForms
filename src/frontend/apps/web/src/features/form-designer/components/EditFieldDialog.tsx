@@ -53,7 +53,7 @@ export function EditFieldDialog({ field, location, canEdit, pending, error, onSa
     <div className="flex flex-col gap-3">
       <TextInput label="Display label" value={values.label} required maxLength={200} disabled={!canEdit} error={errorFor("label")} helpText="Shown on forms, lists and in this catalog. Changing it never changes the field key." onChange={(event) => set("label", event.target.value)} />
       <TextInput label="Field key" value={field.fieldKey} readOnly helpText="Permanent identifier used by records, searches and integrations. It cannot be renamed: add a new field if you need a different key." />
-      <TextInput label="Storage type" value={isDocuments ? "File (document collection)" : field.fieldDataType} readOnly helpText="Permanent: changing it would reinterpret stored values. Add a new field of the new type and migrate deliberately." />
+      <TextInput label="Storage type" value={isDocuments ? "File (document collection)" : field.fieldDataType === "Option" ? (field.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : field.fieldDataType} readOnly helpText="Permanent: changing it would reinterpret stored values. Add a new field of the new type and migrate deliberately." />
       <TextArea label="Description" value={description} rows={2} maxLength={1000} disabled={!canEdit} onChange={(event) => setDescription(event.target.value)} />
       {location ? (
         <TextInput label="Help text" value={values.helpText} maxLength={1000} disabled={!canEdit} error={errorFor("helpText")} onChange={(event) => set("helpText", event.target.value)} />

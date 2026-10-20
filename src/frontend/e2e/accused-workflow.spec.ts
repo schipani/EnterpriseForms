@@ -26,7 +26,7 @@ async function addField(page: Page, name: string, type: string, options?: string
   const dialog = page.getByRole("dialog", { name: "Add field" });
   await dialog.getByLabel("Display name").fill(name);
   await dialog.getByLabel("Storage type").click();
-  await page.getByRole("option", { name: type === "File" ? /File/ : new RegExp(`^${type}$`) }).click();
+  await page.getByRole("option", { name: type === "File" ? /File/ : type === "Option" ? /^Dropdown \(Single Select\)$/ : new RegExp(`^${type}$`) }).click();
   if (options) {
     await dialog.getByLabel(/Options/).fill(options);
   }

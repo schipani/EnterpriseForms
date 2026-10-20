@@ -515,7 +515,7 @@ export function DesignerPage() {
         columns={[
           { key: "name", header: "Field", isRowHeader: true, render: (row) => row.fieldDisplayName },
           { key: "key", header: "Key", render: (row) => <code>{row.fieldKey}</code> },
-          { key: "type", header: "Type", render: (row) => (row.fieldDataType === "Option" && row.optionSelectionMode === "Multiple" ? "Option (multi-select)" : row.fieldDataType) },
+          { key: "type", header: "Type", render: (row) => (row.fieldDataType === "Option" ? (row.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : row.fieldDataType) },
           { key: "placement", header: "Section", render: (row) => sectionNameOf(row.fieldDefinitionId) ?? <span className="text-muted">Not placed</span> },
           { key: "protection", header: "Protection", render: (row) => (row.fieldProtectionMode === "ApplicationEncrypted" ? <Badge tone="success">{row.fieldClassification} · Encrypted</Badge> : <Badge tone="warning">{row.fieldClassification} · Plaintext</Badge>) },
           { key: "options", header: "Options", render: (row) => (row.options.length === 0 ? "" : row.options.map((option) => `${option.optionDisplayText}${option.isActive ? "" : " (inactive)"}`).join(", ")) },

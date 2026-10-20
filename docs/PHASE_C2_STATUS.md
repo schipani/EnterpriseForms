@@ -15,7 +15,7 @@ Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-05 … C-10**.
 | 3 | Add, edit, reorder, deactivate | Add option, label edit, *Move earlier/later*, *Active* checkbox, *Save options* / *Discard* (`PUT …/fields/{id}/options`). |
 | 4 | Stable ids independent of labels | `FieldOptionId` + immutable `OptionKey`; keys cannot be renamed, options cannot be deleted; values reference the option id. |
 | 5 | Default selections, required | *Default* checkbox per option (stored in the draft layout as `defaultOptionKeys`); *Required* in General. Defaults pre-fill new records only; the server validates what is submitted. |
-| 6 | Reusable lists shared by forms | `option_lists` / `option_list_items` (organization-scoped, revision-guarded); *Fields → Option lists*; *Add field → Option source*. A list is **copied** into the field; changes arrive only through **Sync from list**; published versions are never affected. |
+| 6 | Reusable lists shared by forms | `option_lists` / `option_list_items` (organization-scoped, revision-guarded); *Fields → Option lists*; *Add field → Choices*. A list is **copied** into the field; changes arrive only through **Sync from list**; published versions are never affected. |
 | 7 | Designer Preview and real record create/edit | Same `FormRenderer` everywhere; Preview starts from the defaults. |
 | 8 | Typed storage + integrity | One `field_option_values` row per selection (one `field_encrypted_values` row per selection when the field is encrypted). Each row is its own signed Merkle leaf (`FieldSelection` / `FieldValue`). |
 | 9 | Server-side validation | Unknown, inactive, duplicated and wrong-mode selections are refused atomically (`VALIDATION_FAILED` / `ORGANIZATION_OPTION_DISABLED`). |
@@ -56,22 +56,26 @@ Start the dev stack and the web app exactly as in `README.md` (`docker compose -
 
 **A. Dropdown and multi-select** (as `designer`, then `clerk`)
 
-1. Forms → *New form* (tick the clerk as a form user) → **Fields → Add field**: *Priority*, storage type **Option**, options `Low / Medium / High`. Add a second one: *Topics*, **Option**, *Selection* = **Multi-select**, options `Red / Green / Blue`. (Try *Option source* = a shared list after step 6.)
+1. Forms → *New form* (tick the clerk as a form user) → **Fields → Add field**: *Priority*, type **Dropdown (Single Select)**, options `Low / Medium / High`. Add a second one: *Topics*, type **Dropdown (Multi Select)**, options `Red / Green / Blue`. (Try *Choices → Use Existing List* after step 6.)
 2. **Design** tab → *Add Field* cells → place both → click the **Priority** tile. In the right-hand inspector (General tab) the **Options** section lists the options: add *Urgent*, press **Move Urgent earlier**, relabel *High*, **Save options**; tick **Default** on *Medium*; tick **Required**.
 3. Click **Topics**: tick **Default** on *Red* and *Green*. **Preview** shows *Medium* pre-selected and Red/Green checked.
 4. **Save draft → Publish**. Sign in as `clerk` → *New record* for the form: defaults are pre-filled; choose *High*, tick *Blue*, **Create record** → the record shows the labels; **Edit** → untick *Green* → saved (Revision 2).
 5. As `designer`, open the form's Design view → Topics → untick **Active** on *Blue* → **Save options**. As `clerk`: the record still shows “Red, Blue (no longer available)”; **Edit → Save changes** is refused with a clear message until *Blue* is unticked.
-6. *Fields → Option lists → New list…* creates a reusable list; create a field from it with *Add field → Option source*. Edit the list (relabel, add, deactivate) — the field is unchanged until you open it in the inspector and press **Sync from list**.
+6. *Fields → Option lists → New list…* creates a reusable list; create a field from it with *Add field → Dropdown (…) → Choices → Use Existing List → Existing list*. Edit the list (relabel, add, deactivate) — the field is unchanged until you open it in the inspector and press **Sync from list**.
 
 **B. Conditional rules, Show in form, Read-only** (as `designer`, then `clerk`)
 
-1. New form with fields: *Applicant kind* (Option `Person / Company`), *Company name* (text), *Applicant age* (Integer), *Guardian name* (text), *Intake status* (Option `Draft / Final`), *Reference note* (text). Place them all.
+1. New form with fields: *Applicant kind* (Dropdown (Single Select) `Person / Company`), *Company name* (text), *Applicant age* (Integer), *Guardian name* (text), *Intake status* (Dropdown (Single Select) `Draft / Final`), *Reference note* (text). Place them all.
 2. **Company name** → inspector **Rules** tab → *Show this field only when conditions are met* → field *Applicant kind*, operator *is*, value *Company*. Under **Try it with sample values** pick *Person* → “hidden”; *Company* → “shown”. (General tab: tick **Required** — it applies only while the field is shown.)
 3. **Guardian name** → Rules → *Make this field required when conditions are met* → *Applicant age* *is less than* *18*; try ages 15 and 30 in the sample panel.
 4. **Intake status** → General: **Default** = *Draft*; Rules: **Read-only**. **Reference note** → Rules: untick **Show in form**.
 5. Canvas tiles now carry text badges (*Conditional*, *Required if*, *Read-only*, *Not in form*); the left-nav **Rules** view lists them and opens the same inspector tab. In *Applicant kind* → Rules, the field list never offers *Company name* (it would create a loop).
 6. **Preview**: Company name appears only after choosing *Company*; the read-only status shows *Draft*; the reference note is absent. **Save draft → Publish**.
 7. As `clerk`: *New record* — Company name is absent until *Company* is chosen, then required; an age under 18 demands the guardian; status is a read-only *Draft*. Create it, then **Edit** and switch the kind to *Person*: Company name disappears from the form and from the record page, but the value is **retained** (reopen Edit and choose *Company* again — it is back).
+
+## Follow-up: reusable dropdown list workflow (owner retest)
+
+The Add field dialog now offers **Dropdown (Single Select)** and **Dropdown (Multi Select)** instead of the internal storage name "Option", then *Choices* = **Enter choices for this field** or **Use Existing List** (→ *Existing list*). The field catalog, field properties and edit dialog use the same wording. Covered end to end by `e2e/reusable-dropdown-list.spec.ts` (list "Marital Status" → field from the list → place → Preview → publish → create, save, reopen and edit a record); it **fails on the previous dialog** (the user-facing "Option" type was still exposed) and passes now. Storage, option ids, encryption, authorization and versioning are unchanged. This follow-up changed no backend code, so the integration suites were not re-run; frontend lint/typecheck/vitest (138) and the Playwright specs accused-workflow, dropdowns-rules, designer-ux and reusable-dropdown-list (14 tests) passed against the rebuilt development stack.
 
 ## Verification record
 

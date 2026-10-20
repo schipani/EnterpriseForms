@@ -48,7 +48,7 @@ const WIDTH_OPTIONS = [
   { value: "4", label: "4 columns (full row)" },
 ];
 
-const TYPE_LABEL: Record<string, string> = { String: "Text (String)", Integer: "Whole number (Integer)", Decimal: "Decimal", Date: "Date", DateTime: "Date and time", Guid: "Identifier (Guid)", Boolean: "Yes/No (Boolean)", Option: "Dropdown (Option)", File: "File (document collection)" };
+const TYPE_LABEL: Record<string, string> = { String: "Text (String)", Integer: "Whole number (Integer)", Decimal: "Decimal", Date: "Date", DateTime: "Date and time", Guid: "Identifier (Guid)", Boolean: "Yes/No (Boolean)", Option: "Dropdown", File: "File (document collection)" };
 
 /**
  * Right-hand inspector (C1 designer rebuild §2): the single place where a selection is edited. A placed field or
@@ -198,7 +198,7 @@ function FieldProperties(props: DesignerInspectorProps & { element: FieldElement
   const general = (
     <div className="flex flex-col gap-3">
       <TextInput label="Field label" value={values.label} required maxLength={200} disabled={!canDesign} error={errors.label} onChange={(event) => set("label", event.target.value)} />
-      <TextInput label="Field type" value={TYPE_LABEL[dataType] ?? dataType} readOnly />
+      <TextInput label="Field type" value={dataType === "Option" ? (field.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : (TYPE_LABEL[dataType] ?? dataType)} readOnly />
       <TextArea label="Help text" value={values.helpText} rows={2} maxLength={1000} disabled={!canDesign} error={errors.helpText} onChange={(event) => set("helpText", event.target.value)} />
       {supportsPlaceholder ? (
         <TextInput
