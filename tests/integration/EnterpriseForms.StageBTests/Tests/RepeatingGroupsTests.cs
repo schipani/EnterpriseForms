@@ -248,9 +248,14 @@ public sealed class RepeatingGroupsTests(StageBFixture fixture)
         Assert.Equal("INTEGRITY_VERIFICATION_FAILED", read.ErrorCode);
         Assert.DoesNotContain("Ada", read.Body, StringComparison.Ordinal);
 
-        // (b) Moving a value to the other entry is detected.
+        // (b) Moving a value to the other entry is detected. Ada and Bo both have a person_name row (one per entry is
+        // unique), so a true move must first vacate the destination: delete entry 2's name, then retarget entry 1's name
+        // row onto entry 2's group id. The row's signed bytes include form_record_group_id, so the moved row's stored
+        // signature no longer matches it.
         var moved = await NewRecordAsync();
-        fixture.Stack.AttackerSql($"UPDATE field_option_values v SET form_record_group_id = (SELECT g.form_record_group_id FROM form_record_group_revisions g WHERE g.form_record_id = v.form_record_id AND g.content_change_operation_id = v.content_change_operation_id AND g.form_record_group_id <> v.form_record_group_id LIMIT 1) WHERE v.form_record_id = '{moved:D}' AND v.form_record_group_id IS NOT NULL;");
+        fixture.Stack.AttackerSql(
+            $"DELETE FROM field_encrypted_values WHERE form_record_id = '{moved:D}' AND form_record_group_id = (SELECT form_record_group_id FROM form_record_group_revisions WHERE form_record_id = '{moved:D}' ORDER BY group_sort_order DESC LIMIT 1); " +
+            $"UPDATE field_encrypted_values SET form_record_group_id = (SELECT form_record_group_id FROM form_record_group_revisions WHERE form_record_id = '{moved:D}' ORDER BY group_sort_order DESC LIMIT 1) WHERE form_record_id = '{moved:D}' AND form_record_group_id = (SELECT form_record_group_id FROM form_record_group_revisions WHERE form_record_id = '{moved:D}' ORDER BY group_sort_order ASC LIMIT 1);");
         Assert.Equal(HttpStatusCode.Locked, (await s.ProjectionAsync(s.Clerk, moved)).Status);
 
         // (c) Deleting an entry row is detected (the accepted manifest is complete).
