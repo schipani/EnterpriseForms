@@ -18,6 +18,7 @@ export const ENDPOINTS = {
   "forms.get": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}" },
   "forms.create": { method: "POST", path: "/api/v1/form-definitions/designer" },
   "forms.addField": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields" },
+  "forms.createGroup": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/groups" },
   "forms.updateField": { method: "PATCH", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}" },
   "forms.access": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/access" },
   "forms.protection": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection" },

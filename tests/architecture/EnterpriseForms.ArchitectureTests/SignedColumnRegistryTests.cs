@@ -128,6 +128,18 @@ public sealed class SignedColumnRegistryTests
             "created_on:audit timestamp of the physical copy",
             "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
         }),
+        ["form_record_groups"] = (BusinessSignedSchemas.FormRecordGroupsV1, "form_record_group_revisions", new[]
+        {
+            "form_record_group_revision_id:physical surrogate of the staged copy; the canonical pk is form_record_group_id",
+            "form_record_group_id:bound as the canonical primary key (stable occurrence id)",
+            "content_revision:bound as row_revision",
+            "row_revision:integrity envelope",
+            "row_signature:integrity envelope",
+            "row_signature_key_version:integrity envelope",
+            "row_signature_schema_version:integrity envelope",
+            "created_on:audit timestamp of the physical copy",
+            "created_by_user_id:audit actor of the physical copy; the authority journal is the trusted actor record",
+        }),
         ["file_attachment_versions"] = (BusinessSignedSchemas.FileAttachmentVersionsV1, "file_attachment_versions", new[]
         {
             "file_attachment_version_id:bound as the canonical primary key",

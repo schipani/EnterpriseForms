@@ -22,9 +22,9 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
-        if (request.Values.Count == 0)
+        if (request.Values is null || (request.Values.Count == 0 && (request.Groups is null || request.Groups.Count == 0)))
         {
-            throw new BusinessException("INVALID_REQUEST", 422, "at least one value is required");
+            throw new BusinessException("INVALID_REQUEST", 422, "at least one value or repeating-section change is required");
         }
 
         // The current accepted content must verify before it is used as the base of a new candidate (no building on tampered rows).
@@ -38,10 +38,13 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var now = clock.GetUtcNow();
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var currentValues = verified.AllRows.OfType<FieldValueRowBase>().ToList();
-        var applied = CandidateBuilder.ApplyValuesDetailed(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, editable, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption);
+        var groupInput = new CandidateBuilder.GroupInput(verified.Groups, verified.AllRows.OfType<FormRecordGroupRevision>().ToList(), RecordGroupWrites.From(request.Groups));
+        var applied = CandidateBuilder.ApplyValuesDetailed(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, editable, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption, groups: groupInput);
         var candidateValues = applied.Rows;
         var rows = new List<ISignedContentRow>(candidateValues);
+        rows.AddRange(applied.Occurrences);
         rows.AddRange(verified.AllRows.OfType<Domain.Features.Documents.FileAttachmentVersion>().Select(a => CandidateBuilder.CloneAttachment(a)));
+        CandidateBuilder.EnsureWithinCeiling(rows.Count + 1);
 
         var accepted = await stager.StageAndCommitAsync(context, verified.Head, new RecordCandidateStager.CandidateInput(header, rows), idempotencyKey, cancellationToken).ConfigureAwait(false);
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
@@ -55,7 +58,7 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
             }
 
             AuditRecorder.Record(scope, context, clock, AuditCategories.Record, AuditActions.RecordUpdated, "record content revision committed", formRecordId, verified.Definition.FormDefinitionId,
-                metadata: new { contentRevision = accepted.CommittedContentRevision, changedFieldKeys = request.Values.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(), complete = verified.IsComplete, clearedByRule = applied.ClearedByRuleFieldKeys });
+                metadata: new { contentRevision = accepted.CommittedContentRevision, changedFieldKeys = request.Values.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(), complete = verified.IsComplete, clearedByRule = applied.ClearedByRuleFieldKeys, groupChanges = RecordGroupWrites.AuditOf(applied.GroupChanges) });
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -63,7 +66,8 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var optionsById = verified.OptionsById;
         var released = editable is null ? candidateValues : candidateValues.Where(v => editable.Contains(v.FieldValueItemId)).ToList();
         return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, editable is null,
-            released.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, optionsById, verified.Encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is Domain.Features.FormRecords.FieldEncryptedValue)).ToList(),
-            "Committed(" + accepted.ArchiveState + ")");
+            released.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, optionsById, verified.Encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is Domain.Features.FormRecords.FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
+            "Committed(" + accepted.ArchiveState + ")",
+            editable is null ? RecordGroupProjection.Build(verified.Groups, verified.Layout, applied.Occurrences) : []);
     }
 }

@@ -37,6 +37,35 @@ const ruleSchema = ruleConditionSchema.refine((condition) => ruleShapeProblem(co
 
 const safeText = (max: number) => z.string().max(max).refine((text) => !/[<>]/.test(text), "Angle brackets are not permitted in layout text");
 
+const optionKey = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
+
+/**
+ * Dependent dropdown (Phase C3): this dropdown's choices are filtered by another dropdown's selection. Keys are the
+ * immutable option keys of the two fields; a choice without an entry is available whatever the parent's value.
+ */
+const optionFilter = z
+  .object({
+    parentFieldDefinitionId: z.string().uuid(),
+    parentOptionKeysByOption: z.record(optionKey, z.array(optionKey).max(500)).refine((map) => Object.keys(map).length <= 500, "At most 500 options can be mapped"),
+  })
+  .strict();
+
+/** "Allow multiple entries" (Phase C3): the section places a repeating group; its fields have one value per entry. */
+const repeat = z
+  .object({
+    groupDefinitionId: z.string().uuid(),
+    minOccurrences: z.number().int().min(0).max(50),
+    maxOccurrences: z.number().int().min(1).max(50),
+    allowAdd: z.boolean(),
+    allowRemove: z.boolean(),
+    allowReorder: z.boolean(),
+  })
+  .strict()
+  .refine((value) => value.minOccurrences <= value.maxOccurrences, "The minimum number of entries cannot exceed the maximum")
+  .refine((value) => value.allowAdd || value.minOccurrences >= 1, "When entries cannot be added, the section needs a minimum of at least one entry");
+
+export const REPEAT_CEILING = 50;
+
 const fieldElement = z
   .object({
     kind: z.literal("field"),
@@ -62,6 +91,8 @@ const fieldElement = z
     clearWhenHidden: z.boolean().optional(),
     visibleWhen: ruleSchema.optional(),
     requiredWhen: ruleSchema.optional(),
+    /** Dropdowns: choices filtered by another dropdown's selection (the server refuses combinations the filter does not allow). */
+    optionFilter: optionFilter.optional(),
   })
   .strict();
 const documentElement = z
@@ -99,6 +130,8 @@ export const layoutSectionSchema = z
     title: safeText(200).optional(),
     /** Optional section description (C1 designer rebuild); omitted when absent so older layouts are unchanged. */
     description: safeText(1000).optional(),
+    /** Present when the section allows multiple entries (omitted otherwise, so older layouts are unchanged). */
+    repeat: repeat.optional(),
     gridColumns: z.literal(4).default(4),
     layout: z.object({ columnGap: z.enum(["small", "medium", "large"]).optional(), rowGap: z.enum(["small", "medium", "large"]).optional() }).strict().optional(),
     elements: z.array(layoutElementSchema).max(250),
@@ -117,6 +150,8 @@ export type LayoutPlacement = z.infer<typeof placement>;
 export type LayoutValidation = z.infer<typeof validation>;
 export type LayoutUploadPolicy = z.infer<typeof upload>;
 export type FieldElement = z.infer<typeof fieldElement>;
+export type LayoutOptionFilter = z.infer<typeof optionFilter>;
+export type LayoutRepeat = z.infer<typeof repeat>;
 export type DocumentElement = z.infer<typeof documentElement>;
 export type RelatedElement = z.infer<typeof relatedElement>;
 export type LayoutElement = z.infer<typeof layoutElementSchema>;

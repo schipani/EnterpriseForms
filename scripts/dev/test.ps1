@@ -19,9 +19,10 @@ param(
   [switch]$Full            # Level 1: run the whole vitest suite instead of only changed files
 )
 $ErrorActionPreference = 'Stop'
-$root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
-$docker = Join-Path $root 'infrastructure\docker'
-$web = Join-Path $root 'src\frontend'
+# Forward slashes work on Windows and Linux PowerShell alike (the script also runs on hosted Linux runners: level3-script.yml).
+$root = Resolve-Path (Join-Path $PSScriptRoot '../..')
+$docker = Join-Path $root 'infrastructure/docker'
+$web = Join-Path $root 'src/frontend'
 $compose = @('compose', '-f', 'compose.yaml', '-f', 'compose.security-test.yaml', '--env-file', '.env')
 $timings = [System.Collections.Generic.List[string]]::new()
 

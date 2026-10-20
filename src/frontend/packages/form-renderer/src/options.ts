@@ -1,5 +1,5 @@
 import { splitSelection } from "./rules";
-import type { FieldElement, FormLayout } from "./layout";
+import type { FieldElement, FormLayout, LayoutOptionFilter } from "./layout";
 import type { RendererField } from "./validation";
 
 export interface ChoiceOption {
@@ -7,6 +7,77 @@ export interface ChoiceOption {
   label: string;
   /** Selectable now (the live catalog decides: deactivation takes effect immediately). */
   isActive: boolean;
+  /** Dependent dropdown: false when the parent's current selection does not allow this (stored) choice. */
+  allowedByParent?: boolean | undefined;
+}
+
+/**
+ * Whether a dependent dropdown's option is allowed by the parent's selected keys (mirror of FormRules.DependentOptionViolation):
+ * an option without a mapping is always allowed; a mapped option needs one of its parents selected.
+ */
+export function allowedByParent(filter: LayoutOptionFilter, optionKey: string, parentKeys: readonly string[]): boolean {
+  const allowed = filter.parentOptionKeysByOption[optionKey];
+  return allowed === undefined || allowed.some((key) => parentKeys.includes(key));
+}
+
+/** The first selected key the parent's selection does not allow, or undefined. */
+export function dependentViolation(filter: LayoutOptionFilter, field: Pick<RendererField, "optionSelectionMode">, wire: string, parentWire: string): string | undefined {
+  const parentKeys = splitSelection(parentWire);
+  const keys = field.optionSelectionMode === "Multiple" ? splitSelection(wire) : wire ? [wire] : [];
+  return keys.find((key) => !allowedByParent(filter, key, parentKeys));
+}
+
+/**
+ * Choices of a dependent dropdown for the parent's current selection: choices the parent does not allow are removed, except a
+ * stored selection, which stays visible marked as not available so the person can see what to change (it cannot be saved).
+ */
+export function dependentChoicesFor(element: Pick<FieldElement, "options" | "optionFilter">, field: RendererField, selected: readonly string[], parentWire: string | undefined): ChoiceOption[] {
+  const choices = choicesFor(element, field, selected);
+  const filter = element.optionFilter;
+  if (!filter || parentWire === undefined) {
+    return choices;
+  }
+  const parentKeys = splitSelection(parentWire);
+  return choices
+    .map((choice) => ({ ...choice, allowedByParent: allowedByParent(filter, choice.optionKey, parentKeys) }))
+    .filter((choice) => choice.allowedByParent || selected.includes(choice.optionKey));
+}
+
+/**
+ * After a parent dropdown changes, clears dependent selections that are no longer allowed, following chains (Country →
+ * Province → City). Only children of a changed field are touched: a combination made invalid by a later form version is
+ * left for the person to fix (the server refuses to save it), never cleared behind their back.
+ */
+export function cascadeDependentClears(elements: readonly FieldElement[], fields: readonly RendererField[], values: Readonly<Record<string, string>>, changedFieldKeys: readonly string[]): { values: Record<string, string>; clearedFieldKeys: string[] } {
+  const byId = new Map(fields.map((field) => [field.fieldDefinitionId, field]));
+  const next: Record<string, string> = { ...values };
+  const cleared: string[] = [];
+  const queue = [...changedFieldKeys];
+  const seen = new Set<string>(queue);
+  while (queue.length > 0) {
+    const changedKey = queue.shift()!;
+    for (const element of elements) {
+      const filter = element.optionFilter;
+      const parent = filter ? byId.get(filter.parentFieldDefinitionId) : undefined;
+      const child = byId.get(element.fieldDefinitionId);
+      if (!filter || !parent || !child || parent.fieldKey !== changedKey) {
+        continue;
+      }
+      const wire = next[child.fieldKey] ?? "";
+      if (!wire || dependentViolation(filter, child, wire, next[parent.fieldKey] ?? "") === undefined) {
+        continue;
+      }
+      const parentKeys = splitSelection(next[parent.fieldKey] ?? "");
+      // A multi-select keeps the choices that are still allowed; a single selection is cleared.
+      next[child.fieldKey] = child.optionSelectionMode === "Multiple" ? splitSelection(wire).filter((key) => allowedByParent(filter, key, parentKeys)).join(",") : "";
+      cleared.push(child.fieldKey);
+      if (!seen.has(child.fieldKey)) {
+        seen.add(child.fieldKey);
+        queue.push(child.fieldKey);
+      }
+    }
+  }
+  return { values: next, clearedFieldKeys: cleared };
 }
 
 /**

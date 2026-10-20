@@ -190,3 +190,27 @@ public sealed class FieldOptionValueConfiguration : IEntityTypeConfiguration<Fie
         builder.HasIndex(v => new { v.FieldDefinitionId, v.FieldOptionId, v.FormRecordId }).HasDatabaseName("ix_field_option_values_lookup");
     }
 }
+
+public sealed class FormRecordGroupRevisionConfiguration : IEntityTypeConfiguration<FormRecordGroupRevision>
+{
+    public void Configure(EntityTypeBuilder<FormRecordGroupRevision> builder)
+    {
+        builder.MapSnakeCase("form_record_group_revisions");
+        builder.HasKey(g => g.FormRecordGroupRevisionId);
+        builder.Ignore(g => g.EntityKind).Ignore(g => g.ItemKindCode).Ignore(g => g.ItemId).Ignore(g => g.RowPrimaryKey);
+        // One copy of an occurrence per operation; one position per group and operation.
+        builder.HasIndex(g => new { g.ContentChangeOperationId, g.FormRecordId, g.FormRecordGroupId }).IsUnique().HasDatabaseName("uq_form_record_group_revisions_occurrence");
+        builder.HasIndex(g => new { g.ContentChangeOperationId, g.FormRecordId, g.GroupDefinitionId, g.GroupSortOrder }).IsUnique().HasDatabaseName("uq_form_record_group_revisions_position");
+        builder.HasIndex(g => new { g.FormRecordId, g.ContentChangeOperationId }).HasDatabaseName("ix_form_record_group_revisions_record_operation");
+        builder.HasOne<FormRecord>().WithMany().HasForeignKey(g => g.FormRecordId).HasConstraintName("fk_form_record_group_revisions_record");
+        builder.HasOne<GroupDefinition>().WithMany().HasForeignKey(g => g.GroupDefinitionId).HasConstraintName("fk_form_record_group_revisions_group");
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(g => g.TenantId).HasConstraintName("fk_form_record_group_revisions_tenant");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_form_record_group_revisions_signature_length", "octet_length(row_signature) = 32");
+            t.HasCheckConstraint("ck_form_record_group_revisions_versions_positive", "row_revision >= 1 AND row_signature_key_version >= 1 AND row_signature_schema_version >= 1 AND content_revision >= 1");
+            t.HasCheckConstraint("ck_form_record_group_revisions_sort_order", "group_sort_order >= 0");
+            t.HasCheckConstraint("ck_form_record_group_revisions_no_nesting", "parent_form_record_group_id IS NULL");
+        });
+    }
+}

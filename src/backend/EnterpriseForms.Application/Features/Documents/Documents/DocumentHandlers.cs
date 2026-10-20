@@ -130,6 +130,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var rows = new List<ISignedContentRow>();
         rows.AddRange(verified.AllRows.OfType<FieldValueRowBase>().Select(v => UploadSessionHandlers.CloneValue(v)));
+        rows.AddRange(verified.AllRows.OfType<FormRecordGroupRevision>().Select(g => CandidateBuilder.CloneOccurrence(g)));
         rows.AddRange(verified.AllRows.OfType<FileAttachmentVersion>().Where(a => a.FileAttachmentId != fileAttachmentId).Select(a => CandidateBuilder.CloneAttachment(a)));
         var accepted = await stager.StageAndCommitAsync(context, verified.Head, new RecordCandidateStager.CandidateInput(header, rows), "doc-remove:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
 
@@ -154,7 +155,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true, verified.ToValueResponses(), "Committed(" + accepted.ArchiveState + ")");
+        return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true, verified.ToValueResponses(), "Committed(" + accepted.ArchiveState + ")", RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
     }
 
     private static DocumentSummaryResponse Summary(FileAttachmentVersion a, string lifecycle) =>

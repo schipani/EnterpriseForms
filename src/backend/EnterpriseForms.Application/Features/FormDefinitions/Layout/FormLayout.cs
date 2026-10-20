@@ -24,7 +24,22 @@ public sealed record FormLayout(int LayoutSchemaVersion, string Title, IReadOnly
 /// is optional presentation text, omitted from the serialized layout when absent so layouts written before it existed
 /// serialize byte-for-byte as before.
 /// </summary>
-public sealed record LayoutSection(string SectionKey, string Title, int GridColumns, IReadOnlyList<LayoutElement> Elements, string? Description = null);
+public sealed record LayoutSection(string SectionKey, string Title, int GridColumns, IReadOnlyList<LayoutElement> Elements, string? Description = null, LayoutRepeat? Repeat = null);
+
+/// <summary>
+/// "Allow multiple entries" (Phase C3): the section is the placement of a repeating group. Every field placed in it belongs to
+/// that group (permanently, <c>FieldDefinition.GroupDefinitionId</c>) and has one value per occurrence.
+/// </summary>
+public sealed record LayoutRepeat(Guid GroupDefinitionId, int MinOccurrences, int MaxOccurrences, bool AllowAdd, bool AllowRemove, bool AllowReorder)
+{
+    public const int CeilingOccurrences = 50;
+}
+
+/// <summary>
+/// Dependent dropdown (Phase C3): the choices of this dropdown are filtered by the selected option(s) of another dropdown.
+/// Keys are the immutable option keys of the two fields; a child option without an entry is available for every parent value.
+/// </summary>
+public sealed record LayoutOptionFilter(Guid ParentFieldDefinitionId, IReadOnlyDictionary<string, IReadOnlyList<string>> ParentOptionKeysByOption);
 
 public static class LayoutElementKinds
 {
@@ -73,7 +88,8 @@ public sealed record LayoutElement(
     bool ReadOnly = false,
     bool ClearWhenHidden = false,
     RuleCondition? VisibleWhen = null,
-    RuleCondition? RequiredWhen = null);
+    RuleCondition? RequiredWhen = null,
+    LayoutOptionFilter? OptionFilter = null);
 
 public static class FormLayoutCodec
 {
@@ -162,7 +178,7 @@ public static class FormLayoutCodec
                 }
             }
 
-            sections.Add(new LayoutSection(key, OptionalString(section, "title", 200) ?? key, gridColumns, elements, OptionalString(section, "description", 1000)));
+            sections.Add(new LayoutSection(key, OptionalString(section, "title", 200) ?? key, gridColumns, elements, OptionalString(section, "description", 1000), ParseRepeat(section)));
         }
 
         return new FormLayout(schemaVersion, title, sections);
@@ -180,6 +196,7 @@ public static class FormLayoutCodec
                 sectionKey = s.SectionKey,
                 title = s.Title,
                 description = s.Description,
+                repeat = s.Repeat is null ? null : new { groupDefinitionId = s.Repeat.GroupDefinitionId, minOccurrences = s.Repeat.MinOccurrences, maxOccurrences = s.Repeat.MaxOccurrences, allowAdd = s.Repeat.AllowAdd, allowRemove = s.Repeat.AllowRemove, allowReorder = s.Repeat.AllowReorder },
                 gridColumns = 4,
                 elements = s.Elements.Select(e => new
                 {
@@ -203,6 +220,7 @@ public static class FormLayoutCodec
                     clearWhenHidden = e.ClearWhenHidden ? true : (bool?)null,
                     visibleWhen = e.VisibleWhen is null ? null : FormRulesCodec.ToJson(e.VisibleWhen),
                     requiredWhen = e.RequiredWhen is null ? null : FormRulesCodec.ToJson(e.RequiredWhen),
+                    optionFilter = e.OptionFilter is null ? null : new { parentFieldDefinitionId = e.OptionFilter.ParentFieldDefinitionId, parentOptionKeysByOption = new SortedDictionary<string, string[]>(e.OptionFilter.ParentOptionKeysByOption.ToDictionary(kv => kv.Key, kv => kv.Value.OrderBy(k => k, StringComparer.Ordinal).ToArray()), StringComparer.Ordinal) },
                 }).ToArray(),
             }).ToArray(),
         };
@@ -229,7 +247,7 @@ public static class FormLayoutCodec
 
                 return new LayoutElement(kind, fieldId, null, control, label, help, placement, validation, null, null, ParseProtection(element), OptionalString(element, "placeholder", 200),
                     ParseOptions(element), ParseDefaultOptionKeys(element), OptionalBool(element, "showInForm") ?? true, OptionalBool(element, "readOnly") ?? false, OptionalBool(element, "clearWhenHidden") ?? false,
-                    ParseRule(element, "visibleWhen"), ParseRule(element, "requiredWhen"));
+                    ParseRule(element, "visibleWhen"), ParseRule(element, "requiredWhen"), ParseOptionFilter(element));
             }
 
             case LayoutElementKinds.DocumentCollection:
@@ -252,6 +270,68 @@ public static class FormLayoutCodec
                 throw new BusinessException("LAYOUT_INVALID", 422, $"unknown element kind '{kind}'");
         }
     }
+
+    private static LayoutRepeat? ParseRepeat(JsonElement section)
+    {
+        if (!section.TryGetProperty("repeat", out var repeat) || repeat.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (repeat.ValueKind != JsonValueKind.Object)
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, "repeat must be an object");
+        }
+
+        var min = OptionalInt(repeat, "minOccurrences") ?? 0;
+        var max = OptionalInt(repeat, "maxOccurrences") ?? 10;
+        if (min < 0 || max < 1 || min > max || max > LayoutRepeat.CeilingOccurrences)
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, $"a repeating section needs 0 <= minimum <= maximum <= {LayoutRepeat.CeilingOccurrences} entries");
+        }
+
+        var allowAdd = OptionalBool(repeat, "allowAdd") ?? true;
+        if (!allowAdd && min == 0)
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, "when people cannot add entries, the section needs a minimum of at least one entry (that many are created with the record)");
+        }
+
+        return new LayoutRepeat(RequiredGuid(repeat, "groupDefinitionId"), min, max, allowAdd, OptionalBool(repeat, "allowRemove") ?? true, OptionalBool(repeat, "allowReorder") ?? true);
+    }
+
+    private static LayoutOptionFilter? ParseOptionFilter(JsonElement element)
+    {
+        if (!element.TryGetProperty("optionFilter", out var filter) || filter.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (filter.ValueKind != JsonValueKind.Object || !filter.TryGetProperty("parentOptionKeysByOption", out var map) || map.ValueKind != JsonValueKind.Object)
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, "optionFilter needs a parentFieldDefinitionId and a parentOptionKeysByOption map");
+        }
+
+        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        foreach (var entry in map.EnumerateObject())
+        {
+            if (!KeyRegex.IsMatch(entry.Name) || entry.Value.ValueKind != JsonValueKind.Array || entry.Value.GetArrayLength() > 500
+                || entry.Value.EnumerateArray().Any(k => k.ValueKind != JsonValueKind.String || !KeyRegex.IsMatch(k.GetString()!)))
+            {
+                throw new BusinessException("LAYOUT_INVALID", 422, "optionFilter maps option keys to lists of parent option keys");
+            }
+
+            result[entry.Name] = entry.Value.EnumerateArray().Select(k => k.GetString()!).Distinct(StringComparer.Ordinal).ToList();
+        }
+
+        if (result.Count > 500)
+        {
+            throw new BusinessException("LAYOUT_INVALID", 422, "optionFilter may map at most 500 options");
+        }
+
+        return new LayoutOptionFilter(RequiredGuid(filter, "parentFieldDefinitionId"), result);
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex KeyRegex = new("^[a-z][a-z0-9_]{0,63}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     private static bool? OptionalBool(JsonElement element, string name)
     {

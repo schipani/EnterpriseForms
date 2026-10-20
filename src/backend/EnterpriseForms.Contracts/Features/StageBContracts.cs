@@ -27,7 +27,13 @@ public sealed record DirectoryUserResponse(Guid UserId, string DisplayName);
 
 public sealed record FormDefinitionSummaryResponse(Guid FormDefinitionId, string FormDefinitionName, string FormDefinitionDescription, string LifecycleStatus, int? CurrentVersionNumber, Guid? CurrentFormVersionId, bool HasDraft, bool CanDesign, bool CanCreateRecord, DateTimeOffset ModifiedOn);
 
-public sealed record FieldDefinitionResponse(Guid FieldDefinitionId, string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, string FieldClassification, string LifecycleStatus, IReadOnlyList<FieldOptionResponse> Options, long FieldDefinitionRevision = 1, string FieldProtectionMode = "Standard", long ProtectionPolicyRevision = 1, string OptionSelectionMode = "Single", Guid? OptionListId = null);
+public sealed record FieldDefinitionResponse(Guid FieldDefinitionId, string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, string FieldClassification, string LifecycleStatus, IReadOnlyList<FieldOptionResponse> Options, long FieldDefinitionRevision = 1, string FieldProtectionMode = "Standard", long ProtectionPolicyRevision = 1, string OptionSelectionMode = "Single", Guid? OptionListId = null, Guid? GroupDefinitionId = null);
+
+/// <summary>A repeating group of a form (Phase C3): its fields have one value per entry. Placed by a section with "Allow multiple entries".</summary>
+public sealed record GroupDefinitionResponse(Guid GroupDefinitionId, string GroupKey, string GroupDisplayName, string LifecycleStatus);
+
+/// <summary>Creates the stable group behind a section that allows multiple entries. The key is permanent.</summary>
+public sealed record CreateGroupDefinitionRequest(string GroupKey, string GroupDisplayName);
 
 public sealed record FieldOptionResponse(Guid FieldOptionId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive, Guid? OptionListItemId = null);
 
@@ -42,7 +48,8 @@ public sealed record FormDefinitionDetailResponse(
     IReadOnlyList<FieldDefinitionResponse> Fields,
     FormVersionResponse? CurrentVersion,
     FormDraftResponse? Draft,
-    IReadOnlyList<RelationshipDefinitionResponse> Relationships);
+    IReadOnlyList<RelationshipDefinitionResponse> Relationships,
+    IReadOnlyList<GroupDefinitionResponse>? Groups = null);
 
 public sealed record CreateFormDefinitionV2Request(string FormDefinitionName, string FormDefinitionDescription, IReadOnlyList<Guid> FormUserUserIds, IReadOnlyList<Guid> FormUserTeamIds);
 
@@ -65,7 +72,7 @@ public sealed record FormAccessResponse(Guid FormDefinitionId, long Authorizatio
 public sealed record DirectoryTeamResponse(Guid TeamId, string TeamName);
 
 /// <summary>Classification defaults to Confidential for String/File and Internal otherwise; protection defaults to ApplicationEncrypted for Confidential/Restricted and for String, and may be requested explicitly for Public/Internal. Plaintext requires the organization policy to permit it.</summary>
-public sealed record AddFieldDefinitionRequest(string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, IReadOnlyList<CreateFieldOptionRequest>? Options, string? FieldClassification = null, string? FieldProtectionMode = null, string? OptionSelectionMode = null, Guid? OptionListId = null);
+public sealed record AddFieldDefinitionRequest(string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, IReadOnlyList<CreateFieldOptionRequest>? Options, string? FieldClassification = null, string? FieldProtectionMode = null, string? OptionSelectionMode = null, Guid? OptionListId = null, Guid? GroupDefinitionId = null);
 
 /// <summary>Strengthening only (higher classification and/or Standard → ApplicationEncrypted); a reason is recorded with the audit event.</summary>
 public sealed record StrengthenFieldProtectionRequest(string? TargetClassification, string? TargetProtectionMode, string ChangeReason, long ExpectedProtectionRevision);
@@ -146,7 +153,7 @@ public sealed record RecordProjectionResponse(
 
 public sealed record RecordPermissionsResponse(bool CanRead, bool CanEdit, bool CanManageAccess, bool CanTransferOwnership, bool IsCompleteProjection);
 
-public sealed record CreateChildRecordRequest(Guid FormRelationshipDefinitionId, IReadOnlyDictionary<string, string> Values);
+public sealed record CreateChildRecordRequest(Guid FormRelationshipDefinitionId, IReadOnlyDictionary<string, string> Values, IReadOnlyList<RecordGroupValuesRequest>? Groups = null);
 
 public sealed record ChildRecordListResponse(RelationshipDefinitionResponse Relationship, IReadOnlyList<ChildRecordSummaryResponse> Items, long AuthorizationRevision);
 

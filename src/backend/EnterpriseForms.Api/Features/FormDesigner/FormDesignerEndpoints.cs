@@ -42,6 +42,14 @@ public static class FormDesignerEndpoints
             .WithName("AddFieldDefinition")
             .WithSummary("Adds a stable field identity (storage type immutable after creation).");
 
+        group.MapPost("/{formDefinitionId:guid}/groups", static async Task<Created<GroupDefinitionResponse>> (Guid formDefinitionId, CreateGroupDefinitionRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                var response = await handlers.CreateGroupAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, request, cancellationToken).ConfigureAwait(false);
+                return TypedResults.Created($"{ApiVersions.V1Prefix}/form-definitions/{formDefinitionId:D}", response);
+            })
+            .WithName("CreateGroupDefinition")
+            .WithSummary("Creates the stable repeating group behind a section that allows multiple entries (key permanent).");
+
         group.MapPatch("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}", static async Task<Ok<FieldDefinitionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, UpdateFieldDefinitionRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.UpdateFieldAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
             .WithName("UpdateFieldDefinition")

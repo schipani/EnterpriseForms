@@ -210,6 +210,8 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             rows.Add(converted);
         }
 
+        // Repeating-section entries ride through unchanged (same stable ids and order; the authority's reprotection rules accept a same-row copy).
+        rows.AddRange(snapshot.Rows.OfType<FormRecordGroupRevision>().Select(g => CandidateBuilder.CloneOccurrence(g)));
         rows.AddRange(snapshot.Rows.OfType<FileAttachmentVersion>().Select(a => CandidateBuilder.CloneAttachment(a)));
 
         // 4. Prepare (with the verified current snapshot) → stage → read back → commit, as a reprotection operation.

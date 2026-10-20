@@ -80,6 +80,11 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public void AddFieldOption(FieldOption fieldOption) => context.FieldOptions.Add(fieldOption);
 
+        public Task<List<GroupDefinition>> GetGroupDefinitionsAsync(Guid formDefinitionId, CancellationToken cancellationToken) =>
+            context.GroupDefinitions.AsNoTracking().Where(g => g.FormDefinitionId == formDefinitionId).OrderBy(g => g.GroupKey).ToListAsync(cancellationToken);
+
+        public void AddGroupDefinition(GroupDefinition group) => context.GroupDefinitions.Add(group);
+
         public Task<List<OptionList>> GetOptionListsAsync(Guid tenantId, CancellationToken cancellationToken) =>
             context.OptionLists.AsNoTracking().Where(l => l.TenantId == tenantId).OrderBy(l => l.OptionListName).ToListAsync(cancellationToken);
 
@@ -153,6 +158,7 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                     case FieldBooleanValue v: context.FieldBooleanValues.Add(v); break;
                     case FieldOptionValue v: context.FieldOptionValues.Add(v); break;
                     case FileAttachmentVersion v: context.FileAttachmentVersions.Add(v); break; // per-operation immutable copy (B-05)
+                    case FormRecordGroupRevision g: context.FormRecordGroupRevisions.Add(g); break; // per-operation immutable occurrence copy (Phase C3)
                     default: throw new InvalidOperationException("unsupported signed row type " + row.GetType().Name);
                 }
             }
@@ -173,6 +179,7 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             rows.AddRange(await context.FieldEncryptedValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldBooleanValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FieldOptionValues.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
+            rows.AddRange(await context.FormRecordGroupRevisions.AsNoTracking().Where(g => g.FormRecordId == formRecordId && g.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             rows.AddRange(await context.FileAttachmentVersions.AsNoTracking().Where(v => v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId).ToListAsync(cancellationToken).ConfigureAwait(false));
             return rows.OrderBy(r => r.ItemKindCode).ThenBy(r => r.ItemId).ToList();
         }

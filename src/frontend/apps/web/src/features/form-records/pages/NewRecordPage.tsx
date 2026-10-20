@@ -1,11 +1,11 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { FormRenderer, initialValues, tryParseLayout, validateValues, type ValueMap } from "@enterpriseforms/form-renderer";
+import { FormRenderer, groupPayload, initialGroups, initialValues, tryParseLayout, validateGroups, validateValues, type GroupValueMap, type RecordGroupPayload, type ValueMap } from "@enterpriseforms/form-renderer";
 import { Button, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
-import { layoutValues, toRendererFields } from "../components/recordModel";
+import { layoutValues, toGroupInfos, toRendererFields } from "../components/recordModel";
 
 /** PG-016 create record from the current published version; the creator becomes the owner in the authority. */
 export function NewRecordPage() {
@@ -15,9 +15,17 @@ export function NewRecordPage() {
   const queryClient = useQueryClient();
   const form = useQuery({ queryKey: ["forms", formDefinitionId], queryFn: () => api.forms.get(formDefinitionId).then((r) => r.result) });
   const [values, setValues] = useState<ValueMap | null>(null);
+  const [groups, setGroups] = useState<GroupValueMap | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Repeating sections start with their minimum number of entries (created once, so entries keep their identity while editing).
+  useEffect(() => {
+    const parsedLayout = form.data?.currentVersion ? tryParseLayout(form.data.currentVersion.layoutJson) : null;
+    if (groups === null && form.data && parsedLayout?.ok) {
+      setGroups(initialGroups(parsedLayout.layout, toRendererFields(form.data.fields), toGroupInfos(form.data.groups)));
+    }
+  }, [form.data, groups]);
   const create = useMutation({
-    mutationFn: (payload: Record<string, string>) => api.records.create(formDefinitionId, { values: payload, ownerTeamId: null }).then((r) => r.result),
+    mutationFn: (payload: { values: Record<string, string>; groups: RecordGroupPayload[] }) => api.records.create(formDefinitionId, { values: payload.values, ownerTeamId: null, groups: payload.groups }).then((r) => r.result),
     onSuccess: async (record) => {
       await queryClient.invalidateQueries({ queryKey: ["records"] });
       await navigate({ to: "/app/records/$formRecordId", params: { formRecordId: record.formRecordId } });
@@ -40,11 +48,13 @@ export function NewRecordPage() {
   // A new record starts with each dropdown's default selection; the server re-validates whatever is sent.
   const starting = initialValues(parsed.layout, fields);
   const current = values ?? starting;
+  const infos = toGroupInfos(form.data.groups);
+  const currentGroups = groups ?? {};
   const submit = () => {
-    const validation = validateValues(parsed.layout, fields, current, "create");
+    const validation = { ...validateValues(parsed.layout, fields, current, "create"), ...validateGroups(parsed.layout, fields, current, currentGroups, infos, "create") };
     setErrors(validation);
     if (Object.keys(validation).length === 0) {
-      create.mutate(layoutValues(parsed.layout, fields, current, starting));
+      create.mutate({ values: layoutValues(parsed.layout, fields, current, starting), groups: groupPayload(parsed.layout, fields, current, currentGroups, infos) });
     }
   };
   return (
@@ -63,7 +73,7 @@ export function NewRecordPage() {
             {Object.keys(errors).length} field(s) need attention.
           </StatusMessage>
         ) : null}
-        <FormRenderer layout={parsed.layout} fields={fields} values={current} errors={errors} onChange={(key, value) => setValues((previous) => ({ ...(previous ?? starting), [key]: value }))} renderRelatedList={(element) => <p className="text-sm text-muted">{element.label || "Related records"}: available after the record is created.</p>} renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"}: upload after the record is created.</p>} />
+        <FormRenderer layout={parsed.layout} fields={fields} values={current} errors={errors} groups={currentGroups} groupInfos={infos} onGroupsChange={setGroups} onChange={(key, value) => setValues((previous) => ({ ...(previous ?? starting), [key]: value }))} renderRelatedList={(element) => <p className="text-sm text-muted">{element.label || "Related records"}: available after the record is created.</p>} renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"}: upload after the record is created.</p>} />
         {create.isError ? <ErrorPanel error={create.error} /> : null}
         <div className="flex gap-2">
           <Button type="submit" busy={create.isPending}>

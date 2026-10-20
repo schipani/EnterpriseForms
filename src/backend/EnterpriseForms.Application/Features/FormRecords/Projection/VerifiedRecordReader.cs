@@ -23,7 +23,8 @@ public sealed record VerifiedRecord(
     FormLayout Layout,
     IReadOnlyList<FieldDefinition> Fields,
     IReadOnlyList<FieldOption> Options,
-    Encryption.IFieldEncryptionService Encryption)
+    Encryption.IFieldEncryptionService Encryption,
+    IReadOnlyList<GroupDefinition> Groups)
 {
     public IReadOnlyDictionary<Guid, FieldDefinition> FieldsById => Fields.ToDictionary(f => f.FieldDefinitionId);
 
@@ -33,6 +34,9 @@ public sealed record VerifiedRecord(
 
     public IEnumerable<FileAttachmentVersion> AuthorizedAttachments => AuthorizedRows.OfType<FileAttachmentVersion>();
 
+    /// <summary>Committed repeating-section entries (complete reads only: a partial projection never carries occurrence structure).</summary>
+    public IReadOnlyList<FormRecordGroupRevision> Occurrences => IsComplete ? AllRows.OfType<FormRecordGroupRevision>().ToList() : [];
+
     public bool IsComplete => Verification.IsCompleteProjection;
 
     public string ETag => "\"" + Head.CommittedContentRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-" + (Head.CommittedOperationId?.ToString("N") ?? string.Empty) + "\"";
@@ -41,18 +45,40 @@ public sealed record VerifiedRecord(
     {
         var fields = FieldsById;
         var options = OptionsById;
+        // A partial projection never releases values of repeating sections (they are not field-shareable in V1, C-17).
         return AuthorizedValues
-            .Where(v => fields.ContainsKey(v.FieldDefinitionId))
-            .OrderBy(v => fields[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal)
+            .Where(v => fields.ContainsKey(v.FieldDefinitionId) && (IsComplete || v.FormRecordGroupId is null))
+            .OrderBy(v => v.FormRecordGroupId is null ? 0 : 1)
+            .ThenBy(v => v.FormRecordGroupId)
+            .ThenBy(v => fields[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal)
             .Select(v => new FieldValueResponse(v.FieldDefinitionId, fields[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, options, Encryption), fields[v.FieldDefinitionId].FieldDataType,
                 ApplicationEncrypted: v is FieldEncryptedValue,
-                LegacyPlaintext: v is not FieldEncryptedValue && fields[v.FieldDefinitionId].FieldProtectionMode == FieldProtectionModes.ApplicationEncrypted))
+                LegacyPlaintext: v is not FieldEncryptedValue && fields[v.FieldDefinitionId].FieldProtectionMode == FieldProtectionModes.ApplicationEncrypted,
+                FormRecordGroupId: v.FormRecordGroupId))
             .ToList();
     }
 
     public FormRecordResponse ToRecordResponse(Guid organizationId, string integrityStatus = "Verified") =>
         new(Header.FormRecordId, organizationId, Header.FormDefinitionId, IsComplete ? Header.RecordStatus : "(partial)",
-            Verification.CommittedContentRevision, Verification.CommittedOperationId, Verification.AuthorizationRevision, IsComplete, ToValueResponses(), integrityStatus);
+            Verification.CommittedContentRevision, Verification.CommittedOperationId, Verification.AuthorizationRevision, IsComplete, ToValueResponses(), integrityStatus,
+            IsComplete ? RecordGroupProjection.Build(Groups, Layout, Occurrences) : []);
+}
+
+/// <summary>Occurrence lists of a record for the wire: every repeating section placed in the layout (empty lists included, so a client knows the group key) plus any section no longer placed that still holds entries.</summary>
+public static class RecordGroupProjection
+{
+    public static List<RecordGroupResponse> Build(IReadOnlyList<GroupDefinition> groups, FormLayout layout, IReadOnlyList<FormRecordGroupRevision> occurrences)
+    {
+        ArgumentNullException.ThrowIfNull(groups);
+        ArgumentNullException.ThrowIfNull(layout);
+        ArgumentNullException.ThrowIfNull(occurrences);
+        var placed = layout.Sections.Where(s => s.Repeat is not null).Select(s => s.Repeat!.GroupDefinitionId).ToList();
+        var ids = placed.Concat(occurrences.Select(o => o.GroupDefinitionId).Distinct().OrderBy(id => id)).Distinct().ToList();
+        var byId = groups.ToDictionary(g => g.GroupDefinitionId);
+        return ids.Where(byId.ContainsKey)
+            .Select(id => new RecordGroupResponse(id, byId[id].GroupKey, occurrences.Where(o => o.GroupDefinitionId == id).OrderBy(o => o.GroupSortOrder).ThenBy(o => o.FormRecordGroupId).Select(o => new RecordOccurrenceResponse(o.FormRecordGroupId, o.GroupSortOrder)).ToList()))
+            .ToList();
+    }
 }
 
 /// <summary>
@@ -92,6 +118,7 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
         FormVersion version;
         List<FieldDefinition> fields;
         List<FieldOption> options;
+        List<GroupDefinition> groups;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             definition = await scope.FindFormDefinitionAsync(context.OrganizationId, staged.Header.FormDefinitionId, cancellationToken).ConfigureAwait(false)
@@ -102,8 +129,9 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
                       ?? throw new BusinessException("NOT_FOUND", 404, "form version missing");
             fields = await scope.GetFieldDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             options = await scope.GetFieldOptionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+            groups = await scope.GetGroupDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
         }
 
-        return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption);
+        return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption, groups);
     }
 }

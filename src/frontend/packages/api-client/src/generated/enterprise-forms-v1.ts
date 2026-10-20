@@ -207,6 +207,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates the stable repeating group behind a section that allows multiple entries (key permanent). */
+        post: operations["CreateGroupDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}": {
         parameters: {
             query?: never;
@@ -1034,6 +1051,8 @@ export interface components {
             optionSelectionMode?: null | string;
             /** Format: uuid */
             optionListId?: null | string;
+            /** Format: uuid */
+            groupDefinitionId?: null | string;
         };
         AuditEventResponse: {
             /** Format: uuid */
@@ -1125,6 +1144,7 @@ export interface components {
             values: {
                 [key: string]: string;
             };
+            groups?: null | components["schemas"]["RecordGroupValuesRequest"][];
         };
         CreateFieldOptionRequest: {
             optionKey: string;
@@ -1153,6 +1173,11 @@ export interface components {
             };
             /** Format: uuid */
             ownerTeamId?: null | string;
+            groups?: null | components["schemas"]["RecordGroupValuesRequest"][];
+        };
+        CreateGroupDefinitionRequest: {
+            groupKey: string;
+            groupDisplayName: string;
         };
         CreateOptionListRequest: {
             optionListName: string;
@@ -1301,6 +1326,8 @@ export interface components {
             optionSelectionMode: string;
             /** Format: uuid */
             optionListId?: null | string;
+            /** Format: uuid */
+            groupDefinitionId?: null | string;
         };
         FieldOptionChange: {
             /** Format: uuid */
@@ -1399,6 +1426,8 @@ export interface components {
             applicationEncrypted: boolean;
             /** @default false */
             legacyPlaintext: boolean;
+            /** Format: uuid */
+            formRecordGroupId?: null | string;
         };
         FormAccessResponse: {
             /** Format: uuid */
@@ -1422,6 +1451,7 @@ export interface components {
             currentVersion: null | components["schemas"]["FormVersionResponse"];
             draft: null | components["schemas"]["FormDraftResponse"];
             relationships: components["schemas"]["RelationshipDefinitionResponse"][];
+            groups?: null | components["schemas"]["GroupDefinitionResponse"][];
         };
         FormDefinitionResponse: {
             /** Format: uuid */
@@ -1482,6 +1512,7 @@ export interface components {
             isCompleteProjection: boolean;
             values: components["schemas"]["FieldValueResponse"][];
             integrityStatus: string;
+            groups?: null | components["schemas"]["RecordGroupResponse"][];
         };
         FormVersionResponse: {
             /** Format: uuid */
@@ -1498,6 +1529,13 @@ export interface components {
             publishedOn: string;
             /** Format: uuid */
             publishedByUserId: string;
+        };
+        GroupDefinitionResponse: {
+            /** Format: uuid */
+            groupDefinitionId: string;
+            groupKey: string;
+            groupDisplayName: string;
+            lifecycleStatus: string;
         };
         OptionListItemChange: {
             /** Format: uuid */
@@ -1570,6 +1608,16 @@ export interface components {
             events: components["schemas"]["AuditEventResponse"][];
             trustNote: string;
         };
+        RecordGroupResponse: {
+            /** Format: uuid */
+            groupDefinitionId: string;
+            groupKey: string;
+            occurrences: components["schemas"]["RecordOccurrenceResponse"][];
+        };
+        RecordGroupValuesRequest: {
+            groupKey: string;
+            occurrences: components["schemas"]["RecordOccurrenceValuesRequest"][];
+        };
         RecordListItemResponse: {
             /** Format: uuid */
             formRecordId: string;
@@ -1590,6 +1638,19 @@ export interface components {
             /** Format: int64 */
             authorizationRevision: number | string;
             continuationToken: null | string;
+        };
+        RecordOccurrenceResponse: {
+            /** Format: uuid */
+            formRecordGroupId: string;
+            /** Format: int64 */
+            groupSortOrder: number | string;
+        };
+        RecordOccurrenceValuesRequest: {
+            /** Format: uuid */
+            formRecordGroupId: null | string;
+            values: {
+                [key: string]: string;
+            };
         };
         RecordPermissionsResponse: {
             canRead: boolean;
@@ -1774,6 +1835,7 @@ export interface components {
             values: {
                 [key: string]: string;
             };
+            groups?: null | components["schemas"]["RecordGroupValuesRequest"][];
         };
         UpdateOptionListRequest: {
             /** Format: int64 */
@@ -2124,6 +2186,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FieldDefinitionResponse"];
+                };
+            };
+        };
+    };
+    CreateGroupDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGroupDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDefinitionResponse"];
                 };
             };
         };

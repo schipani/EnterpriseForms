@@ -1,6 +1,6 @@
 import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
+import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findOptionFilterCycle, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, setSectionRepeat, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
 import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
 import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -163,6 +163,28 @@ export function DesignerPage() {
       await invalidate();
     },
   });
+  // "Allow multiple entries": the stable group is created on the server (or an unplaced one reused), then placed in the empty section.
+  const enableRepeat = useMutation({
+    mutationFn: async ({ sectionIndex, existingGroupDefinitionId }: { sectionIndex: number; existingGroupDefinitionId: string | null }) => {
+      if (existingGroupDefinitionId) {
+        return { sectionIndex, groupDefinitionId: existingGroupDefinitionId };
+      }
+      const section = layout!.sections[sectionIndex]!;
+      const title = section.title?.trim() || "Entries";
+      const existingKeys = new Set((detail.data?.groups ?? []).map((group) => group.groupKey));
+      let groupKey = toKey(title) || "entries";
+      for (let n = 2; existingKeys.has(groupKey); n += 1) {
+        groupKey = `${toKey(title) || "entries"}_${n}`.slice(0, 64);
+      }
+      const group = await api.forms.createGroup(formDefinitionId, { groupKey, groupDisplayName: title.slice(0, 200) }).then((r) => r.result);
+      return { sectionIndex, groupDefinitionId: group.groupDefinitionId };
+    },
+    onSuccess: async ({ sectionIndex, groupDefinitionId }) => {
+      setLayoutTracked((current) => (current ? setSectionRepeat(current, sectionIndex, { groupDefinitionId, minOccurrences: 0, maxOccurrences: 10, allowAdd: true, allowRemove: true, allowReorder: true }) : current));
+      announce("The section now allows multiple entries. Create its fields with the Add Field cell.");
+      await invalidate();
+    },
+  });
   const editField = useMutation({
     mutationFn: async ({ fieldId, submission }: { fieldId: string; submission: FieldEditSubmission }) => {
       const field = detail.data!.fields.find((candidate) => candidate.fieldDefinitionId === fieldId)!;
@@ -274,7 +296,7 @@ export function DesignerPage() {
   }
   const form = detail.data;
   const canDesign = form.summary.canDesign;
-  const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, optionSelectionMode: field.optionSelectionMode, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted" }));
+  const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, optionSelectionMode: field.optionSelectionMode, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted", groupDefinitionId: field.groupDefinitionId ?? null }));
   const relationships = form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }));
   const dirty = layout !== null && serializeLayout(layout) !== baseJson;
   dirtyRef.current = dirty;
@@ -479,6 +501,10 @@ export function DesignerPage() {
             strengthenError={strengthen.error}
             announce={announce}
             requestedTab={inspectorTab}
+            groups={form.groups ?? []}
+            onEnableRepeat={(sectionIndex, existingGroupDefinitionId) => enableRepeat.mutate({ sectionIndex, existingGroupDefinitionId })}
+            enableRepeatPending={enableRepeat.isPending}
+            enableRepeatError={enableRepeat.error}
           />
         </div>
       </div>
@@ -778,6 +804,10 @@ export function DesignerPage() {
       {createAt ? (
         <AddFieldDialog
           kind={createAt.kind}
+          group={(() => {
+            const section = createAt.target && layout ? layout.sections.find((candidate) => candidate.sectionKey === createAt.target!.sectionKey) : undefined;
+            return section?.repeat ? { groupDefinitionId: section.repeat.groupDefinitionId, sectionTitle: section.title ?? section.sectionKey } : undefined;
+          })()}
           open
           onOpenChange={(open) => (open ? undefined : setCreateAt(null))}
           pending={addFieldMutation.isPending}
@@ -910,14 +940,20 @@ function RulesView({ layout, fields, onEdit }: { layout: FormLayout; fields: rea
   const optionLabel = (fieldId: string, key: string) => fields.find((field) => field.fieldDefinitionId === fieldId)?.options.find((option) => option.optionKey === key)?.optionDisplayText ?? key;
   const rows = layout.sections
     .flatMap((section) => section.elements.map((element) => ({ section, element })))
-    .filter((entry): entry is { section: FormLayout["sections"][number]; element: FieldElement } => entry.element.kind === "field" && (entry.element.visibleWhen !== undefined || entry.element.requiredWhen !== undefined || entry.element.readOnly === true || entry.element.showInForm === false));
+    .filter((entry): entry is { section: FormLayout["sections"][number]; element: FieldElement } => entry.element.kind === "field" && (entry.element.visibleWhen !== undefined || entry.element.requiredWhen !== undefined || entry.element.readOnly === true || entry.element.showInForm === false || entry.element.optionFilter !== undefined));
   const cycle = findRuleCycle(layout);
+  const filterCycle = findOptionFilterCycle(layout);
   return (
     <Card title="Rules and field behavior">
       <p className="text-sm text-muted">Every field with a condition, Read-only or Not-in-form setting in the draft. Select a row to edit it in the Rules tab of the field properties; there is no separate rules editor.</p>
       {cycle ? (
         <StatusMessage tone="danger" title="Circular rule dependency">
           {cycle.map((id) => fields.find((field) => field.fieldDefinitionId === id)?.fieldDisplayName ?? id).join(" → ")}. The draft cannot be saved until the loop is removed.
+        </StatusMessage>
+      ) : null}
+      {filterCycle ? (
+        <StatusMessage tone="danger" title="Circular dropdown dependency">
+          {filterCycle.map((id) => fields.find((field) => field.fieldDefinitionId === id)?.fieldDisplayName ?? id).join(" → ")}. Dropdowns cannot filter each other in a loop; the draft cannot be saved until it is removed.
         </StatusMessage>
       ) : null}
       <DataTable
@@ -929,7 +965,7 @@ function RulesView({ layout, fields, onEdit }: { layout: FormLayout; fields: rea
           { key: "field", header: "Field", isRowHeader: true, render: (row) => row.element.label || (fields.find((field) => field.fieldDefinitionId === row.element.fieldDefinitionId)?.fieldDisplayName ?? "Unknown field") },
           { key: "visible", header: "Shown when", render: (row) => (row.element.visibleWhen ? describeCondition(row.element.visibleWhen, sources, optionLabel) : <span className="text-muted">Always</span>) },
           { key: "required", header: "Required", render: (row) => (row.element.required ? "Always" : row.element.requiredWhen ? `When ${describeCondition(row.element.requiredWhen, sources, optionLabel)}` : <span className="text-muted">No</span>) },
-          { key: "flags", header: "Behavior", render: (row) => [row.element.readOnly ? "Read-only" : null, row.element.showInForm === false ? "Not in form" : null, row.element.clearWhenHidden ? "Clears when hidden" : null].filter(Boolean).join(", ") || <span className="text-muted">Standard</span> },
+          { key: "flags", header: "Behavior", render: (row) => [row.element.readOnly ? "Read-only" : null, row.element.showInForm === false ? "Not in form" : null, row.element.clearWhenHidden ? "Clears when hidden" : null, row.element.optionFilter ? `Choices depend on ${fields.find((field) => field.fieldDefinitionId === row.element.optionFilter!.parentFieldDefinitionId)?.fieldDisplayName ?? "another dropdown"}` : null, row.section.repeat ? "Per entry" : null].filter(Boolean).join(", ") || <span className="text-muted">Standard</span> },
           { key: "actions", header: "Actions", isActions: true, render: (row) => <Button size="sm" variant="secondary" aria-label={`Edit rules of ${row.element.label || "field"}`} onClick={() => onEdit(elementKey(row.element))}>Edit rules</Button> },
         ]}
       />

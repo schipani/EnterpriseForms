@@ -58,6 +58,11 @@
       "bytes": 15826
     },
     {
+      "path": "docs/PHASE_C3_STATUS.md",
+      "sha256": "23a29c63fd4d26780c23a9486964f350ae66a430204241838d441cd749856355",
+      "bytes": 10500
+    },
+    {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
       "sha256": "94aed64050704da8ec31a90ad594b98345b719ca94a8fa3dc9dd5093211d1fd9",
       "bytes": 3799
@@ -99,13 +104,18 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "24d5f668499732eaac4aa825a1aec5b9a25f176e62860c22d94512f48d5079c3",
-      "bytes": 7895
+      "sha256": "678639951cd8eda27f4caeb2a20f442faa12d0d6b2d88e59d27e965db4102ec6",
+      "bytes": 7982
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
       "sha256": "ba289a52bf305eff68b87a74e690fce323053bfc9a789dd1e935601ba2b25aa7",
       "bytes": 7852
+    },
+    {
+      "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",
+      "sha256": "2da32a5de04325a4fc39fa1ebb4a1d7be96aa52d21acf7a73d0ee27cc7a19713",
+      "bytes": 8247
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -194,8 +204,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "e8eb6c92e952a54c49e7fa925eba32bc7744fd2b787227b509a9584bdcd8a644",
-      "bytes": 14562
+      "sha256": "2895ee48ac046ff5b954b5d98d0bbc5573797d59b845b92e4f54d74f0ba076cb",
+      "bytes": 22580
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -444,8 +454,8 @@
     },
     {
       "path": "scripts/dev/test.ps1",
-      "sha256": "23b046d8b98c62d015c10ea25504dd3170a8b0ff7ab548c08400672942ed6d17",
-      "bytes": 7713
+      "sha256": "3e3ff1cf6ac62affa7a6145bab0d4bb8cff3f84cb5f51fd4e57e6a14f868c748",
+      "bytes": 7841
     },
     {
       "path": "scripts/generate-spec-manifest.py",

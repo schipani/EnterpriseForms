@@ -3,7 +3,6 @@
 #   2. Third-party images are pulled in the background while BuildKit builds the four first-party images.
 #   3. First-party images are built by compose (`up --build`): the repository policy allows only GitHub-owned actions, so the
 #      docker/setup-buildx and docker/bake actions (and their layer cache) are not used; runs are slower, never different.
-#      the missing images itself and the run is slower, never different.
 #   4. `up --wait` starts every service on EMPTY volumes (tmpfs), so each run begins from a clean state.
 name: Start disposable stack
 description: Cached image build plus clean-state docker compose up --wait for the security-test profile

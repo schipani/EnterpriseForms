@@ -1,11 +1,12 @@
-import type { FieldDefinitionResponse, RelationshipDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
-import { applyEditValues, elementKey, findElement, moveElementTo, placedIds, toEditValues, updateElementByKey, updateSection, validateEditValues, type DesignerSelection, type FieldEditValues } from "@enterpriseforms/form-designer";
-import { CONTROLS_BY_TYPE, type DocumentElement, type FieldDataType, type FieldElement, type FormLayout, type LayoutElement, type RelatedElement } from "@enterpriseforms/form-renderer";
+import type { FieldDefinitionResponse, GroupDefinitionResponse, RelationshipDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
+import { applyEditValues, elementKey, findElement, moveElementTo, placedIds, sameScope, setSectionRepeat, toEditValues, updateElementByKey, updateSection, validateEditValues, type DesignerSelection, type FieldEditValues } from "@enterpriseforms/form-designer";
+import { CONTROLS_BY_TYPE, REPEAT_CEILING, type DocumentElement, type FieldDataType, type FieldElement, type FormLayout, type LayoutElement, type LayoutRepeat, type RelatedElement } from "@enterpriseforms/form-renderer";
 import { Badge, Button, Checkbox, Select, StatusMessage, Tabs, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useState, type ReactNode } from "react";
 import { CurrentProtectionSection } from "./FieldSecuritySection";
 import { OptionsEditor } from "./OptionsEditor";
 import { RulesTab } from "./RulesTab";
+import { ErrorPanel } from "../../support";
 
 export interface PlacementTarget {
   sectionKey: string;
@@ -39,6 +40,12 @@ export interface DesignerInspectorProps {
   announce: (message: string) => void;
   /** Tab to open when a field is selected from elsewhere (e.g. the Rules overview). */
   requestedTab?: string | undefined;
+  /** Repeating groups of the form (Phase C3). */
+  groups?: readonly GroupDefinitionResponse[] | undefined;
+  /** "Allow multiple entries" on an empty section: creates a group (or reuses an unplaced one) and places it in the section. */
+  onEnableRepeat?: ((sectionIndex: number, existingGroupDefinitionId: string | null) => void) | undefined;
+  enableRepeatPending?: boolean | undefined;
+  enableRepeatError?: unknown;
 }
 
 const WIDTH_OPTIONS = [
@@ -138,7 +145,8 @@ function placementControls({ layout, onChange, onSelect, announce, canDesign }: 
         label="Section"
         value={section.sectionKey}
         disabled={!canDesign}
-        options={layout.sections.map((candidate) => ({ value: candidate.sectionKey, label: candidate.title?.trim() || candidate.sectionKey }))}
+        options={layout.sections.filter((candidate) => sameScope(candidate, section)).map((candidate) => ({ value: candidate.sectionKey, label: candidate.title?.trim() || candidate.sectionKey }))}
+        helpText={section.repeat ? "Fields of a section that allows multiple entries stay in that section (one value per entry)." : undefined}
         onValueChange={(sectionKey) => {
           const target = layout.sections.findIndex((candidate) => candidate.sectionKey === sectionKey);
           if (target >= 0 && target !== sectionIndex) {
@@ -367,6 +375,7 @@ function SectionProperties(props: DesignerInspectorProps & { sectionIndex: numbe
           Every section uses the standard four-column grid (one column on phones, two on tablets). {section.elements.length === 1 ? "1 item" : `${section.elements.length} items`} placed. Use “+ Add Column” to add another empty placement cell.
         </p>
       </div>
+      <RepeatSettings {...props} sectionIndex={sectionIndex} />
       <Checkbox label="Collapsed in the designer" checked={collapsed} onCheckedChange={() => props.onToggleCollapse(section.sectionKey)} helpText="Designer view only; the form always shows the section." />
       {canDesign ? (
         <div className="flex flex-wrap gap-2">
@@ -377,7 +386,7 @@ function SectionProperties(props: DesignerInspectorProps & { sectionIndex: numbe
             Move section down
           </Button>
           <Button size="sm" variant="secondary" onClick={() => props.onDuplicateSection(sectionIndex)}>
-            Duplicate section
+            {section.repeat ? "Duplicate as a plain section" : "Duplicate section"}
           </Button>
           <Button size="sm" variant="danger" disabled={layout.sections.length <= 1} onClick={() => props.onRequestRemoveSection(sectionIndex)}>
             Remove section…
@@ -388,13 +397,94 @@ function SectionProperties(props: DesignerInspectorProps & { sectionIndex: numbe
   );
 }
 
+/**
+ * "Allow multiple entries" (Phase C3). A section that allows multiple entries holds the fields of one repeating group: each
+ * entry has its own values, and those fields stay in the section for life. It can be switched on or off only while the
+ * section is empty; the entry settings can change at any time and take effect when the version is published.
+ */
+function RepeatSettings(props: DesignerInspectorProps & { sectionIndex: number }) {
+  const { layout, onChange, sectionIndex, canDesign } = props;
+  const section = layout.sections[sectionIndex]!;
+  const repeat = section.repeat;
+  const placedGroups = new Set(layout.sections.flatMap((candidate) => (candidate.repeat ? [candidate.repeat.groupDefinitionId] : [])));
+  const reusable = (props.groups ?? []).filter((group) => !placedGroups.has(group.groupDefinitionId));
+  const [reuse, setReuse] = useState<string>("new");
+  const group = repeat ? props.groups?.find((candidate) => candidate.groupDefinitionId === repeat.groupDefinitionId) : undefined;
+  const update = (patch: Partial<LayoutRepeat>) => repeat && onChange(setSectionRepeat(layout, sectionIndex, { ...repeat, ...patch }));
+  const [minText, setMinText] = useState(String(repeat?.minOccurrences ?? 0));
+  const [maxText, setMaxText] = useState(String(repeat?.maxOccurrences ?? 10));
+  const min = Number(minText);
+  const max = Number(maxText);
+  const boundsError = !/^\d+$/.test(minText) || !/^\d+$/.test(maxText) ? "Enter whole numbers" : max < 1 || max > REPEAT_CEILING ? `The maximum must be between 1 and ${REPEAT_CEILING}` : min > max ? "The minimum cannot exceed the maximum" : repeat && !repeat.allowAdd && min < 1 ? "When entries cannot be added, the minimum must be at least 1" : undefined;
+  const commitBounds = (nextMin: string, nextMax: string) => {
+    setMinText(nextMin);
+    setMaxText(nextMax);
+    const a = Number(nextMin);
+    const b = Number(nextMax);
+    if (/^\d+$/.test(nextMin) && /^\d+$/.test(nextMax) && b >= 1 && b <= REPEAT_CEILING && a <= b && (repeat?.allowAdd !== false || a >= 1)) {
+      update({ minOccurrences: a, maxOccurrences: b });
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2 rounded border border-line p-3" data-repeat-settings>
+      <Checkbox
+        label="Allow multiple entries"
+        checked={repeat !== undefined}
+        disabled={!canDesign || props.enableRepeatPending === true || section.elements.length > 0}
+        helpText={
+          section.elements.length > 0
+            ? repeat
+              ? "Remove the fields from this section before turning this off: they have one value per entry and cannot become record-level fields."
+              : "Only an empty section can allow multiple entries. Add a new section, turn this on, then create its fields."
+            : "People can add several entries to this section (for example several people or vehicles); each entry has its own values."
+        }
+        onCheckedChange={(checked) => {
+          if (checked) {
+            props.onEnableRepeat?.(sectionIndex, reuse === "new" ? null : reuse);
+          } else {
+            onChange(setSectionRepeat(layout, sectionIndex, undefined));
+          }
+        }}
+      />
+      {!repeat && reusable.length > 0 && section.elements.length === 0 ? (
+        <Select label="Entries group" value={reuse} disabled={!canDesign} options={[{ value: "new", label: "A new group" }, ...reusable.map((candidate) => ({ value: candidate.groupDefinitionId, label: `${candidate.groupDisplayName} (existing, not placed)` }))]} onValueChange={setReuse} helpText="Reusing a group brings back its fields and the entries already stored in records." />
+      ) : null}
+      {props.enableRepeatError ? <ErrorPanel error={props.enableRepeatError} /> : null}
+      {repeat ? (
+        <>
+          {group ? <p className="text-xs text-muted">Group key <code>{group.groupKey}</code> (permanent).</p> : null}
+          <div className="grid grid-cols-2 gap-2">
+            <TextInput label="Minimum entries" inputMode="numeric" value={minText} disabled={!canDesign} onChange={(event) => commitBounds(event.target.value.trim(), maxText)} />
+            <TextInput label="Maximum entries" inputMode="numeric" value={maxText} disabled={!canDesign} onChange={(event) => commitBounds(minText, event.target.value.trim())} />
+          </div>
+          {boundsError ? (
+            <p role="alert" className="text-sm font-medium text-[#991b1b]">
+              {boundsError}
+            </p>
+          ) : (
+            <p className="text-xs text-muted">
+              Between {min} and {max} entries. A new record starts with {min} {min === 1 ? "entry" : "entries"}. At most {REPEAT_CEILING}.
+            </p>
+          )}
+          <Checkbox label="People can add entries" checked={repeat.allowAdd} disabled={!canDesign || (!repeat.allowAdd && repeat.minOccurrences < 1)} onCheckedChange={(checked) => (checked || repeat.minOccurrences >= 1 ? update({ allowAdd: checked }) : undefined)} helpText={repeat.minOccurrences < 1 ? "Set a minimum of at least 1 to turn this off (the record then has exactly that many entries)." : undefined} />
+          <Checkbox label="People can remove entries" checked={repeat.allowRemove} disabled={!canDesign} onCheckedChange={(checked) => update({ allowRemove: checked })} />
+          <Checkbox label="People can reorder entries" checked={repeat.allowReorder} disabled={!canDesign} onCheckedChange={(checked) => update({ allowReorder: checked })} />
+          <p className="text-xs text-muted">Each entry keeps a permanent identity through edits and reordering. Entries are part of the record: they are not shared on their own and are not separate records (use a related form list for independent child records such as addresses).</p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; target: PlacementTarget }) {
   const { layout, onChange, sectionIndex, target, fields, relationships, canDesign } = props;
   const section = layout.sections[sectionIndex]!;
   const placed = placedIds(layout);
+  // A section that allows multiple entries offers only its group's fields; every other section only record-level fields.
+  const groupId = section.repeat?.groupDefinitionId ?? null;
   const options = [
-    ...fields.filter((field) => !placed.fieldIds.has(field.fieldDefinitionId)).map((field) => ({ value: `field:${field.fieldDefinitionId}`, label: field.fieldDataType === "File" ? `${field.fieldDisplayName} (documents)` : `${field.fieldDisplayName} (${field.fieldDataType})` })),
-    ...relationships.filter((relationship) => !placed.relationshipIds.has(relationship.formRelationshipDefinitionId)).map((relationship) => ({ value: `relationship:${relationship.formRelationshipDefinitionId}`, label: `${relationship.relationshipDisplayName} (related list)` })),
+    ...fields.filter((field) => !placed.fieldIds.has(field.fieldDefinitionId) && (field.groupDefinitionId ?? null) === groupId).map((field) => ({ value: `field:${field.fieldDefinitionId}`, label: field.fieldDataType === "File" ? `${field.fieldDisplayName} (documents)` : `${field.fieldDisplayName} (${field.fieldDataType})` })),
+    ...(groupId ? [] : relationships.filter((relationship) => !placed.relationshipIds.has(relationship.formRelationshipDefinitionId)).map((relationship) => ({ value: `relationship:${relationship.formRelationshipDefinitionId}`, label: `${relationship.relationshipDisplayName} (related list)` }))),
   ];
   const [choice, setChoice] = useState<string | undefined>(undefined);
   const [width, setWidth] = useState("1");
@@ -441,14 +531,18 @@ function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; tar
         <p className="text-sm font-medium">Or create something new here</p>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={() => props.onCreateAt("field", target)}>
-            New field…
+            {groupId ? "New field for each entry…" : "New field…"}
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => props.onCreateAt("documents", target)}>
-            New document collection…
-          </Button>
-          <Button size="sm" variant="secondary" onClick={props.onOpenRelatedForms}>
-            Related form list…
-          </Button>
+          {groupId ? null : (
+            <>
+              <Button size="sm" variant="secondary" onClick={() => props.onCreateAt("documents", target)}>
+                New document collection…
+              </Button>
+              <Button size="sm" variant="secondary" onClick={props.onOpenRelatedForms}>
+                Related form list…
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

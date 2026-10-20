@@ -1,11 +1,11 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
-import { FormRenderer, validateValues, type ValueMap } from "@enterpriseforms/form-renderer";
+import { FormRenderer, groupPayload, validateGroups, validateValues, type GroupValueMap, type RecordGroupPayload, type ValueMap } from "@enterpriseforms/form-renderer";
 import { Button, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
-import { layoutValues, parseProjectionLayout, toRendererFields, toValueMap } from "../components/recordModel";
+import { layoutValues, parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
 
 /** PG-018 edit: optimistic concurrency with the projection's content revision (If-Match); conflicts offer a reload. */
 export function EditRecordPage() {
@@ -15,14 +15,17 @@ export function EditRecordPage() {
   const queryClient = useQueryClient();
   const projection = useQuery({ queryKey: ["records", "projection", formRecordId], queryFn: () => api.records.projection(formRecordId).then((r) => r.result) });
   const [values, setValues] = useState<ValueMap | null>(null);
+  const [groups, setGroups] = useState<GroupValueMap | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   useEffect(() => {
     if (projection.data && values === null) {
       setValues(toValueMap(projection.data.record));
+      setGroups(toGroups(projection.data.record));
     }
   }, [projection.data, values]);
   const update = useMutation({
-    mutationFn: (payload: Record<string, string>) => api.records.update(formRecordId, { expectedContentRevision: Number(projection.data!.record.contentRevision), values: payload }).then((r) => r.result),
+    // Every repeating section is sent as its complete entry list (stable ids kept, new entries without one, removed ones omitted).
+    mutationFn: (payload: { values: Record<string, string>; groups: RecordGroupPayload[] }) => api.records.update(formRecordId, { expectedContentRevision: Number(projection.data!.record.contentRevision), values: payload.values, groups: payload.groups }).then((r) => r.result),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["records"] });
       await navigate({ to: "/app/records/$formRecordId", params: { formRecordId } });
@@ -46,11 +49,13 @@ export function EditRecordPage() {
   const conflict = update.isError && presentError(update.error).kind === "conflict";
   const applyRules = data.permissions.isCompleteProjection;
   const initial = toValueMap(data.record);
+  const infos = toGroupInfos(data.record.groups);
+  const currentGroups = groups ?? {};
   const submit = () => {
-    const validation = validateValues(layout, fields, values, "edit", { applyRules });
+    const validation = { ...validateValues(layout, fields, values, "edit", { applyRules }), ...validateGroups(layout, fields, values, currentGroups, infos, "edit", applyRules) };
     setErrors(validation);
     if (Object.keys(validation).length === 0) {
-      update.mutate(layoutValues(layout, fields, values, initial, applyRules));
+      update.mutate({ values: layoutValues(layout, fields, values, initial, applyRules), groups: groupPayload(layout, fields, values, currentGroups, infos, applyRules) });
     }
   };
   return (
@@ -74,6 +79,7 @@ export function EditRecordPage() {
                 variant="secondary"
                 onClick={() => {
                   setValues(null);
+                  setGroups(null);
                   update.reset();
                   void projection.refetch();
                 }}
@@ -87,7 +93,7 @@ export function EditRecordPage() {
         ) : update.isError ? (
           <ErrorPanel error={update.error} />
         ) : null}
-        <FormRenderer layout={layout} fields={fields} values={values} errors={errors} applyRules={applyRules} onChange={(key, value) => setValues((current) => ({ ...(current ?? {}), [key]: value }))} renderRelatedList={(element) => <p className="text-sm text-muted">{element.label || "Related records"} are managed from the record page.</p>} renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"} are managed from the record page.</p>} />
+        <FormRenderer layout={layout} fields={fields} values={values} errors={errors} applyRules={applyRules} groups={currentGroups} groupInfos={infos} onGroupsChange={setGroups} onChange={(key, value) => setValues((current) => ({ ...(current ?? {}), [key]: value }))} renderRelatedList={(element) => <p className="text-sm text-muted">{element.label || "Related records"} are managed from the record page.</p>} renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"} are managed from the record page.</p>} />
         <div className="flex gap-2">
           <Button type="submit" busy={update.isPending}>
             Save changes

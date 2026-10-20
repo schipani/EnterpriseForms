@@ -339,6 +339,48 @@
         }
       }
     },
+    "/api/v1/form-definitions/{formDefinitionId}/groups": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Creates the stable repeating group behind a section that allows multiple entries (key permanent).",
+        "operationId": "CreateGroupDefinition",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDefinitionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}": {
       "patch": {
         "tags": [
@@ -2583,6 +2625,13 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "groupDefinitionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -2927,6 +2976,15 @@
             "additionalProperties": {
               "type": "string"
             }
+          },
+          "groups": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RecordGroupValuesRequest"
+            }
           }
         }
       },
@@ -3047,6 +3105,30 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "groups": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RecordGroupValuesRequest"
+            }
+          }
+        }
+      },
+      "CreateGroupDefinitionRequest": {
+        "required": [
+          "groupKey",
+          "groupDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "groupKey": {
+            "type": "string"
+          },
+          "groupDisplayName": {
+            "type": "string"
           }
         }
       },
@@ -3584,6 +3666,13 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "groupDefinitionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -3926,6 +4015,13 @@
           "legacyPlaintext": {
             "type": "boolean",
             "default": false
+          },
+          "formRecordGroupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -4038,6 +4134,15 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RelationshipDefinitionResponse"
+            }
+          },
+          "groups": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/GroupDefinitionResponse"
             }
           }
         }
@@ -4258,6 +4363,15 @@
           },
           "integrityStatus": {
             "type": "string"
+          },
+          "groups": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RecordGroupResponse"
+            }
           }
         }
       },
@@ -4314,6 +4428,30 @@
           "publishedByUserId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "GroupDefinitionResponse": {
+        "required": [
+          "groupDefinitionId",
+          "groupKey",
+          "groupDisplayName",
+          "lifecycleStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "groupDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupKey": {
+            "type": "string"
+          },
+          "groupDisplayName": {
+            "type": "string"
+          },
+          "lifecycleStatus": {
+            "type": "string"
           }
         }
       },
@@ -4580,6 +4718,47 @@
           }
         }
       },
+      "RecordGroupResponse": {
+        "required": [
+          "groupDefinitionId",
+          "groupKey",
+          "occurrences"
+        ],
+        "type": "object",
+        "properties": {
+          "groupDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupKey": {
+            "type": "string"
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordOccurrenceResponse"
+            }
+          }
+        }
+      },
+      "RecordGroupValuesRequest": {
+        "required": [
+          "groupKey",
+          "occurrences"
+        ],
+        "type": "object",
+        "properties": {
+          "groupKey": {
+            "type": "string"
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordOccurrenceValuesRequest"
+            }
+          }
+        }
+      },
       "RecordListItemResponse": {
         "required": [
           "formRecordId",
@@ -4654,6 +4833,49 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "RecordOccurrenceResponse": {
+        "required": [
+          "formRecordGroupId",
+          "groupSortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordGroupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupSortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "RecordOccurrenceValuesRequest": {
+        "required": [
+          "formRecordGroupId",
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordGroupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         }
       },
@@ -5406,6 +5628,15 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
+            }
+          },
+          "groups": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RecordGroupValuesRequest"
             }
           }
         }

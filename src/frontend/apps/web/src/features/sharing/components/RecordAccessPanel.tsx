@@ -124,8 +124,10 @@ function CreateShareDialog({ formRecordId, projection, onClose }: { formRecordId
   const [role, setRole] = useState("Reader");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const displayNames = new Map(projection.fields.map((field) => [field.fieldKey, field.fieldDisplayName]));
-  // Only fields with a persisted value can be shared (the share binds to accepted manifest items).
-  const shareable = projection.record.values.map((value) => value.fieldKey).filter((key, index, all) => all.indexOf(key) === index).sort();
+  // Only fields with a persisted value can be shared (the share binds to accepted manifest items). Fields of sections that
+  // allow multiple entries are not shareable on their own in this version (the server refuses them: FIELD_IN_REPEATING_GROUP).
+  const shareable = projection.record.values.filter((value) => !value.formRecordGroupId).map((value) => value.fieldKey).filter((key, index, all) => all.indexOf(key) === index).sort();
+  const hasEntries = projection.record.values.some((value) => value.formRecordGroupId);
   const create = useMutation({
     mutationFn: () => api.shares.create(formRecordId, { recipientUserId: recipientUserId ?? null, recipientTeamId: null, recipientRole: role, fieldKeys: [...selected] }).then((r) => r.result),
     onSuccess: async () => {
@@ -179,6 +181,7 @@ function CreateShareDialog({ formRecordId, projection, onClose }: { formRecordId
           {shareable.map((key) => (
             <Checkbox key={key} label={displayNames.get(key) ?? key} checked={selected.has(key)} onCheckedChange={(checked) => toggle(key, checked === true)} />
           ))}
+          {hasEntries ? <p className="text-sm text-muted">Fields in sections that allow multiple entries cannot be shared on their own.</p> : null}
         </fieldset>
         {create.isError ? <ErrorPanel error={create.error} /> : null}
       </div>

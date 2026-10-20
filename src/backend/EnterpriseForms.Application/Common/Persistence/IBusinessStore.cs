@@ -48,6 +48,11 @@ public interface IBusinessScope : IAsyncDisposable
 
     void AddFieldOption(FieldOption fieldOption);
 
+    // Repeating groups (Phase C3)
+    Task<List<GroupDefinition>> GetGroupDefinitionsAsync(Guid formDefinitionId, CancellationToken cancellationToken);
+
+    void AddGroupDefinition(GroupDefinition group);
+
     // Shared option lists (Phase C2): tenant-scoped templates copied into fields on bind.
     Task<List<OptionList>> GetOptionListsAsync(Guid tenantId, CancellationToken cancellationToken);
 

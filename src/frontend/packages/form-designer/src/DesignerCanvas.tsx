@@ -1,7 +1,7 @@
 import { packElements, visibleColumns, type Breakpoint, type FormLayout, type LayoutElement, type LayoutSection, type RendererField } from "@enterpriseforms/form-renderer";
 import { OverflowMenu } from "@enterpriseforms/ui";
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
-import { duplicateSection, elementKey, findElement, moveElementTo, moveSection, newSectionKey, removeElement, updateElement, updateSection } from "./layoutEdits";
+import { duplicateSection, elementKey, findElement, moveElementTo, moveSection, newSectionKey, removeElement, sameScope, updateElement, updateSection } from "./layoutEdits";
 
 export interface DesignerRelationship {
   formRelationshipDefinitionId: string;
@@ -226,6 +226,11 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
             </button>
           )}
         </h2>
+        {section.repeat ? (
+          <span className="shrink-0 rounded border border-line px-1.5 py-0.5 text-xs" data-repeat-badge title="People can add several entries to this section; each entry has its own values.">
+            Multiple entries · {section.repeat.minOccurrences}–{section.repeat.maxOccurrences}
+          </span>
+        ) : null}
         {collapsed ? <span className="shrink-0 text-sm text-muted">{section.elements.length === 1 ? "1 item" : `${section.elements.length} items`}</span> : null}
         {sectionMenu.length > 0 ? <MenuButton label={`Section actions for ${title}`} items={sectionMenu} /> : null}
       </div>
@@ -343,7 +348,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
         { key: "later", label: "Move later", disabled: index === section.elements.length - 1, run: () => move(sectionIndex, index + 2, `${label} moved later`) },
         ...layout.sections
           .map((candidate, candidateIndex) => ({ candidate, candidateIndex }))
-          .filter(({ candidateIndex }) => candidateIndex !== sectionIndex)
+          .filter(({ candidate, candidateIndex }) => candidateIndex !== sectionIndex && sameScope(candidate, section))
           .map(({ candidate, candidateIndex }) => ({ key: `to-${candidate.sectionKey}`, label: `Move to ${sectionTitle(candidate)}`, run: () => move(candidateIndex, candidate.elements.length, `${label} moved to ${sectionTitle(candidate)}`) })),
         { key: "narrower", label: "Narrower", disabled: span <= 1, run: () => setSpan(span - 1) },
         { key: "wider", label: "Wider", disabled: span >= 4, run: () => setSpan(span + 1) },

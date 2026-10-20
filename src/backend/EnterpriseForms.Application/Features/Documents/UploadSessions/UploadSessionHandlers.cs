@@ -301,8 +301,10 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var rows = new List<ISignedContentRow>();
         rows.AddRange(verified.AllRows.OfType<FieldValueRowBase>().Select(v => CloneValue(v)));
+        rows.AddRange(verified.AllRows.OfType<FormRecordGroupRevision>().Select(g => CandidateBuilder.CloneOccurrence(g)));
         rows.AddRange(verified.AllRows.OfType<FileAttachmentVersion>().Where(a => a.FileAttachmentId != processed.FileAttachmentId).Select(a => CandidateBuilder.CloneAttachment(a)));
         rows.Add(CandidateBuilder.CloneAttachment(processed));
+        CandidateBuilder.EnsureWithinCeiling(rows.Count + 1);
 
         var accepted = await stager.StageAndCommitAsync(context, verified.Head, new RecordCandidateStager.CandidateInput(header, rows), "doc-commit:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
