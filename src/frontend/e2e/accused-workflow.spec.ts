@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { placeFromPicker, selectTile } from "./support";
 
 /**
  * Full Accused vertical slice in a real browser: designer sign-in → create and publish AccusedAddress and Accused forms
@@ -21,7 +22,7 @@ async function signOut(page: Page) {
 
 async function addField(page: Page, name: string, type: string, options?: string) {
   await page.getByRole("tab", { name: /^Fields/ }).click();
-  await page.getByRole("button", { name: "Add field" }).first().click();
+  await page.getByRole("button", { name: "Add field", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add field" });
   await dialog.getByLabel("Display name").fill(name);
   await dialog.getByLabel("Storage type").click();
@@ -32,13 +33,6 @@ async function addField(page: Page, name: string, type: string, options?: string
   await dialog.getByRole("button", { name: "Add field" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("rowheader", { name: name })).toBeVisible();
-}
-
-async function placeFromPicker(page: Page, pickerLabel: string, optionText: RegExp) {
-  await page.getByRole("tab", { name: "Layout" }).click();
-  await page.getByLabel(pickerLabel, { exact: true }).click();
-  await page.getByRole("option", { name: optionText }).click();
-  await page.getByRole("button", { name: pickerLabel, exact: true }).click();
 }
 
 async function saveAndPublish(page: Page, reason: string) {
@@ -82,7 +76,7 @@ test.describe.serial("Stage B Accused workflow", () => {
     await addField(page, "Arrest time", "DateTime");
     await addField(page, "External reference", "Guid");
     // "File" is listed in the generic Add field dialog…
-    await page.getByRole("button", { name: "Add field" }).first().click();
+    await page.getByRole("button", { name: "Add field", exact: true }).click();
     const generic = page.getByRole("dialog", { name: "Add field" });
     await generic.getByLabel("Storage type").click();
     await expect(page.getByRole("option", { name: "File (document collection)" })).toBeVisible();
@@ -116,18 +110,19 @@ test.describe.serial("Stage B Accused workflow", () => {
     await placeFromPicker(page, "Add field", /External reference/);
     await placeFromPicker(page, "Add related list", /Addresses/);
     await placeFromPicker(page, "Add document collection", /Case documents/);
-    const documents = page.getByRole("listitem").filter({ hasText: "Documents: Case documents" });
+    const documents = await selectTile(page, "Case documents");
+    await documents.getByRole("tab", { name: "Validation" }).click();
     await documents.getByLabel("Maximum files").fill("10");
     await documents.getByLabel("Maximum file size (MB)").fill("20");
     await documents.getByLabel("Allowed content types").fill("application/pdf, text/plain");
     // Two half-width name fields on one row, required.
-    const given = page.getByRole("listitem").filter({ hasText: "Field: Given name" });
-    await given.getByLabel("Width", { exact: true }).click();
-    await page.getByRole("option", { name: /2 of 4/ }).click();
+    const given = await selectTile(page, "Given name");
+    await given.getByLabel("Field width").click();
+    await page.getByRole("option", { name: "2 columns" }).click();
     await given.getByRole("checkbox", { name: "Required" }).check();
-    const family = page.getByRole("listitem").filter({ hasText: "Field: Family name" });
-    await family.getByLabel("Width", { exact: true }).click();
-    await page.getByRole("option", { name: /2 of 4/ }).click();
+    const family = await selectTile(page, "Family name");
+    await family.getByLabel("Field width").click();
+    await page.getByRole("option", { name: "2 columns" }).click();
     await saveAndPublish(page, "initial accused layout");
     await signOut(page);
   });

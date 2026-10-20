@@ -1,20 +1,23 @@
 import { LOGO_PATH, useRuntime, useSession } from "@enterpriseforms/app-runtime";
 import { Button, LoadingBlock, StatusMessage } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Link, Navigate, useNavigate } from "@tanstack/react-router";
+import { Link, Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type PropsWithChildren } from "react";
 
 /** Root shell: skip link, header with organization logo top-left (ADR-PB-014), main landmark. Navigation lives in the authenticated layout. */
 export function AppShellLayout({ children }: PropsWithChildren) {
   const session = useSession();
   const branding = session.bootstrap?.branding ?? null;
+  // The form designer is a three-pane workspace (C1 designer rebuild): it uses the full viewport width below the same
+  // global header instead of the reading-width container every other page keeps.
+  const wide = useRouterState({ select: (state) => /^\/app\/forms\/[^/]+\/design$/.test(state.location.pathname) });
   return (
     <div className="min-h-screen bg-page text-body">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">
         Skip to main content
       </a>
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-2">
+        <div className={`mx-auto flex w-full ${wide ? "max-w-[100rem]" : "max-w-7xl"} flex-wrap items-center gap-3 px-4 py-2`}>
           <Link to={session.status === "authenticated" ? "/app/dashboard" : "/"} className="flex min-h-11 items-center gap-3 rounded">
             {branding?.hasLogo ? (
               <img src={LOGO_PATH} alt={branding.logoAlternativeText || `${branding.organizationDisplayName} logo`} className="h-9 w-auto max-w-40 object-contain" />
@@ -27,9 +30,9 @@ export function AppShellLayout({ children }: PropsWithChildren) {
           </Link>
           <div className="ml-auto flex min-w-0 max-w-full items-center gap-2">{session.status === "authenticated" ? <UserMenu /> : null}</div>
         </div>
-        {session.status === "authenticated" ? <PrimaryNav /> : null}
+        {session.status === "authenticated" ? <PrimaryNav wide={wide} /> : null}
       </header>
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-7xl px-4 py-6">
+      <main id="main-content" tabIndex={-1} className={`mx-auto w-full px-4 ${wide ? "max-w-[100rem] py-4" : "max-w-7xl py-6"}`}>
         {children}
       </main>
       <SessionExpiredNotice />
@@ -37,7 +40,7 @@ export function AppShellLayout({ children }: PropsWithChildren) {
   );
 }
 
-function PrimaryNav() {
+function PrimaryNav({ wide }: { wide: boolean }) {
   const session = useSession();
   const items: Array<{ to: string; label: string; show: boolean }> = [
     { to: "/app/dashboard", label: "Dashboard", show: true },
@@ -49,7 +52,7 @@ function PrimaryNav() {
     { to: "/app/gallery", label: "Component gallery", show: true },
   ];
   return (
-    <nav aria-label="Primary" className="mx-auto w-full max-w-7xl px-4">
+    <nav aria-label="Primary" className={`mx-auto w-full ${wide ? "max-w-[100rem]" : "max-w-7xl"} px-4`}>
       <ul className="flex flex-wrap gap-1 py-1">
         {items
           .filter((item) => item.show)

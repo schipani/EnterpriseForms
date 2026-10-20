@@ -59,7 +59,7 @@ export function EditFieldDialog({ field, location, canEdit, pending, error, onSa
         <TextInput label="Help text" value={values.helpText} maxLength={1000} disabled={!canEdit} error={errorFor("helpText")} onChange={(event) => set("helpText", event.target.value)} />
       ) : (
         <StatusMessage tone="info" title="Not on the draft layout">
-          This field is not placed on the draft layout. Place it in the Layout tab to set its help text, requiredness and validation. The label and description above are still saved on the field.
+          This field is not placed on the draft layout. Place it on the Design canvas to set its help text, requiredness and validation. The label and description above are still saved on the field.
         </StatusMessage>
       )}
     </div>
@@ -99,7 +99,7 @@ export function EditFieldDialog({ field, location, canEdit, pending, error, onSa
     </div>
   ) : (
     <StatusMessage tone="info" title="Not on the draft layout">
-      Place this field on the draft layout (Layout tab) to set its validation rules.
+      Place this field on the draft layout (Design canvas) to set its validation rules.
     </StatusMessage>
   );
 

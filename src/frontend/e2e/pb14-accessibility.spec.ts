@@ -42,7 +42,7 @@ async function openLatestAccusedRecord(page: Page): Promise<string> {
 async function openLatestDesigner(page: Page): Promise<void> {
   await page.goto("/app/forms");
   await page.getByRole("row", { name: /^Accused /i }).first().getByRole("link", { name: "Design" }).click();
-  await expect(page.getByRole("tab", { name: "Layout" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Design" })).toBeVisible();
 }
 
 test.describe("PB-14 automated accessibility and responsive validation", () => {
@@ -86,9 +86,24 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await openLatestDesigner(page);
+      // C1 designer rebuild: the Design view (sections canvas + inspector) is the default view.
+      await scan(page, `${viewport.id} designer design view @${viewport.name}`);
+      // Select a tile so the Field Properties inspector is rendered (on narrow widths it is behind the Properties pane switch).
+      await page.getByRole("region", { name: "Form canvas" }).locator("button[aria-keyshortcuts]").first().click();
+      if (viewport.width < 1024) {
+        await page.getByRole("button", { name: "Properties", exact: true }).click();
+      }
+      const inspector = page.getByRole("complementary", { name: /Properties$/ });
+      await expect(inspector).toBeVisible();
+      for (const tabName of ["General", "Validation", "Rules", "Security & Encryption", "Advanced"]) {
+        await inspector.getByRole("tab", { name: tabName }).click();
+        await scan(page, `${viewport.id} designer inspector ${tabName} tab @${viewport.name}`);
+      }
+      if (viewport.width < 1024) {
+        await page.getByRole("button", { name: "Canvas", exact: true }).click();
+      }
+      await page.getByRole("tab", { name: /^Fields/ }).click();
       await scan(page, `${viewport.id} designer fields @${viewport.name}`);
-      await page.getByRole("tab", { name: "Layout" }).click();
-      await scan(page, `${viewport.id} designer layout @${viewport.name}`);
       // New owner-acceptance UI: the Form permissions tab and the Edit field dialog get the same scans.
       await page.getByRole("tab", { name: "Form permissions" }).click();
       await expect(page.getByText(/Source: Authorization Authority/)).toBeVisible();
@@ -106,7 +121,7 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: /^Edit / })).toBeHidden();
       // Phase 1B: the Security & Encryption section of the Add field dialog.
-      await page.getByRole("button", { name: "Add field" }).first().click();
+      await page.getByRole("button", { name: "Add field", exact: true }).click();
       const add = page.getByRole("dialog", { name: "Add field" });
       await expect(add.getByRole("group", { name: "Security & Encryption" })).toBeVisible();
       await scan(page, `${viewport.id} add field dialog with security section @${viewport.name}`);
@@ -159,7 +174,7 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
     await signIn(page, "designer");
     await openLatestDesigner(page);
     await page.getByRole("tab", { name: /^Fields/ }).click();
-    const opener = page.getByRole("button", { name: "Add field" }).first();
+    const opener = page.getByRole("button", { name: "Add field", exact: true });
     await opener.focus();
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: "Add field" });
@@ -172,20 +187,17 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
     await expect(dialog).toBeHidden();
     await expect(opener).toBeFocused();
 
-    // Designer: keyboard reorder through the accessible Move buttons changes element order deterministically.
-    await page.getByRole("tab", { name: "Layout" }).click();
-    const items = page.getByRole("listitem").filter({ hasText: /Field: / });
-    const before = await items.allTextContents();
+    // Designer: keyboard reorder (Alt+ArrowDown on a focused tile, no pointer) changes element order deterministically.
+    await page.getByRole("tab", { name: "Design" }).click();
+    const tiles = page.getByRole("region", { name: "Form canvas" }).getByRole("list").first().locator("button[aria-keyshortcuts]");
+    const before = await tiles.allTextContents();
     expect(before.length).toBeGreaterThan(1);
-    // The first element's "Move … down" button is the first enabled mover in document order.
-    const moveDown = page.getByRole("button", { name: /^Move Field: .* down$/ }).first();
-    await expect(moveDown).toBeEnabled();
-    const movedTitle = (await moveDown.getAttribute("aria-label"))!.replace(/^Move /, "").replace(/ down$/, "");
-    await moveDown.focus();
-    await page.keyboard.press("Enter");
-    const after = await items.allTextContents();
-    expect(after[1]).toContain(movedTitle);
-    expect(after[0]).not.toContain(movedTitle);
+    await tiles.first().focus();
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect.poll(async () => (await tiles.allTextContents())[1]).toBe(before[0]);
+    const after = await tiles.allTextContents();
+    expect(after[0]).toBe(before[1]);
+    await expect(tiles.nth(1)).toBeFocused();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
   });
 

@@ -21,7 +21,7 @@ function policyCard(page: import("@playwright/test").Page) {
 
 async function addEncryptedInternalField(page: import("@playwright/test").Page, name: string) {
   await page.getByRole("tab", { name: /^Fields/ }).click();
-  await page.getByRole("button", { name: "Add field" }).first().click();
+  await page.getByRole("button", { name: "Add field", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add field" });
   await dialog.getByLabel("Display name").fill(name);
   const security = dialog.getByRole("group", { name: "Security & Encryption" });

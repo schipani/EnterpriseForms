@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addDocumentCollection, addField, formIdFromUrl, placeFromPicker, publish, saveAndPublish, signIn, signOut } from "./support";
+import { addDocumentCollection, addField, formIdFromUrl, placeFromPicker, publish, saveAndPublish, selectTile, signIn, signOut } from "./support";
 
 /**
  * Owner acceptance defects, exercised exactly as a person would:
@@ -31,10 +31,11 @@ test.describe.serial("Form management: edit fields and form permissions", () => 
     await addDocumentCollection(page, "Case documents");
     await placeFromPicker(page, "Add field", /Given name/);
     await placeFromPicker(page, "Add document collection", /Case documents/);
-    const documents = page.getByRole("listitem").filter({ hasText: "Documents: Case documents" });
+    const documents = await selectTile(page, "Case documents");
+    await documents.getByRole("tab", { name: "Validation" }).click();
     await documents.getByLabel("Maximum files").fill("10");
     await documents.getByLabel("Allowed content types").fill("text/plain");
-    const given = page.getByRole("listitem").filter({ hasText: "Field: Given name" });
+    const given = await selectTile(page, "Given name");
     await given.getByRole("checkbox", { name: "Required" }).check();
     await saveAndPublish(page, "initial intake layout");
     await expect(page.getByText("Published v1")).toBeVisible();

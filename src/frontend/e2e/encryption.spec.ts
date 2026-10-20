@@ -30,7 +30,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     formId = formIdFromUrl(page.url());
 
     await page.getByRole("tab", { name: /^Fields/ }).click();
-    await page.getByRole("button", { name: "Add field" }).first().click();
+    await page.getByRole("button", { name: "Add field", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Add field" });
     await dialog.getByLabel("Display name").fill("Case notes");
     const security = dialog.getByRole("group", { name: "Security & Encryption" });
@@ -44,7 +44,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await expect(page.getByRole("row", { name: /Case notes/ })).toContainText("Confidential · Encrypted");
 
     // A structured value defaults to Internal + plaintext (permitted by the development policy), with the DBA warning.
-    await page.getByRole("button", { name: "Add field" }).first().click();
+    await page.getByRole("button", { name: "Add field", exact: true }).click();
     const second = page.getByRole("dialog", { name: "Add field" });
     await second.getByLabel("Display name").fill("Exhibit count");
     await second.getByLabel("Storage type").click();
@@ -59,7 +59,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await expect(page.getByRole("row", { name: /Exhibit count/ })).toContainText("Internal · Plaintext");
 
     // Restricted cannot be made plaintext: choosing it hides the opt-out and shows encryption as required.
-    await page.getByRole("button", { name: "Add field" }).first().click();
+    await page.getByRole("button", { name: "Add field", exact: true }).click();
     const third = page.getByRole("dialog", { name: "Add field" });
     await third.getByLabel("Storage type").click();
     await page.getByRole("option", { name: /^Integer$/ }).click();
@@ -157,7 +157,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
       await signIn(page, "designer");
       await page.goto(`/app/forms/${formId}/design`);
       await page.getByRole("tab", { name: /^Fields/ }).click();
-      await page.getByRole("button", { name: "Add field" }).first().click();
+      await page.getByRole("button", { name: "Add field", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: "Add field" });
       await dialog.getByLabel("Display name").fill("Plain attempt");
       await dialog.getByLabel("Storage type").click();

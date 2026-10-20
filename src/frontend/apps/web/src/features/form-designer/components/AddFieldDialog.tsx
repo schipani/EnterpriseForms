@@ -22,7 +22,7 @@ export function toKey(text: string): string {
 /**
  * Adds a stable field identity (storage type is immutable after creation). Option fields need at least one option.
  * `kind="documents"` adds a File field — the identity behind a document collection; its upload limits are set on the
- * `documentCollection` element in the Layout tab (immutable per published version).
+ * `documentCollection` element on the Design canvas (immutable per published version).
  */
 export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error, kind = "field" }: { open: boolean; onOpenChange: (open: boolean) => void; onSubmit: (request: AddFieldDefinitionRequest) => void; pending: boolean; error: unknown; kind?: "field" | "documents" }) {
   const documents = kind === "documents";
@@ -55,7 +55,7 @@ export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error, k
       open={open}
       onOpenChange={onOpenChange}
       title={documents ? "Add document collection" : "Add field"}
-      description={documents ? "A document collection is a File field: a stable identity whose uploads are scanned, encrypted and bound to the record. Allowed types, maximum files and size are set when you place it in the Layout tab." : "A field is a stable identity with an immutable storage type. Its label, width and validation are set per layout version."}
+      description={documents ? "A document collection is a File field: a stable identity whose uploads are scanned, encrypted and bound to the record. Allowed types, maximum files and size are set in the designer inspector after you place it on the Design canvas." : "A field is a stable identity with an immutable storage type. Its label, width and validation are set per layout version."}
       locked={pending}
       footer={
         <>

@@ -1,81 +1,201 @@
-import { expect, test } from "@playwright/test";
-import { addField, formIdFromUrl, saveAndPublish, signIn, signOut } from "./support";
+import { expect, test, type Page } from "@playwright/test";
+import { addDocumentCollection, addField, formIdFromUrl, placeFromPicker, publish, selectTile, signIn, signOut } from "./support";
 
 /**
- * C1-UX representative flows not already covered by form-management.spec.ts / pb14-accessibility.spec.ts:
- *  1. Click an empty grid cell on the Layout tab, add a field there, and resize it with the keyboard-accessible
- *     Narrower/Wider buttons (brief §B — drag is never the only way to change placement/width).
- *  2. Clicking a placed field selects it and populates the Properties inspector; double-clicking its title renames
- *     the display label inline without touching the field key, storage type or any stored value.
- *  3. The Actions column on the Forms list shows one visible primary action plus a "…" overflow menu for the rest.
- *  4. Unsaved layout changes block SPA navigation until the designer confirms or saves; Undo/Redo step through
- *     layout history.
+ * C1 designer rebuild acceptance (docs/ui/c1-designer-rebuild/ACCEPTANCE_TEST_MATRIX.md), against the real API:
+ *  UX-01 three-pane designer · UX-02 click-to-select + inspector · UX-03 inline rename keeps ids · UX-04 "+ Add Row"
+ *  creates a titled section · UX-05 fields placed into that section's exact cells · UX-06 move a field between
+ *  sections · UX-07 rename/collapse/reorder sections survive save + reload · UX-08 removing a non-empty section needs an
+ *  explicit disposition · UX-09 publish → the record page renders the new section · UX-10 a document collection
+ *  placed in a new section keeps its id · UX-11 inspector tabs keep unsaved input · UX-13 Actions column · UX-14
+ *  keyboard-only section/placement work · unsaved-change navigation guard and undo/redo.
  */
 const run = Date.now().toString(36);
-const formName = `Canvas ${run}`;
+const formName = `Sections ${run}`;
 let formId = "";
 
-test.describe.serial("Designer canvas: selection, empty-cell placement, rename, actions column, undo/nav-guard", () => {
-  test("designer builds a form using the visual grid canvas", async ({ page }) => {
+const canvas = (page: Page) => page.getByRole("region", { name: "Form canvas" });
+const section = (page: Page, title: string) => canvas(page).getByRole("region", { name: title, exact: true });
+const tileNames = (page: Page, title: string) => section(page, title).locator("button[aria-keyshortcuts]").allTextContents();
+
+async function saveDraft(page: Page) {
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.getByText("Unsaved changes")).toBeHidden();
+}
+
+test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspector, persistence and publish", () => {
+  test("designer builds titled sections with fields, moves and renames them, and the layout survives save and reload", async ({ page }) => {
     await signIn(page, "designer");
     await page.goto("/app/forms/new");
     await page.getByLabel("Form name").fill(formName);
+    await page.getByRole("checkbox", { name: /clerk/i }).check();
     await page.getByRole("button", { name: "Create form" }).click();
     await expect(page.getByRole("heading", { level: 1, name: formName })).toBeVisible();
     formId = formIdFromUrl(page.url());
 
-    await addField(page, "Case title", "String");
-    await page.getByRole("tab", { name: "Layout" }).click();
+    // UX-01: left designer navigation, centre toolbar + canvas, right inspector.
+    const nav = page.getByRole("tablist", { name: "Form designer" });
+    for (const item of ["Design", "Fields", "Rules", "Preview", "Versions", "Settings", "Form permissions", "Related forms"]) {
+      await expect(nav.getByRole("tab", { name: new RegExp(`^${item}`) })).toBeVisible();
+    }
+    for (const action of ["Add Field", "Add Row", "Add Column", "Save draft"]) {
+      await expect(page.getByRole("group", { name: "Designer actions" }).getByRole("button", { name: action })).toBeVisible();
+    }
+    await expect(page.getByRole("complementary", { name: "Properties" })).toBeVisible();
 
-    // Click an empty cell's "+ Add field" affordance and place the unplaced field there.
-    const emptyCell = page.getByRole("button", { name: /^Add field in .+, column \d+$/ }).first();
-    await emptyCell.click();
-    const picker = page.getByRole("group", { name: "Add field to this cell" });
-    await picker.getByLabel("Field to place here").click();
-    await page.getByRole("option", { name: /Case title/ }).click();
-    await picker.getByRole("button", { name: "Place" }).click();
-    const card = page.getByRole("listitem").filter({ hasText: "Field: Case title" });
-    await expect(card).toBeVisible();
+    for (const [name, type] of [["Last Name", "String"], ["First Name", "String"], ["Reference Number", "String"], ["Address Line 1", "String"], ["City", "String"]] as const) {
+      await addField(page, name, type);
+    }
+    await addDocumentCollection(page, "Case documents");
 
-    // Clicking the card selects it and the inspector shows it; the inspector's Label input mirrors the card's.
-    await card.click();
-    const inspector = page.getByRole("complementary", { name: "Properties" });
-    await expect(inspector.getByText(/Field: Case title/)).toBeVisible();
+    // The form's default section is renamed through the section inspector.
+    await page.getByRole("tab", { name: "Design" }).click();
+    await canvas(page).getByRole("button", { name: formName, exact: true }).click();
+    const sectionInspector = page.getByRole("complementary", { name: "Section Properties" });
+    await sectionInspector.getByLabel("Section title").fill("Personal Information");
+    await expect(section(page, "Personal Information")).toBeVisible();
+    for (const name of [/^Last Name/, /^First Name/, /^Reference Number/]) {
+      await placeFromPicker(page, "Add field", name, { section: "Personal Information" });
+    }
+    expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "First Name", "Reference Number"]);
 
-    // Keyboard-accessible width change: Narrower/Wider buttons are real buttons, reachable and operable by keyboard.
-    const wider = card.getByRole("button", { name: "Wider: increase width of Field: Case title (String)" });
-    await expect(wider).toBeDisabled(); // already full width (4 of 4)
-    const narrower = card.getByRole("button", { name: "Narrower: decrease width of Field: Case title (String)" });
-    await narrower.focus();
-    await page.keyboard.press("Enter");
-    await expect(card.getByRole("combobox", { name: "Width" }).first()).toHaveText(/75%/);
-    await expect(wider).toBeEnabled();
-
-    // Double-click the title to rename inline; the field key and type never change.
-    await card.getByTitle("Double-click to rename the display label").dblclick();
-    const rename = card.getByLabel("Display label");
-    await rename.fill("Matter title");
+    // UX-04: "+ Add Row" creates a titled section with an empty "+ Add Field" cell, ready to rename (not a line break).
+    await page.getByRole("button", { name: "Add Row" }).click();
+    const rename = page.getByRole("textbox", { name: "Rename section" });
+    await expect(rename).toBeFocused();
+    await expect(rename).toHaveValue("New section");
+    await rename.fill("Contact Information");
     await rename.press("Enter");
-    await expect(page.getByRole("listitem").filter({ hasText: "Field: Matter title" })).toBeVisible();
-    await expect(page.getByText("Unsaved changes")).toBeVisible();
+    const contact = section(page, "Contact Information");
+    await expect(contact).toBeVisible();
+    await expect(contact.getByRole("button", { name: /^Add Field to Contact Information/ })).toHaveCount(1);
+    await expect(contact.locator("button[aria-keyshortcuts]")).toHaveCount(0);
 
-    // Undo restores the previous label; redo re-applies the rename.
+    // UX-05: two fields placed into that section's own cells, with spans.
+    await placeFromPicker(page, "Add field", /^Address Line 1/, { section: "Contact Information", width: "2 columns" });
+    await placeFromPicker(page, "Add field", /^City/, { section: "Contact Information", width: "2 columns" });
+    expect(await tileNames(page, "Contact Information")).toEqual(["Address Line 1", "City"]);
+    expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "First Name", "Reference Number"]);
+
+    // UX-02 / UX-11: click a tile → only it is selected; the inspector shows its stable id and keeps input across tabs.
+    const inspector = await selectTile(page, "Last Name");
+    await expect(canvas(page).locator('button[aria-keyshortcuts][aria-pressed="true"]')).toHaveCount(1);
+    await expect(inspector.getByRole("heading", { name: "Field Properties" })).toBeVisible();
+    for (const tabName of ["General", "Validation", "Rules", "Security & Encryption", "Advanced"]) {
+      await expect(inspector.getByRole("tab", { name: tabName })).toBeVisible();
+    }
+    await inspector.getByLabel("Help text").fill("Legal family name");
+    await inspector.getByRole("tab", { name: "Validation" }).click();
+    await inspector.getByLabel("Maximum length").fill("abc");
+    await expect(inspector.getByText("Enter a whole number from 1 to 4000")).toBeVisible();
+    await inspector.getByLabel("Maximum length").fill("80");
+    await inspector.getByRole("tab", { name: "Advanced" }).click();
+    await expect(inspector.getByLabel("Field key")).toHaveValue("last_name");
+    const lastNameId = await inspector.getByLabel("Field UUID").inputValue();
+    await inspector.getByRole("tab", { name: "General" }).click();
+    await expect(inspector.getByLabel("Help text")).toHaveValue("Legal family name");
+    await inspector.getByLabel("Placeholder").fill("Enter last name");
+
+    // UX-06: move a field from Personal Information into the new section (inspector "Section", no dragging).
+    const reference = await selectTile(page, "Reference Number");
+    await reference.getByRole("combobox", { name: "Section" }).click();
+    await page.getByRole("option", { name: "Contact Information" }).click();
+    expect(await tileNames(page, "Contact Information")).toEqual(["Address Line 1", "City", "Reference Number"]);
+    expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "First Name"]);
+
+    // UX-14: keyboard-only move inside a section (Alt+ArrowUp on the focused tile).
+    await section(page, "Contact Information").getByRole("button", { name: "Reference Number", exact: true }).focus();
+    await page.keyboard.press("Alt+ArrowUp");
+    expect(await tileNames(page, "Contact Information")).toEqual(["Address Line 1", "Reference Number", "City"]);
+
+    // UX-03: double-click rename changes only the display label.
+    await section(page, "Personal Information").getByRole("button", { name: "First Name", exact: true }).dblclick();
+    const renameField = page.getByRole("textbox", { name: "Rename field label" });
+    await renameField.fill("Given name");
+    await renameField.press("Enter");
+    await expect(section(page, "Personal Information").getByRole("button", { name: "Given name", exact: true })).toBeVisible();
+
+    // Undo / redo across section and field edits.
     await page.getByRole("button", { name: "Undo last layout change" }).click();
-    await expect(page.getByRole("listitem").filter({ hasText: "Field: Case title" })).toBeVisible();
+    await expect(section(page, "Personal Information").getByRole("button", { name: "First Name", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Redo last undone layout change" }).click();
-    await expect(page.getByRole("listitem").filter({ hasText: "Field: Matter title" })).toBeVisible();
+    await expect(section(page, "Personal Information").getByRole("button", { name: "Given name", exact: true })).toBeVisible();
 
-    await saveAndPublish(page, "initial canvas layout");
+    // UX-10: a document collection placed in another new section; UX-08: removing that non-empty section needs a choice.
+    await page.getByRole("button", { name: "Add Row" }).click();
+    await page.getByRole("textbox", { name: "Rename section" }).fill("Evidence");
+    await page.keyboard.press("Enter");
+    await placeFromPicker(page, "Add document collection", /^Case documents/, { section: "Evidence" });
+    await section(page, "Evidence").getByRole("button", { name: "Section actions for Evidence" }).click();
+    await page.getByRole("menuitem", { name: "Remove section…" }).click();
+    const removal = page.getByRole("dialog", { name: /Remove section “Evidence”/ });
+    const confirm = removal.getByRole("button", { name: "Remove section" });
+    await expect(confirm).toBeDisabled();
+    await removal.getByRole("radio", { name: /Move the 1 item to another section/ }).check();
+    await removal.getByLabel("Move to section").click();
+    await page.getByRole("option", { name: "Contact Information" }).click();
+    await confirm.click();
+    await expect(removal).toBeHidden();
+    await expect(section(page, "Evidence")).toHaveCount(0);
+    expect(await tileNames(page, "Contact Information")).toEqual(["Address Line 1", "Reference Number", "City", "Case documents"]);
+
+    // UX-07: reorder and collapse sections.
+    await section(page, "Contact Information").getByRole("button", { name: "Section actions for Contact Information" }).click();
+    await page.getByRole("menuitem", { name: "Move section up" }).click();
+    await expect(canvas(page).getByRole("heading", { level: 2 }).first()).toHaveText("Contact Information");
+    await page.getByRole("button", { name: "Collapse Personal Information" }).click();
+    await expect(section(page, "Personal Information").getByRole("list")).toBeHidden();
+
+    await saveDraft(page);
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: formName })).toBeVisible();
+    await expect(canvas(page).getByRole("heading", { level: 2 })).toHaveText(["Contact Information", "Personal Information"]);
+    expect(await tileNames(page, "Contact Information")).toEqual(["Address Line 1", "Reference Number", "City", "Case documents"]);
+    await expect(page.getByRole("button", { name: "Expand Personal Information" })).toBeVisible(); // collapse is a per-viewer designer preference
+    await page.getByRole("button", { name: "Expand Personal Information" }).click();
+    expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "Given name"]);
+    const reopened = await selectTile(page, "Last Name");
+    await expect(reopened.getByLabel("Placeholder")).toHaveValue("Enter last name");
+    await reopened.getByRole("tab", { name: "Advanced" }).click();
+    await expect(reopened.getByLabel("Field UUID")).toHaveValue(lastNameId);
+
+    // Preview uses the record renderer and shows both sections.
+    await page.getByRole("tab", { name: "Preview" }).click();
+    await expect(page.getByRole("group", { name: "Contact Information" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Personal Information" })).toBeVisible();
+
+    // UX-09: publish; the version is immutable and listed.
+    await publish(page, "sections layout");
     await expect(page.getByText("Published v1")).toBeVisible();
+    await page.getByRole("tab", { name: "Versions" }).click();
+    await expect(page.getByRole("row", { name: /^v1 / })).toBeVisible();
+
+    // The field catalog shows each field's section and keeps the original key after the rename.
+    await page.getByRole("tab", { name: /^Fields/ }).click();
+    await expect(page.getByRole("row", { name: /First Name/ })).toContainText("first_name");
+    await expect(page.getByRole("row", { name: /Reference Number/ })).toContainText("Contact Information");
     await signOut(page);
   });
 
-  test("unsaved layout changes block navigation until the designer confirms or saves", async ({ page }) => {
+  test("the clerk's record page renders the published sections with their fields", async ({ page }) => {
+    await signIn(page, "clerk");
+    await page.goto("/app/forms");
+    await page.getByRole("row", { name: new RegExp(formName) }).getByRole("button", { name: "New record" }).click();
+    const contact = page.getByRole("group", { name: "Contact Information" });
+    await expect(contact).toBeVisible();
+    await expect(contact.getByLabel(/City/)).toBeVisible();
+    await expect(contact.getByLabel(/Reference Number/)).toBeVisible();
+    await expect(page.getByRole("group", { name: "Personal Information" }).getByLabel(/Given name/)).toBeVisible();
+    await expect(page.getByRole("group", { name: "Personal Information" }).getByPlaceholder("Enter last name")).toBeVisible();
+    await signOut(page);
+  });
+
+  test("unsaved changes block navigation until the designer confirms or saves", async ({ page }) => {
     await signIn(page, "designer");
     await page.goto(`/app/forms/${formId}/design`);
-    await page.getByRole("tab", { name: "Layout" }).click();
-    const card = page.getByRole("listitem").filter({ hasText: "Field: Matter title" });
-    await card.getByRole("button", { name: "Narrower: decrease width of Field: Matter title (String)" }).click();
+    const inspector = await selectTile(page, "City");
+    await inspector.getByLabel("Field width").click();
+    await page.getByRole("option", { name: "3 columns" }).click();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
 
     await page.getByRole("link", { name: "All forms" }).click();
@@ -85,23 +205,55 @@ test.describe.serial("Designer canvas: selection, empty-cell placement, rename, 
     await expect(guard).toBeHidden();
     await expect(page.getByRole("heading", { level: 1, name: formName })).toBeVisible();
 
-    await page.getByRole("button", { name: "Save draft" }).click();
-    await expect(page.getByText("Unsaved changes")).toBeHidden();
+    await saveDraft(page);
     await page.getByRole("link", { name: "All forms" }).click();
     await expect(page.getByRole("dialog", { name: "Discard unsaved layout changes?" })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 1, name: "Forms" })).toBeVisible();
     await signOut(page);
   });
 
-  test("Forms list Actions column: one visible primary action plus an overflow menu", async ({ page }) => {
+  test("Actions columns are rightmost with one visible action plus an overflow menu", async ({ page }) => {
     await signIn(page, "designer");
     await page.goto("/app/forms");
     const row = page.getByRole("row", { name: new RegExp(formName) });
-    await expect(row.getByRole("link", { name: "Design" })).toBeVisible();
-    const overflow = row.getByRole("button", { name: new RegExp(`More actions for ${formName}`) });
-    await overflow.click();
+    await expect(row.getByRole("cell").last().getByRole("link", { name: "Design" })).toBeVisible();
+    await row.getByRole("button", { name: new RegExp(`More actions for ${formName}`) }).click();
     await page.getByRole("menuitem", { name: /Records using this form/ }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Records" })).toBeVisible();
+
+    await page.goto(`/app/forms/${formId}/design`);
+    await page.getByRole("tab", { name: /^Fields/ }).click();
+    const fieldRow = page.getByRole("row", { name: /City/ });
+    const actions = fieldRow.getByRole("cell").last();
+    await expect(actions.getByRole("button", { name: "Edit City" })).toBeVisible();
+    await actions.getByRole("button", { name: "More actions for City" }).click();
+    await page.getByRole("menuitem", { name: "Show on canvas" }).click();
+    await expect(page.getByRole("complementary", { name: "Field Properties" }).getByLabel("Field label")).toHaveValue("City");
+    await signOut(page);
+  });
+
+  test("UX-12: default theme is black and the designer's semantic controls follow the theme tokens", async ({ page }) => {
+    // The organization override path itself (validated branding → --ui-primary-* on :root) is covered by
+    // packages/app-runtime/src/branding.test.ts and branding.spec.ts; here we prove the designer uses those tokens
+    // rather than hard-coded colours, without changing the shared development organization's real branding.
+    await signIn(page, "designer");
+    await page.goto(`/app/forms/${formId}/design`);
+    const inspector = await selectTile(page, "City");
+    const activeTab = inspector.getByRole("tab", { name: "General" });
+    const navTab = page.getByRole("tablist", { name: "Form designer" }).getByRole("tab", { name: "Design" });
+    await inspector.getByLabel("Help text").fill("dirty"); // enables the primary Save draft button
+    const save = page.getByRole("button", { name: "Save draft" });
+    const colours = () =>
+      Promise.all([
+        save.evaluate((el) => getComputedStyle(el).backgroundColor),
+        activeTab.evaluate((el) => getComputedStyle(el).borderBottomColor),
+        navTab.evaluate((el) => getComputedStyle(el).borderLeftColor),
+      ]);
+    expect(await colours()).toEqual(["rgb(17, 17, 17)", "rgb(17, 17, 17)", "rgb(17, 17, 17)"]);
+    await page.evaluate(() => document.documentElement.style.setProperty("--ui-primary-bg", "#1d4ed8"));
+    expect(await colours()).toEqual(["rgb(29, 78, 216)", "rgb(29, 78, 216)", "rgb(29, 78, 216)"]);
+    await page.getByRole("button", { name: "Undo last layout change" }).click();
+    await expect(page.getByText("Unsaved changes")).toBeHidden();
     await signOut(page);
   });
 });

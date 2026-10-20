@@ -19,7 +19,12 @@ public sealed record FormLayout(int LayoutSchemaVersion, string Title, IReadOnly
     public IEnumerable<LayoutElement> FieldElements => Elements.Where(e => e.Kind is LayoutElementKinds.Field or LayoutElementKinds.DocumentCollection);
 }
 
-public sealed record LayoutSection(string SectionKey, string Title, int GridColumns, IReadOnlyList<LayoutElement> Elements);
+/// <summary>
+/// A titled section ("row" in the designer, C1 designer rebuild) with its own four-column grid. <see cref="Description"/>
+/// is optional presentation text, omitted from the serialized layout when absent so layouts written before it existed
+/// serialize byte-for-byte as before.
+/// </summary>
+public sealed record LayoutSection(string SectionKey, string Title, int GridColumns, IReadOnlyList<LayoutElement> Elements, string? Description = null);
 
 public static class LayoutElementKinds
 {
@@ -49,7 +54,8 @@ public sealed record LayoutElement(
     LayoutValidation Validation,
     LayoutUploadPolicy? Upload,
     IReadOnlyList<string>? SummaryFieldKeys,
-    LayoutProtection? Protection = null);
+    LayoutProtection? Protection = null,
+    string? Placeholder = null);
 
 public static class FormLayoutCodec
 {
@@ -138,7 +144,7 @@ public static class FormLayoutCodec
                 }
             }
 
-            sections.Add(new LayoutSection(key, OptionalString(section, "title", 200) ?? key, gridColumns, elements));
+            sections.Add(new LayoutSection(key, OptionalString(section, "title", 200) ?? key, gridColumns, elements, OptionalString(section, "description", 1000)));
         }
 
         return new FormLayout(schemaVersion, title, sections);
@@ -155,6 +161,7 @@ public static class FormLayoutCodec
             {
                 sectionKey = s.SectionKey,
                 title = s.Title,
+                description = s.Description,
                 gridColumns = 4,
                 elements = s.Elements.Select(e => new
                 {
@@ -164,6 +171,7 @@ public static class FormLayoutCodec
                     control = e.Control,
                     label = e.Label,
                     helpText = e.HelpText,
+                    placeholder = e.Placeholder,
                     layout = new { columnSpan = e.Layout.ColumnSpan, startOnNewRow = e.Layout.StartOnNewRow },
                     required = e.Validation.Required,
                     validation = new { minLength = e.Validation.MinLength, maxLength = e.Validation.MaxLength, pattern = e.Validation.Pattern, minimum = e.Validation.Minimum, maximum = e.Validation.Maximum, minDate = e.Validation.MinDate, maxDate = e.Validation.MaxDate },
@@ -194,7 +202,7 @@ public static class FormLayoutCodec
                     throw new BusinessException("LAYOUT_INVALID", 422, $"unknown control '{control}'");
                 }
 
-                return new LayoutElement(kind, fieldId, null, control, label, help, placement, validation, null, null, ParseProtection(element));
+                return new LayoutElement(kind, fieldId, null, control, label, help, placement, validation, null, null, ParseProtection(element), OptionalString(element, "placeholder", 200));
             }
 
             case LayoutElementKinds.DocumentCollection:

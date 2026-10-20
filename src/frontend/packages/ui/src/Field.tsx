@@ -44,7 +44,7 @@ export function FieldShell({ label, helpText, error, required, children, classNa
   );
 }
 
-export const inputClass = "min-h-11 w-full rounded border border-input bg-surface px-3 py-2 text-base text-body placeholder:text-muted disabled:bg-page disabled:text-muted aria-[invalid=true]:border-[#991b1b]";
+export const inputClass = "min-h-11 w-full rounded border border-input bg-surface px-3 py-2 text-base text-body placeholder:text-muted read-only:bg-page disabled:bg-page disabled:text-muted aria-[invalid=true]:border-[#991b1b]";
 
 export interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
   label: string;

@@ -45,6 +45,34 @@ public sealed class StageBUnitTests
     }
 
     [Fact]
+    public void LayoutSectionsCarryOptionalDescriptionAndFieldPlaceholderWithoutChangingLegacySerialization()
+    {
+        var fieldId = Guid.CreateVersion7();
+        var legacy = $$$"""{"layoutSchemaVersion":2,"title":"Accused","sections":[{"sectionKey":"main","title":"Main","gridColumns":4,"elements":[{"kind":"field","fieldDefinitionId":"{{{fieldId}}}","control":"text","label":"Given name","layout":{"columnSpan":2,"startOnNewRow":false}}]}]}""";
+        var legacySerialized = FormLayoutCodec.Serialize(FormLayoutCodec.Parse(legacy));
+        Assert.DoesNotContain("description", legacySerialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("placeholder", legacySerialized, StringComparison.Ordinal);
+
+        // C1 designer rebuild: "+ Add Row" creates a titled section; several sections with their own fields round-trip.
+        var otherId = Guid.CreateVersion7();
+        var json = $$$"""{"layoutSchemaVersion":2,"title":"Accused","sections":[{"sectionKey":"main","title":"Personal Information","gridColumns":4,"elements":[{"kind":"field","fieldDefinitionId":"{{{fieldId}}}","control":"text","label":"Given name","placeholder":"As on the charge sheet","layout":{"columnSpan":1,"startOnNewRow":false}}]},{"sectionKey":"section_1a2b3c4d","title":"Contact Information","description":"Where the accused can be reached","gridColumns":4,"elements":[{"kind":"field","fieldDefinitionId":"{{{otherId}}}","control":"text","label":"City","layout":{"columnSpan":2,"startOnNewRow":false}}]},{"sectionKey":"section_empty","title":"New section","gridColumns":4,"elements":[]}]}""";
+        var layout = FormLayoutCodec.Parse(json);
+        Assert.Equal(3, layout.Sections.Count);
+        Assert.Equal("Contact Information", layout.Sections[1].Title);
+        Assert.Equal("Where the accused can be reached", layout.Sections[1].Description);
+        Assert.Null(layout.Sections[0].Description);
+        Assert.Equal("As on the charge sheet", layout.Elements.First().Placeholder);
+        Assert.Equal(otherId, layout.Sections[1].Elements[0].FieldDefinitionId);
+        var serialized = FormLayoutCodec.Serialize(layout);
+        Assert.Equal(serialized, FormLayoutCodec.Serialize(FormLayoutCodec.Parse(serialized)));
+
+        Assert.Throws<BusinessException>(() => FormLayoutCodec.Parse(json.Replace("Where the accused", "<b>Where</b> the accused", StringComparison.Ordinal)));
+        Assert.Throws<BusinessException>(() => FormLayoutCodec.Parse(json.Replace("As on the charge sheet", new string('x', 201), StringComparison.Ordinal)));
+        // A field may be placed in only one section.
+        Assert.Throws<BusinessException>(() => FormLayoutCodec.Parse(json.Replace(otherId.ToString(), fieldId.ToString(), StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public void TypedValueCodecValidatesAndRoundTripsEveryStageBType()
     {
         var record = Guid.CreateVersion7();

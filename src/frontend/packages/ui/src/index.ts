@@ -4,6 +4,7 @@ export { Checkbox, type CheckboxProps } from "./Checkbox";
 export { Select, type SelectOption, type SelectProps } from "./Select";
 export { Dialog, type DialogProps } from "./Dialog";
 export { Tabs, type TabItem } from "./Tabs";
+export { SideNavTabs, type SideNavItem } from "./SideNavTabs";
 export { Badge, Card, DescriptionList, EmptyState, LoadingBlock, PageHeader, ProgressBar, StatusMessage, type StatusTone } from "./Surfaces";
 export { DataTable, type DataTableColumn } from "./DataTable";
 export { OverflowMenu, RowActions, type OverflowMenuItem } from "./Menu";

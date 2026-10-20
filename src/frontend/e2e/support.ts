@@ -17,7 +17,7 @@ export async function signOut(page: Page) {
 
 export async function addField(page: Page, name: string, type: string) {
   await page.getByRole("tab", { name: /^Fields/ }).click();
-  await page.getByRole("button", { name: "Add field" }).first().click();
+  await page.getByRole("button", { name: "Add field", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add field" });
   await dialog.getByLabel("Display name").fill(name);
   await dialog.getByLabel("Storage type").click();
@@ -37,11 +37,36 @@ export async function addDocumentCollection(page: Page, name: string) {
   await expect(page.getByRole("row", { name: new RegExp(name) })).toContainText("File");
 }
 
-export async function placeFromPicker(page: Page, pickerLabel: string, optionText: RegExp) {
-  await page.getByRole("tab", { name: "Layout" }).click();
-  await page.getByLabel(pickerLabel, { exact: true }).click();
+/**
+ * Places an existing (unplaced) field, document collection or related list on the Design canvas through the C1
+ * designer's real UI: click the last "+ Add Field" cell of a section (default: the last section), choose the item in
+ * the inspector's "Place an existing field" picker, and place it. Related lists and document collections default to a
+ * full row, fields to the width given (default 1 column). `pickerLabel` is kept for call-site readability only.
+ */
+export async function placeFromPicker(page: Page, pickerLabel: string, optionText: RegExp, options: { section?: string; width?: string } = {}) {
+  await page.getByRole("tab", { name: "Design" }).click();
+  const canvas = page.getByRole("region", { name: "Form canvas" });
+  const scope = options.section ? canvas.getByRole("region", { name: options.section, exact: true }) : canvas;
+  await scope.getByRole("button", { name: /^Add Field to / }).last().click();
+  const inspector = page.getByRole("complementary", { name: "Add Field" });
+  await inspector.getByLabel("Place an existing field").click();
   await page.getByRole("option", { name: optionText }).click();
-  await page.getByRole("button", { name: pickerLabel, exact: true }).click();
+  const width = options.width ?? (pickerLabel === "Add field" ? undefined : "4 columns (full row)");
+  if (width) {
+    await inspector.getByLabel("Width").click();
+    await page.getByRole("option", { name: width }).click();
+  }
+  await inspector.getByRole("button", { name: "Place field here" }).click();
+  await expect(page.getByRole("complementary", { name: /Properties$/ })).toBeVisible();
+}
+
+/** Selects a placed tile on the Design canvas by its visible label; the inspector then shows its properties. */
+export async function selectTile(page: Page, label: string) {
+  await page.getByRole("tab", { name: "Design" }).click();
+  await page.getByRole("region", { name: "Form canvas" }).getByRole("button", { name: label, exact: true }).click();
+  const inspector = page.getByRole("complementary", { name: /Properties$/ });
+  await expect(inspector).toBeVisible();
+  return inspector;
 }
 
 export async function saveAndPublish(page: Page, reason: string) {
