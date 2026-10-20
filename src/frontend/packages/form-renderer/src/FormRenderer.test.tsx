@@ -51,4 +51,16 @@ describe("FormRenderer", () => {
     expect(screen.getByText("Ava")).toBeInTheDocument();
     expect(screen.getByText("No")).toBeInTheDocument();
   });
+
+  it("places the designer's help text above the input and the encryption notice below it, both announced with the input", () => {
+    const encryptedFields = fields.map((field) => (field.fieldKey === "given_name" ? { ...field, applicationEncrypted: true } : field));
+    const helpLayout: FormLayout = { ...layout, sections: [{ ...layout.sections[0]!, elements: [{ ...layout.sections[0]!.elements[0]!, helpText: "As on the charge sheet" } as FormLayout["sections"][number]["elements"][number]] }] };
+    render(<FormRenderer layout={helpLayout} fields={encryptedFields} values={{}} breakpoint="desktop" />);
+    const input = screen.getByLabelText(/Given name/);
+    const help = screen.getByText("As on the charge sheet");
+    const note = screen.getByText("Encrypted for privacy — not searchable.");
+    expect(help.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // help precedes the input
+    expect(input.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // the notice follows it
+    expect(input.getAttribute("aria-describedby")!.split(" ")).toEqual([help.id, note.id]);
+  });
 });
