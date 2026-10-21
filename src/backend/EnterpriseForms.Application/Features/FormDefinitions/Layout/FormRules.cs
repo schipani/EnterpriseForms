@@ -224,11 +224,12 @@ public static class FormRules
     /// form, operators and values fit the source type, no field depends on itself (directly or through a chain), and the
     /// behaviour flags are consistent. Throws LAYOUT_INVALID with an explanation the designer can act on.
     /// </summary>
-    public static void ValidateLayout(FormLayout layout, IReadOnlyDictionary<Guid, FieldDefinition> fieldsById, IReadOnlyDictionary<Guid, List<FieldOption>> optionsByField)
+    public static void ValidateLayout(FormLayout layout, IReadOnlyDictionary<Guid, FieldDefinition> fieldsById, IReadOnlyDictionary<Guid, List<FieldOption>> optionsByField, IReadOnlySet<Guid>? groupDefinitionIds = null)
     {
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(fieldsById);
         ArgumentNullException.ThrowIfNull(optionsByField);
+        ValidateGroups(layout, fieldsById, groupDefinitionIds ?? new HashSet<Guid>());
         var placedFields = layout.Elements.Where(e => e.Kind == LayoutElementKinds.Field && e.FieldDefinitionId is not null).ToDictionary(e => e.FieldDefinitionId!.Value);
         var dependencies = new Dictionary<Guid, HashSet<Guid>>();
         foreach (var element in layout.Elements)
@@ -281,6 +282,13 @@ public static class FormRules
                         throw Invalid($"'{name}': a rule cannot read the field it controls");
                     }
 
+                    if (source.GroupDefinitionId is { } sourceGroup && sourceGroup != field.GroupDefinitionId)
+                    {
+                        throw Invalid(field.GroupDefinitionId is null
+                            ? $"'{name}': a rule of a field outside a repeating section cannot read '{source.FieldKey}', which has one value per entry"
+                            : $"'{name}': a rule inside a repeating section can read fields of the same section or fields outside repeating sections, not '{source.FieldKey}'");
+                    }
+
                     if (!AllowedOperators(source).Contains(comparison.Operator))
                     {
                         throw Invalid($"'{name}': operator '{comparison.Operator}' cannot be used on '{source.FieldKey}' ({source.FieldDataType})");
@@ -297,12 +305,138 @@ public static class FormRules
             }
         }
 
+        ValidateOptionFilters(layout, fieldsById, optionsByField, placedFields);
+
         // Circular dependencies: A reads B, B reads A (or any longer chain) can never be evaluated.
         var state = new Dictionary<Guid, int>();
         foreach (var start in dependencies.Keys)
         {
             Visit(start, [], fieldsById, dependencies, state);
         }
+    }
+
+    /// <summary>
+    /// Repeating sections (Phase C3): each group is placed by at most one section; that section holds only data fields of the
+    /// group; a grouped field is placed only in its group's section and an ungrouped field never in one.
+    /// </summary>
+    private static void ValidateGroups(FormLayout layout, IReadOnlyDictionary<Guid, FieldDefinition> fieldsById, IReadOnlySet<Guid> groupDefinitionIds)
+    {
+        var placedGroups = new HashSet<Guid>();
+        foreach (var section in layout.Sections)
+        {
+            var group = section.Repeat?.GroupDefinitionId;
+            if (group is { } g)
+            {
+                if (!groupDefinitionIds.Contains(g))
+                {
+                    throw Invalid($"section '{section.Title}': the repeating group does not belong to this form");
+                }
+
+                if (!placedGroups.Add(g))
+                {
+                    throw Invalid("a repeating group may be placed by one section only");
+                }
+            }
+
+            foreach (var element in section.Elements)
+            {
+                if (group is not null && element.Kind != LayoutElementKinds.Field)
+                {
+                    throw Invalid($"section '{section.Title}' allows multiple entries; document collections and related-form lists cannot be placed in it");
+                }
+
+                if (element.FieldDefinitionId is not { } fieldId || !fieldsById.TryGetValue(fieldId, out var field))
+                {
+                    continue;
+                }
+
+                if (field.GroupDefinitionId != group)
+                {
+                    throw Invalid(field.GroupDefinitionId is null
+                        ? $"'{field.FieldKey}' has one value per record and cannot be placed in the repeating section '{section.Title}'; create the field inside that section instead"
+                        : $"'{field.FieldKey}' belongs to a repeating section and can only be placed in that section");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Dependent dropdowns (Phase C3): the parent is a placed dropdown in the same scope (same repeating section, or outside
+    /// repeating sections), every mapped key exists in the two option catalogs, and no chain of filters loops back.
+    /// </summary>
+    private static void ValidateOptionFilters(FormLayout layout, IReadOnlyDictionary<Guid, FieldDefinition> fieldsById, IReadOnlyDictionary<Guid, List<FieldOption>> optionsByField, Dictionary<Guid, LayoutElement> placedFields)
+    {
+        var parents = new Dictionary<Guid, Guid>();
+        foreach (var element in layout.Elements.Where(e => e.OptionFilter is not null))
+        {
+            var filter = element.OptionFilter!;
+            if (element.Kind != LayoutElementKinds.Field || element.FieldDefinitionId is not { } childId || !fieldsById.TryGetValue(childId, out var child) || child.FieldDataType != FieldDataTypes.Option)
+            {
+                throw Invalid("only dropdowns can filter their choices by another dropdown");
+            }
+
+            if (filter.ParentFieldDefinitionId == childId)
+            {
+                throw Invalid($"'{child.FieldKey}' cannot filter its choices by itself");
+            }
+
+            if (!fieldsById.TryGetValue(filter.ParentFieldDefinitionId, out var parent) || parent.FieldDataType != FieldDataTypes.Option || !placedFields.ContainsKey(parent.FieldDefinitionId))
+            {
+                throw Invalid($"'{child.FieldKey}': the field its choices depend on must be a dropdown placed in this layout");
+            }
+
+            if (parent.GroupDefinitionId is { } parentGroup && parentGroup != child.GroupDefinitionId)
+            {
+                throw Invalid($"'{child.FieldKey}': it can depend on a dropdown of the same repeating section or outside repeating sections, not on '{parent.FieldKey}'");
+            }
+
+            var childKeys = (optionsByField.GetValueOrDefault(childId) ?? []).Select(o => o.OptionKey).ToHashSet(StringComparer.Ordinal);
+            var parentKeys = (optionsByField.GetValueOrDefault(parent.FieldDefinitionId) ?? []).Select(o => o.OptionKey).ToHashSet(StringComparer.Ordinal);
+            foreach (var (childKey, mapped) in filter.ParentOptionKeysByOption)
+            {
+                if (!childKeys.Contains(childKey))
+                {
+                    throw Invalid($"'{child.FieldKey}': '{childKey}' is not an option of this dropdown");
+                }
+
+                var unknown = mapped.FirstOrDefault(k => !parentKeys.Contains(k));
+                if (unknown is not null)
+                {
+                    throw Invalid($"'{child.FieldKey}': '{unknown}' is not an option of '{parent.FieldKey}'");
+                }
+            }
+
+            parents[childId] = parent.FieldDefinitionId;
+        }
+
+        foreach (var start in parents.Keys)
+        {
+            var seen = new List<Guid> { start };
+            var current = start;
+            while (parents.TryGetValue(current, out var next))
+            {
+                if (seen.Contains(next))
+                {
+                    throw Invalid("circular dropdown dependency: " + string.Join(" → ", seen.Append(next).Select(id => fieldsById[id].FieldKey)));
+                }
+
+                seen.Add(next);
+                current = next;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The first selected option key of a dependent dropdown that is not valid for the parent's current selection, or null.
+    /// A child option without a mapping is valid for any parent value; a mapped option needs one of its parents selected.
+    /// </summary>
+    public static string? DependentOptionViolation(LayoutOptionFilter filter, FieldDefinition child, string childWire, string parentWire)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentNullException.ThrowIfNull(child);
+        var parentKeys = SplitSelection(parentWire ?? string.Empty).ToHashSet(StringComparer.Ordinal);
+        var childKeys = child.OptionSelectionMode == OptionSelectionModes.Multiple ? SplitSelection(childWire ?? string.Empty) : string.IsNullOrEmpty(childWire) ? [] : [childWire];
+        return childKeys.FirstOrDefault(key => filter.ParentOptionKeysByOption.TryGetValue(key, out var allowed) && !allowed.Any(parentKeys.Contains));
     }
 
     private static void Visit(Guid node, List<Guid> path, IReadOnlyDictionary<Guid, FieldDefinition> fieldsById, Dictionary<Guid, HashSet<Guid>> dependencies, Dictionary<Guid, int> state)

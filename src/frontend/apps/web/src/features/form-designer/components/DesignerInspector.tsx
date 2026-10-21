@@ -1,15 +1,19 @@
-import type { FieldDefinitionResponse, RelationshipDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
-import { applyEditValues, elementKey, findElement, moveElementTo, placedIds, toEditValues, updateElementByKey, updateSection, validateEditValues, type DesignerSelection, type FieldEditValues } from "@enterpriseforms/form-designer";
-import { CONTROLS_BY_TYPE, type DocumentElement, type FieldDataType, type FieldElement, type FormLayout, type LayoutElement, type RelatedElement } from "@enterpriseforms/form-renderer";
+import type { FieldDefinitionResponse, GroupDefinitionResponse, RelationshipDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
+import { applyEditValues, elementKey, findElement, moveElementTo, placedIds, sameScope, setSectionRepeat, toEditValues, updateElementByKey, updateSection, validateEditValues, type DesignerSelection, type FieldEditValues } from "@enterpriseforms/form-designer";
+import { CONTROLS_BY_TYPE, REPEAT_CEILING, type DocumentElement, type FieldDataType, type FieldElement, type FormLayout, type LayoutElement, type LayoutRepeat, type RelatedElement } from "@enterpriseforms/form-renderer";
 import { Badge, Button, Checkbox, Select, StatusMessage, Tabs, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useState, type ReactNode } from "react";
 import { CurrentProtectionSection } from "./FieldSecuritySection";
 import { OptionsEditor } from "./OptionsEditor";
-import { RulesTab } from "./RulesTab";
+import { DependentChoices, RulesTab } from "./RulesTab";
+import { ErrorPanel } from "../../support";
 
 export interface PlacementTarget {
   sectionKey: string;
   insertIndex: number;
+  /** The specific empty cell this is, when it is one of several at the same `insertIndex` (e.g. a "+ Add Row" column); used to consume exactly that slot and to carry its `startOnNewRow` into the placed field. */
+  slotId?: string | undefined;
+  startOnNewRow?: boolean | undefined;
 }
 
 export interface DesignerInspectorProps {
@@ -37,8 +41,14 @@ export interface DesignerInspectorProps {
   strengthenPending: boolean;
   strengthenError: unknown;
   announce: (message: string) => void;
-  /** Tab to open when a field is selected from elsewhere (e.g. the Rules overview). */
-  requestedTab?: string | undefined;
+  /** Opens the full Configure Field modal (Validation / Conditional Rules / Dropdown Choices / Placement & Alignment / Security & Encryption / Advanced) on `key`, optionally landing on a given tab. */
+  onOpenConfig: (key: string, tab?: string) => void;
+  /** Repeating groups of the form (Phase C3). */
+  groups?: readonly GroupDefinitionResponse[] | undefined;
+  /** "Allow multiple entries" on an empty section: creates a group (or reuses an unplaced one) and places it in the section. */
+  onEnableRepeat?: ((sectionIndex: number, existingGroupDefinitionId: string | null) => void) | undefined;
+  enableRepeatPending?: boolean | undefined;
+  enableRepeatError?: unknown;
 }
 
 const WIDTH_OPTIONS = [
@@ -51,11 +61,15 @@ const WIDTH_OPTIONS = [
 const TYPE_LABEL: Record<string, string> = { String: "Text (String)", Integer: "Whole number (Integer)", Decimal: "Decimal", Date: "Date", DateTime: "Date and time", Guid: "Identifier (Guid)", Boolean: "Yes/No (Boolean)", Option: "Dropdown", File: "File (document collection)" };
 
 /**
- * Right-hand inspector (C1 designer rebuild §2): the single place where a selection is edited. A placed field or
- * document collection shows **Field Properties** with the five stable tabs General / Validation / Rules / Security &
- * Encryption / Advanced; a section shows **Section Properties**; an empty cell shows the Add Field options for that
- * exact position. Presentation edits change the draft layout (undoable; saved with Save draft). Security changes
- * reuse the existing Authority-backed workflow — the inspector never offers its own encryption switch.
+ * Right-hand inspector (Phase C3 designer UX refinement): the single place a selection starts. A placed field or
+ * document collection shows a short **Field Properties** summary (label, type, help text, placeholder) with a
+ * **Configure Field** button that opens the full Validation / Conditional Rules / Dropdown Choices (Option fields
+ * only) / Placement & Alignment / Security & Encryption / Advanced workspace in a large modal (`FieldConfigModal`);
+ * there is no separate General tab — nothing it would show is not already in this quick panel. A section shows
+ * **Section Properties** (unchanged, still inline —
+ * it is short); an empty cell shows the Add Field options for that exact position. Presentation edits change the
+ * draft layout (undoable; saved with Save draft). Security changes reuse the existing Authority-backed workflow —
+ * the inspector never offers its own encryption switch.
  */
 export function DesignerInspector(props: DesignerInspectorProps) {
   const { selection, layout } = props;
@@ -66,7 +80,7 @@ export function DesignerInspector(props: DesignerInspectorProps) {
     if (position) {
       const element = position.element;
       title = element.kind === "relatedFormList" ? "Related List Properties" : "Field Properties";
-      body = <ElementProperties key={selection.key} {...props} element={element} sectionIndex={position.sectionIndex} index={position.index} />;
+      body = <QuickElementProperties key={selection.key} {...props} element={element} />;
     }
   } else if (selection?.kind === "section") {
     const sectionIndex = layout.sections.findIndex((section) => section.sectionKey === selection.sectionKey);
@@ -78,7 +92,7 @@ export function DesignerInspector(props: DesignerInspectorProps) {
     const sectionIndex = layout.sections.findIndex((section) => section.sectionKey === selection.sectionKey);
     if (sectionIndex >= 0) {
       title = "Add Field";
-      body = <SlotOptions key={`${selection.sectionKey}:${selection.insertIndex}`} {...props} sectionIndex={sectionIndex} target={{ sectionKey: selection.sectionKey, insertIndex: selection.insertIndex }} />;
+      body = <SlotOptions key={`${selection.sectionKey}:${selection.slotId}`} {...props} sectionIndex={sectionIndex} target={{ sectionKey: selection.sectionKey, insertIndex: selection.insertIndex, slotId: selection.slotId, startOnNewRow: selection.startOnNewRow }} />;
     }
   }
   return (
@@ -104,16 +118,21 @@ function NothingSelected({ layout, fields, relationships }: DesignerInspectorPro
   const placed = placedIds(layout);
   const unplaced = fields.filter((field) => !placed.fieldIds.has(field.fieldDefinitionId)).length + relationships.filter((relationship) => !placed.relationshipIds.has(relationship.formRelationshipDefinitionId)).length;
   return (
-    <>
-      <p className="text-sm text-muted">Select a field to edit its properties, a section title to edit the section, or an empty “+ Add Field” cell to place a field exactly there.</p>
-      <p className="text-sm">
+    <div role="status">
+      <p className="text-sm text-muted">Select a field to see its properties, a section title to edit the section, or an empty “+ Add Field” cell to place a field exactly there.</p>
+      <p className="mt-2 text-sm">
         {layout.sections.length} {layout.sections.length === 1 ? "section" : "sections"} · {unplaced === 0 ? "every field is placed" : `${unplaced} not yet placed`}
       </p>
-    </>
+    </div>
   );
 }
 
-function placementControls({ layout, onChange, onSelect, announce, canDesign }: DesignerInspectorProps, element: LayoutElement, sectionIndex: number, index: number) {
+/**
+ * `layout`/`onChange` are shared between every placement edit a field or related-list element makes — field width,
+ * section, move earlier/later. `FieldConfigModal` reuses this unchanged with a local draft layout/setter so the
+ * Advanced tab's Placement section behaves identically while deferring the actual commit to Apply Changes.
+ */
+export function placementControls({ layout, onChange, onSelect, announce, canDesign }: DesignerInspectorProps, element: LayoutElement, sectionIndex: number, index: number) {
   const key = elementKey(element);
   const section = layout.sections[sectionIndex]!;
   const moveTo = (targetSectionIndex: number, insertIndex: number, message: string) => {
@@ -125,20 +144,23 @@ function placementControls({ layout, onChange, onSelect, announce, canDesign }: 
     }
   };
   return (
-    <>
-      <Select
-        label="Field width"
-        value={String(element.layout.columnSpan)}
-        disabled={!canDesign}
-        options={WIDTH_OPTIONS}
-        onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => ({ ...current, layout: { ...current.layout, columnSpan: Number(value) as 1 | 2 | 3 | 4 } })))}
-      />
-      <Checkbox label="Start on a new row" checked={element.layout.startOnNewRow} disabled={!canDesign} onCheckedChange={(checked) => onChange(updateElementByKey(layout, key, (current) => ({ ...current, layout: { ...current.layout, startOnNewRow: checked } })))} />
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Select
+          label="Field width"
+          value={String(element.layout.columnSpan)}
+          disabled={!canDesign}
+          options={WIDTH_OPTIONS}
+          onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => ({ ...current, layout: { ...current.layout, columnSpan: Number(value) as 1 | 2 | 3 | 4 } })))}
+        />
+        <Checkbox label="Start on a new row" checked={element.layout.startOnNewRow} disabled={!canDesign} onCheckedChange={(checked) => onChange(updateElementByKey(layout, key, (current) => ({ ...current, layout: { ...current.layout, startOnNewRow: checked } })))} />
+      </div>
       <Select
         label="Section"
         value={section.sectionKey}
         disabled={!canDesign}
-        options={layout.sections.map((candidate) => ({ value: candidate.sectionKey, label: candidate.title?.trim() || candidate.sectionKey }))}
+        options={layout.sections.filter((candidate) => sameScope(candidate, section)).map((candidate) => ({ value: candidate.sectionKey, label: candidate.title?.trim() || candidate.sectionKey }))}
+        helpText={section.repeat ? "Fields of a section that allows multiple entries stay in that section (one value per entry)." : undefined}
         onValueChange={(sectionKey) => {
           const target = layout.sections.findIndex((candidate) => candidate.sectionKey === sectionKey);
           if (target >= 0 && target !== sectionIndex) {
@@ -154,29 +176,34 @@ function placementControls({ layout, onChange, onSelect, announce, canDesign }: 
           Move later
         </Button>
       </div>
-    </>
+    </div>
   );
 }
 
-function ElementProperties(props: DesignerInspectorProps & { element: LayoutElement; sectionIndex: number; index: number }) {
+/**
+ * Quick properties (Phase C3 designer UX refinement): the four fields the right-hand panel always shows for a placed
+ * field or document collection — label, type, help text, placeholder — plus "Configure Field" for everything else.
+ * This panel edits the draft layout live, the same way the full inspector always has; it never needs its own
+ * scrollbar because there is nothing else here to crowd it.
+ */
+function QuickElementProperties(props: DesignerInspectorProps & { element: LayoutElement }) {
   const { element } = props;
-  const [tab, setTab] = useState(props.requestedTab ?? "general");
   if (element.kind === "relatedFormList") {
-    return <RelatedListProperties {...props} element={element} tab={tab} setTab={setTab} />;
+    return <QuickRelatedListProperties {...props} element={element} />;
   }
   const field = props.fields.find((candidate) => candidate.fieldDefinitionId === element.fieldDefinitionId);
   if (!field) {
     return <StatusMessage tone="warning" title="Unknown field">This placement refers to a field that is not in this form's catalog. Remove it from the layout.</StatusMessage>;
   }
-  return <FieldProperties {...props} element={element} field={field} tab={tab} setTab={setTab} />;
+  return <QuickFieldProperties {...props} element={element} field={field} />;
 }
 
-function FieldProperties(props: DesignerInspectorProps & { element: FieldElement | DocumentElement; field: FieldDefinitionResponse; sectionIndex: number; index: number; tab: string; setTab: (tab: string) => void }) {
+function QuickFieldProperties(props: DesignerInspectorProps & { element: FieldElement | DocumentElement; field: FieldDefinitionResponse }) {
   const { element, field, layout, onChange, canDesign } = props;
   const key = elementKey(element);
   const dataType = field.fieldDataType;
-  // Values derive from the draft element on every render (so Undo/Redo are reflected); only input that does not yet
-  // validate is held locally until it does — switching tabs never loses it, because this state lives above the tabs.
+  // Values derive from the draft element on every render (so Undo/Redo and the Configure Field modal's Apply are
+  // reflected immediately); only input that does not yet validate is held locally until it does.
   const [pending, setPending] = useState<Partial<FieldEditValues>>({});
   const base = toEditValues(element, field.fieldDisplayName);
   const values: FieldEditValues = { ...base, ...pending };
@@ -191,14 +218,12 @@ function FieldProperties(props: DesignerInspectorProps & { element: FieldElement
       setPending((current) => ({ ...current, [name]: value }));
     }
   };
-  const controls = element.kind === "field" ? (CONTROLS_BY_TYPE[dataType as FieldDataType] ?? []) : [];
   const supportsPlaceholder = element.kind === "field" && (dataType === "String" || dataType === "Integer" || dataType === "Decimal");
-  const encrypted = field.fieldProtectionMode === "ApplicationEncrypted";
 
-  const general = (
+  return (
     <div className="flex flex-col gap-3">
       <TextInput label="Field label" value={values.label} required maxLength={200} disabled={!canDesign} error={errors.label} onChange={(event) => set("label", event.target.value)} />
-      <TextInput label="Field type" value={dataType === "Option" ? (field.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : (TYPE_LABEL[dataType] ?? dataType)} readOnly />
+      <TextInput label="Field type" value={dataType === "Option" ? (field.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : (TYPE_LABEL[dataType] ?? dataType)} readOnly helpText="Permanent: changing it would reinterpret stored values." />
       <TextArea label="Help text" value={values.helpText} rows={2} maxLength={1000} disabled={!canDesign} error={errors.helpText} onChange={(event) => set("helpText", event.target.value)} />
       {supportsPlaceholder ? (
         <TextInput
@@ -225,56 +250,142 @@ function FieldProperties(props: DesignerInspectorProps & { element: FieldElement
           }}
         />
       ) : null}
-      {dataType === "Option" && element.kind === "field" ? (
-        <OptionsEditor formDefinitionId={props.formDefinitionId} field={field} element={element} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} />
-      ) : null}
-      {controls.length > 1 && element.kind === "field" ? (
-        <Select label="Control" value={element.control} disabled={!canDesign} options={controls.map((control) => ({ value: control, label: control === "textarea" ? "Multi-line text" : "Single-line text" }))} onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => (current.kind === "field" ? { ...current, control: value as FieldElement["control"] } : current)))} />
-      ) : null}
-      <Checkbox label="Required" checked={values.required} disabled={!canDesign} onCheckedChange={(checked) => set("required", checked)} />
-      {placementControls(props, element, props.sectionIndex, props.index)}
+      <ConfigureFieldButton onClick={() => props.onOpenConfig(key)} />
     </div>
   );
+}
 
+function QuickRelatedListProperties(props: DesignerInspectorProps & { element: RelatedElement }) {
+  const { element, relationships, layout, onChange, canDesign } = props;
+  const key = elementKey(element);
+  const relationship = relationships.find((candidate) => candidate.formRelationshipDefinitionId === element.formRelationshipDefinitionId);
+  return (
+    <div className="flex flex-col gap-3">
+      <TextInput
+        label="Field label"
+        value={element.label}
+        required
+        maxLength={200}
+        disabled={!canDesign}
+        onChange={(event) => onChange(updateElementByKey(layout, key, (current) => (current.kind === "relatedFormList" ? { ...current, label: event.target.value.replace(/[<>]/g, "") } : current)))}
+      />
+      <TextInput label="Field type" value="Related form list" readOnly />
+      <TextInput label="Child form" value={relationship?.childFormDefinitionName ?? "Unknown"} readOnly />
+      <ConfigureFieldButton onClick={() => props.onOpenConfig(key)} />
+    </div>
+  );
+}
+
+/** Prominent entry point to the full configuration workspace (Phase C3 designer UX refinement). */
+export function ConfigureFieldButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button onClick={onClick} className="justify-center">
+      <GearIcon /> Configure Field
+    </Button>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+/**
+ * Full Field Properties content (Validation / Conditional Rules / Dropdown Choices for Option fields / Placement &
+ * Alignment / Security & Encryption / Advanced), used only inside `FieldConfigModal` (Phase C3 designer UX
+ * refinement — this used to render inline in the right-hand panel, with a General tab that duplicated the quick
+ * inspector's label/type/help text/placeholder; General is gone, Required moved to Validation, Control stayed on
+ * Advanced, and Placement moved to its own tab so nothing here repeats the quick inspector). The vertical tab
+ * navigation suits the modal's width; `Tabs` keeps the same `role="tab"`/`role="tablist"` semantics either way.
+ */
+export function FieldProperties(props: DesignerInspectorProps & { element: FieldElement | DocumentElement; field: FieldDefinitionResponse; sectionIndex: number; index: number; tab: string; setTab: (tab: string) => void }) {
+  const { element, field, layout, onChange, canDesign } = props;
+  const key = elementKey(element);
+  const dataType = field.fieldDataType;
+  const [pending, setPending] = useState<Partial<FieldEditValues>>({});
+  const base = toEditValues(element, field.fieldDisplayName);
+  const values: FieldEditValues = { ...base, ...pending };
+  const errors = validateEditValues(values, dataType);
+  const set = <K extends keyof FieldEditValues>(name: K, value: FieldEditValues[K]) => {
+    const next = { ...values, [name]: value };
+    const nextErrors = validateEditValues(next, dataType);
+    if (Object.keys(nextErrors).length === 0) {
+      setPending({});
+      onChange(updateElementByKey(layout, key, (current) => applyEditValues(current, next, dataType)));
+    } else {
+      setPending((current) => ({ ...current, [name]: value }));
+    }
+  };
+  const controls = element.kind === "field" ? (CONTROLS_BY_TYPE[dataType as FieldDataType] ?? []) : [];
+  const encrypted = field.fieldProtectionMode === "ApplicationEncrypted";
+
+  // Label, type, help text and placeholder live only in the quick inspector (Phase C3 designer UX refinement); this
+  // modal never repeats them. Required moves here (it is a validation constraint); Control and Placement move to
+  // Advanced; dropdown choices and dependent choices get their own tab below.
   const validation = (
     <div className="flex flex-col gap-3">
+      <Checkbox label="Required" checked={values.required} disabled={!canDesign} onCheckedChange={(checked) => set("required", checked)} />
       {dataType === "String" ? (
-        <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextInput label="Minimum length" inputMode="numeric" value={values.minLength} disabled={!canDesign} error={errors.minLength} onChange={(event) => set("minLength", event.target.value)} />
           <TextInput label="Maximum length" inputMode="numeric" value={values.maxLength} disabled={!canDesign} error={errors.maxLength} onChange={(event) => set("maxLength", event.target.value)} />
-        </>
+        </div>
       ) : null}
       {dataType === "Integer" || dataType === "Decimal" ? (
-        <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextInput label="Minimum value" inputMode="decimal" value={values.minimum} disabled={!canDesign} error={errors.minimum} onChange={(event) => set("minimum", event.target.value)} />
           <TextInput label="Maximum value" inputMode="decimal" value={values.maximum} disabled={!canDesign} error={errors.maximum} onChange={(event) => set("maximum", event.target.value)} />
-        </>
+        </div>
       ) : null}
       {dataType === "Date" || dataType === "DateTime" ? (
-        <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextInput label="Earliest date" type="date" value={values.minDate} disabled={!canDesign} error={errors.minDate} onChange={(event) => set("minDate", event.target.value)} />
           <TextInput label="Latest date" type="date" value={values.maxDate} disabled={!canDesign} error={errors.maxDate} onChange={(event) => set("maxDate", event.target.value)} />
-        </>
+        </div>
       ) : null}
       {dataType === "File" ? (
         <>
-          <TextInput label="Maximum files" inputMode="numeric" value={values.maxFiles} disabled={!canDesign} error={errors.maxFiles} onChange={(event) => set("maxFiles", event.target.value)} />
-          <TextInput label="Maximum file size (MB)" inputMode="numeric" value={values.maxFileSizeMb} disabled={!canDesign} error={errors.maxFileSizeMb} onChange={(event) => set("maxFileSizeMb", event.target.value)} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <TextInput label="Maximum files" inputMode="numeric" value={values.maxFiles} disabled={!canDesign} error={errors.maxFiles} onChange={(event) => set("maxFiles", event.target.value)} />
+            <TextInput label="Maximum file size (MB)" inputMode="numeric" value={values.maxFileSizeMb} disabled={!canDesign} error={errors.maxFileSizeMb} onChange={(event) => set("maxFileSizeMb", event.target.value)} />
+          </div>
           <TextInput label="Allowed content types" value={values.allowedContentTypes} disabled={!canDesign} helpText="Comma-separated MIME types, e.g. application/pdf, text/plain. Documents already stored are never removed." onChange={(event) => set("allowedContentTypes", event.target.value)} />
         </>
       ) : null}
-      {dataType === "Boolean" || dataType === "Option" || dataType === "Guid" ? <p className="text-sm text-muted">{dataType === "Option" ? "A dropdown accepts only its active options (the server enforces this on every save). Use Required (General tab) to demand a choice." : "This storage type has no extra constraints beyond Required (General tab) and its type rules, which the server enforces."}</p> : null}
+      {dataType === "Boolean" || dataType === "Option" || dataType === "Guid" ? <p className="text-sm text-muted">{dataType === "Option" ? "A dropdown accepts only its active options (the server enforces this on every save). Use Required above to demand a choice." : "This storage type has no extra constraints beyond Required above and its type rules, which the server enforces."}</p> : null}
       <p className="text-xs text-muted">Rules apply to new saves after publishing; stored values and documents are never rewritten.</p>
     </div>
   );
 
   const items = [
-    { value: "general", label: "General", content: general },
     { value: "validation", label: "Validation", content: validation },
     {
       value: "rules",
-      label: "Rules",
+      label: "Conditional Rules",
       content: element.kind === "field" ? <RulesTab layout={layout} element={element} field={field} fields={props.fields} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} /> : <RulesNotice />,
+    },
+    dataType === "Option" && element.kind === "field"
+      ? {
+          value: "dropdown",
+          label: "Dropdown Choices",
+          content: (
+            <div className="flex flex-col gap-4">
+              <OptionsEditor formDefinitionId={props.formDefinitionId} field={field} element={element} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} />
+              <div className="border-t border-line pt-4">
+                <DependentChoices layout={layout} element={element} field={field} fields={props.fields} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} />
+              </div>
+            </div>
+          ),
+        }
+      : null,
+    {
+      value: "placement",
+      label: "Placement & Alignment",
+      content: <div className="flex flex-col gap-4">{placementControls(props, element, props.sectionIndex, props.index)}</div>,
     },
     {
       value: "security",
@@ -294,47 +405,49 @@ function FieldProperties(props: DesignerInspectorProps & { element: FieldElement
       value: "advanced",
       label: "Advanced",
       content: (
-        <div className="flex flex-col gap-3">
-          <TextInput label="Field UUID" value={field.fieldDefinitionId} readOnly helpText="Stable identity (FieldDefinitionId); renaming or moving never changes it." />
-          <TextInput label="Field key" value={field.fieldKey} readOnly />
+        <div className="flex flex-col gap-4">
+          {controls.length > 1 && element.kind === "field" ? (
+            <Select label="Control" value={element.control} disabled={!canDesign} options={controls.map((control) => ({ value: control, label: control === "textarea" ? "Multi-line text" : "Single-line text" }))} onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => (current.kind === "field" ? { ...current, control: value as FieldElement["control"] } : current)))} />
+          ) : null}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <TextInput label="Field ID" value={field.fieldDefinitionId} readOnly helpText="This ID stays the same even if you rename or move the field." />
+            <TextInput label="Field key" value={field.fieldKey} readOnly />
+          </div>
           <TextInput label="Catalog name" value={field.fieldDisplayName} readOnly helpText="Name in the field catalog; the label above is this form version's display label." />
-          <TextInput label="Field definition revision" value={String(field.fieldDefinitionRevision)} readOnly />
-          <TextInput label="Lifecycle status" value={field.lifecycleStatus} readOnly />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <TextInput label="Field definition revision" value={String(field.fieldDefinitionRevision)} readOnly />
+            <TextInput label="Lifecycle status" value={field.lifecycleStatus} readOnly />
+          </div>
           <Button size="sm" variant="secondary" onClick={() => props.onOpenFieldEditor(field.fieldDefinitionId)}>
             {canDesign ? "Edit catalog name and description…" : "View field details…"}
           </Button>
         </div>
       ),
     },
-  ];
-  return <Tabs label={`Properties of ${values.label || field.fieldDisplayName}`} density="compact" value={props.tab} onValueChange={props.setTab} items={items} />;
+  ].filter((item): item is NonNullable<typeof item> => item !== null);
+  return <Tabs label={`Properties of ${values.label || field.fieldDisplayName}`} orientation="vertical" value={props.tab} onValueChange={props.setTab} items={items} />;
 }
 
-function RelatedListProperties(props: DesignerInspectorProps & { element: RelatedElement; sectionIndex: number; index: number; tab: string; setTab: (tab: string) => void }) {
-  const { element, layout, onChange, canDesign } = props;
-  const key = elementKey(element);
+export function RelatedListProperties(props: DesignerInspectorProps & { element: RelatedElement; sectionIndex: number; index: number; tab: string; setTab: (tab: string) => void }) {
+  const { element } = props;
   const relationship = props.relationships.find((candidate) => candidate.formRelationshipDefinitionId === element.formRelationshipDefinitionId);
+  // The list label lives in the quick inspector now (Phase C3 designer UX refinement), matching Field Properties.
   const items = [
-    {
-      value: "general",
-      label: "General",
-      content: (
-        <div className="flex flex-col gap-3">
-          <TextInput label="List label" value={element.label} maxLength={200} disabled={!canDesign} onChange={(event) => onChange(updateElementByKey(layout, key, (current) => ({ ...current, label: event.target.value.replace(/[<>]/g, "") })))} />
-          <TextInput label="Child form" value={relationship?.childFormDefinitionName ?? "Unknown"} readOnly />
-          {placementControls(props, element, props.sectionIndex, props.index)}
-        </div>
-      ),
-    },
     { value: "validation", label: "Validation", content: <p className="text-sm text-muted">Allowed number of child records: {relationship ? `${relationship.minimumChildCount}–${relationship.maximumChildCount}` : "unknown"}. Bounds belong to the relationship definition and are enforced by the server.</p> },
-    { value: "rules", label: "Rules", content: <RulesNotice /> },
+    { value: "rules", label: "Conditional Rules", content: <RulesNotice /> },
+    {
+      value: "placement",
+      label: "Placement & Alignment",
+      content: <div className="flex flex-col gap-4">{placementControls(props, element, props.sectionIndex, props.index)}</div>,
+    },
     { value: "security", label: "Security & Encryption", content: <p className="text-sm text-muted">Each child is an independent record. The Authorization Authority decides access per child record; a share of the parent never covers its children, and each child field keeps its own encryption policy.</p> },
     {
       value: "advanced",
       label: "Advanced",
       content: (
-        <div className="flex flex-col gap-3">
-          <TextInput label="Relationship UUID" value={element.formRelationshipDefinitionId} readOnly helpText="Stable identity; moving the list between sections never changes its child links." />
+        <div className="flex flex-col gap-4">
+          <TextInput label="Relationship ID" value={element.formRelationshipDefinitionId} readOnly helpText="This ID stays the same even if you move the list to another section." />
+          <TextInput label="Child form" value={relationship?.childFormDefinitionName ?? "Unknown"} readOnly />
           <Button size="sm" variant="secondary" onClick={props.onOpenRelatedForms}>
             Manage related forms…
           </Button>
@@ -342,7 +455,7 @@ function RelatedListProperties(props: DesignerInspectorProps & { element: Relate
       ),
     },
   ];
-  return <Tabs label={`Properties of ${element.label || "related list"}`} density="compact" value={props.tab} onValueChange={props.setTab} items={items} />;
+  return <Tabs label={`Properties of ${element.label || "related list"}`} orientation="vertical" value={props.tab} onValueChange={props.setTab} items={items} />;
 }
 
 function RulesNotice() {
@@ -367,6 +480,7 @@ function SectionProperties(props: DesignerInspectorProps & { sectionIndex: numbe
           Every section uses the standard four-column grid (one column on phones, two on tablets). {section.elements.length === 1 ? "1 item" : `${section.elements.length} items`} placed. Use “+ Add Column” to add another empty placement cell.
         </p>
       </div>
+      <RepeatSettings {...props} sectionIndex={sectionIndex} />
       <Checkbox label="Collapsed in the designer" checked={collapsed} onCheckedChange={() => props.onToggleCollapse(section.sectionKey)} helpText="Designer view only; the form always shows the section." />
       {canDesign ? (
         <div className="flex flex-wrap gap-2">
@@ -377,7 +491,7 @@ function SectionProperties(props: DesignerInspectorProps & { sectionIndex: numbe
             Move section down
           </Button>
           <Button size="sm" variant="secondary" onClick={() => props.onDuplicateSection(sectionIndex)}>
-            Duplicate section
+            {section.repeat ? "Duplicate as a plain section" : "Duplicate section"}
           </Button>
           <Button size="sm" variant="danger" disabled={layout.sections.length <= 1} onClick={() => props.onRequestRemoveSection(sectionIndex)}>
             Remove section…
@@ -388,13 +502,94 @@ function SectionProperties(props: DesignerInspectorProps & { sectionIndex: numbe
   );
 }
 
+/**
+ * "Allow multiple entries" (Phase C3). A section that allows multiple entries holds the fields of one repeating group: each
+ * entry has its own values, and those fields stay in the section for life. It can be switched on or off only while the
+ * section is empty; the entry settings can change at any time and take effect when the version is published.
+ */
+function RepeatSettings(props: DesignerInspectorProps & { sectionIndex: number }) {
+  const { layout, onChange, sectionIndex, canDesign } = props;
+  const section = layout.sections[sectionIndex]!;
+  const repeat = section.repeat;
+  const placedGroups = new Set(layout.sections.flatMap((candidate) => (candidate.repeat ? [candidate.repeat.groupDefinitionId] : [])));
+  const reusable = (props.groups ?? []).filter((group) => !placedGroups.has(group.groupDefinitionId));
+  const [reuse, setReuse] = useState<string>("new");
+  const group = repeat ? props.groups?.find((candidate) => candidate.groupDefinitionId === repeat.groupDefinitionId) : undefined;
+  const update = (patch: Partial<LayoutRepeat>) => repeat && onChange(setSectionRepeat(layout, sectionIndex, { ...repeat, ...patch }));
+  const [minText, setMinText] = useState(String(repeat?.minOccurrences ?? 0));
+  const [maxText, setMaxText] = useState(String(repeat?.maxOccurrences ?? 10));
+  const min = Number(minText);
+  const max = Number(maxText);
+  const boundsError = !/^\d+$/.test(minText) || !/^\d+$/.test(maxText) ? "Enter whole numbers" : max < 1 || max > REPEAT_CEILING ? `The maximum must be between 1 and ${REPEAT_CEILING}` : min > max ? "The minimum cannot exceed the maximum" : repeat && !repeat.allowAdd && min < 1 ? "When entries cannot be added, the minimum must be at least 1" : undefined;
+  const commitBounds = (nextMin: string, nextMax: string) => {
+    setMinText(nextMin);
+    setMaxText(nextMax);
+    const a = Number(nextMin);
+    const b = Number(nextMax);
+    if (/^\d+$/.test(nextMin) && /^\d+$/.test(nextMax) && b >= 1 && b <= REPEAT_CEILING && a <= b && (repeat?.allowAdd !== false || a >= 1)) {
+      update({ minOccurrences: a, maxOccurrences: b });
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2 rounded border border-line p-3" data-repeat-settings>
+      <Checkbox
+        label="Allow multiple entries"
+        checked={repeat !== undefined}
+        disabled={!canDesign || props.enableRepeatPending === true || section.elements.length > 0}
+        helpText={
+          section.elements.length > 0
+            ? repeat
+              ? "Remove the fields from this section before turning this off: they have one value per entry and cannot become record-level fields."
+              : "Only an empty section can allow multiple entries. Add a new section, turn this on, then create its fields."
+            : "People can add several entries to this section (for example several people or vehicles); each entry has its own values."
+        }
+        onCheckedChange={(checked) => {
+          if (checked) {
+            props.onEnableRepeat?.(sectionIndex, reuse === "new" ? null : reuse);
+          } else {
+            onChange(setSectionRepeat(layout, sectionIndex, undefined));
+          }
+        }}
+      />
+      {!repeat && reusable.length > 0 && section.elements.length === 0 ? (
+        <Select label="Entries group" value={reuse} disabled={!canDesign} options={[{ value: "new", label: "A new group" }, ...reusable.map((candidate) => ({ value: candidate.groupDefinitionId, label: `${candidate.groupDisplayName} (existing, not placed)` }))]} onValueChange={setReuse} helpText="Reusing a group brings back its fields and the entries already stored in records." />
+      ) : null}
+      {props.enableRepeatError ? <ErrorPanel error={props.enableRepeatError} /> : null}
+      {repeat ? (
+        <>
+          {group ? <p className="text-xs text-muted">Group key <code>{group.groupKey}</code> (permanent).</p> : null}
+          <div className="grid grid-cols-2 gap-2">
+            <TextInput label="Minimum entries" inputMode="numeric" value={minText} disabled={!canDesign} onChange={(event) => commitBounds(event.target.value.trim(), maxText)} />
+            <TextInput label="Maximum entries" inputMode="numeric" value={maxText} disabled={!canDesign} onChange={(event) => commitBounds(minText, event.target.value.trim())} />
+          </div>
+          {boundsError ? (
+            <p role="alert" className="text-sm font-medium text-[#991b1b]">
+              {boundsError}
+            </p>
+          ) : (
+            <p className="text-xs text-muted">
+              Between {min} and {max} entries. A new record starts with {min} {min === 1 ? "entry" : "entries"}. At most {REPEAT_CEILING}.
+            </p>
+          )}
+          <Checkbox label="People can add entries" checked={repeat.allowAdd} disabled={!canDesign || (!repeat.allowAdd && repeat.minOccurrences < 1)} onCheckedChange={(checked) => (checked || repeat.minOccurrences >= 1 ? update({ allowAdd: checked }) : undefined)} helpText={repeat.minOccurrences < 1 ? "Set a minimum of at least 1 to turn this off (the record then has exactly that many entries)." : undefined} />
+          <Checkbox label="People can remove entries" checked={repeat.allowRemove} disabled={!canDesign} onCheckedChange={(checked) => update({ allowRemove: checked })} />
+          <Checkbox label="People can reorder entries" checked={repeat.allowReorder} disabled={!canDesign} onCheckedChange={(checked) => update({ allowReorder: checked })} />
+          <p className="text-xs text-muted">Each entry keeps a permanent identity through edits and reordering. Entries are part of the record: they are not shared on their own and are not separate records (use a related form list for independent child records such as addresses).</p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; target: PlacementTarget }) {
   const { layout, onChange, sectionIndex, target, fields, relationships, canDesign } = props;
   const section = layout.sections[sectionIndex]!;
   const placed = placedIds(layout);
+  // A section that allows multiple entries offers only its group's fields; every other section only record-level fields.
+  const groupId = section.repeat?.groupDefinitionId ?? null;
   const options = [
-    ...fields.filter((field) => !placed.fieldIds.has(field.fieldDefinitionId)).map((field) => ({ value: `field:${field.fieldDefinitionId}`, label: field.fieldDataType === "File" ? `${field.fieldDisplayName} (documents)` : `${field.fieldDisplayName} (${field.fieldDataType})` })),
-    ...relationships.filter((relationship) => !placed.relationshipIds.has(relationship.formRelationshipDefinitionId)).map((relationship) => ({ value: `relationship:${relationship.formRelationshipDefinitionId}`, label: `${relationship.relationshipDisplayName} (related list)` })),
+    ...fields.filter((field) => !placed.fieldIds.has(field.fieldDefinitionId) && (field.groupDefinitionId ?? null) === groupId).map((field) => ({ value: `field:${field.fieldDefinitionId}`, label: field.fieldDataType === "File" ? `${field.fieldDisplayName} (documents)` : `${field.fieldDisplayName} (${field.fieldDataType})` })),
+    ...(groupId ? [] : relationships.filter((relationship) => !placed.relationshipIds.has(relationship.formRelationshipDefinitionId)).map((relationship) => ({ value: `relationship:${relationship.formRelationshipDefinitionId}`, label: `${relationship.relationshipDisplayName} (related list)` }))),
   ];
   const [choice, setChoice] = useState<string | undefined>(undefined);
   const [width, setWidth] = useState("1");
@@ -407,13 +602,14 @@ function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; tar
     }
     const [kind, id] = choice.split(":", 2) as [string, string];
     const columnSpan = Number(width) as 1 | 2 | 3 | 4;
+    const startOnNewRow = target.startOnNewRow === true;
     let element: LayoutElement;
     if (kind === "relationship") {
       const relationship = relationships.find((candidate) => candidate.formRelationshipDefinitionId === id)!;
-      element = { kind: "relatedFormList", formRelationshipDefinitionId: id, label: relationship.relationshipDisplayName, layout: { columnSpan, startOnNewRow: false }, summaryFieldKeys: [] };
+      element = { kind: "relatedFormList", formRelationshipDefinitionId: id, label: relationship.relationshipDisplayName, layout: { columnSpan, startOnNewRow }, summaryFieldKeys: [] };
     } else {
       const field = fields.find((candidate) => candidate.fieldDefinitionId === id)!;
-      element = newElementFor(field, columnSpan);
+      element = { ...newElementFor(field, columnSpan), layout: { columnSpan, startOnNewRow } };
     }
     const sectionNow = layout.sections[sectionIndex]!;
     const elements = [...sectionNow.elements];
@@ -441,14 +637,18 @@ function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; tar
         <p className="text-sm font-medium">Or create something new here</p>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={() => props.onCreateAt("field", target)}>
-            New field…
+            {groupId ? "New field for each entry…" : "New field…"}
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => props.onCreateAt("documents", target)}>
-            New document collection…
-          </Button>
-          <Button size="sm" variant="secondary" onClick={props.onOpenRelatedForms}>
-            Related form list…
-          </Button>
+          {groupId ? null : (
+            <>
+              <Button size="sm" variant="secondary" onClick={() => props.onCreateAt("documents", target)}>
+                New document collection…
+              </Button>
+              <Button size="sm" variant="secondary" onClick={props.onOpenRelatedForms}>
+                Related form list…
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

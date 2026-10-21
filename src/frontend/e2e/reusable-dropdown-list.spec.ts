@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { formIdFromUrl, placeFromPicker, saveAndPublish, selectTile, signIn, signOut } from "./support";
+import { formIdFromUrl, openFieldConfig, placeFromPicker, saveAndPublish, selectTile, signIn, signOut } from "./support";
 
 /**
  * Reusable dropdown list workflow, exactly as a user does it in the browser:
@@ -69,9 +69,12 @@ test.describe.serial("Reusable option list → dropdown field → record", () =>
     await placeFromPicker(page, "Add field", /^Previous statuses/, { width: "2 columns" });
     const inspector = await selectTile(page, "Marital status");
     await expect(inspector.getByLabel("Field type")).toHaveValue("Dropdown (Single Select)");
-    const region = inspector.getByRole("region", { name: "Options of Marital status" });
+    const modal = await openFieldConfig(page, "Marital status", "Dropdown Choices");
+    const region = modal.getByRole("region", { name: "Options of Marital status" });
     await expect(region.getByRole("listitem")).toHaveCount(4);
     await expect(region.getByText("Shared list")).toBeVisible();
+    await modal.getByRole("button", { name: "Cancel" }).click();
+    await expect(modal).toBeHidden();
 
     // 7. Preview: pick a value.
     await page.getByRole("tab", { name: "Preview" }).click();

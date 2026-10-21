@@ -24,7 +24,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
     public Task<FormRecordResponse> HandleAsync(RequestContext context, Guid formDefinitionId, CreateFormRecordRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return CreateAsync(context, formDefinitionId, request.Values, request.OwnerTeamId, null, idempotencyKey, cancellationToken);
+        return CreateAsync(context, formDefinitionId, request.Values, request.Groups, request.OwnerTeamId, null, idempotencyKey, cancellationToken);
     }
 
     /// <summary>Child record creation (B-04): the parent must be owned by the actor; the relationship definition binds the child form.</summary>
@@ -61,10 +61,10 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             throw new BusinessException("NOT_FOUND", 404, "parent record not found");
         }
 
-        return await CreateAsync(context, relationship.ChildFormDefinitionId, request.Values, null, (parentFormRecordId, relationship, existingCount + 1), idempotencyKey, cancellationToken).ConfigureAwait(false);
+        return await CreateAsync(context, relationship.ChildFormDefinitionId, request.Values, request.Groups, null, (parentFormRecordId, relationship, existingCount + 1), idempotencyKey, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<FormRecordResponse> CreateAsync(RequestContext context, Guid formDefinitionId, IReadOnlyDictionary<string, string> values, Guid? ownerTeamId, (Guid ParentId, FormRelationshipDefinition Relationship, int SortOrder)? child, string idempotencyKey, CancellationToken cancellationToken)
+    private async Task<FormRecordResponse> CreateAsync(RequestContext context, Guid formDefinitionId, IReadOnlyDictionary<string, string> values, IReadOnlyList<RecordGroupValuesRequest>? groupValues, Guid? ownerTeamId, (Guid ParentId, FormRelationshipDefinition Relationship, int SortOrder)? child, string idempotencyKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(values);
@@ -73,6 +73,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         Domain.Features.FormDefinitions.FormVersion version;
         List<Domain.Features.FormDefinitions.FieldDefinition> fields;
         List<Domain.Features.FormDefinitions.FieldOption> options;
+        List<Domain.Features.FormDefinitions.GroupDefinition> groups;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             definition = await scope.FindFormDefinitionAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)
@@ -86,13 +87,17 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
                       ?? throw new BusinessException("FORM_NOT_PUBLISHED", 422, "published version missing");
             fields = await scope.GetFieldDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
             options = await scope.GetFieldOptionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
+            groups = await scope.GetGroupDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
         }
 
         var layout = FormLayoutCodec.Parse(version.LayoutJson);
         var now = clock.GetUtcNow();
         var formRecordId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "record");
         // Validate before any authority command so a bad request never registers a phantom resource.
-        var candidateValues = CandidateBuilder.ApplyValues([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption, creating: true);
+        var applied = CandidateBuilder.ApplyValuesDetailed([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption, creating: true,
+            groups: new CandidateBuilder.GroupInput(groups, [], RecordGroupWrites.From(groupValues)));
+        var candidateValues = applied.Rows;
+        CandidateBuilder.EnsureWithinCeiling(candidateValues.Count + applied.Occurrences.Count + 1);
 
         if (child is null)
         {
@@ -160,7 +165,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
                     AuditRecorder.Record(scope, context, clock, AuditCategories.Relationship, AuditActions.ChildRecordLinked, "child record created and linked", formRecordId, formDefinitionId, targetEntityType: "form_record", targetEntityId: c.ParentId, metadata: new { relationship = c.Relationship.RelationshipDefinitionKey, commandId = command.CommandId });
                 }
 
-                AuditRecorder.Record(scope, context, clock, AuditCategories.Record, AuditActions.RecordCreated, "record registered with the authority", formRecordId, formDefinitionId, metadata: new { commandId = command.CommandId, authorizationRevision = command.AuthorizationRevision });
+                AuditRecorder.Record(scope, context, clock, AuditCategories.Record, AuditActions.RecordCreated, "record registered with the authority", formRecordId, formDefinitionId, metadata: new { commandId = command.CommandId, authorizationRevision = command.AuthorizationRevision, groupChanges = RecordGroupWrites.AuditOf(applied.GroupChanges) });
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             }
         }
@@ -181,7 +186,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             RelationshipSortOrder = child?.SortOrder,
         };
 
-        var accepted = await stager.StageAndCommitAsync(context, head, new RecordCandidateStager.CandidateInput(header, candidateValues.Cast<ISignedContentRow>().ToList()), idempotencyKey, cancellationToken).ConfigureAwait(false);
+        var accepted = await stager.StageAndCommitAsync(context, head, new RecordCandidateStager.CandidateInput(header, candidateValues.Cast<ISignedContentRow>().Concat(applied.Occurrences).ToList()), idempotencyKey, cancellationToken).ConfigureAwait(false);
         if (accepted.CommittedOperationId is { } acceptedOperation)
         {
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
@@ -195,7 +200,8 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         var fieldsById = fields.ToDictionary(f => f.FieldDefinitionId);
         var optionsById = options.ToDictionary(o => o.FieldOptionId);
         return new FormRecordResponse(formRecordId, context.OrganizationId, formDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true,
-            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue)).ToList(),
-            "Committed(" + accepted.ArchiveState + ")");
+            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
+            "Committed(" + accepted.ArchiveState + ")",
+            Projection.RecordGroupProjection.Build(groups, layout, applied.Occurrences));
     }
 }

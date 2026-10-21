@@ -95,10 +95,21 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
       }
       const inspector = page.getByRole("complementary", { name: /Properties$/ });
       await expect(inspector).toBeVisible();
-      for (const tabName of ["General", "Validation", "Rules", "Security & Encryption", "Advanced"]) {
-        await inspector.getByRole("tab", { name: tabName }).click();
-        await scan(page, `${viewport.id} designer inspector ${tabName} tab @${viewport.name}`);
+      await scan(page, `${viewport.id} designer quick inspector @${viewport.name}`);
+      // Phase C3 designer UX refinement: Validation/Conditional Rules/Security & Encryption/Advanced (and, for a
+      // dropdown field, Dropdown Choices) live in the large Configure Field modal
+      // (90vw/1200px, full-screen below sm — this exercises exactly that at the 200%/400% zoom equivalent
+      // viewports), opened from the quick inspector's prominent button. There is no General tab: label, type, help
+      // text and placeholder live only in the quick inspector, scanned above.
+      await inspector.getByRole("button", { name: "Configure Field" }).click();
+      const configModal = page.getByRole("dialog", { name: /^Configure /i });
+      await expect(configModal).toBeVisible();
+      for (const tabName of ["Validation", "Conditional Rules", "Placement & Alignment", "Security & Encryption", "Advanced"]) {
+        await configModal.getByRole("tab", { name: tabName }).click();
+        await scan(page, `${viewport.id} designer configure field ${tabName} tab @${viewport.name}`);
       }
+      await configModal.getByRole("button", { name: "Cancel" }).click();
+      await expect(configModal).toBeHidden();
       if (viewport.width < 1024) {
         await page.getByRole("button", { name: "Canvas", exact: true }).click();
       }

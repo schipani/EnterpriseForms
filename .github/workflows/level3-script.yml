@@ -1,0 +1,64 @@
+# Runs the developer Level 3 script (scripts/dev/test.ps1 -Level 3) unchanged on a disposable hosted runner, so the script
+# itself is verified end to end in an isolated environment: its own clean security-test stack, SEC-P01..SEC-P12, the Stage B
+# integration tests and every Playwright project, then teardown. Runs on manual dispatch and on pull requests that change
+# the script (or this workflow); synthetic credentials only. It does not replace the security-gate-a / stage-b-integration
+# gates (which remain the required evidence) — it checks the script.
+name: level3-script
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/dev/test.ps1
+      - .github/workflows/level3-script.yml
+      # The script starts the stack from these files.
+      - infrastructure/docker/compose.yaml
+      - infrastructure/docker/compose.security-test.yaml
+      - infrastructure/docker/env.example
+
+permissions:
+  contents: read
+
+jobs:
+  level3:
+    name: Level 3 developer script (isolated hosted runner)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.20.0"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: Playwright Chromium (the script runs `npm ci` itself; browsers live outside node_modules)
+        working-directory: src/frontend
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Level 3 (the script, unchanged)
+        shell: pwsh
+        run: ./scripts/dev/test.ps1 -Level 3
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with:
+          name: level3-script-evidence
+          path: |
+            artifacts/test-results
+            artifacts/security
+            artifacts/stage-b
+          if-no-files-found: warn
+      - name: Tear down (in case the script stopped early)
+        if: always()
+        working-directory: infrastructure/docker
+        run: docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env down -v --remove-orphans || true

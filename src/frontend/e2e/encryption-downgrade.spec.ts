@@ -74,6 +74,10 @@ test.describe.serial("Field encryption removal: policy switch, administrator-onl
     await expect(edit.getByRole("button", { name: /Strengthen protection/ })).toBeVisible();
     await expect(edit.getByRole("button", { name: /Remove encryption/ })).toHaveCount(0);
     await expect(edit.getByRole("button", { name: /Declassify/ })).toHaveCount(0);
+    // The simplified primary copy says this plainly; the full governance detail (why a designer can't do this) is
+    // behind an accessible "Learn more" disclosure, not hidden entirely (Phase C3 usability corrections).
+    await expect(edit.getByText(/Turning encryption off requires administrator approval/)).toBeVisible();
+    await edit.getByText("Learn more", { exact: true }).click(); // a native <summary> disclosure, not exposed as role=button in this browser/Playwright combination
     await expect(edit.getByText(/Removing encryption is not a designer action/)).toBeVisible();
     await page.getByRole("dialog", { name: "Edit field" }).getByRole("button", { name: "Cancel" }).click();
     await signOut(page);

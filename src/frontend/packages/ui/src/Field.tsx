@@ -1,5 +1,5 @@
 import * as Label from "@radix-ui/react-label";
-import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { createContext, forwardRef, useContext, useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 
 export interface FieldShellProps {
   label: string;
@@ -13,14 +13,38 @@ export interface FieldShellProps {
   className?: string;
 }
 
-/** Label, help text and error message stay adjacent to their control and are associated by id (WCAG 1.3.1 / 3.3.1). */
+/**
+ * Where help text sits relative to its control. Defaults to the record-entry renderer's existing, tested order
+ * (help text orients the person before they reach the control — `FormRenderer.test.tsx` "places the designer's help
+ * text above the input"), unaffected by this provider. The Form Designer and its configuration dialogs wrap
+ * themselves in `<FieldLayoutProvider helpAfterControl>` (Phase C3 usability corrections: label, then the control,
+ * then help text, matching "Field key" in Add Field and every field in Configure Field) so every `TextInput`/
+ * `TextArea`/`Select` inside gets the new order without touching each call site individually.
+ */
+const FieldLayoutContext = createContext(false);
+
+export function FieldLayoutProvider({ helpAfterControl = true, children }: { helpAfterControl?: boolean; children: ReactNode }) {
+  return <FieldLayoutContext.Provider value={helpAfterControl}>{children}</FieldLayoutContext.Provider>;
+}
+
+/**
+ * Label, then — depending on `FieldLayoutProvider` — help text before or after the control, then the status note and
+ * error message. `aria-describedby` associates help/note/error with the control regardless of visual order
+ * (WCAG 1.3.1 / 3.3.1).
+ */
 export function FieldShell({ label, helpText, note, error, required, children, className = "" }: FieldShellProps) {
+  const helpAfterControl = useContext(FieldLayoutContext);
   const id = useId();
   const inputId = `${id}-input`;
   const helpId = `${id}-help`;
   const errorId = `${id}-error`;
   const noteId = `${id}-note`;
   const describedBy = [helpText ? helpId : null, note ? noteId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
+  const help = helpText ? (
+    <p id={helpId} className="text-sm text-muted">
+      {helpText}
+    </p>
+  ) : null;
   return (
     <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
       <Label.Root htmlFor={inputId} className="text-sm font-medium text-body">
@@ -32,12 +56,9 @@ export function FieldShell({ label, helpText, note, error, required, children, c
         ) : null}
         {required ? <span className="sr-only"> (required)</span> : null}
       </Label.Root>
-      {helpText ? (
-        <p id={helpId} className="text-sm text-muted">
-          {helpText}
-        </p>
-      ) : null}
+      {helpAfterControl ? null : help}
       {children({ inputId, describedBy, invalid: Boolean(error) })}
+      {helpAfterControl ? help : null}
       {note ? (
         <p id={noteId} className="text-sm text-muted">
           {note}

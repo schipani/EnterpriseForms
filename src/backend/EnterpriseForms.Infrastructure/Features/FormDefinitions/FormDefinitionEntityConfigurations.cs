@@ -58,6 +58,7 @@ public sealed class FieldDefinitionConfiguration : IEntityTypeConfiguration<Fiel
         builder.Property(f => f.ProtectionPolicyRevision).HasDefaultValue(1L);
         builder.Property(f => f.OptionSelectionMode).HasMaxLength(10).HasDefaultValue("Single");
         builder.HasOne<OptionList>().WithMany().HasForeignKey(f => f.OptionListId).HasConstraintName("fk_field_definitions_option_list");
+        builder.HasOne<GroupDefinition>().WithMany().HasForeignKey(f => f.GroupDefinitionId).HasConstraintName("fk_field_definitions_group");
         builder.HasIndex(f => new { f.FormDefinitionId, f.FieldKey }).IsUnique().HasDatabaseName("uq_field_definitions_form_key");
         builder.HasOne<FormDefinition>().WithMany().HasForeignKey(f => f.FormDefinitionId).HasConstraintName("fk_field_definitions_definition");
         builder.ToTable(t =>
@@ -71,5 +72,20 @@ public sealed class FieldDefinitionConfiguration : IEntityTypeConfiguration<Fiel
             t.HasCheckConstraint("ck_field_definitions_option_selection_mode", "option_selection_mode IN ('Single','Multiple')");
             t.HasCheckConstraint("ck_field_definitions_classification", "field_classification IN ('Public','Internal','Confidential','Restricted')");
         });
+    }
+}
+
+public sealed class GroupDefinitionConfiguration : IEntityTypeConfiguration<GroupDefinition>
+{
+    public void Configure(EntityTypeBuilder<GroupDefinition> builder)
+    {
+        builder.MapSnakeCase("group_definitions");
+        builder.HasKey(g => g.GroupDefinitionId);
+        builder.Property(g => g.GroupKey).HasMaxLength(64);
+        builder.Property(g => g.GroupDisplayName).HasMaxLength(200);
+        builder.Property(g => g.LifecycleStatus).HasMaxLength(20);
+        builder.HasIndex(g => new { g.FormDefinitionId, g.GroupKey }).IsUnique().HasDatabaseName("uq_group_definitions_form_key");
+        builder.HasOne<FormDefinition>().WithMany().HasForeignKey(g => g.FormDefinitionId).HasConstraintName("fk_group_definitions_definition");
+        builder.ToTable(t => t.HasCheckConstraint("ck_group_definitions_lifecycle", "lifecycle_status IN ('Available','Deprecated','Retired')"));
     }
 }

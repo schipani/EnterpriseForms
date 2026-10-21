@@ -105,10 +105,21 @@ public static class BusinessSignedSchemas
         new RowSignedColumn("wrapped_data_key", RowColumnType.Bytes, Nullable: false),
     ]);
 
+    /// <summary>form_record_groups v1 (Phase C3): one occurrence of a repeating group; canonical pk = the stable occurrence id.</summary>
+    public static readonly RowSchemaDefinition FormRecordGroupsV1 = new("form_record_groups", 1,
+    [
+        new RowSignedColumn("content_change_operation_id", RowColumnType.Uuid, Nullable: false),
+        new RowSignedColumn("form_record_id", RowColumnType.Uuid, Nullable: false),
+        new RowSignedColumn("group_definition_id", RowColumnType.Uuid, Nullable: false),
+        new RowSignedColumn("group_sort_order", RowColumnType.Int64, Nullable: false),
+        new RowSignedColumn("parent_form_record_group_id", RowColumnType.Uuid, Nullable: true),
+        new RowSignedColumn("tenant_id", RowColumnType.Uuid, Nullable: false),
+    ]);
+
     /// <summary>Current schema per entity kind (used for new candidates).</summary>
     public static IReadOnlyList<RowSchemaDefinition> All { get; } =
     [
-        FormRecordsV2, FormRecordsV3, FieldStringValuesV1, FieldIntegerValuesV1, FieldDecimalValuesV1, FieldDateValuesV1, FieldDateTimeValuesV1, FieldGuidValuesV1, FieldBooleanValuesV1, FieldOptionValuesV1, FieldEncryptedValuesV1, FileAttachmentVersionsV1,
+        FormRecordsV2, FormRecordsV3, FieldStringValuesV1, FieldIntegerValuesV1, FieldDecimalValuesV1, FieldDateValuesV1, FieldDateTimeValuesV1, FieldGuidValuesV1, FieldBooleanValuesV1, FieldOptionValuesV1, FieldEncryptedValuesV1, FileAttachmentVersionsV1, FormRecordGroupsV1,
     ];
 
     public static int CurrentSchemaVersion(ISignedContentRow row)
@@ -127,6 +138,7 @@ public static class BusinessSignedSchemas
             FieldEncryptedValue => FieldEncryptedValuesV1.SchemaVersion,
             FieldOptionValue => FieldOptionValuesV1.SchemaVersion,
             FileAttachmentVersion => FileAttachmentVersionsV1.SchemaVersion,
+            FormRecordGroupRevision => FormRecordGroupsV1.SchemaVersion,
             _ => throw new ArgumentOutOfRangeException(nameof(row), row.GetType().Name, "unregistered signed row type"),
         };
     }
@@ -149,6 +161,15 @@ public static class BusinessSignedSchemas
             FieldEncryptedValue v => RowCanonicalizerV1.Encode(FieldEncryptedValuesV1, context, EncryptedColumns(v)),
             FieldOptionValue v => RowCanonicalizerV1.Encode(FieldOptionValuesV1, context, ValueColumns(v, "field_option_id", RowValue.Uuid(v.FieldOptionId))),
             FileAttachmentVersion v => RowCanonicalizerV1.Encode(FileAttachmentVersionsV1, context, AttachmentColumns(v)),
+            FormRecordGroupRevision g => RowCanonicalizerV1.Encode(FormRecordGroupsV1, context, new Dictionary<string, RowValue?>(StringComparer.Ordinal)
+            {
+                ["content_change_operation_id"] = RowValue.Uuid(g.ContentChangeOperationId),
+                ["form_record_id"] = RowValue.Uuid(g.FormRecordId),
+                ["group_definition_id"] = RowValue.Uuid(g.GroupDefinitionId),
+                ["group_sort_order"] = RowValue.Int64(g.GroupSortOrder),
+                ["parent_form_record_group_id"] = g.ParentFormRecordGroupId is { } parent ? RowValue.Uuid(parent) : null,
+                ["tenant_id"] = RowValue.Uuid(g.TenantId),
+            }),
             _ => throw new ArgumentOutOfRangeException(nameof(row), row.GetType().Name, "unregistered signed row type"),
         };
     }

@@ -14,7 +14,7 @@ public static class BusinessRuntimeGrants
     private static readonly string[] InsertOnlyTables =
     [
         "form_record_revisions", "field_string_values", "field_integer_values", "field_decimal_values", "field_date_values", "field_date_time_values", "field_guid_values", "field_boolean_values", "field_option_values", "field_encrypted_values",
-        "form_versions", "field_definitions", "audit_events", "file_attachment_versions",
+        "form_versions", "field_definitions", "audit_events", "file_attachment_versions", "group_definitions", "form_record_group_revisions",
     ];
 
     private static readonly string[] ProjectionTables =

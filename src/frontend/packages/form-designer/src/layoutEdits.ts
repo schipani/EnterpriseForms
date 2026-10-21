@@ -1,4 +1,4 @@
-import type { FormLayout, LayoutElement, LayoutSection } from "@enterpriseforms/form-renderer";
+import type { FormLayout, LayoutElement, LayoutRepeat, LayoutSection } from "@enterpriseforms/form-renderer";
 
 /**
  * Pure, immutable layout edits used by the designer canvas and inspector (unit-tested; no React).
@@ -52,7 +52,7 @@ export function moveElement(layout: FormLayout, sectionIndex: number, from: numb
 export function moveElementTo(layout: FormLayout, key: string, targetSectionIndex: number, targetIndex: number): FormLayout {
   const source = findElement(layout, key);
   const target = layout.sections[targetSectionIndex];
-  if (!source || !target) {
+  if (!source || !target || !sameScope(layout.sections[source.sectionIndex]!, target)) {
     return layout;
   }
   let insertAt = Math.max(0, Math.min(targetIndex, target.elements.length));
@@ -67,6 +67,41 @@ export function moveElementTo(layout: FormLayout, key: string, targetSectionInde
   }
   const without = removeElement(layout, source.sectionIndex, source.index);
   return insertElement(without, targetSectionIndex, insertAt, source.element);
+}
+
+/**
+ * Whether elements can move between two sections (Phase C3). A field of a repeating section belongs to its group for life
+ * and has one value per entry, so it stays in that group's section; record-level fields, document collections and related
+ * lists never enter a repeating section. Moves are allowed between sections of the same scope only.
+ */
+export function sameScope(a: LayoutSection, b: LayoutSection): boolean {
+  return (a.repeat?.groupDefinitionId ?? null) === (b.repeat?.groupDefinitionId ?? null);
+}
+
+/**
+ * "Allow multiple entries": turns an empty section into the placement of a repeating group (or back), or changes the entry
+ * settings of a section that already allows multiple entries. Turning it on or off needs an empty section, because field
+ * membership in a group is permanent.
+ */
+export function setSectionRepeat(layout: FormLayout, sectionIndex: number, repeat: LayoutRepeat | undefined): FormLayout {
+  const section = layout.sections[sectionIndex];
+  if (!section) {
+    return layout;
+  }
+  const switching = (section.repeat?.groupDefinitionId ?? null) !== (repeat?.groupDefinitionId ?? null);
+  if (switching && section.elements.length > 0) {
+    return layout;
+  }
+  if (repeat && layout.sections.some((candidate, index) => index !== sectionIndex && candidate.repeat?.groupDefinitionId === repeat.groupDefinitionId)) {
+    return layout;
+  }
+  const next: LayoutSection = { ...section };
+  if (repeat) {
+    next.repeat = repeat;
+  } else {
+    delete next.repeat;
+  }
+  return replaceSection(layout, sectionIndex, next);
 }
 
 export function updateElement(layout: FormLayout, sectionIndex: number, index: number, patch: (element: LayoutElement) => LayoutElement): FormLayout {
@@ -204,7 +239,7 @@ export function removeSection(layout: FormLayout, sectionIndex: number, disposit
   let sections = [...layout.sections];
   if (disposition.kind === "moveTo") {
     const target = sections[disposition.targetSectionIndex];
-    if (!target || disposition.targetSectionIndex === sectionIndex) {
+    if (!target || disposition.targetSectionIndex === sectionIndex || !sameScope(section, target)) {
       return layout;
     }
     sections[disposition.targetSectionIndex] = { ...target, elements: [...target.elements, ...section.elements] };

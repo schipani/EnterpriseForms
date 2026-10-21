@@ -644,6 +644,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("form_definition_id");
 
+                    b.Property<Guid?>("GroupDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_definition_id");
+
                     b.Property<bool>("IsSearchable")
                         .HasColumnType("boolean")
                         .HasColumnName("is_searchable");
@@ -693,6 +697,8 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnName("protection_policy_revision");
 
                     b.HasKey("FieldDefinitionId");
+
+                    b.HasIndex("GroupDefinitionId");
 
                     b.HasIndex("OptionListId");
 
@@ -1172,6 +1178,55 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.ToTable("form_versions", null, t =>
                         {
                             t.HasCheckConstraint("ck_form_versions_number_positive", "version_number > 0 AND layout_schema_version > 0");
+                        });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.GroupDefinition", b =>
+                {
+                    b.Property<Guid>("GroupDefinitionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_definition_id");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<string>("GroupDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("group_display_name");
+
+                    b.Property<string>("GroupKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("group_key");
+
+                    b.Property<string>("LifecycleStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("lifecycle_status");
+
+                    b.HasKey("GroupDefinitionId");
+
+                    b.HasIndex("FormDefinitionId", "GroupKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_group_definitions_form_key");
+
+                    b.ToTable("group_definitions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_group_definitions_lifecycle", "lifecycle_status IN ('Available','Deprecated','Retired')");
                         });
                 });
 
@@ -2245,6 +2300,99 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FormRecordGroupRevision", b =>
+                {
+                    b.Property<Guid>("FormRecordGroupRevisionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_group_revision_id");
+
+                    b.Property<Guid>("ContentChangeOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("content_change_operation_id");
+
+                    b.Property<long>("ContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("content_revision");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<Guid>("FormRecordGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_group_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("GroupDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_definition_id");
+
+                    b.Property<long>("GroupSortOrder")
+                        .HasColumnType("bigint")
+                        .HasColumnName("group_sort_order");
+
+                    b.Property<Guid?>("ParentFormRecordGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_form_record_group_id");
+
+                    b.Property<long>("RowRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_revision");
+
+                    b.Property<byte[]>("RowSignature")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("row_signature");
+
+                    b.Property<int>("RowSignatureKeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_signature_key_version");
+
+                    b.Property<int>("RowSignatureSchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_signature_schema_version");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("FormRecordGroupRevisionId");
+
+                    b.HasIndex("GroupDefinitionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("FormRecordId", "ContentChangeOperationId")
+                        .HasDatabaseName("ix_form_record_group_revisions_record_operation");
+
+                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "FormRecordGroupId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_form_record_group_revisions_occurrence");
+
+                    b.HasIndex("ContentChangeOperationId", "FormRecordId", "GroupDefinitionId", "GroupSortOrder")
+                        .IsUnique()
+                        .HasDatabaseName("uq_form_record_group_revisions_position");
+
+                    b.ToTable("form_record_group_revisions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_form_record_group_revisions_no_nesting", "parent_form_record_group_id IS NULL");
+
+                            t.HasCheckConstraint("ck_form_record_group_revisions_signature_length", "octet_length(row_signature) = 32");
+
+                            t.HasCheckConstraint("ck_form_record_group_revisions_sort_order", "group_sort_order >= 0");
+
+                            t.HasCheckConstraint("ck_form_record_group_revisions_versions_positive", "row_revision >= 1 AND row_signature_key_version >= 1 AND row_signature_schema_version >= 1 AND content_revision >= 1");
+                        });
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FormRecordRevision", b =>
                 {
                     b.Property<Guid>("FormRecordRevisionId")
@@ -3153,6 +3301,11 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_field_definitions_definition");
 
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.GroupDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("GroupDefinitionId")
+                        .HasConstraintName("fk_field_definitions_group");
+
                     b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.OptionList", null)
                         .WithMany()
                         .HasForeignKey("OptionListId")
@@ -3253,6 +3406,16 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("RestoredFromFormVersionId")
                         .HasConstraintName("fk_form_versions_restored_from");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.GroupDefinition", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FormDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FormDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_definitions_definition");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.OptionList", b =>
@@ -3530,6 +3693,30 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_form_records_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FormRecordGroupRevision", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormRecords.FormRecord", null)
+                        .WithMany()
+                        .HasForeignKey("FormRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_form_record_group_revisions_record");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.GroupDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("GroupDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_form_record_group_revisions_group");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_form_record_group_revisions_tenant");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FormRecordRevision", b =>

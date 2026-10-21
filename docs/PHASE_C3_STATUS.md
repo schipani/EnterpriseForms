@@ -1,0 +1,216 @@
+# Phase C3 — Repeating groups and dependent dropdowns
+
+Branch `phase-c/repeating-groups` (from main `7b3c173`). **Status: implemented and verified as recorded below. The owner tested repeating groups directly and confirmed they work well, and approved closing Phase C3 and proceeding (2026-10-21) — see Addendum 5. The owner separately found the Form Designer's overall UX functional but not fully visually accepted; that remains open, tracked future work, not resolved by this document.** Nothing here is an accessibility certification, an independent review or a production security certification.
+
+Architecture assessment (written before implementation): `docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md`. Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-15 … C-26**.
+
+**Trust boundary: unchanged.** No change to the Authorization Authority, its command protocol, RowHmac v1 or Merkle v1 (C-15). The one new signed artifact is the business signed schema `form_record_groups` v1, registered like the Stage B value schemas.
+
+## What was built
+
+### Priority 1 — Repeating groups
+
+| # | Requirement | Where / how |
+|---|---|---|
+| 1 | "Allow multiple entries" on a section | Section Properties → **Allow multiple entries** (only for an empty section). The server creates a permanent group (`POST /api/v1/form-definitions/{id}/groups`); the section's layout gets `repeat`. Canvas badge "Multiple entries · min–max". |
+| 2 | Minimum / maximum entries | Section Properties: Minimum entries, Maximum entries (0–50, max ≥ 1, min ≤ max); validated in the inspector, by the layout schema and by the server. |
+| 3 | Allow adding / removing / reordering | Section Properties checkboxes; when entries cannot be added the minimum must be ≥ 1 (a new record starts with exactly that many). Enforced by the server on every write (C-18). |
+| 4 | Fields, validation, conditional visibility, required-if per entry | Fields are created from the section's "+ Add Field" cell ("New field for each entry…") and belong to the group for life (C-16). Validation and Rules tabs work as for any field; rules inside an entry may read the same entry or record-level fields; a record-level rule cannot read entry fields (the rule builder only offers fields in scope). Evaluated per entry in the form and on the server. |
+| 5 | Create / edit / remove / reorder entries | Record form: "Add *Section*", per entry "Move up", "Move down", "Remove" (only what the section allows), focus moves to a new entry, every change announced; errors name the entry ("… (entry 2)"). |
+| 6 | Stable identity | Each entry has a permanent `formRecordGroupId` (signed `RepeatedGroup` manifest item); edits and reordering keep it, a removed entry leaves the next accepted revision, a new entry gets a new id. Verified through the API in the integration and browser tests. |
+| 7 | Dropdowns, multi-select, defaults, read-only, encryption, published versions | All work per entry: dropdown defaults pre-fill a new entry, a read-only dropdown receives its default from the server, encrypted fields store one ciphertext per entry, published versions are immutable and older records without entries keep working (empty section, entries can be added). |
+| 8 | Distinct from independently authorized child entities | Entries are content of one record (one owner, one authorization scope, one content revision). Related-form lists (e.g. AccusedAddress) are unchanged independent child records; neither document collections nor related lists can be placed in a repeating section. |
+
+### Priority 2 — Dependent dropdowns
+
+| # | Requirement | Where / how |
+|---|---|---|
+| 1 | One dropdown filters another (Country → Province → City) | Field Properties → Rules → **Dependent choices**: "Filter the choices by another dropdown", "Depends on", then per choice the parent values it belongs to ("Ontario when Canada"). Chains are supported. |
+| 2 | Stable option identifiers | The mapping uses option keys only (`optionFilter.parentOptionKeysByOption`); relabelling never breaks it. Choices left unmapped are always available. |
+| 3 | Single- and multi-select | Both as parent and child (a multi-select child keeps the choices that still fit). |
+| 4 | Configured in the inspector | Rules tab of the dropdown; the left-nav Rules overview lists "Choices depend on …". |
+| 5 | Invalid and circular dependencies | Rejected at draft save and publish (unknown or unplaced parent, non-dropdown, out-of-scope parent, unknown keys, self-dependency, **cycles**); the designer shows a "Circular dropdown dependency" message and only offers parents that cannot create a loop. |
+| 6 | Behavior when a parent changes | The form clears dependent selections that no longer fit, down the chain, and announces it. The server **never clears**: it refuses an invalid combination with `DEPENDENT_OPTION_INVALID` (C-19). |
+| 7 | Server-side validity | Every full-scope write (create, edit, child create), top level and per entry. |
+
+### Security notes
+
+* Entry rows are signed and part of the complete accepted manifest: reordering, moving a value between entries or deleting an entry in PostgreSQL makes the record fail closed (`INTEGRITY_VERIFICATION_FAILED`, tested with the attacker SQL role).
+* Fields of repeating sections cannot be shared on their own (`FIELD_IN_REPEATING_GROUP`); shared views never contain repeating sections or entry values (C-17).
+* Forged, foreign and duplicated entry ids are refused; field-scoped writers cannot change entries.
+* Values inside entries keep their field's protection (application encryption per value, no plaintext copies).
+
+## Known limits (tracked, not hidden)
+
+* **Deferred for review (would change the Authority):** field shares that cover entries; nested repeating groups; field-scoped contributor writes (refused for every write today — the C-05 finding).
+* No group-level conditional visibility (rules are per field), no search UI over entry values, no per-entry documents.
+* NVDA / VoiceOver / real browser zoom reviews of the new UI were **not** performed; automated axe scans pass (designer Preview, record form and record view with entries).
+* Hosted SEC-P gate, Stage B integration/browser gates and the Level 3 script run: see the verification record — nothing is claimed beyond what ran.
+* Open production items from earlier phases are unchanged: G19, the C-12 Authority review, PB14-C1 manual accessibility, every production Level 2 requirement.
+
+## Browser testing instructions (owner-reproducible)
+
+The development stack (`enterpriseforms`, API on 5080) was updated **in place** — `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d --build --no-deps business-migrate api worker web` — which applied the additive migration `PhaseC3RepeatingGroups`. Vault, the databases and their volumes were not restarted, so your development data and signing key are intact. Start the frontend with `npm run dev -w apps/web` in `src/frontend` (http://localhost:5173), or use the built web container on http://127.0.0.1:8081.
+
+1. Sign in as **designer**. Forms → **New form** (tick the clerk as a form user) → open the designer.
+2. **Fields** tab → *Add field* → "Country", **Dropdown (Single Select)**, options `Canada`, `USA`. Again: "Province", options `Ontario`, `Quebec`, `Texas`. Place both in the first section.
+3. **+ Add Row**, name the new section "People", press Enter. Click the section title → Section Properties → tick **Allow multiple entries**. The canvas shows "Multiple entries · 0–10". Set **Maximum entries** to 3.
+4. In the People section click **+ Add Field** → **New field for each entry…** → "Person name" (Text). Again for "Role" as a **Dropdown (Single Select)** with `Witness`, `Suspect` (note: no File type is offered here). Select "Person name" → tick **Required**.
+5. Optional rule: select a field in People → Rules → "Show this field only when …" — the field list offers this section's fields and record-level fields only.
+6. Select **Province** → Rules → **Dependent choices** → tick "Filter the choices by another dropdown" (Depends on: Country) → tick "Ontario when Canada", "Quebec when Canada", "Texas when USA".
+7. **Preview**: "Add People" creates an entry; choosing Canada leaves only Ontario/Quebec in Province. **Save draft**, **Publish**.
+8. Sign out, sign in as **clerk**, open the form → **New record**.
+   * Choose Canada → Ontario, then change Country to USA: Province is cleared and the change is announced; only Texas is offered.
+   * **Add People** twice; fill entry 1, leave entry 2's name empty and press **Create record** — the error names "entry 2". Fill it and create.
+9. On the record: entries are listed in order. **Edit** → **Move up** on entry 2 → Save: the order is swapped, revision 2. Edit again → **Remove** one entry, **Add People**, Save.
+10. **Access** → Share fields: Person name / Role are not offered ("Fields in sections that allow multiple entries cannot be shared on their own").
+11. Try to break it (optional, API): sending an entry id that does not belong to the record returns `OCCURRENCE_UNKNOWN`; sending Province "Ontario" with Country "USA" returns `DEPENDENT_OPTION_INVALID`.
+
+## Verification record
+
+Local (Windows, this branch, before commit):
+
+| Check | Result |
+|---|---|
+| .NET solution tests (Release; architecture, contract incl. 34 new C3 cases, authority unit tests) | **220 / 220** passed, 0 warnings |
+| Frontend lint + typecheck | clean |
+| Vitest (all 16 files) | **158 / 158** passed (incl. new `groups.test.ts`, `RepeatingSection.test.tsx`, `phaseC3.test.ts`) |
+| Playwright `repeating-groups.spec.ts` against the **development** stack (5080) | **2 / 2** passed (axe: no violations after the label-in-name fix below) |
+| OpenAPI / generated client | regenerated; additive changes only |
+
+Finding fixed during verification: axe `label-content-name-mismatch` (WCAG 2.5.3) — the entry "Move up/down" buttons' accessible names did not contain their visible text; they are now "Move up, People 1".
+
+Hosted (isolated, disposable runners), on commit `be5566b` (fixes to the three `RepeatingGroupsTests` cases that the first hosted run on `666c314` caught — see decision log and PR history for what each fix was):
+
+| Gate | Commit | Result |
+|---|---|---|
+| ci (specs, .NET, frontend, compose) | `be5566b` | **success** |
+| stage-b-integration (Stage B integration incl. `RepeatingGroupsTests`, all Playwright projects) | `be5566b` | **success** |
+| security-gate-a (SEC-P01..SEC-P12) | `be5566b` | **success** |
+| level3-script (the Level 3 script, unchanged, on its own clean stack) | `be5566b` | **success** |
+
+### What this does not show
+
+No manual screen-reader or zoom review, no independent security review of the C3 changes, no Azure staging evidence, and no production certification of any kind.
+
+## Addendum: Form Designer UX refinement (owner-requested, after the C3 review above)
+
+The owner reviewed the running designer and asked for fewer visible scrollbars and a smaller, less crowded Field Properties panel. This addendum covers that request; it changes the **frontend only** (no schema, Authority, encryption, integrity, published-version, rule-engine or repeating-group change). See `docs/decisions/PHASE_C_DECISION_LOG.md` **C-22**.
+
+### What changed
+
+- **Pinned header.** The form name, draft status and the toolbar (Add Field/Row/Column, Undo/Redo, Preview, Save draft, Publish) now sit in one bar pinned to the top of the page (`position: sticky`) instead of scrolling away inside the Design tab. There is exactly one scroll surface for the whole designer (the page itself); the two boxes that used to force their own inner scrollbar (the left-hand section nav and the right-hand inspector) are now `sticky` without a height cap, so they stay in view without a scrollbar of their own. The pinned bar's own height is measured (not guessed) so the nav and inspector sit exactly below it at any width. As a defensive bound only — not the normal case — the pinned bar itself caps at 70% of the viewport height with its own scroll, so at very short viewports (400% zoom) its buttons stay reachable instead of being able to cover the whole screen; this was found and fixed during verification (below), not assumed safe.
+- **Short Field Properties panel.** Selecting a field or document collection now shows only **Field label**, **Field type** (still permanent/read-only), **Help text** and **Placeholder**, plus a **Configure Field** button (gear icon). A section's own properties (title, description, "Allow multiple entries", move/duplicate/remove) are unchanged — they were never part of the crowding complaint and stay inline.
+- **Configure Field modal.** Clicking it opens the previous General / Validation / Rules / Security & Encryption / Advanced workspace unchanged in content, now in a large dialog (~90vw up to 1200px, ~85vh, full-screen below `sm`) with a vertical tab list (more room, same `role=tab`/`role=tablist` semantics) and a pinned header/footer around one scrolling middle region. **Apply Changes** commits the field's edits (label, type-appropriate validation, rules, placement) to the draft as one undo step; **Cancel**, Escape, the overlay and the × button all discard them the same way — this is new: the old inline panel applied every keystroke immediately, which is what made Cancel meaningless before. Security & Encryption and "Edit catalog name and description…" are unaffected: those already acted immediately through their own server calls (Authority-backed strengthening; a separate catalog save), and still do — Cancel never rolls them back, because they were never part of the draft layout.
+- `Dialog` (`packages/ui`) gained an opt-in `size="large"` variant for this; every existing caller is unchanged (`size` defaults to the old behaviour). `SideNavTabs` dropped its `header` prop (folded into the page's own pinned bar, its only consumer) and its forced inner scrollbar.
+
+### Required regressions re-run after the change
+
+Every existing spec that used to reach General/Validation/Rules/Security/Advanced inline (`designer-ux.spec.ts`, `dropdowns-rules.spec.ts`, `accused-workflow.spec.ts`, `form-management.spec.ts`, `repeating-groups.spec.ts`, `reusable-dropdown-list.spec.ts`, `pb14-accessibility.spec.ts`) was updated to open Configure Field first, via a new `openFieldConfig` helper in `e2e/support.ts`, and re-run end to end against the development stack:
+
+| Spec | Result |
+|---|---|
+| `designer-layout-refinement.spec.ts` (new; pinned header, 4-field quick panel + empty state, modal open/tabs/Apply/Cancel/Escape sync, keyboard-only nav, axe) | **5 / 5** passed |
+| `designer-ux.spec.ts` | **5 / 5** passed |
+| `dropdowns-rules.spec.ts` | **5 / 5** passed |
+| `form-management.spec.ts` | **3 / 3** passed |
+| `reusable-dropdown-list.spec.ts` | **2 / 2** passed |
+| `accused-workflow.spec.ts` | **2 / 2** passed |
+| `repeating-groups.spec.ts` | **2 / 2** passed |
+| `encryption.spec.ts` + `encryption-downgrade.spec.ts` (unchanged files; confirm `Dialog`'s default size is pixel-identical) | **8 / 8** passed |
+| `pb14-accessibility.spec.ts` (axe at 320/768/1440/720/320×256; keyboard-only; forced-colors/reduced-motion) | **3 / 3** passed, after one real fix (below) |
+| Vitest (all packages) / lint / typecheck / production build | clean |
+
+Two real problems were found and fixed by this verification, not assumed away:
+1. **Target-size false attribution.** The new quick-panel axe scan initially reported a `target-size` (WCAG 2.5.8) finding on the canvas tile's own rename button — a **pre-existing** issue from Phase C1 (that button is untouched by this change) that a page-wide scan picks up incidentally whenever a tile is selected. The scan is now scoped to the inspector panel under test (`AxeBuilder.include`), and the pre-existing finding is left as a separate, tracked gap rather than silently working around it by disabling the rule.
+2. **Pinned bar could cover the whole short viewport.** At the 200%-zoom-equivalent width (720×600), the header + full toolbar wrapped across enough rows to be taller than the viewport, and — because `position: sticky` keeps occupying that space at every scroll position — the canvas became permanently unclickable underneath it (242 failed click retries in `pb14-accessibility.spec.ts`, not a flaky timeout). This is exactly the "content becomes inaccessible" failure mode the task asked to avoid, and it was only caught by actually running the test at that viewport. Fixed by bounding the pinned bar to `max-h-[70vh]` with its own scroll as a fallback (described above); re-run confirmed clean.
+
+### What this addendum does not show
+
+No manual NVDA/VoiceOver review was performed for the new modal (automated axe only, as instructed). The pre-existing canvas-tile target-size finding above is not fixed here (out of scope for this refinement) and should get its own follow-up.
+
+## Addendum 2: Simplified Field Configuration and the real sticky-header fix (owner-requested, after the addendum above)
+
+The owner reported the addendum-1 refinement still felt repetitive (the quick inspector and Configure Field modal overlapped) and, separately, that the *actual* toolbar (Add Field/Row/Column, Undo/Redo, Save draft, Publish) did not stay visible on scroll even though the breadcrumb did — "this is incorrect," with an explicit instruction not to paper over it with `z-index`. See `docs/decisions/PHASE_C_DECISION_LOG.md` **C-23**. Frontend only; no schema, Authority, encryption, integrity, published-version, rule-engine or repeating-group change.
+
+### The sticky-header bug: two real, unrelated root causes, both found by reproducing it, not guessing
+
+1. **`pinnedHeight` never updated.** `DesignerPage.tsx`'s `ResizeObserver` was attached in a `useEffect(() => {...}, [])` reading a plain `useRef`. On the component's first render the page is still loading (`detail.isPending`), so the pinned bar's `<div ref={pinnedRef}>` does not exist yet; the one-time effect ran against `pinnedRef.current === null`, found nothing to observe, and never ran again once the real page rendered. Every consumer of `pinnedHeight` (the left nav's and the quick inspector's `top` offset) was stuck at the initial value of `0` forever. Fixed with a callback ref (`useState<HTMLDivElement | null>` + `ref={setPinnedNode}`, effect keyed on `[pinnedNode]`), so the observer attaches exactly when the node mounts, however late.
+2. **The canvas/inspector grid was missing `items-start`.** Even after (1), the inspector column still did not stick: CSS Grid's default `align-items: stretch` was stretching the sticky wrapper to the *canvas's full height* (confirmed directly — `getBoundingClientRect().height` matched the multi-thousand-pixel canvas, not the ~550px inspector), and a `position: sticky` element stretched to span its entire scrollable range does not stick in Chromium — it just tracks normal flow. `SideNavTabs`'s own grid already had `lg:items-start`; the designer's own canvas/inspector grid in `DesignerPage.tsx` did not. Added it there.
+
+Both were confirmed with a throwaway diagnostic spec (deleted after use, not committed) that measured `getBoundingClientRect()` on the pinned bar, the inspector wrapper and every ancestor's `position`/`overflow`/`transform` while scrolling a real 8-section form, against both the Vite dev server and the Docker-built image at `localhost:8081` (same bug in both — not a stale-build artifact). A body-overflow sticky-containing-block hypothesis was tested and disproved along the way (forcing `overflow-y: visible` on `<body>` made no difference) before the grid-stretch cause was found and confirmed by direct fix-and-reverify.
+
+### Redundant configuration removed
+
+The owner's target shape: quick inspector keeps Field label / Field type (read-only) / Help text / Placeholder / Configure Field; the modal keeps Validation / Conditional rules / Dropdown choices and dependent choices / Security & Encryption / Advanced, with nothing repeated between them.
+
+- **General tab removed** from the Configure Field modal (`FieldProperties` and `RelatedListProperties` in `DesignerInspector.tsx`). Label, type, help text and placeholder are no longer shown there at all — the quick inspector is now the only place that edits them. The related-list quick inspector's "Field label" is now editable (it was read-only, deferring to the removed General tab); it uses the same sanitized `onChange` the old General tab used.
+- **Required** moved from General onto **Validation** (it is a validation constraint); Validation is now the modal's first/default tab, so every existing "toggle Required" interaction still works without a tab switch.
+- **Control** (single-line vs. multi-line text) and **Placement** (field width, start-on-new-row, Section, Move earlier/later) moved onto **Advanced**, under their own "Placement" heading — unchanged content and behaviour, just relocated.
+- **Dropdown choices and dependent choices**: a new tab, shown only for `Option` fields, combining the option list editor (previously on General) with "Dependent choices" (previously the last section of the Rules tab) — the two kinds of choice configuration are no longer split across two different tabs. `RulesTab.tsx`'s `DependentChoices` is now exported and rendered from here instead of from `RulesTab` itself.
+- **Rules tab relabelled "Conditional rules"** (internal tab id unchanged) to match the owner's naming and to distinguish it from the new Dropdown tab now that dependent choices moved out of it.
+- **Add Field / Edit Field dialogs reviewed, not changed.** `AddFieldDialog` is the field-creation flow (out of scope — "without disrupting field creation"). `EditFieldDialog` duplicates General/Validation/Advanced content, but deliberately: it is the only way to rename a field's *catalog* display name/description and edit an *unplaced* field's help text, both from the Fields catalog table without any canvas selection — a genuinely different, already-tested workflow (`form-management.spec.ts`), not a copy of Configure Field. Gutting its Validation tab would have silently broken that existing, owner-facing edit path for no benefit, so it was left alone.
+
+### Required regressions re-run after this round
+
+| Spec | Result |
+|---|---|
+| `designer-ux.spec.ts` | **5 / 5** passed |
+| `dropdowns-rules.spec.ts` | **5 / 5** passed |
+| `repeating-groups.spec.ts` | **2 / 2** passed |
+| `reusable-dropdown-list.spec.ts` | **2 / 2** passed |
+| `accused-workflow.spec.ts` | **2 / 2** passed |
+| `form-management.spec.ts` | **3 / 3** passed |
+| `designer-layout-refinement.spec.ts` | **5 / 5** passed |
+| `pb14-accessibility.spec.ts` | **3 / 3** passed |
+| Vitest (all packages) / lint / typecheck / production build | clean |
+
+A first full run caught one real gap in the test updates (not a product bug): `designer-ux.spec.ts`'s UX-06 "move a field between sections" step opened Configure Field and reached for the Section picker without switching to the Advanced tab, where Placement now lives. Fixed in the test; re-run confirmed clean (27/27 across the table above on the second pass).
+
+### What this addendum does not show
+
+No manual NVDA/VoiceOver review was performed (automated axe only, as instructed). The pre-existing canvas-tile target-size finding from Addendum 1 is still open and untouched.
+
+## Addendum 3: Add Row and canvas selection fixes (owner-requested, frontend only)
+
+Two owner-reported defects. **Decision:** `docs/decisions/PHASE_C_DECISION_LOG.md` **C-24**.
+
+**1. Add Row built the wrong structure.** "+ Add Row" created one empty cell with `columnSpan: 4` — a single wide cell, not four independent columns. Fixed by reusing the exact single-column slot model "+ Add Column" already uses, four times: each of the four cells is its own `{ id, index, startOnNewRow }` entry in `extraSlots`, only the first marked `startOnNewRow: true` so the row reliably starts fresh (the packer then lays the other three immediately after it, filling exactly one row of four); each is independently selectable and placeable, exactly like any other empty cell. No new layout-schema concept — a placed field in one of the four still ends up as an ordinary `FieldElement` with `columnSpan: 1`, indistinguishable in storage from one placed through "+ Add Column".
+
+**2. Section selection intercepted a column's own click.** The root cause: slot selection compared only `(sectionKey, insertIndex)`. The four columns "+ Add Row" creates all share the same `insertIndex` until one is filled, so they were indistinguishable — clicking any one of them highlighted all four, and `SlotOptions` could not tell which specific cell was being filled. Fixed by giving every slot a stable `id`, carried through `DesignerSelection`'s `slot` variant, `PlacementTarget`, and `consumeSlot` (which now removes the exact filled slot by id rather than "the first slot at this index"). Separately hardened click handling per the owner's "a parent selection must never intercept a child's click" instruction: `event.stopPropagation()` added to the slot button, the field tile's name button, and the section header's select button, so a bubbled click can never re-select a parent even if a future DOM change broke the existing `closest("button,...")` guards. Added a secondary, visually distinct "contains selection" outline on a section when a field or column inside it (not the section itself) is selected, so the containing section's boundary stays visible without being confused with the primary selection. Added Escape-to-parent keyboard navigation (a field or column selection moves to its containing section; a section has no higher parent to move to), scoped to clicks/focus inside the canvas and explicitly excluding open dialogs, menus and listboxes so it never fights Radix's own Escape-to-close behavior.
+
+**Regression tests** (`e2e/designer-interaction-corrections.spec.ts`, rewritten first test): select a section, click Add Row, confirm exactly four independent 1-column cells sharing one row (plus the section's own always-present trailing cell, which coexists and wraps below — the same pattern "+ Add Column" already has on an empty section); click each of the four individually and confirm only that one shows `aria-pressed="true"`; place a field in all four; select the section via its header and confirm no field shows selected; select a field then press Escape and confirm selection moves to the section; save, reload, and confirm the four fields still share one row; confirm Preview renders all four. Two test-only bugs were found and fixed while writing this: the "first four, trailing fifth" cell-count assumption (fixed to expect 5, not 4, matching point 1 above), and a missing switch back to the Design tab after `addField()` (which leaves the Fields tab active) before clicking the next empty column. All 6 tests in the file pass (verified run, against the real development stack).
+
+## Addendum 4: Restored the Encrypted badge on the canvas (owner-requested, frontend only)
+
+The owner asked for the green "Encrypted" badge (with a lock icon) on encrypted field tiles, reported as having "disappeared" during the layout refinements. **Decision:** `docs/decisions/PHASE_C_DECISION_LOG.md` **C-25**.
+
+**Root cause, checked against git history rather than assumed:** `git log` on `DesignerCanvas.tsx` back through every Phase C1/C2/C3 commit shows `TileBadges`/`behaviorFlags` have only ever taken the layout `element` as input, never the `field` (which carries `RendererField.applicationEncrypted`) — there was no data path for this badge to exist at any point in the rebuilt (Phase C1+) designer, unlike the Fields catalog table's "Protection" column, which has shown `Confidential · Encrypted` / `Internal · Plaintext` since Stage B and was never touched. So this is a gap being filled now, not a regression this session introduced, though the fix is the same either way.
+
+**Fix:** `field` is now passed into `behaviorFlags`/`TileBadges` (and the tile's screen-reader description), which add an `"encrypted"` flag — green/success styling (the same `#166534`/`#f0fdf4`/`#14532d` tone already used by `Badge tone="success"` elsewhere) with a small lock icon — whenever `field.applicationEncrypted === true`, directly from the field's actual current protection mode. This does **not** read or imply anything about per-record migration completeness (the separate, independently-caveated `fullyEncrypted`/`COMPLETENESS_NOTE` status covered by security finding G19 and decision C-03): a field can show "Encrypted" here while individual stored records are still mid-migration, exactly as the Fields table and Configure Field's Security & Encryption tab already represent it. Works the same for a field placed inside a repeating section, since the canvas renders the field's placement once regardless of how many entries a record ends up with. Existing badges (Conditional, Required if, Not in form, Read-only) are unchanged, rendered in their original neutral style; the Encrypted badge is additive, still below the field's preview control, same list, same layout.
+
+**Regression test** (`e2e/encryption.spec.ts`, extended): after placing the already-created encrypted "Case notes" and plaintext "Exhibit count" fields, checks the canvas tile shows (only for the encrypted one) a badge with text "Encrypted", the exact success-tone text color, and that the plaintext tile shows none. All 4 tests in the file pass (verified run, against the real development stack).
+
+### Verified test results (this closure round)
+
+| Spec | Result |
+|---|---|
+| `designer-interaction-corrections.spec.ts` (Add Row/selection fixes) | **6 / 6** passed |
+| `encryption.spec.ts` (Encrypted badge, extended) | **4 / 4** passed |
+| `form-management.spec.ts` | **3 / 3** passed |
+| `repeating-groups.spec.ts` | **2 / 2** passed |
+| `reusable-dropdown-list.spec.ts` | **2 / 2** passed |
+| `designer-ux.spec.ts`, `dropdowns-rules.spec.ts`, `designer-layout-refinement.spec.ts`, `accused-workflow.spec.ts` | all passing (unaffected by this round; re-confirmed) |
+| `encryption-downgrade.spec.ts` | **1 / 4** confirmed locally; the remaining 3 are blocked by a local-environment limit (see Addendum 5), not by a code defect — relying on hosted CI's clean-database run for the rest |
+| Vitest (158/158) / lint / typecheck / production build | clean |
+
+Two test-only bugs were found and fixed during this round's own verification, separate from the two described above: `designer-interaction-corrections.spec.ts` used a field named "Status" as a functional smoke-check, whose derived key (`status`) is a single-word column name the server's naming rule (CLAUDE.md §0.5) correctly rejects — renamed to "Case status"; and `encryption-downgrade.spec.ts`'s check for the (now collapsed-by-default) governance detail text first had to click "Learn more" by role `button`, which a native `<summary>` element does not reliably expose as in this Playwright/Chromium combination — fixed to click it by its visible text instead.
+
+## Addendum 5: Phase C3 closure
+
+Per the owner's "Phase C3 — Final Closure" instruction (2026-10-21). **Decision:** `docs/decisions/PHASE_C_DECISION_LOG.md` **C-26**.
+
+- **Repeating groups: owner-tested and confirmed working.** The owner personally tested the Phase C3 repeating-groups/dependent-dropdowns feature (addenda above cover only the later UX-correction rounds) and confirmed it works well. This is an owner acceptance of that specific feature, not a new accessibility or security review and not production certification.
+- **Form Designer UX: functional but not fully visually accepted.** The owner's own words: the overall Form Designer UX "remains functional but clunky and is NOT fully visually accepted." Despite four rounds of fixes in this file, the designer's visual polish is **explicitly recorded as outstanding future usability work**, not resolved by any addendum here. Nothing in this status document should be read as a visual-design sign-off.
+- **Local verification limit encountered and documented, not worked around.** While re-verifying `encryption-downgrade.spec.ts` during closure, the clerk persona's forms list reproducibly failed with a server error visible in the UI itself: *"The request failed — 1..250 checks per call · Code LIMIT_EXCEEDED"*. This is the Authorization Authority's SpiceDB batch-check limit (250 items per call), hit because this branch's many hours of continuous local Playwright runs have accumulated far more than 250 forms in the shared local development organization — a pre-existing backend limitation (the forms-list authorization filter has no pagination/batching above 250), not something introduced by any change in this file's addenda, and not reproducible in hosted CI, which always starts from a fresh, empty database. No local data was deleted or reset to work around it (explicitly out of scope for this session); the test was instead verified against hosted CI's clean environment. This local-environment limitation is a new, separate, tracked observation — it does not close or touch G06, G19, or any other open gap below.
+- **All previously recorded gaps remain exactly as open as before.** Nothing in Addenda 1–5 changes the status of any item in `SECURITY_GAP_ASSESSMENT.md`, the PB-14 manual accessibility checklist, or any production Level 2 certification requirement. In particular: G19 (migration completeness is not independently verified), G06 (trusted search completeness), manual NVDA/VoiceOver review (not performed, per Addendum 1/2), and every Level 2 production gate in `docs/decisions/PREBUILD_DECISION_REGISTER.md` remain open.

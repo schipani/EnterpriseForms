@@ -1,4 +1,4 @@
-import { removeSection, type SectionRemoval } from "@enterpriseforms/form-designer";
+import { removeSection, sameScope, type SectionRemoval } from "@enterpriseforms/form-designer";
 import type { FormLayout } from "@enterpriseforms/form-renderer";
 import { Button, Dialog, Select } from "@enterpriseforms/ui";
 import { useId, useState } from "react";
@@ -11,7 +11,8 @@ import { useId, useState } from "react";
  */
 export function RemoveSectionDialog({ layout, sectionIndex, onConfirm, onClose }: { layout: FormLayout; sectionIndex: number; onConfirm: (next: FormLayout, message: string) => void; onClose: () => void }) {
   const section = layout.sections[sectionIndex];
-  const others = layout.sections.map((candidate, index) => ({ candidate, index })).filter(({ index }) => index !== sectionIndex);
+  // Placements can only move to a section of the same scope (a section that allows multiple entries keeps its group's fields).
+  const others = layout.sections.map((candidate, index) => ({ candidate, index })).filter(({ candidate, index }) => index !== sectionIndex && (!section || sameScope(candidate, section)));
   const [choice, setChoice] = useState<"move" | "unplace" | null>(null);
   const [target, setTarget] = useState<string | undefined>(others[Math.max(0, sectionIndex - 1)]?.candidate.sectionKey ?? others[0]?.candidate.sectionKey);
   const groupName = useId();
@@ -56,8 +57,8 @@ export function RemoveSectionDialog({ layout, sectionIndex, onConfirm, onClose }
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-1 font-medium">What should happen to the {items}?</legend>
           <label className="flex items-start gap-3">
-            <input type="radio" name={groupName} className={radio} checked={choice === "move"} onChange={() => setChoice("move")} />
-            <span>Move the {items} to another section</span>
+            <input type="radio" name={groupName} className={radio} checked={choice === "move"} disabled={others.length === 0} onChange={() => setChoice("move")} />
+            <span>Move the {items} to another section{others.length === 0 ? " (no compatible section: fields of a section that allows multiple entries can only be un-placed)" : ""}</span>
           </label>
           {choice === "move" ? (
             <div className="pl-8">

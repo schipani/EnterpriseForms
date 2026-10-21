@@ -1,16 +1,17 @@
 import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
+import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findOptionFilterCycle, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, setSectionRepeat, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
 import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ErrorPanel } from "../../support";
 import { AddFieldDialog, toKey } from "../components/AddFieldDialog";
-import { DesignerInspector, newElementFor, type PlacementTarget } from "../components/DesignerInspector";
+import { DesignerInspector, newElementFor, type DesignerInspectorProps, type PlacementTarget } from "../components/DesignerInspector";
 import { EditFieldDialog, type FieldEditSubmission } from "../components/EditFieldDialog";
+import { FieldConfigModal } from "../components/FieldConfigModal";
 import { OptionListsDialog } from "../components/OptionListsDialog";
 import { FormAccessPanel } from "../components/FormAccessPanel";
 import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
@@ -19,10 +20,13 @@ type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" 
 
 /**
  * PG-033/037 Form Designer (C1 designer rebuild, docs/ui/c1-designer-rebuild): a left designer navigation, a centre
- * toolbar + canvas of titled sections with compact field previews, and a persistent right inspector. "+ Add Row"
- * creates a titled section (an existing layout-v2 `section`, not a line-break flag); fields are placed into exact
- * cells, moved between sections and edited in the inspector. Save draft uses the draft revision CAS, Publish the draft
- * + current version CAS; the server validates every layout again and published versions stay immutable.
+ * toolbar + canvas of titled sections with compact field previews, and a persistent right inspector. "+ Add Section"
+ * creates a titled section (an existing layout-v2 `section`, not a line-break flag); "+ Add Row" adds an empty,
+ * full-width cell at the end of the currently selected section so the next field placed there starts a fresh row
+ * (usability corrections round: the old "+ Add Row" button actually created a section, which was wrong). Fields are
+ * placed into exact cells, moved between sections and edited in the inspector. Save draft uses the draft revision
+ * CAS, Publish the draft + current version CAS; the server validates every layout again and published versions stay
+ * immutable.
  */
 export function DesignerPage() {
   const { formDefinitionId } = useParams({ from: "/app/forms/$formDefinitionId/design" });
@@ -76,7 +80,12 @@ export function DesignerPage() {
 
   const [view, setView] = useState<View>("design");
   const [selection, setSelection] = useState<DesignerSelection>(null);
-  const [extraSlots, setExtraSlots] = useState<Record<string, number[]>>({});
+  const [extraSlots, setExtraSlots] = useState<Record<string, Array<{ id: string; index: number; startOnNewRow?: boolean }>>>({});
+  // Stable per-slot ids (Phase C3 usability corrections): several empty cells at the same insertIndex — most notably
+  // the four independent columns "+ Add Row" creates — are otherwise indistinguishable, which was the root cause of
+  // clicking one column selecting/highlighting all of them.
+  const nextSlotIdRef = useRef(0);
+  const nextSlotId = () => `slot-${nextSlotIdRef.current++}`;
   const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed(formDefinitionId));
   const [renamingSectionKey, setRenamingSectionKey] = useState<string | null>(null);
   const [pane, setPane] = useState<"canvas" | "properties">("canvas");
@@ -84,7 +93,9 @@ export function DesignerPage() {
   const [createAt, setCreateAt] = useState<{ kind: "field" | "documents"; target: PlacementTarget | null } | null>(null);
   const [editFieldId, setEditFieldId] = useState<string | null>(null);
   const [optionListsOpen, setOptionListsOpen] = useState(false);
-  const [inspectorTab, setInspectorTab] = useState<string | undefined>(undefined);
+  // Phase C3 designer UX refinement: the quick inspector has no tabs of its own any more; "Configure Field" and the
+  // Rules overview both open the full workspace in FieldConfigModal, landing on the tab named here.
+  const [configTarget, setConfigTarget] = useState<{ key: string; tab: string } | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [changeReason, setChangeReason] = useState("");
   const [relationshipOpen, setRelationshipOpen] = useState(false);
@@ -137,8 +148,11 @@ export function DesignerPage() {
       if (!slots) {
         return current;
       }
-      const at = slots.indexOf(target.insertIndex);
-      const remaining = (at >= 0 ? slots.filter((_, index) => index !== at) : slots).map((index) => (index >= target.insertIndex ? index + 1 : index));
+      // Remove exactly the slot that was filled (by its stable id, when the placement came from one — e.g. a
+      // specific column of a "+ Add Row" row); fall back to the first slot at that position otherwise. Every other
+      // pending slot at or after this position shifts by one, since the array of elements just grew.
+      const at = target.slotId && target.slotId !== "baseline" ? slots.findIndex((slot) => slot.id === target.slotId) : slots.findIndex((slot) => slot.index === target.insertIndex);
+      const remaining = (at >= 0 ? slots.filter((_, index) => index !== at) : slots).map((slot) => (slot.index >= target.insertIndex ? { ...slot, index: slot.index + 1 } : slot));
       return { ...current, [target.sectionKey]: remaining };
     });
   const addFieldMutation = useMutation({
@@ -160,6 +174,28 @@ export function DesignerPage() {
         setView("design");
         announce(`${field.fieldDisplayName} created and placed`);
       }
+      await invalidate();
+    },
+  });
+  // "Allow multiple entries": the stable group is created on the server (or an unplaced one reused), then placed in the empty section.
+  const enableRepeat = useMutation({
+    mutationFn: async ({ sectionIndex, existingGroupDefinitionId }: { sectionIndex: number; existingGroupDefinitionId: string | null }) => {
+      if (existingGroupDefinitionId) {
+        return { sectionIndex, groupDefinitionId: existingGroupDefinitionId };
+      }
+      const section = layout!.sections[sectionIndex]!;
+      const title = section.title?.trim() || "Entries";
+      const existingKeys = new Set((detail.data?.groups ?? []).map((group) => group.groupKey));
+      let groupKey = toKey(title) || "entries";
+      for (let n = 2; existingKeys.has(groupKey); n += 1) {
+        groupKey = `${toKey(title) || "entries"}_${n}`.slice(0, 64);
+      }
+      const group = await api.forms.createGroup(formDefinitionId, { groupKey, groupDisplayName: title.slice(0, 200) }).then((r) => r.result);
+      return { sectionIndex, groupDefinitionId: group.groupDefinitionId };
+    },
+    onSuccess: async ({ sectionIndex, groupDefinitionId }) => {
+      setLayoutTracked((current) => (current ? setSectionRepeat(current, sectionIndex, { groupDefinitionId, minOccurrences: 0, maxOccurrences: 10, allowAdd: true, allowRemove: true, allowReorder: true }) : current));
+      announce("The section now allows multiple entries. Create its fields with the Add Field cell.");
       await invalidate();
     },
   });
@@ -241,15 +277,25 @@ export function DesignerPage() {
   const dirtyRef = useRef(false);
   const blocker = useBlocker({ shouldBlockFn: () => dirtyRef.current, enableBeforeUnload: () => dirtyRef.current, withResolver: true });
 
-  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z / Ctrl+Y on the Design view, outside text inputs (which keep native undo).
-  const shortcuts = useRef({ undo, redo });
-  shortcuts.current = { undo, redo };
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z / Ctrl+Y on the Design view, outside text inputs (which keep native undo); Escape
+  // moves selection to its immediate parent while focus is on the canvas, outside any dialog/menu/listbox (which
+  // keep their own Escape-to-close behavior). `shortcuts.current` is refreshed every render (below, once
+  // `parentOfSelection` exists) so the listener — created once per `view` — never reads a stale `selection`/`layout`.
+  const shortcuts = useRef({ undo, redo, parentOfSelection: (): DesignerSelection => null });
   useEffect(() => {
     if (view !== "design") {
       return;
     }
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
+      if (event.key === "Escape" && !event.ctrlKey && !event.metaKey && target?.closest('[aria-label="Form canvas"]') && !target?.closest('[role="dialog"],[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper]')) {
+        const parent = shortcuts.current.parentOfSelection();
+        if (parent) {
+          event.preventDefault();
+          setSelection(parent);
+        }
+        return;
+      }
       if (!(event.ctrlKey || event.metaKey) || target?.closest("input,textarea,select,[contenteditable=true],[role=dialog]")) {
         return;
       }
@@ -266,6 +312,24 @@ export function DesignerPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [view]);
 
+  // Phase C3 designer UX refinement: the header + toolbar pin to the top of the page (one scroll surface for the
+  // whole designer, not a second one inside it); the nav list and quick inspector stick just below it. The offset is
+  // measured, not guessed, so it stays correct however the header wraps (long form names, narrow widths, 400% zoom).
+  // A callback ref (not a plain useRef read inside a `[]`-deps effect) because the pinned bar's DOM node does not
+  // exist on first mount: the component still returns the loading/error state below until `detail` resolves, so a
+  // one-time mount effect would see `pinnedRef.current === null`, skip creating the observer, and never run again —
+  // leaving every consumer of `pinnedHeight` (the side nav, the quick inspector) stuck at the initial offset forever.
+  const [pinnedNode, setPinnedNode] = useState<HTMLDivElement | null>(null);
+  const [pinnedHeight, setPinnedHeight] = useState(0);
+  useEffect(() => {
+    if (!pinnedNode || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => setPinnedHeight(entries[0]?.contentRect.height ?? 0));
+    observer.observe(pinnedNode);
+    return () => observer.disconnect();
+  }, [pinnedNode]);
+
   if (detail.isPending) {
     return <LoadingBlock label="Loading form" />;
   }
@@ -274,7 +338,7 @@ export function DesignerPage() {
   }
   const form = detail.data;
   const canDesign = form.summary.canDesign;
-  const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, optionSelectionMode: field.optionSelectionMode, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted" }));
+  const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, optionSelectionMode: field.optionSelectionMode, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted", groupDefinitionId: field.groupDefinitionId ?? null }));
   const relationships = form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }));
   const dirty = layout !== null && serializeLayout(layout) !== baseJson;
   dirtyRef.current = dirty;
@@ -291,7 +355,19 @@ export function DesignerPage() {
     const index = layout.sections.findIndex((section) => section.sectionKey === selection.sectionKey);
     return index >= 0 ? index : null;
   };
-  const addRow = () => {
+  // Escape moves selection to its immediate parent (a field or empty column to its containing section); a section
+  // has no higher parent to move to (Phase C3 usability corrections).
+  const parentOfSelection = (): DesignerSelection => {
+    if (!layout || !selection || selection.kind === "section") {
+      return null;
+    }
+    const index = sectionOfSelection();
+    return index !== null ? { kind: "section", sectionKey: layout.sections[index]!.sectionKey } : null;
+  };
+  shortcuts.current = { undo, redo, parentOfSelection };
+  // Add Section creates a new titled section (what "+ Add Row" used to do; the real "Add Row" below adds a row
+  // inside the selected section instead).
+  const addSection = () => {
     if (!layout) {
       return;
     }
@@ -308,6 +384,28 @@ export function DesignerPage() {
     setNotice(null);
     announce("New section added. Type its title and press Enter.");
   };
+  // Add Row adds a new row containing four independent 1-column cells at the end of the currently selected section
+  // (disabled with no section target) — the same single-column building block "+ Add Column" uses, not a separate
+  // structure. Only the first of the four is marked startOnNewRow, so the row reliably starts fresh even when the
+  // current row has room left; the packer then lays the other three immediately after it, filling exactly one row.
+  // Each column gets its own stable id so it can be independently selected and placed into.
+  const addRow = () => {
+    if (!layout) {
+      return;
+    }
+    const sectionIndex = sectionOfSelection();
+    if (sectionIndex === null) {
+      return;
+    }
+    const section = layout.sections[sectionIndex]!;
+    const insertIndex = section.elements.length;
+    const columns = [{ id: nextSlotId(), index: insertIndex, startOnNewRow: true }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }];
+    setView("design");
+    setExtraSlots((current) => ({ ...current, [section.sectionKey]: [...(current[section.sectionKey] ?? []), ...columns] }));
+    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex, slotId: columns[0]!.id, startOnNewRow: true });
+    setNotice(null);
+    announce(`New row of 4 empty columns added in ${section.title ?? section.sectionKey}`);
+  };
   const addColumn = () => {
     if (!layout) {
       return;
@@ -323,8 +421,9 @@ export function DesignerPage() {
       setNotice(`“${section.title ?? section.sectionKey}” already shows four empty cells. Sections use the standard four-column grid; place a field in an empty cell first.`);
       return;
     }
-    setExtraSlots((current) => ({ ...current, [target.sectionKey]: [...(current[target.sectionKey] ?? []), target.insertIndex] }));
-    setSelection({ kind: "slot", sectionKey: target.sectionKey, insertIndex: target.insertIndex });
+    const id = nextSlotId();
+    setExtraSlots((current) => ({ ...current, [target.sectionKey]: [...(current[target.sectionKey] ?? []), { id, index: target.insertIndex }] }));
+    setSelection({ kind: "slot", sectionKey: target.sectionKey, insertIndex: target.insertIndex, slotId: id });
     setNotice(`Empty cell added in “${section.title ?? section.sectionKey}”. Sections keep the four-column grid; a full row continues on the next row.`);
     announce("Empty cell added");
   };
@@ -335,12 +434,8 @@ export function DesignerPage() {
     const sectionIndex = sectionOfSelection() ?? layout.sections.length - 1;
     const section = layout.sections[sectionIndex]!;
     setView("design");
-    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex: section.elements.length });
+    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex: section.elements.length, slotId: "baseline" });
     setPane("properties");
-  };
-  const showProperties = () => {
-    setPane("properties");
-    window.setTimeout(() => document.getElementById("designer-inspector-heading")?.focus(), 0);
   };
   const toggleCollapse = (sectionKey: string) =>
     setCollapsed((current) => {
@@ -358,6 +453,55 @@ export function DesignerPage() {
     const found = layout ? locateField(layout, fieldId) : null;
     return found ? (layout!.sections[found.sectionIndex]!.title ?? "") : null;
   };
+
+  // Shared by the quick inspector and the Configure Field modal (Phase C3 designer UX refinement) so the two never
+  // drift: the modal gets the exact same callbacks, just with layout/onChange later overridden to a local draft.
+  const inspectorProps: DesignerInspectorProps | null = layout
+    ? {
+        layout,
+        onChange: setLayoutTracked,
+        selection,
+        onSelect: (next) => {
+          setSelection(next);
+          setNotice(null);
+        },
+        fields: form.fields,
+        relationships: form.relationships,
+        formDefinitionId,
+        canDesign,
+        collapsed,
+        onToggleCollapse: toggleCollapse,
+        onRequestRemoveSection: setRemoveSectionIndex,
+        onMoveSection: (sectionIndex, delta) => setLayoutTracked(moveSection(layout, sectionIndex, sectionIndex + delta)),
+        onDuplicateSection: (sectionIndex) => {
+          const key = newSectionKey(layout);
+          setLayoutTracked(duplicateSection(layout, sectionIndex, key));
+          setSelection({ kind: "section", sectionKey: key });
+        },
+        onOpenFieldEditor: (fieldId) => {
+          editField.reset();
+          setEditFieldId(fieldId);
+        },
+        onCreateAt: (kind, target) => setCreateAt({ kind, target }),
+        onPlacedAt: consumeSlot,
+        onOpenRelatedForms: () => setView("relationships"),
+        onStrengthen: (fieldId, request) => strengthen.mutate({ fieldId, request }),
+        strengthenPending: strengthen.isPending,
+        strengthenError: strengthen.error,
+        announce,
+        // "validation" is the modal's first tab (Phase C3 designer UX refinement removed the General tab; label,
+        // type, help text and placeholder live only in the quick inspector).
+        onOpenConfig: (key, tab) => setConfigTarget({ key, tab: tab ?? "validation" }),
+        groups: form.groups ?? [],
+        onEnableRepeat: (sectionIndex, existingGroupDefinitionId) => enableRepeat.mutate({ sectionIndex, existingGroupDefinitionId }),
+        enableRepeatPending: enableRepeat.isPending,
+        enableRepeatError: enableRepeat.error,
+      }
+    : null;
+
+  // "+ Add Row" needs an actual section target (a selected section, a field or a cell within one); unlike "+ Add
+  // Column" it does not fall back to the last section when nothing is selected.
+  const sectionTargetIndex = sectionOfSelection();
 
   const toolbar = (
     <div role="group" aria-label="Designer actions" className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2">
@@ -383,10 +527,13 @@ export function DesignerPage() {
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-          <Button variant="secondary" onClick={addRow} disabled={!layout}>
+          <Button variant="secondary" onClick={addSection} disabled={!layout}>
+            <span aria-hidden="true">+</span> Add Section
+          </Button>
+          <Button variant="secondary" onClick={addRow} disabled={!layout || sectionTargetIndex === null} title={!layout || sectionTargetIndex !== null ? undefined : "Select a section, a field or a cell first"}>
             <span aria-hidden="true">+</span> Add Row
           </Button>
-          <Button variant="secondary" onClick={addColumn} disabled={!layout}>
+          <Button variant="secondary" onClick={addColumn} disabled={!layout || !columnSlotFor(layout, selection)}>
             <span aria-hidden="true">+</span> Add Column
           </Button>
           <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-line sm:inline-block" />
@@ -425,7 +572,12 @@ export function DesignerPage() {
           </button>
         ))}
       </div>
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+      {/* lg:items-start: without it, CSS Grid's default align-items:stretch makes the inspector column match the
+          canvas's full (often very tall) height, and a position:sticky element stretched to span its entire
+          scrollable range does not stick in Chromium — it just tracks normal flow. SideNavTabs' own grid already has
+          this; this was the one grid missing it, which is why the inspector (and nothing else) failed to stay pinned
+          on a tall canvas. */}
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:items-start lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className={`min-w-0 ${pane === "canvas" ? "" : "hidden lg:block"}`} aria-label="Form canvas" role="region">
           <DesignerCanvas
             layout={layout}
@@ -444,42 +596,17 @@ export function DesignerPage() {
             renamingSectionKey={renamingSectionKey}
             onRenamingSectionChange={setRenamingSectionKey}
             onRequestRemoveSection={setRemoveSectionIndex}
-            onShowProperties={showProperties}
+            onOpenConfig={(key) => {
+              setSelection({ kind: "element", key });
+              setConfigTarget({ key, tab: "validation" });
+            }}
             announce={announce}
           />
         </div>
-        <div className={`min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto ${pane === "properties" ? "" : "hidden lg:block"}`}>
-          <DesignerInspector
-            layout={layout}
-            onChange={setLayoutTracked}
-            selection={selection}
-            onSelect={setSelection}
-            fields={form.fields}
-            relationships={form.relationships}
-            formDefinitionId={formDefinitionId}
-            canDesign={canDesign}
-            collapsed={collapsed}
-            onToggleCollapse={toggleCollapse}
-            onRequestRemoveSection={setRemoveSectionIndex}
-            onMoveSection={(sectionIndex, delta) => setLayoutTracked(moveSection(layout, sectionIndex, sectionIndex + delta))}
-            onDuplicateSection={(sectionIndex) => {
-              const key = newSectionKey(layout);
-              setLayoutTracked(duplicateSection(layout, sectionIndex, key));
-              setSelection({ kind: "section", sectionKey: key });
-            }}
-            onOpenFieldEditor={(fieldId) => {
-              editField.reset();
-              setEditFieldId(fieldId);
-            }}
-            onCreateAt={(kind, target) => setCreateAt({ kind, target })}
-            onPlacedAt={consumeSlot}
-            onOpenRelatedForms={() => setView("relationships")}
-            onStrengthen={(fieldId, request) => strengthen.mutate({ fieldId, request })}
-            strengthenPending={strengthen.isPending}
-            strengthenError={strengthen.error}
-            announce={announce}
-            requestedTab={inspectorTab}
-          />
+        {/* Sticky, not scroll-capped: the quick panel is short by design (Phase C3 designer UX refinement), so it never
+            needs a scrollbar of its own — it just stays in view, offset below the pinned header, while the canvas scrolls. */}
+        <div className={`min-w-0 lg:sticky ${pane === "properties" ? "" : "hidden lg:block"}`} style={{ top: pinnedHeight + 16 }}>
+          <DesignerInspector {...inspectorProps!} />
         </div>
       </div>
     </div>
@@ -571,7 +698,7 @@ export function DesignerPage() {
   const views: Array<{ value: View; label: ReactNode; icon: ReactNode; content: ReactNode }> = [
     { value: "design", label: "Design", icon: <NavIcon d="M4 20h4L18.5 9.5a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4" />, content: designView },
     { value: "fields", label: <>Fields <Count n={form.fields.length} /></>, icon: <NavIcon d="M3 5h18v14H3zM3 10h18M3 15h18M9 5v14" />, content: fieldsView },
-    { value: "rules", label: "Rules", icon: <NavIcon d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" />, content: layout ? <RulesView layout={layout} fields={form.fields} onEdit={(key) => { setInspectorTab("rules"); setSelection({ kind: "element", key }); setPane("properties"); setView("design"); }} /> : <LoadingBlock /> },
+    { value: "rules", label: "Rules", icon: <NavIcon d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9" />, content: layout ? <RulesView layout={layout} fields={form.fields} onEdit={(key) => { setSelection({ kind: "element", key }); setPane("properties"); setView("design"); setConfigTarget({ key, tab: "rules" }); }} /> : <LoadingBlock /> },
     {
       value: "preview",
       label: "Preview",
@@ -716,23 +843,37 @@ export function DesignerPage() {
   );
 
   return (
-    <>
+    // Form Designer usability corrections: label, control, then help text in every field here (and in the dialogs
+    // it opens — Configure Field, Add/Edit Field, Option lists, Publish, Remove section — since Radix dialogs portal
+    // their DOM elsewhere but stay inside this React tree). The record-entry form keeps its own tested order
+    // (FieldLayoutProvider's default) unaffected.
+    <FieldLayoutProvider helpAfterControl>
       <div className="sr-only" role="status" aria-live="polite">
         {announcement}
       </div>
       {parseError ? <StatusMessage tone="danger" title="The stored layout could not be parsed">{parseError}</StatusMessage> : null}
+      {/* Phase C3 designer UX refinement: the form name, draft status and primary actions stay reachable while the
+          canvas (or any tab's content) scrolls, without a second independently-scrolling box. Height is measured
+          (pinnedRef) so the nav list and quick inspector below can offset by exactly this much. */}
+      {/* max-h/overflow-y-auto is a safety net, not the normal case: at ordinary widths and zoom this content fits and
+          never scrolls. Only when the header and toolbar together would be taller than most of a very short viewport
+          (e.g. 400% zoom) does this bar get its own short scroll, so Save draft/Publish stay reachable instead of
+          being permanently covered — never content "inaccessible" the way an un-clamped sticky block would leave it. */}
+      <div ref={setPinnedNode} className="sticky top-0 z-20 -mx-4 flex max-h-[70vh] flex-col gap-2 overflow-y-auto bg-page px-4 pb-2 pt-2 sm:-mx-0 sm:px-0 sm:pt-0">
+        {header}
+        {toolbar}
+      </div>
       <SideNavTabs
         label="Form designer"
-        header={header}
         value={view}
         onValueChange={(next) => setView(next as View)}
+        stickyTop={pinnedHeight + 16}
         items={views.map((item) => ({
           value: item.value,
           label: item.label,
           icon: item.icon,
           content: (
-            <div className="flex min-w-0 flex-col gap-3">
-              {toolbar}
+            <div className="flex min-w-0 flex-col gap-3 pt-3">
               {notice && item.value === "design" ? (
                 <StatusMessage tone="info" title="Layout grid">
                   {notice}
@@ -745,6 +886,7 @@ export function DesignerPage() {
           ),
         }))}
       />
+      {configTarget && inspectorProps ? <FieldConfigModal {...inspectorProps} open configKey={configTarget.key} initialTab={configTarget.tab} onClose={() => setConfigTarget(null)} /> : null}
 
       {removeSectionIndex !== null && layout ? (
         <RemoveSectionDialog
@@ -778,6 +920,10 @@ export function DesignerPage() {
       {createAt ? (
         <AddFieldDialog
           kind={createAt.kind}
+          group={(() => {
+            const section = createAt.target && layout ? layout.sections.find((candidate) => candidate.sectionKey === createAt.target!.sectionKey) : undefined;
+            return section?.repeat ? { groupDefinitionId: section.repeat.groupDefinitionId, sectionTitle: section.title ?? section.sectionKey } : undefined;
+          })()}
           open
           onOpenChange={(open) => (open ? undefined : setCreateAt(null))}
           pending={addFieldMutation.isPending}
@@ -848,7 +994,7 @@ export function DesignerPage() {
       >
         <p className="text-sm text-muted">Use Save draft first if you want to keep this layout.</p>
       </Dialog>
-    </>
+    </FieldLayoutProvider>
   );
 }
 
@@ -910,14 +1056,20 @@ function RulesView({ layout, fields, onEdit }: { layout: FormLayout; fields: rea
   const optionLabel = (fieldId: string, key: string) => fields.find((field) => field.fieldDefinitionId === fieldId)?.options.find((option) => option.optionKey === key)?.optionDisplayText ?? key;
   const rows = layout.sections
     .flatMap((section) => section.elements.map((element) => ({ section, element })))
-    .filter((entry): entry is { section: FormLayout["sections"][number]; element: FieldElement } => entry.element.kind === "field" && (entry.element.visibleWhen !== undefined || entry.element.requiredWhen !== undefined || entry.element.readOnly === true || entry.element.showInForm === false));
+    .filter((entry): entry is { section: FormLayout["sections"][number]; element: FieldElement } => entry.element.kind === "field" && (entry.element.visibleWhen !== undefined || entry.element.requiredWhen !== undefined || entry.element.readOnly === true || entry.element.showInForm === false || entry.element.optionFilter !== undefined));
   const cycle = findRuleCycle(layout);
+  const filterCycle = findOptionFilterCycle(layout);
   return (
     <Card title="Rules and field behavior">
       <p className="text-sm text-muted">Every field with a condition, Read-only or Not-in-form setting in the draft. Select a row to edit it in the Rules tab of the field properties; there is no separate rules editor.</p>
       {cycle ? (
         <StatusMessage tone="danger" title="Circular rule dependency">
           {cycle.map((id) => fields.find((field) => field.fieldDefinitionId === id)?.fieldDisplayName ?? id).join(" → ")}. The draft cannot be saved until the loop is removed.
+        </StatusMessage>
+      ) : null}
+      {filterCycle ? (
+        <StatusMessage tone="danger" title="Circular dropdown dependency">
+          {filterCycle.map((id) => fields.find((field) => field.fieldDefinitionId === id)?.fieldDisplayName ?? id).join(" → ")}. Dropdowns cannot filter each other in a loop; the draft cannot be saved until it is removed.
         </StatusMessage>
       ) : null}
       <DataTable
@@ -929,7 +1081,7 @@ function RulesView({ layout, fields, onEdit }: { layout: FormLayout; fields: rea
           { key: "field", header: "Field", isRowHeader: true, render: (row) => row.element.label || (fields.find((field) => field.fieldDefinitionId === row.element.fieldDefinitionId)?.fieldDisplayName ?? "Unknown field") },
           { key: "visible", header: "Shown when", render: (row) => (row.element.visibleWhen ? describeCondition(row.element.visibleWhen, sources, optionLabel) : <span className="text-muted">Always</span>) },
           { key: "required", header: "Required", render: (row) => (row.element.required ? "Always" : row.element.requiredWhen ? `When ${describeCondition(row.element.requiredWhen, sources, optionLabel)}` : <span className="text-muted">No</span>) },
-          { key: "flags", header: "Behavior", render: (row) => [row.element.readOnly ? "Read-only" : null, row.element.showInForm === false ? "Not in form" : null, row.element.clearWhenHidden ? "Clears when hidden" : null].filter(Boolean).join(", ") || <span className="text-muted">Standard</span> },
+          { key: "flags", header: "Behavior", render: (row) => [row.element.readOnly ? "Read-only" : null, row.element.showInForm === false ? "Not in form" : null, row.element.clearWhenHidden ? "Clears when hidden" : null, row.element.optionFilter ? `Choices depend on ${fields.find((field) => field.fieldDefinitionId === row.element.optionFilter!.parentFieldDefinitionId)?.fieldDisplayName ?? "another dropdown"}` : null, row.section.repeat ? "Per entry" : null].filter(Boolean).join(", ") || <span className="text-muted">Standard</span> },
           { key: "actions", header: "Actions", isActions: true, render: (row) => <Button size="sm" variant="secondary" aria-label={`Edit rules of ${row.element.label || "field"}`} onClick={() => onEdit(elementKey(row.element))}>Edit rules</Button> },
         ]}
       />

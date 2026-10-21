@@ -1,6 +1,7 @@
 export {
   CONTROLS_BY_TYPE,
   FIELD_DATA_TYPES,
+  REPEAT_CEILING,
   emptyLayout,
   formLayoutSchema,
   layoutElementSchema,
@@ -12,6 +13,8 @@ export {
   type FieldElement,
   type FormLayout,
   type LayoutElement,
+  type LayoutOptionFilter,
+  type LayoutRepeat,
   type LayoutPlacement,
   type LayoutSection,
   type LayoutUploadPolicy,
@@ -19,8 +22,28 @@ export {
   type RelatedElement,
 } from "./layout";
 export { breakpointForWidth, effectiveSpan, packElements, visibleColumns, type Breakpoint, type PackedCell } from "./packer";
-export { ruleFieldsOf, ruleStatesFor, validateValues, valuesById, type ErrorMap, type RendererField, type RuleContext, type ValueMap } from "./validation";
-export { choicesFor, defaultSelection, describeSelection, initialValues, type ChoiceOption } from "./options";
+export { ruleFieldsOf, ruleStatesFor, validateElement, validateValues, valuesById, type ErrorMap, type RendererField, type RuleContext, type ValueMap } from "./validation";
+export { allowedByParent, cascadeDependentClears, choicesFor, defaultSelection, dependentChoicesFor, dependentViolation, describeSelection, initialValues, type ChoiceOption } from "./options";
+export {
+  changeInOccurrence,
+  changeTopLevel,
+  groupKeyFor,
+  groupPayload,
+  initialGroups,
+  moveOccurrence,
+  newOccurrence,
+  occurrenceErrorKey,
+  occurrenceRuleStates,
+  repeatingSections,
+  toGroupValueMap,
+  topLevelFieldElements,
+  validateGroups,
+  type GroupInfo,
+  type GroupValueMap,
+  type OccurrenceState,
+  type RecordGroupPayload,
+  type RepeatingSection,
+} from "./groups";
 export {
   GROUP_OPERATORS,
   OPERATOR_LABEL,

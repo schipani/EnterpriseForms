@@ -229,10 +229,15 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
       {status.isError ? <ErrorPanel error={status.error} onRetry={() => void status.refetch()} /> : null}
       {(encrypted && field.fieldClassification === "Restricted") || migrationActive ? null : canEdit && !open ? (
         <div>
-          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          <p className="text-xs text-muted">Encryption helps protect sensitive information.</p>
+          <Button size="sm" variant="secondary" onClick={() => setOpen(true)} className="mt-1">
             Strengthen protection…
           </Button>
-          <p className="mt-1 text-xs text-muted">Protection can be strengthened by any designer. Removing encryption is not a designer action: it needs the organization's data-protection policy to permit it and an organization administrator (two of them for Confidential or Restricted data).</p>
+          <p className="mt-1 text-xs text-muted">Turning encryption off requires administrator approval and must be permitted by your organization's security policy.</p>
+          <details className="mt-1 text-xs text-muted">
+            <summary className="cursor-pointer text-body">Learn more</summary>
+            <p className="mt-1">Protection can be strengthened by any designer. Removing encryption is not a designer action: it needs the organization's data-protection policy to permit it and an organization administrator (two of them for Confidential or Restricted data).</p>
+          </details>
         </div>
       ) : null}
       {open ? (

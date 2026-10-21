@@ -8,7 +8,7 @@ import { DocumentCollection } from "../../documents";
 import { ChildRecordList } from "../../related-forms";
 import { RecordAccessPanel } from "../../sharing";
 import { ErrorPanel } from "../../support";
-import { parseProjectionLayout, toRendererFields, toValueMap } from "../components/recordModel";
+import { parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
 
 /** PG-017 record workspace: verified projection, related lists, documents, activity. Permissions come from the projection. */
 export function RecordPage() {
@@ -67,6 +67,8 @@ export function RecordPage() {
                 layout={layout}
                 fields={fields}
                 values={values}
+                groups={toGroups(data.record)}
+                groupInfos={toGroupInfos(data.record.groups)}
                 readOnly
                 applyRules={data.permissions.isCompleteProjection}
                 renderRelatedList={(element) => {

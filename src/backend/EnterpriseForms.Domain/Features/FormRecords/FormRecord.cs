@@ -126,6 +126,56 @@ public sealed class FormRecordRevision : ISignedContentRow
     public Guid RowPrimaryKey => FormRecordId;
 }
 
+/// <summary>
+/// Immutable staged copy of one occurrence of a repeating group — the RepeatedGroup Merkle item (MERKLE §2, kind 2).
+/// Signed under RowHmac v1 entity kind <c>form_record_groups</c>; the canonical primary key is the stable occurrence id
+/// (<see cref="FormRecordGroupId"/>), which value rows of the occurrence carry as their signed <c>form_record_group_id</c>.
+/// The physical row id differs per operation, exactly like the record header.
+/// </summary>
+public sealed class FormRecordGroupRevision : ISignedContentRow
+{
+    public Guid FormRecordGroupRevisionId { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid FormRecordId { get; set; }
+
+    /// <summary>Stable occurrence identity (survives edits and reordering).</summary>
+    public Guid FormRecordGroupId { get; set; }
+
+    public Guid GroupDefinitionId { get; set; }
+
+    /// <summary>Reserved for nested groups; always null in this version.</summary>
+    public Guid? ParentFormRecordGroupId { get; set; }
+
+    /// <summary>Display position of the occurrence within its group (signed).</summary>
+    public long GroupSortOrder { get; set; }
+
+    public Guid ContentChangeOperationId { get; set; }
+
+    public long ContentRevision { get; set; }
+
+    public long RowRevision { get; set; }
+
+    public byte[] RowSignature { get; set; } = [];
+
+    public int RowSignatureKeyVersion { get; set; }
+
+    public int RowSignatureSchemaVersion { get; set; }
+
+    public DateTimeOffset CreatedOn { get; set; }
+
+    public Guid CreatedByUserId { get; set; }
+
+    public string EntityKind => "form_record_groups";
+
+    public byte ItemKindCode => ContentItemKindCodes.RepeatedGroup;
+
+    public Guid ItemId => FormRecordGroupId;
+
+    public Guid RowPrimaryKey => FormRecordGroupId;
+}
+
 /// <summary>Common shape of the typed value tables (CLAUDE.md §2.4): one logical item identity, staged immutably per operation.</summary>
 public abstract class FieldValueRowBase : ISignedContentRow
 {

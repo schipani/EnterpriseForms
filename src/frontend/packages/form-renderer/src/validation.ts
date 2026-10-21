@@ -1,6 +1,6 @@
 import type { FieldElement, FormLayout } from "./layout";
-import { choicesFor } from "./options";
-import { evaluateRuleStates, splitSelection, type RuleField } from "./rules";
+import { choicesFor, dependentViolation } from "./options";
+import { evaluateRuleStates, splitSelection, type FieldRuleState, type RuleField } from "./rules";
 
 export interface RendererField {
   fieldDefinitionId: string;
@@ -12,6 +12,8 @@ export interface RendererField {
   /** Dropdowns: "Single" (default) or "Multiple". Permanent for the field. */
   optionSelectionMode?: string;
   options: Array<{ fieldOptionId: string; optionKey: string; optionDisplayText: string; optionSortOrder: number; isActive: boolean }>;
+  /** Fields of a repeating section (Phase C3): one value per entry. Permanent for the field. */
+  groupDefinitionId?: string | null | undefined;
 }
 
 export type ValueMap = Record<string, string>;
@@ -56,36 +58,48 @@ export function validateValues(layout: FormLayout, fields: readonly RendererFiel
   const byId = new Map(fields.map((field) => [field.fieldDefinitionId, field]));
   const states = ruleStatesFor(layout, fields, values, context.applyRules);
   for (const section of layout.sections) {
+    if (section.repeat) {
+      continue; // entries of a repeating section are validated per entry (validateGroups)
+    }
     for (const element of section.elements) {
       if (element.kind !== "field") {
         continue;
       }
       const field = byId.get(element.fieldDefinitionId);
-      if (!field) {
-        continue;
-      }
-      const state = states.get(element.fieldDefinitionId);
-      if (state && !state.visible) {
-        continue; // hidden by a rule: nothing is required, and its (retained) value is not re-validated here
-      }
-      if (element.readOnly) {
-        continue; // the user cannot change it; the server applies its default and keeps its value
-      }
-      const raw = values[field.fieldKey];
-      const present = raw !== undefined && raw !== "";
-      if (!present) {
-        if (state?.required && (scope === "create" || field.fieldKey in values)) {
-          errors[field.fieldKey] = `${labelOf(element, field)} is required`;
-        }
-        continue;
-      }
-      const message = validateOne(element, field, raw);
-      if (message) {
+      const message = field ? validateElement(element, field, values, states.get(element.fieldDefinitionId), scope === "create" || field.fieldKey in values, context.applyRules, byId) : undefined;
+      if (message && field) {
         errors[field.fieldKey] = message;
       }
     }
   }
   return errors;
+}
+
+/**
+ * One field element against the values of its scope (the record, or one entry merged with the record's values), in the
+ * server's order: hidden → nothing to check; read-only → the server keeps it; missing → required?; present → type and
+ * format rules, then (full projections only) the dependent-dropdown filter.
+ */
+export function validateElement(element: FieldElement, field: RendererField, scopeValues: ValueMap, state: FieldRuleState | undefined, requireMissing: boolean, applyRules: boolean, byId: ReadonlyMap<string, RendererField>): string | undefined {
+  if (state && !state.visible) {
+    return undefined; // hidden by a rule: nothing is required, and its (retained) value is not re-validated here
+  }
+  if (element.readOnly) {
+    return undefined; // the user cannot change it; the server applies its default and keeps its value
+  }
+  const raw = scopeValues[field.fieldKey];
+  if (raw === undefined || raw === "") {
+    return state?.required && requireMissing ? `${labelOf(element, field)} is required` : undefined;
+  }
+  const message = validateOne(element, field, raw);
+  if (message || !applyRules || !element.optionFilter) {
+    return message;
+  }
+  const parent = byId.get(element.optionFilter.parentFieldDefinitionId);
+  if (parent && dependentViolation(element.optionFilter, field, raw, scopeValues[parent.fieldKey] ?? "") !== undefined) {
+    return `${labelOf(element, field)}: the selection is not available for the chosen ${parent.fieldDisplayName}; choose another`;
+  }
+  return undefined;
 }
 
 function labelOf(element: FieldElement, field: RendererField): string {

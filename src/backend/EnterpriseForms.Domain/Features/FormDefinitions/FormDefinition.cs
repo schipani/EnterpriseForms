@@ -119,4 +119,28 @@ public sealed class FieldDefinition
 
     /// <summary>The shared option list the field's options were copied from, when created from one.</summary>
     public Guid? OptionListId { get; set; }
+
+    /// <summary>The repeating group the field belongs to (values stored per occurrence); permanent from creation, null for top-level fields.</summary>
+    public Guid? GroupDefinitionId { get; set; }
+}
+
+/// <summary>
+/// Stable identity of a repeating group of a form (CLAUDE.md §2.3, Phase C3). The published layout decides where the group
+/// is placed and how many occurrences it allows; this row only fixes its identity and key.
+/// </summary>
+public sealed class GroupDefinition
+{
+    public Guid GroupDefinitionId { get; set; }
+
+    public Guid FormDefinitionId { get; set; }
+
+    public string GroupKey { get; set; } = string.Empty;
+
+    public string GroupDisplayName { get; set; } = string.Empty;
+
+    public string LifecycleStatus { get; set; } = "Available";
+
+    public DateTimeOffset CreatedOn { get; set; }
+
+    public Guid CreatedByUserId { get; set; }
 }

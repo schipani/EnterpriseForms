@@ -1,5 +1,5 @@
 import type { FieldDefinitionResponse } from "@enterpriseforms/api-client";
-import { appendCondition, asGroup, candidateSources, conditionProblem, findRuleCycle, newComparison, removeNode, replaceNode, type ConditionPath } from "@enterpriseforms/form-designer";
+import { appendCondition, asGroup, candidateFilterParents, candidateSources, conditionProblem, fieldScopes, findOptionFilterCycle, findRuleCycle, newComparison, removeNode, replaceNode, type ConditionPath } from "@enterpriseforms/form-designer";
 import {
   OPERATOR_LABEL,
   allowedOperators,
@@ -25,9 +25,11 @@ const toSource = (field: FieldDefinitionResponse): Source => ({ fieldDefinitionI
 const countNodes = (node: RuleCondition): number => ("conditions" in node ? 1 + node.conditions.reduce((sum, child) => sum + countNodes(child), 0) : 1);
 
 /**
- * Rules tab of Field Properties (Phase C2): Show in form, Read-only, a visibility rule, a required-if rule and the
- * opt-in clear-when-hidden behaviour. Everything edits the draft element (undoable, saved with Save draft); the server
- * validates the same rules on save and publish and enforces them on every record write.
+ * Conditional rules tab of Field Properties (Phase C2; Phase C3 designer UX refinement relocated dependent-dropdown
+ * choices to their own "Dropdown choices and dependent choices" tab — see `DependentChoices` below): Show in form,
+ * Read-only, a visibility rule, a required-if rule and the opt-in clear-when-hidden behaviour. Everything edits the
+ * draft element (undoable, saved with Save draft); the server validates the same rules on save and publish and
+ * enforces them on every record write.
  */
 export function RulesTab({ layout, element, field, fields, canDesign, onElementChange }: { layout: FormLayout; element: FieldElement; field: FieldDefinitionResponse; fields: readonly FieldDefinitionResponse[]; canDesign: boolean; onElementChange: (next: FieldElement) => void }) {
   const sources = fields.map(toSource);
@@ -95,7 +97,7 @@ export function RulesTab({ layout, element, field, fields, canDesign, onElementC
 
       <section aria-label="Required rule" className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">Required</h3>
-        <p className="text-xs text-muted">{required ? "This field is always required (General tab)." : "Optional unless a condition below makes it required."}</p>
+        <p className="text-xs text-muted">{required ? "This field is always required (Validation tab)." : "Optional unless a condition below makes it required."}</p>
         <Checkbox
           label="Make this field required when conditions are met"
           checked={element.requiredWhen !== undefined}
@@ -113,6 +115,92 @@ export function RulesTab({ layout, element, field, fields, canDesign, onElementC
 
       {element.visibleWhen || element.requiredWhen ? <TryIt layout={layout} element={element} sources={sources} fields={fields} /> : null}
     </div>
+  );
+}
+
+const byOrder = (a: { optionSortOrder: number | string }, b: { optionSortOrder: number | string }) => Number(a.optionSortOrder) - Number(b.optionSortOrder);
+
+/**
+ * Dependent dropdown (Phase C3): this dropdown offers only the choices that fit another dropdown's selection, mapped by
+ * stable option keys (labels can change freely). A choice left unmapped is always available. Saved with the draft and
+ * validated by the server (parent, keys, scope and no loops); the server refuses records whose selections do not fit.
+ * Rendered from the "Dropdown choices and dependent choices" tab (Phase C3 designer UX refinement), alongside the
+ * dropdown's own option list — not from the Conditional rules tab, so the two kinds of choice configuration are not
+ * split across two different tabs.
+ */
+export function DependentChoices({ layout, element, field, fields, canDesign, onElementChange }: { layout: FormLayout; element: FieldElement; field: FieldDefinitionResponse; fields: readonly FieldDefinitionResponse[]; canDesign: boolean; onElementChange: (next: FieldElement) => void }) {
+  const candidates = candidateFilterParents(layout, field.fieldDefinitionId, fields.map(toSource)).map((candidate) => fields.find((f) => f.fieldDefinitionId === candidate.fieldDefinitionId)!);
+  const filter = element.optionFilter;
+  const parent = filter ? fields.find((candidate) => candidate.fieldDefinitionId === filter.parentFieldDefinitionId) : undefined;
+  const parentChoices = parent ? (candidates.some((candidate) => candidate.fieldDefinitionId === parent.fieldDefinitionId) ? candidates : [parent, ...candidates]) : candidates;
+  const childOptions = [...field.options].filter((option) => option.isActive || filter?.parentOptionKeysByOption[option.optionKey] !== undefined).sort(byOrder);
+  const parentOptions = parent ? [...parent.options].filter((option) => option.isActive).sort(byOrder) : [];
+  const cycle = findOptionFilterCycle(layout);
+  const scopes = fieldScopes(layout);
+  const named = (id: string) => fields.find((candidate) => candidate.fieldDefinitionId === id)?.fieldDisplayName ?? "unknown field";
+  const write = (next: FieldElement["optionFilter"]) => {
+    const updated: FieldElement = { ...element };
+    if (next) {
+      updated.optionFilter = next;
+    } else {
+      delete updated.optionFilter;
+    }
+    onElementChange(updated);
+  };
+  const setMapping = (childKey: string, parentKeys: string[]) => {
+    if (!filter) {
+      return;
+    }
+    const map = { ...filter.parentOptionKeysByOption };
+    if (parentKeys.length > 0) {
+      map[childKey] = parentKeys;
+    } else {
+      delete map[childKey];
+    }
+    write({ ...filter, parentOptionKeysByOption: map });
+  };
+  return (
+    <section aria-label="Dependent choices" className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">Dependent choices</h3>
+      <p className="text-xs text-muted">Offer only the choices that fit another dropdown's selection — for example the provinces of the selected country. When the other dropdown changes, a choice that no longer fits is cleared in the form (and announced); the server refuses to save a combination that does not fit.</p>
+      <Checkbox
+        label="Filter the choices by another dropdown"
+        checked={filter !== undefined}
+        disabled={!canDesign || (candidates.length === 0 && filter === undefined)}
+        onCheckedChange={(checked) => (checked && candidates[0] ? write({ parentFieldDefinitionId: candidates[0].fieldDefinitionId, parentOptionKeysByOption: {} }) : write(undefined))}
+      />
+      {candidates.length === 0 && filter === undefined ? <p className="text-xs text-muted">Place another dropdown {scopes.get(field.fieldDefinitionId) ? "in this section or outside sections that allow multiple entries" : "outside sections that allow multiple entries"} to filter by it.</p> : null}
+      {filter && parent ? (
+        <>
+          <Select label="Depends on" value={parent.fieldDefinitionId} disabled={!canDesign} options={parentChoices.map((candidate) => ({ value: candidate.fieldDefinitionId, label: candidate.fieldDisplayName }))} onValueChange={(id) => id !== parent.fieldDefinitionId && write({ parentFieldDefinitionId: id, parentOptionKeysByOption: {} })} />
+          <p className="text-xs text-muted">For each choice, tick the {parent.fieldDisplayName} values it belongs to. A choice with nothing ticked is always available.</p>
+          {childOptions.map((option) => {
+            const mapped = filter.parentOptionKeysByOption[option.optionKey] ?? [];
+            return (
+              <fieldset key={option.optionKey} className="flex flex-col gap-1 rounded border border-line p-2" data-dependent-choice={option.optionKey}>
+                <legend className="px-1 text-sm font-medium">
+                  {option.optionDisplayText} — {mapped.length === 0 ? "always available" : `available when ${parent.fieldDisplayName} is ${mapped.map((key) => parent.options.find((candidate) => candidate.optionKey === key)?.optionDisplayText ?? key).join(" or ")}`}
+                </legend>
+                {parentOptions.map((parentOption) => (
+                  <Checkbox
+                    key={parentOption.optionKey}
+                    label={`${option.optionDisplayText} when ${parentOption.optionDisplayText}`}
+                    checked={mapped.includes(parentOption.optionKey)}
+                    disabled={!canDesign}
+                    onCheckedChange={(checked) => setMapping(option.optionKey, parentOptions.map((candidate) => candidate.optionKey).filter((key) => (key === parentOption.optionKey ? checked : mapped.includes(key))))}
+                  />
+                ))}
+              </fieldset>
+            );
+          })}
+        </>
+      ) : null}
+      {cycle ? (
+        <StatusMessage tone="danger" title="Circular dropdown dependency">
+          {cycle.map(named).join(" → ")}. Dropdowns cannot filter each other in a loop; the draft cannot be saved until this is removed.
+        </StatusMessage>
+      ) : null}
+    </section>
   );
 }
 

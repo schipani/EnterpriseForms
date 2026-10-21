@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addDocumentCollection, addField, formIdFromUrl, placeFromPicker, publish, selectTile, signIn, signOut } from "./support";
+import { addDocumentCollection, addField, formIdFromUrl, openFieldConfig, placeFromPicker, publish, selectTile, signIn, signOut } from "./support";
 
 /**
  * C1 designer rebuild acceptance (docs/ui/c1-designer-rebuild/ACCEPTANCE_TEST_MATRIX.md), against the real API:
@@ -38,7 +38,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     for (const item of ["Design", "Fields", "Rules", "Preview", "Versions", "Settings", "Form permissions", "Related forms"]) {
       await expect(nav.getByRole("tab", { name: new RegExp(`^${item}`) })).toBeVisible();
     }
-    for (const action of ["Add Field", "Add Row", "Add Column", "Save draft"]) {
+    for (const action of ["Add Field", "Add Section", "Add Row", "Add Column", "Save draft"]) {
       await expect(page.getByRole("group", { name: "Designer actions" }).getByRole("button", { name: action })).toBeVisible();
     }
     await expect(page.getByRole("complementary", { name: "Properties" })).toBeVisible();
@@ -59,8 +59,8 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     }
     expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "First Name", "Reference Number"]);
 
-    // UX-04: "+ Add Row" creates a titled section with an empty "+ Add Field" cell, ready to rename (not a line break).
-    await page.getByRole("button", { name: "Add Row" }).click();
+    // UX-04: "+ Add Section" creates a titled section with an empty "+ Add Field" cell, ready to rename (not a line break).
+    await page.getByRole("button", { name: "Add Section" }).click();
     const rename = page.getByRole("textbox", { name: "Rename section" });
     await expect(rename).toBeFocused();
     await expect(rename).toHaveValue("New section");
@@ -77,29 +77,39 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     expect(await tileNames(page, "Contact Information")).toEqual(["Address Line 1", "City"]);
     expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "First Name", "Reference Number"]);
 
-    // UX-02 / UX-11: click a tile → only it is selected; the inspector shows its stable id and keeps input across tabs.
+    // UX-02 / UX-11: click a tile → only it is selected; the quick inspector shows its stable id's core fields live,
+    // and Configure Field's full workspace keeps input across tabs.
     const inspector = await selectTile(page, "Last Name");
     await expect(canvas(page).locator('button[aria-keyshortcuts][aria-pressed="true"]')).toHaveCount(1);
     await expect(inspector.getByRole("heading", { name: "Field Properties" })).toBeVisible();
-    for (const tabName of ["General", "Validation", "Rules", "Security & Encryption", "Advanced"]) {
-      await expect(inspector.getByRole("tab", { name: tabName })).toBeVisible();
-    }
     await inspector.getByLabel("Help text").fill("Legal family name");
-    await inspector.getByRole("tab", { name: "Validation" }).click();
-    await inspector.getByLabel("Maximum length").fill("abc");
-    await expect(inspector.getByText("Enter a whole number from 1 to 4000")).toBeVisible();
-    await inspector.getByLabel("Maximum length").fill("80");
-    await inspector.getByRole("tab", { name: "Advanced" }).click();
-    await expect(inspector.getByLabel("Field key")).toHaveValue("last_name");
-    const lastNameId = await inspector.getByLabel("Field UUID").inputValue();
-    await inspector.getByRole("tab", { name: "General" }).click();
-    await expect(inspector.getByLabel("Help text")).toHaveValue("Legal family name");
-    await inspector.getByLabel("Placeholder").fill("Enter last name");
+    await inspector.getByLabel("Placeholder").fill("Enter last name"); // label/type/help text/placeholder live only in the quick inspector
+    let modal = await openFieldConfig(page, "Last Name");
+    for (const tabName of ["Validation", "Conditional Rules", "Placement & Alignment", "Security & Encryption", "Advanced"]) {
+      await expect(modal.getByRole("tab", { name: tabName })).toBeVisible();
+    }
+    await expect(modal.getByRole("tab", { name: "General" })).toHaveCount(0); // removed: nothing here duplicates the quick inspector
+    await expect(modal.getByLabel("Maximum length")).toBeVisible(); // Validation is the modal's first (default) tab
+    await modal.getByLabel("Maximum length").fill("abc");
+    await expect(modal.getByText("Enter a whole number from 1 to 4000")).toBeVisible();
+    await modal.getByLabel("Maximum length").fill("80");
+    await modal.getByRole("tab", { name: "Advanced" }).click();
+    await expect(modal.getByLabel("Field key")).toHaveValue("last_name");
+    const lastNameId = await modal.getByLabel("Field ID").inputValue();
+    // Switching tabs must not lose the Validation-tab edit made above (C1-UX §C).
+    await modal.getByRole("tab", { name: "Validation" }).click();
+    await expect(modal.getByLabel("Maximum length")).toHaveValue("80");
+    await modal.getByRole("button", { name: "Apply Changes" }).click();
+    await expect(modal).toBeHidden();
+    await expect(inspector.getByLabel("Placeholder")).toHaveValue("Enter last name"); // unaffected by the modal's Apply
 
-    // UX-06: move a field from Personal Information into the new section (inspector "Section", no dragging).
-    const reference = await selectTile(page, "Reference Number");
-    await reference.getByRole("combobox", { name: "Section" }).click();
+    // UX-06: move a field from Personal Information into the new section (Configure Field's Placement & Alignment
+    // tab → Section, no dragging).
+    modal = await openFieldConfig(page, "Reference Number", "Placement & Alignment");
+    await modal.getByRole("combobox", { name: "Section" }).click();
     await page.getByRole("option", { name: "Contact Information" }).click();
+    await modal.getByRole("button", { name: "Apply Changes" }).click();
+    await expect(modal).toBeHidden();
     expect(await tileNames(page, "Contact Information")).toEqual(["Address Line 1", "City", "Reference Number"]);
     expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "First Name"]);
 
@@ -122,7 +132,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     await expect(section(page, "Personal Information").getByRole("button", { name: "Given name", exact: true })).toBeVisible();
 
     // UX-10: a document collection placed in another new section; UX-08: removing that non-empty section needs a choice.
-    await page.getByRole("button", { name: "Add Row" }).click();
+    await page.getByRole("button", { name: "Add Section" }).click();
     await page.getByRole("textbox", { name: "Rename section" }).fill("Evidence");
     await page.keyboard.press("Enter");
     await placeFromPicker(page, "Add document collection", /^Case documents/, { section: "Evidence" });
@@ -156,8 +166,9 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "Given name"]);
     const reopened = await selectTile(page, "Last Name");
     await expect(reopened.getByLabel("Placeholder")).toHaveValue("Enter last name");
-    await reopened.getByRole("tab", { name: "Advanced" }).click();
-    await expect(reopened.getByLabel("Field UUID")).toHaveValue(lastNameId);
+    const reopenedModal = await openFieldConfig(page, "Last Name", "Advanced");
+    await expect(reopenedModal.getByLabel("Field ID")).toHaveValue(lastNameId);
+    await reopenedModal.getByRole("button", { name: "Cancel" }).click();
 
     // Preview uses the record renderer and shows both sections.
     await page.getByRole("tab", { name: "Preview" }).click();
@@ -193,9 +204,11 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
   test("unsaved changes block navigation until the designer confirms or saves", async ({ page }) => {
     await signIn(page, "designer");
     await page.goto(`/app/forms/${formId}/design`);
-    const inspector = await selectTile(page, "City");
-    await inspector.getByLabel("Field width").click();
+    const modal = await openFieldConfig(page, "City", "Placement & Alignment");
+    await modal.getByLabel("Field width").click();
     await page.getByRole("option", { name: "3 columns" }).click();
+    await modal.getByRole("button", { name: "Apply Changes" }).click();
+    await expect(modal).toBeHidden();
     await expect(page.getByText("Unsaved changes")).toBeVisible();
 
     await page.getByRole("link", { name: "All forms" }).click();
@@ -239,19 +252,23 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     await signIn(page, "designer");
     await page.goto(`/app/forms/${formId}/design`);
     const inspector = await selectTile(page, "City");
-    const activeTab = inspector.getByRole("tab", { name: "General" });
-    const navTab = page.getByRole("tablist", { name: "Form designer" }).getByRole("tab", { name: "Design" });
     await inspector.getByLabel("Help text").fill("dirty"); // enables the primary Save draft button
+    const navTab = page.getByRole("tablist", { name: "Form designer" }).getByRole("tab", { name: "Design" });
     const save = page.getByRole("button", { name: "Save draft" });
-    const colours = () =>
-      Promise.all([
-        save.evaluate((el) => getComputedStyle(el).backgroundColor),
-        activeTab.evaluate((el) => getComputedStyle(el).borderBottomColor),
-        navTab.evaluate((el) => getComputedStyle(el).borderLeftColor),
-      ]);
-    expect(await colours()).toEqual(["rgb(17, 17, 17)", "rgb(17, 17, 17)", "rgb(17, 17, 17)"]);
+    // The modal's overlay marks the rest of the page aria-hidden while open, so the toolbar and nav are read with it
+    // closed; the modal's own active-tab indicator (vertical nav, Phase C3: a left border) is read with it open.
+    const pageColours = () => Promise.all([save.evaluate((el) => getComputedStyle(el).backgroundColor), navTab.evaluate((el) => getComputedStyle(el).borderLeftColor)]);
+    const modalColour = async () => {
+      const modal = await openFieldConfig(page, "City");
+      const colour = await modal.getByRole("tab", { name: "Validation" }).evaluate((el) => getComputedStyle(el).borderLeftColor);
+      await modal.getByRole("button", { name: "Cancel" }).click();
+      return colour;
+    };
+    expect(await pageColours()).toEqual(["rgb(17, 17, 17)", "rgb(17, 17, 17)"]);
+    expect(await modalColour()).toBe("rgb(17, 17, 17)");
     await page.evaluate(() => document.documentElement.style.setProperty("--ui-primary-bg", "#1d4ed8"));
-    expect(await colours()).toEqual(["rgb(29, 78, 216)", "rgb(29, 78, 216)", "rgb(29, 78, 216)"]);
+    expect(await pageColours()).toEqual(["rgb(29, 78, 216)", "rgb(29, 78, 216)"]);
+    expect(await modalColour()).toBe("rgb(29, 78, 216)");
     await page.getByRole("button", { name: "Undo last layout change" }).click();
     await expect(page.getByText("Unsaved changes")).toBeHidden();
     await signOut(page);

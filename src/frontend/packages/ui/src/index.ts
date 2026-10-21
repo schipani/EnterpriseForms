@@ -1,5 +1,5 @@
 export { Button, type ButtonProps, type ButtonVariant } from "./Button";
-export { FieldShell, TextArea, TextInput, inputClass, type TextAreaProps, type TextInputProps } from "./Field";
+export { FieldLayoutProvider, FieldShell, TextArea, TextInput, inputClass, type TextAreaProps, type TextInputProps } from "./Field";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
 export { Select, type SelectOption, type SelectProps } from "./Select";
 export { Dialog, type DialogProps } from "./Dialog";

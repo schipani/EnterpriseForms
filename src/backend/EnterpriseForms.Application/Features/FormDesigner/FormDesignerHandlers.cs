@@ -100,12 +100,64 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         var draft = decisions[0].Allowed ? await scope.FindDraftAsync(formDefinitionId, cancellationToken).ConfigureAwait(false) : null;
         var relationships = await scope.GetRelationshipDefinitionsAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false);
         var names = (await scope.GetFormDefinitionsAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false)).ToDictionary(d => d.FormDefinitionId, d => d.FormDefinitionName);
+        var groups = await scope.GetGroupDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
         return new FormDefinitionDetailResponse(
             Summary(definition, version, draft is not null, decisions[0].Allowed, decisions[1].Allowed),
             ToFieldResponses(fields, options),
             version is null ? null : ToVersion(version),
             draft is null ? null : new FormDraftResponse(draft.FormDraftId, draft.BasedOnFormVersionId, draft.LayoutSchemaVersion, draft.LayoutJson, draft.DraftRevision, draft.UpdatedOn),
-            relationships.Select(r => ToRelationship(r, names.GetValueOrDefault(r.ChildFormDefinitionId, string.Empty))).ToList());
+            relationships.Select(r => ToRelationship(r, names.GetValueOrDefault(r.ChildFormDefinitionId, string.Empty))).ToList(),
+            groups.Select(ToGroup).ToList());
+    }
+
+    public static GroupDefinitionResponse ToGroup(GroupDefinition g) => new(g.GroupDefinitionId, g.GroupKey, g.GroupDisplayName, g.LifecycleStatus);
+
+    /// <summary>
+    /// Creates the stable repeating group behind a section that allows multiple entries (Phase C3). The group key is
+    /// permanent; fields created for the group belong to it for life. Placing it in a section is a layout (draft) change.
+    /// </summary>
+    public async Task<GroupDefinitionResponse> CreateGroupAsync(RequestContext context, Guid formDefinitionId, CreateGroupDefinitionRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(request);
+        await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (!KeyPattern().IsMatch(request.GroupKey ?? string.Empty) || string.IsNullOrWhiteSpace(request.GroupDisplayName) || request.GroupDisplayName.Length > 200 || request.GroupDisplayName.Contains('<', StringComparison.Ordinal))
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, "a snake_case group key and a display name (max 200) are required");
+        }
+
+        var now = clock.GetUtcNow();
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        if (await scope.FindFormDefinitionAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            throw new BusinessException("NOT_FOUND", 404, "form definition not found");
+        }
+
+        var existing = await scope.GetGroupDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false);
+        if (existing.Any(g => g.GroupKey == request.GroupKey))
+        {
+            throw new BusinessException("GROUP_KEY_EXISTS", 409, "a repeating group with this key already exists on the form");
+        }
+
+        if (existing.Count >= 25)
+        {
+            throw new BusinessException("LIMIT_EXCEEDED", 422, "a form may define at most 25 repeating groups");
+        }
+
+        var group = new GroupDefinition
+        {
+            GroupDefinitionId = Guid.CreateVersion7(),
+            FormDefinitionId = formDefinitionId,
+            GroupKey = request.GroupKey!,
+            GroupDisplayName = request.GroupDisplayName.Trim(),
+            LifecycleStatus = "Available",
+            CreatedOn = now,
+            CreatedByUserId = context.LocalUserId,
+        };
+        scope.AddGroupDefinition(group);
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormDraftUpdated, "repeating group defined", formDefinitionId: formDefinitionId, metadata: new { groupKey = group.GroupKey, groupDefinitionId = group.GroupDefinitionId });
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return ToGroup(group);
     }
 
     public async Task<FormDefinitionDetailResponse> CreateAsync(RequestContext context, CreateFormDefinitionV2Request request, string idempotencyKey, CancellationToken cancellationToken)
@@ -215,6 +267,19 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                 throw new BusinessException("LIMIT_EXCEEDED", 422, "a form may define at most 250 fields");
             }
 
+            if (request.GroupDefinitionId is { } groupId)
+            {
+                if (request.FieldDataType == FieldDataTypes.File)
+                {
+                    throw new BusinessException("INVALID_REQUEST", 422, "document collections cannot be placed in a section that allows multiple entries");
+                }
+
+                if ((await check.GetGroupDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).All(g => g.GroupDefinitionId != groupId))
+                {
+                    throw new BusinessException("NOT_FOUND", 404, "repeating group not found on this form");
+                }
+            }
+
             await check.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -251,6 +316,8 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             CreatedOn = now,
             CreatedByUserId = context.LocalUserId,
             OptionSelectionMode = selectionMode,
+            // Permanent: a value is either top-level or per entry for the life of the field (C-16).
+            GroupDefinitionId = request.GroupDefinitionId,
         };
         var options = new List<FieldOption>();
         if (request.FieldDataType == FieldDataTypes.Option && request.OptionListId is { } optionListId)
@@ -298,7 +365,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             }
         }
 
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormDraftUpdated, "field definition added", formDefinitionId: formDefinitionId, fieldDefinitionId: field.FieldDefinitionId, metadata: new { fieldKey = field.FieldKey, dataType = field.FieldDataType, classification = field.FieldClassification, protectionMode = field.FieldProtectionMode, authorityCommandId = requirementCommandId, optionSelectionMode = field.OptionSelectionMode, optionListId = field.OptionListId });
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormDraftUpdated, "field definition added", formDefinitionId: formDefinitionId, fieldDefinitionId: field.FieldDefinitionId, metadata: new { fieldKey = field.FieldKey, dataType = field.FieldDataType, classification = field.FieldClassification, protectionMode = field.FieldProtectionMode, authorityCommandId = requirementCommandId, optionSelectionMode = field.OptionSelectionMode, optionListId = field.OptionListId, groupDefinitionId = field.GroupDefinitionId });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToFieldResponses([field], options)[0];
     }
@@ -1321,7 +1388,8 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             }
         }
 
-        FormRules.ValidateLayout(layout, fields, optionsByField);
+        var groupIds = (await scope.GetGroupDefinitionsAsync(formDefinitionId, cancellationToken).ConfigureAwait(false)).Select(g => g.GroupDefinitionId).ToHashSet();
+        FormRules.ValidateLayout(layout, fields, optionsByField, groupIds);
     }
 
     /// <summary>Default selections and the options snapshot only make sense for a dropdown: defaults must name active options of the field (at most one for a single-select), and a required dropdown needs something to choose.</summary>
@@ -1438,6 +1506,6 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(options);
         var byField = options.GroupBy(o => o.FieldDefinitionId).ToDictionary(g => g.Key, g => g.OrderBy(o => o.OptionSortOrder).ThenBy(o => o.OptionKey, StringComparer.Ordinal).Select(o => new FieldOptionResponse(o.FieldOptionId, o.OptionKey, o.OptionDisplayText, o.OptionSortOrder, o.IsActive, o.OptionListItemId)).ToList());
-        return fields.OrderBy(f => f.FieldKey, StringComparer.Ordinal).Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, byField.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision, f.OptionSelectionMode, f.OptionListId)).ToList();
+        return fields.OrderBy(f => f.FieldKey, StringComparer.Ordinal).Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, byField.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision, f.OptionSelectionMode, f.OptionListId, f.GroupDefinitionId)).ToList();
     }
 }

@@ -75,10 +75,81 @@ export function dependsOn(layout: FormLayout, fieldId: string, otherId: string):
   return false;
 }
 
-/** Fields a rule on `targetId` may read: placed fields with a usable operator set that do not already depend on the target. */
+/** Placed field id → the repeating group of its section (null for a record-level section). */
+export function fieldScopes(layout: FormLayout): Map<string, string | null> {
+  const scopes = new Map<string, string | null>();
+  for (const section of layout.sections) {
+    for (const element of section.elements) {
+      if (element.kind === "field") {
+        scopes.set(element.fieldDefinitionId, section.repeat?.groupDefinitionId ?? null);
+      }
+    }
+  }
+  return scopes;
+}
+
+/**
+ * Whether a rule (or dropdown filter) of `targetId` may read `sourceId` (mirror of the server's scope check): a record-level
+ * field can be read by anything; a field of a repeating section only by fields of the same section (one value per entry).
+ */
+export function inScope(layout: FormLayout, sourceId: string, targetId: string): boolean {
+  const scopes = fieldScopes(layout);
+  const source = scopes.get(sourceId) ?? null;
+  return source === null || source === (scopes.get(targetId) ?? null);
+}
+
+/** Fields a rule on `targetId` may read: placed fields in scope with a usable operator set that do not already depend on the target. */
 export function candidateSources(layout: FormLayout, targetId: string, fields: readonly RuleField[], usable: (field: RuleField) => boolean): RuleField[] {
-  const placed = new Set(layout.sections.flatMap((section) => section.elements).filter((element) => element.kind === "field").map((element) => (element as { fieldDefinitionId: string }).fieldDefinitionId));
-  return fields.filter((field) => field.fieldDefinitionId !== targetId && placed.has(field.fieldDefinitionId) && usable(field) && !dependsOn(layout, field.fieldDefinitionId, targetId));
+  const scopes = fieldScopes(layout);
+  return fields.filter((field) => field.fieldDefinitionId !== targetId && scopes.has(field.fieldDefinitionId) && inScope(layout, field.fieldDefinitionId, targetId) && usable(field) && !dependsOn(layout, field.fieldDefinitionId, targetId));
+}
+
+/** Dependent dropdowns: child field id → the parent field id its choices are filtered by. */
+export function optionFilterParents(layout: FormLayout): Map<string, string> {
+  const parents = new Map<string, string>();
+  for (const element of layout.sections.flatMap((section) => section.elements)) {
+    if (element.kind === "field" && element.optionFilter) {
+      parents.set(element.fieldDefinitionId, element.optionFilter.parentFieldDefinitionId);
+    }
+  }
+  return parents;
+}
+
+/** A loop of dropdown dependencies (Country → Province → City → Country), as field ids with the start repeated; null when there is none. */
+export function findOptionFilterCycle(layout: FormLayout): string[] | null {
+  const parents = optionFilterParents(layout);
+  for (const start of parents.keys()) {
+    const path = [start];
+    let current = start;
+    while (parents.has(current)) {
+      const next = parents.get(current)!;
+      if (path.includes(next)) {
+        return [...path.slice(path.indexOf(next)), next];
+      }
+      path.push(next);
+      current = next;
+    }
+  }
+  return null;
+}
+
+/** Dropdowns that `targetId`'s choices can depend on: placed dropdowns in scope, not itself, and not (transitively) depending on it. */
+export function candidateFilterParents(layout: FormLayout, targetId: string, fields: readonly RuleField[]): RuleField[] {
+  const scopes = fieldScopes(layout);
+  const parents = optionFilterParents(layout);
+  const reachesTarget = (id: string): boolean => {
+    const seen = new Set<string>();
+    let current: string | undefined = id;
+    while (current !== undefined && !seen.has(current)) {
+      if (current === targetId) {
+        return true;
+      }
+      seen.add(current);
+      current = parents.get(current);
+    }
+    return false;
+  };
+  return fields.filter((field) => field.fieldDataType === "Option" && field.fieldDefinitionId !== targetId && scopes.has(field.fieldDefinitionId) && inScope(layout, field.fieldDefinitionId, targetId) && !reachesTarget(field.fieldDefinitionId));
 }
 
 export type ConditionPath = number[];

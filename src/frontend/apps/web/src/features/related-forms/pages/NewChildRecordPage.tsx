@@ -1,10 +1,10 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { FormRenderer, initialValues, tryParseLayout, validateValues, type ValueMap } from "@enterpriseforms/form-renderer";
+import { FormRenderer, groupPayload, initialGroups, initialValues, tryParseLayout, validateGroups, validateValues, type GroupValueMap, type RecordGroupPayload, type ValueMap } from "@enterpriseforms/form-renderer";
 import { Button, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useState } from "react";
-import { layoutValues, toRendererFields } from "../../form-records";
+import { useEffect, useState } from "react";
+import { layoutValues, toGroupInfos, toRendererFields } from "../../form-records";
 import { ErrorPanel } from "../../support";
 
 /** Creates a child record (e.g. AccusedAddress) under a parent through the relationship; ownership follows the parent in the authority. */
@@ -17,9 +17,16 @@ export function NewChildRecordPage() {
   const relationship = parent.data?.relationships.find((candidate) => candidate.formRelationshipDefinitionId === formRelationshipDefinitionId);
   const childForm = useQuery({ queryKey: ["forms", relationship?.childFormDefinitionId], queryFn: () => api.forms.get(relationship!.childFormDefinitionId).then((r) => r.result), enabled: Boolean(relationship) });
   const [values, setValues] = useState<ValueMap | null>(null);
+  const [groups, setGroups] = useState<GroupValueMap | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const parsedLayout = childForm.data?.currentVersion ? tryParseLayout(childForm.data.currentVersion.layoutJson) : null;
+    if (groups === null && childForm.data && parsedLayout?.ok) {
+      setGroups(initialGroups(parsedLayout.layout, toRendererFields(childForm.data.fields), toGroupInfos(childForm.data.groups)));
+    }
+  }, [childForm.data, groups]);
   const create = useMutation({
-    mutationFn: (payload: Record<string, string>) => api.related.create(formRecordId, { formRelationshipDefinitionId, values: payload }).then((r) => r.result),
+    mutationFn: (payload: { values: Record<string, string>; groups: RecordGroupPayload[] }) => api.related.create(formRecordId, { formRelationshipDefinitionId, values: payload.values, groups: payload.groups }).then((r) => r.result),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["related", formRecordId] });
       await queryClient.invalidateQueries({ queryKey: ["records"] });
@@ -50,11 +57,13 @@ export function NewChildRecordPage() {
   // A new child starts with each dropdown's default selection; the server re-validates whatever is sent.
   const starting = initialValues(parsed.layout, fields);
   const current = values ?? starting;
+  const infos = toGroupInfos(child.groups);
+  const currentGroups = groups ?? {};
   const submit = () => {
-    const validation = validateValues(parsed.layout, fields, current, "create");
+    const validation = { ...validateValues(parsed.layout, fields, current, "create"), ...validateGroups(parsed.layout, fields, current, currentGroups, infos, "create") };
     setErrors(validation);
     if (Object.keys(validation).length === 0) {
-      create.mutate(layoutValues(parsed.layout, fields, current, starting));
+      create.mutate({ values: layoutValues(parsed.layout, fields, current, starting), groups: groupPayload(parsed.layout, fields, current, currentGroups, infos) });
     }
   };
   return (
@@ -68,7 +77,7 @@ export function NewChildRecordPage() {
           submit();
         }}
       >
-        <FormRenderer layout={parsed.layout} fields={fields} values={current} errors={errors} onChange={(key, value) => setValues((previous) => ({ ...(previous ?? starting), [key]: value }))} />
+        <FormRenderer layout={parsed.layout} fields={fields} values={current} errors={errors} groups={currentGroups} groupInfos={infos} onGroupsChange={setGroups} onChange={(key, value) => setValues((previous) => ({ ...(previous ?? starting), [key]: value }))} />
         {create.isError ? <ErrorPanel error={create.error} /> : null}
         <div className="flex gap-2">
           <Button type="submit" busy={create.isPending}>

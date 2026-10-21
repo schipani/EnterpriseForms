@@ -16,6 +16,8 @@ export {
   removeElement,
   removeSection,
   renameSection,
+  sameScope,
+  setSectionRepeat,
   sectionIndexOf,
   updateElement,
   updateElementByKey,
@@ -23,4 +25,4 @@ export {
   type ElementPosition,
   type SectionRemoval,
 } from "./layoutEdits";
-export { appendCondition, asGroup, candidateSources, conditionProblem, dependsOn, findRuleCycle, getNode, newComparison, operandProblem, removeNode, replaceNode, ruleDependencies, type ConditionPath } from "./ruleEdit";
+export { appendCondition, asGroup, candidateFilterParents, candidateSources, conditionProblem, dependsOn, fieldScopes, findOptionFilterCycle, findRuleCycle, getNode, inScope, newComparison, operandProblem, optionFilterParents, removeNode, replaceNode, ruleDependencies, type ConditionPath } from "./ruleEdit";

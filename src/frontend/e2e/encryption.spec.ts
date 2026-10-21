@@ -72,6 +72,20 @@ test.describe.serial("Field encryption: designer configuration, record display, 
 
     await placeFromPicker(page, "Add field", /Case notes/);
     await placeFromPicker(page, "Add field", /Exhibit count/);
+
+    // The designer canvas shows a green "Encrypted" badge (lock icon, success styling) below the field's preview
+    // control for the encrypted field, and none for the plaintext one — restored after it disappeared in the Phase
+    // C3 layout refinement (TileBadges never received the field's protection mode, only the layout element).
+    await page.getByRole("tab", { name: "Design" }).click();
+    const canvas = page.getByRole("region", { name: "Form canvas" });
+    const encryptedTile = canvas.getByRole("button", { name: "Case notes", exact: true }).locator("..").locator("..");
+    const plaintextTile = canvas.getByRole("button", { name: "Exhibit count", exact: true }).locator("..").locator("..");
+    const encryptedBadge = encryptedTile.locator('[data-flag="encrypted"]');
+    await expect(encryptedBadge).toBeVisible();
+    await expect(encryptedBadge).toHaveText("Encrypted");
+    await expect(encryptedBadge).toHaveCSS("color", "rgb(20, 83, 45)"); // #14532d, the existing success/green tone
+    await expect(plaintextTile.locator('[data-flag="encrypted"]')).toHaveCount(0);
+
     await saveAndPublish(page, "initial sealed form");
     await expect(page.getByText("Published v1")).toBeVisible();
     await signOut(page);
