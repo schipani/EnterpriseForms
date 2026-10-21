@@ -78,7 +78,7 @@ test.describe.serial("Phase C3: repeating groups and dependent dropdowns", () =>
     await placeFromPicker(page, "Add field", /^Province/, { width: "2 columns" });
 
     // A new section, then "Allow multiple entries" in its Section Properties.
-    await page.getByRole("button", { name: "Add Row" }).click();
+    await page.getByRole("button", { name: "Add Section" }).click();
     const rename = page.getByRole("textbox", { name: "Rename section" });
     await rename.fill("People");
     await rename.press("Enter");
@@ -94,8 +94,8 @@ test.describe.serial("Phase C3: repeating groups and dependent dropdowns", () =>
     await addEntryField(page, "People", "Role", ["Witness", "Suspect"]);
     let modal = await openFieldConfig(page, "Person name");
     await modal.getByRole("checkbox", { name: "Required" }).click();
-    // Entry fields stay in their section: the Section picker (Advanced tab: Placement) offers only that section.
-    await modal.getByRole("tab", { name: "Advanced" }).click();
+    // Entry fields stay in their section: the Section picker (Placement & Alignment tab) offers only that section.
+    await modal.getByRole("tab", { name: "Placement & Alignment" }).click();
     await modal.getByRole("combobox", { name: "Section" }).click();
     await expect(page.getByRole("option")).toHaveText(["People"]);
     await page.keyboard.press("Escape");
@@ -106,7 +106,7 @@ test.describe.serial("Phase C3: repeating groups and dependent dropdowns", () =>
     await expect(sectionInspector.getByRole("checkbox", { name: "Allow multiple entries" })).toBeDisabled();
 
     // Province depends on Country (stable option keys; a choice with nothing ticked is always available).
-    modal = await openFieldConfig(page, "Province", "Dropdown choices and dependent choices");
+    modal = await openFieldConfig(page, "Province", "Dropdown Choices");
     const dependent = modal.getByRole("region", { name: "Dependent choices" });
     await dependent.getByRole("checkbox", { name: "Filter the choices by another dropdown" }).click();
     await expect(dependent.getByLabel("Depends on")).toContainText("Country");

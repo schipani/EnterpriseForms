@@ -38,7 +38,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     for (const item of ["Design", "Fields", "Rules", "Preview", "Versions", "Settings", "Form permissions", "Related forms"]) {
       await expect(nav.getByRole("tab", { name: new RegExp(`^${item}`) })).toBeVisible();
     }
-    for (const action of ["Add Field", "Add Row", "Add Column", "Save draft"]) {
+    for (const action of ["Add Field", "Add Section", "Add Row", "Add Column", "Save draft"]) {
       await expect(page.getByRole("group", { name: "Designer actions" }).getByRole("button", { name: action })).toBeVisible();
     }
     await expect(page.getByRole("complementary", { name: "Properties" })).toBeVisible();
@@ -59,8 +59,8 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     }
     expect(await tileNames(page, "Personal Information")).toEqual(["Last Name", "First Name", "Reference Number"]);
 
-    // UX-04: "+ Add Row" creates a titled section with an empty "+ Add Field" cell, ready to rename (not a line break).
-    await page.getByRole("button", { name: "Add Row" }).click();
+    // UX-04: "+ Add Section" creates a titled section with an empty "+ Add Field" cell, ready to rename (not a line break).
+    await page.getByRole("button", { name: "Add Section" }).click();
     const rename = page.getByRole("textbox", { name: "Rename section" });
     await expect(rename).toBeFocused();
     await expect(rename).toHaveValue("New section");
@@ -85,7 +85,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     await inspector.getByLabel("Help text").fill("Legal family name");
     await inspector.getByLabel("Placeholder").fill("Enter last name"); // label/type/help text/placeholder live only in the quick inspector
     let modal = await openFieldConfig(page, "Last Name");
-    for (const tabName of ["Validation", "Conditional rules", "Security & Encryption", "Advanced"]) {
+    for (const tabName of ["Validation", "Conditional Rules", "Placement & Alignment", "Security & Encryption", "Advanced"]) {
       await expect(modal.getByRole("tab", { name: tabName })).toBeVisible();
     }
     await expect(modal.getByRole("tab", { name: "General" })).toHaveCount(0); // removed: nothing here duplicates the quick inspector
@@ -95,7 +95,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     await modal.getByLabel("Maximum length").fill("80");
     await modal.getByRole("tab", { name: "Advanced" }).click();
     await expect(modal.getByLabel("Field key")).toHaveValue("last_name");
-    const lastNameId = await modal.getByLabel("Field UUID").inputValue();
+    const lastNameId = await modal.getByLabel("Field ID").inputValue();
     // Switching tabs must not lose the Validation-tab edit made above (C1-UX §C).
     await modal.getByRole("tab", { name: "Validation" }).click();
     await expect(modal.getByLabel("Maximum length")).toHaveValue("80");
@@ -103,9 +103,9 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     await expect(modal).toBeHidden();
     await expect(inspector.getByLabel("Placeholder")).toHaveValue("Enter last name"); // unaffected by the modal's Apply
 
-    // UX-06: move a field from Personal Information into the new section (Configure Field's Advanced tab: Placement
-    // → Section, no dragging).
-    modal = await openFieldConfig(page, "Reference Number", "Advanced");
+    // UX-06: move a field from Personal Information into the new section (Configure Field's Placement & Alignment
+    // tab → Section, no dragging).
+    modal = await openFieldConfig(page, "Reference Number", "Placement & Alignment");
     await modal.getByRole("combobox", { name: "Section" }).click();
     await page.getByRole("option", { name: "Contact Information" }).click();
     await modal.getByRole("button", { name: "Apply Changes" }).click();
@@ -132,7 +132,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     await expect(section(page, "Personal Information").getByRole("button", { name: "Given name", exact: true })).toBeVisible();
 
     // UX-10: a document collection placed in another new section; UX-08: removing that non-empty section needs a choice.
-    await page.getByRole("button", { name: "Add Row" }).click();
+    await page.getByRole("button", { name: "Add Section" }).click();
     await page.getByRole("textbox", { name: "Rename section" }).fill("Evidence");
     await page.keyboard.press("Enter");
     await placeFromPicker(page, "Add document collection", /^Case documents/, { section: "Evidence" });
@@ -167,7 +167,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     const reopened = await selectTile(page, "Last Name");
     await expect(reopened.getByLabel("Placeholder")).toHaveValue("Enter last name");
     const reopenedModal = await openFieldConfig(page, "Last Name", "Advanced");
-    await expect(reopenedModal.getByLabel("Field UUID")).toHaveValue(lastNameId);
+    await expect(reopenedModal.getByLabel("Field ID")).toHaveValue(lastNameId);
     await reopenedModal.getByRole("button", { name: "Cancel" }).click();
 
     // Preview uses the record renderer and shows both sections.
@@ -204,7 +204,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
   test("unsaved changes block navigation until the designer confirms or saves", async ({ page }) => {
     await signIn(page, "designer");
     await page.goto(`/app/forms/${formId}/design`);
-    const modal = await openFieldConfig(page, "City", "Advanced"); // Field width (Placement) now lives on the Advanced tab
+    const modal = await openFieldConfig(page, "City", "Placement & Alignment");
     await modal.getByLabel("Field width").click();
     await page.getByRole("option", { name: "3 columns" }).click();
     await modal.getByRole("button", { name: "Apply Changes" }).click();

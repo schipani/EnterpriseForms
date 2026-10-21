@@ -9,8 +9,14 @@ export interface DesignerRelationship {
   childFormDefinitionName: string;
 }
 
-/** What the inspector shows: a placed element, a section, or an empty "+ Add Field" cell (exact insertion position). */
-export type DesignerSelection = { kind: "element"; key: string } | { kind: "section"; sectionKey: string } | { kind: "slot"; sectionKey: string; insertIndex: number } | null;
+/**
+ * What the inspector shows: a placed element, a section, or an empty "+ Add Field" cell (exact insertion position).
+ * A slot's `slotId` disambiguates several empty cells that share the same `insertIndex` — the four independent
+ * columns "+ Add Row" creates all insert at the same position until one of them is filled, so `insertIndex` alone
+ * cannot tell them apart (Phase C3 usability corrections: this was the root cause of all four columns highlighting
+ * together, and of clicks on one column sometimes acting on another).
+ */
+export type DesignerSelection = { kind: "element"; key: string } | { kind: "section"; sectionKey: string } | { kind: "slot"; sectionKey: string; insertIndex: number; slotId: string; startOnNewRow?: boolean | undefined } | null;
 
 export interface DesignerCanvasProps {
   layout: FormLayout;
@@ -20,17 +26,25 @@ export interface DesignerCanvasProps {
   readOnly?: boolean | undefined;
   selection: DesignerSelection;
   onSelect: (selection: DesignerSelection) => void;
-  /** Additional empty placement cells per section (insertion indexes) created by "+ Add Column"; designer-only, never persisted. */
-  extraSlots?: Readonly<Record<string, readonly number[]>> | undefined;
+  /**
+   * Additional empty placement cells per section, designer-only and never persisted, each with a stable `id` so it
+   * can be independently selected, highlighted and later consumed by filling it with a field. "+ Add Column" adds
+   * one 1-column cell at the target position. "+ Add Row" adds four independent 1-column cells at the end of the
+   * target section — the same single-column building block "+ Add Column" uses, reusing the existing grid/packing
+   * semantics rather than a separate structure — with only the first one marked `startOnNewRow: true` so the row
+   * always starts fresh (the packer, `packElements`, then lays the other three immediately after it; together they
+   * fill exactly one row of four).
+   */
+  extraSlots?: Readonly<Record<string, readonly { id: string; index: number; startOnNewRow?: boolean }[]>> | undefined;
   collapsed: ReadonlySet<string>;
   onToggleCollapse: (sectionKey: string) => void;
-  /** Section whose title is being renamed inline (set right after "+ Add Row"). */
+  /** Section whose title is being renamed inline (set right after "+ Add Section"). */
   renamingSectionKey: string | null;
   onRenamingSectionChange: (sectionKey: string | null) => void;
   /** Opens the explicit field-placement disposition dialog (never removes placements silently). */
   onRequestRemoveSection: (sectionIndex: number) => void;
-  /** Brings the inspector into view (phone/tablet) for the current selection. */
-  onShowProperties?: (() => void) | undefined;
+  /** Opens the Configure Field modal directly for the given element (canvas tile's Settings icon). */
+  onOpenConfig?: ((key: string) => void) | undefined;
   /** Polite status announcements (moves, renames) for assistive technology. */
   announce?: ((message: string) => void) | undefined;
 }
@@ -105,7 +119,7 @@ type Drag = {
   drop: (sectionIndex: number, insertIndex: number) => (event: DragEvent) => void;
 };
 
-type Item = { type: "element"; element: LayoutElement; index: number; layout: LayoutElement["layout"] } | { type: "slot"; insertIndex: number; ordinal: number; layout: LayoutElement["layout"] };
+type Item = { type: "element"; element: LayoutElement; index: number; layout: LayoutElement["layout"] } | { type: "slot"; insertIndex: number; slotId: string; startOnNewRow?: boolean; layout: LayoutElement["layout"] };
 
 /**
  * The canvas shows the authored four-column desktop arrangement whenever a section is wide enough to draw four usable
@@ -141,16 +155,22 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
   const collapsed = props.collapsed.has(section.sectionKey);
   const renaming = props.renamingSectionKey === section.sectionKey;
   const selected = selection?.kind === "section" && selection.sectionKey === section.sectionKey;
+  // A field or empty column selected inside this section gets its own (stronger) outline; the containing section
+  // still shows a visually distinct, lighter outline so its boundary stays clear without implying it is itself the
+  // selected object (Phase C3 usability corrections).
+  const containsSelection = (selection?.kind === "element" && findElement(layout, selection.key)?.sectionIndex === sectionIndex) || (selection?.kind === "slot" && selection.sectionKey === section.sectionKey);
   const headingId = `designer-section-${section.sectionKey}`;
   const bodyId = `${headingId}-body`;
 
-  // Placement cells: the trailing "+ Add Field" cell plus any extra cells added with "+ Add Column", in element order.
-  const slotIndexes = readOnly ? [] : [...(props.extraSlots?.[section.sectionKey] ?? []).map((index) => Math.min(index, section.elements.length)), section.elements.length].sort((a, b) => a - b);
+  // Placement cells: the trailing "+ Add Field" cell (always 1 column, stable id "baseline") plus any extra cells
+  // added with "+ Add Column" (one 1-column cell) or "+ Add Row" (four independent 1-column cells), in element order.
+  const slots = readOnly
+    ? []
+    : [...(props.extraSlots?.[section.sectionKey] ?? []).map((slot) => ({ id: slot.id, index: Math.min(slot.index, section.elements.length), startOnNewRow: slot.startOnNewRow === true })), { id: "baseline", index: section.elements.length, startOnNewRow: false }].sort((a, b) => a.index - b.index);
   const items: Item[] = [];
-  let ordinal = 0;
   const pushSlots = (index: number) => {
-    for (const slot of slotIndexes.filter((candidate) => candidate === index)) {
-      items.push({ type: "slot", insertIndex: slot, ordinal: ++ordinal, layout: { columnSpan: 1, startOnNewRow: false } });
+    for (const slot of slots.filter((candidate) => candidate.index === index)) {
+      items.push({ type: "slot", insertIndex: slot.index, slotId: slot.id, startOnNewRow: slot.startOnNewRow, layout: { columnSpan: 1, startOnNewRow: slot.startOnNewRow } });
     }
   };
   section.elements.forEach((element, index) => {
@@ -182,7 +202,7 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
   return (
     <section
       aria-labelledby={headingId}
-      className={`min-w-0 rounded-lg border bg-surface ${selected ? "border-focus ring-2 ring-focus" : "border-line"} ${dropTarget === `section:${section.sectionKey}` ? "outline-2 outline-dashed outline-focus" : ""}`}
+      className={`min-w-0 rounded-lg border bg-surface ${selected ? "border-focus ring-2 ring-focus" : containsSelection ? "border-focus" : "border-line"} ${dropTarget === `section:${section.sectionKey}` ? "outline-2 outline-dashed outline-focus" : ""}`}
       onDragOver={readOnly ? undefined : drag.over(`section:${section.sectionKey}`)}
       onDrop={readOnly ? undefined : drag.drop(sectionIndex, section.elements.length)}
     >
@@ -218,7 +238,10 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
               type="button"
               className="max-w-full truncate rounded px-1 text-left hover:bg-page"
               aria-pressed={selected}
-              onClick={() => props.onSelect({ kind: "section", sectionKey: section.sectionKey })}
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onSelect({ kind: "section", sectionKey: section.sectionKey });
+              }}
               onDoubleClick={() => !readOnly && props.onRenamingSectionChange(section.sectionKey)}
               title={readOnly ? undefined : "Select the section; double-click to rename"}
             >
@@ -234,7 +257,19 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
         {collapsed ? <span className="shrink-0 text-sm text-muted">{section.elements.length === 1 ? "1 item" : `${section.elements.length} items`}</span> : null}
         {sectionMenu.length > 0 ? <MenuButton label={`Section actions for ${title}`} items={sectionMenu} /> : null}
       </div>
-      <div id={bodyId} hidden={collapsed} className="p-3">
+      <div
+        id={bodyId}
+        data-section-body="true"
+        hidden={collapsed}
+        className="p-3"
+        onClick={(event) => {
+          // Clicking empty section area (not a field tile, slot cell or other control) selects the section, the
+          // same as clicking its header — both become the target for "+ Add Row".
+          if (!(event.target as HTMLElement).closest("button,input,[role=menu]")) {
+            props.onSelect({ kind: "section", sectionKey: section.sectionKey });
+          }
+        }}
+      >
         {section.description ? <p className="mb-3 text-sm text-muted">{section.description}</p> : null}
         {section.elements.length === 0 && readOnly ? <p className="text-sm text-muted">No fields in this section.</p> : null}
         <ol ref={gridRef} aria-label={`Fields in ${title}`} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }} data-breakpoint={breakpoint}>
@@ -242,15 +277,20 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
             const style = { gridColumn: `${cell.column} / span ${cell.span}`, gridRow: cell.row };
             if (cell.element.type === "slot") {
               const slot = cell.element;
-              const isSelected = selection?.kind === "slot" && selection.sectionKey === section.sectionKey && selection.insertIndex === slot.insertIndex;
-              const target = `slot:${section.sectionKey}:${slot.insertIndex}:${slot.ordinal}`;
+              const isSelected = selection?.kind === "slot" && selection.sectionKey === section.sectionKey && selection.slotId === slot.slotId;
+              const target = `slot:${section.sectionKey}:${slot.slotId}`;
               return (
-                <li key={target} style={style} className="min-w-0" onDragOver={drag.over(target)} onDrop={drag.drop(sectionIndex, slot.insertIndex)}>
+                <li key={slot.slotId} style={style} className="min-w-0" onDragOver={drag.over(target)} onDrop={drag.drop(sectionIndex, slot.insertIndex)}>
                   <button
                     type="button"
                     aria-pressed={isSelected}
                     aria-label={`Add Field to ${title}, position ${slot.insertIndex + 1}`}
-                    onClick={() => props.onSelect({ kind: "slot", sectionKey: section.sectionKey, insertIndex: slot.insertIndex })}
+                    onClick={(event) => {
+                      // A parent section/row selection must never intercept a column's own click (Phase C3 usability
+                      // corrections): stop here even though the section-body handler already skips buttons.
+                      event.stopPropagation();
+                      props.onSelect({ kind: "slot", sectionKey: section.sectionKey, insertIndex: slot.insertIndex, slotId: slot.slotId, startOnNewRow: slot.startOnNewRow });
+                    }}
                     className={`flex h-full min-h-20 w-full flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-sm font-medium text-body hover:bg-page ${isSelected || dropTarget === target ? "border-focus bg-page" : "border-input"}`}
                   >
                     <span aria-hidden="true" className="text-xl leading-none">
@@ -295,7 +335,10 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
   const label = displayLabel(element, field, relationship);
   const kind = element.kind === "relatedFormList" ? "Related list" : element.kind === "documentCollection" ? "Document collection" : `${TYPE_LABEL[field?.fieldDataType ?? ""] ?? "Field"} field`;
   const span = element.layout.columnSpan;
-  const select = () => props.onSelect({ kind: "element", key });
+  const select = (event?: { stopPropagation: () => void }) => {
+    event?.stopPropagation(); // a field's own click must never also select its containing section (Phase C3 usability corrections)
+    props.onSelect({ kind: "element", key });
+  };
   const move = (targetSectionIndex: number, insertIndex: number, message: string) => {
     const next = moveElementTo(layout, key, targetSectionIndex, insertIndex);
     if (next !== layout) {
@@ -418,8 +461,8 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
           )}
           {selected && !readOnly && !renaming ? (
             <div role="group" aria-label={`Actions for ${label}`} className="absolute -top-4 right-2 z-10 flex items-center gap-0.5 rounded-md border border-line bg-surface px-0.5 shadow-sm">
-              {props.onShowProperties ? (
-                <IconButton label={`Edit properties of ${label}`} onClick={props.onShowProperties}>
+              {props.onOpenConfig ? (
+                <IconButton label={`Configure ${label}`} onClick={() => props.onOpenConfig!(key)}>
                   <GearIcon />
                 </IconButton>
               ) : null}
@@ -432,10 +475,12 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
         </div>
         <span id={`${key}-desc`} className="sr-only">
           {kind}, {span} of 4 columns{element.kind !== "relatedFormList" && element.required ? ", required" : ""}
-          {behaviorFlags(element).map((flag) => `, ${flag.description}`).join("")}, in {sectionTitle(section)}
+          {behaviorFlags(element, field).map((flag) => `, ${flag.description}`).join("")}, in {sectionTitle(section)}
         </span>
-        <TileBadges element={element} />
+        {/* The preview resembles the actual record form (control first); badges are designer-only metadata, shown
+            below the control like Required's "*", never mistaken for a form value. */}
         <TilePreview element={element} field={field} relationship={relationship} />
+        <TileBadges element={element} field={field} />
       </div>
     </li>
   );
@@ -445,38 +490,59 @@ interface BehaviorFlag {
   key: string;
   label: string;
   description: string;
+  /** Success (green) styling for the Encrypted badge; other flags keep the neutral style. */
+  tone?: "success";
 }
 
-/** Rule and behavior settings that change how a field acts in the data-entry form, as visible (never color-only) text. */
-function behaviorFlags(element: LayoutElement): BehaviorFlag[] {
-  if (element.kind !== "field") {
+/**
+ * Rule, behavior and protection settings that change how a field acts (or is protected) in the data-entry form, as
+ * visible (never color-only) text below the control. `field` carries the catalog's current protection mode
+ * (`RendererField.applicationEncrypted`, the same source the Fields catalog table's "Protection" column and the
+ * Configure Field modal's Security & Encryption tab read) — this is the field's actual current protection mode, not
+ * a claim that any particular stored record has finished an encryption migration (G19/COMPLETENESS_NOTE); it works
+ * the same for a field placed inside a repeating section, since the canvas shows the field's placement once
+ * regardless of how many entries a published record ends up with.
+ */
+function behaviorFlags(element: LayoutElement, field: RendererField | undefined): BehaviorFlag[] {
+  if (element.kind === "relatedFormList") {
     return [];
   }
   const flags: BehaviorFlag[] = [];
-  if (element.visibleWhen) {
-    flags.push({ key: "visible-rule", label: "Conditional", description: "shown only when a visibility rule holds" });
+  if (element.kind === "field") {
+    if (element.visibleWhen) {
+      flags.push({ key: "visible-rule", label: "Conditional", description: "shown only when a visibility rule holds" });
+    }
+    if (element.requiredWhen) {
+      flags.push({ key: "required-rule", label: "Required if", description: "required when a rule holds" });
+    }
+    if (element.showInForm === false) {
+      flags.push({ key: "not-in-form", label: "Not in form", description: "not shown in the data-entry form" });
+    }
+    if (element.readOnly) {
+      flags.push({ key: "read-only", label: "Read-only", description: "read-only" });
+    }
   }
-  if (element.requiredWhen) {
-    flags.push({ key: "required-rule", label: "Required if", description: "required when a rule holds" });
-  }
-  if (element.showInForm === false) {
-    flags.push({ key: "not-in-form", label: "Not in form", description: "not shown in the data-entry form" });
-  }
-  if (element.readOnly) {
-    flags.push({ key: "read-only", label: "Read-only", description: "read-only" });
+  if (field?.applicationEncrypted === true) {
+    flags.push({ key: "encrypted", label: "Encrypted", description: "application-encrypted: protected at rest, not searchable", tone: "success" });
   }
   return flags;
 }
 
-function TileBadges({ element }: { element: LayoutElement }) {
-  const flags = behaviorFlags(element);
+function TileBadges({ element, field }: { element: LayoutElement; field: RendererField | undefined }) {
+  const flags = behaviorFlags(element, field);
   if (flags.length === 0) {
     return null;
   }
   return (
     <ul aria-hidden="true" className="flex flex-wrap gap-1" data-tile-flags="true">
       {flags.map((flag) => (
-        <li key={flag.key} data-flag={flag.key} title={flag.description} className="rounded border border-line bg-page px-1.5 py-0.5 text-xs text-body">
+        <li
+          key={flag.key}
+          data-flag={flag.key}
+          title={flag.description}
+          className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs ${flag.tone === "success" ? "border-[#166534] bg-[#f0fdf4] text-[#14532d] font-medium" : "border-line bg-page text-body"}`}
+        >
+          {flag.key === "encrypted" ? <LockIcon /> : null}
           {flag.label}
         </li>
       ))}
@@ -634,6 +700,15 @@ function TrashIcon() {
   return (
     <svg {...svg}>
       <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg {...svg} width={12} height={12}>
+      <rect x="4" y="11" width="16" height="9" rx="1.5" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }

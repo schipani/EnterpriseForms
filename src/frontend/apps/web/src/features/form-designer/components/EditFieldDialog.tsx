@@ -113,7 +113,7 @@ export function EditFieldDialog({ field, location, canEdit, pending, error, onSa
 
   const advancedContent = (
     <div className="flex flex-col gap-3 text-sm">
-      <TextInput label="Field UUID" value={field.fieldDefinitionId} readOnly helpText="Stable identity (FieldDefinitionId). Reusing an existing field — rather than creating a new one — keeps this id, its key and its historical values." />
+      <TextInput label="Field ID" value={field.fieldDefinitionId} readOnly helpText="This ID stays the same even if you rename the field. Reusing an existing field, instead of creating a new one, keeps this ID, its key and its history." />
       <TextInput label="Field definition revision" value={String(field.fieldDefinitionRevision)} readOnly />
       <TextInput label="Protection policy revision" value={String(field.protectionPolicyRevision)} readOnly />
       <TextInput label="Lifecycle status" value={field.lifecycleStatus} readOnly />

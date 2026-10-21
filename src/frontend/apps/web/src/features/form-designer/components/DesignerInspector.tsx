@@ -11,6 +11,9 @@ import { ErrorPanel } from "../../support";
 export interface PlacementTarget {
   sectionKey: string;
   insertIndex: number;
+  /** The specific empty cell this is, when it is one of several at the same `insertIndex` (e.g. a "+ Add Row" column); used to consume exactly that slot and to carry its `startOnNewRow` into the placed field. */
+  slotId?: string | undefined;
+  startOnNewRow?: boolean | undefined;
 }
 
 export interface DesignerInspectorProps {
@@ -38,7 +41,7 @@ export interface DesignerInspectorProps {
   strengthenPending: boolean;
   strengthenError: unknown;
   announce: (message: string) => void;
-  /** Opens the full Configure Field modal (Validation / Conditional rules / Dropdown choices and dependent choices / Security & Encryption / Advanced) on `key`, optionally landing on a given tab. */
+  /** Opens the full Configure Field modal (Validation / Conditional Rules / Dropdown Choices / Placement & Alignment / Security & Encryption / Advanced) on `key`, optionally landing on a given tab. */
   onOpenConfig: (key: string, tab?: string) => void;
   /** Repeating groups of the form (Phase C3). */
   groups?: readonly GroupDefinitionResponse[] | undefined;
@@ -60,8 +63,8 @@ const TYPE_LABEL: Record<string, string> = { String: "Text (String)", Integer: "
 /**
  * Right-hand inspector (Phase C3 designer UX refinement): the single place a selection starts. A placed field or
  * document collection shows a short **Field Properties** summary (label, type, help text, placeholder) with a
- * **Configure Field** button that opens the full Validation / Conditional rules / Dropdown choices and dependent
- * choices (Option fields only) / Security & Encryption / Advanced workspace in a large modal (`FieldConfigModal`);
+ * **Configure Field** button that opens the full Validation / Conditional Rules / Dropdown Choices (Option fields
+ * only) / Placement & Alignment / Security & Encryption / Advanced workspace in a large modal (`FieldConfigModal`);
  * there is no separate General tab — nothing it would show is not already in this quick panel. A section shows
  * **Section Properties** (unchanged, still inline —
  * it is short); an empty cell shows the Add Field options for that exact position. Presentation edits change the
@@ -89,7 +92,7 @@ export function DesignerInspector(props: DesignerInspectorProps) {
     const sectionIndex = layout.sections.findIndex((section) => section.sectionKey === selection.sectionKey);
     if (sectionIndex >= 0) {
       title = "Add Field";
-      body = <SlotOptions key={`${selection.sectionKey}:${selection.insertIndex}`} {...props} sectionIndex={sectionIndex} target={{ sectionKey: selection.sectionKey, insertIndex: selection.insertIndex }} />;
+      body = <SlotOptions key={`${selection.sectionKey}:${selection.slotId}`} {...props} sectionIndex={sectionIndex} target={{ sectionKey: selection.sectionKey, insertIndex: selection.insertIndex, slotId: selection.slotId, startOnNewRow: selection.startOnNewRow }} />;
     }
   }
   return (
@@ -292,12 +295,12 @@ function GearIcon() {
 }
 
 /**
- * Full Field Properties content (Validation / Conditional rules / Dropdown choices and dependent choices for Option
- * fields / Security & Encryption / Advanced), used only inside `FieldConfigModal` (Phase C3 designer UX refinement —
- * this used to render inline in the right-hand panel, with a General tab that duplicated the quick inspector's
- * label/type/help text/placeholder; General is gone, and Required, Control and Placement moved to Validation/
- * Advanced so nothing here repeats the quick inspector). The vertical tab navigation suits the modal's width; `Tabs`
- * keeps the same `role="tab"`/`role="tablist"` semantics either way.
+ * Full Field Properties content (Validation / Conditional Rules / Dropdown Choices for Option fields / Placement &
+ * Alignment / Security & Encryption / Advanced), used only inside `FieldConfigModal` (Phase C3 designer UX
+ * refinement — this used to render inline in the right-hand panel, with a General tab that duplicated the quick
+ * inspector's label/type/help text/placeholder; General is gone, Required moved to Validation, Control stayed on
+ * Advanced, and Placement moved to its own tab so nothing here repeats the quick inspector). The vertical tab
+ * navigation suits the modal's width; `Tabs` keeps the same `role="tab"`/`role="tablist"` semantics either way.
  */
 export function FieldProperties(props: DesignerInspectorProps & { element: FieldElement | DocumentElement; field: FieldDefinitionResponse; sectionIndex: number; index: number; tab: string; setTab: (tab: string) => void }) {
   const { element, field, layout, onChange, canDesign } = props;
@@ -362,13 +365,13 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
     { value: "validation", label: "Validation", content: validation },
     {
       value: "rules",
-      label: "Conditional rules",
+      label: "Conditional Rules",
       content: element.kind === "field" ? <RulesTab layout={layout} element={element} field={field} fields={props.fields} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} /> : <RulesNotice />,
     },
     dataType === "Option" && element.kind === "field"
       ? {
           value: "dropdown",
-          label: "Dropdown choices and dependent choices",
+          label: "Dropdown Choices",
           content: (
             <div className="flex flex-col gap-4">
               <OptionsEditor formDefinitionId={props.formDefinitionId} field={field} element={element} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} />
@@ -379,6 +382,11 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
           ),
         }
       : null,
+    {
+      value: "placement",
+      label: "Placement & Alignment",
+      content: <div className="flex flex-col gap-4">{placementControls(props, element, props.sectionIndex, props.index)}</div>,
+    },
     {
       value: "security",
       label: "Security & Encryption",
@@ -402,7 +410,7 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
             <Select label="Control" value={element.control} disabled={!canDesign} options={controls.map((control) => ({ value: control, label: control === "textarea" ? "Multi-line text" : "Single-line text" }))} onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => (current.kind === "field" ? { ...current, control: value as FieldElement["control"] } : current)))} />
           ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextInput label="Field UUID" value={field.fieldDefinitionId} readOnly helpText="Stable identity (FieldDefinitionId); renaming or moving never changes it." />
+            <TextInput label="Field ID" value={field.fieldDefinitionId} readOnly helpText="This ID stays the same even if you rename or move the field." />
             <TextInput label="Field key" value={field.fieldKey} readOnly />
           </div>
           <TextInput label="Catalog name" value={field.fieldDisplayName} readOnly helpText="Name in the field catalog; the label above is this form version's display label." />
@@ -413,10 +421,6 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
           <Button size="sm" variant="secondary" onClick={() => props.onOpenFieldEditor(field.fieldDefinitionId)}>
             {canDesign ? "Edit catalog name and description…" : "View field details…"}
           </Button>
-          <div className="border-t border-line pt-4">
-            <h3 className="mb-3 text-sm font-semibold">Placement</h3>
-            {placementControls(props, element, props.sectionIndex, props.index)}
-          </div>
         </div>
       ),
     },
@@ -430,22 +434,23 @@ export function RelatedListProperties(props: DesignerInspectorProps & { element:
   // The list label lives in the quick inspector now (Phase C3 designer UX refinement), matching Field Properties.
   const items = [
     { value: "validation", label: "Validation", content: <p className="text-sm text-muted">Allowed number of child records: {relationship ? `${relationship.minimumChildCount}–${relationship.maximumChildCount}` : "unknown"}. Bounds belong to the relationship definition and are enforced by the server.</p> },
-    { value: "rules", label: "Conditional rules", content: <RulesNotice /> },
+    { value: "rules", label: "Conditional Rules", content: <RulesNotice /> },
+    {
+      value: "placement",
+      label: "Placement & Alignment",
+      content: <div className="flex flex-col gap-4">{placementControls(props, element, props.sectionIndex, props.index)}</div>,
+    },
     { value: "security", label: "Security & Encryption", content: <p className="text-sm text-muted">Each child is an independent record. The Authorization Authority decides access per child record; a share of the parent never covers its children, and each child field keeps its own encryption policy.</p> },
     {
       value: "advanced",
       label: "Advanced",
       content: (
         <div className="flex flex-col gap-4">
-          <TextInput label="Relationship UUID" value={element.formRelationshipDefinitionId} readOnly helpText="Stable identity; moving the list between sections never changes its child links." />
+          <TextInput label="Relationship ID" value={element.formRelationshipDefinitionId} readOnly helpText="This ID stays the same even if you move the list to another section." />
           <TextInput label="Child form" value={relationship?.childFormDefinitionName ?? "Unknown"} readOnly />
           <Button size="sm" variant="secondary" onClick={props.onOpenRelatedForms}>
             Manage related forms…
           </Button>
-          <div className="border-t border-line pt-4">
-            <h3 className="mb-3 text-sm font-semibold">Placement</h3>
-            {placementControls(props, element, props.sectionIndex, props.index)}
-          </div>
         </div>
       ),
     },
@@ -597,13 +602,14 @@ function SlotOptions(props: DesignerInspectorProps & { sectionIndex: number; tar
     }
     const [kind, id] = choice.split(":", 2) as [string, string];
     const columnSpan = Number(width) as 1 | 2 | 3 | 4;
+    const startOnNewRow = target.startOnNewRow === true;
     let element: LayoutElement;
     if (kind === "relationship") {
       const relationship = relationships.find((candidate) => candidate.formRelationshipDefinitionId === id)!;
-      element = { kind: "relatedFormList", formRelationshipDefinitionId: id, label: relationship.relationshipDisplayName, layout: { columnSpan, startOnNewRow: false }, summaryFieldKeys: [] };
+      element = { kind: "relatedFormList", formRelationshipDefinitionId: id, label: relationship.relationshipDisplayName, layout: { columnSpan, startOnNewRow }, summaryFieldKeys: [] };
     } else {
       const field = fields.find((candidate) => candidate.fieldDefinitionId === id)!;
-      element = newElementFor(field, columnSpan);
+      element = { ...newElementFor(field, columnSpan), layout: { columnSpan, startOnNewRow } };
     }
     const sectionNow = layout.sections[sectionIndex]!;
     const elements = [...sectionNow.elements];

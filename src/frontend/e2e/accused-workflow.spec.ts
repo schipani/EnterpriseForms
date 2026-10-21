@@ -120,13 +120,13 @@ test.describe.serial("Stage B Accused workflow", () => {
     // Two half-width name fields on one row, required.
     modal = await openFieldConfig(page, "Given name");
     await modal.getByRole("checkbox", { name: "Required" }).check();
-    await modal.getByRole("tab", { name: "Advanced" }).click(); // Field width (Placement) lives here now
+    await modal.getByRole("tab", { name: "Placement & Alignment" }).click();
     await modal.getByLabel("Field width").click();
     await page.getByRole("option", { name: "2 columns" }).click();
     await modal.getByRole("button", { name: "Apply Changes" }).click();
     await expect(modal).toBeHidden();
 
-    modal = await openFieldConfig(page, "Family name", "Advanced");
+    modal = await openFieldConfig(page, "Family name", "Placement & Alignment");
     await modal.getByLabel("Field width").click();
     await page.getByRole("option", { name: "2 columns" }).click();
     await modal.getByRole("button", { name: "Apply Changes" }).click();

@@ -89,7 +89,7 @@ export function AddFieldDialog({ open, onOpenChange, onSubmit, pending, error, k
     >
       {group ? <p className="rounded border border-line bg-page p-2 text-sm">This field belongs to “{group.sectionTitle}”, which allows multiple entries: it has one value per entry and stays in that section. This cannot be changed later.</p> : null}
       <TextInput label="Display name" value={displayName} required maxLength={200} onChange={(event) => setDisplayName(event.target.value)} />
-      <TextInput label="Field key" value={effectiveKey} required helpText="snake_case, immutable, unique within the form" error={effectiveKey && !KEY.test(effectiveKey) ? "Use lowercase letters, digits and underscores, starting with a letter" : undefined} onChange={(event) => { setKeyTouched(true); setKey(event.target.value); }} />
+      <TextInput label="Field key" value={effectiveKey} required helpText="Lowercase letters, numbers and underscores only. Unique within this form, and cannot be changed after the field is created." error={effectiveKey && !KEY.test(effectiveKey) ? "Use lowercase letters, digits and underscores, starting with a letter" : undefined} onChange={(event) => { setKeyTouched(true); setKey(event.target.value); }} />
       {documents ? (
         <TextInput label="Storage type" value="File (document collection)" readOnly helpText="Documents are attachment references, never file bytes in the record." />
       ) : (

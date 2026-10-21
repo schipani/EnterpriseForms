@@ -69,7 +69,7 @@ test.describe.serial("Reusable option list → dropdown field → record", () =>
     await placeFromPicker(page, "Add field", /^Previous statuses/, { width: "2 columns" });
     const inspector = await selectTile(page, "Marital status");
     await expect(inspector.getByLabel("Field type")).toHaveValue("Dropdown (Single Select)");
-    const modal = await openFieldConfig(page, "Marital status", "Dropdown choices and dependent choices");
+    const modal = await openFieldConfig(page, "Marital status", "Dropdown Choices");
     const region = modal.getByRole("region", { name: "Options of Marital status" });
     await expect(region.getByRole("listitem")).toHaveCount(4);
     await expect(region.getByText("Shared list")).toBeVisible();

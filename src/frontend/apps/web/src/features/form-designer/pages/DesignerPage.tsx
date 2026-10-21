@@ -2,7 +2,7 @@ import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "
 import { useApi } from "@enterpriseforms/app-runtime";
 import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findOptionFilterCycle, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, setSectionRepeat, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
 import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useParams } from "@tanstack/react-router";
@@ -20,10 +20,13 @@ type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" 
 
 /**
  * PG-033/037 Form Designer (C1 designer rebuild, docs/ui/c1-designer-rebuild): a left designer navigation, a centre
- * toolbar + canvas of titled sections with compact field previews, and a persistent right inspector. "+ Add Row"
- * creates a titled section (an existing layout-v2 `section`, not a line-break flag); fields are placed into exact
- * cells, moved between sections and edited in the inspector. Save draft uses the draft revision CAS, Publish the draft
- * + current version CAS; the server validates every layout again and published versions stay immutable.
+ * toolbar + canvas of titled sections with compact field previews, and a persistent right inspector. "+ Add Section"
+ * creates a titled section (an existing layout-v2 `section`, not a line-break flag); "+ Add Row" adds an empty,
+ * full-width cell at the end of the currently selected section so the next field placed there starts a fresh row
+ * (usability corrections round: the old "+ Add Row" button actually created a section, which was wrong). Fields are
+ * placed into exact cells, moved between sections and edited in the inspector. Save draft uses the draft revision
+ * CAS, Publish the draft + current version CAS; the server validates every layout again and published versions stay
+ * immutable.
  */
 export function DesignerPage() {
   const { formDefinitionId } = useParams({ from: "/app/forms/$formDefinitionId/design" });
@@ -77,7 +80,12 @@ export function DesignerPage() {
 
   const [view, setView] = useState<View>("design");
   const [selection, setSelection] = useState<DesignerSelection>(null);
-  const [extraSlots, setExtraSlots] = useState<Record<string, number[]>>({});
+  const [extraSlots, setExtraSlots] = useState<Record<string, Array<{ id: string; index: number; startOnNewRow?: boolean }>>>({});
+  // Stable per-slot ids (Phase C3 usability corrections): several empty cells at the same insertIndex — most notably
+  // the four independent columns "+ Add Row" creates — are otherwise indistinguishable, which was the root cause of
+  // clicking one column selecting/highlighting all of them.
+  const nextSlotIdRef = useRef(0);
+  const nextSlotId = () => `slot-${nextSlotIdRef.current++}`;
   const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed(formDefinitionId));
   const [renamingSectionKey, setRenamingSectionKey] = useState<string | null>(null);
   const [pane, setPane] = useState<"canvas" | "properties">("canvas");
@@ -140,8 +148,11 @@ export function DesignerPage() {
       if (!slots) {
         return current;
       }
-      const at = slots.indexOf(target.insertIndex);
-      const remaining = (at >= 0 ? slots.filter((_, index) => index !== at) : slots).map((index) => (index >= target.insertIndex ? index + 1 : index));
+      // Remove exactly the slot that was filled (by its stable id, when the placement came from one — e.g. a
+      // specific column of a "+ Add Row" row); fall back to the first slot at that position otherwise. Every other
+      // pending slot at or after this position shifts by one, since the array of elements just grew.
+      const at = target.slotId && target.slotId !== "baseline" ? slots.findIndex((slot) => slot.id === target.slotId) : slots.findIndex((slot) => slot.index === target.insertIndex);
+      const remaining = (at >= 0 ? slots.filter((_, index) => index !== at) : slots).map((slot) => (slot.index >= target.insertIndex ? { ...slot, index: slot.index + 1 } : slot));
       return { ...current, [target.sectionKey]: remaining };
     });
   const addFieldMutation = useMutation({
@@ -266,15 +277,25 @@ export function DesignerPage() {
   const dirtyRef = useRef(false);
   const blocker = useBlocker({ shouldBlockFn: () => dirtyRef.current, enableBeforeUnload: () => dirtyRef.current, withResolver: true });
 
-  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z / Ctrl+Y on the Design view, outside text inputs (which keep native undo).
-  const shortcuts = useRef({ undo, redo });
-  shortcuts.current = { undo, redo };
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z / Ctrl+Y on the Design view, outside text inputs (which keep native undo); Escape
+  // moves selection to its immediate parent while focus is on the canvas, outside any dialog/menu/listbox (which
+  // keep their own Escape-to-close behavior). `shortcuts.current` is refreshed every render (below, once
+  // `parentOfSelection` exists) so the listener — created once per `view` — never reads a stale `selection`/`layout`.
+  const shortcuts = useRef({ undo, redo, parentOfSelection: (): DesignerSelection => null });
   useEffect(() => {
     if (view !== "design") {
       return;
     }
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
+      if (event.key === "Escape" && !event.ctrlKey && !event.metaKey && target?.closest('[aria-label="Form canvas"]') && !target?.closest('[role="dialog"],[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper]')) {
+        const parent = shortcuts.current.parentOfSelection();
+        if (parent) {
+          event.preventDefault();
+          setSelection(parent);
+        }
+        return;
+      }
       if (!(event.ctrlKey || event.metaKey) || target?.closest("input,textarea,select,[contenteditable=true],[role=dialog]")) {
         return;
       }
@@ -334,7 +355,19 @@ export function DesignerPage() {
     const index = layout.sections.findIndex((section) => section.sectionKey === selection.sectionKey);
     return index >= 0 ? index : null;
   };
-  const addRow = () => {
+  // Escape moves selection to its immediate parent (a field or empty column to its containing section); a section
+  // has no higher parent to move to (Phase C3 usability corrections).
+  const parentOfSelection = (): DesignerSelection => {
+    if (!layout || !selection || selection.kind === "section") {
+      return null;
+    }
+    const index = sectionOfSelection();
+    return index !== null ? { kind: "section", sectionKey: layout.sections[index]!.sectionKey } : null;
+  };
+  shortcuts.current = { undo, redo, parentOfSelection };
+  // Add Section creates a new titled section (what "+ Add Row" used to do; the real "Add Row" below adds a row
+  // inside the selected section instead).
+  const addSection = () => {
     if (!layout) {
       return;
     }
@@ -351,6 +384,28 @@ export function DesignerPage() {
     setNotice(null);
     announce("New section added. Type its title and press Enter.");
   };
+  // Add Row adds a new row containing four independent 1-column cells at the end of the currently selected section
+  // (disabled with no section target) — the same single-column building block "+ Add Column" uses, not a separate
+  // structure. Only the first of the four is marked startOnNewRow, so the row reliably starts fresh even when the
+  // current row has room left; the packer then lays the other three immediately after it, filling exactly one row.
+  // Each column gets its own stable id so it can be independently selected and placed into.
+  const addRow = () => {
+    if (!layout) {
+      return;
+    }
+    const sectionIndex = sectionOfSelection();
+    if (sectionIndex === null) {
+      return;
+    }
+    const section = layout.sections[sectionIndex]!;
+    const insertIndex = section.elements.length;
+    const columns = [{ id: nextSlotId(), index: insertIndex, startOnNewRow: true }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }, { id: nextSlotId(), index: insertIndex, startOnNewRow: false }];
+    setView("design");
+    setExtraSlots((current) => ({ ...current, [section.sectionKey]: [...(current[section.sectionKey] ?? []), ...columns] }));
+    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex, slotId: columns[0]!.id, startOnNewRow: true });
+    setNotice(null);
+    announce(`New row of 4 empty columns added in ${section.title ?? section.sectionKey}`);
+  };
   const addColumn = () => {
     if (!layout) {
       return;
@@ -366,8 +421,9 @@ export function DesignerPage() {
       setNotice(`“${section.title ?? section.sectionKey}” already shows four empty cells. Sections use the standard four-column grid; place a field in an empty cell first.`);
       return;
     }
-    setExtraSlots((current) => ({ ...current, [target.sectionKey]: [...(current[target.sectionKey] ?? []), target.insertIndex] }));
-    setSelection({ kind: "slot", sectionKey: target.sectionKey, insertIndex: target.insertIndex });
+    const id = nextSlotId();
+    setExtraSlots((current) => ({ ...current, [target.sectionKey]: [...(current[target.sectionKey] ?? []), { id, index: target.insertIndex }] }));
+    setSelection({ kind: "slot", sectionKey: target.sectionKey, insertIndex: target.insertIndex, slotId: id });
     setNotice(`Empty cell added in “${section.title ?? section.sectionKey}”. Sections keep the four-column grid; a full row continues on the next row.`);
     announce("Empty cell added");
   };
@@ -378,12 +434,8 @@ export function DesignerPage() {
     const sectionIndex = sectionOfSelection() ?? layout.sections.length - 1;
     const section = layout.sections[sectionIndex]!;
     setView("design");
-    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex: section.elements.length });
+    setSelection({ kind: "slot", sectionKey: section.sectionKey, insertIndex: section.elements.length, slotId: "baseline" });
     setPane("properties");
-  };
-  const showProperties = () => {
-    setPane("properties");
-    window.setTimeout(() => document.getElementById("designer-inspector-heading")?.focus(), 0);
   };
   const toggleCollapse = (sectionKey: string) =>
     setCollapsed((current) => {
@@ -447,6 +499,10 @@ export function DesignerPage() {
       }
     : null;
 
+  // "+ Add Row" needs an actual section target (a selected section, a field or a cell within one); unlike "+ Add
+  // Column" it does not fall back to the last section when nothing is selected.
+  const sectionTargetIndex = sectionOfSelection();
+
   const toolbar = (
     <div role="group" aria-label="Designer actions" className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2">
       {canDesign ? (
@@ -471,10 +527,13 @@ export function DesignerPage() {
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-          <Button variant="secondary" onClick={addRow} disabled={!layout}>
+          <Button variant="secondary" onClick={addSection} disabled={!layout}>
+            <span aria-hidden="true">+</span> Add Section
+          </Button>
+          <Button variant="secondary" onClick={addRow} disabled={!layout || sectionTargetIndex === null} title={!layout || sectionTargetIndex !== null ? undefined : "Select a section, a field or a cell first"}>
             <span aria-hidden="true">+</span> Add Row
           </Button>
-          <Button variant="secondary" onClick={addColumn} disabled={!layout}>
+          <Button variant="secondary" onClick={addColumn} disabled={!layout || !columnSlotFor(layout, selection)}>
             <span aria-hidden="true">+</span> Add Column
           </Button>
           <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-line sm:inline-block" />
@@ -537,7 +596,10 @@ export function DesignerPage() {
             renamingSectionKey={renamingSectionKey}
             onRenamingSectionChange={setRenamingSectionKey}
             onRequestRemoveSection={setRemoveSectionIndex}
-            onShowProperties={showProperties}
+            onOpenConfig={(key) => {
+              setSelection({ kind: "element", key });
+              setConfigTarget({ key, tab: "validation" });
+            }}
             announce={announce}
           />
         </div>
@@ -781,7 +843,11 @@ export function DesignerPage() {
   );
 
   return (
-    <>
+    // Form Designer usability corrections: label, control, then help text in every field here (and in the dialogs
+    // it opens — Configure Field, Add/Edit Field, Option lists, Publish, Remove section — since Radix dialogs portal
+    // their DOM elsewhere but stay inside this React tree). The record-entry form keeps its own tested order
+    // (FieldLayoutProvider's default) unaffected.
+    <FieldLayoutProvider helpAfterControl>
       <div className="sr-only" role="status" aria-live="polite">
         {announcement}
       </div>
@@ -928,7 +994,7 @@ export function DesignerPage() {
       >
         <p className="text-sm text-muted">Use Save draft first if you want to keep this layout.</p>
       </Dialog>
-    </>
+    </FieldLayoutProvider>
   );
 }
 

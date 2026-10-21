@@ -4,8 +4,9 @@ import { addField, formIdFromUrl, openFieldConfig, placeFromPicker, selectTile, 
 
 /**
  * Phase C3 designer UX refinement: a pinned header (one scroll surface, no nested scrollbars), a short quick
- * inspector (label / type / help text / placeholder + Configure Field), and the full General / Validation / Rules /
- * Security & Encryption / Advanced workspace moved into a large Configure Field modal with Apply Changes / Cancel.
+ * inspector (label / type / help text / placeholder + Configure Field), and the full Validation / Conditional
+ * Rules / Placement & Alignment / Security & Encryption / Advanced workspace in a large Configure Field modal with
+ * Apply Changes / Cancel.
  * Other specs (designer-ux, dropdowns-rules, accused-workflow, form-management, repeating-groups,
  * reusable-dropdown-list, pb14-accessibility) exercise the same modal for their own fields and rules; this file
  * checks the refinement itself.
@@ -41,7 +42,7 @@ test.describe.serial("Phase C3 designer UX refinement: pinned header, quick insp
     for (let i = 1; i <= 12; i++) {
       await addField(page, `Field ${i}`, "String");
       await page.getByRole("tab", { name: "Design" }).click();
-      await page.getByRole("button", { name: "Add Row" }).click();
+      await page.getByRole("button", { name: "Add Section" }).click();
       await page.getByRole("textbox", { name: "Rename section" }).fill(`Section ${i}`);
       await page.keyboard.press("Enter");
       await placeFromPicker(page, "Add field", new RegExp(`^Field ${i} \\(`), { section: `Section ${i}` });
@@ -67,7 +68,7 @@ test.describe.serial("Phase C3 designer UX refinement: pinned header, quick insp
     expect(stuck!.y).toBeLessThanOrEqual(120);
     // The primary actions (toolbar) pinned alongside it are still reachable without scrolling further.
     await expect(page.getByRole("button", { name: "Save draft" })).toBeInViewport();
-    await expect(page.getByRole("button", { name: "Add Row" })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Add Section" })).toBeInViewport();
 
     // One scroll surface: nothing inside the designer workspace has its own overflow/scrollbar.
     const innerScrollers = await page.evaluate(() => {
@@ -125,7 +126,7 @@ test.describe.serial("Phase C3 designer UX refinement: pinned header, quick insp
     const tile = canvas.getByRole("button", { name: "Field 2", exact: true });
     await expect(tile).not.toContainText("*");
     let modal = await openFieldConfig(page, "Field 2");
-    for (const tabName of ["Validation", "Conditional rules", "Security & Encryption", "Advanced"]) {
+    for (const tabName of ["Validation", "Conditional Rules", "Placement & Alignment", "Security & Encryption", "Advanced"]) {
       await expect(modal.getByRole("tab", { name: tabName })).toBeVisible();
     }
     await expect(modal.getByRole("tab", { name: "General" })).toHaveCount(0);
@@ -193,7 +194,7 @@ test.describe.serial("Phase C3 designer UX refinement: pinned header, quick insp
     // Keyboard-only tab navigation (vertical nav: Up/Down per the WAI-ARIA tabs pattern) and a field inside it.
     await modal.getByRole("tab", { name: "Validation" }).focus();
     await page.keyboard.press("ArrowDown");
-    await expect(modal.getByRole("tab", { name: "Conditional rules" })).toBeFocused();
+    await expect(modal.getByRole("tab", { name: "Conditional Rules" })).toBeFocused();
     await expect(modal.getByRole("checkbox", { name: "Show in form" })).toBeVisible(); // the panel has swapped before the next key press
     await page.keyboard.press("Tab");
     await expect(modal.getByRole("tabpanel")).toBeFocused(); // the panel itself is tabbable first (WAI-ARIA tabs pattern)
