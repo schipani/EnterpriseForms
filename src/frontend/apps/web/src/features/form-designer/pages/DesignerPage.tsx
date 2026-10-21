@@ -294,16 +294,20 @@ export function DesignerPage() {
   // Phase C3 designer UX refinement: the header + toolbar pin to the top of the page (one scroll surface for the
   // whole designer, not a second one inside it); the nav list and quick inspector stick just below it. The offset is
   // measured, not guessed, so it stays correct however the header wraps (long form names, narrow widths, 400% zoom).
-  const pinnedRef = useRef<HTMLDivElement>(null);
+  // A callback ref (not a plain useRef read inside a `[]`-deps effect) because the pinned bar's DOM node does not
+  // exist on first mount: the component still returns the loading/error state below until `detail` resolves, so a
+  // one-time mount effect would see `pinnedRef.current === null`, skip creating the observer, and never run again —
+  // leaving every consumer of `pinnedHeight` (the side nav, the quick inspector) stuck at the initial offset forever.
+  const [pinnedNode, setPinnedNode] = useState<HTMLDivElement | null>(null);
   const [pinnedHeight, setPinnedHeight] = useState(0);
   useEffect(() => {
-    if (!pinnedRef.current || typeof ResizeObserver === "undefined") {
+    if (!pinnedNode || typeof ResizeObserver === "undefined") {
       return;
     }
     const observer = new ResizeObserver((entries) => setPinnedHeight(entries[0]?.contentRect.height ?? 0));
-    observer.observe(pinnedRef.current);
+    observer.observe(pinnedNode);
     return () => observer.disconnect();
-  }, []);
+  }, [pinnedNode]);
 
   if (detail.isPending) {
     return <LoadingBlock label="Loading form" />;
@@ -433,7 +437,9 @@ export function DesignerPage() {
         strengthenPending: strengthen.isPending,
         strengthenError: strengthen.error,
         announce,
-        onOpenConfig: (key, tab) => setConfigTarget({ key, tab: tab ?? "general" }),
+        // "validation" is the modal's first tab (Phase C3 designer UX refinement removed the General tab; label,
+        // type, help text and placeholder live only in the quick inspector).
+        onOpenConfig: (key, tab) => setConfigTarget({ key, tab: tab ?? "validation" }),
         groups: form.groups ?? [],
         onEnableRepeat: (sectionIndex, existingGroupDefinitionId) => enableRepeat.mutate({ sectionIndex, existingGroupDefinitionId }),
         enableRepeatPending: enableRepeat.isPending,
@@ -507,7 +513,12 @@ export function DesignerPage() {
           </button>
         ))}
       </div>
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+      {/* lg:items-start: without it, CSS Grid's default align-items:stretch makes the inspector column match the
+          canvas's full (often very tall) height, and a position:sticky element stretched to span its entire
+          scrollable range does not stick in Chromium — it just tracks normal flow. SideNavTabs' own grid already has
+          this; this was the one grid missing it, which is why the inspector (and nothing else) failed to stay pinned
+          on a tall canvas. */}
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:items-start lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className={`min-w-0 ${pane === "canvas" ? "" : "hidden lg:block"}`} aria-label="Form canvas" role="region">
           <DesignerCanvas
             layout={layout}
@@ -782,7 +793,7 @@ export function DesignerPage() {
           never scrolls. Only when the header and toolbar together would be taller than most of a very short viewport
           (e.g. 400% zoom) does this bar get its own short scroll, so Save draft/Publish stay reachable instead of
           being permanently covered — never content "inaccessible" the way an un-clamped sticky block would leave it. */}
-      <div ref={pinnedRef} className="sticky top-0 z-20 -mx-4 flex max-h-[70vh] flex-col gap-2 overflow-y-auto bg-page px-4 pb-2 pt-2 sm:-mx-0 sm:px-0 sm:pt-0">
+      <div ref={setPinnedNode} className="sticky top-0 z-20 -mx-4 flex max-h-[70vh] flex-col gap-2 overflow-y-auto bg-page px-4 pb-2 pt-2 sm:-mx-0 sm:px-0 sm:pt-0">
         {header}
         {toolbar}
       </div>

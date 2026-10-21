@@ -25,9 +25,11 @@ const toSource = (field: FieldDefinitionResponse): Source => ({ fieldDefinitionI
 const countNodes = (node: RuleCondition): number => ("conditions" in node ? 1 + node.conditions.reduce((sum, child) => sum + countNodes(child), 0) : 1);
 
 /**
- * Rules tab of Field Properties (Phase C2): Show in form, Read-only, a visibility rule, a required-if rule and the
- * opt-in clear-when-hidden behaviour. Everything edits the draft element (undoable, saved with Save draft); the server
- * validates the same rules on save and publish and enforces them on every record write.
+ * Conditional rules tab of Field Properties (Phase C2; Phase C3 designer UX refinement relocated dependent-dropdown
+ * choices to their own "Dropdown choices and dependent choices" tab — see `DependentChoices` below): Show in form,
+ * Read-only, a visibility rule, a required-if rule and the opt-in clear-when-hidden behaviour. Everything edits the
+ * draft element (undoable, saved with Save draft); the server validates the same rules on save and publish and
+ * enforces them on every record write.
  */
 export function RulesTab({ layout, element, field, fields, canDesign, onElementChange }: { layout: FormLayout; element: FieldElement; field: FieldDefinitionResponse; fields: readonly FieldDefinitionResponse[]; canDesign: boolean; onElementChange: (next: FieldElement) => void }) {
   const sources = fields.map(toSource);
@@ -95,7 +97,7 @@ export function RulesTab({ layout, element, field, fields, canDesign, onElementC
 
       <section aria-label="Required rule" className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">Required</h3>
-        <p className="text-xs text-muted">{required ? "This field is always required (General tab)." : "Optional unless a condition below makes it required."}</p>
+        <p className="text-xs text-muted">{required ? "This field is always required (Validation tab)." : "Optional unless a condition below makes it required."}</p>
         <Checkbox
           label="Make this field required when conditions are met"
           checked={element.requiredWhen !== undefined}
@@ -111,8 +113,6 @@ export function RulesTab({ layout, element, field, fields, canDesign, onElementC
         </StatusMessage>
       ) : null}
 
-      {field.fieldDataType === "Option" ? <DependentChoices layout={layout} element={element} field={field} fields={fields} canDesign={canDesign} onElementChange={onElementChange} /> : null}
-
       {element.visibleWhen || element.requiredWhen ? <TryIt layout={layout} element={element} sources={sources} fields={fields} /> : null}
     </div>
   );
@@ -124,8 +124,11 @@ const byOrder = (a: { optionSortOrder: number | string }, b: { optionSortOrder: 
  * Dependent dropdown (Phase C3): this dropdown offers only the choices that fit another dropdown's selection, mapped by
  * stable option keys (labels can change freely). A choice left unmapped is always available. Saved with the draft and
  * validated by the server (parent, keys, scope and no loops); the server refuses records whose selections do not fit.
+ * Rendered from the "Dropdown choices and dependent choices" tab (Phase C3 designer UX refinement), alongside the
+ * dropdown's own option list — not from the Conditional rules tab, so the two kinds of choice configuration are not
+ * split across two different tabs.
  */
-function DependentChoices({ layout, element, field, fields, canDesign, onElementChange }: { layout: FormLayout; element: FieldElement; field: FieldDefinitionResponse; fields: readonly FieldDefinitionResponse[]; canDesign: boolean; onElementChange: (next: FieldElement) => void }) {
+export function DependentChoices({ layout, element, field, fields, canDesign, onElementChange }: { layout: FormLayout; element: FieldElement; field: FieldDefinitionResponse; fields: readonly FieldDefinitionResponse[]; canDesign: boolean; onElementChange: (next: FieldElement) => void }) {
   const candidates = candidateFilterParents(layout, field.fieldDefinitionId, fields.map(toSource)).map((candidate) => fields.find((f) => f.fieldDefinitionId === candidate.fieldDefinitionId)!);
   const filter = element.optionFilter;
   const parent = filter ? fields.find((candidate) => candidate.fieldDefinitionId === filter.parentFieldDefinitionId) : undefined;

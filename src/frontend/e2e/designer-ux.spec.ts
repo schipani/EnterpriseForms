@@ -83,25 +83,29 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     await expect(canvas(page).locator('button[aria-keyshortcuts][aria-pressed="true"]')).toHaveCount(1);
     await expect(inspector.getByRole("heading", { name: "Field Properties" })).toBeVisible();
     await inspector.getByLabel("Help text").fill("Legal family name");
+    await inspector.getByLabel("Placeholder").fill("Enter last name"); // label/type/help text/placeholder live only in the quick inspector
     let modal = await openFieldConfig(page, "Last Name");
-    for (const tabName of ["General", "Validation", "Rules", "Security & Encryption", "Advanced"]) {
+    for (const tabName of ["Validation", "Conditional rules", "Security & Encryption", "Advanced"]) {
       await expect(modal.getByRole("tab", { name: tabName })).toBeVisible();
     }
-    await expect(modal.getByLabel("Help text")).toHaveValue("Legal family name"); // quick-panel edits and the modal stay in sync
-    await modal.getByRole("tab", { name: "Validation" }).click();
+    await expect(modal.getByRole("tab", { name: "General" })).toHaveCount(0); // removed: nothing here duplicates the quick inspector
+    await expect(modal.getByLabel("Maximum length")).toBeVisible(); // Validation is the modal's first (default) tab
     await modal.getByLabel("Maximum length").fill("abc");
     await expect(modal.getByText("Enter a whole number from 1 to 4000")).toBeVisible();
     await modal.getByLabel("Maximum length").fill("80");
     await modal.getByRole("tab", { name: "Advanced" }).click();
     await expect(modal.getByLabel("Field key")).toHaveValue("last_name");
     const lastNameId = await modal.getByLabel("Field UUID").inputValue();
-    await modal.getByRole("tab", { name: "General" }).click();
-    await modal.getByLabel("Placeholder").fill("Enter last name");
+    // Switching tabs must not lose the Validation-tab edit made above (C1-UX §C).
+    await modal.getByRole("tab", { name: "Validation" }).click();
+    await expect(modal.getByLabel("Maximum length")).toHaveValue("80");
     await modal.getByRole("button", { name: "Apply Changes" }).click();
     await expect(modal).toBeHidden();
+    await expect(inspector.getByLabel("Placeholder")).toHaveValue("Enter last name"); // unaffected by the modal's Apply
 
-    // UX-06: move a field from Personal Information into the new section (Configure Field's "Section", no dragging).
-    modal = await openFieldConfig(page, "Reference Number");
+    // UX-06: move a field from Personal Information into the new section (Configure Field's Advanced tab: Placement
+    // → Section, no dragging).
+    modal = await openFieldConfig(page, "Reference Number", "Advanced");
     await modal.getByRole("combobox", { name: "Section" }).click();
     await page.getByRole("option", { name: "Contact Information" }).click();
     await modal.getByRole("button", { name: "Apply Changes" }).click();
@@ -200,7 +204,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
   test("unsaved changes block navigation until the designer confirms or saves", async ({ page }) => {
     await signIn(page, "designer");
     await page.goto(`/app/forms/${formId}/design`);
-    const modal = await openFieldConfig(page, "City");
+    const modal = await openFieldConfig(page, "City", "Advanced"); // Field width (Placement) now lives on the Advanced tab
     await modal.getByLabel("Field width").click();
     await page.getByRole("option", { name: "3 columns" }).click();
     await modal.getByRole("button", { name: "Apply Changes" }).click();
@@ -256,7 +260,7 @@ test.describe.serial("C1 designer rebuild: sections (Add Row), placement, inspec
     const pageColours = () => Promise.all([save.evaluate((el) => getComputedStyle(el).backgroundColor), navTab.evaluate((el) => getComputedStyle(el).borderLeftColor)]);
     const modalColour = async () => {
       const modal = await openFieldConfig(page, "City");
-      const colour = await modal.getByRole("tab", { name: "General" }).evaluate((el) => getComputedStyle(el).borderLeftColor);
+      const colour = await modal.getByRole("tab", { name: "Validation" }).evaluate((el) => getComputedStyle(el).borderLeftColor);
       await modal.getByRole("button", { name: "Cancel" }).click();
       return colour;
     };

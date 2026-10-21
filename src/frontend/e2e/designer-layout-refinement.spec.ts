@@ -125,9 +125,10 @@ test.describe.serial("Phase C3 designer UX refinement: pinned header, quick insp
     const tile = canvas.getByRole("button", { name: "Field 2", exact: true });
     await expect(tile).not.toContainText("*");
     let modal = await openFieldConfig(page, "Field 2");
-    for (const tabName of ["General", "Validation", "Rules", "Security & Encryption", "Advanced"]) {
+    for (const tabName of ["Validation", "Conditional rules", "Security & Encryption", "Advanced"]) {
       await expect(modal.getByRole("tab", { name: tabName })).toBeVisible();
     }
+    await expect(modal.getByRole("tab", { name: "General" })).toHaveCount(0);
     await modal.getByRole("checkbox", { name: "Required" }).click();
     await expect(modal.getByRole("checkbox", { name: "Required" })).toHaveAttribute("aria-checked", "true");
     await modal.getByRole("button", { name: "Cancel" }).click();
@@ -186,15 +187,18 @@ test.describe.serial("Phase C3 designer UX refinement: pinned header, quick insp
     const modal = page.getByRole("dialog", { name: /^Configure /i });
     await expect(modal).toBeVisible();
     await axeScan(page, "Configure Field modal at phone width");
+    // Validation is the modal's first (default) tab — no General tab any more, nothing here duplicates the quick inspector.
+    await expect(modal.getByRole("tab", { name: "General" })).toHaveCount(0);
+    await expect(modal.getByLabel("Minimum length")).toBeVisible();
     // Keyboard-only tab navigation (vertical nav: Up/Down per the WAI-ARIA tabs pattern) and a field inside it.
-    await modal.getByRole("tab", { name: "General" }).focus();
+    await modal.getByRole("tab", { name: "Validation" }).focus();
     await page.keyboard.press("ArrowDown");
-    await expect(modal.getByRole("tab", { name: "Validation" })).toBeFocused();
-    await expect(modal.getByLabel("Minimum length")).toBeVisible(); // the panel has swapped before the next key press
+    await expect(modal.getByRole("tab", { name: "Conditional rules" })).toBeFocused();
+    await expect(modal.getByRole("checkbox", { name: "Show in form" })).toBeVisible(); // the panel has swapped before the next key press
     await page.keyboard.press("Tab");
     await expect(modal.getByRole("tabpanel")).toBeFocused(); // the panel itself is tabbable first (WAI-ARIA tabs pattern)
     await page.keyboard.press("Tab");
-    await expect(modal.getByLabel("Minimum length")).toBeFocused();
+    await expect(modal.getByRole("checkbox", { name: "Show in form" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(modal).toBeHidden();
     await signOut(page);

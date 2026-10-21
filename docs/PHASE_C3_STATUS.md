@@ -2,7 +2,7 @@
 
 Branch `phase-c/repeating-groups` (from main `7b3c173`). **Status: implemented and verified as recorded below; awaiting owner review. Not merged.** Nothing here is an accessibility certification, an independent review or a production security certification.
 
-Architecture assessment (written before implementation): `docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md`. Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-15 … C-21**.
+Architecture assessment (written before implementation): `docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md`. Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-15 … C-23**.
 
 **Trust boundary: unchanged.** No change to the Authorization Authority, its command protocol, RowHmac v1 or Merkle v1 (C-15). The one new signed artifact is the business signed schema `form_record_groups` v1, registered like the Stage B value schemas.
 
@@ -128,3 +128,45 @@ Two real problems were found and fixed by this verification, not assumed away:
 ### What this addendum does not show
 
 No manual NVDA/VoiceOver review was performed for the new modal (automated axe only, as instructed). The pre-existing canvas-tile target-size finding above is not fixed here (out of scope for this refinement) and should get its own follow-up.
+
+## Addendum 2: Simplified Field Configuration and the real sticky-header fix (owner-requested, after the addendum above)
+
+The owner reported the addendum-1 refinement still felt repetitive (the quick inspector and Configure Field modal overlapped) and, separately, that the *actual* toolbar (Add Field/Row/Column, Undo/Redo, Save draft, Publish) did not stay visible on scroll even though the breadcrumb did — "this is incorrect," with an explicit instruction not to paper over it with `z-index`. See `docs/decisions/PHASE_C_DECISION_LOG.md` **C-23**. Frontend only; no schema, Authority, encryption, integrity, published-version, rule-engine or repeating-group change.
+
+### The sticky-header bug: two real, unrelated root causes, both found by reproducing it, not guessing
+
+1. **`pinnedHeight` never updated.** `DesignerPage.tsx`'s `ResizeObserver` was attached in a `useEffect(() => {...}, [])` reading a plain `useRef`. On the component's first render the page is still loading (`detail.isPending`), so the pinned bar's `<div ref={pinnedRef}>` does not exist yet; the one-time effect ran against `pinnedRef.current === null`, found nothing to observe, and never ran again once the real page rendered. Every consumer of `pinnedHeight` (the left nav's and the quick inspector's `top` offset) was stuck at the initial value of `0` forever. Fixed with a callback ref (`useState<HTMLDivElement | null>` + `ref={setPinnedNode}`, effect keyed on `[pinnedNode]`), so the observer attaches exactly when the node mounts, however late.
+2. **The canvas/inspector grid was missing `items-start`.** Even after (1), the inspector column still did not stick: CSS Grid's default `align-items: stretch` was stretching the sticky wrapper to the *canvas's full height* (confirmed directly — `getBoundingClientRect().height` matched the multi-thousand-pixel canvas, not the ~550px inspector), and a `position: sticky` element stretched to span its entire scrollable range does not stick in Chromium — it just tracks normal flow. `SideNavTabs`'s own grid already had `lg:items-start`; the designer's own canvas/inspector grid in `DesignerPage.tsx` did not. Added it there.
+
+Both were confirmed with a throwaway diagnostic spec (deleted after use, not committed) that measured `getBoundingClientRect()` on the pinned bar, the inspector wrapper and every ancestor's `position`/`overflow`/`transform` while scrolling a real 8-section form, against both the Vite dev server and the Docker-built image at `localhost:8081` (same bug in both — not a stale-build artifact). A body-overflow sticky-containing-block hypothesis was tested and disproved along the way (forcing `overflow-y: visible` on `<body>` made no difference) before the grid-stretch cause was found and confirmed by direct fix-and-reverify.
+
+### Redundant configuration removed
+
+The owner's target shape: quick inspector keeps Field label / Field type (read-only) / Help text / Placeholder / Configure Field; the modal keeps Validation / Conditional rules / Dropdown choices and dependent choices / Security & Encryption / Advanced, with nothing repeated between them.
+
+- **General tab removed** from the Configure Field modal (`FieldProperties` and `RelatedListProperties` in `DesignerInspector.tsx`). Label, type, help text and placeholder are no longer shown there at all — the quick inspector is now the only place that edits them. The related-list quick inspector's "Field label" is now editable (it was read-only, deferring to the removed General tab); it uses the same sanitized `onChange` the old General tab used.
+- **Required** moved from General onto **Validation** (it is a validation constraint); Validation is now the modal's first/default tab, so every existing "toggle Required" interaction still works without a tab switch.
+- **Control** (single-line vs. multi-line text) and **Placement** (field width, start-on-new-row, Section, Move earlier/later) moved onto **Advanced**, under their own "Placement" heading — unchanged content and behaviour, just relocated.
+- **Dropdown choices and dependent choices**: a new tab, shown only for `Option` fields, combining the option list editor (previously on General) with "Dependent choices" (previously the last section of the Rules tab) — the two kinds of choice configuration are no longer split across two different tabs. `RulesTab.tsx`'s `DependentChoices` is now exported and rendered from here instead of from `RulesTab` itself.
+- **Rules tab relabelled "Conditional rules"** (internal tab id unchanged) to match the owner's naming and to distinguish it from the new Dropdown tab now that dependent choices moved out of it.
+- **Add Field / Edit Field dialogs reviewed, not changed.** `AddFieldDialog` is the field-creation flow (out of scope — "without disrupting field creation"). `EditFieldDialog` duplicates General/Validation/Advanced content, but deliberately: it is the only way to rename a field's *catalog* display name/description and edit an *unplaced* field's help text, both from the Fields catalog table without any canvas selection — a genuinely different, already-tested workflow (`form-management.spec.ts`), not a copy of Configure Field. Gutting its Validation tab would have silently broken that existing, owner-facing edit path for no benefit, so it was left alone.
+
+### Required regressions re-run after this round
+
+| Spec | Result |
+|---|---|
+| `designer-ux.spec.ts` | **5 / 5** passed |
+| `dropdowns-rules.spec.ts` | **5 / 5** passed |
+| `repeating-groups.spec.ts` | **2 / 2** passed |
+| `reusable-dropdown-list.spec.ts` | **2 / 2** passed |
+| `accused-workflow.spec.ts` | **2 / 2** passed |
+| `form-management.spec.ts` | **3 / 3** passed |
+| `designer-layout-refinement.spec.ts` | **5 / 5** passed |
+| `pb14-accessibility.spec.ts` | **3 / 3** passed |
+| Vitest (all packages) / lint / typecheck / production build | clean |
+
+A first full run caught one real gap in the test updates (not a product bug): `designer-ux.spec.ts`'s UX-06 "move a field between sections" step opened Configure Field and reached for the Section picker without switching to the Advanced tab, where Placement now lives. Fixed in the test; re-run confirmed clean (27/27 across the table above on the second pass).
+
+### What this addendum does not show
+
+No manual NVDA/VoiceOver review was performed (automated axe only, as instructed). The pre-existing canvas-tile target-size finding from Addendum 1 is still open and untouched.

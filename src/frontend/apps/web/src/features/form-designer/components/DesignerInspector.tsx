@@ -5,7 +5,7 @@ import { Badge, Button, Checkbox, Select, StatusMessage, Tabs, TextArea, TextInp
 import { useState, type ReactNode } from "react";
 import { CurrentProtectionSection } from "./FieldSecuritySection";
 import { OptionsEditor } from "./OptionsEditor";
-import { RulesTab } from "./RulesTab";
+import { DependentChoices, RulesTab } from "./RulesTab";
 import { ErrorPanel } from "../../support";
 
 export interface PlacementTarget {
@@ -38,7 +38,7 @@ export interface DesignerInspectorProps {
   strengthenPending: boolean;
   strengthenError: unknown;
   announce: (message: string) => void;
-  /** Opens the full Configure Field modal (General / Validation / Rules / Security & Encryption / Advanced) on `key`, optionally landing on a given tab. */
+  /** Opens the full Configure Field modal (Validation / Conditional rules / Dropdown choices and dependent choices / Security & Encryption / Advanced) on `key`, optionally landing on a given tab. */
   onOpenConfig: (key: string, tab?: string) => void;
   /** Repeating groups of the form (Phase C3). */
   groups?: readonly GroupDefinitionResponse[] | undefined;
@@ -60,8 +60,10 @@ const TYPE_LABEL: Record<string, string> = { String: "Text (String)", Integer: "
 /**
  * Right-hand inspector (Phase C3 designer UX refinement): the single place a selection starts. A placed field or
  * document collection shows a short **Field Properties** summary (label, type, help text, placeholder) with a
- * **Configure Field** button that opens the full General / Validation / Rules / Security & Encryption / Advanced
- * workspace in a large modal (`FieldConfigModal`); a section shows **Section Properties** (unchanged, still inline —
+ * **Configure Field** button that opens the full Validation / Conditional rules / Dropdown choices and dependent
+ * choices (Option fields only) / Security & Encryption / Advanced workspace in a large modal (`FieldConfigModal`);
+ * there is no separate General tab — nothing it would show is not already in this quick panel. A section shows
+ * **Section Properties** (unchanged, still inline —
  * it is short); an empty cell shows the Add Field options for that exact position. Presentation edits change the
  * draft layout (undoable; saved with Save draft). Security changes reuse the existing Authority-backed workflow —
  * the inspector never offers its own encryption switch.
@@ -124,8 +126,8 @@ function NothingSelected({ layout, fields, relationships }: DesignerInspectorPro
 
 /**
  * `layout`/`onChange` are shared between every placement edit a field or related-list element makes — field width,
- * section, move earlier/later. `FieldConfigModal` reuses this unchanged with a local draft layout/setter so its
- * General tab behaves identically while deferring the actual commit to Apply Changes.
+ * section, move earlier/later. `FieldConfigModal` reuses this unchanged with a local draft layout/setter so the
+ * Advanced tab's Placement section behaves identically while deferring the actual commit to Apply Changes.
  */
 export function placementControls({ layout, onChange, onSelect, announce, canDesign }: DesignerInspectorProps, element: LayoutElement, sectionIndex: number, index: number) {
   const key = elementKey(element);
@@ -251,14 +253,22 @@ function QuickFieldProperties(props: DesignerInspectorProps & { element: FieldEl
 }
 
 function QuickRelatedListProperties(props: DesignerInspectorProps & { element: RelatedElement }) {
-  const { element, relationships } = props;
+  const { element, relationships, layout, onChange, canDesign } = props;
+  const key = elementKey(element);
   const relationship = relationships.find((candidate) => candidate.formRelationshipDefinitionId === element.formRelationshipDefinitionId);
   return (
     <div className="flex flex-col gap-3">
-      <TextInput label="Field label" value={element.label} readOnly helpText="Open Configure Field to change the list label." />
+      <TextInput
+        label="Field label"
+        value={element.label}
+        required
+        maxLength={200}
+        disabled={!canDesign}
+        onChange={(event) => onChange(updateElementByKey(layout, key, (current) => (current.kind === "relatedFormList" ? { ...current, label: event.target.value.replace(/[<>]/g, "") } : current)))}
+      />
       <TextInput label="Field type" value="Related form list" readOnly />
       <TextInput label="Child form" value={relationship?.childFormDefinitionName ?? "Unknown"} readOnly />
-      <ConfigureFieldButton onClick={() => props.onOpenConfig(elementKey(element))} />
+      <ConfigureFieldButton onClick={() => props.onOpenConfig(key)} />
     </div>
   );
 }
@@ -282,10 +292,12 @@ function GearIcon() {
 }
 
 /**
- * Full Field Properties content (General / Validation / Rules / Security & Encryption / Advanced), used only inside
- * `FieldConfigModal` (Phase C3 designer UX refinement — this used to render inline in the right-hand panel). The
- * vertical tab navigation suits the modal's width; `Tabs` keeps the same `role="tab"`/`role="tablist"` semantics
- * either way.
+ * Full Field Properties content (Validation / Conditional rules / Dropdown choices and dependent choices for Option
+ * fields / Security & Encryption / Advanced), used only inside `FieldConfigModal` (Phase C3 designer UX refinement —
+ * this used to render inline in the right-hand panel, with a General tab that duplicated the quick inspector's
+ * label/type/help text/placeholder; General is gone, and Required, Control and Placement moved to Validation/
+ * Advanced so nothing here repeats the quick inspector). The vertical tab navigation suits the modal's width; `Tabs`
+ * keeps the same `role="tab"`/`role="tablist"` semantics either way.
  */
 export function FieldProperties(props: DesignerInspectorProps & { element: FieldElement | DocumentElement; field: FieldDefinitionResponse; sectionIndex: number; index: number; tab: string; setTab: (tab: string) => void }) {
   const { element, field, layout, onChange, canDesign } = props;
@@ -306,59 +318,14 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
     }
   };
   const controls = element.kind === "field" ? (CONTROLS_BY_TYPE[dataType as FieldDataType] ?? []) : [];
-  const supportsPlaceholder = element.kind === "field" && (dataType === "String" || dataType === "Integer" || dataType === "Decimal");
   const encrypted = field.fieldProtectionMode === "ApplicationEncrypted";
 
-  const general = (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <TextInput label="Field label" value={values.label} required maxLength={200} disabled={!canDesign} error={errors.label} onChange={(event) => set("label", event.target.value)} />
-        <TextInput label="Field type" value={dataType === "Option" ? (field.optionSelectionMode === "Multiple" ? "Dropdown (Multi Select)" : "Dropdown (Single Select)") : (TYPE_LABEL[dataType] ?? dataType)} readOnly />
-      </div>
-      <TextArea label="Help text" value={values.helpText} rows={2} maxLength={1000} disabled={!canDesign} error={errors.helpText} onChange={(event) => set("helpText", event.target.value)} />
-      {supportsPlaceholder ? (
-        <TextInput
-          label="Placeholder"
-          value={element.kind === "field" ? (element.placeholder ?? "") : ""}
-          maxLength={200}
-          disabled={!canDesign}
-          onChange={(event) => {
-            const text = event.target.value.replace(/[<>]/g, "");
-            onChange(
-              updateElementByKey(layout, key, (current) => {
-                if (current.kind !== "field") {
-                  return current;
-                }
-                const next: FieldElement = { ...current };
-                if (text) {
-                  next.placeholder = text;
-                } else {
-                  delete next.placeholder;
-                }
-                return next;
-              }),
-            );
-          }}
-        />
-      ) : null}
-      {dataType === "Option" && element.kind === "field" ? (
-        <OptionsEditor formDefinitionId={props.formDefinitionId} field={field} element={element} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} />
-      ) : null}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-center">
-        {controls.length > 1 && element.kind === "field" ? (
-          <Select label="Control" value={element.control} disabled={!canDesign} options={controls.map((control) => ({ value: control, label: control === "textarea" ? "Multi-line text" : "Single-line text" }))} onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => (current.kind === "field" ? { ...current, control: value as FieldElement["control"] } : current)))} />
-        ) : null}
-        <Checkbox label="Required" checked={values.required} disabled={!canDesign} onCheckedChange={(checked) => set("required", checked)} />
-      </div>
-      <div className="border-t border-line pt-4">
-        <h3 className="mb-3 text-sm font-semibold">Placement</h3>
-        {placementControls(props, element, props.sectionIndex, props.index)}
-      </div>
-    </div>
-  );
-
+  // Label, type, help text and placeholder live only in the quick inspector (Phase C3 designer UX refinement); this
+  // modal never repeats them. Required moves here (it is a validation constraint); Control and Placement move to
+  // Advanced; dropdown choices and dependent choices get their own tab below.
   const validation = (
     <div className="flex flex-col gap-3">
+      <Checkbox label="Required" checked={values.required} disabled={!canDesign} onCheckedChange={(checked) => set("required", checked)} />
       {dataType === "String" ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextInput label="Minimum length" inputMode="numeric" value={values.minLength} disabled={!canDesign} error={errors.minLength} onChange={(event) => set("minLength", event.target.value)} />
@@ -386,19 +353,32 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
           <TextInput label="Allowed content types" value={values.allowedContentTypes} disabled={!canDesign} helpText="Comma-separated MIME types, e.g. application/pdf, text/plain. Documents already stored are never removed." onChange={(event) => set("allowedContentTypes", event.target.value)} />
         </>
       ) : null}
-      {dataType === "Boolean" || dataType === "Option" || dataType === "Guid" ? <p className="text-sm text-muted">{dataType === "Option" ? "A dropdown accepts only its active options (the server enforces this on every save). Use Required (General tab) to demand a choice." : "This storage type has no extra constraints beyond Required (General tab) and its type rules, which the server enforces."}</p> : null}
+      {dataType === "Boolean" || dataType === "Option" || dataType === "Guid" ? <p className="text-sm text-muted">{dataType === "Option" ? "A dropdown accepts only its active options (the server enforces this on every save). Use Required above to demand a choice." : "This storage type has no extra constraints beyond Required above and its type rules, which the server enforces."}</p> : null}
       <p className="text-xs text-muted">Rules apply to new saves after publishing; stored values and documents are never rewritten.</p>
     </div>
   );
 
   const items = [
-    { value: "general", label: "General", content: general },
     { value: "validation", label: "Validation", content: validation },
     {
       value: "rules",
-      label: "Rules",
+      label: "Conditional rules",
       content: element.kind === "field" ? <RulesTab layout={layout} element={element} field={field} fields={props.fields} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} /> : <RulesNotice />,
     },
+    dataType === "Option" && element.kind === "field"
+      ? {
+          value: "dropdown",
+          label: "Dropdown choices and dependent choices",
+          content: (
+            <div className="flex flex-col gap-4">
+              <OptionsEditor formDefinitionId={props.formDefinitionId} field={field} element={element} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} />
+              <div className="border-t border-line pt-4">
+                <DependentChoices layout={layout} element={element} field={field} fields={props.fields} canDesign={canDesign} onElementChange={(next) => onChange(updateElementByKey(layout, key, () => next))} />
+              </div>
+            </div>
+          ),
+        }
+      : null,
     {
       value: "security",
       label: "Security & Encryption",
@@ -417,7 +397,10 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
       value: "advanced",
       label: "Advanced",
       content: (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
+          {controls.length > 1 && element.kind === "field" ? (
+            <Select label="Control" value={element.control} disabled={!canDesign} options={controls.map((control) => ({ value: control, label: control === "textarea" ? "Multi-line text" : "Single-line text" }))} onValueChange={(value) => onChange(updateElementByKey(layout, key, (current) => (current.kind === "field" ? { ...current, control: value as FieldElement["control"] } : current)))} />
+          ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextInput label="Field UUID" value={field.fieldDefinitionId} readOnly helpText="Stable identity (FieldDefinitionId); renaming or moving never changes it." />
             <TextInput label="Field key" value={field.fieldKey} readOnly />
@@ -430,27 +413,6 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
           <Button size="sm" variant="secondary" onClick={() => props.onOpenFieldEditor(field.fieldDefinitionId)}>
             {canDesign ? "Edit catalog name and description…" : "View field details…"}
           </Button>
-        </div>
-      ),
-    },
-  ];
-  return <Tabs label={`Properties of ${values.label || field.fieldDisplayName}`} orientation="vertical" value={props.tab} onValueChange={props.setTab} items={items} />;
-}
-
-export function RelatedListProperties(props: DesignerInspectorProps & { element: RelatedElement; sectionIndex: number; index: number; tab: string; setTab: (tab: string) => void }) {
-  const { element, layout, onChange, canDesign } = props;
-  const key = elementKey(element);
-  const relationship = props.relationships.find((candidate) => candidate.formRelationshipDefinitionId === element.formRelationshipDefinitionId);
-  const items = [
-    {
-      value: "general",
-      label: "General",
-      content: (
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextInput label="List label" value={element.label} maxLength={200} disabled={!canDesign} onChange={(event) => onChange(updateElementByKey(layout, key, (current) => ({ ...current, label: event.target.value.replace(/[<>]/g, "") })))} />
-            <TextInput label="Child form" value={relationship?.childFormDefinitionName ?? "Unknown"} readOnly />
-          </div>
           <div className="border-t border-line pt-4">
             <h3 className="mb-3 text-sm font-semibold">Placement</h3>
             {placementControls(props, element, props.sectionIndex, props.index)}
@@ -458,18 +420,32 @@ export function RelatedListProperties(props: DesignerInspectorProps & { element:
         </div>
       ),
     },
+  ].filter((item): item is NonNullable<typeof item> => item !== null);
+  return <Tabs label={`Properties of ${values.label || field.fieldDisplayName}`} orientation="vertical" value={props.tab} onValueChange={props.setTab} items={items} />;
+}
+
+export function RelatedListProperties(props: DesignerInspectorProps & { element: RelatedElement; sectionIndex: number; index: number; tab: string; setTab: (tab: string) => void }) {
+  const { element } = props;
+  const relationship = props.relationships.find((candidate) => candidate.formRelationshipDefinitionId === element.formRelationshipDefinitionId);
+  // The list label lives in the quick inspector now (Phase C3 designer UX refinement), matching Field Properties.
+  const items = [
     { value: "validation", label: "Validation", content: <p className="text-sm text-muted">Allowed number of child records: {relationship ? `${relationship.minimumChildCount}–${relationship.maximumChildCount}` : "unknown"}. Bounds belong to the relationship definition and are enforced by the server.</p> },
-    { value: "rules", label: "Rules", content: <RulesNotice /> },
+    { value: "rules", label: "Conditional rules", content: <RulesNotice /> },
     { value: "security", label: "Security & Encryption", content: <p className="text-sm text-muted">Each child is an independent record. The Authorization Authority decides access per child record; a share of the parent never covers its children, and each child field keeps its own encryption policy.</p> },
     {
       value: "advanced",
       label: "Advanced",
       content: (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <TextInput label="Relationship UUID" value={element.formRelationshipDefinitionId} readOnly helpText="Stable identity; moving the list between sections never changes its child links." />
+          <TextInput label="Child form" value={relationship?.childFormDefinitionName ?? "Unknown"} readOnly />
           <Button size="sm" variant="secondary" onClick={props.onOpenRelatedForms}>
             Manage related forms…
           </Button>
+          <div className="border-t border-line pt-4">
+            <h3 className="mb-3 text-sm font-semibold">Placement</h3>
+            {placementControls(props, element, props.sectionIndex, props.index)}
+          </div>
         </div>
       ),
     },

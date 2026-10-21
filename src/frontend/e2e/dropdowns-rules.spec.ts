@@ -6,7 +6,7 @@ import { addField, formIdFromUrl, openFieldConfig, placeFromPicker, saveAndPubli
  * Phase C2, through the real application and API (no mocks):
  *  - dropdown + multi-select: add/relabel/reorder/deactivate options in the inspector, defaults, required, Preview,
  *    record create / edit / view, deactivation that never corrupts a stored record;
- *  - conditional visibility, conditional required, Show in form, Read-only: rule builder in the Rules tab, "try it"
+ *  - conditional visibility, conditional required, Show in form, Read-only: rule builder in the Conditional rules tab, "try it"
  *    preview, canvas indicators, cycle prevention, Preview, record create / edit, retention of hidden values.
  * The server enforcement behind each behavior is covered by the Stage B integration tests (DropdownTests, RulesTests).
  */
@@ -34,8 +34,8 @@ async function addOptionField(page: Page, name: string, options: string[], mode:
   await expect(page.getByRole("rowheader", { name })).toBeVisible();
 }
 
-// Options editing (and the rest of General/Validation/Rules/Security/Advanced) lives inside the Configure Field
-// modal (Phase C3 designer UX refinement); callers pass the modal dialog locator from openFieldConfig.
+// Options editing lives on the "Dropdown choices and dependent choices" tab of the Configure Field modal (Phase C3
+// designer UX refinement); callers pass the modal dialog locator from openFieldConfig.
 const optionsRegion = (modal: Locator, field: string) => modal.getByRole("region", { name: `Options of ${field}` });
 const optionRow = (modal: Locator, field: string, key: string) => optionsRegion(modal, field).locator(`[data-option-key="${key}"]`);
 
@@ -62,8 +62,9 @@ test.describe.serial("Phase C2 priority 1: dropdowns and multi-select", () => {
     await placeFromPicker(page, "Add field", /^Priority/, { width: "2 columns" });
     await placeFromPicker(page, "Add field", /^Topics/, { width: "2 columns" });
 
-    // Dropdown options: add, reorder, relabel, default, required — all in Configure Field's General tab.
-    let modal = await openFieldConfig(page, "Priority");
+    // Dropdown options: add, reorder, relabel, default — all in Configure Field's "Dropdown choices and dependent
+    // choices" tab; Required is a Validation-tab setting (not duplicated here).
+    let modal = await openFieldConfig(page, "Priority", "Dropdown choices and dependent choices");
     await expect(optionsRegion(modal, "Priority").getByText("Choose one")).toBeVisible();
     await expect(optionsRegion(modal, "Priority").getByRole("listitem")).toHaveCount(3);
     await optionsRegion(modal, "Priority").getByLabel("New option").fill("Urgent");
@@ -76,12 +77,13 @@ test.describe.serial("Phase C2 priority 1: dropdowns and multi-select", () => {
     await expect(optionsRegion(modal, "Priority").getByLabel("Label of option 3")).toHaveValue("Urgent");
     await expect(optionsRegion(modal, "Priority").getByLabel("Label of option 4")).toHaveValue("High (escalate)");
     await optionRow(modal, "Priority", "medium").getByRole("checkbox", { name: "Default" }).click();
+    await modal.getByRole("tab", { name: "Validation" }).click();
     await modal.getByRole("checkbox", { name: "Required" }).click();
     await modal.getByRole("button", { name: "Apply Changes" }).click();
     await expect(modal).toBeHidden();
 
     // Multi-select: the permanent selection mode is shown, two defaults, option identities listed.
-    modal = await openFieldConfig(page, "Topics");
+    modal = await openFieldConfig(page, "Topics", "Dropdown choices and dependent choices");
     await expect(optionsRegion(modal, "Topics").getByText("Multi-select")).toBeVisible();
     await optionRow(modal, "Topics", "red").getByRole("checkbox", { name: "Default" }).click();
     await optionRow(modal, "Topics", "green").getByRole("checkbox", { name: "Default" }).click();
@@ -142,7 +144,7 @@ test.describe.serial("Phase C2 priority 1: dropdowns and multi-select", () => {
     await signIn(page, "designer");
     await page.goto(`/app/forms/${formId}/design`);
     await expect(page.getByRole("tab", { name: "Design" })).toBeVisible();
-    const deactivateModal = await openFieldConfig(page, "Topics");
+    const deactivateModal = await openFieldConfig(page, "Topics", "Dropdown choices and dependent choices");
     await optionRow(deactivateModal, "Topics", "blue").getByRole("checkbox", { name: "Active" }).click();
     await optionsRegion(deactivateModal, "Topics").getByRole("button", { name: "Save options" }).click();
     await expect(optionsRegion(deactivateModal, "Topics").getByText(/Options saved/)).toBeVisible();
@@ -191,7 +193,7 @@ test.describe.serial("Phase C2: conditional rules, Show in form and Read-only", 
 
     modal = await openFieldConfig(page, "Company name");
     await modal.getByRole("checkbox", { name: "Required" }).click();
-    await modal.getByRole("tab", { name: "Rules" }).click();
+    await modal.getByRole("tab", { name: "Conditional rules" }).click();
     await modal.getByRole("checkbox", { name: "Show this field only when conditions are met" }).click();
     await chooseOption(page, "Visibility condition 1.1 field", "Applicant kind");
     await chooseOption(page, "Visibility condition 1.1 operator", "is");
@@ -207,7 +209,7 @@ test.describe.serial("Phase C2: conditional rules, Show in form and Read-only", 
     await expect(modal).toBeHidden();
 
     // Guardian name: required when the age is under 18. The operator list offers number operators only.
-    modal = await openFieldConfig(page, "Guardian name", "Rules");
+    modal = await openFieldConfig(page, "Guardian name", "Conditional rules");
     await modal.getByRole("checkbox", { name: "Make this field required when conditions are met" }).click();
     await chooseOption(page, "Required condition 1.1 field", "Applicant age");
     await page.getByLabel("Required condition 1.1 operator").click();
@@ -224,14 +226,14 @@ test.describe.serial("Phase C2: conditional rules, Show in form and Read-only", 
     await expect(modal).toBeHidden();
 
     // Intake status: read-only with a default of Draft. Reference note: not shown in the form.
-    modal = await openFieldConfig(page, "Intake status");
+    modal = await openFieldConfig(page, "Intake status", "Dropdown choices and dependent choices");
     await optionRow(modal, "Intake status", "draft").getByRole("checkbox", { name: "Default" }).click();
-    await modal.getByRole("tab", { name: "Rules" }).click();
+    await modal.getByRole("tab", { name: "Conditional rules" }).click();
     await modal.getByRole("checkbox", { name: "Read-only" }).click();
     await modal.getByRole("button", { name: "Apply Changes" }).click();
     await expect(modal).toBeHidden();
 
-    modal = await openFieldConfig(page, "Reference note", "Rules");
+    modal = await openFieldConfig(page, "Reference note", "Conditional rules");
     await modal.getByRole("checkbox", { name: "Show in form" }).click();
     await expect(modal.getByRole("checkbox", { name: "Show in form" })).toHaveAttribute("aria-checked", "false");
     await modal.getByRole("button", { name: "Apply Changes" }).click();
@@ -239,7 +241,7 @@ test.describe.serial("Phase C2: conditional rules, Show in form and Read-only", 
 
     // A rule can never form a loop: fields that already depend on Applicant kind are not offered as its source.
     // (An experiment, discarded with Cancel: nothing here should end up on the draft.)
-    modal = await openFieldConfig(page, "Applicant kind", "Rules");
+    modal = await openFieldConfig(page, "Applicant kind", "Conditional rules");
     await modal.getByRole("checkbox", { name: "Show this field only when conditions are met" }).click();
     await page.getByLabel("Visibility condition 1.1 field").click();
     await expect(page.getByRole("option", { name: "Company name" })).toHaveCount(0);

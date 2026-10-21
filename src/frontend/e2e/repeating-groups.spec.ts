@@ -94,7 +94,8 @@ test.describe.serial("Phase C3: repeating groups and dependent dropdowns", () =>
     await addEntryField(page, "People", "Role", ["Witness", "Suspect"]);
     let modal = await openFieldConfig(page, "Person name");
     await modal.getByRole("checkbox", { name: "Required" }).click();
-    // Entry fields stay in their section: the Section picker offers only that section.
+    // Entry fields stay in their section: the Section picker (Advanced tab: Placement) offers only that section.
+    await modal.getByRole("tab", { name: "Advanced" }).click();
     await modal.getByRole("combobox", { name: "Section" }).click();
     await expect(page.getByRole("option")).toHaveText(["People"]);
     await page.keyboard.press("Escape");
@@ -105,7 +106,7 @@ test.describe.serial("Phase C3: repeating groups and dependent dropdowns", () =>
     await expect(sectionInspector.getByRole("checkbox", { name: "Allow multiple entries" })).toBeDisabled();
 
     // Province depends on Country (stable option keys; a choice with nothing ticked is always available).
-    modal = await openFieldConfig(page, "Province", "Rules");
+    modal = await openFieldConfig(page, "Province", "Dropdown choices and dependent choices");
     const dependent = modal.getByRole("region", { name: "Dependent choices" });
     await dependent.getByRole("checkbox", { name: "Filter the choices by another dropdown" }).click();
     await expect(dependent.getByLabel("Depends on")).toContainText("Country");

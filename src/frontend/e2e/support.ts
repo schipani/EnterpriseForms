@@ -85,8 +85,8 @@ export async function publish(page: Page, reason: string) {
 
 /**
  * Selects a tile (same as `selectTile`), then opens the Configure Field modal from the quick inspector's prominent
- * button and, if given, switches to `tab` (General / Validation / Rules / Security & Encryption / Advanced). Returns
- * the modal dialog locator (Phase C3 designer UX refinement).
+ * button and, if given, switches to `tab` (Validation / Conditional rules / Dropdown choices and dependent choices /
+ * Security & Encryption / Advanced). Returns the modal dialog locator (Phase C3 designer UX refinement).
  */
 export async function openFieldConfig(page: Page, label: string, tab?: string): Promise<Locator> {
   const quick = await selectTile(page, label);
