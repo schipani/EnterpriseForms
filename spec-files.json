@@ -133,6 +133,11 @@
       "bytes": 57561
     },
     {
+      "path": "docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md",
+      "sha256": "4e0fdc8aef2fc27779c052ff161d441d870596c046fe466b37d1546331a3e7f6",
+      "bytes": 57922
+    },
+    {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
       "sha256": "601d3bd714ada33016c5ad2a39b8d2b2711e112813340a247d45aca2b19790c2",
       "bytes": 6295
