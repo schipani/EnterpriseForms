@@ -94,3 +94,22 @@ Failures found by the full suite and fixed:
 2. *Accessibility defect (fixed):* the "View in Related records / Documents" pointer had an accessible name that did not contain its visible text (axe `label-content-name-mismatch`, WCAG 2.5.3, at 320 px). The name now starts with the visible text.
 3. *Unsaved-changes guard (fixed):* it blocked the navigation to the sign-in page after signing out of an unsaved editor; the session has already ended there, so that navigation is no longer blocked.
 4. *Test assumptions (test fixes, no product change):* a test locator for "Draft" now scopes to the Details section (the summary shows the status too); the PB-14 helpers now find the latest Accused record through the list API's cursors (with a correct global sort it need not be on the first page of a long-lived stack) and the first Accused form the designer may actually design (the development organization has a seeded "Accused" form the designer may only use).
+
+## 8. Hosted verification (isolated, disposable runners)
+
+On commit `e4bc875` (the implementation commit of this PR):
+
+| Gate | Run | Result |
+|---|---|---|
+| ci — specifications/manifest/integrity vectors, .NET build + architecture + contract tests, frontend lint/typecheck/tests/build/client drift, Compose profiles | 39711625275 | **success** |
+| stage-b-integration — Stage B integration tests on the real stack | 39711625289 | **success: 58 / 58**, including all five new `RecordWorkspaceTests` (TRX: `FormsCatalogIsCompleteAndExactBeyondTheAuthorityBatchLimit`, `MyRecordsListsTheCompleteAuthorizedSetAcrossLookupPages…`, `TheRecordSummaryCarriesOnlyAllowlistedMetadata`, `ValidationFailuresNameTheFieldsWithoutDisclosingValues`, `ListsFailClosedWhileTheAuthorityIsUnavailable` — all Passed) |
+| stage-b-integration — browser end-to-end (all Playwright projects) | 39711625289 | **success: 47 / 47**, including the four `records-workspace.spec.ts` tests |
+| security-gate-a — SEC-P01..SEC-P12 (dispatched on the branch) | 39711633299 | **success: 13 / 13** |
+| level3-script — the Level 3 script, unchanged, on its own clean stack (triggered by the `compose.security-test.yaml` change) | 39711625343 | **success** |
+| CodeQL | 39711623607 | **success** |
+
+The commit that adds this section changes documentation only (`docs/PHASE_C4_STATUS.md`, spec manifest); its own CI run is recorded on the PR.
+
+### What this does not show
+
+No manual screen-reader or real browser-zoom review of the new pages (PB-14 manual review stays open), no independent security review of the C-27/C-28 changes (C-28 changes Authority code and needs the production security review), no performance benchmark at PB-09 scale (C-29 notes the known O(N²/250) discovery cost), no Azure staging evidence and no production certification of any kind. G06, G19 and every production Level 2 gate remain open.
