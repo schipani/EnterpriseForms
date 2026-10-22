@@ -112,9 +112,28 @@ This could not be checked against the owner's persistent development data withou
 | Specification validator (`--strict`) | pass |
 | Docker integration (`ContributorWriteTests` + updated `RulesTests`), Playwright (`contributor-writes.spec.ts`), SEC-P01…SEC-P12 | **Hosted only** — they cannot run beside the owner's persistent dev stack. See §9. |
 
-## 9. Hosted verification
+## 9. Hosted verification (isolated, disposable GitHub runners; draft PR #15)
 
-Recorded after the CI runs on the draft PR. SEC-P is dispatched manually on the implementation commit.
+| Commit | Workflow | Run | Result |
+|---|---|---|---|
+| `ff9711d` (implementation + docs) | ci | 39740725730 | success |
+| | stage-b-integration — integration | 39740725594 | **65 / 65**, all seven `ContributorWriteTests` passed by name; `RulesTests` passed |
+| | stage-b-integration — browser | 39740725594 | **51 / 51**, including the four `contributor-writes.spec.ts` tests |
+| | security-gate-a (manual dispatch) | 39740734569 | **13 / 13**; evidence SEC-P01…SEC-P12 = PASS, bound to `ff9711d` |
+| | level3-script | 39740725917 | success |
+| `fcdb52a` (test hardening: CI asserts the switch mode; the load race revokes only after a write lands) | ci | 39744229937 | success on re-run (see note) — test floor 4 files, **302 / 302** |
+| | stage-b-integration — integration | 39744230036 | **65 / 65**, all seven `ContributorWriteTests` passed |
+| | stage-b-integration — browser | 39744230036 | **51 / 51**. The spec now **asserts** that the Authority reported contributor writes enabled (`EXPECT_CONTRIBUTOR_WRITES=true`), so the editing path itself was exercised: contributor edit, owner sees the change and the sharing history, revocation notice, axe scans |
+| | security-gate-a (manual dispatch) | 39744222709 | **13 / 13**; SEC-P01…SEC-P12 = PASS, bound to `fcdb52a` |
+| | level3-script | 39744229841 | success |
+
+**Note — the first `ci` attempt on `fcdb52a`:**
+* The .NET test step itself passed: 302 tests, including the Authority executable.
+* The solution-wide floor then found only 3 of 4 TRX files (211 tests), because two test executables wrote timestamp-named TRX files at the same instant and one overwrote the other.
+* This is a pre-existing CI fragility unrelated to C5. A re-run of the failed job passed (4 files, 302/302).
+* It is left as is: making TRX names unique is a CI change for its own commit.
+
+These are development results on synthetic data. They are not Azure staging evidence, not an independent review, and not a Level 2 claim.
 
 ## 10. Still open (unchanged by C5)
 
