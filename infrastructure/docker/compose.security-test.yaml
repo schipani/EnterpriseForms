@@ -19,6 +19,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
       FaultInjection__Enabled: "true"
+      # C-28: a small lookup page makes every multi-record discovery test cross SpiceDB cursor pages (production keeps 1000).
+      SpiceDb__LookupPageSize: "20"
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
   api:

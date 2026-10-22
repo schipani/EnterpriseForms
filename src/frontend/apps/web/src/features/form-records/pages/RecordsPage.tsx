@@ -1,85 +1,251 @@
-import { useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, DataTable, LoadingBlock, PageHeader, Select } from "@enterpriseforms/ui";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { presentError, useApi } from "@enterpriseforms/app-runtime";
+import type { RecordListItemResponse, RecordListQuery, RecordListResponse } from "@enterpriseforms/api-client";
+import { Badge, Button, Card, Checkbox, DataTable, EmptyState, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage } from "@enterpriseforms/ui";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
+import { formatDateTime, recordStatusLabel, RECORD_STATUSES, SORT_CHOICES, sortChoiceFor, type RecordsSearch } from "../components/recordList";
 
-/** PG-010 records list: authority-filtered discovery; rows are unverified pointers until opened (B-07). */
+/** Errors that mean "this page position is no longer meaningful": the list restarts from the first page. */
+const RESTART_CODES = new Set(["LIST_CHANGED", "CURSOR_INVALID", "CURSOR_SCOPE_MISMATCH"]);
+
+/**
+ * PG-015 My Records (C-29). The server lists every record the authority lets the user discover (all of them, at one
+ * authorization revision), then filters, sorts and pages that set; this page only renders what it returns. Row details
+ * are application-database information and are checked when a record is opened.
+ */
 export function RecordsPage() {
   const api = useApi();
   const navigate = useNavigate();
   const search = useSearch({ from: "/app/records" });
-  const forms = useQuery({ queryKey: ["forms"], queryFn: () => api.forms.list().then((r) => r.result) });
-  // Opaque, authority-issued continuation tokens (ADR-PB-006): each page is a fresh discover lookup; "Load more" appends.
-  const records = useInfiniteQuery({
-    queryKey: ["records", search.form ?? "all"],
-    initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => api.records.list({ ...(search.form ? { formDefinitionId: search.form } : {}), pageSize: 50, ...(pageParam ? { continuationToken: pageParam } : {}) }).then((r) => r.result),
-    getNextPageParam: (last) => last.continuationToken ?? undefined,
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [restarted, setRestarted] = useState(false);
+  const sort = sortChoiceFor(search.sort);
+  const pageSize = search.size ?? 25;
+  const query: RecordListQuery = {
+    ...(search.form ? { formDefinitionId: search.form } : {}),
+    ...(search.status ? { recordStatus: search.status } : {}),
+    ...(search.children ? { includeChildren: true } : {}),
+    sortBy: sort.sortBy,
+    sortDirection: sort.sortDirection,
+    pageSize,
+    ...(cursor ? { continuationToken: cursor } : {}),
+  };
+  const records = useQuery<RecordListResponse>({
+    queryKey: ["records", "list", query],
+    queryFn: ({ signal }) => api.records.list(query, signal).then((r) => r.result),
+    // Keep showing the current page while the next one loads (no flash of an empty table).
+    placeholderData: (previous) => previous,
   });
-  const rows = records.data?.pages.flatMap((page) => page.items) ?? [];
-  const selectedForm = forms.data?.find((form) => form.formDefinitionId === search.form);
+  // Forms this user may create records with (the authority decides; the list is complete even for large catalogs, C-27).
+  const forms = useQuery({ queryKey: ["forms"], queryFn: () => api.forms.list().then((r) => r.result) });
+  const creatable = (forms.data ?? []).filter((form) => form.canCreateRecord && form.currentVersionNumber !== null);
+
+  const errorCode = records.isError ? presentError(records.error).code : null;
+  useEffect(() => {
+    if (errorCode && RESTART_CODES.has(errorCode) && cursor) {
+      setCursor(undefined);
+      setRestarted(true);
+    }
+  }, [errorCode, cursor]);
+
+  const update = (next: Partial<RecordsSearch>) => {
+    setCursor(undefined);
+    setRestarted(false);
+    void navigate({ to: "/app/records", search: (current: RecordsSearch) => clean({ ...current, ...next }) });
+  };
+  const filtered = Boolean(search.form || search.status || search.children);
+  const data = records.data;
+  const rows = data?.items ?? [];
+  const formOptions = data?.availableForms ?? [];
+  const selectedFormMissing = search.form && !formOptions.some((form) => form.formDefinitionId === search.form);
+  const total = Number(data?.totalCount ?? 0);
+  const unavailable = Number(data?.unavailableRecordCount ?? 0);
+  const first = total > 0 ? Number(data!.pageStart) : 0;
+  const last = total > 0 ? first + rows.length - 1 : 0;
+
   return (
     <>
       <PageHeader
-        title="Records"
-        lead="Only records you own or were explicitly granted are listed. Opening a record verifies its signed content."
+        title="My Records"
+        lead="Records you own and records shared with you. Opening a record checks its signed content."
         actions={
           <>
-            <Button variant="secondary" busy={records.isFetching} onClick={() => void records.refetch()}>
+            <Button variant="secondary" aria-label="Refresh My Records" busy={records.isFetching} onClick={() => void records.refetch()}>
               Refresh
             </Button>
-            {selectedForm?.canCreateRecord && selectedForm.currentVersionNumber !== null ? (
-              <Link to="/app/forms/$formDefinitionId/records/new" params={{ formDefinitionId: selectedForm.formDefinitionId }}>
-                <Button>New {selectedForm.formDefinitionName}</Button>
-              </Link>
+            {creatable.length > 0 ? (
+              <OverflowMenu
+                label="New record"
+                trigger={<Button>New record</Button>}
+                items={creatable.map((form) => ({
+                  key: form.formDefinitionId,
+                  content: (
+                    <Link to="/app/forms/$formDefinitionId/records/new" params={{ formDefinitionId: form.formDefinitionId }}>
+                      {form.formDefinitionName}
+                    </Link>
+                  ),
+                }))}
+              />
             ) : null}
           </>
         }
       />
       <Card>
-        <div className="max-w-md">
-          <Select label="Form" value={search.form ?? "all"} options={[{ value: "all", label: "All forms" }, ...(forms.data ?? []).map((form) => ({ value: form.formDefinitionId, label: form.formDefinitionName }))]} onValueChange={(value) => void navigate({ to: "/app/records", search: value === "all" ? {} : { form: value } })} />
-        </div>
-        {records.isPending ? <LoadingBlock label="Loading records" /> : null}
-        {records.isError ? <ErrorPanel error={records.error} onRetry={() => void records.refetch()} /> : null}
-        {records.data ? (
-          <DataTable
-            caption="Records"
-            rowKey={(row) => row.formRecordId}
-            rows={rows}
-            emptyMessage="No records are visible to you."
-            columns={[
-              { key: "form", header: "Form", isRowHeader: true, render: (row) => <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }} className="underline-offset-4 hover:underline">{row.formDefinitionName}</Link> },
-              { key: "id", header: "Record", render: (row) => <code className="text-xs">{row.formRecordId}</code> },
-              { key: "status", header: "Status", render: (row) => <Badge tone="neutral">{row.recordStatus}</Badge> },
-              { key: "created", header: "Created", render: (row) => new Date(row.createdOn).toLocaleString() },
-              { key: "modified", header: "Modified", render: (row) => new Date(row.modifiedOn).toLocaleString() },
-              { key: "verified", header: "Integrity", render: (row) => (row.projectionVerified ? <Badge tone="success">Verified</Badge> : <Badge tone="neutral">Verified on open</Badge>) },
-              {
-                key: "actions",
-                header: "Actions",
-                isActions: true,
-                render: (row) => (
-                  <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }}>
-                    <Button size="sm" variant="secondary">
-                      View
-                    </Button>
-                  </Link>
-                ),
-              },
-            ]}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="group" aria-label="Filter and sort records">
+          <Select
+            label="Form"
+            value={search.form ?? "all"}
+            options={[{ value: "all", label: "All forms" }, ...(selectedFormMissing ? [{ value: search.form!, label: "Selected form (no records)" }] : []), ...formOptions.map((form) => ({ value: form.formDefinitionId, label: form.formDefinitionName || "Unnamed form" }))]}
+            onValueChange={(value) => update({ form: value === "all" ? undefined : value })}
           />
-        ) : null}
-        {records.hasNextPage ? (
-          <div className="mt-3 flex items-center gap-3">
-            <Button variant="secondary" busy={records.isFetchingNextPage} onClick={() => void records.fetchNextPage()}>
-              Load more
+          <Select label="Status" value={search.status ?? "all"} options={[{ value: "all", label: "All statuses" }, ...RECORD_STATUSES.map((status) => ({ value: status, label: recordStatusLabel(status) }))]} onValueChange={(value) => update({ status: value === "all" ? undefined : value })} />
+          <Select label="Sort by" value={sort.key} options={SORT_CHOICES.map((choice) => ({ value: choice.key, label: choice.label }))} onValueChange={(value) => update({ sort: value === SORT_CHOICES[0]!.key ? undefined : value })} />
+          <Select label="Rows per page" value={String(pageSize)} options={["10", "25", "50", "100"].map((size) => ({ value: size, label: size }))} onValueChange={(value) => update({ size: value === "25" ? undefined : Number(value) })} />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <Checkbox label="Include related (child) records" checked={Boolean(search.children)} onCheckedChange={(checked) => update({ children: checked ? true : undefined })} />
+          {filtered || search.sort || search.size ? (
+            <Button variant="ghost" size="sm" onClick={() => update({ form: undefined, status: undefined, children: undefined, sort: undefined, size: undefined })}>
+              Clear filters
             </Button>
-            <span className="text-sm text-muted">{rows.length} shown</span>
-          </div>
+          ) : null}
+        </div>
+      </Card>
+
+      <Card className="mt-4">
+        {restarted ? (
+          <StatusMessage tone="info" title="The list was reloaded">
+            Access to records changed while you were browsing, so the list starts again from the first page.
+          </StatusMessage>
+        ) : null}
+        {records.isPending ? <LoadingBlock label="Loading your records" /> : null}
+        {records.isError && !(errorCode && RESTART_CODES.has(errorCode) && cursor) ? <ErrorPanel error={records.error} onRetry={() => void records.refetch()} /> : null}
+        {data && unavailable > 0 ? (
+          <StatusMessage tone="warning" title={`${unavailable} of your records could not be described`}>
+            You have access to {unavailable === 1 ? "a record" : "records"} that the application database holds no information for, so {unavailable === 1 ? "it is" : "they are"} not in the table or the filters. Open {unavailable === 1 ? "it" : "them"} to check:{" "}
+            {(data.unavailableRecordIds ?? []).map((id, index) => (
+              <span key={id}>
+                {index > 0 ? ", " : null}
+                <Link to="/app/records/$formRecordId" params={{ formRecordId: id }} className="underline underline-offset-4">
+                  {referenceFor(id)}
+                </Link>
+              </span>
+            ))}
+            {unavailable > (data.unavailableRecordIds?.length ?? 0) ? " …" : null}
+          </StatusMessage>
+        ) : null}
+        {data && total === 0 ? (
+          filtered ? (
+            <EmptyState title="No records match these filters" actions={<Button variant="secondary" onClick={() => update({ form: undefined, status: undefined, children: undefined })}>Clear filters</Button>}>
+              Try another form or status, or include related records.
+            </EmptyState>
+          ) : (
+            <EmptyState
+              title="You have no records yet"
+              actions={creatable.length === 1 ? (
+                <Link to="/app/forms/$formDefinitionId/records/new" params={{ formDefinitionId: creatable[0]!.formDefinitionId }}>
+                  <Button>New {creatable[0]!.formDefinitionName}</Button>
+                </Link>
+              ) : null}
+            >
+              Records you create, and records other people share with you, appear here.
+              {creatable.length > 1 ? " Use New record to start one." : null}
+            </EmptyState>
+          )
+        ) : null}
+        {data && total > 0 ? (
+          <>
+            <p className="mb-2 text-sm text-muted">Record details shown here come from the application database and are checked when you open a record.</p>
+            <DataTable
+              caption="My Records"
+              rowKey={(row) => row.formRecordId}
+              rows={rows}
+              stickyActions
+              columns={[
+                {
+                  key: "record",
+                  header: "Record",
+                  isRowHeader: true,
+                  render: (row) => (
+                    <span className="flex flex-col">
+                      <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }} className="underline-offset-4 hover:underline">
+                        {row.formDefinitionName || "Unnamed form"}
+                      </Link>
+                      <span className="text-xs font-normal text-muted">
+                        {row.recordReference}
+                        {row.parentFormRecordId ? <> · related to {referenceFor(row.parentFormRecordId)}</> : null}
+                      </span>
+                    </span>
+                  ),
+                },
+                { key: "status", header: "Status", render: (row) => <Badge tone="neutral">{recordStatusLabel(row.recordStatus)}</Badge> },
+                { key: "created", header: "Created", render: (row) => <CreatedCell row={row} /> },
+                { key: "modified", header: "Last changed", render: (row) => formatDateTime(row.modifiedOn) },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  isActions: true,
+                  render: (row) => (
+                    <RowActions
+                      overflowLabel={`More actions for ${row.formDefinitionName} ${row.recordReference}`}
+                      primary={
+                        <>
+                          <Link to="/app/records/$formRecordId" params={{ formRecordId: row.formRecordId }} aria-label={`Open ${row.formDefinitionName} ${row.recordReference}`}>
+                            <Button size="sm" variant="secondary">
+                              Open
+                            </Button>
+                          </Link>
+                          {row.canEdit ? (
+                            <Link to="/app/records/$formRecordId/edit" params={{ formRecordId: row.formRecordId }} aria-label={`Edit ${row.formDefinitionName} ${row.recordReference}`}>
+                              <Button size="sm" variant="secondary">
+                                Edit
+                              </Button>
+                            </Link>
+                          ) : null}
+                        </>
+                      }
+                      overflow={row.parentFormRecordId ? [{ key: "parent", content: <Link to="/app/records/$formRecordId" params={{ formRecordId: row.parentFormRecordId }}>Open parent record</Link> }] : []}
+                    />
+                  ),
+                },
+              ]}
+            />
+            <nav aria-label="Record pages" className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm" aria-live="polite">
+                Showing {first}–{last} of {total} {total === 1 ? "record" : "records"}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" disabled={!data.previousToken || records.isFetching} onClick={() => setCursor(data.previousToken ?? undefined)}>
+                  Previous page
+                </Button>
+                <Button variant="secondary" size="sm" disabled={!data.continuationToken || records.isFetching} onClick={() => setCursor(data.continuationToken ?? undefined)}>
+                  Next page
+                </Button>
+              </div>
+            </nav>
+          </>
         ) : null}
       </Card>
     </>
   );
+}
+
+function CreatedCell({ row }: { row: RecordListItemResponse }) {
+  return (
+    <span className="flex flex-col">
+      <span>{formatDateTime(row.createdOn)}</span>
+      {row.createdByCurrentUser ? <span className="text-xs text-muted">by you</span> : row.createdByDisplayName ? <span className="text-xs text-muted">by {row.createdByDisplayName}</span> : null}
+    </span>
+  );
+}
+
+/** Same short reference the server derives (display only). */
+function referenceFor(formRecordId: string): string {
+  return "REC-" + formRecordId.replace(/-/g, "").slice(-8).toUpperCase();
+}
+
+function clean(search: RecordsSearch): RecordsSearch {
+  return Object.fromEntries(Object.entries(search).filter(([, value]) => value !== undefined)) as RecordsSearch;
 }

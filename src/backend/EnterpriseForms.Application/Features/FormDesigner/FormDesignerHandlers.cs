@@ -30,23 +30,15 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
     {
         ArgumentNullException.ThrowIfNull(context);
         List<FormDefinition> definitions;
-        Dictionary<Guid, FormVersion> currentVersions = [];
-        HashSet<Guid> drafts = [];
+        Dictionary<Guid, FormVersion> currentVersions;
+        HashSet<Guid> drafts;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             definitions = await scope.GetFormDefinitionsAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false);
-            foreach (var d in definitions)
-            {
-                if (d.CurrentFormVersionId is { } vid && await scope.FindFormVersionAsync(vid, cancellationToken).ConfigureAwait(false) is { } v)
-                {
-                    currentVersions[d.FormDefinitionId] = v;
-                }
-
-                if (await scope.FindDraftAsync(d.FormDefinitionId, cancellationToken).ConfigureAwait(false) is not null)
-                {
-                    drafts.Add(d.FormDefinitionId);
-                }
-            }
+            var expected = definitions.Where(d => d.CurrentFormVersionId is not null).ToDictionary(d => d.CurrentFormVersionId!.Value, d => d.FormDefinitionId);
+            var versions = await scope.GetFormVersionSummariesAsync(expected.Keys.ToList(), cancellationToken).ConfigureAwait(false);
+            currentVersions = versions.Where(v => expected.TryGetValue(v.FormVersionId, out var owner) && owner == v.FormDefinitionId).ToDictionary(v => v.FormDefinitionId);
+            drafts = await scope.GetFormDefinitionIdsWithDraftAsync(definitions.Select(d => d.FormDefinitionId).ToList(), cancellationToken).ConfigureAwait(false);
         }
 
         if (definitions.Count == 0)
@@ -54,6 +46,8 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             return [];
         }
 
+        // Two checks per form; the authority client splits batches above its per-call limit (C-27), so a catalog of any
+        // size is evaluated completely at one authorization revision or the request fails closed.
         var checks = new List<PermissionCheckRequest>();
         foreach (var d in definitions)
         {

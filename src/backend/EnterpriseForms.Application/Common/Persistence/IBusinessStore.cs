@@ -74,11 +74,17 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<FormVersion?> FindFormVersionAsync(Guid formVersionId, CancellationToken cancellationToken);
 
+    /// <summary>The given versions without their layout JSON (catalog summaries need only the version numbers).</summary>
+    Task<List<FormVersion>> GetFormVersionSummariesAsync(IReadOnlyCollection<Guid> formVersionIds, CancellationToken cancellationToken);
+
     Task<List<FormVersion>> GetFormVersionsAsync(Guid formDefinitionId, CancellationToken cancellationToken);
 
     void AddFormVersion(FormVersion version);
 
     Task<FormDraft?> FindDraftAsync(Guid formDefinitionId, CancellationToken cancellationToken);
+
+    /// <summary>Ids of the given forms that currently have a draft (one query for a catalog page).</summary>
+    Task<HashSet<Guid>> GetFormDefinitionIdsWithDraftAsync(IReadOnlyCollection<Guid> formDefinitionIds, CancellationToken cancellationToken);
 
     void AddDraft(FormDraft draft);
 

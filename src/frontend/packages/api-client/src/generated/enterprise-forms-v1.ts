@@ -522,7 +522,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Authority-discoverable records with unverified local metadata; open a record for the verified projection. */
+        /** My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection. */
         get: operations["ListFormRecords"];
         put?: never;
         post?: never;
@@ -1618,6 +1618,11 @@ export interface components {
             groupKey: string;
             occurrences: components["schemas"]["RecordOccurrenceValuesRequest"][];
         };
+        RecordListFormOption: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            formDefinitionName: string;
+        };
         RecordListItemResponse: {
             /** Format: uuid */
             formRecordId: string;
@@ -1632,12 +1637,46 @@ export interface components {
             /** Format: uuid */
             parentFormRecordId: null | string;
             projectionVerified: boolean;
+            /** @default  */
+            recordReference: string;
+            createdByDisplayName?: null | string;
+            /** @default false */
+            createdByCurrentUser: boolean;
+            /** @default false */
+            canEdit: boolean;
         };
         RecordListResponse: {
             items: components["schemas"]["RecordListItemResponse"][];
             /** Format: int64 */
             authorizationRevision: number | string;
             continuationToken: null | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            totalCount: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            pageStart: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            pageSize: number | string;
+            previousToken?: null | string;
+            availableForms?: null | components["schemas"]["RecordListFormOption"][];
+            /**
+             * Format: int32
+             * @default 0
+             */
+            unavailableRecordCount: number | string;
+            unavailableRecordIds?: null | string[];
+            /** @default modifiedOn */
+            sortBy: string;
+            /** @default desc */
+            sortDirection: string;
         };
         RecordOccurrenceResponse: {
             /** Format: uuid */
@@ -1672,6 +1711,16 @@ export interface components {
             /** Format: uuid */
             formRelationshipDefinitionId: null | string;
             eTag: string;
+            summary?: null | components["schemas"]["RecordProjectionSummaryResponse"];
+        };
+        RecordProjectionSummaryResponse: {
+            recordReference: string;
+            /** Format: date-time */
+            createdOn: null | string;
+            /** Format: date-time */
+            modifiedOn: null | string;
+            createdByDisplayName: null | string;
+            createdByCurrentUser: boolean;
         };
         RecordShareListResponse: {
             items: components["schemas"]["RecordShareSummaryResponse"][];
@@ -2725,7 +2774,10 @@ export interface operations {
         parameters: {
             query?: {
                 formDefinitionId?: string;
+                recordStatus?: string;
                 includeChildren?: boolean;
+                sortBy?: string;
+                sortDirection?: string;
                 pageSize?: number | string;
                 continuationToken?: string;
             };

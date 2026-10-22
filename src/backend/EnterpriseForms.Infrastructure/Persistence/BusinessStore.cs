@@ -107,6 +107,11 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public Task<FormVersion?> FindFormVersionAsync(Guid formVersionId, CancellationToken cancellationToken) =>
             context.FormVersions.AsNoTracking().FirstOrDefaultAsync(v => v.FormVersionId == formVersionId, cancellationToken);
 
+        public Task<List<FormVersion>> GetFormVersionSummariesAsync(IReadOnlyCollection<Guid> formVersionIds, CancellationToken cancellationToken) =>
+            context.FormVersions.AsNoTracking().Where(v => formVersionIds.Contains(v.FormVersionId))
+                .Select(v => new FormVersion { FormVersionId = v.FormVersionId, FormDefinitionId = v.FormDefinitionId, VersionNumber = v.VersionNumber, LayoutSchemaVersion = v.LayoutSchemaVersion, LayoutJson = string.Empty, ChangeReason = v.ChangeReason, RestoredFromFormVersionId = v.RestoredFromFormVersionId, PublishedOn = v.PublishedOn, PublishedByUserId = v.PublishedByUserId })
+                .ToListAsync(cancellationToken);
+
         public Task<List<FormVersion>> GetFormVersionsAsync(Guid formDefinitionId, CancellationToken cancellationToken) =>
             context.FormVersions.AsNoTracking().Where(v => v.FormDefinitionId == formDefinitionId).OrderByDescending(v => v.VersionNumber).ToListAsync(cancellationToken);
 
@@ -114,6 +119,9 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public Task<FormDraft?> FindDraftAsync(Guid formDefinitionId, CancellationToken cancellationToken) =>
             context.FormDrafts.FirstOrDefaultAsync(d => d.FormDefinitionId == formDefinitionId, cancellationToken);
+
+        public async Task<HashSet<Guid>> GetFormDefinitionIdsWithDraftAsync(IReadOnlyCollection<Guid> formDefinitionIds, CancellationToken cancellationToken) =>
+            (await context.FormDrafts.AsNoTracking().Where(d => formDefinitionIds.Contains(d.FormDefinitionId)).Select(d => d.FormDefinitionId).ToListAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
 
         public void AddDraft(FormDraft draft) => context.FormDrafts.Add(draft);
 

@@ -353,7 +353,17 @@ public static class CandidateBuilder
                     : CloneOccurrence(source, write is null ? source.GroupSortOrder : index);
                 occurrenceRows.Add(occurrence);
                 var path = $"{groupKey}[{index + 1}].";
-                var applied = ApplyScope(context, isNew ? [] : currentValues.Where(v => v.FormRecordGroupId == id).ToList(), occurrenceValues, id, groupId, creating || isNew, path);
+                ScopeResult applied;
+                try
+                {
+                    applied = ApplyScope(context, isNew ? [] : currentValues.Where(v => v.FormRecordGroupId == id).ToList(), occurrenceValues, id, groupId, creating || isNew, path);
+                }
+                catch (BusinessException ex) when (ex.FieldKeys.Count > 0 && ex.FieldKeys.Any(k => !k.Contains('[', StringComparison.Ordinal)))
+                {
+                    // Value validation names the bare field key; inside an entry the client addresses it as group[n].field.
+                    throw new BusinessException(ex.ErrorCode, ex.HttpStatusCode, ex.Message) { FieldKeys = ex.FieldKeys.Select(k => k.Contains('[', StringComparison.Ordinal) ? k : path + k).ToList() };
+                }
+
                 scopes.Add((applied, occurrence, path));
             }
 
@@ -397,12 +407,12 @@ public static class CandidateBuilder
 
             if (dependencyErrors.Count > 0)
             {
-                throw new BusinessException("DEPENDENT_OPTION_INVALID", 422, "selections not allowed for the chosen parent value: " + string.Join(", ", dependencyErrors));
+                throw new BusinessException("DEPENDENT_OPTION_INVALID", 422, "selections not allowed for the chosen parent value: " + string.Join(", ", dependencyErrors)) { FieldKeys = dependencyErrors };
             }
 
             if (missing.Count > 0)
             {
-                throw new BusinessException("VALIDATION_FAILED", 422, "required fields missing: " + string.Join(", ", missing));
+                throw new BusinessException("VALIDATION_FAILED", 422, "required fields missing: " + string.Join(", ", missing)) { FieldKeys = missing };
             }
         }
 
@@ -625,7 +635,7 @@ public static class CandidateBuilder
                                 && string.Equals(scope.Wire.GetValueOrDefault(field.FieldDefinitionId) ?? string.Empty, CanonicalSelection(field, ActiveDefaults(element, field, c.Options), c.Options), StringComparison.Ordinal);
             if (!equalsDefault)
             {
-                throw new BusinessException("FIELD_READ_ONLY", 403, $"field '{scope.Path}{field.FieldKey}' is read-only and cannot be changed");
+                throw new BusinessException("FIELD_READ_ONLY", 403, $"field '{scope.Path}{field.FieldKey}' is read-only and cannot be changed") { FieldKeys = [scope.Path + field.FieldKey] };
             }
         }
     }
@@ -641,7 +651,7 @@ public static class CandidateBuilder
             {
                 if (scope.Changed.Contains(field.FieldDefinitionId) && c.Origin == RecordWriteOrigin.User)
                 {
-                    throw new BusinessException("FIELD_HIDDEN_BY_RULE", 422, $"field '{scope.Path}{field.FieldKey}' is hidden by a rule and cannot be changed");
+                    throw new BusinessException("FIELD_HIDDEN_BY_RULE", 422, $"field '{scope.Path}{field.FieldKey}' is hidden by a rule and cannot be changed") { FieldKeys = [scope.Path + field.FieldKey] };
                 }
 
                 if (element.ClearWhenHidden && present)

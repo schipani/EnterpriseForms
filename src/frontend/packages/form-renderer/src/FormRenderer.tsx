@@ -143,7 +143,7 @@ export function FormRenderer({ layout, fields, values, errors = {}, onChange, re
             {section.description ? <p className="mb-3 text-sm text-muted">{section.description}</p> : null}
             <div className={`grid ${gapClass[section.layout?.columnGap ?? "medium"]}`} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
               {cells.map((cell) => (
-                <div key={elementKey(cell.element)} className="min-w-0" style={{ gridColumn: `${cell.column} / span ${cell.span}`, gridRow: cell.row }}>
+                <div key={elementKey(cell.element)} className="min-w-0" style={{ gridColumn: `${cell.column} / span ${cell.span}`, gridRow: cell.row }} data-field-key={fieldKeyOfCell(cell.element, byId)}>
                   {renderElement(cell.element, byId, values, values, (key) => errors[key], changeTop, readOnly, states, renderRelatedList, renderDocumentCollection)}
                 </div>
               ))}
@@ -284,7 +284,7 @@ function RepeatingSectionView({
                 </div>
                 <div className={`grid ${gapClass[section.layout?.columnGap ?? "medium"]}`} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
                   {cells.map((cell) => (
-                    <div key={elementKey(cell.element)} className="min-w-0" style={{ gridColumn: `${cell.column} / span ${cell.span}`, gridRow: cell.row }}>
+                    <div key={elementKey(cell.element)} className="min-w-0" style={{ gridColumn: `${cell.column} / span ${cell.span}`, gridRow: cell.row }} data-field-key={entryFieldKeyOfCell(cell.element, byId, groupKey, index)}>
                       {renderElement(cell.element, byId, scopeValues, entry.values, (key) => errors[occurrenceErrorKey(groupKey, index, key)], (key, value) => onFieldChange(index, key, value), readOnly, states, renderRelatedList, renderDocumentCollection)}
                     </div>
                   ))}
@@ -466,6 +466,19 @@ function MultiSelectControl({ element, field, value, label, helpText, note, erro
       ) : null}
     </fieldset>
   );
+}
+
+/**
+ * The error-map key of a field cell (`fieldKey`, or `groupKey[n].fieldKey` inside entry n), exposed as `data-field-key`
+ * so a form-level validation summary can move focus to the field. Presentation only; never used for authorization.
+ */
+function fieldKeyOfCell(element: LayoutElement, byId: ReadonlyMap<string, RendererField>): string | undefined {
+  return element.kind === "field" ? byId.get(element.fieldDefinitionId)?.fieldKey : undefined;
+}
+
+function entryFieldKeyOfCell(element: LayoutElement, byId: ReadonlyMap<string, RendererField>, groupKey: string, index: number): string | undefined {
+  const key = fieldKeyOfCell(element, byId);
+  return key ? occurrenceErrorKey(groupKey, index, key) : undefined;
 }
 
 export function displayValue(field: RendererField, value: string | undefined, element?: Pick<FieldElement, "options"> | undefined): string {

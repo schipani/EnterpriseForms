@@ -36,11 +36,19 @@ public interface ISpiceDbProjection
 
     Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkAsync(IReadOnlyList<SpiceDbCheck> checks, string zedToken, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, string zedToken, int limit, CancellationToken cancellationToken);
+    /// <summary>
+    /// Every resource the subject holds the permission on (unconditionally), at least as fresh as the token, enumerated
+    /// completely with SpiceDB cursors. Never truncates: more than <paramref name="maximumResults"/> distinct results
+    /// throws <see cref="SpiceDbLookupLimitExceededException"/> (C-28).
+    /// </summary>
+    Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, string zedToken, int maximumResults, CancellationToken cancellationToken);
 
     Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken);
 }
 
 public sealed class SpiceDbPreconditionFailedException(string detail) : Exception(detail);
+
+/// <summary>A lookup would return more results than the caller accepts; nothing partial is returned.</summary>
+public sealed class SpiceDbLookupLimitExceededException(string detail) : Exception(detail);
 
 public sealed class SpiceDbUnavailableException(string detail, Exception? inner = null) : Exception(detail, inner);

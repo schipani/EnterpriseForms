@@ -53,11 +53,13 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<FormAccessState> GetFormAccessAsync(DelegatedUserContext user, Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
         SendAsync<FormAccessState>(HttpMethod.Get, $"internal/v1/form-definitions/{organizationId:D}/{formDefinitionId:D}/access", user, null, null, cancellationToken);
 
-    public async Task<IReadOnlyList<PermissionDecision>> CheckPermissionsBatchAsync(DelegatedUserContext user, IReadOnlyList<PermissionCheckRequest> requests, CancellationToken cancellationToken)
-    {
-        var response = await SendAsync<BatchResponse>(HttpMethod.Post, "internal/v1/authorization/check-batch", user, new { checks = requests }, null, cancellationToken).ConfigureAwait(false);
-        return response.Decisions;
-    }
+    /// <summary>Any number of checks: split into authority calls of at most 250 and recombined only at one revision (C-27).</summary>
+    public Task<IReadOnlyList<PermissionDecision>> CheckPermissionsBatchAsync(DelegatedUserContext user, IReadOnlyList<PermissionCheckRequest> requests, CancellationToken cancellationToken) =>
+        PermissionCheckBatching.CheckAllAsync(requests, async (chunk, token) =>
+        {
+            var response = await SendAsync<BatchResponse>(HttpMethod.Post, "internal/v1/authorization/check-batch", user, new { checks = chunk }, null, token).ConfigureAwait(false);
+            return response.Decisions;
+        }, cancellationToken);
 
     public Task<RecordDiscoveryPage> DiscoverAuthorizedRecordsAsync(DelegatedUserContext user, Guid organizationId, int pageSize, string? continuationToken, CancellationToken cancellationToken) =>
         SendAsync<RecordDiscoveryPage>(HttpMethod.Post, "internal/v1/authorization/discover", user, new { organization_id = organizationId, page_size = pageSize, continuation_token = continuationToken }, null, cancellationToken);

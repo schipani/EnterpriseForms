@@ -27,6 +27,9 @@ public static class AuthorityErrorCodes
 
     /// <summary>A content change carries rows of a field in a protection form the authority no longer accepts (atomic cutover barrier, Amendment A1); rebuild and retry.</summary>
     public const string FieldProtectionChanged = "FIELD_PROTECTION_CHANGED";
+
+    /// <summary>A discovery continuation token was issued at an earlier authorization revision; restart the enumeration from the first page (C-28).</summary>
+    public const string ContinuationInvalidated = "CONTINUATION_INVALIDATED";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

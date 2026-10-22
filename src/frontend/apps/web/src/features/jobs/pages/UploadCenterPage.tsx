@@ -51,7 +51,7 @@ export function UploadCenterPage() {
             <li key={item.clientUploadId} className="rounded border border-line p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">
-                  <Link to="/app/records/$formRecordId" params={{ formRecordId: item.formRecordId }} className="underline-offset-4 hover:underline">
+                  <Link to="/app/records/$formRecordId" params={{ formRecordId: item.formRecordId }} search={{ tab: "documents" }} className="underline-offset-4 hover:underline">
                     {item.fileName}
                   </Link>
                 </p>

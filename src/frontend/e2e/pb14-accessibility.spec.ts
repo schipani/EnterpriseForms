@@ -32,16 +32,29 @@ async function scan(page: Page, label: string) {
 }
 
 async function openLatestAccusedRecord(page: Page): Promise<string> {
+  // My Records sorts the complete authorized set by last change (C-29), so on a long-lived stack the latest Accused record
+  // need not be on the first page: page through the same list API the page uses, then open the record through the UI.
+  let token: string | null = null;
+  let recordId: string | undefined;
+  do {
+    const response = await page.request.get(`/api/v1/form-records?pageSize=100${token ? `&continuationToken=${encodeURIComponent(token)}` : ""}`);
+    expect(response.ok()).toBeTruthy();
+    const body = (await response.json()) as { items: Array<{ formRecordId: string; formDefinitionName: string }>; continuationToken: string | null };
+    recordId = body.items.find((item) => /^Accused /i.test(item.formDefinitionName))?.formRecordId;
+    token = body.continuationToken;
+  } while (!recordId && token);
+  expect(recordId, "an Accused record visible to the persona").toBeTruthy();
   await page.goto("/app/records");
-  const row = page.getByRole("row", { name: /^Accused /i }).first();
-  await row.getByRole("link").first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Records" })).toBeVisible();
+  await page.goto(`/app/records/${recordId}`);
   await expect(page.getByText("Integrity: Verified")).toBeVisible({ timeout: 60_000 });
   return page.url();
 }
 
 async function openLatestDesigner(page: Page): Promise<void> {
   await page.goto("/app/forms");
-  await page.getByRole("row", { name: /^Accused /i }).first().getByRole("link", { name: "Design" }).click();
+  // The first Accused form this persona may design (a long-lived stack can list Accused forms it may only use).
+  await page.getByRole("row", { name: /^Accused /i }).filter({ has: page.getByRole("link", { name: "Design" }) }).first().getByRole("link", { name: "Design" }).click();
   await expect(page.getByRole("tab", { name: "Design" })).toBeVisible();
 }
 
@@ -171,7 +184,12 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
 
     // Record tabs follow the WAI-ARIA tabs pattern: arrow keys move the active tab without a mouse.
     const recordUrl = await openLatestAccusedRecord(page);
+    // Accused records have Details, Related records, Documents, Sharing and access, Activity and history (C-30).
     await page.getByRole("tab", { name: "Details" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("tab", { name: "Related records" })).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("tab", { name: "Documents" })).toHaveAttribute("aria-selected", "true");
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("tab", { name: "Access" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByText("Your permissions on this record")).toBeVisible();

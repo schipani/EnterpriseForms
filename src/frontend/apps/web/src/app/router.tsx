@@ -1,4 +1,5 @@
 import { Outlet, createRootRoute, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
+import { parseRecordsSearch, parseRecordTabSearch } from "../features/form-records/routeSearch";
 import { AppShellLayout, AuthenticatedLayout, LandingRedirect } from "./AppShellLayout";
 
 /**
@@ -31,9 +32,9 @@ const dashboardRoute = createRoute({ getParentRoute: () => appRoute, path: "/das
 const formsRoute = createRoute({ getParentRoute: () => appRoute, path: "/forms", component: lazyRouteComponent(() => import("../features/form-catalog"), "FormsPage") });
 const newFormRoute = createRoute({ getParentRoute: () => appRoute, path: "/forms/new", component: lazyRouteComponent(() => import("../features/form-catalog"), "NewFormPage") });
 const designerRoute = createRoute({ getParentRoute: () => appRoute, path: "/forms/$formDefinitionId/design", component: lazyRouteComponent(() => import("../features/form-designer"), "DesignerPage") });
-const recordsRoute = createRoute({ getParentRoute: () => appRoute, path: "/records", component: lazyRouteComponent(() => import("../features/form-records"), "RecordsPage"), validateSearch: (search: Record<string, unknown>): { form?: string } => (typeof search["form"] === "string" ? { form: search["form"] } : {}) });
+const recordsRoute = createRoute({ getParentRoute: () => appRoute, path: "/records", component: lazyRouteComponent(() => import("../features/form-records"), "RecordsPage"), validateSearch: parseRecordsSearch });
 const newRecordRoute = createRoute({ getParentRoute: () => appRoute, path: "/forms/$formDefinitionId/records/new", component: lazyRouteComponent(() => import("../features/form-records"), "NewRecordPage") });
-const recordRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId", component: lazyRouteComponent(() => import("../features/form-records"), "RecordPage") });
+const recordRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId", component: lazyRouteComponent(() => import("../features/form-records"), "RecordPage"), validateSearch: parseRecordTabSearch });
 const editRecordRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/edit", component: lazyRouteComponent(() => import("../features/form-records"), "EditRecordPage") });
 const newChildRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/related/$formRelationshipDefinitionId/new", component: lazyRouteComponent(() => import("../features/related-forms"), "NewChildRecordPage") });
 const uploadsRoute = createRoute({ getParentRoute: () => appRoute, path: "/uploads", component: lazyRouteComponent(() => import("../features/jobs"), "UploadCenterPage") });

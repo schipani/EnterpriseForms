@@ -10,17 +10,22 @@ export interface OverflowMenuItem {
   content: ReactNode;
 }
 
-/** Accessible "more actions" (…) overflow menu (Radix dropdown): roving tabindex, Escape to close, typeahead. */
-export function OverflowMenu({ label, items }: { label: string; items: OverflowMenuItem[] }) {
+/**
+ * Accessible "more actions" (…) overflow menu (Radix dropdown): roving tabindex, Escape to close, typeahead. Pass
+ * `trigger` (a single button whose visible text names the menu) to use it as a labelled menu button instead of "…".
+ */
+export function OverflowMenu({ label, items, trigger }: { label: string; items: OverflowMenuItem[]; trigger?: ReactNode }) {
   if (items.length === 0) {
     return null;
   }
   return (
     <RadixDropdownMenu.Root>
       <RadixDropdownMenu.Trigger asChild>
-        <Button variant="secondary" size="sm" aria-label={label}>
-          <span aria-hidden="true">&hellip;</span>
-        </Button>
+        {trigger ?? (
+          <Button variant="secondary" size="sm" aria-label={label}>
+            <span aria-hidden="true">&hellip;</span>
+          </Button>
+        )}
       </RadixDropdownMenu.Trigger>
       <RadixDropdownMenu.Portal>
         <RadixDropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-48 rounded border border-input bg-surface p-1 shadow-lg">

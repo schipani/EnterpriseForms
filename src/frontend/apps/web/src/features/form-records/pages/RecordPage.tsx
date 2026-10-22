@@ -1,20 +1,39 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { FormRenderer } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
+import type { RecordProjectionResponse } from "@enterpriseforms/api-client";
+import { FormRenderer, type DocumentElement, type FormLayout, type RelatedElement } from "@enterpriseforms/form-renderer";
+import { Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { RecordActivity } from "../../audit";
 import { DocumentCollection } from "../../documents";
 import { ChildRecordList } from "../../related-forms";
 import { RecordAccessPanel } from "../../sharing";
 import { ErrorPanel } from "../../support";
+import { formatDateTime, recordStatusLabel } from "../components/recordList";
 import { parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
+import type { RecordTab } from "../components/recordTabs";
 
-/** PG-017 record workspace: verified projection, related lists, documents, activity. Permissions come from the projection. */
+/**
+ * PG-016 record workspace (C-30): a summary of the record plus sections for its details, related records, documents,
+ * sharing and activity. Everything shown comes from the verified, authorized projection — a partial (shared) view
+ * receives only the shared fields and documents, never related lists, so those sections simply do not appear.
+ */
 export function RecordPage() {
   const { formRecordId } = useParams({ from: "/app/records/$formRecordId" });
+  const search = useSearch({ from: "/app/records/$formRecordId" });
+  const navigate = useNavigate();
   const api = useApi();
   const projection = useQuery({ queryKey: ["records", "projection", formRecordId], queryFn: () => api.records.projection(formRecordId).then((r) => r.result) });
+  const [savedNotice, setSavedNotice] = useState(false);
+  useEffect(() => {
+    if (search.saved) {
+      // Confirm once, then drop the flag from the URL so a reload does not repeat it.
+      setSavedNotice(true);
+      void navigate({ to: "/app/records/$formRecordId", params: { formRecordId }, search: (current) => ({ ...current, saved: undefined }), replace: true });
+    }
+  }, [search.saved, formRecordId, navigate]);
+
   if (projection.isPending) {
     return <LoadingBlock label="Verifying record" />;
   }
@@ -23,22 +42,31 @@ export function RecordPage() {
   }
   const data = projection.data;
   const { layout, error } = parseProjectionLayout(data);
-  const fields = toRendererFields(data.fields);
-  const values = toValueMap(data.record);
+  const relatedElements = layout ? relatedListsOf(layout) : [];
+  const documentElements = layout ? documentCollectionsOf(layout) : [];
   const relationshipsById = new Map(data.relationships.map((relationship) => [relationship.formRelationshipDefinitionId, relationship]));
+  const sections: RecordTab[] = ["details", ...(relatedElements.length > 0 ? (["related"] as const) : []), ...(documentElements.length > 0 ? (["documents"] as const) : []), "sharing", "activity"];
+  const tab: RecordTab = search.tab && sections.includes(search.tab) ? search.tab : "details";
+  const showTab = (next: RecordTab) => void navigate({ to: "/app/records/$formRecordId", params: { formRecordId }, search: (current) => ({ ...current, tab: next === "details" ? undefined : next }), replace: true });
+
+  const renderDocuments = (element: DocumentElement) => {
+    const field = data.fields.find((candidate) => candidate.fieldDefinitionId === element.fieldDefinitionId);
+    return <DocumentCollection key={element.fieldDefinitionId} formRecordId={formRecordId} fieldDefinitionId={element.fieldDefinitionId} label={element.label || field?.fieldDisplayName || "Documents"} documents={data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId)} policy={element.upload} canEdit={data.permissions.canEdit} contentRevision={Number(data.record.contentRevision)} onChanged={() => void projection.refetch()} />;
+  };
+
   return (
     <>
       <PageHeader
         title={data.formDefinitionName}
-        lead={data.parentFormRecordId ? "Child record" : "Record"}
+        lead={data.parentFormRecordId ? "Related (child) record" : "Record"}
         actions={
           <>
             {data.parentFormRecordId ? (
-              <Link to="/app/records/$formRecordId" params={{ formRecordId: data.parentFormRecordId }}>
+              <Link to="/app/records/$formRecordId" params={{ formRecordId: data.parentFormRecordId }} search={{ tab: "related" }}>
                 <Button variant="ghost">Parent record</Button>
               </Link>
             ) : null}
-            <Button variant="secondary" busy={projection.isFetching} onClick={() => void projection.refetch()}>
+            <Button variant="secondary" aria-label="Refresh this record" busy={projection.isFetching} onClick={() => void projection.refetch()}>
               Refresh
             </Button>
             {data.permissions.canEdit ? (
@@ -49,15 +77,19 @@ export function RecordPage() {
           </>
         }
       />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Badge tone={data.record.integrityStatus === "Verified" ? "success" : "danger"}>Integrity: {data.record.integrityStatus}</Badge>
-        <Badge tone="neutral">Revision {String(data.record.contentRevision)}</Badge>
-        <Badge tone="neutral">Layout v{data.layoutVersion.versionNumber}</Badge>
-        {!data.permissions.isCompleteProjection ? <Badge tone="warning">Partial view (shared fields only)</Badge> : null}
-      </div>
+      {savedNotice ? (
+        <div className="mb-4">
+          <StatusMessage tone="success" title="Changes saved" actions={<Button size="sm" variant="ghost" onClick={() => setSavedNotice(false)}>Dismiss</Button>}>
+            Your changes were saved and the record was verified again.
+          </StatusMessage>
+        </div>
+      ) : null}
+      <RecordSummary data={data} />
       {error ? <StatusMessage tone="danger" title="Layout could not be parsed">{error}</StatusMessage> : null}
       <Tabs
         label="Record sections"
+        value={tab}
+        onValueChange={(value) => showTab(value as RecordTab)}
         items={[
           {
             value: "details",
@@ -65,28 +97,96 @@ export function RecordPage() {
             content: layout ? (
               <FormRenderer
                 layout={layout}
-                fields={fields}
-                values={values}
+                fields={toRendererFields(data.fields)}
+                values={toValueMap(data.record)}
                 groups={toGroups(data.record)}
                 groupInfos={toGroupInfos(data.record.groups)}
                 readOnly
                 applyRules={data.permissions.isCompleteProjection}
-                renderRelatedList={(element) => {
-                  const relationship = relationshipsById.get(element.formRelationshipDefinitionId);
-                  return relationship ? <ChildRecordList parentFormRecordId={formRecordId} relationship={relationship} label={element.label} canEdit={data.permissions.canEdit} summaryFieldKeys={element.summaryFieldKeys} /> : <p className="text-sm text-muted">{element.label}: relationship not available.</p>;
+                renderRelatedList={(element) => <SectionPointer label={element.label || relationshipsById.get(element.formRelationshipDefinitionId)?.relationshipDisplayName || "Related records"} target="Related records" onOpen={() => showTab("related")} />}
+                renderDocumentCollection={(element, field) => {
+                  const count = data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId).length;
+                  return <SectionPointer label={element.label || field?.fieldDisplayName || "Documents"} detail={`${count} ${count === 1 ? "document" : "documents"}`} target="Documents" onOpen={() => showTab("documents")} />;
                 }}
-                renderDocumentCollection={(element, field) => <DocumentCollection formRecordId={formRecordId} fieldDefinitionId={element.fieldDefinitionId} label={element.label || field?.fieldDisplayName || "Documents"} documents={data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId)} policy={element.upload} canEdit={data.permissions.canEdit} contentRevision={Number(data.record.contentRevision)} onChanged={() => void projection.refetch()} />}
               />
             ) : null,
           },
-          {
-            value: "access",
-            label: "Access",
-            content: <RecordAccessPanel formRecordId={formRecordId} projection={data} />,
-          },
-          { value: "activity", label: "Activity", content: <Card title="Audit history"><RecordActivity formRecordId={formRecordId} /></Card> },
+          ...(relatedElements.length > 0
+            ? [
+                {
+                  value: "related",
+                  label: "Related records",
+                  content: (
+                    <div className="flex flex-col gap-4">
+                      {relatedElements.map((element) => {
+                        const relationship = relationshipsById.get(element.formRelationshipDefinitionId);
+                        return relationship ? (
+                          <ChildRecordList key={element.formRelationshipDefinitionId} parentFormRecordId={formRecordId} relationship={relationship} label={element.label} canEdit={data.permissions.canEdit} summaryFieldKeys={element.summaryFieldKeys} />
+                        ) : (
+                          <p key={element.formRelationshipDefinitionId} className="text-sm text-muted">
+                            {element.label}: this list is not available.
+                          </p>
+                        );
+                      })}
+                    </div>
+                  ),
+                },
+              ]
+            : []),
+          ...(documentElements.length > 0 ? [{ value: "documents", label: "Documents", content: <div className="flex flex-col gap-4">{documentElements.map(renderDocuments)}</div> }] : []),
+          { value: "sharing", label: "Sharing and access", content: <RecordAccessPanel formRecordId={formRecordId} projection={data} /> },
+          { value: "activity", label: "Activity and history", content: <Card title="Audit history"><RecordActivity formRecordId={formRecordId} /></Card> },
         ]}
       />
     </>
   );
+}
+
+function RecordSummary({ data }: { data: RecordProjectionResponse }) {
+  const summary = data.summary;
+  const complete = data.permissions.isCompleteProjection;
+  const access = complete ? (data.permissions.canEdit ? "Full access: you can view and edit this record" : "You can view this record") : "Shared fields only: you can see the fields and documents shared with you";
+  return (
+    <Card title="Record summary" aria-label="Record summary" className="mb-4">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <Badge tone={data.record.integrityStatus === "Verified" ? "success" : "danger"}>Integrity: {data.record.integrityStatus}</Badge>
+        <Badge tone="neutral">Revision {String(data.record.contentRevision)}</Badge>
+        <Badge tone="neutral">Layout v{data.layoutVersion.versionNumber}</Badge>
+        {!complete ? <Badge tone="warning">Partial view (shared fields only)</Badge> : null}
+      </div>
+      <DescriptionList
+        items={[
+          { term: "Reference", detail: summary?.recordReference ?? "—" },
+          ...(complete ? [{ term: "Status", detail: recordStatusLabel(data.record.recordStatus) }] : []),
+          { term: "Created", detail: summary?.createdOn ? `${formatDateTime(summary.createdOn)}${summary.createdByCurrentUser ? " by you" : summary.createdByDisplayName ? ` by ${summary.createdByDisplayName}` : ""}` : "—" },
+          { term: "Last changed", detail: summary?.modifiedOn ? formatDateTime(summary.modifiedOn) : "—" },
+          { term: "Your access", detail: access },
+        ]}
+      />
+    </Card>
+  );
+}
+
+/** Stands in the Details form where the designer placed a related list or document collection; the content lives in its own section. */
+function SectionPointer({ label, detail, target, onOpen }: { label: string; detail?: string; target: string; onOpen: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-line bg-page px-3 py-2">
+      <span>
+        <span className="font-medium">{label}</span>
+        {detail ? <span className="text-sm text-muted"> · {detail}</span> : null}
+      </span>
+      {/* The accessible name starts with the visible text (WCAG 2.5.3) and adds which list or collection it opens. */}
+      <Button size="sm" variant="secondary" onClick={onOpen} aria-label={`View in ${target}: ${label}`}>
+        View in {target}
+      </Button>
+    </div>
+  );
+}
+
+function relatedListsOf(layout: FormLayout): RelatedElement[] {
+  return layout.sections.flatMap((section) => section.elements.filter((element): element is RelatedElement => element.kind === "relatedFormList"));
+}
+
+function documentCollectionsOf(layout: FormLayout): DocumentElement[] {
+  return layout.sections.flatMap((section) => section.elements.filter((element): element is DocumentElement => element.kind === "documentCollection"));
 }

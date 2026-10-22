@@ -19,4 +19,10 @@ public sealed class BusinessException(string errorCode, int httpStatusCode, stri
     public string ErrorCode { get; } = errorCode;
 
     public int HttpStatusCode { get; } = httpStatusCode;
+
+    /// <summary>
+    /// Record fields the failure is about, as the record form addresses them: a field key, or <c>groupKey[n].fieldKey</c>
+    /// for entry n (1-based) of a repeating section (C-31). Returned to the client as the <c>field_keys</c> problem extension.
+    /// </summary>
+    public IReadOnlyList<string> FieldKeys { get; init; } = [];
 }

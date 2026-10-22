@@ -9,6 +9,17 @@ export type { components as EnterpriseFormsV1Components, paths as EnterpriseForm
 
 export const API_V1_PREFIX = "/api/v1" as const;
 
+/** My Records query (C-29). `continuationToken` is an opaque cursor from a previous page of the same filters and sort. */
+export type RecordListQuery = {
+  formDefinitionId?: string;
+  recordStatus?: string;
+  includeChildren?: boolean;
+  sortBy?: "modifiedOn" | "createdOn" | "formName" | "recordStatus";
+  sortDirection?: "asc" | "desc";
+  pageSize?: number;
+  continuationToken?: string;
+};
+
 type S = components["schemas"];
 
 export type SessionResponse = S["SessionResponse"];
@@ -153,7 +164,7 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       update: (optionListId: string, request: UpdateOptionListRequest) => write<OptionListResponse>("PUT", "optionLists.update", { optionListId }, request, { resourceKey: `option-list:${optionListId}` }),
     },
     records: {
-      list: (query: { formDefinitionId?: string; includeChildren?: boolean; pageSize?: number; continuationToken?: string }, signal?: AbortSignal) => read<RecordListResponse>("records.list", undefined, query, "interactive-read", signal),
+      list: (query: RecordListQuery, signal?: AbortSignal) => read<RecordListResponse>("records.list", undefined, query, "interactive-read", signal),
       create: (formDefinitionId: string, request: CreateFormRecordRequest) => write<FormRecordResponse>("POST", "records.create", { formDefinitionId }, request, { idempotent: true }),
       projection: (formRecordId: string, signal?: AbortSignal) => read<RecordProjectionResponse>("records.projection", { formRecordId }, undefined, "interactive-read", signal),
       update: (formRecordId: string, request: UpdateFormRecordRequest) => write<FormRecordResponse>("PATCH", "records.update", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),

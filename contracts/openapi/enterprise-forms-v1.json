@@ -1234,7 +1234,7 @@
         "tags": [
           "FormRecords"
         ],
-        "summary": "Authority-discoverable records with unverified local metadata; open a record for the verified projection.",
+        "summary": "My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection.",
         "operationId": "ListFormRecords",
         "parameters": [
           {
@@ -1246,10 +1246,31 @@
             }
           },
           {
+            "name": "recordStatus",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "includeChildren",
             "in": "query",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortDirection",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -4759,6 +4780,22 @@
           }
         }
       },
+      "RecordListFormOption": {
+        "required": [
+          "formDefinitionId",
+          "formDefinitionName"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formDefinitionName": {
+            "type": "string"
+          }
+        }
+      },
       "RecordListItemResponse": {
         "required": [
           "formRecordId",
@@ -4803,6 +4840,24 @@
           },
           "projectionVerified": {
             "type": "boolean"
+          },
+          "recordReference": {
+            "type": "string",
+            "default": ""
+          },
+          "createdByDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdByCurrentUser": {
+            "type": "boolean",
+            "default": false
+          },
+          "canEdit": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -4833,6 +4888,75 @@
               "null",
               "string"
             ]
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "availableForms": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RecordListFormOption"
+            }
+          },
+          "unavailableRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "unavailableRecordIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "sortBy": {
+            "type": "string",
+            "default": "modifiedOn"
+          },
+          "sortDirection": {
+            "type": "string",
+            "default": "desc"
           }
         }
       },
@@ -4967,6 +5091,54 @@
           },
           "eTag": {
             "type": "string"
+          },
+          "summary": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RecordProjectionSummaryResponse"
+              }
+            ]
+          }
+        }
+      },
+      "RecordProjectionSummaryResponse": {
+        "required": [
+          "recordReference",
+          "createdOn",
+          "modifiedOn",
+          "createdByDisplayName",
+          "createdByCurrentUser"
+        ],
+        "type": "object",
+        "properties": {
+          "recordReference": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "modifiedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdByDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdByCurrentUser": {
+            "type": "boolean"
           }
         }
       },

@@ -28,10 +28,13 @@ public static class FormRecordEndpoints
 
         var records = endpoints.MapGroup(ApiVersions.V1Prefix + "/form-records").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
 
-        records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, bool? includeChildren, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
-                TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, includeChildren ?? false, pageSize ?? 25, continuationToken, cancellationToken).ConfigureAwait(false)))
+        records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, string? recordStatus, bool? includeChildren, string? sortBy, string? sortDirection, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
+            {
+                var query = RecordListQuery.Create(formDefinitionId, recordStatus, includeChildren ?? false, sortBy, sortDirection, pageSize ?? 25);
+                return TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), query, continuationToken, cancellationToken).ConfigureAwait(false));
+            })
             .WithName("ListFormRecords")
-            .WithSummary("Authority-discoverable records with unverified local metadata; open a record for the verified projection.");
+            .WithSummary("My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection.");
 
         records.MapGet("/{formRecordId:guid}", static async Task<Ok<FormRecordResponse>> (Guid formRecordId, HttpContext http, GetFormRecordHandler handler, CancellationToken cancellationToken) =>
             {

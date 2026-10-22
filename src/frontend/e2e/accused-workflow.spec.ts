@@ -162,7 +162,8 @@ test.describe.serial("Stage B Accused workflow", () => {
     await expect(page.getByText(/\(2026-03-0[89]T\d{2}:30:00Z\)/)).toBeVisible();
     const recordUrl = page.url();
 
-    // Two addresses through the reusable child list.
+    // Two addresses through the reusable child list (Related records section, C-30).
+    await page.getByRole("tab", { name: "Related records" }).click();
     for (const [street, kind] of [
       ["12 King Street W", "Home"],
       ["100 Queen Street W", "Work"],
@@ -181,10 +182,12 @@ test.describe.serial("Stage B Accused workflow", () => {
     await page.getByRole("link", { name: "Edit" }).first().click();
     await page.getByLabel(/Given name/).fill("Avery-Edited");
     await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Changes saved")).toBeVisible();
     await expect(page.getByText("Avery-Edited")).toBeVisible();
     await expect(page.getByText("Revision 2")).toBeVisible();
 
-    // The published collection is visible on the record with the designer's limits.
+    // The published collection is visible in the Documents section with the designer's limits.
+    await page.getByRole("tab", { name: "Documents" }).click();
     await expect(page.getByRole("heading", { name: /Case documents \(0 of 10\)/ })).toBeVisible();
     await expect(page.getByText(/Up to 10 files, 20\.0 MB each; types: application\/pdf, text\/plain/)).toBeVisible();
     // Upload two documents concurrently, navigate away mid-flight, come back: the shell-owned manager finished them.
@@ -198,7 +201,8 @@ test.describe.serial("Stage B Accused workflow", () => {
     await expect(page.getByText("warrant.txt").first()).toBeVisible();
     // SPA navigation back (a full reload would discard the in-memory files by design; server sessions stay resumable).
     await page.getByRole("link", { name: "warrant.txt" }).click();
-    await expect(page).toHaveURL(recordUrl);
+    await expect(page).toHaveURL(`${recordUrl}?tab=documents`);
+    await expect(page.getByRole("tab", { name: "Documents" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("rowheader", { name: "warrant.txt" })).toBeVisible({ timeout: 120_000 });
     await expect(page.getByRole("rowheader", { name: "statement.txt" })).toBeVisible({ timeout: 120_000 });
     const warrantRow = page.getByRole("row", { name: /warrant\.txt/ });
