@@ -73,6 +73,10 @@ export function RecordPage() {
               <Link to="/app/records/$formRecordId/edit" params={{ formRecordId }}>
                 <Button>Edit</Button>
               </Link>
+            ) : !data.permissions.isCompleteProjection && data.permissions.canEditSharedFields ? (
+              <Link to="/app/records/$formRecordId/edit" params={{ formRecordId }}>
+                <Button>Edit shared fields</Button>
+              </Link>
             ) : null}
           </>
         }
@@ -145,7 +149,14 @@ export function RecordPage() {
 function RecordSummary({ data }: { data: RecordProjectionResponse }) {
   const summary = data.summary;
   const complete = data.permissions.isCompleteProjection;
-  const access = complete ? (data.permissions.canEdit ? "Full access: you can view and edit this record" : "You can view this record") : "Shared fields only: you can see the fields and documents shared with you";
+  const sharedEditable = (data.sharedFieldAccess ?? []).filter((item) => item.editable).length;
+  const access = complete
+    ? data.permissions.canEdit
+      ? "Full access: you can view and edit this record"
+      : "You can view this record"
+    : sharedEditable > 0
+      ? `Shared fields only: you can see the fields and documents shared with you and change ${sharedEditable} of the shared ${sharedEditable === 1 ? "field" : "fields"}`
+      : "Shared fields only: you can see the fields and documents shared with you";
   return (
     <Card title="Record summary" aria-label="Record summary" className="mb-4">
       <div className="mb-3 flex flex-wrap gap-2">

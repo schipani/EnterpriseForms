@@ -80,6 +80,11 @@ jobs:
     name: Stage B browser end-to-end (real stack)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      # Phase C5 (D10): contributor writes are OFF by default in every profile; only this disposable browser stack turns them
+      # on so the contributor experience is exercised end to end. The integration job keeps the default and toggles them
+      # per test through the Testing-only operator override.
+      AUTHORITY_SHARE_CONTRIBUTOR_WRITES_ENABLED: "true"
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6

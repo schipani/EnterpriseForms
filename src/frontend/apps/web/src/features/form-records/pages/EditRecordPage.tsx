@@ -23,10 +23,27 @@ interface MergeReport {
 
 const baseOf = (projection: RecordProjectionResponse): EditBase => ({ projection, snapshot: { values: toValueMap(projection.record), groups: toGroups(projection.record) } });
 
+/** Why a shared field is view only (Phase C5); never describes a field the viewer cannot see. */
+const viewOnlyReasons: Record<string, string> = {
+  ViewOnlyShare: "shared with you for viewing",
+  ReadOnly: "read-only in this form",
+  RuleDependency: "depends on parts of the record that are not shared with you",
+  Restricted: "restricted information",
+  MultiSelect: "a multiple-choice field",
+  FileField: "a document field",
+  NotInForm: "not part of this form",
+  MultipleValues: "holds several values",
+  ProtectionMigrationPending: "its protection is being updated",
+  ContributorWritesDisabled: "changing shared fields is not enabled",
+};
+
 /**
  * PG-017 record editor. The save is a full snapshot checked against the revision this session started from (If-Match),
  * never against whatever was fetched later, so a background refresh can never turn into a silent overwrite. A conflict
  * offers to reapply the user's own changes onto the latest version, with fields both people changed resolved by hand.
+ * Shared mode (Phase C5): a person with shared edit access sees only the fields shared with them; the ones they may
+ * change are inputs, the others are marked read-only, and the save sends only the changed shared values. The server and
+ * the Authority decide what may change; this page never relies on hidden controls.
  */
 export function EditRecordPage() {
   const { formRecordId } = useParams({ from: "/app/records/$formRecordId/edit" });
@@ -76,8 +93,9 @@ export function EditRecordPage() {
     },
     onError: (error) => {
       const presented = presentError(error);
-      // A 403 that names fields (for example a read-only field) is a validation answer, not lost access.
-      if ((presented.kind === "access-denied" || presented.kind === "not-found") && presented.fieldKeys.length === 0) {
+      // A 403 that names fields (for example a read-only field) is a validation answer, not lost access; so is "editing
+      // shared fields is not enabled", which is shown as an error rather than clearing the page.
+      if ((presented.kind === "access-denied" || presented.kind === "not-found") && presented.fieldKeys.length === 0 && presented.code !== "CONTRIBUTOR_WRITES_DISABLED") {
         // Access was removed while editing: stop, and drop the local changes (they can no longer be saved or shown).
         setRevoked(true);
         setValues({});
@@ -106,18 +124,31 @@ export function EditRecordPage() {
       </StatusMessage>
     );
   }
-  if (!data.permissions.canEdit) {
+  const shared = !data.permissions.isCompleteProjection;
+  if (!data.permissions.canEdit && !(shared && data.permissions.canEditSharedFields)) {
     return (
       <StatusMessage tone="danger" title="You cannot edit this record" actions={<Link to="/app/records/$formRecordId" params={{ formRecordId }}><Button variant="secondary">Back to the record</Button></Link>}>
-        Only the record owner (or a member of the owning team) can edit it.
+        {!shared
+          ? "Only the record owner (or a member of the owning team) can edit it."
+          : data.permissions.contributorWritesEnabled
+            ? "None of the fields shared with you can be changed with your access."
+            : "Changing shared fields is not enabled. You can still view the fields shared with you."}
       </StatusMessage>
     );
   }
-  const { layout, error } = parseProjectionLayout(data);
-  if (!layout) {
+  const { layout: parsedLayout, error } = parseProjectionLayout(data);
+  if (!parsedLayout) {
     return <StatusMessage tone="danger" title="Layout could not be parsed">{error}</StatusMessage>;
   }
   const fields = toRendererFields(data.fields);
+  // Shared mode: fields the person may not change are rendered read-only (the server refuses them regardless).
+  const access = shared ? (data.sharedFieldAccess ?? []) : [];
+  const editableKeys = new Set(access.filter((item) => item.editable).map((item) => item.fieldKey));
+  const viewOnly = access.filter((item) => !item.editable);
+  const keyById = new Map(fields.map((field) => [field.fieldDefinitionId, field.fieldKey]));
+  const layout: FormLayout = shared
+    ? { ...parsedLayout, sections: parsedLayout.sections.map((section) => ({ ...section, elements: section.elements.map((element) => (element.kind === "field" && !editableKeys.has(keyById.get(element.fieldDefinitionId) ?? "") ? { ...element, readOnly: true } : element)) })) }
+    : parsedLayout;
   const presented = update.isError ? presentError(update.error) : null;
   const conflict = presented?.kind === "conflict";
   const applyRules = data.permissions.isCompleteProjection;
@@ -142,6 +173,16 @@ export function EditRecordPage() {
     if (!dirty) {
       // An unchanged snapshot would still become a new revision; there is nothing to save.
       setNothingToSave(true);
+      return;
+    }
+    if (shared) {
+      // Only the changed values the person may change are sent; repeating sections are never part of a share.
+      const changed = Object.fromEntries([...editableKeys].filter((key) => (values[key] ?? "") !== (base.snapshot.values[key] ?? "")).map((key) => [key, values[key] ?? ""]));
+      if (Object.keys(changed).length === 0) {
+        setNothingToSave(true);
+        return;
+      }
+      update.mutate({ revision: Number(data.record.contentRevision), values: changed, groups: [] });
       return;
     }
     update.mutate({ revision: Number(data.record.contentRevision), values: layoutValues(layout, fields, values, base.snapshot.values, applyRules), groups: groupPayload(layout, fields, values, groups, infos, applyRules) });
@@ -194,7 +235,23 @@ export function EditRecordPage() {
   const errorEntries = Object.entries(shownErrors).filter(([, message]) => Boolean(message));
   return (
     <>
-      <PageHeader title={`Edit ${data.formDefinitionName}`} lead={`Editing content revision ${String(data.record.contentRevision)} with layout v${data.layoutVersion.versionNumber}.`} />
+      <PageHeader title={shared ? `Edit shared fields — ${data.formDefinitionName}` : `Edit ${data.formDefinitionName}`} lead={`Editing content revision ${String(data.record.contentRevision)} with layout v${data.layoutVersion.versionNumber}.`} />
+      {shared ? (
+        <div className="mb-4">
+          <StatusMessage tone="info" title={`You can change ${editableKeys.size} shared ${editableKeys.size === 1 ? "field" : "fields"}`}>
+            <p>Other parts of this record are not shown. Fields marked Read-only can be viewed but not changed with your access. A shared value can be changed but not cleared.</p>
+            {viewOnly.length > 0 ? (
+              <ul className="mt-2 flex list-disc flex-col gap-1 pl-5" aria-label="Fields you can view but not change">
+                {viewOnly.map((item) => (
+                  <li key={item.fieldKey}>
+                    {labelForKey(layout, fields, item.fieldKey)}: {viewOnlyReasons[item.notEditableReason ?? ""] ?? "not changeable with your access"}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </StatusMessage>
+        </div>
+      ) : null}
       <form
         ref={formRef}
         noValidate
