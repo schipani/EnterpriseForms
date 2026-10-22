@@ -1,8 +1,10 @@
 # Phase C6 — Architecture review: record lifecycle and history
 
-**Status: Revision 1 — PROPOSAL FOR OWNER REVIEW. Not approved. Nothing in this document is implemented.**
+**Status: Revision 1 — APPROVED FOR CONTROLLED DEVELOPMENT (owner, 2026-10-22, decision C-43). Milestone 0 implemented (§1.1.4); Milestones 1–5 not started.**
 
-Branch `phase-c/record-lifecycle` from main `f859e42`. This is an architecture review only. No application code, schema, signing protocol, security control, persistent development database, SpiceDB, Vault or signing key was changed or touched while preparing it.
+Approval terms (C-43): OD-01…OD-13 approved as recommended, with these clarifications — Submitted records are locked until an authorized owner reopens them with a reason; archive and unarchive preserve existing field values without revalidating them; restoration is exact and all-or-nothing; historical views clearly distinguish current labels from historical content; restoring values into a currently plaintext field requires explicit acknowledgement but can never bypass organizational encryption requirements. AC-1 and AC-2 approved for controlled development (not yet implemented); **AC-3 deferred** (the Authority journal format does not change); AC-4: the existing fail-closed behaviour is kept for V1. Only Milestone 0 is authorized so far. This is not production approval, an independent security review or Level 2 certification.
+
+Branch `phase-c/record-lifecycle` from main `f859e42`. Revision 1 was prepared as an architecture review only: no application code, schema, signing protocol, security control, persistent development database, SpiceDB, Vault or signing key was changed or touched while preparing it. Milestone 0's implementation status and evidence are in `docs/PHASE_C6_STATUS.md`.
 
 **What this is not:**
 * not an implementation, and not permission to implement;
@@ -74,6 +76,20 @@ Note that `fullyEncrypted` / `fullyPlaintext` require `legacyPlaintext == 0` / `
 | **S5** | **Tests.** Replace the SQL oracle with an Authority-derived one: the verified status fields from S1, cross-checked by a new read-only test observer that reads `record_content_heads` on the Authority database container. (Today the harness has only `AttackerSql`, which plays the hostile **BusinessDb** administrator; the observer must stay separate from it and exist only in the test harness.) Add a deterministic reproduction: arm the existing `CrashAfterContentHeadCommit` fault during a reprotection commit, restart the worker, and assert that the status converges to the verified count and the projection is repaired. Add a fixture with an abandoned candidate at the same revision as the accepted one. | Reproduces F-A, F-B and F-C on demand instead of by timing. No retries are added. |
 
 Schema impact: one business migration (new nullable columns on the two migration tables). The response contract gains additive fields; existing ones keep their meaning, with the estimate labelled. No Authority, RowHmac, Merkle or SpiceDB change.
+
+#### 1.1.4 Milestone 0 as implemented (decision C-44) — differences from §1.1.3
+
+The hosted logs of the two failures confirm the diagnosis. Attempt 2 waited 300 s with the migration `Completed` (the Authority post-check had passed) while the status stayed `EncryptionMigrationIncomplete` with a legacy count of 1: a permanently stale projection (F-A + F-C). Attempt 1 counted 2 legacy-encrypted records where the Authority-accepted heads hold 1.
+
+| Step | As implemented | Difference from §1.1.3 and why |
+|---|---|---|
+| S1 | Per item: `verified_head_operation_id`, `verified_head_content_revision`, `verified_old_form_value_count`, `verified_on`. Per migration: `verification_checked_on`, `verified_record_count`, `verified_remaining_record_count`, `verified_remaining_value_count`, `unverified_record_count`. Status field `verification` reports them with a `basis` text saying they are stored in the business database, not protected against a database administrator, and limited to listed records (G19). | **The local estimate is kept as a cross-check.** "All listed records encrypted / migrated to plaintext" needs a clean stored check **and** an estimate that agrees, so a forged stored result alone cannot produce the claim (the existing forged-completion tests now also forge the new columns). This is what made the flake visible, so S2 makes the estimate converge: the post-check repairs every checked record's projection before the estimate is read. |
+| S1 (new) | **Every migration is verified by the worker.** A migration created when the estimate finds nothing to convert is queued, not marked completed. | Found during implementation: before M0 such a migration was marked "Completed and verified" at creation from the estimate alone, with no Authority check. With a stale projection that could claim encryption while an accepted head still held plaintext (the unsafe direction). The migration's data step re-queues the latest such migration of each field, so the worker verifies it; earlier migrations that did pass the worker's post-check keep their claim, with the equivalent stored result (remaining 0, unverified 0, checked count unknown). |
+| S1 (new) | The post-check counts a listed record whose Authority head cannot be read (403/404/423) as **unverified** and never completes the migration with any; before, a tracked record answering 404 made the post-check throw and the migration loop as Blocked. | "Unverified rather than guessing". |
+| S2 | One store method, `ProjectAcceptedHeadAsync`, applies the monotonic rule in a **single conditional `UPDATE`**; all projection writers use it (create, update, upload commit, document removal, worker, post-check, verified reads). | Atomicity: the earlier load-modify-save could regress the projection when two writers raced. `FormRecord.RecordAcceptedContent` remains as the documented in-memory rule. |
+| S3 | `AcceptedHeadProjection.Resolve` returns Resolved / NoAcceptedContent / Unresolved. "No accepted content" is projected as revision 0 with no operation (constraint `ck_form_records_revision_projection` replaces `ck_form_records_revision_positive`). Unresolved records are visited by the migration (value count 0) and reported as `estimateUnresolvedRecordCount`. | A record whose creation never committed would otherwise stay "unknown" forever and block the claim; the Authority's answer (revision 0) now resolves it. A worker item for such a record completes as `NoAcceptedContent` instead of failing `NO_COMMITTED_CONTENT`: there is no copy to convert, and the barrier refuses one from then on. |
+| S4 | `completed_by_operation_kind` = MigrationWorker / OtherMigration / UserOperation / NoAcceptedContent, decided by re-deriving this record's reprotection operation ids (`ReprotectionAttribution`); `completed_by_user_commit` is true only for UserOperation. | **No `last_attempt_operation_id` column:** operation ids are a pure function of the idempotency key, so derivation needs no extra write and also covers a crash before such a write. Limitation: when a user operation was accepted after the worker's own, the head (and so the attribution) is the user's; earlier accepted operations are not visible without AC-1. |
+| S5 | `ComposeStack.AuthorityObserverSql` (read-only transaction inside the authority-db container, test harness only) and `AuthorityOracle`. Every migration, downgrade, encryption, repeating-group and rules assertion that took "the accepted operation" from the business projection or the highest staged revision now takes it from the Authority. New deterministic reproductions: lost commit response in both directions (`CrashAfterContentHeadCommit`), and an abandoned candidate at the accepted revision with a lost and then a forged projection (`PauseBeforeContentCommit`). | No retries, sleeps or longer timeouts were added. |
 
 ### 1.2 Content and versioning model (as built)
 
@@ -347,7 +363,7 @@ No change to RowHmac v1, Merkle v1, signed schemas (no `form_records` v4), Spice
 
 | Change | Milestone |
 |---|---|
-| `field_protection_migration_items`: `verified_head_operation_id`, `verified_head_content_revision`, `verified_old_form_value_count`, `verified_on`, `last_attempt_operation_id`; aggregates on `field_protection_migrations` | M0 |
+| `field_protection_migration_items`: `verified_head_operation_id`, `verified_head_content_revision`, `verified_old_form_value_count`, `verified_on`, `completed_by_operation_kind` (no `last_attempt_operation_id`, §1.1.4); aggregates on `field_protection_migrations`; `form_records` revision-0 projection constraint; data step (EF migration `PhaseC6ProtectionStatusVerification`) | M0 — **implemented** |
 | `form_records` projection: start maintaining `record_status` and `submitted_on` (columns exist) | M1 |
 | New audit action constants (§2.6) | M1, M3, M4 |
 | OpenAPI: lifecycle, versions and restore routes; additive status fields | M0–M4 |
@@ -486,7 +502,7 @@ The existing `Audit history` card stays, with its "local audit projection" note,
 
 | Milestone | Content | Exit criteria |
 |---|---|---|
-| **M0 — stabilization** | S1–S5 (§1.1.3) | Deterministic reproductions C6-M0-01…03 pass; the two flaky tests use the Authority oracle and pass on 10 consecutive hosted runs; no retries added |
+| **M0 — stabilization** | S1–S5 (§1.1.3, as implemented §1.1.4) | Deterministic reproductions C6-M0-01…03 pass; the formerly flaky tests use the Authority oracle; the full hosted integration suite passes on repeated runs; no retries added. *(Revised from "10 consecutive hosted runs" per the owner's instruction not to spend hours on repeated rebuilds: determinism comes from fault injection, and a limited number of repeat runs checks stability.)* — **implemented; see `docs/PHASE_C6_STATUS.md`** |
 | **M1 — lifecycle** | Transition endpoints, `LifecycleTransitionBuilder`, status gates in every content-writing handler, projection, audit, UI actions and dialogs; AC-2 if approved | C6-L-* pass; contributor and owner suites unchanged |
 | **M2 — Authority history read (and AC-3 if approved)** | AC-1 (and AC-3), Authority unit tests, internal OpenAPI artifact | Authority tests pass; independent-review package updated; SEC-P 13/13 |
 | **M3 — history UI** | Versions list and version view, layout handling, error states | C6-H-* pass; axe clean |
