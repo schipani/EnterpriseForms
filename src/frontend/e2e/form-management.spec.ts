@@ -51,6 +51,7 @@ test.describe.serial("Form management: edit fields and form permissions", () => 
     await page.getByRole("button", { name: "Create record" }).click();
     await expect(page.getByText("Integrity: Verified")).toBeVisible();
     clerkRecordUrl = page.url();
+    await page.getByRole("tab", { name: "Documents" }).click();
     await page.getByLabel(/Choose files for Case documents/).setInputFiles({ name: "exhibit-a.txt", mimeType: "text/plain", buffer: Buffer.from(`synthetic exhibit ${run}`) });
     const row = page.getByRole("row", { name: /exhibit-a\.txt/ });
     await expect(row.getByText("Ready")).toBeVisible({ timeout: 120_000 });
@@ -128,6 +129,7 @@ test.describe.serial("Form management: edit fields and form permissions", () => 
     await expect(page.getByText("Layout v2")).toBeVisible();
     await expect(page.getByText("Forename", { exact: true })).toBeVisible();
     await expect(page.getByText("Casey", { exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Documents" }).click();
     await expect(page.getByRole("heading", { name: /Evidence \(1 of 5\)/ })).toBeVisible();
     const original = page.getByRole("row", { name: /exhibit-a\.txt/ });
     await expect(original.getByText("Ready")).toBeVisible();

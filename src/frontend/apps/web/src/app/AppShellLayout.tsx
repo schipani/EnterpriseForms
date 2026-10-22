@@ -44,7 +44,7 @@ function PrimaryNav({ wide }: { wide: boolean }) {
   const session = useSession();
   const items: Array<{ to: string; label: string; show: boolean }> = [
     { to: "/app/dashboard", label: "Dashboard", show: true },
-    { to: "/app/records", label: "Records", show: session.hasCapability("records.discover") },
+    { to: "/app/records", label: "My Records", show: session.hasCapability("records.discover") },
     { to: "/app/forms", label: "Forms", show: true },
     { to: "/app/uploads", label: "Uploads", show: true },
     { to: "/app/activity", label: "My activity", show: true },

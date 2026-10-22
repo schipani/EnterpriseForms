@@ -40,12 +40,16 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
         List<Domain.Features.RelatedForms.FormRelationshipDefinition> relationships;
         Dictionary<Guid, string> formNames;
         List<FileAttachment> attachments;
+        RecordProjectionSummaryResponse summary;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             relationships = await scope.GetRelationshipDefinitionsAsync(context.OrganizationId, verified.Definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             var definitions = await scope.GetFormDefinitionsAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false);
             formNames = definitions.ToDictionary(d => d.FormDefinitionId, d => d.FormDefinitionName);
             attachments = await scope.GetAttachmentsAsync(formRecordId, cancellationToken).ConfigureAwait(false);
+            var row = await scope.FindFormRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+            var creator = (await scope.GetUsersAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false)).FirstOrDefault(u => u.UserId == verified.Header.CreatedByUserId);
+            summary = new RecordProjectionSummaryResponse(ListRecords.RecordListQuery.ReferenceFor(formRecordId), row?.CreatedOn, row?.ModifiedOn, creator?.DisplayName, verified.Header.CreatedByUserId == context.LocalUserId);
             AuditRecorder.Record(scope, context, clock, AuditCategories.Record, AuditActions.RecordViewed, "verified record projection read", formRecordId, metadata: new { complete = verified.IsComplete, contentRevision = verified.Head.CommittedContentRevision });
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -80,7 +84,8 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed, verified.IsComplete),
             verified.Header.ParentFormRecordId,
             verified.Header.FormRelationshipDefinitionId,
-            verified.ETag);
+            verified.ETag,
+            summary);
     }
 
     /// <summary>

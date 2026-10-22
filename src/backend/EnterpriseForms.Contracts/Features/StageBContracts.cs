@@ -135,9 +135,25 @@ public sealed record CreateRelationshipDefinitionRequest(Guid ChildFormDefinitio
 
 public sealed record CreateRecordV2Request(IReadOnlyDictionary<string, string> Values, Guid? OwnerTeamId = null);
 
-public sealed record RecordListItemResponse(Guid FormRecordId, Guid FormDefinitionId, string FormDefinitionName, string RecordStatus, DateTimeOffset CreatedOn, DateTimeOffset ModifiedOn, Guid? ParentFormRecordId, bool ProjectionVerified);
+/// <summary>
+/// One discoverable record (C-29). The record id comes from the authority; every other property is unverified business
+/// metadata (allowlisted discovery metadata only — never a field value). <c>CanEdit</c> is the authority's current answer.
+/// </summary>
+public sealed record RecordListItemResponse(Guid FormRecordId, Guid FormDefinitionId, string FormDefinitionName, string RecordStatus, DateTimeOffset CreatedOn, DateTimeOffset ModifiedOn, Guid? ParentFormRecordId, bool ProjectionVerified,
+    string RecordReference = "", string? CreatedByDisplayName = null, bool CreatedByCurrentUser = false, bool CanEdit = false);
 
-public sealed record RecordListResponse(IReadOnlyList<RecordListItemResponse> Items, long AuthorizationRevision, string? ContinuationToken);
+public sealed record RecordListFormOption(Guid FormDefinitionId, string FormDefinitionName);
+
+/// <summary>
+/// A page of the caller's discoverable records (C-29). <c>TotalCount</c> counts the listed records matching the filters
+/// — only records the caller may discover, never anything else. <c>ContinuationToken</c> / <c>PreviousToken</c> are
+/// opaque, expiring cursors bound to the caller, organization, filters, sort and authorization revision (PB-06).
+/// <c>UnavailableRecordCount</c>: records the authority lists for the caller that have no business metadata to filter
+/// or sort by; they are reported, never silently dropped (<c>UnavailableRecordIds</c> holds up to 50 of them).
+/// </summary>
+public sealed record RecordListResponse(IReadOnlyList<RecordListItemResponse> Items, long AuthorizationRevision, string? ContinuationToken,
+    int TotalCount = 0, int PageStart = 0, int PageSize = 0, string? PreviousToken = null, IReadOnlyList<RecordListFormOption>? AvailableForms = null,
+    int UnavailableRecordCount = 0, IReadOnlyList<Guid>? UnavailableRecordIds = null, string SortBy = "modifiedOn", string SortDirection = "desc");
 
 public sealed record RecordProjectionResponse(
     FormRecordResponse Record,
@@ -149,7 +165,14 @@ public sealed record RecordProjectionResponse(
     RecordPermissionsResponse Permissions,
     Guid? ParentFormRecordId,
     Guid? FormRelationshipDefinitionId,
-    string ETag);
+    string ETag,
+    RecordProjectionSummaryResponse? Summary = null);
+
+/// <summary>
+/// Record header for the workspace summary (C-30): the same allowlisted metadata as a My Records row. The creator comes
+/// from the verified signed header; the timestamps are unverified business metadata (not part of the signed content).
+/// </summary>
+public sealed record RecordProjectionSummaryResponse(string RecordReference, DateTimeOffset? CreatedOn, DateTimeOffset? ModifiedOn, string? CreatedByDisplayName, bool CreatedByCurrentUser);
 
 public sealed record RecordPermissionsResponse(bool CanRead, bool CanEdit, bool CanManageAccess, bool CanTransferOwnership, bool IsCompleteProjection);
 

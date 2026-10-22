@@ -41,6 +41,8 @@ export type ProblemDetails = {
   command_id?: string;
   command_status?: string;
   retryable?: boolean;
+  /** Record fields a validation failure is about: `fieldKey` or `groupKey[n].fieldKey` (C-31). */
+  field_keys?: string[];
 };
 
 export type OperationSuccess = { type: "succeeded"; operationId: string; status: number; result: unknown; etag?: string };

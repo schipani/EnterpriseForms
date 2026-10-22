@@ -6,6 +6,8 @@ export interface PresentedError {
   title: string;
   detail: string;
   correlationId: string | undefined;
+  /** Record fields named by the server (C-31); empty when the failure is not about specific fields. */
+  fieldKeys: string[];
   kind: "access-denied" | "session-expired" | "not-found" | "conflict" | "validation" | "unavailable" | "other";
 }
 
@@ -45,6 +47,16 @@ const titles: Record<string, string> = {
   NETWORK_ERROR: "The server could not be reached",
   TENANT_SWITCH: "The organization context changed",
   SESSION_CLEARED: "The session was cleared",
+  LIST_CHANGED: "Access changed while you were browsing",
+  CURSOR_INVALID: "This page of the list has expired",
+  CURSOR_SCOPE_MISMATCH: "This page belongs to different filters",
+  RECORD_LIST_TOO_LARGE: "Too many records to list completely",
+  AUTHORIZATION_STATE_CHANGED: "Access changed while this was loading",
+  AUTHORITY_NOT_READY: "Access is being updated",
+  LIMIT_EXCEEDED: "The request is larger than the system allows",
+  FIELD_READ_ONLY: "A read-only field cannot be changed",
+  FIELD_HIDDEN_BY_RULE: "A hidden field cannot be changed",
+  DEPENDENT_OPTION_INVALID: "A choice does not fit the selected parent value",
 };
 
 /** Maps a coordinator failure into safe, user-facing copy. Internal details stay in the correlation id only. */
@@ -53,7 +65,7 @@ export function presentError(error: unknown): PresentedError {
     const code = error.errorCode;
     const status = error.status;
     const kind: PresentedError["kind"] = status === 401 ? "session-expired" : status === 403 ? "access-denied" : status === 404 ? "not-found" : status === 409 || status === 412 || status === 428 ? "conflict" : status === 400 || status === 422 ? "validation" : status === 503 || status === 0 ? "unavailable" : "other";
-    return { code, status, title: titles[code] ?? (kind === "unavailable" ? "The service is temporarily unavailable" : "The request failed"), detail: error.problem?.detail ?? error.message, correlationId: error.correlationId, kind };
+    return { code, status, title: titles[code] ?? (kind === "unavailable" ? "The service is temporarily unavailable" : "The request failed"), detail: error.problem?.detail ?? error.message, correlationId: error.correlationId, fieldKeys: Array.isArray(error.problem?.field_keys) ? error.problem.field_keys.filter((key): key is string => typeof key === "string") : [], kind };
   }
-  return { code: "UNKNOWN", status: 0, title: "Something went wrong", detail: error instanceof Error ? error.message : String(error), correlationId: undefined, kind: "other" };
+  return { code: "UNKNOWN", status: 0, title: "Something went wrong", detail: error instanceof Error ? error.message : String(error), correlationId: undefined, fieldKeys: [], kind: "other" };
 }

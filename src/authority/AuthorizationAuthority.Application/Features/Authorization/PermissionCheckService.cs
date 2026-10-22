@@ -89,6 +89,18 @@ public sealed class PermissionCheckService(IAuthorityStore store, ISpiceDbProjec
         throw AuthorityException.NotReady("authorization state moved during check");
     }
 
+    /// <summary>
+    /// Upper bound of discoverable records per user and organization. Above it discovery fails closed with
+    /// <c>LIMIT_EXCEEDED</c> instead of returning a truncated set (C-28).
+    /// </summary>
+    public const int MaximumDiscoverableRecords = 50_000;
+
+    /// <summary>
+    /// Discoverable records = registered active records ∩ SpiceDB <c>discover</c> lookup at the authority-held token,
+    /// paged by sorted id. The lookup is enumerated completely (never capped and truncated); like a permission check the
+    /// gate is re-read afterwards, so a set evaluated while the authorization state moved is never returned (C-28). A
+    /// continuation token is bound to the revision it was issued at; a later revision invalidates it with a distinct code.
+    /// </summary>
     public async Task<DiscoverResponse> DiscoverAsync(VerifiedActor actor, DiscoverRecordsRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -103,22 +115,52 @@ public sealed class PermissionCheckService(IAuthorityStore store, ISpiceDbProjec
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
-        var registered = (await scope.GetActiveRecordIdsAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)).ToHashSet();
-        var lookedUp = await spiceDb.LookupResourcesAsync(ResourceTypeNames.FormRecord, "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D"), state.ProjectionZedToken!, 1000, cancellationToken).ConfigureAwait(false);
-        var ids = lookedUp.Select(Guid.Parse).Where(registered.Contains).OrderBy(id => id).ToList();
-
         var skip = 0;
         if (!string.IsNullOrEmpty(request.ContinuationToken))
         {
             var parts = request.ContinuationToken.Split(':');
-            if (parts.Length != 2 || !long.TryParse(parts[0], out var tokenRevision) || tokenRevision != state.AuthorizationRevision || !int.TryParse(parts[1], out skip))
+            if (parts.Length != 2 || !long.TryParse(parts[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var tokenRevision)
+                || !int.TryParse(parts[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out skip))
             {
-                throw AuthorityException.Invalid("continuation token invalidated by an authorization revision change");
+                throw AuthorityException.Invalid("continuation token malformed");
+            }
+
+            if (tokenRevision != state.AuthorizationRevision)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.ContinuationInvalidated, 409, true, "continuation token invalidated by an authorization revision change; restart from the first page");
             }
         }
 
+        var registered = (await scope.GetActiveRecordIdsAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)).ToHashSet();
+        IReadOnlyList<string> lookedUp;
+        try
+        {
+            lookedUp = await spiceDb.LookupResourcesAsync(ResourceTypeNames.FormRecord, "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D"), state.ProjectionZedToken!, MaximumDiscoverableRecords, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SpiceDbLookupLimitExceededException)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, $"more than {MaximumDiscoverableRecords} discoverable records; nothing partial is returned");
+        }
+
+        // Re-read: the lookup ran at the token of `state`; if the authoritative state moved meanwhile, fail closed (retryable).
+        var after = await scope.ReadOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false);
+        if (after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision || after.IntegrityQuarantineEnabled)
+        {
+            throw AuthorityException.NotReady("authorization state moved during discovery");
+        }
+
+        var ids = new List<Guid>(lookedUp.Count);
+        foreach (var value in lookedUp)
+        {
+            if (Guid.TryParse(value, out var id) && registered.Contains(id))
+            {
+                ids.Add(id);
+            }
+        }
+
+        ids.Sort();
         var page = ids.Skip(skip).Take(request.PageSize).ToList();
-        var next = skip + page.Count < ids.Count ? $"{state.AuthorizationRevision}:{skip + page.Count}" : null;
+        var next = skip + page.Count < ids.Count ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{state.AuthorizationRevision}:{skip + page.Count}") : null;
         return new DiscoverResponse(page, state.AuthorizationRevision, next);
     }
 

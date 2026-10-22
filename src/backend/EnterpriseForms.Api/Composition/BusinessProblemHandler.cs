@@ -18,6 +18,12 @@ public sealed class BusinessProblemHandler : IExceptionHandler
         {
             case BusinessException ex:
                 problem = Build(ex.HttpStatusCode, ex.ErrorCode, ex.Message);
+                if (ex.FieldKeys.Count > 0)
+                {
+                    // Field keys of the caller's own submission (never values): lets the form mark the exact fields (C-31).
+                    problem.Extensions["field_keys"] = ex.FieldKeys;
+                }
+
                 break;
             case AuthorityClientException ex:
                 problem = Build(ex.HttpStatusCode, ex.ErrorCode, ex.Message);

@@ -23,6 +23,9 @@ public sealed class SpiceDbOptions
     public bool UseTls { get; set; }
 
     public int TimeoutSeconds { get; set; } = 5;
+
+    /// <summary>Results per LookupResources page; enumeration continues with cursors until exhausted (C-28).</summary>
+    public int LookupPageSize { get; set; } = 1000;
 }
 
 /// <summary>
@@ -35,6 +38,7 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
     private const string CursorRelation = "projection_cursor";
     private readonly Lazy<(GrpcChannel Channel, PermissionsService.PermissionsServiceClient Permissions, SchemaService.SchemaServiceClient Schema, Metadata Headers)> connection;
     private readonly TimeSpan timeout;
+    private readonly int lookupPageSize;
     private readonly string? configurationError;
 
     public SpiceDbProjectionClient(IOptions<SpiceDbOptions> options)
@@ -47,6 +51,7 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         }
 
         timeout = TimeSpan.FromSeconds(Math.Max(1, value.TimeoutSeconds));
+        lookupPageSize = Math.Clamp(value.LookupPageSize, 1, 10_000);
         connection = new Lazy<(GrpcChannel, PermissionsService.PermissionsServiceClient, SchemaService.SchemaServiceClient, Metadata)>(() =>
         {
             if (configurationError is not null)
@@ -271,33 +276,64 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         }
     }
 
-    public async Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, string zedToken, int limit, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, string zedToken, int maximumResults, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(zedToken))
         {
             throw new SpiceDbUnavailableException("no authority-held ZedToken; projection not confirmed");
         }
 
+        // Cursor-paged (C-28). Every page repeats the same request (SpiceDB binds a cursor to the request, consistency
+        // included); a cursor also carries the snapshot revision of the first page, so the pages form one consistent view.
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        Cursor? cursor = null;
         try
         {
-            using var call = Permissions.LookupResources(new LookupResourcesRequest
+            while (true)
             {
-                Consistency = new Consistency { AtLeastAsFresh = new ZedToken { Token = zedToken } },
-                ResourceObjectType = resourceType,
-                Permission = permission,
-                Subject = new SubjectReference { Object = new ObjectReference { ObjectType = subjectType, ObjectId = subjectId } },
-                OptionalLimit = (uint)limit,
-            }, Options(cancellationToken));
-            var ids = new List<string>();
-            await foreach (var response in call.ResponseStream.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-            {
-                if (response.Permissionship == LookupPermissionship.HasPermission)
+                var request = new LookupResourcesRequest
                 {
-                    ids.Add(response.ResourceObjectId);
+                    Consistency = new Consistency { AtLeastAsFresh = new ZedToken { Token = zedToken } },
+                    ResourceObjectType = resourceType,
+                    Permission = permission,
+                    Subject = new SubjectReference { Object = new ObjectReference { ObjectType = subjectType, ObjectId = subjectId } },
+                    OptionalLimit = (uint)lookupPageSize,
+                };
+                if (cursor is not null)
+                {
+                    request.OptionalCursor = cursor;
+                }
+
+                var received = 0;
+                using (var call = Permissions.LookupResources(request, Options(cancellationToken)))
+                {
+                    await foreach (var response in call.ResponseStream.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        received++;
+                        cursor = response.AfterResultCursor;
+                        // Conditional (caveated) permission is not permission: it is never listed (fail closed).
+                        if (response.Permissionship == LookupPermissionship.HasPermission && seen.Add(response.ResourceObjectId))
+                        {
+                            ids.Add(response.ResourceObjectId);
+                            if (ids.Count > maximumResults)
+                            {
+                                throw new SpiceDbLookupLimitExceededException($"more than {maximumResults} {resourceType} results");
+                            }
+                        }
+                    }
+                }
+
+                if (received < lookupPageSize)
+                {
+                    return ids;
+                }
+
+                if (cursor is null)
+                {
+                    throw new SpiceDbUnavailableException("LookupResources returned a full page without a cursor");
                 }
             }
-
-            return ids;
         }
         catch (RpcException ex)
         {

@@ -156,7 +156,7 @@ public static class FieldValueCodec
             .ToList();
         if (missing.Count > 0)
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, "required fields missing: " + string.Join(", ", missing));
+            throw new BusinessException("VALIDATION_FAILED", 422, "required fields missing: " + string.Join(", ", missing)) { FieldKeys = missing };
         }
     }
 
@@ -165,12 +165,12 @@ public static class FieldValueCodec
         var max = v.MaxLength ?? 4000;
         if (value.Length > max || value.Length < (v.MinLength ?? 0))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' length must be {v.MinLength ?? 0}..{max}");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' length must be {v.MinLength ?? 0}..{max}") { FieldKeys = [field.FieldKey] };
         }
 
         if (v.Pattern is not null && !Regex.IsMatch(value, "^(?:" + v.Pattern + ")$", RegexOptions.None, TimeSpan.FromMilliseconds(100)))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' does not match the required pattern");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' does not match the required pattern") { FieldKeys = [field.FieldKey] };
         }
 
         return value;
@@ -180,12 +180,12 @@ public static class FieldValueCodec
     {
         if (!long.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var parsed))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be an integer");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be an integer") { FieldKeys = [field.FieldKey] };
         }
 
         if (parsed < (v.Minimum ?? long.MinValue) || parsed > (v.Maximum ?? long.MaxValue))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside {v.Minimum}..{v.Maximum}");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside {v.Minimum}..{v.Maximum}") { FieldKeys = [field.FieldKey] };
         }
 
         return parsed;
@@ -195,12 +195,12 @@ public static class FieldValueCodec
     {
         if (!decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsed) || decimal.Round(parsed, 4) != parsed || Math.Abs(parsed) >= 1_000_000_000_000_000m)
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be a decimal with at most 4 fraction digits");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be a decimal with at most 4 fraction digits") { FieldKeys = [field.FieldKey] };
         }
 
         if (parsed < (v.Minimum ?? decimal.MinValue) || parsed > (v.Maximum ?? decimal.MaxValue))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside {v.Minimum}..{v.Maximum}");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside {v.Minimum}..{v.Maximum}") { FieldKeys = [field.FieldKey] };
         }
 
         return parsed;
@@ -210,12 +210,12 @@ public static class FieldValueCodec
     {
         if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be an ISO date (yyyy-MM-dd)");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be an ISO date (yyyy-MM-dd)") { FieldKeys = [field.FieldKey] };
         }
 
         if (parsed < (v.MinDate ?? DateOnly.MinValue) || parsed > (v.MaxDate ?? DateOnly.MaxValue))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside the permitted date range");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside the permitted date range") { FieldKeys = [field.FieldKey] };
         }
 
         return parsed;
@@ -226,13 +226,13 @@ public static class FieldValueCodec
     {
         if (!DateTimeOffset.TryParseExact(value, ["yyyy-MM-dd'T'HH:mm:ssK", "yyyy-MM-dd'T'HH:mmK"], CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsed))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be an ISO 8601 instant with offset (yyyy-MM-ddTHH:mm:ssZ)");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be an ISO 8601 instant with offset (yyyy-MM-ddTHH:mm:ssZ)") { FieldKeys = [field.FieldKey] };
         }
 
         var date = DateOnly.FromDateTime(parsed.UtcDateTime);
         if (date < (v.MinDate ?? DateOnly.MinValue) || date > (v.MaxDate ?? DateOnly.MaxValue))
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside the permitted date range");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' is outside the permitted date range") { FieldKeys = [field.FieldKey] };
         }
 
         return new DateTimeOffset(parsed.UtcDateTime, TimeSpan.Zero);
@@ -242,7 +242,7 @@ public static class FieldValueCodec
     {
         if (!Guid.TryParseExact(value, "D", out var parsed) || parsed == Guid.Empty)
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be a non-empty UUID in canonical form");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' must be a non-empty UUID in canonical form") { FieldKeys = [field.FieldKey] };
         }
 
         return parsed;
@@ -260,12 +260,12 @@ public static class FieldValueCodec
         var option = options.FirstOrDefault(o => o.FieldDefinitionId == field.FieldDefinitionId && o.OptionKey == value);
         if (option is null)
         {
-            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' has no option '{value}'");
+            throw new BusinessException("VALIDATION_FAILED", 422, $"field '{field.FieldKey}' has no option '{value}'") { FieldKeys = [field.FieldKey] };
         }
 
         if (!option.IsActive)
         {
-            throw new BusinessException("ORGANIZATION_OPTION_DISABLED", 422, $"option '{value}' of field '{field.FieldKey}' is no longer available");
+            throw new BusinessException("ORGANIZATION_OPTION_DISABLED", 422, $"option '{value}' of field '{field.FieldKey}' is no longer available") { FieldKeys = [field.FieldKey] };
         }
 
         return option.FieldOptionId;

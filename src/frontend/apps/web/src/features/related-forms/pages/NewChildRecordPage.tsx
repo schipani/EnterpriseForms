@@ -30,7 +30,7 @@ export function NewChildRecordPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["related", formRecordId] });
       await queryClient.invalidateQueries({ queryKey: ["records"] });
-      await navigate({ to: "/app/records/$formRecordId", params: { formRecordId } });
+      await navigate({ to: "/app/records/$formRecordId", params: { formRecordId }, search: { tab: "related" } });
     },
   });
   if (parent.isPending || (relationship && childForm.isPending)) {
@@ -83,7 +83,7 @@ export function NewChildRecordPage() {
           <Button type="submit" busy={create.isPending}>
             Add {relationship.childFormDefinitionName}
           </Button>
-          <Link to="/app/records/$formRecordId" params={{ formRecordId }}>
+          <Link to="/app/records/$formRecordId" params={{ formRecordId }} search={{ tab: "related" }}>
             <Button variant="secondary">Cancel</Button>
           </Link>
         </div>

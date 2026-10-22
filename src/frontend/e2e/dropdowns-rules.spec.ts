@@ -301,7 +301,7 @@ test.describe.serial("Phase C2: conditional rules, Show in form and Read-only", 
     await page.getByRole("button", { name: "Create record" }).click();
     await expect(page.getByText("Integrity: Verified")).toBeVisible();
     await expect(page.getByText("Acme Browser Ltd")).toBeVisible();
-    await expect(page.getByText("Draft", { exact: true })).toBeVisible(); // read-only default applied
+    await expect(page.getByRole("tabpanel", { name: "Details" }).getByText("Draft", { exact: true })).toBeVisible(); // read-only default applied (the record summary also shows the record status "Draft")
     recordUrl = page.url();
     const recordId = /\/app\/records\/([0-9a-f-]{36})/.exec(recordUrl)![1]!;
 

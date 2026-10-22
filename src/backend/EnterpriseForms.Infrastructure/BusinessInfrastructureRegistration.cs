@@ -12,7 +12,6 @@ using EnterpriseForms.Application.Features.FormDesigner;
 using EnterpriseForms.Application.Features.FormDesigner.OptionLists;
 using EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 using EnterpriseForms.Application.Features.FormRecords.GetFormRecord;
-using EnterpriseForms.Application.Features.FormRecords.ListRecords;
 using EnterpriseForms.Application.Features.FormRecords.Projection;
 using EnterpriseForms.Application.Features.FormRecords.Staging;
 using EnterpriseForms.Infrastructure.Features.FormRecords;
@@ -62,7 +61,6 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<GetFormRecordHandler>();
         services.AddSingleton<GetRecordProjectionHandler>();
         services.AddSingleton<UpdateFormRecordHandler>();
-        services.AddSingleton<ListRecordsHandler>();
         services.AddSingleton<TransferOwnershipHandler>();
         services.AddSingleton<ChildRecordHandlers>();
         services.AddSingleton<CreateShareHandler>();
