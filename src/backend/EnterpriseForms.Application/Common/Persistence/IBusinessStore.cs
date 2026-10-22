@@ -134,6 +134,17 @@ public interface IBusinessScope : IAsyncDisposable
     /// </summary>
     Task<bool> ProjectAcceptedHeadAsync(Guid tenantId, Guid formRecordId, long acceptedContentRevision, Guid? acceptedOperationId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Projects the lifecycle status of the Authority-verified signed header onto form_records (record_status, submitted_on)
+    /// only while the projected revision still equals <paramref name="atContentRevision"/>, so a slower writer never
+    /// overwrites a newer revision's status. The projection serves listing and filtering only; every lifecycle decision
+    /// uses the verified header. Returns true when the row changed. The caller commits.
+    /// </summary>
+    Task<bool> ProjectLifecycleAsync(Guid tenantId, Guid formRecordId, long atContentRevision, string recordStatus, DateTimeOffset? submittedOn, CancellationToken cancellationToken);
+
+    /// <summary>Upload sessions of the record that could still add a document (open, completed or processed and not yet committed, within the session lifetime).</summary>
+    Task<int> CountInFlightUploadSessionsAsync(Guid tenantId, Guid formRecordId, DateTimeOffset notBefore, CancellationToken cancellationToken);
+
     Task<List<FormRecord>> GetFormRecordsAsync(Guid tenantId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
 
     void AddFormRecord(FormRecord record);

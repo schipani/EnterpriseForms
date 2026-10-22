@@ -27,6 +27,7 @@ export function RecordsPage() {
     ...(search.form ? { formDefinitionId: search.form } : {}),
     ...(search.status ? { recordStatus: search.status } : {}),
     ...(search.children ? { includeChildren: true } : {}),
+    ...(search.archived ? { includeArchived: true } : {}),
     sortBy: sort.sortBy,
     sortDirection: sort.sortDirection,
     pageSize,
@@ -55,7 +56,7 @@ export function RecordsPage() {
     setRestarted(false);
     void navigate({ to: "/app/records", search: (current: RecordsSearch) => clean({ ...current, ...next }) });
   };
-  const filtered = Boolean(search.form || search.status || search.children);
+  const filtered = Boolean(search.form || search.status || search.children || search.archived);
   const data = records.data;
   const rows = data?.items ?? [];
   const formOptions = data?.availableForms ?? [];
@@ -105,9 +106,12 @@ export function RecordsPage() {
           <Select label="Rows per page" value={String(pageSize)} options={["10", "25", "50", "100"].map((size) => ({ value: size, label: size }))} onValueChange={(value) => update({ size: value === "25" ? undefined : Number(value) })} />
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <Checkbox label="Include related (child) records" checked={Boolean(search.children)} onCheckedChange={(checked) => update({ children: checked ? true : undefined })} />
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <Checkbox label="Include related (child) records" checked={Boolean(search.children)} onCheckedChange={(checked) => update({ children: checked ? true : undefined })} />
+            <Checkbox label="Include archived records" checked={Boolean(search.archived) || search.status === "Archived"} disabled={search.status === "Archived"} onCheckedChange={(checked) => update({ archived: checked ? true : undefined })} />
+          </div>
           {filtered || search.sort || search.size ? (
-            <Button variant="ghost" size="sm" onClick={() => update({ form: undefined, status: undefined, children: undefined, sort: undefined, size: undefined })}>
+            <Button variant="ghost" size="sm" onClick={() => update({ form: undefined, status: undefined, children: undefined, archived: undefined, sort: undefined, size: undefined })}>
               Clear filters
             </Button>
           ) : null}
@@ -138,7 +142,7 @@ export function RecordsPage() {
         ) : null}
         {data && total === 0 ? (
           filtered ? (
-            <EmptyState title="No records match these filters" actions={<Button variant="secondary" onClick={() => update({ form: undefined, status: undefined, children: undefined })}>Clear filters</Button>}>
+            <EmptyState title="No records match these filters" actions={<Button variant="secondary" onClick={() => update({ form: undefined, status: undefined, children: undefined, archived: undefined })}>Clear filters</Button>}>
               Try another form or status, or include related records.
             </EmptyState>
           ) : (
@@ -197,7 +201,7 @@ export function RecordsPage() {
                               Open
                             </Button>
                           </Link>
-                          {row.canEdit ? (
+                          {row.canEdit && row.recordStatus === "Draft" ? (
                             <Link to="/app/records/$formRecordId/edit" params={{ formRecordId: row.formRecordId }} aria-label={`Edit ${row.formDefinitionName} ${row.recordReference}`}>
                               <Button size="sm" variant="secondary">
                                 Edit

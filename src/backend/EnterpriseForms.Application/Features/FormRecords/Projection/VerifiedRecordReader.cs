@@ -134,7 +134,10 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
 
             // Phase C6 M0 (S2): the head just verified by the Authority is projected onto form_records (monotonic, atomic), so a
             // projection left stale by a lost commit response is repaired by the next verified read. Not a modification of the record.
-            if (await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, verification.CommittedContentRevision, verification.CommittedOperationId, cancellationToken).ConfigureAwait(false))
+            // Phase C6 M1: the verified signed header's lifecycle status is projected too (listing/filtering only), at the verified revision.
+            var headChanged = await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, verification.CommittedContentRevision, verification.CommittedOperationId, cancellationToken).ConfigureAwait(false);
+            var statusChanged = await scope.ProjectLifecycleAsync(context.OrganizationId, formRecordId, verification.CommittedContentRevision, staged.Header.RecordStatus, staged.Header.SubmittedOn, cancellationToken).ConfigureAwait(false);
+            if (headChanged || statusChanged)
             {
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             }

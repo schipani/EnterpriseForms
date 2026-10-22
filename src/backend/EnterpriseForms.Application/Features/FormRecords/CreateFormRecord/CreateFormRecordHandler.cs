@@ -19,7 +19,7 @@ namespace EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 /// Effective → typed, validated candidate v1 → staged → committed head. Local projections (record, link, audit) are
 /// written only after the authority command is Effective.
 /// </summary>
-public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption)
+public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption, Projection.VerifiedRecordReader reader)
 {
     public Task<FormRecordResponse> HandleAsync(RequestContext context, Guid formDefinitionId, CreateFormRecordRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
@@ -60,6 +60,9 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         {
             throw new BusinessException("NOT_FOUND", 404, "parent record not found");
         }
+
+        // Phase C6 M1: child items are part of the parent's content, so a Submitted or Archived parent is locked (OD-02).
+        Lifecycle.RecordLifecycle.RequireContentEditable(await reader.ReadAsync(context, parentFormRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false));
 
         return await CreateAsync(context, relationship.ChildFormDefinitionId, request.Values, request.Groups, null, (parentFormRecordId, relationship, existingCount + 1), idempotencyKey, cancellationToken).ConfigureAwait(false);
     }

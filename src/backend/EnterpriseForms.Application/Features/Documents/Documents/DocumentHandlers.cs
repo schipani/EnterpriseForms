@@ -117,6 +117,8 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             throw new BusinessException("FORBIDDEN", 403, "removing documents requires record ownership");
         }
 
+        FormRecords.Lifecycle.RecordLifecycle.RequireContentEditable(verified);
+
         if (request.ExpectedContentRevision != verified.Head.CommittedContentRevision)
         {
             throw new BusinessException("CONTENT_REVISION_CONFLICT", 409, "expected_content_revision is stale");

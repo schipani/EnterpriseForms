@@ -28,9 +28,9 @@ public static class FormRecordEndpoints
 
         var records = endpoints.MapGroup(ApiVersions.V1Prefix + "/form-records").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
 
-        records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, string? recordStatus, bool? includeChildren, string? sortBy, string? sortDirection, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
+        records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, string? recordStatus, bool? includeChildren, bool? includeArchived, string? sortBy, string? sortDirection, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
             {
-                var query = RecordListQuery.Create(formDefinitionId, recordStatus, includeChildren ?? false, sortBy, sortDirection, pageSize ?? 25);
+                var query = RecordListQuery.Create(formDefinitionId, recordStatus, includeChildren ?? false, sortBy, sortDirection, pageSize ?? 25, includeArchived ?? false);
                 return TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), query, continuationToken, cancellationToken).ConfigureAwait(false));
             })
             .WithName("ListFormRecords")
@@ -66,6 +66,21 @@ public static class FormRecordEndpoints
             .WithName("UpdateFormRecord")
             .WithSummary("Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority.");
 
+        foreach (var transition in new[] { Application.Features.FormRecords.Lifecycle.RecordLifecycle.Submit, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Reopen, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Archive, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Unarchive })
+        {
+            var captured = transition;
+            records.MapPost("/{formRecordId:guid}/" + captured.ToLowerInvariant(), async Task<Ok<RecordLifecycleResponse>> (Guid formRecordId, RecordLifecycleRequest request, HttpContext http, Application.Features.FormRecords.Lifecycle.RecordLifecycleHandler handler, CancellationToken cancellationToken) =>
+                {
+                    var context = BusinessAuthentication.RequireContext(http);
+                    var effective = RequireIfMatchRevision(http, request);
+                    var response = await handler.HandleAsync(context, formRecordId, captured, effective, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false);
+                    http.Response.Headers.ETag = response.ETag;
+                    return TypedResults.Ok(response);
+                })
+                .WithName(captured + "FormRecord")
+                .WithSummary($"Lifecycle transition '{captured}' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.");
+        }
+
         records.MapPost("/{formRecordId:guid}/transfer-ownership", static async Task<Ok<CommandStatusResponse>> (Guid formRecordId, TransferOwnershipRequest request, HttpContext http, TransferOwnershipHandler handler, CancellationToken cancellationToken) =>
             {
                 var context = BusinessAuthentication.RequireContext(http);
@@ -74,6 +89,13 @@ public static class FormRecordEndpoints
             .WithName("TransferRecordOwnership");
 
         return endpoints;
+    }
+
+    /// <summary>Lifecycle transitions: the same If-Match rule as updates (the header may carry the content-revision ETag).</summary>
+    internal static RecordLifecycleRequest RequireIfMatchRevision(HttpContext http, RecordLifecycleRequest request)
+    {
+        var carrier = RequireIfMatchRevision(http, new UpdateFormRecordRequest(request.ExpectedContentRevision, new Dictionary<string, string>()));
+        return request with { ExpectedContentRevision = carrier.ExpectedContentRevision };
     }
 
     /// <summary>PB-06: `If-Match: "revision"` overrides/validates the body revision; 412 on mismatch between the two.</summary>

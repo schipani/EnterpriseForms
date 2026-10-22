@@ -14,6 +14,7 @@ export type RecordListQuery = {
   formDefinitionId?: string;
   recordStatus?: string;
   includeChildren?: boolean;
+  includeArchived?: boolean;
   sortBy?: "modifiedOn" | "createdOn" | "formName" | "recordStatus";
   sortDirection?: "asc" | "desc";
   pageSize?: number;
@@ -49,6 +50,10 @@ export type FieldProtectionResponse = S["FieldProtectionResponse"];
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
 export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
 export type FieldProtectionVerificationResponse = S["FieldProtectionVerificationResponse"];
+export type RecordLifecycleRequest = S["RecordLifecycleRequest"];
+export type RecordLifecycleResponse = S["RecordLifecycleResponse"];
+export type RecordLifecycleStateResponse = S["RecordLifecycleStateResponse"];
+export type RecordLifecycleTransition = "submit" | "reopen" | "archive" | "unarchive";
 export type RetryFieldProtectionMigrationRequest = S["RetryFieldProtectionMigrationRequest"];
 export type ReclassifyFieldRequest = S["ReclassifyFieldRequest"];
 export type DowngradeFieldProtectionRequest = S["DowngradeFieldProtectionRequest"];
@@ -168,6 +173,7 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       list: (query: RecordListQuery, signal?: AbortSignal) => read<RecordListResponse>("records.list", undefined, query, "interactive-read", signal),
       create: (formDefinitionId: string, request: CreateFormRecordRequest) => write<FormRecordResponse>("POST", "records.create", { formDefinitionId }, request, { idempotent: true }),
       projection: (formRecordId: string, signal?: AbortSignal) => read<RecordProjectionResponse>("records.projection", { formRecordId }, undefined, "interactive-read", signal),
+      lifecycle: (transition: RecordLifecycleTransition, formRecordId: string, request: RecordLifecycleRequest) => write<RecordLifecycleResponse>("POST", `records.${transition}`, { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
       update: (formRecordId: string, request: UpdateFormRecordRequest) => write<FormRecordResponse>("PATCH", "records.update", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
     },
     related: {

@@ -34,6 +34,10 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
 
         // The current accepted content must verify before it is used as the base of a new candidate (no building on tampered rows).
         var verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false);
+
+        // Phase C6 M1: a Submitted or Archived record rejects ordinary content edits, for owners and shared contributors alike
+        // (decided on the Authority-verified signed header, not on the unsigned status projection).
+        Lifecycle.RecordLifecycle.RequireContentEditable(verified);
         if (request.ExpectedContentRevision != verified.Head.CommittedContentRevision)
         {
             throw new BusinessException("CONTENT_REVISION_CONFLICT", 409, "expected_content_revision is stale");

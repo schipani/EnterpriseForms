@@ -3,6 +3,7 @@ export interface RecordsSearch {
   form?: string | undefined;
   status?: string | undefined;
   children?: boolean | undefined;
+  archived?: boolean | undefined;
   sort?: string | undefined;
   size?: number | undefined;
 }
@@ -48,6 +49,9 @@ export function parseRecordsSearch(search: Record<string, unknown>): RecordsSear
   }
   if (search["children"] === true || search["children"] === "true") {
     result.children = true;
+  }
+  if (search["archived"] === true || search["archived"] === "true") {
+    result.archived = true;
   }
   if (typeof search["sort"] === "string" && SORT_CHOICES.some((choice) => choice.key === search["sort"])) {
     result.sort = search["sort"];

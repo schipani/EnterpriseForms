@@ -567,6 +567,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-records/{formRecordId}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lifecycle transition 'Submit' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status. */
+        post: operations["SubmitFormRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lifecycle transition 'Reopen' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status. */
+        post: operations["ReopenFormRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lifecycle transition 'Archive' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status. */
+        post: operations["ArchiveFormRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lifecycle transition 'Unarchive' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status. */
+        post: operations["UnarchiveFormRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-records/{formRecordId}/transfer-ownership": {
         parameters: {
             query?: never;
@@ -1637,6 +1705,34 @@ export interface components {
             groupKey: string;
             occurrences: components["schemas"]["RecordOccurrenceValuesRequest"][];
         };
+        RecordLifecycleRequest: {
+            /** Format: int64 */
+            expectedContentRevision: number | string;
+            expectedStatus?: null | string;
+            reason?: null | string;
+        };
+        RecordLifecycleResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            transition: string;
+            previousStatus: string;
+            status: string;
+            /** Format: date-time */
+            submittedOn: null | string;
+            /** Format: int64 */
+            contentRevision: number | string;
+            /** Format: uuid */
+            committedOperationId: null | string;
+            eTag: string;
+            allowedTransitions: string[];
+        };
+        RecordLifecycleStateResponse: {
+            status: string;
+            /** Format: date-time */
+            submittedOn: null | string;
+            allowedTransitions: string[];
+            contentEditable: boolean;
+        };
         RecordListFormOption: {
             /** Format: uuid */
             formDefinitionId: string;
@@ -1736,6 +1832,7 @@ export interface components {
             eTag: string;
             summary?: null | components["schemas"]["RecordProjectionSummaryResponse"];
             sharedFieldAccess?: null | components["schemas"]["SharedFieldAccessResponse"][];
+            lifecycle?: null | components["schemas"]["RecordLifecycleStateResponse"];
         };
         RecordProjectionSummaryResponse: {
             recordReference: string;
@@ -2805,6 +2902,7 @@ export interface operations {
                 formDefinitionId?: string;
                 recordStatus?: string;
                 includeChildren?: boolean;
+                includeArchived?: boolean;
                 sortBy?: string;
                 sortDirection?: string;
                 pageSize?: number | string;
@@ -2893,6 +2991,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecordProjectionResponse"];
+                };
+            };
+        };
+    };
+    SubmitFormRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordLifecycleResponse"];
+                };
+            };
+        };
+    };
+    ReopenFormRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordLifecycleResponse"];
+                };
+            };
+        };
+    };
+    ArchiveFormRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordLifecycleResponse"];
+                };
+            };
+        };
+    };
+    UnarchiveFormRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordLifecycleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordLifecycleResponse"];
                 };
             };
         };

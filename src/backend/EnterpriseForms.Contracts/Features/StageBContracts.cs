@@ -188,7 +188,8 @@ public sealed record RecordProjectionResponse(
     Guid? FormRelationshipDefinitionId,
     string ETag,
     RecordProjectionSummaryResponse? Summary = null,
-    IReadOnlyList<SharedFieldAccessResponse>? SharedFieldAccess = null);
+    IReadOnlyList<SharedFieldAccessResponse>? SharedFieldAccess = null,
+    RecordLifecycleStateResponse? Lifecycle = null);
 
 /// <summary>
 /// Phase C5: for a share editor's partial projection, whether each readable field can be changed and, if not, why
@@ -204,6 +205,20 @@ public sealed record SharedFieldAccessResponse(string FieldKey, bool Editable, s
 public sealed record RecordProjectionSummaryResponse(string RecordReference, DateTimeOffset? CreatedOn, DateTimeOffset? ModifiedOn, string? CreatedByDisplayName, bool CreatedByCurrentUser);
 
 /// <summary><c>CanEditSharedFields</c> (Phase C5): a share editor may change at least one shared value now; <c>ContributorWritesEnabled</c> reports the Authority's switch (D10).</summary>
+/// <summary>
+/// Lifecycle state from the Authority-verified signed header (Phase C6 M1). <c>Status</c> is Draft, Submitted or Archived
+/// (also for a partial share projection: status is not field content). <c>AllowedTransitions</c> lists what the caller may
+/// start now (owner only); <c>ContentEditable</c> is false once the record is Submitted or Archived. Advisory for the UI —
+/// the server decides every transition and every content write again.
+/// </summary>
+public sealed record RecordLifecycleStateResponse(string Status, DateTimeOffset? SubmittedOn, IReadOnlyList<string> AllowedTransitions, bool ContentEditable);
+
+/// <summary>Request of a lifecycle transition. <c>ExpectedStatus</c> guards against acting on a stale view; <c>Reason</c> is mandatory for Reopen (1..500 characters) and optional for Archive.</summary>
+public sealed record RecordLifecycleRequest(long ExpectedContentRevision, string? ExpectedStatus = null, string? Reason = null);
+
+/// <summary>Result of a committed lifecycle transition (the new accepted revision and the state it produced).</summary>
+public sealed record RecordLifecycleResponse(Guid FormRecordId, string Transition, string PreviousStatus, string Status, DateTimeOffset? SubmittedOn, long ContentRevision, Guid? CommittedOperationId, string ETag, IReadOnlyList<string> AllowedTransitions);
+
 public sealed record RecordPermissionsResponse(bool CanRead, bool CanEdit, bool CanManageAccess, bool CanTransferOwnership, bool IsCompleteProjection, bool CanEditSharedFields = false, bool ContributorWritesEnabled = false);
 
 public sealed record CreateChildRecordRequest(Guid FormRelationshipDefinitionId, IReadOnlyDictionary<string, string> Values, IReadOnlyList<RecordGroupValuesRequest>? Groups = null);

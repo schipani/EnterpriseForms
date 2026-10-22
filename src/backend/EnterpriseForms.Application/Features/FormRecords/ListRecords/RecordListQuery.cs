@@ -12,7 +12,7 @@ namespace EnterpriseForms.Application.Features.FormRecords.ListRecords;
 /// over the caller's complete authorized set (authority-sourced ids) joined with business metadata — never over a single
 /// authority page — so ordering is deterministic across pages (record id is the final tie-break).
 /// </summary>
-public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatus, bool IncludeChildren, string SortBy, string SortDirection, int PageSize)
+public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatus, bool IncludeChildren, string SortBy, string SortDirection, int PageSize, bool IncludeArchived = false)
 {
     public const int MaximumPageSize = 100;
 
@@ -20,7 +20,7 @@ public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatu
 
     public static readonly IReadOnlyList<string> Statuses = ["Draft", "Submitted", "Archived", "Deleted"];
 
-    public static RecordListQuery Create(Guid? formDefinitionId, string? recordStatus, bool includeChildren, string? sortBy, string? sortDirection, int pageSize)
+    public static RecordListQuery Create(Guid? formDefinitionId, string? recordStatus, bool includeChildren, string? sortBy, string? sortDirection, int pageSize, bool includeArchived = false)
     {
         var sort = string.IsNullOrEmpty(sortBy) ? "modifiedOn" : sortBy;
         if (!SortFields.Contains(sort, StringComparer.Ordinal))
@@ -39,13 +39,13 @@ public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatu
             throw new BusinessException("INVALID_REQUEST", 422, "recordStatus must be one of: " + string.Join(", ", Statuses));
         }
 
-        return new RecordListQuery(formDefinitionId, recordStatus, includeChildren, sort, direction, Math.Clamp(pageSize, 1, MaximumPageSize));
+        return new RecordListQuery(formDefinitionId, recordStatus, includeChildren, sort, direction, Math.Clamp(pageSize, 1, MaximumPageSize), includeArchived);
     }
 
     /// <summary>Stable digest of everything that shapes the ordered result; a cursor is valid only for the same scope.</summary>
     public string ScopeDigest()
     {
-        var text = string.Join('|', FormDefinitionId?.ToString("D") ?? "-", RecordStatus ?? "-", IncludeChildren ? "1" : "0", SortBy, SortDirection, PageSize.ToString(CultureInfo.InvariantCulture));
+        var text = string.Join('|', FormDefinitionId?.ToString("D") ?? "-", RecordStatus ?? "-", IncludeChildren ? "1" : "0", IncludeArchived ? "a" : "-", SortBy, SortDirection, PageSize.ToString(CultureInfo.InvariantCulture));
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 
@@ -57,7 +57,10 @@ public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatu
         var filtered = records
             .Where(r => IncludeChildren || r.ParentFormRecordId is null)
             .Where(r => FormDefinitionId is null || r.FormDefinitionId == FormDefinitionId)
-            .Where(r => RecordStatus is null || string.Equals(r.RecordStatus, RecordStatus, StringComparison.Ordinal));
+            .Where(r => RecordStatus is null || string.Equals(r.RecordStatus, RecordStatus, StringComparison.Ordinal))
+            // Phase C6 M1: Archived records are hidden from the ordinary list unless asked for (explicit status filter or includeArchived).
+            // The status here is the unsigned listing projection; opening a record always shows its verified status.
+            .Where(r => RecordStatus is not null || IncludeArchived || !string.Equals(r.RecordStatus, RecordLifecycleStatuses.Archived, StringComparison.Ordinal));
         var descending = SortDirection == "desc";
         IOrderedEnumerable<FormRecord> ordered = SortBy switch
         {
@@ -129,4 +132,10 @@ public sealed record RecordListCursor(Guid OrganizationId, Guid UserId, long Aut
     }
 
     private sealed record Payload(int V, Guid O, Guid U, long R, string Q, int S);
+}
+
+/// <summary>Status literals used by listing (the lifecycle rules live in <c>Lifecycle.RecordLifecycle</c>).</summary>
+internal static class RecordLifecycleStatuses
+{
+    public const string Archived = "Archived";
 }

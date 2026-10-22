@@ -169,6 +169,17 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             return false;
         }
 
+        public async Task<bool> ProjectLifecycleAsync(Guid tenantId, Guid formRecordId, long atContentRevision, string recordStatus, DateTimeOffset? submittedOn, CancellationToken cancellationToken) =>
+            await context.FormRecords
+                .Where(r => r.TenantId == tenantId && r.FormRecordId == formRecordId && r.RecordRevision == atContentRevision && (r.RecordStatus != recordStatus || r.SubmittedOn != submittedOn))
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.RecordStatus, recordStatus).SetProperty(r => r.SubmittedOn, submittedOn), cancellationToken)
+                .ConfigureAwait(false) > 0;
+
+        public Task<int> CountInFlightUploadSessionsAsync(Guid tenantId, Guid formRecordId, DateTimeOffset notBefore, CancellationToken cancellationToken) =>
+            context.UploadSessions.CountAsync(s => s.TenantId == tenantId && s.FormRecordId == formRecordId
+                && (s.SessionState == UploadSessionStates.Open || s.SessionState == UploadSessionStates.Completed || s.SessionState == UploadSessionStates.Processed)
+                && s.SessionModifiedOn >= notBefore, cancellationToken);
+
         public Task<List<FormRecord>> GetFormRecordsAsync(Guid tenantId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
             context.FormRecords.AsNoTracking().Where(r => r.TenantId == tenantId && formRecordIds.Contains(r.FormRecordId)).ToListAsync(cancellationToken);
 

@@ -86,6 +86,9 @@ public sealed class ChildRecordHandlers(IBusinessStore store, IAuthorizationAuth
             throw new BusinessException("NOT_FOUND", 404, "parent record not found");
         }
 
+        // Phase C6 M1: removing a child changes the parent's content, so a Submitted or Archived parent is locked.
+        FormRecords.Lifecycle.RecordLifecycle.RequireContentEditable(await reader.ReadAsync(context, parentFormRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false));
+
         var payload = JsonSerializer.SerializeToElement(new { form_record_id = childFormRecordId, parent_form_record_id = parentFormRecordId });
         var command = await awaiter.SubmitAndAwaitAsync(user, new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.UnlinkChildRecord, new ResourceReference(ProtectedResourceKind.FormRecord, childFormRecordId), decision.AuthorizationRevision, payload, request.RemovalReason.Trim()), "unlink:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         var outcome = new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, command.CommandStatus == SecurityCommandStatus.Effective);

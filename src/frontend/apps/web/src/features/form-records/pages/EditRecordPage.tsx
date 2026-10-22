@@ -125,6 +125,13 @@ export function EditRecordPage() {
     );
   }
   const shared = !data.permissions.isCompleteProjection;
+  if (data.lifecycle && !data.lifecycle.contentEditable) {
+    return (
+      <StatusMessage tone="info" title={`This record is ${data.lifecycle.status.toLowerCase()} and can't be edited`} actions={<Link to="/app/records/$formRecordId" params={{ formRecordId }}><Button variant="secondary">Back to the record</Button></Link>}>
+        {data.lifecycle.status === "Archived" ? "The owner can unarchive it to work on it again." : "The owner can reopen it with a reason to make changes."}
+      </StatusMessage>
+    );
+  }
   if (!data.permissions.canEdit && !(shared && data.permissions.canEditSharedFields)) {
     return (
       <StatusMessage tone="danger" title="You cannot edit this record" actions={<Link to="/app/records/$formRecordId" params={{ formRecordId }}><Button variant="secondary">Back to the record</Button></Link>}>
@@ -150,7 +157,9 @@ export function EditRecordPage() {
     ? { ...parsedLayout, sections: parsedLayout.sections.map((section) => ({ ...section, elements: section.elements.map((element) => (element.kind === "field" && !editableKeys.has(keyById.get(element.fieldDefinitionId) ?? "") ? { ...element, readOnly: true } : element)) })) }
     : parsedLayout;
   const presented = update.isError ? presentError(update.error) : null;
-  const conflict = presented?.kind === "conflict";
+  // A locked record (submitted or archived in the meantime) is a different answer from "someone else saved": no merge helps.
+  const lockedNow = presented?.code === "RECORD_NOT_EDITABLE";
+  const conflict = presented?.kind === "conflict" && !lockedNow;
   const applyRules = data.permissions.isCompleteProjection;
   const infos = toGroupInfos(data.record.groups);
   const unresolved = report?.conflicts ?? [];

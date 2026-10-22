@@ -1260,6 +1260,13 @@
             }
           },
           {
+            "name": "includeArchived",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "sortBy",
             "in": "query",
             "schema": {
@@ -1404,6 +1411,174 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RecordProjectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/submit": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Lifecycle transition 'Submit' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.",
+        "operationId": "SubmitFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/reopen": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Lifecycle transition 'Reopen' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.",
+        "operationId": "ReopenFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/archive": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Lifecycle transition 'Archive' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.",
+        "operationId": "ArchiveFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/unarchive": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Lifecycle transition 'Unarchive' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.",
+        "operationId": "UnarchiveFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLifecycleResponse"
                 }
               }
             }
@@ -4852,6 +5027,124 @@
           }
         }
       },
+      "RecordLifecycleRequest": {
+        "required": [
+          "expectedContentRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expectedStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RecordLifecycleResponse": {
+        "required": [
+          "formRecordId",
+          "transition",
+          "previousStatus",
+          "status",
+          "submittedOn",
+          "contentRevision",
+          "committedOperationId",
+          "eTag",
+          "allowedTransitions"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "transition": {
+            "type": "string"
+          },
+          "previousStatus": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "submittedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committedOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "eTag": {
+            "type": "string"
+          },
+          "allowedTransitions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RecordLifecycleStateResponse": {
+        "required": [
+          "status",
+          "submittedOn",
+          "allowedTransitions",
+          "contentEditable"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "submittedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "allowedTransitions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contentEditable": {
+            "type": "boolean"
+          }
+        }
+      },
       "RecordListFormOption": {
         "required": [
           "formDefinitionId",
@@ -5190,6 +5483,16 @@
             "items": {
               "$ref": "#/components/schemas/SharedFieldAccessResponse"
             }
+          },
+          "lifecycle": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RecordLifecycleStateResponse"
+              }
+            ]
           }
         }
       },
