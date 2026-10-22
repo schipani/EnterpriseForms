@@ -16,7 +16,10 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
 {
     public sealed record CandidateInput(FormRecordRevision Header, IReadOnlyList<ISignedContentRow> Rows);
 
-    public async Task<AcceptedContentRevision> StageAndCommitAsync(RequestContext context, AcceptedContentRevision head, CandidateInput candidate, string idempotencyKey, CancellationToken cancellationToken)
+    /// <param name="currentItems">Share-scoped writes (Phase C5): the verified current snapshot, which the Authority binds to its accepted head.</param>
+    /// <param name="preserveSchemaVersions">Share-scoped writes copy rows verbatim, so each keeps the signed schema version it was accepted under (D15).</param>
+    public async Task<AcceptedContentRevision> StageAndCommitAsync(RequestContext context, AcceptedContentRevision head, CandidateInput candidate, string idempotencyKey, CancellationToken cancellationToken,
+        IReadOnlyList<StagedContentItem>? currentItems = null, bool preserveSchemaVersions = false)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(head);
@@ -44,12 +47,12 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
             row.ContentRevision = candidateRevision;
             row.RowRevision = candidateRevision;
             row.RowSignatureKeyVersion = (int)keyVersion;
-            row.RowSignatureSchemaVersion = BusinessSignedSchemas.CurrentSchemaVersion(row);
+            row.RowSignatureSchemaVersion = preserveSchemaVersions && row.RowSignatureSchemaVersion > 0 ? row.RowSignatureSchemaVersion : BusinessSignedSchemas.CurrentSchemaVersion(row);
         }
 
         var items = allRows.Select(r => new CandidateContentItem((ManifestItemKind)r.ItemKindCode, r.ItemId, Convert.ToBase64String(BusinessSignedSchemas.Encode(r, keyVersion)))).ToList();
         var prepared = await authority.PrepareContentChangeAsync(context.ToDelegatedUser(), new PrepareContentChangeRequest(
-            context.OrganizationId, candidate.Header.FormRecordId, operationId, head.AuthorizationRevision, head.CommittedContentRevision, head.CommittedManifestRootBase64, items),
+            context.OrganizationId, candidate.Header.FormRecordId, operationId, head.AuthorizationRevision, head.CommittedContentRevision, head.CommittedManifestRootBase64, items, CurrentItems: currentItems),
             "content:" + idempotencyKey, cancellationToken).ConfigureAwait(false);
         if (prepared.OperationId != operationId || prepared.CandidateContentRevision != candidateRevision || prepared.SignatureKeyVersion != (int)keyVersion)
         {

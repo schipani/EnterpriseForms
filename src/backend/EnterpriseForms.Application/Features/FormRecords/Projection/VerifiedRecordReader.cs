@@ -24,7 +24,8 @@ public sealed record VerifiedRecord(
     IReadOnlyList<FieldDefinition> Fields,
     IReadOnlyList<FieldOption> Options,
     Encryption.IFieldEncryptionService Encryption,
-    IReadOnlyList<GroupDefinition> Groups)
+    IReadOnlyList<GroupDefinition> Groups,
+    IReadOnlyList<StagedContentItem> ObservedItems)
 {
     public IReadOnlyDictionary<Guid, FieldDefinition> FieldsById => Fields.ToDictionary(f => f.FieldDefinitionId);
 
@@ -132,6 +133,6 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
             groups = await scope.GetGroupDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
         }
 
-        return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption, groups);
+        return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption, groups, staged.Items);
     }
 }

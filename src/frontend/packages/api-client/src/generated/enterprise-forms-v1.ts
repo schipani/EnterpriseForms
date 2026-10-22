@@ -1697,6 +1697,10 @@ export interface components {
             canManageAccess: boolean;
             canTransferOwnership: boolean;
             isCompleteProjection: boolean;
+            /** @default false */
+            canEditSharedFields: boolean;
+            /** @default false */
+            contributorWritesEnabled: boolean;
         };
         RecordProjectionResponse: {
             record: components["schemas"]["FormRecordResponse"];
@@ -1712,6 +1716,7 @@ export interface components {
             formRelationshipDefinitionId: null | string;
             eTag: string;
             summary?: null | components["schemas"]["RecordProjectionSummaryResponse"];
+            sharedFieldAccess?: null | components["schemas"]["SharedFieldAccessResponse"][];
         };
         RecordProjectionSummaryResponse: {
             recordReference: string;
@@ -1797,6 +1802,11 @@ export interface components {
             /** Format: date-time */
             expiresOn: null | string;
             identityProviderKind: string;
+        };
+        SharedFieldAccessResponse: {
+            fieldKey: string;
+            editable: boolean;
+            notEditableReason: null | string;
         };
         ShareResponse: {
             /** Format: uuid */

@@ -20,7 +20,7 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// commit proves the staged bytes equal the approved candidate and CAS-advances the trusted head, verify compares an
 /// observed projection with the complete accepted leaf index. No generic signing path exists (A9).
 /// </summary>
-public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ISpiceDbProjection spiceDb, IFaultInjector faultInjector, TimeProvider clock)
+public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ISpiceDbProjection spiceDb, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites)
 {
     private const int MaxCandidateItems = 500;
     private static readonly TimeSpan OperationLifetime = TimeSpan.FromMinutes(10);
@@ -111,8 +111,20 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         Dictionary<string, string> mutations;
         if (reprotection is null)
         {
-            mutations = ClassifyMutations(parsed, currentLeaves);
-            AuthorizeMutations(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false), bound, request.FormRecordId, mutations);
+            // Desired-state edges read under the organization lock (A6): the same lock every security command takes.
+            var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
+            if (graph.IsRecordOwner(bound.AuthorityUserId, request.FormRecordId))
+            {
+                mutations = ClassifyMutations(parsed, currentLeaves);
+            }
+            else
+            {
+                // Phase C5 share editor: switch, scope, current-snapshot proof (D4) and column-class classification (D14/D15).
+                RequireShareEditor(graph, bound, request.FormRecordId);
+                mutations = await ClassifyShareScopedAsync(scope, state, request, parsed, currentLeaves, head, key, graph, bound, operationId, candidateRevision, correlationId, cancellationToken).ConfigureAwait(false);
+            }
+
+            AuthorizeMutations(graph, bound, request.FormRecordId, mutations);
             await EnforceProtectionBarrierAsync(scope, state.OrganizationId, resource.ParentResourceEntityId, parsed.Select(p => (p.Kind, (ReadOnlyMemory<byte>)p.CanonicalBytes)), cancellationToken).ConfigureAwait(false);
         }
         else
@@ -189,6 +201,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     public async Task<ContentRevision> CommitAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        // Testing only (no-op elsewhere): holds a commit before it takes the organization lock, so integration tests can
+        // revoke a grant between prepare and commit deterministically (Phase C5 revocation-race tests).
+        await faultInjector.PauseIfArmedAsync(FaultNames.PauseBeforeContentCommit, cancellationToken).ConfigureAwait(false);
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
@@ -262,7 +278,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         {
             try
             {
-                AuthorizeMutations(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false), bound, request.FormRecordId, mutations);
+                // Commit-time authorization against the CURRENT desired edges, inside the transaction that holds the
+                // organization lock and advances the head: a revocation committed before this point aborts the write.
+                AuthorizeMutations(new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false)), bound, request.FormRecordId, mutations);
             }
             catch (AuthorityException)
             {
@@ -481,6 +499,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
 
         List<VerifiedProjectionItem> authorized;
+        List<VerifiedProjectionItem> readable = [];
+        List<VerifiedProjectionItem> editable = [];
         if (fullRead)
         {
             authorized = expected.Select(l => new VerifiedProjectionItem((ManifestItemKind)l.ManifestItemKindCode, l.ManifestItemId)).ToList();
@@ -488,10 +508,11 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         else
         {
             // Field-level shares scope value leaves and selection leaves (a plaintext dropdown / multi-select stores one selection leaf per option) by the same field-item edges.
+            // Phase C5 (D7): both the readable and the editable subsets are returned, so a partial editor needs one verification; advisory only — prepare/commit decide.
             var fieldLeaves = expected.Where(l => l.ManifestItemKindCode is (byte)ManifestItemKind.FieldValue or (byte)ManifestItemKind.FieldSelection).ToList();
-            var checks = fieldLeaves.Select(l => new SpiceDbCheck(ResourceTypeNames.FieldItem, l.ManifestItemId.ToString("D"), request.RequestedAction == RequestedAction.Edit ? "edit" : "read", ResourceTypeNames.User, subject)).ToList();
-            var outcomes = checks.Count == 0 ? [] : await spiceDb.CheckBulkAsync(checks, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
-            authorized = fieldLeaves.Where((_, i) => outcomes[i] == SpiceDbCheckOutcome.Allowed).Select(l => new VerifiedProjectionItem((ManifestItemKind)l.ManifestItemKindCode, l.ManifestItemId)).ToList();
+            readable = await CheckFieldLeavesAsync(fieldLeaves, "read", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+            editable = await CheckFieldLeavesAsync(fieldLeaves, "edit", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+            authorized = request.RequestedAction == RequestedAction.Edit ? editable : readable;
         }
 
         var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
@@ -500,7 +521,19 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw AuthorityException.NotReady("authorization state moved during verification");
         }
 
-        return new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId);
+        return new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId, readable, editable, contributorWrites.Enabled);
+    }
+
+    private async Task<List<VerifiedProjectionItem>> CheckFieldLeavesAsync(List<RecordManifestLeaf> fieldLeaves, string permission, string subject, string zedToken, CancellationToken cancellationToken)
+    {
+        if (fieldLeaves.Count == 0)
+        {
+            return [];
+        }
+
+        var checks = fieldLeaves.Select(l => new SpiceDbCheck(ResourceTypeNames.FieldItem, l.ManifestItemId.ToString("D"), permission, ResourceTypeNames.User, subject)).ToList();
+        var outcomes = await spiceDb.CheckBulkAsync(checks, zedToken, cancellationToken).ConfigureAwait(false);
+        return fieldLeaves.Where((_, i) => outcomes[i] == SpiceDbCheckOutcome.Allowed).Select(l => new VerifiedProjectionItem((ManifestItemKind)l.ManifestItemKindCode, l.ManifestItemId)).ToList();
     }
 
     /// <summary>Returns null when the observed set is exactly the expected set with verifying signatures and matching root; otherwise a failure code.</summary>
@@ -647,13 +680,27 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
                 }
             }
 
+            // Identity binding I1–I3 for every user and reprotection write (Phase C5, D8/D14): supported schema, exact
+            // column set, item id inside the bytes = manifest item id, tenant and record columns = the request.
+            RowCanonicalDocument document;
+            try
+            {
+                document = RowCanonicalDecoder.Decode(bytes);
+            }
+            catch (IntegrityFormatException ex)
+            {
+                throw AuthorityException.Invalid("candidate bytes are not RowHmac v1: " + ex.Code);
+            }
+
+            ContentDeltaRules.EnforceIdentityBinding(item.ItemKind, item.ItemId, document, organizationId, request.FormRecordId);
+
             var key = MerkleManifestV1.ItemKey(ToMerkleKind(item.ItemKind), item.ItemId);
             if (!keys.Add(Convert.ToHexStringLower(key)))
             {
                 throw AuthorityException.Invalid("duplicate candidate item");
             }
 
-            parsed.Add(new ParsedCandidateItem(item.ItemKind, item.ItemId, key, bytes, SHA256.HashData(bytes)));
+            parsed.Add(new ParsedCandidateItem(item.ItemKind, item.ItemId, key, bytes, SHA256.HashData(bytes), document));
         }
 
         if (headers != 1)
@@ -687,21 +734,19 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return result;
     }
 
-    /// <summary>Owner: any mutation. Share contributor/manager: updates of explicitly shared field items only (no adds/removes, no header changes).</summary>
-    private static void AuthorizeMutations(IReadOnlyList<Domain.Features.SecurityCommands.AuthorityRelationshipEdge> edges, BoundActor actor, Guid formRecordId, IReadOnlyDictionary<string, string> mutations)
+    /// <summary>
+    /// Owner: any mutation. Share contributor/manager (Phase C5): only when contributor writes are enabled, and only
+    /// <c>Update</c> of explicitly shared field items (value or single selection); every other item <c>Unchanged</c>.
+    /// Called at prepare (after classification) and again at commit against the current desired edges.
+    /// </summary>
+    private void AuthorizeMutations(DesiredStateGraph graph, BoundActor actor, Guid formRecordId, IReadOnlyDictionary<string, string> mutations)
     {
-        var graph = new DesiredStateGraph(edges);
         if (graph.IsRecordOwner(actor.AuthorityUserId, formRecordId))
         {
             return;
         }
 
-        var editable = graph.EditableFieldItemsViaShares(actor.AuthorityUserId, formRecordId);
-        if (editable.Count == 0)
-        {
-            throw AuthorityException.Forbidden("actor may not change this record");
-        }
-
+        var editable = RequireShareEditor(graph, actor, formRecordId);
         foreach (var (keyHex, mutation) in mutations)
         {
             if (mutation == ContentMutationKinds.Unchanged)
@@ -712,11 +757,77 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             var key = Convert.FromHexString(keyHex);
             var kind = (MerkleItemKind)key[0];
             var itemId = new Guid(key.AsSpan(1, 16), bigEndian: true);
-            if (mutation != ContentMutationKinds.Update || kind != MerkleItemKind.FieldValue || !editable.Contains(itemId))
+            if (mutation != ContentMutationKinds.Update || kind is not (MerkleItemKind.FieldValue or MerkleItemKind.FieldSelection) || !editable.Contains(itemId))
             {
-                throw AuthorityException.Forbidden("mutation exceeds the actor's edit scope");
+                throw AuthorityException.Forbidden("SHARE_MUTATION_OUT_OF_SCOPE: mutation exceeds the actor's edit scope");
             }
         }
+    }
+
+    /// <summary>A non-owner may write only through an explicit contributor/manager share, and only while the switch is enabled (fail closed).</summary>
+    private IReadOnlySet<Guid> RequireShareEditor(DesiredStateGraph graph, BoundActor actor, Guid formRecordId)
+    {
+        var editable = graph.EditableFieldItemsViaShares(actor.AuthorityUserId, formRecordId);
+        if (editable.Count == 0)
+        {
+            throw AuthorityException.Forbidden("actor may not change this record");
+        }
+
+        if (!contributorWrites.Enabled)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.ContributorWritesDisabled, 403, false, "field-scoped contributor writes are disabled");
+        }
+
+        return editable;
+    }
+
+    /// <summary>
+    /// Share-editor classification (Phase C5 proposal §7). The supplied current snapshot must equal the accepted head
+    /// exactly (D4: coverage, SHA-256 per item against the accepted digests, header bindings, recomputed root and leaf-index
+    /// digest); a mismatch journals a minimal integrity incident and signs nothing. Then every candidate item is classified
+    /// by the column-class rules (D14/D15) against its bound current item.
+    /// </summary>
+    private async Task<Dictionary<string, string>> ClassifyShareScopedAsync(IAuthorityScope scope, OrganizationAuthorizationState state, PrepareContentChangeRequest request, IReadOnlyList<ParsedCandidateItem> parsed,
+        IReadOnlyList<RecordManifestLeaf> currentLeaves, RecordContentHead head, IntegrityKeyRegistration key, DesiredStateGraph graph, BoundActor bound, Guid operationId, long candidateRevision, Guid correlationId, CancellationToken cancellationToken)
+    {
+        if (request.CurrentItems is null || request.CurrentItems.Count == 0)
+        {
+            throw AuthorityException.Invalid("CURRENT_SNAPSHOT_REQUIRED: a share-scoped write must carry the complete current snapshot");
+        }
+
+        if (head.CommittedOperationId is not { } headOperation || head.CurrentRecordManifestCommitId is null || head.CommittedContentRevision == 0)
+        {
+            throw AuthorityException.Invalid("record has no accepted content");
+        }
+
+        if (head.SignatureKeyVersion < key.MinimumVerificationKeyVersion)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.KeyUnavailable, 503, false, "accepted key version is no longer verifiable");
+        }
+
+        var commit = await scope.FindManifestCommitByOperationAsync(state.OrganizationId, request.FormRecordId, headOperation, cancellationToken).ConfigureAwait(false);
+        if (commit is null || commit.RecordManifestCommitId != head.CurrentRecordManifestCommitId || commit.CommittedContentRevision != head.CommittedContentRevision
+            || commit.RowSignatureKeyVersion != head.SignatureKeyVersion || !commit.ManifestRootDigest.AsSpan().SequenceEqual(head.CommittedManifestRoot))
+        {
+            throw new AuthorityException(AuthorityErrorCodes.CurrentSnapshotMismatch, 409, false, "ACCEPTED_STATE_INCONSISTENT");
+        }
+
+        var accepted = new ContentDeltaRules.AcceptedState(head.CommittedContentRevision, headOperation, head.CommittedManifestRoot, commit.ManifestLeafIndexDigest, commit.ManifestLeafCount, head.SignatureKeyVersion,
+            currentLeaves.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList());
+        var (failure, current) = ContentDeltaRules.BindCurrentSnapshot(request.CurrentItems, accepted, state.OrganizationId);
+        if (failure is not null)
+        {
+            state.ContentIntegrityRevision++;
+            var incident = new IntegrityIncidentBody(request.FormRecordId, head.CommittedContentRevision, headOperation, failure, bound.AuthorityUserId, correlationId);
+            scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "CurrentSnapshotMismatch", incident, null, headOperation, clock));
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            throw new AuthorityException(AuthorityErrorCodes.CurrentSnapshotMismatch, 409, false, failure);
+        }
+
+        var candidate = parsed.Select(p => new ContentDeltaRules.DecodedItem(p.Kind, p.ItemId, p.Key, p.Document, p.Digest)).ToList();
+        var shareScope = new ContentDeltaRules.ShareScope(state.OrganizationId, request.FormRecordId, head.CommittedContentRevision, headOperation, candidateRevision, operationId,
+            graph.EditableFieldItemsViaShares(bound.AuthorityUserId, request.FormRecordId));
+        return ContentDeltaRules.ClassifyShareScoped(current, candidate, shareScope);
     }
 
     private sealed record ReprotectionContext(Guid CommandId, Guid FormDefinitionId, Guid FieldDefinitionId, ProtectionDirection Direction);
@@ -906,7 +1017,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
     }
 
-    private sealed record ParsedCandidateItem(ManifestItemKind Kind, Guid ItemId, byte[] Key, byte[] CanonicalBytes, byte[] Digest);
+    private sealed record ParsedCandidateItem(ManifestItemKind Kind, Guid ItemId, byte[] Key, byte[] CanonicalBytes, byte[] Digest, RowCanonicalDocument Document);
 
     private sealed record ContentCheckpointBody(Guid FormRecordId, long CommittedContentRevision, Guid CommittedOperationId, string ManifestRootHex, string LeafIndexDigestHex, long LeafCount, int KeyVersion, Guid ActorUserId, long AuthorizationRevision, Guid CorrelationId);
 

@@ -30,4 +30,15 @@ public static class FaultNames
 
     /// <summary>Testing only: terminate after a prepared content operation is durably stored, before the response is sent (the caller sees a transport failure and retries).</summary>
     public const string CrashAfterPrepareCommit = "CrashAfterPrepareCommit";
+
+    /// <summary>Testing only: hold the next content commit before it takes the organization lock until released (fault "None") or 60 s pass (Phase C5 revocation races).</summary>
+    public const string PauseBeforeContentCommit = "PauseBeforeContentCommit";
 }
+
+/// <summary>Testing only: state of the fault injector (armed fault and number of operations currently held at a pause point).</summary>
+public sealed record FaultInjectionStatus(string ArmedFault, int PausedOperations);
+
+/// <summary>Testing only: override of the contributor-write switch (null restores the deployment configuration).</summary>
+public sealed record ContributorWriteOverrideRequest(bool? Enabled);
+
+public sealed record ContributorWriteSwitchState(bool Enabled, bool ConfiguredEnabled);

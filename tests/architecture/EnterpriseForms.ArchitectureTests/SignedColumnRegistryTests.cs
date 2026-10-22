@@ -166,6 +166,25 @@ public sealed class SignedColumnRegistryTests
         Assert.Contains(BusinessSignedSchemas.All, s => s.EntityKind == "form_records" && s.SchemaVersion == 3);
     }
 
+    /// <summary>
+    /// Phase C5 (D14, C-34 condition 3): the Authority's column-class table and the business signed-column registry
+    /// describe exactly the same (entity kind, schema version) set with exactly the same columns, so every signed column
+    /// of every supported item type has one class and an unregistered schema or column fails closed in the Authority.
+    /// </summary>
+    [Fact]
+    public void TheAuthorityColumnClassTableCoversEveryBusinessSignedSchemaExactly()
+    {
+        var business = BusinessSignedSchemas.All.ToDictionary(s => (s.EntityKind, s.SchemaVersion));
+        var authority = AuthorizationAuthority.Application.Features.Content.ContentDeltaRules.Rules.ToDictionary(r => (r.EntityKind, r.SchemaVersion));
+        Assert.Equal(business.Keys.OrderBy(k => k.EntityKind, StringComparer.Ordinal).ThenBy(k => k.SchemaVersion), authority.Keys.OrderBy(k => k.EntityKind, StringComparer.Ordinal).ThenBy(k => k.SchemaVersion));
+        foreach (var (key, schema) in business)
+        {
+            var rule = authority[key];
+            Assert.True(schema.Columns.Select(c => c.ColumnName).OrderBy(c => c, StringComparer.Ordinal).SequenceEqual(rule.Columns.Keys.OrderBy(c => c, StringComparer.Ordinal)),
+                $"{key.EntityKind} v{key.SchemaVersion}: the Authority classifies a different column set than the business registry signs");
+        }
+    }
+
     [Fact]
     public void RegisteredColumnsExistInTheModelAndUnsignedColumnsAreJustified()
     {

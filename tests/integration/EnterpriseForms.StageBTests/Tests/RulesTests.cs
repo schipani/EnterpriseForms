@@ -273,15 +273,26 @@ public sealed class RulesTests(StageBFixture fixture)
         Assert.DoesNotContain("visibleWhen", reduced, StringComparison.Ordinal); // no rule metadata about fields the viewer cannot see
         Assert.DoesNotContain("Company name", reduced, StringComparison.Ordinal);
 
-        // Read-only binds a field-scoped contributor before the authority is even asked; out-of-scope fields are refused.
+        // A field-scoped contributor: read-only and out-of-scope fields are refused before the authority is asked.
         var contributor = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "intake_status", "reference_note" } });
         Assert.True(contributor.IsSuccess, contributor.Body);
         await s.WaitProjectionAsync(s.Designer, record, TimeSpan.FromSeconds(40));
-        var statusWrite = await EditAsync(s, record, s.Designer, new() { ["intake_status"] = "final" });
-        Assert.Equal(HttpStatusCode.Forbidden, statusWrite.Status);
-        Assert.Equal("FIELD_READ_ONLY", statusWrite.ErrorCode);
-        var outOfScope = await EditAsync(s, record, s.Designer, new() { ["applicant_kind"] = "person" });
-        Assert.Equal(HttpStatusCode.Forbidden, outOfScope.Status);
+        // Phase C5: contributor writes are off by default (D10) — refused before any candidate is built.
+        var disabledWrite = await EditAsync(s, record, s.Designer, new() { ["intake_status"] = "final" });
+        Assert.Equal((HttpStatusCode.Forbidden, "CONTRIBUTOR_WRITES_DISABLED"), (disabledWrite.Status, disabledWrite.ErrorCode));
+        // With contributor writes on, a read-only field and an out-of-scope field get the same refusal (D9).
+        Assert.True((await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/testing/contributor-writes", new { enabled = true })).IsSuccess);
+        try
+        {
+            var statusWrite = await EditAsync(s, record, s.Designer, new() { ["intake_status"] = "final" });
+            Assert.Equal((HttpStatusCode.Forbidden, "FIELD_NOT_EDITABLE"), (statusWrite.Status, statusWrite.ErrorCode));
+            var outOfScope = await EditAsync(s, record, s.Designer, new() { ["applicant_kind"] = "person" });
+            Assert.Equal((HttpStatusCode.Forbidden, "FIELD_NOT_EDITABLE"), (outOfScope.Status, outOfScope.ErrorCode));
+        }
+        finally
+        {
+            Assert.True((await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/testing/contributor-writes", new { enabled = (bool?)null })).IsSuccess);
+        }
 
         // The owner (and only someone authorized for the field) can still write a field the form does not show.
         var ownerWrite = await EditAsync(s, record, s.Clerk, new() { ["reference_note"] = "owner reference" });

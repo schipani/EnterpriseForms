@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Api.Composition;
 using AuthorizationAuthority.Application.Common;
+using AuthorizationAuthority.Application.Features.Content;
 using AuthorizationAuthority.Application.Features.OperatorPlane;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Infrastructure.Faults;
@@ -34,7 +35,7 @@ public static class OperatorEndpoints
                     return TypedResults.Problem(title: "Fault injection disabled", detail: "FaultInjection:Enabled is honoured only in the Testing environment.", statusCode: StatusCodes.Status403Forbidden);
                 }
 
-                if (request.FaultName is not (FaultNames.None or FaultNames.CrashAfterJournalCommit or FaultNames.CrashAfterProjectionWrite or FaultNames.CrashAfterContentHeadCommit or FaultNames.CrashAfterPrepareCommit))
+                if (request.FaultName is not (FaultNames.None or FaultNames.CrashAfterJournalCommit or FaultNames.CrashAfterProjectionWrite or FaultNames.CrashAfterContentHeadCommit or FaultNames.CrashAfterPrepareCommit or FaultNames.PauseBeforeContentCommit))
                 {
                     throw AuthorityException.Invalid("unknown fault name");
                 }
@@ -44,6 +45,32 @@ public static class OperatorEndpoints
             })
             .WithName("ArmFaultInjection")
             .WithSummary("Testing only: arms a one-shot process crash at a named protocol transition (SEC-P09).");
+
+        group.MapGet("/fault-injection", static Results<Ok<FaultInjectionStatus>, ProblemHttpResult> (IServiceProvider services, IHostEnvironment environment) =>
+            {
+                var injector = services.GetService<ProcessCrashFaultInjector>();
+                if (injector is null || !environment.IsEnvironment("Testing"))
+                {
+                    return TypedResults.Problem(title: "Fault injection disabled", detail: "FaultInjection:Enabled is honoured only in the Testing environment.", statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                return TypedResults.Ok(new FaultInjectionStatus(injector.Armed.Length == 0 ? FaultNames.None : injector.Armed, injector.Paused));
+            })
+            .WithName("GetFaultInjection")
+            .WithSummary("Testing only: armed fault and number of operations held at a pause point.");
+
+        group.MapPost("/testing/contributor-writes", static Results<Ok<ContributorWriteSwitchState>, ProblemHttpResult> (ContributorWriteOverrideRequest request, ShareContributorWriteSwitch contributorWrites, IHostEnvironment environment) =>
+            {
+                if (!environment.IsEnvironment("Testing") || !contributorWrites.TestingOverrideAllowed)
+                {
+                    return TypedResults.Problem(title: "Override disabled", detail: "The contributor-write override exists only in the Testing environment.", statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                contributorWrites.SetTestingOverride(request.Enabled);
+                return TypedResults.Ok(new ContributorWriteSwitchState(contributorWrites.Enabled, contributorWrites.ConfiguredEnabled));
+            })
+            .WithName("OverrideContributorWrites")
+            .WithSummary("Testing only: turns field-scoped contributor writes on or off for the disposable integration stack (Phase C5, D10); null restores the deployment configuration.");
 
         return endpoints;
     }
