@@ -104,7 +104,7 @@ public sealed class FieldProtectionMigrationTests(StageBFixture fixture)
             var command = AuthorityOracle.ReprotectionCommandOf(fixture.Stack, Guid.Parse(parts[1]));
             var expected = command == commandId ? "MigrationWorker" : command is null ? "UserOperation" : "OtherMigration";
             Assert.True(expected == parts[2], $"record {parts[0]}: item says {parts[2]}, the authority's accepted operation is {expected}");
-            Assert.Equal(expected == "UserOperation" ? "t" : "f", parts[3]);
+            Assert.Equal(expected == "UserOperation" ? "true" : "false", parts[3]); // boolean || text renders true/false
         }
     }
 
