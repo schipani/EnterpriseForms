@@ -1,6 +1,6 @@
 # Phase C6 — Architecture review: record lifecycle and history
 
-**Status: Revision 1 — APPROVED FOR CONTROLLED DEVELOPMENT (owner, 2026-10-22, decision C-43). Milestone 0 implemented (§1.1.4); Milestones 1–5 not started.**
+**Status: Revision 1 — APPROVED FOR CONTROLLED DEVELOPMENT (owner, 2026-10-22, decision C-43). Milestone 0 implemented and provisionally accepted (§1.1.4); Milestone 1 implemented, awaiting owner browser acceptance (decision C-45, `docs/PHASE_C6_STATUS.md` §7); Milestones 2–5 not started.**
 
 Approval terms (C-43): OD-01…OD-13 approved as recommended, with these clarifications — Submitted records are locked until an authorized owner reopens them with a reason; archive and unarchive preserve existing field values without revalidating them; restoration is exact and all-or-nothing; historical views clearly distinguish current labels from historical content; restoring values into a currently plaintext field requires explicit acknowledgement but can never bypass organizational encryption requirements. AC-1 and AC-2 approved for controlled development (not yet implemented); **AC-3 deferred** (the Authority journal format does not change); AC-4: the existing fail-closed behaviour is kept for V1. Only Milestone 0 is authorized so far. This is not production approval, an independent security review or Level 2 certification.
 
@@ -140,6 +140,8 @@ There is no restore. The owner write path is the natural base:
 ## 2. Proposed lifecycle state machine
 
 ### 2.1 States and transitions
+
+> **As implemented in M1 (C-45):** the state machine below is built as designed. Differences: none in behaviour; the request-validation order was corrected to authorization first; a Draft → Archived transition and the deterministic Unarchive rule are implemented exactly as drawn. The Authority-side Draft-only guard for share editors (AC-2) is **not** built, so for contributors the lock is enforced by the business API (R-01).
 
 ```
                  Submit (owner)                 Archive (owner)

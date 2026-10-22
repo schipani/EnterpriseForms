@@ -105,3 +105,80 @@ Existing tests made Authority-oracle-based: `FieldProtectionMigrationTests` (all
 Owner conditions for closing M0 (all met): repeat integration run and SEC-P re-run on `505b452` pass (§4.2); this document, the architecture updates and decisions C-43 / C-44 are final; the deterministic reproductions replace the proposed 10 consecutive hosted runs (recorded in §4.2 and architecture §8); the G19 limitation is preserved (§5).
 
 M1 is documented separately in §7.
+
+---
+
+## 7. Milestone 1 — record lifecycle (Draft, Submitted, Archived)
+
+**Status: implemented and verified on disposable hosted stacks; awaiting owner browser acceptance.** Final M1 commit `b674d51` (feature `64e2b73`; one ordering fix `b674d51`). Decision **C-45**. Authorized by the owner after provisional acceptance of M0. Not an independent review, not production approval, no Level 2 claim.
+
+### 7.1 What was built
+
+| Area | Behaviour |
+|---|---|
+| Transitions (owner only) | **Submit** Draft → Submitted (full validation). **Reopen** Submitted → Draft (reason mandatory, 1–500 characters). **Archive** Draft or Submitted → Archived (reason optional; confirmation dialog). **Unarchive** Archived → Submitted if the record was submitted and not reopened before archiving, otherwise Draft. Everything else is `409 LIFECYCLE_TRANSITION_NOT_ALLOWED`. The owner's request listed Archived → Submitted; the approved architecture (§2.1) makes Unarchive return the record to the exact state it was archived from, which needs no extra signed column (Archive keeps `submitted_on`, Reopen clears it). |
+| Where status lives | The signed `record_status` / `submitted_on` columns of the record header (already part of the signed schema v2/v3). Every decision uses the status of the **Authority-verified header**, never the unsigned `form_records.record_status` projection, which is only kept in step for listing. |
+| How a transition is written | One owner content operation through the ordinary prepare → stage → read-back → commit protocol. The new header carries the new status; **every value row, entry and document version is copied verbatim** (same helpers as document removal). Nothing is decrypted or re-encrypted; ciphertext, nonces, wrapped keys and document objects are byte-identical in the new revision. Submit decrypts to validate but writes nothing it decrypted. |
+| Submit validation | The whole current content against the current effective layout: types, required and required-if, visibility rules, active and organization-enabled options, dependent dropdowns, repeating-section bounds; and no document upload still in flight (`409 UPLOADS_IN_PROGRESS`). Failures return `422 VALIDATION_FAILED` with `field_keys`. Archive, Unarchive and Reopen perform **no** value validation. |
+| Locking | `409 RECORD_NOT_EDITABLE` for: owner edits, **shared-contributor edits**, upload start and commit, document removal, child-record create and unlink, on any non-Draft record. Sharing, revocation and ownership transfer stay possible (OD-06). Field-protection migrations are unaffected (they copy the header verbatim). |
+| Concurrency | Optimistic: `If-Match` / `expectedContentRevision` (`409 CONTENT_REVISION_CONFLICT`) and `expectedStatus` (`409 LIFECYCLE_STATE_CONFLICT`); the Authority's compare-and-swap on the head decides races between a transition and any other write. |
+| Listing | Archived records are hidden from My Records by default; `includeArchived=true`, or an explicit `recordStatus=Archived`, shows them. The list cursor is bound to this choice. The list's Edit link is hidden for non-Draft rows. |
+| Audit | `RECORD_SUBMITTED`, `RECORD_REOPENED` (with reason), `RECORD_ARCHIVED`, `RECORD_UNARCHIVED`, and `RECORD_LIFECYCLE_DENIED` (outcome Denied, error code only, never values). |
+| UI (existing Record Workspace) | Status badge and row in the summary, also for shared recipients (status is not field content, OD-08). Action buttons only for the owner, from the server's `lifecycle.allowedTransitions`: Submit, Reopen as draft, Archive, Unarchive. Each opens a confirmation dialog (focus trap, Escape, reason field where applicable); success notice; error panel, and for a failed submission the list of fields to fix. A lock banner explains Submitted / Archived. Edit, document and child-list actions disappear when locked, and the editor URL shows an explanation instead of a form. "Include archived records" checkbox on My Records. |
+| API | `POST /api/v1/form-records/{id}/submit|reopen|archive|unarchive` (Idempotency-Key, If-Match); projection gains `lifecycle { status, submittedOn, allowedTransitions, contentEditable }`; list gains `includeArchived`. |
+
+**Not changed:** the Authorization Authority (protocol, code, schema), RowHmac, signed schemas, Merkle manifests, SpiceDB, cryptography, journal format. History browsing, restoration, AC-1, AC-2 and AC-3 are **not** implemented. No lifecycle invariant needed an Authority change to be enforced for **owners**; the one that cannot be enforced inside the Authority without AC-2 is described in §7.4.
+
+### 7.2 Verification
+
+| Check | Result |
+|---|---|
+| .NET (CI-equivalent, Release, one TRX per project) | **331 / 331** (314 before M1 + 17 new `PhaseC6LifecycleTests`): Authority 91, contract 140, architecture 66, integrity 34 |
+| Frontend typecheck / ESLint / vitest | clean / clean / 13 new + existing files passed locally (full suite last run in full before M1: 166 / 166) |
+| Hosted Docker integration on `b674d51` (run 39806400678) | **76 / 76** (11 m 15 s): 68 existing + 8 `RecordLifecycleTests` |
+| Hosted browser (Playwright, run 39806400678) | **61 / 61** (7.3 m): 56 existing + 5 `record-lifecycle.spec.ts` (submit, lock, shared recipient, reopen with reason, archive/list/unarchive, axe scans of both dialogs, the submitted record and My Records) |
+| Hosted SEC-P01…SEC-P12 on `b674d51` (run 39810858142) | **13 / 13**; also 13 / 13 on `64e2b73` (run 39803409044) |
+| Combined gate (run 39806400678) | passed |
+
+**One failure on the way (run 39803403311 on `64e2b73`: integration 75 / 76, browser 61 / 61).** A shared contributor calling Reopen without a reason received `422 REASON_REQUIRED` instead of `403`: request validation ran before the ownership check. A real ordering defect in my handler, fixed in `b674d51` (authorization first); the test caught it, and was not changed.
+
+Tests:
+* `RecordLifecycleTests` (Docker): the owner walks every transition with audit events and the round-trip of the submission time; archive/unarchive keep encrypted values, plaintext values and the document byte-identical (SQL comparison of ciphertext, nonce, wrapped key, object key); strangers, an administrator, a designer, a cross-tenant caller and read/contributor shares are refused and audited; locks on every write path for owners and contributors (switch on), in both Submitted and Archived; submit validation against a newly required field, archive allowed regardless, upload-in-flight block and release; stale revision, stale status and a held Submit/Archive race (exactly one wins, checked in the Authority); archived hiding in the list; hostile business-database administrator (three scenarios, §7.3).
+* `PhaseC6LifecycleTests` (unit): transition table (all other combinations refused), deterministic unarchive and round trips, lock on every non-Draft status, list default, audit actions.
+
+### 7.3 Adversarial coverage (architecture §7.2 subset for M1)
+
+| Case | Result |
+|---|---|
+| Unauthorized transitions (strangers, administrator, designer, other tenant, reader, contributor) | 404 / 403, nothing staged, `RECORD_LIFECYCLE_DENIED` audited |
+| Incomplete submission | 422 with the missing field; head unchanged; archive still possible |
+| Shared contributors | cannot transition; cannot edit a locked record (409 before scope rules) |
+| Stale versions and concurrent writes | 409; exactly one of two held transitions commits |
+| Database tampering — flip the unsigned status column to Draft on a Submitted record | edit still refused; the next verified read repairs the column |
+| — fake Archived on a Draft record | affects only the unsigned list; opening the record shows Draft and repairs it |
+| — edit the signed header row's status | `423 INTEGRITY_VERIFICATION_FAILED`, nothing released, no transition can be built on it |
+
+Not covered by an automated test in M1 (stated, not hidden): archiving a record whose strengthened field still holds legacy plaintext (the Authority's protection barrier should answer `FIELD_PROTECTION_CHANGED`; it needs a worker held mid-migration), upload commit refusal on a record locked between upload and commit (code path guarded, not exercised), and a replayed transition request after success (a replay with the old revision is `CONTENT_REVISION_CONFLICT`, as for ordinary updates).
+
+### 7.4 Limits and risks (for the independent reviewer)
+
+* **R-01 — lock enforced by the business API for contributors.** The Authority does not interpret status for owner writes, and its share-editor Draft-only guard is **AC-2, not built** (owner instruction). A compromised business runtime could therefore let a contributor write to a locked record; a business-database administrator cannot change the status (signed) or the lock.
+* **Unsigned listing status.** The list hides Archived by the unsigned projection; a database writer can hide or reveal records in the list (not in access). It is repaired by verified reads.
+* **Submit decrypts to validate** (owner's own full read; nothing written).
+* **No PB-08 step-up** on Restricted records for submit/archive/reopen (existing residual).
+* **Child records** keep their own status; archiving or submitting a parent does not cascade (OD-05).
+* **History and restore** are M2+, unchanged. Everything open in §5 and in `PHASE_C5_STATUS.md` §12.6 remains open: G06, G19, G20, G21, U1–U11, C-12/C-28 reviews, PB-14 manual accessibility, PB-08 step-up, My Records scalability, Form Designer usability debt, every production Level 2 gate.
+
+### 7.5 Browser acceptance (owner)
+
+Use the hosted evidence above, or a stack you choose to rebuild: **the new business migration `PhaseC6ProtectionStatusVerification` (M0) would be applied to your persistent development database the next time the dev stack's migrate service runs, so I did not rebuild it.** To try M1 locally:
+
+1. From `infrastructure/docker`: `docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d --no-deps --build --wait business-migrate api worker web` (authorizes the M0 + M1 schema change on your dev database; the Authority needs no change). Start `npm run dev -w apps/web` (http://localhost:5173) if you do not reuse yours.
+2. Sign in as **Avery Owner (owner)**. Open any record you own (My Records → a Draft). The header shows **Submit**, **Archive**, **Refresh**, **Edit**; the summary shows a **Draft** badge.
+3. **Submit** → dialog "Submit this record?" explains the lock → **Submit record**. Expect "Record submitted. It is now locked.", a **Submitted** badge, the banner "This record is submitted", no **Edit**, and **Reopen as draft** / **Archive** buttons. If the form has a required field that is empty, the dialog stays open, names the field and nothing changes.
+4. Try `/app/records/<id>/edit` directly: the page says the record is submitted and cannot be edited. Documents and related-record actions are gone from the tabs.
+5. **Reopen as draft**: the confirm button stays disabled until you type a reason. After confirming, **Edit** returns.
+6. Share one field with **Casey Clerk** (Contributor), submit again, sign in as the clerk: the page shows **Submitted** and the lock, **no** lifecycle buttons and no **Edit shared fields**.
+7. As the owner, **Archive** (optional reason). The record disappears from **My Records**; tick **Include archived records** (or choose status Archived) to find it. Open it → **Unarchive** → it returns to Submitted (if it had been submitted) or Draft.
+8. Activity history tab: submitted / reopened (with your reason) / archived / unarchived events.
+
