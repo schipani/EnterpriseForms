@@ -1,6 +1,6 @@
 # Phase C4 — Record Workspace and Authorized Discovery
 
-Branch `phase-c/record-workspace` (from main `b35516f`). **Status: implemented and verified (§7, §8); OWNER ACCEPTED FOR CONTINUED DEVELOPMENT (decision C-33, 2026-10-22, §9). Not merged at the time of writing — merging needs the owner's explicit approval.** Nothing here is an accessibility certification, an independent review or a production security certification. Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-27 onward**.
+Branch `phase-c/record-workspace` (from main `b35516f`). **Status: implemented and verified (§7, §8); OWNER ACCEPTED FOR CONTINUED DEVELOPMENT (decision C-33, 2026-10-22, §9); merged by owner approval (PR #14).** Nothing here is an accessibility certification, an independent review or a production security certification. Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-27 onward**.
 
 ## 1. Assessment of the existing implementation (before any change)
 
@@ -134,3 +134,7 @@ No manual screen-reader or real browser-zoom review of the new pages (PB-14 manu
 2. **Authority discovery change needs independent security review (C-28).** `DiscoverAsync` and the SpiceDB `LookupResources` client changed (cursor-paged enumeration, 50,000 ceiling, gate re-read, `CONTINUATION_INVALIDATED`). It is an implementation correction, not a protocol change, but it is a trust-boundary component change made without independent review, in the same position as C-12. It must be covered by the production security review (with SIM/CONS/MRK regression on Azure staging) before any Level 2 claim.
 3. **G06 — search completeness.** My Records filters and sorts on business-database metadata; it is not an independently verified search and makes no completeness claim.
 4. **G19 — migration completeness**, **PB-14 manual accessibility review** (NVDA, VoiceOver, real browser zoom, product/design sign-off — nothing of C4 was reviewed manually), the **field-scoped contributor-write limitation**, the **Form Designer's not-fully-accepted usability**, and **every production Level 2 gate** (independent cryptographic attestation, Managed HSM, Confidential Ledger, Azure staging, DR rehearsal) remain open and unwaived.
+
+### Outstanding requirement for Phase C5 (owner instruction, 2026-10-22)
+
+**Field-scoped contributor-write limitation — preserved, not fixed.** Shared contributors cannot currently modify records, because of the signed-manifest integrity model: record-level `edit` is `effective_owner` in the Authority schema, and no field-scoped write can pass the Authority (canonical row bytes include the row primary key and operation id, so every leaf of a rewritten record counts as an update). Share recipients are therefore never offered Edit and no test asserts a contributor write succeeding. Lifting it requires an **Authorization Authority design change** (and an independent security review of it) and is an **outstanding requirement for Phase C5**; C4 did not attempt it.
