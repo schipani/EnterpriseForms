@@ -433,4 +433,181 @@ public sealed class RecordLifecycleTests(StageBFixture fixture)
         Assert.Equal(HttpStatusCode.Locked, reopen.Status);
         Assert.Equal(head.ContentRevision, AuthorityOracle.Head(fixture.Stack, record).ContentRevision);
     }
+
+    // ---- AC-2 and M1 regression coverage (C-46) ----
+
+    /// <summary>Recreates only the api container with the Testing-only business bypass of the contributor lifecycle lock on or off.</summary>
+    private void SetBusinessContributorLockBypass(bool bypass)
+    {
+        Environment.SetEnvironmentVariable("API_TESTING_BYPASS_CONTRIBUTOR_LIFECYCLE_LOCK", bypass ? "true" : "false");
+        fixture.Stack.Compose("up -d --no-deps --wait api", 300);
+        Assert.Contains(bypass ? "true" : "false", fixture.Stack.Compose("exec -T api printenv Testing__BypassContributorLifecycleLock", 60), StringComparison.Ordinal);
+    }
+
+    private string AuthorityOperationCount(Guid record) =>
+        fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM content_change_operations WHERE form_record_id = '{record:D}';").Trim();
+
+    /// <summary>
+    /// AC-2: with the business API's own lifecycle lock switched off for contributors (a compromised or bypassed business
+    /// runtime), a contributor with a valid edit share and the contributor-write switch on can edit the Draft record, but the
+    /// Authorization Authority refuses the same write once the record is Submitted or Archived — decided from the signed status
+    /// of the accepted header. The Authority stores no operation for the refused attempt.
+    /// </summary>
+    [Fact]
+    public async Task WithTheBusinessLockBypassedTheAuthorityAloneRefusesContributorWritesToLockedRecords()
+    {
+        var (s, record) = await AccusedAsync("c6-ac2-bypass");
+        try
+        {
+            await SetContributorWritesAsync(true);
+            var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Designer.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Contributor", fieldKeys = new[] { "given_name" } });
+            Assert.True(share.IsSuccess, share.Body);
+            await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
+            SetBusinessContributorLockBypass(true);
+
+            // Control: through the bypassed business API the contributor's write to the Draft record is accepted.
+            var draft = await s.WaitProjectionAsync(s.Designer, record, TimeSpan.FromSeconds(60));
+            var control = await EditAsync(s, s.Designer, record, new() { ["given_name"] = "Draft-Edit" }, Revision(draft.Root));
+            Assert.True(control.IsSuccess, control.Body);
+
+            foreach (var transition in new[] { "submit", "archive" })
+            {
+                if (transition == "archive")
+                {
+                    await StepAsync(s, record, "reopen", "test the archived lock too");
+                }
+
+                var locked = await StepAsync(s, record, transition);
+                var operationsBefore = AuthorityOperationCount(record);
+                var contributorView = await s.WaitProjectionAsync(s.Designer, record, TimeSpan.FromSeconds(60));
+                var attempt = await EditAsync(s, s.Designer, record, new() { ["given_name"] = "Bypass-Attempt" }, Revision(contributorView.Root));
+                Assert.Equal(HttpStatusCode.Conflict, attempt.Status);
+                Assert.Equal("RECORD_NOT_EDITABLE", attempt.ErrorCode);
+                Assert.Contains("Authorization Authority", attempt.Body, StringComparison.Ordinal); // refused by the Authority, not by the bypassed business check
+                Assert.Equal(operationsBefore, AuthorityOperationCount(record)); // nothing prepared, signed or stored
+                Assert.Equal(Revision(locked), AuthorityOracle.Head(fixture.Stack, record).ContentRevision);
+                var values = (await ViewAsync(s, s.Clerk, record)).GetProperty("record").GetProperty("values").EnumerateArray().ToDictionary(v => v.GetProperty("fieldKey").GetString()!, v => v.GetProperty("stringValue").GetString()!);
+                Assert.Equal("Draft-Edit", values["given_name"]);
+            }
+        }
+        finally
+        {
+            SetBusinessContributorLockBypass(false);
+            await SetContributorWritesAsync(null);
+        }
+    }
+
+    /// <summary>
+    /// Regression: archiving while a field's encryption migration has not yet reached the record. The archive candidate copies
+    /// the legacy plaintext row verbatim, so the Authority's protection barrier refuses it (fail closed: nothing committed,
+    /// status unchanged, nothing decrypted). Once the worker converts the record the same archive succeeds and the value is
+    /// preserved, now encrypted. The worker is held (paused container) to make the window deterministic.
+    /// </summary>
+    [Fact]
+    public async Task ArchivingWhileAProtectionMigrationIsPendingFailsClosedAndSucceedsAfterTheMigration()
+    {
+        var (s, record) = await AccusedAsync("c6-migration-pending");
+        var dateField = s.AccusedFields["date_of_birth"];
+        var before = await ViewAsync(s, s.Clerk, record);
+        fixture.Stack.Pause("worker");
+        try
+        {
+            var strengthened = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/fields/{dateField:D}/protection", s.Token(s.Designer), new { targetClassification = "Confidential", targetProtectionMode = "ApplicationEncrypted", changeReason = "dates of birth are personal data", expectedProtectionRevision = 1 });
+            Assert.True(strengthened.IsSuccess, strengthened.Body);
+
+            var refused = await TransitionAsync(s, s.Clerk, record, "archive", Revision(before), "Draft");
+            Assert.Equal(HttpStatusCode.Conflict, refused.Status);
+            Assert.Equal("FIELD_PROTECTION_MIGRATION_PENDING", refused.ErrorCode);
+            Assert.Equal(Revision(before), AuthorityOracle.Head(fixture.Stack, record).ContentRevision);
+            Assert.Equal("Draft", Status(await ViewAsync(s, s.Clerk, record)));
+        }
+        finally
+        {
+            fixture.Stack.Unpause("worker");
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(240);
+        JsonElement protection;
+        do
+        {
+            var status = await fixture.Api.GetAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/fields/{dateField:D}/protection", s.Token(s.Designer));
+            protection = status.IsSuccess ? status.Root.Clone() : default;
+            if (protection.ValueKind == JsonValueKind.Object && protection.GetProperty("fullyEncrypted").GetBoolean())
+            {
+                break;
+            }
+
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
+        }
+        while (DateTime.UtcNow < deadline);
+        Assert.True(protection.ValueKind == JsonValueKind.Object && protection.GetProperty("fullyEncrypted").GetBoolean(), "migration did not complete: " + protection.GetRawText());
+
+        var archived = await StepAsync(s, record, "archive", "closing after the migration");
+        Assert.Equal("Archived", Status(archived));
+        var date = archived.GetProperty("record").GetProperty("values").EnumerateArray().Single(v => v.GetProperty("fieldKey").GetString() == "date_of_birth");
+        Assert.Equal("1990-02-28", date.GetProperty("stringValue").GetString());
+        Assert.True(date.GetProperty("applicationEncrypted").GetBoolean());
+    }
+
+    /// <summary>
+    /// Regression: an upload processed while the record was a Draft cannot be committed after the record is locked. Submit
+    /// waits for uploads in flight (OD-04); Archive does not, and the later commit is refused (RECORD_NOT_EDITABLE) with the
+    /// session left Processed and no document added. After Unarchive the same session commits (until it expires).
+    /// </summary>
+    [Fact]
+    public async Task AnUploadCannotCompleteIntoALockedRecordAndCanAfterUnlocking()
+    {
+        var (s, record) = await AccusedAsync("c6-upload-after-lock");
+        var session = await s.TransferAsync(s.Clerk, record, "late.txt", "text/plain", StageBScenario.SyntheticBytes(512, 11));
+        Assert.Equal("Processed", session.GetProperty("sessionState").GetString());
+        var sessionId = session.GetProperty("uploadSessionId").GetGuid();
+
+        var view = await ViewAsync(s, s.Clerk, record);
+        var submit = await TransitionAsync(s, s.Clerk, record, "submit", Revision(view), "Draft");
+        Assert.Equal("UPLOADS_IN_PROGRESS", submit.ErrorCode);
+
+        var archived = await StepAsync(s, record, "archive");
+        var commit = await fixture.Api.PostAsync($"/api/v1/upload-sessions/{sessionId:D}/commit", s.Token(s.Clerk), new { });
+        Assert.Equal(HttpStatusCode.Conflict, commit.Status);
+        Assert.Equal("RECORD_NOT_EDITABLE", commit.ErrorCode);
+        Assert.Equal("Processed", (await fixture.Api.GetAsync($"/api/v1/upload-sessions/{sessionId:D}", s.Token(s.Clerk))).Root.GetProperty("sessionState").GetString());
+        Assert.Equal(Revision(archived), AuthorityOracle.Head(fixture.Stack, record).ContentRevision);
+        Assert.Empty((await ViewAsync(s, s.Clerk, record)).GetProperty("documents").EnumerateArray());
+
+        await StepAsync(s, record, "unarchive");
+        var committed = await fixture.Api.PostAsync($"/api/v1/upload-sessions/{sessionId:D}/commit", s.Token(s.Clerk), new { });
+        Assert.True(committed.IsSuccess, committed.Body);
+        Assert.Single((await ViewAsync(s, s.Clerk, record)).GetProperty("documents").EnumerateArray());
+        Assert.Equal("Submitted", Status(await StepAsync(s, record, "submit")));
+    }
+
+    /// <summary>
+    /// Regression: replaying a successful transition with the same Idempotency-Key (a retry after a lost response) returns the
+    /// committed result without staging anything or writing a second audit event; the same request with a new key is refused
+    /// as stale, never applied twice.
+    /// </summary>
+    [Fact]
+    public async Task ReplayingASuccessfulTransitionIsIdempotentAndANewKeyIsRefusedAsStale()
+    {
+        var (s, record) = await AccusedAsync("c6-replay");
+        var view = await ViewAsync(s, s.Clerk, record);
+        var key = "c6-replay-" + Guid.NewGuid().ToString("N");
+        var first = await TransitionAsync(s, s.Clerk, record, "submit", Revision(view), "Draft", idempotencyKey: key);
+        Assert.True(first.IsSuccess, first.Body);
+        var operationsAfterFirst = AuthorityOperationCount(record);
+
+        var replay = await TransitionAsync(s, s.Clerk, record, "submit", Revision(view), "Draft", idempotencyKey: key);
+        Assert.True(replay.IsSuccess, replay.Body);
+        Assert.Equal(first.Root.GetProperty("committedOperationId").GetGuid(), replay.Root.GetProperty("committedOperationId").GetGuid());
+        Assert.Equal(first.Root.GetProperty("contentRevision").GetInt64(), replay.Root.GetProperty("contentRevision").GetInt64());
+        Assert.Equal("Submitted", replay.Root.GetProperty("status").GetString());
+        Assert.Equal("Draft", replay.Root.GetProperty("previousStatus").GetString());
+        Assert.Equal(operationsAfterFirst, AuthorityOperationCount(record));
+
+        var fresh = await TransitionAsync(s, s.Clerk, record, "submit", Revision(view), "Draft");
+        Assert.Equal(HttpStatusCode.Conflict, fresh.Status);
+        Assert.Contains(fresh.ErrorCode, new[] { "CONTENT_REVISION_CONFLICT", "LIFECYCLE_STATE_CONFLICT" });
+        Assert.Equal(Revision(view) + 1, AuthorityOracle.Head(fixture.Stack, record).ContentRevision);
+        Assert.Single(await ActionsAsync(s, record), a => a == "RECORD_SUBMITTED");
+    }
 }

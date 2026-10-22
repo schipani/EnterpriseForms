@@ -26,6 +26,9 @@ services:
   api:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
+      # Phase C6 AC-2 adversarial tests only: skip the business lifecycle lock on the contributor path so the Authority's own
+      # lock is what is exercised. Off unless a test recreates the api container with the variable set; Testing-only (startup guard).
+      Testing__BypassContributorLifecycleLock: ${API_TESTING_BYPASS_CONTRIBUTOR_LIFECYCLE_LOCK:-false}
     ports: ["127.0.0.1:5180:8080"]
   worker:
     environment:

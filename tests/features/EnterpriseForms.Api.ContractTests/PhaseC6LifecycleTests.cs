@@ -116,4 +116,16 @@ public sealed class PhaseC6LifecycleTests
         Assert.Equal(["RECORD_SUBMITTED", "RECORD_REOPENED", "RECORD_ARCHIVED", "RECORD_UNARCHIVED"], actions);
         Assert.Throws<ArgumentOutOfRangeException>(() => RecordLifecycle.AuditActionFor("Delete"));
     }
+
+    [Fact]
+    public void TheContributorLockBypassIsTestingOnlyAndRefusesToStartAnywhereElse()
+    {
+        Assert.False(LifecycleTestingHooks.FromConfiguration(false, "Production").BypassContributorLifecycleLock);
+        Assert.False(LifecycleTestingHooks.FromConfiguration(false, "Testing").BypassContributorLifecycleLock);
+        Assert.True(LifecycleTestingHooks.FromConfiguration(true, "Testing").BypassContributorLifecycleLock);
+        foreach (var environment in new[] { "Production", "Staging", "Development", "testing", "" })
+        {
+            Assert.Throws<InvalidOperationException>(() => LifecycleTestingHooks.FromConfiguration(true, environment));
+        }
+    }
 }

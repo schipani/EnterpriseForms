@@ -274,13 +274,16 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             mutations[Convert.ToHexStringLower(removed.ManifestItemKey)] = ContentMutationKinds.Remove;
         }
 
+        var shareEditorOperation = false;
         if (reprotection is null)
         {
             try
             {
                 // Commit-time authorization against the CURRENT desired edges, inside the transaction that holds the
                 // organization lock and advances the head: a revocation committed before this point aborts the write.
-                AuthorizeMutations(new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false)), bound, request.FormRecordId, mutations);
+                var commitGraph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
+                AuthorizeMutations(commitGraph, bound, request.FormRecordId, mutations);
+                shareEditorOperation = !commitGraph.IsRecordOwner(bound.AuthorityUserId, request.FormRecordId);
             }
             catch (AuthorityException)
             {
@@ -300,6 +303,24 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         if (verified is not null)
         {
             throw new AuthorityException(AuthorityErrorCodes.CandidateMismatch, 409, false, verified);
+        }
+
+        if (shareEditorOperation)
+        {
+            // AC-2 at commit, on the verified staged header (equal to the accepted header except the operation binding, D15).
+            // The head compare-and-swap above already rejects a candidate prepared before a lifecycle transition committed;
+            // this re-check keeps the lock independent of that reasoning.
+            try
+            {
+                RequireShareEditableStatus(RowCanonicalDecoder.Decode(Convert.FromBase64String(request.StagedItems.Single(i => i.ItemKind == ManifestItemKind.RecordHeader).CanonicalBytesBase64)), "commit");
+            }
+            catch (AuthorityException)
+            {
+                operation.OperationStateName = ContentOperationStates.Aborted;
+                operation.OperationQuarantineReasonCode = "RECORD_LOCKED_BEFORE_COMMIT";
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                throw;
+            }
         }
 
         faultInjector.CrashIfArmed(FaultNames.CrashAfterContentHeadCommit + ":before");
@@ -764,6 +785,21 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
     }
 
+    /// <summary>
+    /// AC-2 (Phase C6, approved C-43): a share editor may change content only while the record's signed header status is
+    /// Draft. Submitted and Archived records are locked; an unreadable or missing status fails closed. Owners are not
+    /// subject to this rule here (their lifecycle transitions are owner content writes; the business API locks their
+    /// ordinary edits, R-01). Signed formats, manifests and the journal are unchanged.
+    /// </summary>
+    public static void RequireShareEditableStatus(RowCanonicalDocument? header, string stage)
+    {
+        var status = header?.Column("record_status") is { IsNull: false } column ? column.AsText() : null;
+        if (!string.Equals(status, "Draft", StringComparison.Ordinal))
+        {
+            throw new AuthorityException(AuthorityErrorCodes.RecordNotEditable, 409, false, $"RECORD_LOCKED: shared contributors cannot change a record whose accepted status is {status ?? "unknown"} ({stage})");
+        }
+    }
+
     /// <summary>A non-owner may write only through an explicit contributor/manager share, and only while the switch is enabled (fail closed).</summary>
     private IReadOnlySet<Guid> RequireShareEditor(DesiredStateGraph graph, BoundActor actor, Guid formRecordId)
     {
@@ -823,6 +859,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.CurrentSnapshotMismatch, 409, false, failure);
         }
+
+        // AC-2: the lifecycle lock, decided from the signed header of the accepted head (the snapshot was just bound to it).
+        RequireShareEditableStatus(current.Where(i => i.Kind == ManifestItemKind.RecordHeader).Select(i => i.Document).SingleOrDefault(), "prepare");
 
         var candidate = parsed.Select(p => new ContentDeltaRules.DecodedItem(p.Kind, p.ItemId, p.Key, p.Document, p.Digest)).ToList();
         var shareScope = new ContentDeltaRules.ShareScope(state.OrganizationId, request.FormRecordId, head.CommittedContentRevision, headOperation, candidateRevision, operationId,

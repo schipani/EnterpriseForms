@@ -36,6 +36,12 @@ public static class AuthorityErrorCodes
 
     /// <summary>Field-scoped contributor writes are disabled by deployment configuration (Phase C5, D10; the default everywhere).</summary>
     public const string ContributorWritesDisabled = "CONTRIBUTOR_WRITES_DISABLED";
+
+    /// <summary>
+    /// AC-2 (Phase C6): a share editor's content write targets a record whose accepted, signed header status is not Draft
+    /// (Submitted or Archived). Decided from the signed header bound to the accepted head, never from a business projection.
+    /// </summary>
+    public const string RecordNotEditable = "RECORD_NOT_EDITABLE";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

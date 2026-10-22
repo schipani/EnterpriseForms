@@ -18,7 +18,7 @@ namespace EnterpriseForms.Application.Features.FormRecords.UpdateFormRecord;
 /// their edited items replaced and send that snapshot as proof; the Authority decides the share scope at prepare and again
 /// at commit. A partial projection never runs the owner candidate builder (C5-F2: nothing outside the scope is decrypted).
 /// </summary>
-public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusinessStore store, RecordCandidateStager stager, TimeProvider clock)
+public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusinessStore store, RecordCandidateStager stager, TimeProvider clock, Lifecycle.LifecycleTestingHooks testingHooks)
 {
     /// <summary>Audit description of a share editor's committed change (Phase C5 collaboration history).</summary>
     public const string SharedEditAuditDescription = "shared fields changed by a person with shared edit access";
@@ -37,7 +37,11 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
 
         // Phase C6 M1: a Submitted or Archived record rejects ordinary content edits, for owners and shared contributors alike
         // (decided on the Authority-verified signed header, not on the unsigned status projection).
-        Lifecycle.RecordLifecycle.RequireContentEditable(verified);
+        // The Authority enforces the same lock for contributors (AC-2); only the Testing-only hook may skip the business check, and only on that path.
+        if (verified.IsComplete || !testingHooks.BypassContributorLifecycleLock)
+        {
+            Lifecycle.RecordLifecycle.RequireContentEditable(verified);
+        }
         if (request.ExpectedContentRevision != verified.Head.CommittedContentRevision)
         {
             throw new BusinessException("CONTENT_REVISION_CONFLICT", 409, "expected_content_revision is stale");
@@ -92,6 +96,11 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTRIBUTOR_WRITES_DISABLED")
         {
             throw new BusinessException("CONTRIBUTOR_WRITES_DISABLED", 403, "changing shared fields is not enabled");
+        }
+        catch (AuthorityClientException ex) when (ex.ErrorCode == "RECORD_NOT_EDITABLE")
+        {
+            // AC-2: the Authority's own lifecycle lock (signed status of the accepted header).
+            throw new BusinessException("RECORD_NOT_EDITABLE", 409, "the Authorization Authority refused the change: this record is submitted or archived and cannot be changed");
         }
         catch (AuthorityClientException ex) when (ex.HttpStatusCode is 403 or 422 && ex.ErrorCode is "FORBIDDEN" or "INVALID_COMMAND")
         {

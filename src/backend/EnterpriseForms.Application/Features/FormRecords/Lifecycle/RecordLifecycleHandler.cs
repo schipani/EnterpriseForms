@@ -52,6 +52,15 @@ public sealed class RecordLifecycleHandler(VerifiedRecordReader reader, IBusines
             throw new BusinessException("FORBIDDEN", 403, "only the record's owner can change its status");
         }
 
+        // Idempotent replay (a retry after a lost response, a double click): when this request's own operation is already the
+        // accepted head, answer with the committed result — nothing is staged again and no second audit event is written.
+        // The operation id is the same pure function of the idempotency key that the stager used for the original prepare.
+        var stagerKey = "lifecycle:" + transition + ":" + idempotencyKey;
+        if (verified.Head.CommittedOperationId is { } headOperation && headOperation == RecordCandidateStager.DeriveOperationId(context.OrganizationId, formRecordId, stagerKey))
+        {
+            return Response(formRecordId, transition, PreviousStatusOf(transition, verified.Header.SubmittedOn), verified.Header.RecordStatus, verified.Header.SubmittedOn, verified.Head.CommittedContentRevision, headOperation);
+        }
+
         // Authorization comes before input validation: a caller who may not change the status learns nothing about what a valid request looks like.
         var reason = NormalizeReason(transition, request.Reason);
         var current = verified.Header.RecordStatus;
@@ -84,7 +93,18 @@ public sealed class RecordLifecycleHandler(VerifiedRecordReader reader, IBusines
         rows.AddRange(verified.AllRows.OfType<FileAttachmentVersion>().Select(a => CandidateBuilder.CloneAttachment(a)));
         CandidateBuilder.EnsureWithinCeiling(rows.Count + 1);
 
-        var accepted = await stager.StageAndCommitAsync(context, verified.Head, new RecordCandidateStager.CandidateInput(header, rows), "lifecycle:" + transition + ":" + idempotencyKey, cancellationToken).ConfigureAwait(false);
+        AcceptedContentRevision accepted;
+        try
+        {
+            accepted = await stager.StageAndCommitAsync(context, verified.Head, new RecordCandidateStager.CandidateInput(header, rows), stagerKey, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityClientException ex) when (ex.ErrorCode == "FIELD_PROTECTION_CHANGED")
+        {
+            // The verbatim copy still carries rows of a field whose protection changed and whose migration has not reached this
+            // record yet; the Authority's barrier refuses them. Fail closed: nothing committed, the status is unchanged, and the
+            // same request succeeds once the migration has converted the record (it processes records in every lifecycle state).
+            throw new BusinessException("FIELD_PROTECTION_MIGRATION_PENDING", 409, "a protection change is still being applied to this record; try again shortly");
+        }
 
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -106,9 +126,23 @@ public sealed class RecordLifecycleHandler(VerifiedRecordReader reader, IBusines
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        var etag = "\"" + accepted.CommittedContentRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-" + (accepted.CommittedOperationId?.ToString("N") ?? string.Empty) + "\"";
-        return new RecordLifecycleResponse(formRecordId, transition, current, plan.Status, plan.SubmittedOn, accepted.CommittedContentRevision, accepted.CommittedOperationId, etag, RecordLifecycle.AllowedFor(plan.Status));
+        return Response(formRecordId, transition, current, plan.Status, plan.SubmittedOn, accepted.CommittedContentRevision, accepted.CommittedOperationId);
     }
+
+    private static RecordLifecycleResponse Response(Guid formRecordId, string transition, string previousStatus, string status, DateTimeOffset? submittedOn, long revision, Guid? operationId)
+    {
+        var etag = "\"" + revision.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-" + (operationId?.ToString("N") ?? string.Empty) + "\"";
+        return new RecordLifecycleResponse(formRecordId, transition, previousStatus, status, submittedOn, revision, operationId, etag, RecordLifecycle.AllowedFor(status));
+    }
+
+    /// <summary>The status a transition started from, reconstructed for a replayed response (Archive: Submitted when the archived record had been submitted).</summary>
+    private static string PreviousStatusOf(string transition, DateTimeOffset? submittedOn) => transition switch
+    {
+        RecordLifecycle.Submit => RecordLifecycle.Draft,
+        RecordLifecycle.Reopen => RecordLifecycle.Submitted,
+        RecordLifecycle.Archive => submittedOn is null ? RecordLifecycle.Draft : RecordLifecycle.Submitted,
+        _ => RecordLifecycle.Archived,
+    };
 
     /// <summary>
     /// Submission validation (architecture §2.3): the whole current content must satisfy the current effective layout —
