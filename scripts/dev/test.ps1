@@ -90,8 +90,8 @@ try {
         if ($LASTEXITCODE -eq 0) { git diff --exit-code -- contracts/openapi }
         if ($LASTEXITCODE -eq 0) { dotnet build tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj -c Release }
         if ($LASTEXITCODE -eq 0) { dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release }
-        if ($LASTEXITCODE -eq 0) { dotnet test --solution EnterpriseForms.All.slnx --no-build -c Release --results-directory artifacts/test-results --report-xunit-trx -- --minimum-expected-tests 10 }
-        if ($LASTEXITCODE -eq 0) { python scripts/ci/assert_test_totals.py artifacts/test-results --min-total 130 --min-files 4 }
+        if ($LASTEXITCODE -eq 0) { python -m unittest scripts/ci/test_test_results.py }
+        if ($LASTEXITCODE -eq 0) { python scripts/ci/run_dotnet_tests.py EnterpriseForms.All.slnx --results-dir artifacts/test-results --configuration Release --no-build --minimum-expected-tests 10 --min-total 130 }
       }
     }
     Step 'Frontend full (client drift, lint, typecheck, tests, build)' {

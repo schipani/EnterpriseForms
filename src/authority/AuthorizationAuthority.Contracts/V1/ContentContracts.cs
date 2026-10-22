@@ -84,6 +84,8 @@ public sealed record VerifiedProjectionItem(ManifestItemKind ItemKind, Guid Item
 /// verified=true only when the observed set equals the authority's complete accepted leaf index for the current head,
 /// every row signature verifies under the recorded key version, the recomputed root equals the accepted root, the
 /// organization gate is open and the content checkpoint is archived. authorized_items is the subset the caller may release.
+/// Phase C5 (D7, additive): for a partial projection readable_items and editable_items are both returned (advisory only;
+/// prepare and commit decide) and contributor_writes_enabled reports the Authority's deployment switch (D10).
 /// </summary>
 public sealed record VerifyRecordProjectionResult(
     bool Verified,
@@ -93,4 +95,7 @@ public sealed record VerifyRecordProjectionResult(
     long AuthorizationRevision,
     IReadOnlyList<VerifiedProjectionItem> AuthorizedItems,
     bool IsCompleteProjection,
-    Guid CorrelationId);
+    Guid CorrelationId,
+    IReadOnlyList<VerifiedProjectionItem>? ReadableItems = null,
+    IReadOnlyList<VerifiedProjectionItem>? EditableItems = null,
+    bool ContributorWritesEnabled = false);

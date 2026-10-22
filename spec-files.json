@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "82d7040c5dbbb1722ce69a9e6927ea8d24be3d7fc96b63cbf5b70b58d87ad93e",
-      "bytes": 26275
+      "sha256": "e6212803b961f869642c1fd5e2e26bc6423bd10ed3b2ebf108f39c2f804a8c4b",
+      "bytes": 27784
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -66,6 +66,11 @@
       "path": "docs/PHASE_C4_STATUS.md",
       "sha256": "444910e38e817bdf7b5382ed243a445b37916cab3fcaf5962f7aa237826252fb",
       "bytes": 22284
+    },
+    {
+      "path": "docs/PHASE_C5_STATUS.md",
+      "sha256": "cd042891eaff5314a04de445ddeb3912ddf3e221562e43c95c953244f8de89d3",
+      "bytes": 34615
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -121,6 +126,11 @@
       "path": "docs/architecture/PHASE_C3_REPEATING_GROUPS_AND_DEPENDENT_DROPDOWNS.md",
       "sha256": "2da32a5de04325a4fc39fa1ebb4a1d7be96aa52d21acf7a73d0ee27cc7a19713",
       "bytes": 8247
+    },
+    {
+      "path": "docs/architecture/PHASE_C5_COLLABORATION_CONTRIBUTOR_WRITES.md",
+      "sha256": "baec68fa068e7480fd5590aafdd518a2206e56371872c230f9844bf40b18f511",
+      "bytes": 57561
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -209,8 +219,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "d47c5c58fa4f1153faf3b3bbb7980716e3724db06b26817efd720973d7b8ae27",
-      "bytes": 45127
+      "sha256": "795fa03406aa7705c1f1d1f3956e8663873f481e684edaa0a68c12d206c44a7a",
+      "bytes": 55094
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -449,8 +459,13 @@
     },
     {
       "path": "scripts/ci/assert_test_totals.py",
-      "sha256": "a18433520928387776efc3abd89ecec3830dd7030f939b8f414611158c138248",
-      "bytes": 2166
+      "sha256": "bb2de3d64a3c19fc9dc074a5ea9f421d06a7a26e4198292567b76fb3e43240e7",
+      "bytes": 3673
+    },
+    {
+      "path": "scripts/ci/run_dotnet_tests.py",
+      "sha256": "9efc3bda170dd0c753d84116b524ed73f957294edd4997cf6b2902b9cc628e68",
+      "bytes": 4044
     },
     {
       "path": "scripts/ci/summarize_trx.py",
@@ -458,9 +473,14 @@
       "bytes": 1750
     },
     {
+      "path": "scripts/ci/test_test_results.py",
+      "sha256": "c63cede5ac611a8899f3936452d556db07533dfc537e3bf39dfaee650a2aaa48",
+      "bytes": 4364
+    },
+    {
       "path": "scripts/dev/test.ps1",
-      "sha256": "3e3ff1cf6ac62affa7a6145bab0d4bb8cff3f84cb5f51fd4e57e6a14f868c748",
-      "bytes": 7841
+      "sha256": "e5ca4a8fe0dcb8d1792c5b154ebcbd59b24378bb571b532a78032c1e9e701470",
+      "bytes": 7815
     },
     {
       "path": "scripts/generate-spec-manifest.py",
@@ -579,8 +599,8 @@
     },
     {
       "path": "trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md",
-      "sha256": "5f0786b54475d8e830304fe409168fe34a2fe1f1e43d6275ad841583d8547ee5",
-      "bytes": 32015
+      "sha256": "b62d9be5242ee4866666f05f2d521ddbf616e478dc0345e9f3e483aac580881c",
+      "bytes": 32710
     },
     {
       "path": "trust_authority/CRYPTOGRAPHIC_SIGNING_AUTHORITY.md",
@@ -609,8 +629,8 @@
     },
     {
       "path": "trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md",
-      "sha256": "a785670f335c21fa592e3afa93aac4f685029e1c44109411743831068346399d",
-      "bytes": 30214
+      "sha256": "07c3bead94e586109bf934d6ac12ebf057d5f1aab49a9fb6143173c3fb5d6121",
+      "bytes": 31326
     },
     {
       "path": "trust_authority/POSTGRESQL_PRIVILEGE_TEST_PLAN.md",

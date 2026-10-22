@@ -30,6 +30,12 @@ public static class AuthorityErrorCodes
 
     /// <summary>A discovery continuation token was issued at an earlier authorization revision; restart the enumeration from the first page (C-28).</summary>
     public const string ContinuationInvalidated = "CONTINUATION_INVALIDATED";
+
+    /// <summary>A share editor's current snapshot is not exactly the accepted, verified head (coverage, digest, binding or root); nothing is signed (Phase C5, D4).</summary>
+    public const string CurrentSnapshotMismatch = "CURRENT_SNAPSHOT_MISMATCH";
+
+    /// <summary>Field-scoped contributor writes are disabled by deployment configuration (Phase C5, D10; the default everywhere).</summary>
+    public const string ContributorWritesDisabled = "CONTRIBUTOR_WRITES_DISABLED";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

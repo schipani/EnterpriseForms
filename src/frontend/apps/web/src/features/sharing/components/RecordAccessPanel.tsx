@@ -3,13 +3,22 @@ import { useApi } from "@enterpriseforms/app-runtime";
 import { Badge, Button, Card, Checkbox, DataTable, DescriptionList, Dialog, LoadingBlock, Select, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ActivityTimeline } from "../../audit";
 import { ErrorPanel } from "../../support";
+import { contributorViewOnlyReasons } from "./contributorPreview";
 
-const ROLES = [
+/** Role copy follows the Authority's contributor-write switch (Phase C5, D10): never promise an edit that cannot happen. */
+const rolesFor = (contributorWritesEnabled: boolean) => [
   { value: "Reader", label: "Reader — view the selected fields" },
-  { value: "Contributor", label: "Contributor — view and edit the selected fields" },
-  { value: "Manager", label: "Manager — contributor plus share within the same scope" },
+  {
+    value: "Contributor",
+    label: contributorWritesEnabled ? "Contributor — view the selected fields and change their values" : "Contributor — view the selected fields (changing shared values is not enabled)",
+  },
+  { value: "Manager", label: contributorWritesEnabled ? "Manager — contributor, and can share these fields with others" : "Manager — view and share these fields with others (changing shared values is not enabled)" },
 ];
+
+/** Audit description the server writes for a share editor's committed change (UpdateFormRecordHandler.SharedEditAuditDescription). */
+const SHARED_EDIT_DESCRIPTION = "shared fields changed by a person with shared edit access";
 
 /**
  * PG-017 Access tab (CLAUDE.md §4H, ADR-PB-002 Stage B item 5): the caller's effective permissions as decided by the
@@ -24,14 +33,22 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
   const shares = useQuery({ queryKey: ["shares", formRecordId], queryFn: () => api.shares.list(formRecordId).then((r) => r.result), enabled: canManage });
   const [open, setOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<RecordShareSummaryResponse | null>(null);
+  const [revokedNotice, setRevokedNotice] = useState<string | null>(null);
+  const writesEnabled = projection.permissions.contributorWritesEnabled;
+  // Collaboration history (owners, who can read the record's activity): grants, revocations and shared edits only.
+  const history = useQuery({ queryKey: ["audit", "record", formRecordId], queryFn: () => api.audit.record(formRecordId).then((r) => r.result), enabled: canManage && projection.permissions.isCompleteProjection });
+  const collaboration = (history.data?.events ?? []).filter((event) => event.eventAction === "RECORD_ACCESS_GRANTED" || event.eventAction === "RECORD_ACCESS_REVOKED" || (event.eventAction === "RECORD_UPDATED" && event.eventDescription === SHARED_EDIT_DESCRIPTION));
   const revoke = useMutation({
     mutationFn: (share: RecordShareSummaryResponse) => api.shares.revoke(formRecordId, share.recordShareId).then((r) => r.result),
-    onSuccess: async () => {
+    onSuccess: async (_result, share) => {
       setRevokeTarget(null);
+      setRevokedNotice(share.recipientDisplayName ?? share.recipientUserId ?? share.recipientTeamId ?? "the recipient");
       await queryClient.invalidateQueries({ queryKey: ["shares", formRecordId] });
+      await queryClient.invalidateQueries({ queryKey: ["audit", "record", formRecordId] });
     },
   });
   const activeShares = shares.data?.items.filter((share) => share.shareStatus === "Active") ?? [];
+  const sharedEditable = (projection.sharedFieldAccess ?? []).filter((item) => item.editable).length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -39,7 +56,16 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
         <DescriptionList
           items={[
             { term: "Read", detail: projection.permissions.canRead ? "Yes" : "No" },
-            { term: "Edit", detail: projection.permissions.canEdit ? "Yes" : "No" },
+            {
+              term: "Edit",
+              detail: projection.permissions.canEdit
+                ? "Yes"
+                : !projection.permissions.isCompleteProjection && sharedEditable > 0
+                  ? `Shared fields you can change: ${sharedEditable}`
+                  : !projection.permissions.isCompleteProjection && !writesEnabled && (projection.sharedFieldAccess ?? []).length > 0
+                    ? "No (changing shared fields is not enabled)"
+                    : "No",
+            },
             { term: "Manage access", detail: projection.permissions.canManageAccess ? "Yes" : "No" },
             { term: "Transfer ownership", detail: projection.permissions.canTransferOwnership ? "Yes" : "No" },
             { term: "View scope", detail: projection.permissions.isCompleteProjection ? "Complete record" : `Shared fields only (${projection.record.values.length})` },
@@ -63,6 +89,11 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
             </>
           }
         >
+          {revokedNotice ? (
+            <StatusMessage tone="success" title={`Access revoked for ${revokedNotice}`} actions={<Button size="sm" variant="ghost" onClick={() => setRevokedNotice(null)}>Dismiss</Button>}>
+              They lose discovery, reading and editing of the shared fields on their next request. Changes they already saved stay in the record history.
+            </StatusMessage>
+          ) : null}
           {shares.isPending ? <LoadingBlock label="Loading shares" /> : null}
           {shares.isError ? <ErrorPanel error={shares.error} onRetry={() => void shares.refetch()} /> : null}
           {shares.data ? (
@@ -74,6 +105,7 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
               columns={[
                 { key: "recipient", header: "Recipient", isRowHeader: true, render: (row) => row.recipientDisplayName ?? (row.recipientTeamId ? `Team ${row.recipientTeamId}` : (row.recipientUserId ?? "unknown")) },
                 { key: "role", header: "Role", render: (row) => row.recipientRole },
+                { key: "changes", header: "Can change values", render: (row) => (row.recipientRole !== "Reader" && writesEnabled ? "Yes" : "No") },
                 { key: "fields", header: "Fields", render: (row) => row.fieldKeys.join(", ") },
                 { key: "status", header: "Status", render: (row) => <Badge tone={row.shareStatus === "Active" ? "success" : "neutral"}>{row.shareStatus}</Badge> },
                 { key: "by", header: "Shared by", render: (row) => row.sharedByDisplayName ?? row.sharedByUserId },
@@ -83,16 +115,32 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
             />
           ) : null}
           <StatusMessage tone="info" title="What a share covers">
-            A share names exactly the fields chosen now. Fields added later, documents, and child records such as addresses are not included and need their own share.
+            A share names exactly the fields chosen now. Fields added later, documents, and child records such as addresses are not included and need their own share. A share follows the current value of a field: if you clear a field or change a multiple choice, the new value is not covered until you share it again.
           </StatusMessage>
         </Card>
       ) : null}
-      {open ? <CreateShareDialog formRecordId={formRecordId} projection={projection} onClose={() => setOpen(false)} /> : null}
+      {canManage && projection.permissions.isCompleteProjection ? (
+        <Card
+          title="Sharing history"
+          aria-label="Sharing history"
+          actions={
+            <Button size="sm" variant="secondary" busy={history.isFetching} onClick={() => void history.refetch()}>
+              Refresh
+            </Button>
+          }
+        >
+          {history.isPending ? <LoadingBlock label="Loading sharing history" /> : null}
+          {history.isError ? <ErrorPanel error={history.error} onRetry={() => void history.refetch()} /> : null}
+          {history.data ? (collaboration.length > 0 ? <ActivityTimeline events={collaboration} /> : <p className="text-sm text-muted">No shares, revocations or shared edits yet.</p>) : null}
+          <p className="mt-2 text-sm text-muted">Shares granted and revoked, and changes made by people with shared edit access. Values are never shown here; the full audit history is under Activity and history.</p>
+        </Card>
+      ) : null}
+      {open ? <CreateShareDialog formRecordId={formRecordId} projection={projection} contributorWritesEnabled={writesEnabled} onClose={() => setOpen(false)} /> : null}
       <Dialog
         open={revokeTarget !== null}
         onOpenChange={(next) => (next ? undefined : setRevokeTarget(null))}
         title="Revoke this share?"
-        description="The authority removes the grant immediately; the recipient loses discovery, reading and editing of the shared fields on their next request."
+        description="The authority removes the grant immediately; the recipient loses discovery, reading and editing of the shared fields on their next request. Changes they already saved stay in the record history."
         locked={revoke.isPending}
         footer={
           <>
@@ -116,7 +164,7 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
   );
 }
 
-function CreateShareDialog({ formRecordId, projection, onClose }: { formRecordId: string; projection: RecordProjectionResponse; onClose: () => void }) {
+function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled, onClose }: { formRecordId: string; projection: RecordProjectionResponse; contributorWritesEnabled: boolean; onClose: () => void }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.organization.users().then((r) => r.result) });
@@ -128,6 +176,9 @@ function CreateShareDialog({ formRecordId, projection, onClose }: { formRecordId
   // allow multiple entries are not shareable on their own in this version (the server refuses them: FIELD_IN_REPEATING_GROUP).
   const shareable = projection.record.values.filter((value) => !value.formRecordGroupId).map((value) => value.fieldKey).filter((key, index, all) => all.indexOf(key) === index).sort();
   const hasEntries = projection.record.values.some((value) => value.formRecordGroupId);
+  // Phase C5: for a role that can change values, preview which selected fields would still be view only (advisory).
+  const canChange = role !== "Reader" && contributorWritesEnabled;
+  const viewOnly = canChange ? contributorViewOnlyReasons(projection.layoutVersion.layoutJson, projection.fields, selected) : new Map<string, string>();
   const create = useMutation({
     mutationFn: () => api.shares.create(formRecordId, { recipientUserId: recipientUserId ?? null, recipientTeamId: null, recipientRole: role, fieldKeys: [...selected] }).then((r) => r.result),
     onSuccess: async () => {
@@ -167,7 +218,7 @@ function CreateShareDialog({ formRecordId, projection, onClose }: { formRecordId
         {users.isPending ? <LoadingBlock label="Loading people" /> : null}
         {users.isError ? <ErrorPanel error={users.error} onRetry={() => void users.refetch()} /> : null}
         {users.data ? <Select label="Person" required value={recipientUserId} placeholder="Choose a person" options={users.data.map((user) => ({ value: user.userId, label: user.displayName }))} onValueChange={setRecipientUserId} /> : null}
-        <Select label="Role" required value={role} options={ROLES} onValueChange={setRole} />
+        <Select label="Role" required value={role} options={rolesFor(contributorWritesEnabled)} onValueChange={setRole} />
         <fieldset className="flex flex-col gap-2 rounded border border-line p-3">
           <legend className="px-1 text-sm font-medium">Fields to share</legend>
           <div className="flex gap-2">
@@ -179,9 +230,14 @@ function CreateShareDialog({ formRecordId, projection, onClose }: { formRecordId
             </Button>
           </div>
           {shareable.map((key) => (
-            <Checkbox key={key} label={displayNames.get(key) ?? key} checked={selected.has(key)} onCheckedChange={(checked) => toggle(key, checked === true)} />
+            <div key={key} className="flex flex-wrap items-center gap-2">
+              <Checkbox label={displayNames.get(key) ?? key} checked={selected.has(key)} onCheckedChange={(checked) => toggle(key, checked === true)} />
+              {viewOnly.has(key) ? <Badge tone="neutral">View only: {viewOnly.get(key)}</Badge> : null}
+            </div>
           ))}
+          <p className="text-sm text-muted">Empty fields can't be shared yet: a share covers the values a record holds now.</p>
           {hasEntries ? <p className="text-sm text-muted">Fields in sections that allow multiple entries cannot be shared on their own.</p> : null}
+          {canChange ? <p className="text-sm text-muted">A person with this role can change the values of the selected fields, except those marked View only. They cannot clear values, change multiple choices, entries, documents or related records.</p> : null}
         </fieldset>
         {create.isError ? <ErrorPanel error={create.error} /> : null}
       </div>

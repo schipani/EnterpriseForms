@@ -5027,6 +5027,14 @@
           },
           "isCompleteProjection": {
             "type": "boolean"
+          },
+          "canEditSharedFields": {
+            "type": "boolean",
+            "default": false
+          },
+          "contributorWritesEnabled": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -5101,6 +5109,15 @@
                 "$ref": "#/components/schemas/RecordProjectionSummaryResponse"
               }
             ]
+          },
+          "sharedFieldAccess": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SharedFieldAccessResponse"
+            }
           }
         }
       },
@@ -5438,6 +5455,28 @@
           },
           "identityProviderKind": {
             "type": "string"
+          }
+        }
+      },
+      "SharedFieldAccessResponse": {
+        "required": [
+          "fieldKey",
+          "editable",
+          "notEditableReason"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldKey": {
+            "type": "string"
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "notEditableReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

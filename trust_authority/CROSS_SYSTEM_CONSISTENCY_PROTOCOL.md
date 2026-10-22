@@ -97,6 +97,8 @@ stateDiagram-v2
 
 **Key correction to prior drafts:** A local business DB candidate's `Prepared` or `Published` flag is not authoritative. The independent `committed_operation_id` is necessary to distinguish simultaneous candidates with the same proposed revision and to survive a crash after authority commit but before local publication. Add this ID to the authority head, API content-revision DTO and content read path.
 
+**Share-scoped user operations (Phase C5 clarification, decision D12).** A content change by a non-owner share editor carries `current_items`: the complete accepted snapshot it was built from, bound by the authority to the accepted head before any classification or signing. The deployment switch `Content:ShareContributorWritesEnabled` (off by default, refused in Production) is checked at Prepare and again at Commit, and Commit re-authorizes against the current desired edges under the organization lock taken by every security command, so a revocation committed before Commit aborts the write. See `docs/architecture/PHASE_C5_COLLABORATION_CONTRIBUTOR_WRITES.md` and decisions C-34…C-40.
+
 ### Content concurrency examples
 
 - Two editors prepare revisions from head `5`; the first validated commit moves head to `6`; the second gets `409 ContentRevisionConflict` and must re-prepare against `6` after resolving edits; no silent overwrite.

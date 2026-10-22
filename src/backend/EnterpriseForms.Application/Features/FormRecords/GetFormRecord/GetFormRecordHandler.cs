@@ -73,6 +73,17 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             .Where(f => authorizedFieldIds is null || authorizedFieldIds.Contains(f.FieldDefinitionId) || authorizedDocumentFieldIds!.Contains(f.FieldDefinitionId))
             .Select(f => new FieldDefinitionResponse(f.FieldDefinitionId, f.FieldKey, f.FieldDisplayName, f.FieldDescription, f.FieldDataType, f.FieldClassification, f.LifecycleStatus, options.GetValueOrDefault(f.FieldDefinitionId, []), f.FieldDefinitionRevision, f.FieldProtectionMode, f.ProtectionPolicyRevision, f.OptionSelectionMode, GroupDefinitionId: f.GroupDefinitionId))
             .ToList();
+        // Phase C5: per-field edit eligibility for a share editor (never for owners; reasons never describe unreadable fields).
+        List<SharedFieldAccessResponse>? sharedAccess = null;
+        if (!verified.IsComplete)
+        {
+            var editableItems = (verified.Verification.EditableItems ?? []).Select(i => i.ItemId).ToHashSet();
+            sharedAccess = SharedEdits.SharedFieldEligibility.Compute(verified.Layout, verified.FieldsById, SharedEdits.SharedFieldWriteBuilder.ReadableRows(verified), editableItems).Values
+                .OrderBy(a => a.Field.FieldKey, StringComparer.Ordinal)
+                .Select(a => new SharedFieldAccessResponse(a.Field.FieldKey, a.Editable && verified.Verification.ContributorWritesEnabled, a.Editable && !verified.Verification.ContributorWritesEnabled ? "ContributorWritesDisabled" : a.NotEditableReason))
+                .ToList();
+        }
+
         var version = verified.LayoutVersion;
         return new RecordProjectionResponse(
             verified.ToRecordResponse(context.OrganizationId),
@@ -81,11 +92,12 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             fields,
             documents,
             relationships.Where(r => verified.IsComplete || visibleRelationshipIds.Contains(r.FormRelationshipDefinitionId)).Select(r => new RelationshipDefinitionResponse(r.FormRelationshipDefinitionId, r.ParentFormDefinitionId, r.ChildFormDefinitionId, formNames.GetValueOrDefault(r.ChildFormDefinitionId, string.Empty), r.RelationshipDefinitionKey, r.RelationshipDisplayName, r.MinimumChildCount, r.MaximumChildCount, r.LifecycleStatus)).ToList(),
-            new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed, verified.IsComplete),
+            new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed, verified.IsComplete, sharedAccess?.Any(a => a.Editable) == true, verified.Verification.ContributorWritesEnabled),
             verified.Header.ParentFormRecordId,
             verified.Header.FormRelationshipDefinitionId,
             verified.ETag,
-            summary);
+            summary,
+            sharedAccess);
     }
 
     /// <summary>

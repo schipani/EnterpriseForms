@@ -51,6 +51,11 @@ public sealed class Program
 
         builder.Services.AddAuthorityInfrastructure(builder.Configuration, builder.Environment);
         builder.Services.AddSigningProviderConfiguration(builder.Configuration, builder.Environment);
+        // Phase C5 (D10): field-scoped contributor writes; off unless the deployment sets exactly "true"; refused in Production.
+        builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.Create(
+            builder.Configuration[AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.ConfigurationKey],
+            builder.Environment.IsProduction(),
+            builder.Environment.IsEnvironment("Testing")));
         builder.Services.AddInternalAuthentication(builder.Configuration);
         builder.Services.AddSingleton<SpiceDbSchemaInitializer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SpiceDbSchemaInitializer>());

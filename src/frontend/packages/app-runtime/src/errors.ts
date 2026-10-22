@@ -57,6 +57,13 @@ const titles: Record<string, string> = {
   FIELD_READ_ONLY: "A read-only field cannot be changed",
   FIELD_HIDDEN_BY_RULE: "A hidden field cannot be changed",
   DEPENDENT_OPTION_INVALID: "A choice does not fit the selected parent value",
+  FIELD_NOT_EDITABLE: "This field cannot be changed with your access",
+  CONTRIBUTOR_WRITES_DISABLED: "Changing shared fields is not enabled",
+  CHANGE_NOT_PERMITTED: "This change is not permitted with your access",
+  CLEAR_NOT_PERMITTED: "A shared value can be changed but not cleared",
+  CHANGE_AFFECTS_OTHER_FIELDS: "This change would affect fields you cannot change",
+  FIELD_PROTECTION_MIGRATION_PENDING: "This field's protection is being updated; try again later",
+  NO_CHANGE: "There are no changes to save",
 };
 
 /** Maps a coordinator failure into safe, user-facing copy. Internal details stay in the correlation id only. */

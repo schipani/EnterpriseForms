@@ -104,7 +104,9 @@ public sealed record VerifyRecordProjectionRequest(Guid OrganizationId, Guid For
 
 public sealed record VerifiedProjectionItem(ManifestItemKind ItemKind, Guid ItemId);
 
-public sealed record VerifyRecordProjectionResult(bool Verified, string? FailureReasonCode, long CommittedContentRevision, Guid? CommittedOperationId, long AuthorizationRevision, IReadOnlyList<VerifiedProjectionItem> AuthorizedItems, bool IsCompleteProjection, Guid CorrelationId);
+/// <summary>Phase C5 (D7, additive): readable/editable subsets of a partial projection (advisory) and the Authority's contributor-write switch (D10).</summary>
+public sealed record VerifyRecordProjectionResult(bool Verified, string? FailureReasonCode, long CommittedContentRevision, Guid? CommittedOperationId, long AuthorizationRevision, IReadOnlyList<VerifiedProjectionItem> AuthorizedItems, bool IsCompleteProjection, Guid CorrelationId,
+    IReadOnlyList<VerifiedProjectionItem>? ReadableItems = null, IReadOnlyList<VerifiedProjectionItem>? EditableItems = null, bool ContributorWritesEnabled = false);
 
 public sealed record FormAccessSubjectState(string SubjectKind, Guid SubjectId);
 

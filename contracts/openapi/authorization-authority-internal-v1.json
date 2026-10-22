@@ -485,6 +485,56 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Testing only: armed fault and number of operations held at a pause point.",
+        "operationId": "GetFaultInjection",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FaultInjectionStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/testing/contributor-writes": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Testing only: turns field-scoped contributor writes on or off for the disposable integration stack (Phase C5, D10); null restores the deployment configuration.",
+        "operationId": "OverrideContributorWrites",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContributorWriteOverrideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContributorWriteSwitchState"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -728,6 +778,35 @@
           }
         }
       },
+      "ContributorWriteOverrideRequest": {
+        "required": [
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "ContributorWriteSwitchState": {
+        "required": [
+          "enabled",
+          "configured_enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "configured_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "DiscoverRecordsRequest": {
         "required": [
           "organization_id",
@@ -794,6 +873,26 @@
         "properties": {
           "fault_name": {
             "type": "string"
+          }
+        }
+      },
+      "FaultInjectionStatus": {
+        "required": [
+          "armed_fault",
+          "paused_operations"
+        ],
+        "type": "object",
+        "properties": {
+          "armed_fault": {
+            "type": "string"
+          },
+          "paused_operations": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -1483,6 +1582,28 @@
           "correlation_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "readable_items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/VerifiedProjectionItem"
+            }
+          },
+          "editable_items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/VerifiedProjectionItem"
+            }
+          },
+          "contributor_writes_enabled": {
+            "type": "boolean",
+            "default": false
           }
         }
       }

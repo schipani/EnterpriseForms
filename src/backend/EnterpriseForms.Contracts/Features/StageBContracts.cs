@@ -166,7 +166,15 @@ public sealed record RecordProjectionResponse(
     Guid? ParentFormRecordId,
     Guid? FormRelationshipDefinitionId,
     string ETag,
-    RecordProjectionSummaryResponse? Summary = null);
+    RecordProjectionSummaryResponse? Summary = null,
+    IReadOnlyList<SharedFieldAccessResponse>? SharedFieldAccess = null);
+
+/// <summary>
+/// Phase C5: for a share editor's partial projection, whether each readable field can be changed and, if not, why
+/// (ViewOnlyShare, ReadOnly, RuleDependency, Restricted, MultiSelect, FileField, NotInForm, MultipleValues,
+/// ProtectionMigrationPending). Advisory for the UI; the server and the Authority decide on save.
+/// </summary>
+public sealed record SharedFieldAccessResponse(string FieldKey, bool Editable, string? NotEditableReason);
 
 /// <summary>
 /// Record header for the workspace summary (C-30): the same allowlisted metadata as a My Records row. The creator comes
@@ -174,7 +182,8 @@ public sealed record RecordProjectionResponse(
 /// </summary>
 public sealed record RecordProjectionSummaryResponse(string RecordReference, DateTimeOffset? CreatedOn, DateTimeOffset? ModifiedOn, string? CreatedByDisplayName, bool CreatedByCurrentUser);
 
-public sealed record RecordPermissionsResponse(bool CanRead, bool CanEdit, bool CanManageAccess, bool CanTransferOwnership, bool IsCompleteProjection);
+/// <summary><c>CanEditSharedFields</c> (Phase C5): a share editor may change at least one shared value now; <c>ContributorWritesEnabled</c> reports the Authority's switch (D10).</summary>
+public sealed record RecordPermissionsResponse(bool CanRead, bool CanEdit, bool CanManageAccess, bool CanTransferOwnership, bool IsCompleteProjection, bool CanEditSharedFields = false, bool ContributorWritesEnabled = false);
 
 public sealed record CreateChildRecordRequest(Guid FormRelationshipDefinitionId, IReadOnlyDictionary<string, string> Values, IReadOnlyList<RecordGroupValuesRequest>? Groups = null);
 
