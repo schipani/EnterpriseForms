@@ -33,8 +33,6 @@ public sealed class RecordLifecycleHandler(VerifiedRecordReader reader, IBusines
             throw new BusinessException("INVALID_REQUEST", 422, "unknown lifecycle transition");
         }
 
-        var reason = NormalizeReason(transition, request.Reason);
-
         // Verified read with the Edit action: the Authority's own read/edit decision and a complete-projection verification.
         VerifiedRecord verified;
         try
@@ -54,6 +52,8 @@ public sealed class RecordLifecycleHandler(VerifiedRecordReader reader, IBusines
             throw new BusinessException("FORBIDDEN", 403, "only the record's owner can change its status");
         }
 
+        // Authorization comes before input validation: a caller who may not change the status learns nothing about what a valid request looks like.
+        var reason = NormalizeReason(transition, request.Reason);
         var current = verified.Header.RecordStatus;
         if (request.ExpectedContentRevision != verified.Head.CommittedContentRevision)
         {
