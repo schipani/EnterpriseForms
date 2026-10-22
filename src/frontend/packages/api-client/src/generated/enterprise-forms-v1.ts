@@ -1405,6 +1405,25 @@ export interface components {
              * @default 0
              */
             legacyEncryptedRecordCount: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            estimateUnresolvedRecordCount: number | string;
+            verification?: null | components["schemas"]["FieldProtectionVerificationResponse"];
+        };
+        FieldProtectionVerificationResponse: {
+            /** Format: date-time */
+            checkedOn: string;
+            /** Format: int32 */
+            checkedRecordCount: null | number | string;
+            /** Format: int32 */
+            remainingRecordCount: number | string;
+            /** Format: int32 */
+            remainingValueCount: number | string;
+            /** Format: int32 */
+            unverifiedRecordCount: number | string;
+            basis: string;
         };
         FieldResponse: {
             /** Format: uuid */

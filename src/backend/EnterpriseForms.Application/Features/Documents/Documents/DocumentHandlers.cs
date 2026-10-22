@@ -145,7 +145,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             }
 
             var record = await scope.FindFormRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
-            if (record is not null && accepted.CommittedOperationId is { } acceptedOperation && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
+            if (record is not null && accepted.CommittedOperationId is not null && await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, accepted.CommittedContentRevision, accepted.CommittedOperationId, cancellationToken).ConfigureAwait(false))
             {
                 record.ModifiedOn = clock.GetUtcNow();
                 record.ModifiedByUserId = context.LocalUserId;

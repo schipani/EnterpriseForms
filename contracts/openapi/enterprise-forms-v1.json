@@ -3975,6 +3975,78 @@
             ],
             "format": "int32",
             "default": 0
+          },
+          "estimateUnresolvedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "verification": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FieldProtectionVerificationResponse"
+              }
+            ]
+          }
+        }
+      },
+      "FieldProtectionVerificationResponse": {
+        "required": [
+          "checkedOn",
+          "checkedRecordCount",
+          "remainingRecordCount",
+          "remainingValueCount",
+          "unverifiedRecordCount",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "checkedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "remainingRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "remainingValueCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unverifiedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "basis": {
+            "type": "string"
           }
         }
       },

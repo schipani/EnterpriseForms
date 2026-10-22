@@ -1,4 +1,5 @@
 using EnterpriseForms.Application.Common.Persistence;
+using EnterpriseForms.Application.Features.FormRecords.Projection;
 using EnterpriseForms.Domain.Features.Audit;
 using EnterpriseForms.Domain.Features.Documents;
 using EnterpriseForms.Domain.Features.FormDefinitions;
@@ -143,6 +144,30 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public Task<FormRecord?> FindFormRecordAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken) =>
             context.FormRecords.FirstOrDefaultAsync(r => r.TenantId == tenantId && r.FormRecordId == formRecordId, cancellationToken);
+
+        public async Task<bool> ProjectAcceptedHeadAsync(Guid tenantId, Guid formRecordId, long acceptedContentRevision, Guid? acceptedOperationId, CancellationToken cancellationToken)
+        {
+            if (acceptedOperationId is { } operation && acceptedContentRevision > 0)
+            {
+                // Same rule as FormRecord.RecordAcceptedContent, evaluated atomically by PostgreSQL.
+                return await context.FormRecords
+                    .Where(r => r.TenantId == tenantId && r.FormRecordId == formRecordId
+                                && (r.RecordRevision < acceptedContentRevision || (r.RecordRevision == acceptedContentRevision && r.AcceptedContentChangeOperationId != operation)))
+                    .ExecuteUpdateAsync(s => s.SetProperty(r => r.RecordRevision, acceptedContentRevision).SetProperty(r => r.AcceptedContentChangeOperationId, (Guid?)operation), cancellationToken)
+                    .ConfigureAwait(false) > 0;
+            }
+
+            if (acceptedOperationId is null && acceptedContentRevision == 0)
+            {
+                // "No accepted content": only while nothing accepted is projected (a creation still in flight keeps revision 1 until its commit is projected).
+                return await context.FormRecords
+                    .Where(r => r.TenantId == tenantId && r.FormRecordId == formRecordId && r.AcceptedContentChangeOperationId == null && r.RecordRevision > 0 && r.RecordRevision <= 1)
+                    .ExecuteUpdateAsync(s => s.SetProperty(r => r.RecordRevision, 0L), cancellationToken)
+                    .ConfigureAwait(false) > 0;
+            }
+
+            return false;
+        }
 
         public Task<List<FormRecord>> GetFormRecordsAsync(Guid tenantId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
             context.FormRecords.AsNoTracking().Where(r => r.TenantId == tenantId && formRecordIds.Contains(r.FormRecordId)).ToListAsync(cancellationToken);
@@ -300,61 +325,59 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public void AddSecurityPolicy(OrganizationSecurityPolicy policy) => context.OrganizationSecurityPolicies.Add(policy);
 
-        /// <summary>Records whose latest staged copy of this field is still a typed plaintext row (projection estimate for the migration status: the local store holds every staged revision, highest revision last; the authority head decides what is current).</summary>
-        /// <summary>Plaintext rows of the field in each record's accepted head (same row-count semantics as before; see <see cref="CurrentOperationsAsync"/>).</summary>
-        public async Task<int> CountLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken) =>
-            (await GetLegacyPlaintextRecordsAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false)).Sum(r => r.PlaintextValueCount);
-
-        public async Task<List<LegacyPlaintextRecord>> GetLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken)
+        /// <summary>
+        /// Phase C6 M0 (S3). Records whose projected accepted operation holds rows of the field in the old form. The projected
+        /// operation is used only when corroborated (<see cref="AcceptedHeadProjection.Resolve"/>); a record whose accepted
+        /// operation cannot be resolved locally is reported as unresolved — never estimated from the highest staged revision,
+        /// which can be an abandoned candidate. Nothing here is an authorization, integrity or completeness decision.
+        /// </summary>
+        public async Task<LegacyRecordEstimate> EstimateOldFormRecordsAsync(Guid fieldDefinitionId, bool encryptedForm, CancellationToken cancellationToken)
         {
-            var plaintext = context.FieldStringValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId })
-                .Concat(context.FieldIntegerValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldDecimalValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldDateValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldDateTimeValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldGuidValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldBooleanValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
-                .Concat(context.FieldOptionValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }));
-            var rows = await plaintext.ToListAsync(cancellationToken).ConfigureAwait(false);
+            var rows = encryptedForm
+                ? await context.FieldEncryptedValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }).ToListAsync(cancellationToken).ConfigureAwait(false)
+                : await context.FieldStringValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId })
+                    .Concat(context.FieldIntegerValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                    .Concat(context.FieldDecimalValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                    .Concat(context.FieldDateValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                    .Concat(context.FieldDateTimeValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                    .Concat(context.FieldGuidValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                    .Concat(context.FieldBooleanValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                    .Concat(context.FieldOptionValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }))
+                    .ToListAsync(cancellationToken).ConfigureAwait(false);
             if (rows.Count == 0)
             {
-                return [];
+                return new LegacyRecordEstimate([], []);
             }
 
-            var latestByRecord = await CurrentOperationsAsync(rows.Select(r => r.FormRecordId).Distinct().ToList(), cancellationToken).ConfigureAwait(false);
-            return rows.Where(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId)
+            var resolved = await ResolveAcceptedOperationsAsync(rows.Select(r => r.FormRecordId).Distinct().ToList(), cancellationToken).ConfigureAwait(false);
+            var holders = rows.Where(r => resolved.TryGetValue(r.FormRecordId, out var op) && op is { } accepted && accepted == r.ContentChangeOperationId)
                 .GroupBy(r => r.FormRecordId)
                 .Select(g => new LegacyPlaintextRecord(g.Key, g.Count()))
                 .OrderBy(r => r.FormRecordId)
                 .ToList();
+            var unresolved = rows.Select(r => r.FormRecordId).Distinct().Where(id => !resolved.ContainsKey(id)).OrderBy(id => id).ToList();
+            return new LegacyRecordEstimate(holders, unresolved);
         }
 
-        /// <summary>
-        /// The operation each record's local estimate reads: the projected authority-accepted head
-        /// (form_records.accepted_content_change_operation_id), never merely the highest staged revision — a candidate the
-        /// authority rejected stays in the insert-only tables and must not be mistaken for the record's state.
-        /// The projection is an untrusted hint: it is honoured only when a staged revision header of the same record with
-        /// that operation exists at the projected revision (form_records.record_revision). A pointer that is missing,
-        /// dangling or inconsistent falls back to the highest staged revision, so a single forged column cannot hide a
-        /// record from the estimate. Nothing here is an authorization or integrity decision: content reads and migration
-        /// completion verify against the authority head (FieldProtectionMigrationService.FinalizeAsync).
-        /// </summary>
-        private async Task<Dictionary<Guid, Guid>> CurrentOperationsAsync(List<Guid> recordIds, CancellationToken cancellationToken)
+        /// <summary>The corroborated projected accepted operation of each record (null value: the Authority reported no accepted content); records that cannot be resolved are absent (see <see cref="AcceptedHeadProjection.Resolve"/>).</summary>
+        private async Task<Dictionary<Guid, Guid?>> ResolveAcceptedOperationsAsync(List<Guid> recordIds, CancellationToken cancellationToken)
         {
             var projected = (await context.FormRecords.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.AcceptedContentChangeOperationId, r.RecordRevision }).ToListAsync(cancellationToken).ConfigureAwait(false))
                 .ToDictionary(r => r.FormRecordId);
-            var revisions = await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var result = new Dictionary<Guid, Guid>();
-            foreach (var group in revisions.GroupBy(r => r.FormRecordId))
+            var headers = (await context.FormRecordRevisions.Where(r => recordIds.Contains(r.FormRecordId)).Select(r => new { r.FormRecordId, r.ContentChangeOperationId, r.ContentRevision }).ToListAsync(cancellationToken).ConfigureAwait(false))
+                .ToLookup(r => r.FormRecordId, r => new AcceptedHeadProjection.StagedHeader(r.ContentChangeOperationId, r.ContentRevision));
+            var result = new Dictionary<Guid, Guid?>();
+            foreach (var recordId in recordIds)
             {
-                if (projected.TryGetValue(group.Key, out var record) && record.AcceptedContentChangeOperationId is { } pointer
-                    && group.Any(r => r.ContentChangeOperationId == pointer && r.ContentRevision == record.RecordRevision))
+                if (!projected.TryGetValue(recordId, out var record))
                 {
-                    result[group.Key] = pointer;
+                    continue; // no projection row at all: unresolved
                 }
-                else
+
+                var resolution = AcceptedHeadProjection.Resolve(record.AcceptedContentChangeOperationId, record.RecordRevision, headers[recordId]);
+                if (resolution.Kind != AcceptedHeadProjection.ResolutionKind.Unresolved)
                 {
-                    result[group.Key] = group.OrderByDescending(r => r.ContentRevision).First().ContentChangeOperationId;
+                    result[recordId] = resolution.OperationId;
                 }
             }
 
@@ -377,25 +400,6 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             count += await context.FieldOptionValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken).ConfigureAwait(false);
             return count;
         }
-
-        public async Task<List<LegacyPlaintextRecord>> GetLegacyEncryptedRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken)
-        {
-            var rows = await context.FieldEncryptedValues.Where(v => v.FieldDefinitionId == fieldDefinitionId).Select(v => new { v.FormRecordId, v.ContentChangeOperationId }).ToListAsync(cancellationToken).ConfigureAwait(false);
-            if (rows.Count == 0)
-            {
-                return [];
-            }
-
-            var latestByRecord = await CurrentOperationsAsync(rows.Select(r => r.FormRecordId).Distinct().ToList(), cancellationToken).ConfigureAwait(false);
-            return rows.Where(r => latestByRecord.TryGetValue(r.FormRecordId, out var op) && op == r.ContentChangeOperationId)
-                .GroupBy(r => r.FormRecordId)
-                .Select(g => new LegacyPlaintextRecord(g.Key, g.Count()))
-                .OrderBy(r => r.FormRecordId)
-                .ToList();
-        }
-
-        public async Task<int> CountLegacyEncryptedRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken) =>
-            (await GetLegacyEncryptedRecordsAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false)).Count;
 
         public Task<int> CountEncryptedRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken) =>
             context.FieldEncryptedValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId && v.FormRecordId == formRecordId && v.ContentChangeOperationId == contentChangeOperationId, cancellationToken);
@@ -435,6 +439,15 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public async Task<HashSet<Guid>> GetProtectionMigrationItemRecordIdsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
             (await context.FieldProtectionMigrationItems.AsNoTracking().Where(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId).Select(i => i.FormRecordId).ToListAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
+
+        public Task<List<FieldProtectionMigrationItem>> GetProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrationItems.Where(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId).ToListAsync(cancellationToken);
+
+        public Task<List<ProtectionMigrationAttempt>> GetProtectionMigrationAttemptsForRecordAsync(Guid formDefinitionId, Guid formRecordId, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrationItems.AsNoTracking()
+                .Where(i => i.FormRecordId == formRecordId && context.FieldProtectionMigrations.Any(m => m.FieldProtectionMigrationId == i.FieldProtectionMigrationId && m.FormDefinitionId == formDefinitionId))
+                .Select(i => new ProtectionMigrationAttempt(i.FieldProtectionMigrationId, i.AttemptCount))
+                .ToListAsync(cancellationToken);
 
         public Task<List<FieldProtectionMigrationItem>> GetFailedProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
             context.FieldProtectionMigrationItems.Where(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId && i.ItemState == FieldProtectionMigrationItemStates.Failed).ToListAsync(cancellationToken);

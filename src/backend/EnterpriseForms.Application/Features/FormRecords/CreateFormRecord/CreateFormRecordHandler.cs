@@ -190,11 +190,8 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         if (accepted.CommittedOperationId is { } acceptedOperation)
         {
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-            var record = await scope.FindFormRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
-            if (record is not null && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
-            {
-                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-            }
+            await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, accepted.CommittedContentRevision, acceptedOperation, cancellationToken).ConfigureAwait(false);
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         var fieldsById = fields.ToDictionary(f => f.FieldDefinitionId);

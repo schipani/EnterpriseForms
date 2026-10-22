@@ -48,6 +48,7 @@ export type UpdateFieldDefinitionRequest = S["UpdateFieldDefinitionRequest"];
 export type FieldProtectionResponse = S["FieldProtectionResponse"];
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
 export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
+export type FieldProtectionVerificationResponse = S["FieldProtectionVerificationResponse"];
 export type RetryFieldProtectionMigrationRequest = S["RetryFieldProtectionMigrationRequest"];
 export type ReclassifyFieldRequest = S["ReclassifyFieldRequest"];
 export type DowngradeFieldProtectionRequest = S["DowngradeFieldProtectionRequest"];

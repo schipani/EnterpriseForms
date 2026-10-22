@@ -27,6 +27,7 @@ public sealed class FieldProtectionMigrationConfiguration : IEntityTypeConfigura
             t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Completed','Failed','Blocked','Cancelled')");
             t.HasCheckConstraint("ck_field_protection_migrations_direction", "migration_direction IN ('Encrypt','Decrypt')");
             t.HasCheckConstraint("ck_field_protection_migrations_counts", "total_record_count >= 0 AND total_value_count >= 0 AND completed_record_count >= 0 AND failed_record_count >= 0 AND completed_record_count + failed_record_count <= total_record_count");
+            t.HasCheckConstraint("ck_field_protection_migrations_verified_counts", "(verified_record_count IS NULL OR verified_record_count >= 0) AND (verified_remaining_record_count IS NULL OR verified_remaining_record_count >= 0) AND (verified_remaining_value_count IS NULL OR verified_remaining_value_count >= 0) AND (unverified_record_count IS NULL OR unverified_record_count >= 0)");
         });
     }
 }
@@ -39,10 +40,17 @@ public sealed class FieldProtectionMigrationItemConfiguration : IEntityTypeConfi
         builder.HasKey(i => i.FieldProtectionMigrationItemId);
         builder.Property(i => i.ItemState).HasMaxLength(20);
         builder.Property(i => i.LastErrorCode).HasMaxLength(200);
+        builder.Property(i => i.CompletedByOperationKind).HasMaxLength(30);
         builder.HasIndex(i => new { i.FieldProtectionMigrationId, i.FormRecordId }).IsUnique().HasDatabaseName("uq_field_protection_migration_items_record");
         builder.HasIndex(i => new { i.FieldProtectionMigrationId, i.ItemState }).HasDatabaseName("ix_field_protection_migration_items_state");
+        builder.HasIndex(i => i.FormRecordId).HasDatabaseName("ix_field_protection_migration_items_form_record");
         builder.HasOne<FieldProtectionMigration>().WithMany().HasForeignKey(i => i.FieldProtectionMigrationId).HasConstraintName("fk_field_protection_migration_items_migration");
         builder.HasOne<FormRecord>().WithMany().HasForeignKey(i => i.FormRecordId).HasConstraintName("fk_field_protection_migration_items_record");
-        builder.ToTable(t => t.HasCheckConstraint("ck_field_protection_migration_items_state", "item_state IN ('Pending','Completed','Failed')"));
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_field_protection_migration_items_state", "item_state IN ('Pending','Completed','Failed')");
+            t.HasCheckConstraint("ck_field_protection_migration_items_completion_kind", "completed_by_operation_kind IS NULL OR completed_by_operation_kind IN ('MigrationWorker','OtherMigration','UserOperation','NoAcceptedContent')");
+            t.HasCheckConstraint("ck_field_protection_migration_items_verified_counts", "(verified_old_form_value_count IS NULL OR verified_old_form_value_count >= 0) AND (verified_head_content_revision IS NULL OR verified_head_content_revision >= 0)");
+        });
     }
 }

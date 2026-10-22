@@ -61,6 +61,27 @@ public sealed class FieldProtectionMigration
 
     /// <summary>Set when, after every item completed, no plaintext copy of the field was found in any latest committed snapshot.</summary>
     public DateTimeOffset? MigrationVerifiedOn { get; set; }
+
+    /// <summary>
+    /// Phase C6 M0 (S1): when the worker's last post-check ran, whatever its outcome. The post-check reads every listed
+    /// record's Authority-accepted head and counts rows of the old form in exactly that operation. These results are
+    /// stored in the business database: they record what the Authority-backed check found, but a hostile business
+    /// database administrator could alter them, so the status never relies on them alone (it also requires the local
+    /// estimate to agree), and the list of records checked comes from the business database (G19).
+    /// </summary>
+    public DateTimeOffset? VerificationCheckedOn { get; set; }
+
+    /// <summary>Records whose Authority-accepted head the last post-check read.</summary>
+    public int? VerifiedRecordCount { get; set; }
+
+    /// <summary>Of those, records whose accepted head still held rows of the old form.</summary>
+    public int? VerifiedRemainingRecordCount { get; set; }
+
+    /// <summary>Rows of the old form in those accepted heads.</summary>
+    public int? VerifiedRemainingValueCount { get; set; }
+
+    /// <summary>Listed records the last post-check could not read from the Authority (forbidden, not found, locked); never counted as converted.</summary>
+    public int? UnverifiedRecordCount { get; set; }
 }
 
 public static class FieldProtectionMigrationStates
@@ -111,9 +132,43 @@ public sealed class FieldProtectionMigrationItem
 
     public long? CompletedContentRevision { get; set; }
 
+    /// <summary>True only when the accepted operation that completed the item is a user operation (<see cref="CompletedByOperationKind"/> = UserOperation).</summary>
     public bool CompletedByUserCommit { get; set; }
 
+    /// <summary>
+    /// Phase C6 M0 (S4): which kind of accepted operation completed the item, decided from the operation's identity (never
+    /// from timing): this migration's own reprotection operation, another protection migration's operation, a user
+    /// operation, or no accepted content at all. See <see cref="FieldProtectionCompletionKinds"/>.
+    /// </summary>
+    public string? CompletedByOperationKind { get; set; }
+
+    /// <summary>Phase C6 M0 (S1): the Authority-accepted head this item was last checked against (operation and revision; revision 0 = no accepted content).</summary>
+    public Guid? VerifiedHeadOperationId { get; set; }
+
+    public long? VerifiedHeadContentRevision { get; set; }
+
+    /// <summary>Rows of the old form found in that accepted head (counted from the business rows of exactly that operation).</summary>
+    public int? VerifiedOldFormValueCount { get; set; }
+
+    public DateTimeOffset? VerifiedOn { get; set; }
+
     public DateTimeOffset ItemModifiedOn { get; set; }
+}
+
+/// <summary>How a migration item was completed (Phase C6 M0, S4). Decided from the accepted operation's identity.</summary>
+public static class FieldProtectionCompletionKinds
+{
+    /// <summary>The accepted head is an operation of this migration (its operation id derives from this migration's idempotency key).</summary>
+    public const string MigrationWorker = "MigrationWorker";
+
+    /// <summary>The accepted head is an operation of another protection migration of the same form.</summary>
+    public const string OtherMigration = "OtherMigration";
+
+    /// <summary>The accepted head is not a protection-migration operation: a user's own write already holds the field in the target form.</summary>
+    public const string UserOperation = "UserOperation";
+
+    /// <summary>The Authority holds no accepted content for the record (revision 0): there is no copy to convert.</summary>
+    public const string NoAcceptedContent = "NoAcceptedContent";
 }
 
 public static class FieldProtectionMigrationItemStates

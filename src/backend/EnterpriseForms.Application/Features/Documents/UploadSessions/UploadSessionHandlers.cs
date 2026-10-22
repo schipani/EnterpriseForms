@@ -324,7 +324,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
                 }
 
                 var record = await scope.FindFormRecordAsync(context.OrganizationId, session.FormRecordId, cancellationToken).ConfigureAwait(false);
-                if (record is not null && accepted.CommittedOperationId is { } acceptedOperation && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
+                if (record is not null && accepted.CommittedOperationId is not null && await scope.ProjectAcceptedHeadAsync(context.OrganizationId, session.FormRecordId, accepted.CommittedContentRevision, accepted.CommittedOperationId, cancellationToken).ConfigureAwait(false))
                 {
                     record.ModifiedOn = clock.GetUtcNow();
                     record.ModifiedByUserId = context.LocalUserId;

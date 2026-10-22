@@ -77,9 +77,30 @@ public sealed record AddFieldDefinitionRequest(string FieldKey, string FieldDisp
 /// <summary>Strengthening only (higher classification and/or Standard → ApplicationEncrypted); a reason is recorded with the audit event.</summary>
 public sealed record StrengthenFieldProtectionRequest(string? TargetClassification, string? TargetProtectionMode, string ChangeReason, long ExpectedProtectionRevision);
 
-/// <summary>Protection state of a field. <c>MigrationState</c>: Plaintext, Encrypted, or EncryptionPendingRewrite (records still carrying a legacy plaintext copy: <c>LegacyPlaintextRecordCount</c>, a business-table estimate). <c>FullyEncrypted</c> / <c>FullyPlaintext</c> mean "every record the business database lists was converted and the worker's post-check against their authority-accepted versions passed"; they are not an independently verified completeness guarantee (security finding G19).</summary>
+/// <summary>
+/// Protection state of a field. <c>MigrationState</c>: Plaintext, Encrypted, or EncryptionPendingRewrite (records still
+/// carrying a legacy plaintext copy). <c>LegacyPlaintextRecordCount</c> / <c>LegacyEncryptedRecordCount</c> are a local
+/// business-database <b>estimate</b> over records whose accepted version resolves locally; <c>EstimateUnresolvedRecordCount</c>
+/// counts records holding rows of the field whose accepted version cannot be resolved locally (never guessed, Phase C6 M0).
+/// <c>Verification</c> is the migration worker's last check against the Authorization Authority's accepted versions, stored in
+/// the business database. <c>FullyEncrypted</c> / <c>FullyPlaintext</c> mean "every record the business database lists was
+/// converted, the worker's check against their Authority-accepted versions found none remaining or unreadable, and the local
+/// estimate agrees"; they are not an independently verified completeness guarantee (security finding G19) and not
+/// protected against a hostile business-database administrator.
+/// </summary>
 public sealed record FieldProtectionResponse(Guid FieldDefinitionId, string FieldKey, string FieldClassification, string FieldProtectionMode, long ProtectionPolicyRevision, DateTimeOffset? ProtectionChangedOn, string MigrationState, int LegacyPlaintextRecordCount, string SearchImpact, string OrganizationMinimumClassification, bool OrganizationPermitsPlaintext,
-    bool FullyEncrypted = false, FieldProtectionMigrationResponse? Migration = null, bool FullyPlaintext = false, int LegacyEncryptedRecordCount = 0);
+    bool FullyEncrypted = false, FieldProtectionMigrationResponse? Migration = null, bool FullyPlaintext = false, int LegacyEncryptedRecordCount = 0,
+    int EstimateUnresolvedRecordCount = 0, FieldProtectionVerificationResponse? Verification = null);
+
+/// <summary>
+/// The migration worker's last post-check (Phase C6 M0): it read the Authority-accepted version of each record the business
+/// database lists and counted rows of the old form in exactly that version. <c>RemainingRecordCount</c> / <c>RemainingValueCount</c>:
+/// records and rows still in the old form; <c>UnverifiedRecordCount</c>: listed records whose accepted version could not be
+/// read (never counted as converted); <c>CheckedRecordCount</c> is null for checks recorded before Phase C6. The result is
+/// stored in the business database, so it is not protected against a hostile business-database administrator, and it covers
+/// only the records the business database lists (G19). <c>Basis</c> says this in words for display.
+/// </summary>
+public sealed record FieldProtectionVerificationResponse(DateTimeOffset CheckedOn, int? CheckedRecordCount, int RemainingRecordCount, int RemainingValueCount, int UnverifiedRecordCount, string Basis);
 
 /// <summary>
 /// Progress of the background plaintext→encrypted migration of a field (B-28). <c>MigrationState</c>: Queued, Running,

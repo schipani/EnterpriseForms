@@ -26,7 +26,8 @@ public sealed class FormRecordConfiguration : IEntityTypeConfiguration<FormRecor
             t.HasCheckConstraint("ck_form_records_status", "record_status IN ('Draft','Submitted','Archived','Deleted')");
             // Exactly-one-owner projection invariant (CLAUDE.md §4B) for top-level records; child records derive ownership from the parent (B-04).
             t.HasCheckConstraint("ck_form_records_single_owner", "(parent_form_record_id IS NOT NULL) OR (owner_user_id IS NOT NULL AND owner_team_id IS NULL) OR (owner_user_id IS NULL AND owner_team_id IS NOT NULL)");
-            t.HasCheckConstraint("ck_form_records_revision_positive", "record_revision >= 1");
+            // Phase C6 M0: revision 0 (with no projected operation) records that the Authority reported no accepted content for the record.
+            t.HasCheckConstraint("ck_form_records_revision_projection", "record_revision >= 1 OR (record_revision = 0 AND accepted_content_change_operation_id IS NULL)");
             t.HasCheckConstraint("ck_form_records_parent_pair", "(parent_form_record_id IS NULL) = (form_relationship_definition_id IS NULL)");
         });
     }

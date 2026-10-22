@@ -134,11 +134,13 @@ public sealed class RepeatingGroupsTests(StageBFixture fixture)
         var (ada, bo) = (first[0].Id, first[1].Id);
 
         // Two signed occurrence rows in the accepted operation; entry names are application-encrypted per entry (no plaintext copy).
-        string Accepted(string table) => fixture.Stack.AttackerSql($"SELECT count(*) FROM {table} WHERE form_record_id = '{record:D}' AND content_change_operation_id = (SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}');").Trim();
+        // The accepted operation comes from the Authority (Phase C6 M0 oracle), never from the business projection.
+        var acceptedOperation = AuthorityOracle.Head(fixture.Stack, record).OperationId!.Value;
+        string Accepted(string table) => fixture.Stack.AttackerSql($"SELECT count(*) FROM {table} WHERE form_record_id = '{record:D}' AND content_change_operation_id = '{acceptedOperation:D}';").Trim();
         Assert.Equal("2", Accepted("form_record_group_revisions"));
         Assert.Equal("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_string_values WHERE form_record_id = '{record:D}';").Trim());
         // Ada's name, Bo's name and Bo's notes (text is Confidential + encrypted); the Role dropdown is Internal plaintext under the development policy.
-        Assert.Equal("3", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values WHERE form_record_id = '{record:D}' AND form_record_group_id IS NOT NULL AND content_change_operation_id = (SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}');").Trim());
+        Assert.Equal("3", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values WHERE form_record_id = '{record:D}' AND form_record_group_id IS NOT NULL AND content_change_operation_id = '{acceptedOperation:D}';").Trim());
         Assert.DoesNotContain("Synthetic", fixture.Stack.AttackerSql($"SELECT encode(encrypted_value_bytes,'escape') FROM field_encrypted_values WHERE form_record_id = '{record:D}';"), StringComparison.Ordinal);
 
         // Reorder and edit: identities stay, values follow their entry.

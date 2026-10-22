@@ -208,7 +208,9 @@ public sealed class EncryptionTests(StageBFixture fixture)
         Assert.Equal("legacy plaintext note", value.GetProperty("stringValue").GetString());
         Assert.True(value.GetProperty("applicationEncrypted").GetBoolean());
         Assert.False(value.GetProperty("legacyPlaintext").GetBoolean());
-        var latestOperation = fixture.Stack.AttackerSql($"SELECT content_change_operation_id FROM form_record_revisions WHERE form_record_id = '{recordId:D}' ORDER BY content_revision DESC LIMIT 1;").Trim();
+        // The accepted head comes from the Authority (Phase C6 M0 oracle): after a lost commit race two staged candidates can share
+        // the highest revision, so "the highest staged revision" is not the record's state.
+        var latestOperation = AuthorityOracle.Head(fixture.Stack, recordId).OperationId!.Value.ToString("D");
         Assert.Equal("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_string_values WHERE form_record_id = '{recordId:D}' AND content_change_operation_id = '{latestOperation}';").Trim());
         Assert.Equal("1", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values WHERE form_record_id = '{recordId:D}' AND content_change_operation_id = '{latestOperation}';").Trim());
         var deadline = DateTime.UtcNow.AddSeconds(120);

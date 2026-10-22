@@ -893,6 +893,26 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("total_value_count");
 
+                    b.Property<int?>("UnverifiedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("unverified_record_count");
+
+                    b.Property<DateTimeOffset?>("VerificationCheckedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verification_checked_on");
+
+                    b.Property<int?>("VerifiedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("verified_record_count");
+
+                    b.Property<int?>("VerifiedRemainingRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("verified_remaining_record_count");
+
+                    b.Property<int?>("VerifiedRemainingValueCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("verified_remaining_value_count");
+
                     b.HasKey("FieldProtectionMigrationId");
 
                     b.HasIndex("FormDefinitionId");
@@ -913,6 +933,8 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_field_protection_migrations_direction", "migration_direction IN ('Encrypt','Decrypt')");
 
                             t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Completed','Failed','Blocked','Cancelled')");
+
+                            t.HasCheckConstraint("ck_field_protection_migrations_verified_counts", "(verified_record_count IS NULL OR verified_record_count >= 0) AND (verified_remaining_record_count IS NULL OR verified_remaining_record_count >= 0) AND (verified_remaining_value_count IS NULL OR verified_remaining_value_count >= 0) AND (unverified_record_count IS NULL OR unverified_record_count >= 0)");
                         });
                 });
 
@@ -926,6 +948,11 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer")
                         .HasColumnName("attempt_count");
+
+                    b.Property<string>("CompletedByOperationKind")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("completed_by_operation_kind");
 
                     b.Property<bool>("CompletedByUserCommit")
                         .HasColumnType("boolean")
@@ -970,9 +997,26 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<long?>("VerifiedHeadContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("verified_head_content_revision");
+
+                    b.Property<Guid?>("VerifiedHeadOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("verified_head_operation_id");
+
+                    b.Property<int?>("VerifiedOldFormValueCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("verified_old_form_value_count");
+
+                    b.Property<DateTimeOffset?>("VerifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verified_on");
+
                     b.HasKey("FieldProtectionMigrationItemId");
 
-                    b.HasIndex("FormRecordId");
+                    b.HasIndex("FormRecordId")
+                        .HasDatabaseName("ix_field_protection_migration_items_form_record");
 
                     b.HasIndex("FieldProtectionMigrationId", "FormRecordId")
                         .IsUnique()
@@ -983,7 +1027,11 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
 
                     b.ToTable("field_protection_migration_items", null, t =>
                         {
+                            t.HasCheckConstraint("ck_field_protection_migration_items_completion_kind", "completed_by_operation_kind IS NULL OR completed_by_operation_kind IN ('MigrationWorker','OtherMigration','UserOperation','NoAcceptedContent')");
+
                             t.HasCheckConstraint("ck_field_protection_migration_items_state", "item_state IN ('Pending','Completed','Failed')");
+
+                            t.HasCheckConstraint("ck_field_protection_migration_items_verified_counts", "(verified_old_form_value_count IS NULL OR verified_old_form_value_count >= 0) AND (verified_head_content_revision IS NULL OR verified_head_content_revision >= 0)");
                         });
                 });
 
@@ -2292,7 +2340,7 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_form_records_parent_pair", "(parent_form_record_id IS NULL) = (form_relationship_definition_id IS NULL)");
 
-                            t.HasCheckConstraint("ck_form_records_revision_positive", "record_revision >= 1");
+                            t.HasCheckConstraint("ck_form_records_revision_projection", "record_revision >= 1 OR (record_revision = 0 AND accepted_content_change_operation_id IS NULL)");
 
                             t.HasCheckConstraint("ck_form_records_single_owner", "(parent_form_record_id IS NOT NULL) OR (owner_user_id IS NOT NULL AND owner_team_id IS NULL) OR (owner_user_id IS NULL AND owner_team_id IS NOT NULL)");
 

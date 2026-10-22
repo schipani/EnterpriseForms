@@ -131,6 +131,13 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
             fields = await scope.GetFieldDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             options = await scope.GetFieldOptionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             groups = await scope.GetGroupDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+
+            // Phase C6 M0 (S2): the head just verified by the Authority is projected onto form_records (monotonic, atomic), so a
+            // projection left stale by a lost commit response is repaired by the next verified read. Not a modification of the record.
+            if (await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, verification.CommittedContentRevision, verification.CommittedOperationId, cancellationToken).ConfigureAwait(false))
+            {
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
 
         return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption, groups, staged.Items);
