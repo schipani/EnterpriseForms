@@ -441,7 +441,10 @@ public sealed class RecordLifecycleTests(StageBFixture fixture)
     {
         Environment.SetEnvironmentVariable("API_TESTING_BYPASS_CONTRIBUTOR_LIFECYCLE_LOCK", bypass ? "true" : "false");
         fixture.Stack.Compose("up -d --no-deps --wait api", 300);
-        Assert.Contains(bypass ? "true" : "false", fixture.Stack.Compose("exec -T api printenv Testing__BypassContributorLifecycleLock", 60), StringComparison.Ordinal);
+        // The API image has no shell utilities; read the container's configured environment instead.
+        var container = fixture.Stack.Compose("ps -q api").Trim();
+        var environment = ComposeStack.Run("docker", "inspect --format \"{{range .Config.Env}}{{println .}}{{end}}\" " + container, 60);
+        Assert.Contains("Testing__BypassContributorLifecycleLock=" + (bypass ? "true" : "false"), environment, StringComparison.Ordinal);
     }
 
     private string AuthorityOperationCount(Guid record) =>
