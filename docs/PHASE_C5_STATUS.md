@@ -240,3 +240,69 @@ docker inspect enterpriseforms-authority-1 --format '{{range .Config.Env}}{{prin
 ```
 
 This recreates only the Authority container (no rebuild, no other service). Persistent data, Vault and keys are untouched. Any later compose command run without the variable also leaves the switch off. To turn it on again, prefix the command with `AUTHORITY_SHARE_CONTRIBUTOR_WRITES_ENABLED=true`. Never put the variable in a committed file; a Production Authority refuses to start with it on.
+
+## 12. Closure preparation (owner acceptance, 2026-10-22)
+
+### 12.1 Owner functional acceptance (decision C-42)
+
+The project owner personally tested Phase C5 and reports that contributor editing works very well. The owner accepts, **for continued development**:
+* sharing individual record fields;
+* contributor editing of authorized fields;
+* protection of unshared fields;
+* concurrent editing and conflict resolution;
+* access revocation;
+* sharing history.
+
+This is an owner functional review. It is **not** an independent security review or certification, and **not** approval for production use. Contributor editing stays disabled by default and is refused in Production until G20 is closed.
+
+### 12.2 Hosted verification on `1fc1393` (latest code commit; later commits are documentation only)
+
+| Workflow | Run | Result |
+|---|---|---|
+| ci — the four **required** checks (Specifications/manifest/vectors; .NET build, architecture, contract tests; Frontend lint/typecheck/tests/build/client drift; Docker Compose profiles) | 39765425192 | **all success**. The new runner: 5 accounting self-tests; 4 projects run concurrently, 4 fixed-path TRX files, **302 / 302**. |
+| security-gate-a (manual dispatch) | 39765416531 | **13 / 13**; evidence SEC-P01…SEC-P12 = **PASS, bound to `1fc1393`**. SEC-P also passed on `fcdb52a` (39744222709) and `ff9711d` (39740734569). |
+| stage-b-integration — browser | 39765425164 | **56 / 56**, none skipped, including all five `c5-owner-acceptance.spec.ts` steps with contributor editing asserted on |
+| stage-b-integration — integration | 39765425164 (attempts 1 and 2) | **64 / 65 both times — not green.** Attempt 1 failed `FieldProtectionDowngradeTests.InterruptedAndTamperedMigrations…` (legacy-encrypted count 2, expected 1). Attempt 2 failed `FieldProtectionMigrationTests.ConcurrentUserEditsAndAWorkerRestart…` (migration Completed 24/24, but legacy-plaintext count 1). All seven `ContributorWriteTests` passed in both attempts. See §12.3. |
+| level3-script | 39765425172 | success |
+
+### 12.3 Known pre-existing intermittent integration failure (not fixed in C5; not a required check)
+
+* **Same family as Phase C1.** Both failures belong to the field-protection migration test family that Phase C1 documented as flaky and **unresolved** (`docs/PHASE_C1_UX_STATUS.md`). Both are an off-by-one in a **business-side status count** (`BusinessStore.CurrentOperationsAsync`, used for the legacy plaintext and legacy encrypted record counts) after the Authority or the worker is interrupted mid-migration.
+* **Likely cause (from code reading, not proven by these runs' logs).** When the record's accepted-operation pointer has not yet been repaired, the count falls back to "highest staged revision". That is ambiguous when an abandoned candidate shares a revision with the committed one.
+* **What still held.** The Authority-backed checks in those tests behaved correctly: the tampered record failed closed; `fullyPlaintext` and `fullyEncrypted` were not claimed while the counts disagreed.
+* **Not caused by C5.** C5 does not change this code. The same backend code passed the whole suite on `ff9711d`, `fcdb52a` and `a59749e`; `1fc1393` differs only in CI scripts, an end-to-end spec and documents, none of which the integration job uses.
+* **Disposition.** Recorded as an open defect needing its own fix: make the status count use the Authority-accepted head, or disambiguate same-revision candidates. Do not paper over it with retries. It does not block the required checks.
+
+### 12.4 Local development switch restored to disabled (persistent data preserved)
+
+* Only the Authority container was recreated, with no rebuild and no other service: `docker compose … up -d --no-deps --wait authority`, without the variable. Before/after container IDs show `vault`, `business-db`, `authority-db`, `spicedb`, `spicedb-db`, `azurite`, `clamav`, `archive-store`, `api`, `worker` and `web` unchanged. No data, volume or Vault signing key was touched.
+* **Configuration:** the running Authority shows `Content__ShareContributorWritesEnabled=false`, `ASPNETCORE_ENVIRONMENT=Development`.
+* **Behaviour:** the C5 browser specs run against the dev stack with `EXPECT_CONTRIBUTOR_WRITES=false` gave **5 passed, 4 skipped**. The Authority reported contributor writes disabled; the UI offered no "Edit shared fields" and showed "Changing shared fields is not enabled"; the acceptance editing steps were skipped.
+* **Committed defaults are unchanged:** `appsettings.json` `"ShareContributorWritesEnabled": false`; `compose.yaml` `${AUTHORITY_SHARE_CONTRIBUTOR_WRITES_ENABLED:-false}`.
+
+### 12.5 Production startup guard — verified by starting the real binary
+
+* `ASPNETCORE_ENVIRONMENT=Production Content__ShareContributorWritesEnabled=true dotnet AuthorizationAuthority.Api.dll` aborts at startup: `InvalidOperationException: Content:ShareContributorWritesEnabled must not be enabled in Production: field-scoped contributor writes await the independent Level 2 security review (Phase C5, C-34).`
+* With the switch off, the same binary passes this guard and stops at the next, unrelated Production guard (`Signing:Provider is not configured`). That shows the C5 guard is enforced first and independently.
+* Unit coverage: `ShareContributorWriteSwitchTests`.
+
+### 12.6 Still open (unchanged)
+
+* G20 (independent review of the C5 Authority change) and G21 (U11, option-catalog integrity);
+* U1–U11;
+* G06 and G19;
+* the C-12 and C-28 Authority reviews;
+* PB-14 manual accessibility reviews;
+* the My Records scalability concern;
+* the Form Designer usability debt;
+* PB-08 step-up;
+* FR-C5-01…07 (not approved);
+* every production Level 2 gate;
+* the unexplained intermittent Playwright failure (§11.3);
+* the field-protection status-count intermittent defect (§12.3).
+
+### 12.7 Merge readiness (PR #15)
+
+* **Branch protection on `main`:** the four `ci` checks above are required, with strict up-to-date (the branch is based on current `main`, `cf45a9e`); signed commits and linear history (satisfied by a GitHub squash merge); a pull request with no required approvals.
+* **Required checks:** pass on `1fc1393`, and must pass again on the documentation-only closure head.
+* **Not merged.** The merge is the owner's decision. The red, non-required Stage B integration run (§12.3) is disclosed for that decision.
