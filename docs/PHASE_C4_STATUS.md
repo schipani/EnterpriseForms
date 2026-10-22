@@ -1,6 +1,6 @@
 # Phase C4 — Record Workspace and Authorized Discovery
 
-Branch `phase-c/record-workspace` (from main `b35516f`). **Status: implemented and locally verified (§7); hosted CI, integration and SEC-P evidence in §8. Awaiting owner review — not merged.** Nothing here is an accessibility certification, an independent review or a production security certification. Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-27 onward**.
+Branch `phase-c/record-workspace` (from main `b35516f`). **Status: implemented and verified (§7, §8); OWNER ACCEPTED FOR CONTINUED DEVELOPMENT (decision C-33, 2026-10-22, §9). Not merged at the time of writing — merging needs the owner's explicit approval.** Nothing here is an accessibility certification, an independent review or a production security certification. Decisions: `docs/decisions/PHASE_C_DECISION_LOG.md` **C-27 onward**.
 
 ## 1. Assessment of the existing implementation (before any change)
 
@@ -113,3 +113,24 @@ The commit that adds this section changes documentation only (`docs/PHASE_C4_STA
 ### What this does not show
 
 No manual screen-reader or real browser-zoom review of the new pages (PB-14 manual review stays open), no independent security review of the C-27/C-28 changes (C-28 changes Authority code and needs the production security review), no performance benchmark at PB-09 scale (C-29 notes the known O(N²/250) discovery cost), no Azure staging evidence and no production certification of any kind. G06, G19 and every production Level 2 gate remain open.
+
+## 9. Closure (owner decision C-33, 2026-10-22)
+
+**Owner acceptance.** The project owner personally tested Phase C4 and reports that everything appears to work well: My Records, Record Overview, Record Editing, sorting, filtering and pagination, unsaved-change warnings and concurrency handling. This is **functional acceptance for continued development**. It is an owner review — not an independent review, not formal accessibility acceptance, and not production security certification.
+
+**Verified state of PR #14** (checked 2026-10-22 against the GitHub API): head `8b8f053` (documentation-only on top of the implementation commit `e4bc875`). The four required check contexts — Specifications/manifest/integrity vectors, .NET build/architecture/contract tests, Frontend lint/typecheck/tests/build/client drift, Docker Compose profiles — are `success` on that head, as are stage-b-integration (integration and browser jobs), level3-script and CodeQL. This closure commit is documentation-only and its own checks are recorded on the PR.
+
+**Which commit each result belongs to.**
+
+| Evidence | Ran on | Note |
+|---|---|---|
+| SEC-P01..SEC-P12 (`security-gate-a`, 13 / 13) | `e4bc875` only (manual dispatch, run 39711633299) | The docs-only commits `8b8f053` and this closure commit changed no code, contract or workflow, so SEC-P was **not** re-run on them and is not claimed for them. SEC-P is not part of the automatic pull-request checks. |
+| Stage B integration 58 / 58, browser e2e 47 / 47, level3-script, CodeQL | `e4bc875`; ci, stage-b-integration, level3-script and CodeQL again on `8b8f053` | |
+| Local .NET 242, Vitest 163, Playwright 47 / 47 | pre-commit working tree identical in code to `e4bc875` | |
+
+**Unresolved items carried forward (nothing below was closed by C4 or by this acceptance).**
+
+1. **My Records scalability (C-29).** Every request re-enumerates the user's complete discoverable set from the Authority, and every Authority discover page re-runs the full SpiceDB lookup, so listing N records costs about N²/250 lookup results per full listing. It is acceptable for development-scale data and has not been benchmarked against PB-09 (25 organizations, 100K records per organization). The business layer refuses more than 10,000 records and the Authority more than 50,000 (typed errors, never truncation). A scalable design (an Authority-side cursor or an independently maintained, revision-fenced listing index) changes the Authority contract and needs its own design review before large tenants.
+2. **Authority discovery change needs independent security review (C-28).** `DiscoverAsync` and the SpiceDB `LookupResources` client changed (cursor-paged enumeration, 50,000 ceiling, gate re-read, `CONTINUATION_INVALIDATED`). It is an implementation correction, not a protocol change, but it is a trust-boundary component change made without independent review, in the same position as C-12. It must be covered by the production security review (with SIM/CONS/MRK regression on Azure staging) before any Level 2 claim.
+3. **G06 — search completeness.** My Records filters and sorts on business-database metadata; it is not an independently verified search and makes no completeness claim.
+4. **G19 — migration completeness**, **PB-14 manual accessibility review** (NVDA, VoiceOver, real browser zoom, product/design sign-off — nothing of C4 was reviewed manually), the **field-scoped contributor-write limitation**, the **Form Designer's not-fully-accepted usability**, and **every production Level 2 gate** (independent cryptographic attestation, Managed HSM, Confidential Ledger, Azure staging, DR rehearsal) remain open and unwaived.
