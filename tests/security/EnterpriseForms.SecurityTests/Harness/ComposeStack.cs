@@ -28,14 +28,14 @@ public sealed class ComposeStack
 
     /// <summary>
     /// Test oracle only (Phase C6 M0): reads the independently administered AuthorityDb in a read-only transaction
-    /// (<c>default_transaction_read_only</c>), inside the authority-db container. It plays no attacker role and is never used
+    /// (<c>default_transaction_read_only</c>), inside the authority-db container, with the Authority's <c>authority</c> schema on the search path. It plays no attacker role and is never used
     /// by product code; it lets tests compare business-database estimates with what the Authority actually accepted, instead
     /// of checking an estimate against itself.
     /// </summary>
     public string AuthorityObserverSql(string sql)
     {
         var encodedSql = Convert.ToBase64String(Encoding.UTF8.GetBytes(sql));
-        var shell = $"echo {encodedSql} | base64 -d | PGPASSWORD=\"$POSTGRES_PASSWORD\" PGOPTIONS='-c default_transaction_read_only=on' psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -v ON_ERROR_STOP=1 -qAt";
+        var shell = $"echo {encodedSql} | base64 -d | PGPASSWORD=\"$POSTGRES_PASSWORD\" PGOPTIONS='-c default_transaction_read_only=on -c search_path=authority' psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -v ON_ERROR_STOP=1 -qAt";
         var encodedShell = Convert.ToBase64String(Encoding.UTF8.GetBytes(shell));
         return Compose($"exec -T authority-db sh -c \"echo {encodedShell} | base64 -d | sh\"", 60);
     }
