@@ -459,8 +459,13 @@
     },
     {
       "path": "scripts/ci/assert_test_totals.py",
-      "sha256": "a18433520928387776efc3abd89ecec3830dd7030f939b8f414611158c138248",
-      "bytes": 2166
+      "sha256": "bb2de3d64a3c19fc9dc074a5ea9f421d06a7a26e4198292567b76fb3e43240e7",
+      "bytes": 3673
+    },
+    {
+      "path": "scripts/ci/run_dotnet_tests.py",
+      "sha256": "9efc3bda170dd0c753d84116b524ed73f957294edd4997cf6b2902b9cc628e68",
+      "bytes": 4044
     },
     {
       "path": "scripts/ci/summarize_trx.py",
@@ -468,9 +473,14 @@
       "bytes": 1750
     },
     {
+      "path": "scripts/ci/test_test_results.py",
+      "sha256": "c63cede5ac611a8899f3936452d556db07533dfc537e3bf39dfaee650a2aaa48",
+      "bytes": 4364
+    },
+    {
       "path": "scripts/dev/test.ps1",
-      "sha256": "3e3ff1cf6ac62affa7a6145bab0d4bb8cff3f84cb5f51fd4e57e6a14f868c748",
-      "bytes": 7841
+      "sha256": "e5ca4a8fe0dcb8d1792c5b154ebcbd59b24378bb571b532a78032c1e9e701470",
+      "bytes": 7815
     },
     {
       "path": "scripts/generate-spec-manifest.py",

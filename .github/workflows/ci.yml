@@ -62,10 +62,10 @@ jobs:
         run: dotnet build tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj --no-restore -c Release
       - name: Build the Stage B integration test project (compiles only; runs in stage-b-integration against the Docker stack)
         run: dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release
-      - name: Test (integrity vectors, architecture fitness functions, API contracts, authority unit tests; zero discovered tests fails)
-        run: dotnet test --solution EnterpriseForms.All.slnx --no-build -c Release --results-directory artifacts/test-results --report-xunit-trx -- --minimum-expected-tests 10
-      - name: Solution-wide test floor (per-executable minimum cannot express it; sums the TRX files, fails on <130 executed or any non-pass)
-        run: python scripts/ci/assert_test_totals.py artifacts/test-results --min-total 130 --min-files 4
+      - name: Test-result accounting self-tests (lost, overwritten, stale, empty and failed TRX files are detected)
+        run: python -m unittest scripts/ci/test_test_results.py
+      - name: Test (integrity vectors, architecture fitness functions, API contracts, authority unit tests; concurrent, one TRX per project; zero tests, a missing or extra TRX, or <130 executed fails)
+        run: python scripts/ci/run_dotnet_tests.py EnterpriseForms.All.slnx --results-dir artifacts/test-results --configuration Release --no-build --minimum-expected-tests 10 --min-total 130
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: always()
         with:
