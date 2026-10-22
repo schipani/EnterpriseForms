@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "82d7040c5dbbb1722ce69a9e6927ea8d24be3d7fc96b63cbf5b70b58d87ad93e",
-      "bytes": 26275
+      "sha256": "b8c9e66f8c1171af22d8720b7da7db130d261e03dcb6a72a17ebed006adfdce7",
+      "bytes": 26918
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -66,6 +66,11 @@
       "path": "docs/PHASE_C4_STATUS.md",
       "sha256": "444910e38e817bdf7b5382ed243a445b37916cab3fcaf5962f7aa237826252fb",
       "bytes": 22284
+    },
+    {
+      "path": "docs/PHASE_C5_STATUS.md",
+      "sha256": "2644e1f0663875313ef4d542561eee94c487927693d0b9f8966cb08208386e2c",
+      "bytes": 16781
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -214,8 +219,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "b1df2ddff36e009103e8c05506e3fe554836dcce80175207d9c64563b4849a7c",
-      "bytes": 47336
+      "sha256": "2887a3dd71613ebbca8996ce10f8f847cf65fa51d46b8089b24267366bed426b",
+      "bytes": 52410
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -584,8 +589,8 @@
     },
     {
       "path": "trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md",
-      "sha256": "5f0786b54475d8e830304fe409168fe34a2fe1f1e43d6275ad841583d8547ee5",
-      "bytes": 32015
+      "sha256": "b62d9be5242ee4866666f05f2d521ddbf616e478dc0345e9f3e483aac580881c",
+      "bytes": 32710
     },
     {
       "path": "trust_authority/CRYPTOGRAPHIC_SIGNING_AUTHORITY.md",
@@ -614,8 +619,8 @@
     },
     {
       "path": "trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md",
-      "sha256": "a785670f335c21fa592e3afa93aac4f685029e1c44109411743831068346399d",
-      "bytes": 30214
+      "sha256": "07c3bead94e586109bf934d6ac12ebf057d5f1aab49a9fb6143173c3fb5d6121",
+      "bytes": 31326
     },
     {
       "path": "trust_authority/POSTGRESQL_PRIVILEGE_TEST_PLAN.md",
