@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "b8c9e66f8c1171af22d8720b7da7db130d261e03dcb6a72a17ebed006adfdce7",
-      "bytes": 26918
+      "sha256": "e6212803b961f869642c1fd5e2e26bc6423bd10ed3b2ebf108f39c2f804a8c4b",
+      "bytes": 27784
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -69,8 +69,8 @@
     },
     {
       "path": "docs/PHASE_C5_STATUS.md",
-      "sha256": "2d2bfea09ed77ba1e55d07af3711a65e2cdbdcdeb173097aab149c0b6ff925bc",
-      "bytes": 18708
+      "sha256": "7686047f8bc26897f79e334b2aee19e897c45533d4670f5af942759a1b428600",
+      "bytes": 28250
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -219,8 +219,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "2887a3dd71613ebbca8996ce10f8f847cf65fa51d46b8089b24267366bed426b",
-      "bytes": 52410
+      "sha256": "eba30c367e7aed3437cde1781ebd2a802b869bcd6de1ff8d1cec1f1277dbf2ef",
+      "bytes": 53415
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

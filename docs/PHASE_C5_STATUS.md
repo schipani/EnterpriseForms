@@ -100,7 +100,7 @@ This could not be checked against the owner's persistent development data withou
 | U8 | Delegation chains and team shares at commit | The commit uses the same `DesiredStateGraph` as share commands; team-member removal tested. | Awaiting independent review (relates to C-12) |
 | U9 | Snapshot mismatch journals but does not quarantine | As proposed: journal incident, no quarantine. | Awaiting independent review |
 | U10 | Single-select updates | Implemented with the Authority single-item rule (condition 1). | Awaiting independent review |
-| **U11 (new)** | Option catalog membership is validated by the business against unsigned BusinessDb catalog rows. A hostile DBA could add a selectable option for owners and contributors alike. | Not changed in C5 (pre-existing, shared with owner writes; relates to G03 form-definition integrity). | Open, for the reviewer and the owner |
+| **U11 (new)** | Option catalog membership is validated by the business against unsigned BusinessDb catalog rows. A hostile DBA could add a selectable option for owners and contributors alike. | Not changed in C5: pre-existing and shared with owner writes. Severity assessed in §11.4: **Medium**, not a development-merge blocker, production Level 2 blocker. Tracked as **G21**. | **Open — outstanding security issue** |
 
 ## 8. Verification record (local, synthetic)
 
@@ -139,6 +139,7 @@ These are development results on synthetic data. They are not Azure staging evid
 
 * G06 and G19;
 * G20 (new: independent review of this Authority change);
+* G21 (new: option catalog / form-definition metadata integrity, U11 — see §11.4);
 * the C-12 and C-28 Authority reviews;
 * the PB-14 manual accessibility reviews (nothing in C5 was manually reviewed);
 * the My Records scalability concern;
@@ -146,3 +147,96 @@ These are development results on synthetic data. They are not Azure staging evid
 * PB-08 step-up;
 * future requirements FR-C5-01…07 (not approved);
 * every production Level 2 gate.
+
+## 11. Owner acceptance preparation (2026-10-22)
+
+### 11.1 CI test-result filename collision — fixed (C-41)
+
+* **Problem.** `dotnet test --solution … --results-directory X --report-xunit-trx` put every executable's timestamp-named TRX file in one folder. Two executables finishing together wrote the same name, and one result was lost.
+* **Fix.** `scripts/ci/run_dotnet_tests.py`:
+  * discovers the solution's test projects;
+  * empties the results root, so files from an earlier run can't be counted;
+  * runs the projects **concurrently**;
+  * has each write exactly `<results>/<Project>/<Project>.trx`.
+
+  `assert_test_totals.py --expect-projects` then requires exactly one TRX per project and no other file, so a lost, overwritten, duplicated, stale or empty result fails the run. `ci.yml` and `scripts/dev/test.ps1` use it.
+* **Proof.**
+  * `scripts/ci/test_test_results.py`: 5 self-tests, run in CI, covering concurrent writers counted correctly, the PR #15 collision shape, missing, stale, duplicate, failed and empty files.
+  * A local concurrent run: 4 projects, 4 files, **302 / 302**.
+
+### 11.2 Local development stack prepared for acceptance (persistent services untouched)
+
+* **What changed:** only the application containers `authority`, `api`, `worker` and `web` were rebuilt from the branch and recreated. Command: `docker compose … up -d --no-deps --build --wait authority api worker web`.
+* **What didn't:** `vault`, `business-db`, `authority-db`, `spicedb`, `spicedb-db`, `azurite`, `clamav` and `archive-store` keep their original container IDs and creation times (recorded before and after). They weren't recreated, their volumes weren't touched, and the in-memory Vault and its development signing keys are intact. No migrations were needed (C5 has no schema change).
+* **Switch.** Contributor editing is enabled **only** in this local Authority, by passing `AUTHORITY_SHARE_CONTRIBUTOR_WRITES_ENABLED=true` in the environment of that one compose command. Nothing was written to `.env` or committed. The committed default remains `false`, and the Production startup guard is unchanged. The Authority reports `Content__ShareContributorWritesEnabled=true`, `ASPNETCORE_ENVIRONMENT=Development`.
+
+### 11.3 Acceptance and regression results on the development stack (synthetic data)
+
+| Check | Result |
+|---|---|
+| `e2e/c5-owner-acceptance.spec.ts` | **5 / 5 passed**. <br>• Owner creates a record (Case title, Internal notes, Priority dropdown) and shares Case title + Priority with the clerk for editing. <br>• The clerk sees no Internal notes label or value in the UI or API, and a write to it is refused exactly like an unknown field. <br>• The clerk edits both shared fields and saves; the owner sees the changes. <br>• **Stale edit:** the owner saves while the clerk edits; the clerk's save is refused as a conflict, the clerk reapplies onto the latest version (the owner's title is kept) and saves. <br>• Owner revokes; the clerk can no longer open, read or edit (UI and API 403/404). Axe scan clean. |
+| `e2e/contributor-writes.spec.ts` | **4 / 4 passed** (switch reported on, asserted) |
+| Full Playwright suite against the dev stack | **54 passed, 1 failed, 1 not run** (11.2 min). The failure is `form-management.spec.ts` "designer edits an existing field and the document collection…" (not a C5 area); the "not run" test is the dependent next test in that serial file. Re-running that file: 3/3 passed, then 9/9 with `--repeat-each=3`; it passed in both hosted browser runs. The original error detail was overwritten by the re-runs, so it is recorded as an **unexplained intermittent failure**. |
+| Unshared encrypted value: non-disclosure | API projection and PATCH responses for the clerk contain neither the `internal_notes` key nor its value (asserted). |
+| Unshared encrypted value: preservation (read-only SQL on the dev database) | Envelope digest of Internal notes is **identical** in the revision the clerk created (rev 2 = rev 1). In the clerk's reapply revision, both Internal notes and Case title are identical to the owner's revision 3. The owner's write re-sealed Internal notes, which is the owner path's normal behaviour. No plaintext row exists for either encrypted text field. The `SharedFieldWriteBuilder` decryption-spy unit test proves nothing outside the read scope is decrypted. |
+| .NET CI-equivalent (new runner) | **302 / 302**, 4 per-project TRX files |
+| Result-accounting self-tests | **5 / 5** |
+| vitest / typecheck | **166 / 166**; clean |
+
+### 11.4 U11 — option catalog integrity: assessment (outstanding security issue, G21)
+
+**What it is:**
+* Dropdown values are stored as stable option ids (plaintext) or option keys (inside ciphertext). The Authority signs the row, and for share editors enforces single-item structure (C-36).
+* **Which options are allowed, and what they are called**, comes from `field_options` and the published layout snapshot in `form_versions`, which are business PostgreSQL rows. Neither is row-signed, part of a record manifest, or known to the Authority.
+
+**What a hostile business-database administrator could do:**
+* insert a new option, or reactivate a deactivated one, for a field. Owners **and** contributors could then select it, the API would accept it, and the Authority would sign it as part of an otherwise authorized write;
+* relabel existing options, so every record shows a different meaning for a stored choice without any write at all. This is stronger, needs no user action, and is independent of C5.
+
+**What it does not do:**
+* grant access;
+* reveal or decrypt protected values;
+* bypass Authority authorization, revocation, the content CAS or manifest verification. The signed value is exactly what an authorized user submitted.
+
+**Severity: Medium.** It is an integrity and meaning problem under the Level 2 hostile-DBA threat, with no confidentiality or authorization impact. It is a specific case of the wider unsigned form-definition metadata gap (form versions, layouts, option catalogs; related to G03/G18).
+
+**Assessment:**
+* **Not a development-merge blocker.** It pre-exists C5, affects owner writes identically, is not widened in capability by contributor writes (the administrator can already relabel), and development uses synthetic data only.
+* **A production Level 2 blocker** unless resolved or explicitly accepted after independent review. Possible directions, **not implemented and not designed here**:
+  * an Authority-anchored signed form-version snapshot that includes the option catalog, with write validation against that snapshot;
+  * binding the option key and label into the signed value.
+
+  Either changes the trust model and needs its own design review.
+
+No change was made to the Authority or the trust model for U11.
+
+### 11.5 Browser acceptance instructions (owner)
+
+1. Use the rebuilt local stack (above). Start the web app as usual (`npm run dev -w apps/web`, http://localhost:5173), or reuse your running Vite.
+2. **Sign in as Avery Owner (owner).** Create or pick a form with two text fields and a single-choice dropdown, and create a record. Or use the "C5 Acceptance …" form the automated run published (Case title, Internal notes, Priority).
+3. Record page → **Sharing and access** → **Share fields**:
+   * Person **Casey Clerk**; Role **Contributor**. The wording says "change their values".
+   * Tick **only** one text field and the dropdown. Fields a contributor could not change show a "View only" badge.
+   * **Share**. The table shows "Can change values: Yes".
+4. Sign out. **Sign in as Casey Clerk (clerk)** and open the record from My Records:
+   * "Partial view (shared fields only)" appears and the unshared text field is absent;
+   * click **Edit shared fields**: the banner says you can change 2 shared fields;
+   * change both; **Save changes** → "Changes saved".
+5. **Stale edit:** as the clerk, open **Edit shared fields** and change the dropdown, but don't save. In another browser (or a private window), sign in as the owner and change the shared text field. Back as the clerk, **Save changes**:
+   * "Someone else saved this record while you were editing" appears;
+   * choose **Review and reapply my changes**, check the values, save.
+6. As the owner: the record shows the permitted changes, the unshared field is unchanged, and **Sharing history** lists the shared edits. **Revoke** the clerk's share → "Access revoked for Casey Clerk".
+7. As the clerk: the record and its edit page now show not found or no permission.
+
+### 11.6 Returning the local feature switch to disabled after acceptance
+
+Recreate only the Authority with the committed default (no variable set):
+
+```bash
+cd infrastructure/docker
+docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d --no-deps --wait authority
+docker inspect enterpriseforms-authority-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep Content__
+#   expect: Content__ShareContributorWritesEnabled=false
+```
+
+This recreates only the Authority container (no rebuild, no other service). Persistent data, Vault and keys are untouched. Any later compose command run without the variable also leaves the switch off. To turn it on again, prefix the command with `AUTHORITY_SHARE_CONTRIBUTOR_WRITES_ENABLED=true`. Never put the variable in a committed file; a Production Authority refuses to start with it on.
