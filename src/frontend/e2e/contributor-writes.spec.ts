@@ -81,6 +81,11 @@ test.describe("Phase C5 collaboration and contributor writes", () => {
       const projection = await clerk.get(`/api/v1/form-records/${recordId}/projection`);
       writesEnabled = (projection["permissions"] as Json)["contributorWritesEnabled"] === true;
     }).toPass({ timeout: 60_000 });
+    // CI declares the mode its stack was started in, so a switch that did not reach the Authority fails the run instead of silently testing the other path.
+    const expected = process.env["EXPECT_CONTRIBUTOR_WRITES"];
+    if (expected !== undefined) {
+      expect(writesEnabled, "contributor-write switch reported by the Authority").toBe(expected === "true");
+    }
     await signOut(page);
   });
 

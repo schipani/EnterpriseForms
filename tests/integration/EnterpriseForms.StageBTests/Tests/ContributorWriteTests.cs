@@ -275,7 +275,7 @@ public sealed class ContributorWriteTests(StageBFixture fixture)
         {
             await SetContributorWritesAsync(true);
             var shareId = await ShareAsync(s, record, s.Designer, "Contributor", "given_name");
-            var accepted = new List<long>();
+            var accepted = new System.Collections.Concurrent.ConcurrentQueue<long>();
             var refusedAfterRevocation = 0;
             var revoked = new TaskCompletionSource();
             var cancellation = TestContext.Current.CancellationToken;
@@ -298,7 +298,7 @@ public sealed class ContributorWriteTests(StageBFixture fixture)
                     var result = await s.Fixture.Api.PatchAsync($"/api/v1/form-records/{record:D}", s.Token(s.Designer), new { expectedContentRevision = Revision(projection.Root), values = new Dictionary<string, string> { ["given_name"] = "Load-" + i } });
                     if (result.IsSuccess)
                     {
-                        accepted.Add(result.Root.GetProperty("authorizationRevision").GetInt64());
+                        accepted.Enqueue(result.Root.GetProperty("authorizationRevision").GetInt64());
                     }
                     else if (revoked.Task.IsCompleted && result.Status is HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
                     {
@@ -307,7 +307,13 @@ public sealed class ContributorWriteTests(StageBFixture fixture)
                 }
             }, cancellation);
 
-            await Task.Delay(1500, cancellation);
+            // Revoke only once at least one contributor write has landed, so the race always has both sides.
+            var firstWrite = DateTime.UtcNow.AddSeconds(60);
+            while (accepted.IsEmpty && DateTime.UtcNow < firstWrite)
+            {
+                await Task.Delay(100, cancellation);
+            }
+
             var revoke = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{shareId:D}/revoke", s.Token(s.Clerk), new { });
             Assert.True(revoke.IsSuccess, revoke.Body);
             var gate = await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
