@@ -406,7 +406,13 @@ The duplicate-reference and technical-failure UI cases replace the server respon
 
 ### 10.5 Hosted verification
 
-Recorded after the hosted runs complete (see the commit message and decision C-48).
+On `bf51fe7` (disposable GitHub-hosted stacks):
+
+| Suite | Result |
+|---|---|
+| Hosted Docker integration (run 39895116830) | **84 / 84** (80 before; the 4 new `RecordLookupTests` included) |
+| Hosted browser (same run) | **66 / 66** (61 before; the 5 new `record-lookup` tests included) |
+| Hosted SEC-P01…SEC-P12 (run 39895119735) | **13 / 13** |
 
 ### 10.6 Browser acceptance (owner)
 
