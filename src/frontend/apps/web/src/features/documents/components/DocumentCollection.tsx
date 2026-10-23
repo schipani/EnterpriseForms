@@ -1,7 +1,7 @@
 import type { DocumentSummaryResponse } from "@enterpriseforms/api-client";
 import { DOWNLOAD_PATH, resolvePath, useApi, useRuntime } from "@enterpriseforms/app-runtime";
 import type { LayoutUploadPolicy } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, ProgressBar, RowActions, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, Dialog, LoadingBlock, ProgressBar, RowActions, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { phaseTone, useUploadItems } from "../../jobs";
@@ -246,7 +246,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
             <Button variant="secondary" onClick={() => setRemoveTarget(null)} disabled={remove.isPending}>
               Cancel
             </Button>
-            <Button variant="danger" busy={remove.isPending} disabled={reason.trim().length < 3} onClick={() => removeTarget && remove.mutate(removeTarget)}>
+            <Button variant="danger" icon={ActionIcons.delete} busy={remove.isPending} disabled={reason.trim().length < 3} onClick={() => removeTarget && remove.mutate(removeTarget)}>
               Remove document
             </Button>
           </>

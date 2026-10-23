@@ -1,7 +1,7 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import type { RecordProjectionResponse } from "@enterpriseforms/api-client";
 import { FormRenderer, displayValue, groupPayload, validateGroups, validateValues, type ErrorMap, type FormLayout, type GroupValueMap, type RecordGroupPayload, type RendererField, type ValueMap } from "@enterpriseforms/form-renderer";
-import { Button, Dialog, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
+import { ActionIcons, Button, Dialog, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -347,7 +347,7 @@ export function EditRecordPage() {
           renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"} are managed from the record page (Documents).</p>}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" busy={update.isPending} disabled={conflict}>
+          <Button type="submit" icon={ActionIcons.save} busy={update.isPending} disabled={conflict}>
             Save changes
           </Button>
           <Button

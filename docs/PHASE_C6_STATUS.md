@@ -551,3 +551,16 @@ At **http://127.0.0.1:8091** (run `python scripts/devstack/devstack.py up` first
 8. **Phone width:** narrow the window to about 320 px; the version page should stay readable without sideways scrolling.
 
 Tampered or missing history can't be produced safely in the browser; the automated tests cover it (§12.2).
+
+## 13. Consistent action-button icons (decision C-51)
+
+Owner request during M2 usability work. Labeled action buttons carry a recognizable icon, left of the text.
+
+* **Convention:** `Button` has an `icon` prop (decorative, `aria-hidden`, 16 px on small and 18 px on medium buttons, same stroke, fixed gap, hidden while the button is busy). The visible text stays the accessible name, so no test or screen-reader name changed. Colors, the black default primary and the focus ring are untouched.
+* **One icon per action** in `packages/ui/src/actionIcons.ts` (Lucide): add (plus), search, reset (rotate), edit (pencil), save, submit (send), archive, unarchive, reopen (rotate-back), configure (gear), delete (trash), download. Call sites choose a name, never an icon.
+* **Dependency:** Lucide was not yet used in the application, so `lucide-react` 1.61.0 (ISC licence, 0 advisories) was added, pinned, to `@enterpriseforms/ui` only; named imports are tree-shaken.
+* **Applied to:** New record (My Records and Forms), Search (Find a record), Clear filters, Edit and Edit shared fields, Save changes, the lifecycle actions (Submit, Reopen, Archive, Unarchive), Configure Field (the hand-drawn gear is replaced), the designer's Add Field, Add Section, Add Row and Add Column (the text "+" is replaced), and the destructive Remove confirmations. Cancel, Yes/No and informational controls get no icon.
+* **Not applied:** document and file "Download" are links, not Buttons, so they were left as they are; there is no Export or Save Draft button in the application yet.
+* **Verification:** typecheck and lint clean; vitest 178 / 178; new Playwright `action-icons` (New record and Search: icon present, decorative, left of the label, same size, 4 to 12 px gap, same black primary colors, keyboard focus ring, 320 px layout; Cancel has no icon) plus the broader suites touching these screens: **35 / 35** on the persistent dev stack (only `web` was rebuilt). Hosted run: not yet.
+* **Not found:** the request refers to a "unified My Records search" and an "Activity Log correction". I have no specification for either beyond the Find a record lookup (C-48) and the Activity tab rename (C-50), so nothing further was changed for them.
+

@@ -1,7 +1,7 @@
 import { useApi } from "@enterpriseforms/app-runtime";
 import type { RecordProjectionResponse } from "@enterpriseforms/api-client";
 import { FormRenderer, type DocumentElement, type FormLayout, type RelatedElement } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -79,11 +79,11 @@ export function RecordPage() {
             <LifecycleActions formRecordId={formRecordId} data={data} onDone={setLifecycleNotice} />
             {data.permissions.canEdit && contentEditable ? (
               <Link to="/app/records/$formRecordId/edit" params={{ formRecordId }}>
-                <Button>Edit</Button>
+                <Button icon={ActionIcons.edit}>Edit</Button>
               </Link>
             ) : !data.permissions.isCompleteProjection && data.permissions.canEditSharedFields && contentEditable ? (
               <Link to="/app/records/$formRecordId/edit" params={{ formRecordId }}>
-                <Button>Edit shared fields</Button>
+                <Button icon={ActionIcons.edit}>Edit shared fields</Button>
               </Link>
             ) : null}
           </>

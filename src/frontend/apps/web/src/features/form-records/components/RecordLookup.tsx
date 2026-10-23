@@ -1,6 +1,6 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import type { RecordListItemResponse, RecordLookupResponse } from "@enterpriseforms/api-client";
-import { Badge, Button, Card, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
@@ -64,7 +64,7 @@ export function RecordLookup() {
           className="min-w-0 flex-1"
         />
         <div className="flex gap-2 sm:mb-0.5">
-          <Button type="submit" busy={lookup !== null && result.isFetching}>
+          <Button type="submit" icon={ActionIcons.search} busy={lookup !== null && result.isFetching}>
             Search
           </Button>
           {lookup !== null || text ? (

@@ -1,6 +1,6 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import type { RecordListItemResponse, RecordListQuery, RecordListResponse } from "@enterpriseforms/api-client";
-import { Badge, Button, Card, Checkbox, DataTable, EmptyState, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -80,7 +80,7 @@ export function RecordsPage() {
             {creatable.length > 0 ? (
               <OverflowMenu
                 label="New record"
-                trigger={<Button>New record</Button>}
+                trigger={<Button icon={ActionIcons.add}>New record</Button>}
                 items={creatable.map((form) => ({
                   key: form.formDefinitionId,
                   content: (
@@ -113,7 +113,7 @@ export function RecordsPage() {
             <Checkbox label="Include archived records" checked={Boolean(search.archived) || search.status === "Archived"} disabled={search.status === "Archived"} onCheckedChange={(checked) => update({ archived: checked ? true : undefined })} />
           </div>
           {filtered || search.sort || search.size ? (
-            <Button variant="ghost" size="sm" onClick={() => update({ form: undefined, status: undefined, children: undefined, archived: undefined, sort: undefined, size: undefined })}>
+            <Button variant="ghost" size="sm" icon={ActionIcons.reset} onClick={() => update({ form: undefined, status: undefined, children: undefined, archived: undefined, sort: undefined, size: undefined })}>
               Clear filters
             </Button>
           ) : null}
@@ -144,7 +144,7 @@ export function RecordsPage() {
         ) : null}
         {data && total === 0 ? (
           filtered ? (
-            <EmptyState title="No records match these filters" actions={<Button variant="secondary" onClick={() => update({ form: undefined, status: undefined, children: undefined, archived: undefined })}>Clear filters</Button>}>
+            <EmptyState title="No records match these filters" actions={<Button variant="secondary" icon={ActionIcons.reset} onClick={() => update({ form: undefined, status: undefined, children: undefined, archived: undefined })}>Clear filters</Button>}>
               Try another form or status, or include related records.
             </EmptyState>
           ) : (
@@ -205,7 +205,7 @@ export function RecordsPage() {
                           </Link>
                           {row.canEdit && row.recordStatus === "Draft" ? (
                             <Link to="/app/records/$formRecordId/edit" params={{ formRecordId: row.formRecordId }} aria-label={`Edit ${row.formDefinitionName} ${row.recordReference}`}>
-                              <Button size="sm" variant="secondary">
+                              <Button size="sm" variant="secondary" icon={ActionIcons.edit}>
                                 Edit
                               </Button>
                             </Link>

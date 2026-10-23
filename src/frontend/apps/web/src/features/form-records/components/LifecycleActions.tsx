@@ -1,6 +1,6 @@
 import { useApi, presentError } from "@enterpriseforms/app-runtime";
 import type { RecordLifecycleTransition, RecordProjectionResponse } from "@enterpriseforms/api-client";
-import { Button, Dialog, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Button, Dialog, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -13,6 +13,8 @@ import { ErrorPanel } from "../../support";
 
 interface TransitionCopy {
   readonly transition: RecordLifecycleTransition;
+  /** Key into ActionIcons for the header button. */
+  readonly icon: keyof typeof ActionIcons;
   /** The server's transition name (what AllowedTransitions lists). */
   readonly name: string;
   readonly button: string;
@@ -28,6 +30,7 @@ interface TransitionCopy {
 export const TRANSITIONS: readonly TransitionCopy[] = [
   {
     transition: "submit",
+    icon: "submit",
     name: "Submit",
     button: "Submit",
     title: "Submit this record?",
@@ -38,6 +41,7 @@ export const TRANSITIONS: readonly TransitionCopy[] = [
   },
   {
     transition: "reopen",
+    icon: "reopen",
     name: "Reopen",
     button: "Reopen as draft",
     title: "Reopen this record as a draft?",
@@ -49,6 +53,7 @@ export const TRANSITIONS: readonly TransitionCopy[] = [
   },
   {
     transition: "archive",
+    icon: "archive",
     name: "Archive",
     button: "Archive",
     title: "Archive this record?",
@@ -60,6 +65,7 @@ export const TRANSITIONS: readonly TransitionCopy[] = [
   },
   {
     transition: "unarchive",
+    icon: "unarchive",
     name: "Unarchive",
     button: "Unarchive",
     title: "Unarchive this record?",
@@ -79,7 +85,7 @@ export function LifecycleActions({ formRecordId, data, onDone }: { formRecordId:
   return (
     <>
       {TRANSITIONS.filter((copy) => allowed.includes(copy.name)).map((copy) => (
-        <Button key={copy.name} variant={copy.variant} onClick={() => setActive(copy)}>
+        <Button key={copy.name} variant={copy.variant} icon={ActionIcons[copy.icon]} onClick={() => setActive(copy)}>
           {copy.button}
         </Button>
       ))}
