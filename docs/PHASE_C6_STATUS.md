@@ -529,7 +529,13 @@ The owner's own M1 acceptance record (REC-017EF770) shows its real history on th
 
 ### 12.5 Hosted verification
 
-Recorded after the hosted runs complete.
+| Run | Result |
+|---|---|
+| SEC-P01…SEC-P12 on `4dfc893` (run 39900560772) | **13 / 13** |
+| Stage B on `4dfc893` (run 39900557044) | browser **71 / 71** (5 new history tests); integration **88 / 89** — all 5 new `RecordHistoryTests` passed; one existing test failed (below) |
+| Stage B on `cc88873` (run 39902110449) | integration **89 / 89**; browser **71 / 71**; combined gate passed |
+
+The one failure was in an existing test, not M2. `EncryptionTests.StrengtheningAFieldIsAnAuditedMigration…` edits a record while the field-protection migration worker commits. On that run the worker committed first, and the user's edit met the worker's new head before its checkpoint held the archive receipt. The edit was therefore refused with the designed retryable `503 AUTHORITY_NOT_READY` (SEC-P12: nothing is released before the receipt) instead of a revision conflict, and the test accepted only the conflict. Both outcomes leave the record unchanged, and the test already redoes the edit on the verified head, so the assertion now accepts either (`cc88873`). No product change. M2 does not touch the write path, and the current-head read is unchanged.
 
 ### 12.6 Browser acceptance (owner)
 
