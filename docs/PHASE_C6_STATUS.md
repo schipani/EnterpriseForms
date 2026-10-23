@@ -616,5 +616,13 @@ Not changed by design: the renamed `RecordLookup` component, the C-48 `lookup` e
 
 ### 14.6 Hosted verification
 
-Recorded after the hosted runs complete.
+| Run | Result |
+|---|---|
+| SEC-P01…SEC-P12 on `9cafc34` (run 40031918773) | **13 / 13** (no security-relevant code changed afterwards) |
+| Stage B on `848349b` (run 40035454847) | integration **89 / 89**; browser **81 / 81**; combined gate passed |
+
+Earlier hosted runs on the way (both CI-only causes, no product change):
+* `9cafc34` (run 40031915127): the browser job failed at the frontend install because `npm install` on Windows (adding `lucide-react` in C-51) had dropped the optional macOS `fsevents` lock entry, so hosted `npm ci` refused to run; the entry was restored exactly as before. This also affected the C-51 icon commit, which had not been run hosted.
+* The same run's integration test `ReplayingASuccessfulTransition…` (my earlier C-46 test) replayed immediately after a commit and met the retryable `503 AWAITING_ARCHIVE` gate (SEC-P12); it now waits until the committed head is readable, as a client retry would (`eb9baaa`).
+* `eb9baaa` (run 40033704862): integration 89 / 89; the browser job failed 2 of 81 because the C-51 `action-icons` spec assumed a form and a record that exist on the dev stack but not on a fresh stack; it now creates its own (`848349b`).
 
