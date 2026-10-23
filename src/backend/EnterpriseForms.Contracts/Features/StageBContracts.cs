@@ -172,6 +172,9 @@ public sealed record RecordListFormOption(Guid FormDefinitionId, string FormDefi
 /// <c>UnavailableRecordCount</c>: records the authority lists for the caller that have no business metadata to filter
 /// or sort by; they are reported, never silently dropped (<c>UnavailableRecordIds</c> holds up to 50 of them).
 /// </summary>
+/// <summary>Quick record lookup (Phase C6): authorized exact matches only; <c>MatchCount</c> counts authorized matches (described or not).</summary>
+public sealed record RecordLookupResponse(string NormalizedQuery, string LookupKind, IReadOnlyList<RecordListItemResponse> Matches, int MatchCount, IReadOnlyList<Guid> UnavailableRecordIds, long AuthorizationRevision);
+
 public sealed record RecordListResponse(IReadOnlyList<RecordListItemResponse> Items, long AuthorizationRevision, string? ContinuationToken,
     int TotalCount = 0, int PageStart = 0, int PageSize = 0, string? PreviousToken = null, IReadOnlyList<RecordListFormOption>? AvailableForms = null,
     int UnavailableRecordCount = 0, IReadOnlyList<Guid>? UnavailableRecordIds = null, string SortBy = "modifiedOn", string SortDirection = "desc");

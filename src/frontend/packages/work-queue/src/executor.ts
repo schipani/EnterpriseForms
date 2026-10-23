@@ -91,8 +91,11 @@ export class OperationExecutor {
     const timeout = setTimeout(() => controller.abort(), operation.timeoutMilliseconds ?? 60_000);
     try {
       const outcome = await this.execute(operation, controller.signal);
-      this.emit(outcome);
-      if (outcome.type === "failed" && outcome.retryable && this.canRetry(operation)) {
+      const retrying = outcome.type === "failed" && outcome.retryable && this.canRetry(operation);
+      // A failure that will not be retried (retries exhausted, or an unsafe write) is final, so the caller is settled
+      // instead of waiting forever; `retryable` still tells the UI whether the error was transient.
+      this.emit(outcome.type === "failed" && !retrying ? { ...outcome, final: true } : outcome);
+      if (retrying) {
         const attempt = (this.attempts.get(operation.operationId) ?? 0) + 1;
         this.attempts.set(operation.operationId, attempt);
         this.emit({ type: "state", operationId: operation.operationId, state: "Retrying" });

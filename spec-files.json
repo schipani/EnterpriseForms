@@ -74,8 +74,8 @@
     },
     {
       "path": "docs/PHASE_C6_STATUS.md",
-      "sha256": "2f7e87680395c308b714175cda685dcc44e31d35ceaf3f4c676688208479707c",
-      "bytes": 43317
+      "sha256": "e8f310b18890a085ce3f3ec1f4fbd1727d2fe3f2fd2eb5be8fbfdd79be28088e",
+      "bytes": 50276
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "6e183027c6f9771c074e7105ede4154336cccd60c8b4ad80abe19d54c89a6993",
-      "bytes": 65187
+      "sha256": "40c3b559d2fec8b054e02fa703becde582a4a301b6d589579e62aa55e5e6c0d7",
+      "bytes": 66554
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -294,8 +294,8 @@
     },
     {
       "path": "docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md",
-      "sha256": "057369067b7c4016e7e9584c76bbaf94bbb9d375d80e0ed67ede67352899f2b3",
-      "bytes": 11853
+      "sha256": "351584a8f8f473da1c4f3436075798d02abde451ba2f88eb654faf889391c504",
+      "bytes": 12123
     },
     {
       "path": "docs/infrastructure/PB05_DEPLOYMENT_BLUEPRINT.md",
@@ -499,8 +499,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "f3dcc3d5097e83c630ae02e8784d490747fc127a68d227a66aa417f686108ecf",
-      "bytes": 49808
+      "sha256": "82cd156d18241e39e6b10268ae068c13d6c2bbab77fb34f75162922e6321fa81",
+      "bytes": 51373
     },
     {
       "path": "scripts/generate-spec-manifest.py",

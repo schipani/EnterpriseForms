@@ -1314,6 +1314,36 @@
         }
       }
     },
+    "/api/v1/form-records/lookup": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Quick lookup by an exact record id or short reference (REC-XXXXXXXX). Matches come only from the authority (a Discover check of the id, or the caller's complete discoverable set for a reference); a missing record and an undiscoverable one give the same empty result. Archived and related records are included. Rows carry unverified local metadata only. Not a field-value search.",
+        "operationId": "LookupFormRecord",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-records/{formRecordId}": {
       "get": {
         "tags": [
@@ -5322,6 +5352,54 @@
           "sortDirection": {
             "type": "string",
             "default": "desc"
+          }
+        }
+      },
+      "RecordLookupResponse": {
+        "required": [
+          "normalizedQuery",
+          "lookupKind",
+          "matches",
+          "matchCount",
+          "unavailableRecordIds",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "normalizedQuery": {
+            "type": "string"
+          },
+          "lookupKind": {
+            "type": "string"
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordListItemResponse"
+            }
+          },
+          "matchCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unavailableRecordIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },

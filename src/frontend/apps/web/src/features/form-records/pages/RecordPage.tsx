@@ -10,6 +10,7 @@ import { DocumentCollection } from "../../documents";
 import { ChildRecordList } from "../../related-forms";
 import { RecordAccessPanel } from "../../sharing";
 import { ErrorPanel } from "../../support";
+import { CopyReference } from "../components/CopyReference";
 import { LifecycleActions } from "../components/LifecycleActions";
 import { formatDateTime, recordStatusLabel } from "../components/recordList";
 import { parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
@@ -189,7 +190,7 @@ function RecordSummary({ data }: { data: RecordProjectionResponse }) {
       </div>
       <DescriptionList
         items={[
-          { term: "Reference", detail: summary?.recordReference ?? "—" },
+          { term: "Reference", detail: summary?.recordReference ? <CopyReference reference={summary.recordReference} /> : "—" },
           { term: "Status", detail: recordStatusLabel(data.lifecycle?.status ?? data.record.recordStatus) },
           { term: "Created", detail: summary?.createdOn ? `${formatDateTime(summary.createdOn)}${summary.createdByCurrentUser ? " by you" : summary.createdByDisplayName ? ` by ${summary.createdByDisplayName}` : ""}` : "—" },
           { term: "Last changed", detail: summary?.modifiedOn ? formatDateTime(summary.modifiedOn) : "—" },

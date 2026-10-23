@@ -2,7 +2,7 @@
 
 Branch `phase-c/record-lifecycle` from main `f859e42`. Architecture: `docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md` (revision 1), approved for controlled development by the owner on 2026-10-22 (decision **C-43**). Implementation decision: **C-44**.
 
-**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), and the recoverable development environment for browser acceptance in §9 (C-47). AC-1 is approved but not started; AC-3 is deferred; nothing is merged to main; M2 is not started.
+**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), the recoverable development environment for browser acceptance in §9 (C-47), and the quick record lookup in §10 (C-48). AC-1 is approved but not started; AC-3 is deferred; nothing is merged to main; M2 is not started.
 
 **What this is not:**
 * not an independent security review;
@@ -346,3 +346,80 @@ Everything in §8.7, plus:
 * a Vault audit device, which is not configured.
 
 Nothing in this section is a production or Level 2 claim.
+
+## 10. Quick record lookup on My Records (decision C-48)
+
+Owner request before M2: find a record quickly by pasting its reference or ID. This is a usability change, not a search feature: G06 search completeness is unchanged and still open.
+
+### 10.1 How references work, and why the lookup is complete and authorization-safe
+
+* A short reference (`REC-017EF770`) is **not stored**. It is derived from the record ID (`REC-` + the last eight hexadecimal digits; `RecordListQuery.ReferenceFor`).
+* It is **not unique**: different records can share one, so a reference lookup can have several answers.
+* **Exact record ID:** one Authorization Authority `Discover` check of that ID.
+* **Exact reference:** matched against the caller's **complete** discoverable set. That is every page of the Authority's discover lookup at one authorization revision, the same enumerator My Records uses (C-29). The match uses the record IDs only, because the reference is a function of the ID.
+  * The business database is not consulted to decide matches.
+  * Above the enumeration bound (10,000 discoverable records) the lookup fails closed with `RECORD_LIST_TOO_LARGE`. It never answers from a partial set, and the user is told to paste the full ID instead.
+* The business database only **describes** matches (form, status, dates, creator). This is the same allowlisted, unverified metadata as My Records, and opening a record performs the verified read.
+* A record that does not exist and a record the caller may not discover produce the **same** empty answer. No count, metadata or existence of unauthorized records is returned.
+* Only two input forms are accepted: a full UUID (hyphens and braces optional) or `REC-` + 8 hex digits. Anything else is refused (`422 LOOKUP_INVALID`), so no field value, name or free text is ever searched.
+* Archived and related (child) records are included: an exact lookup is not subject to the list's default filters.
+
+Endpoint: `GET /api/v1/form-records/lookup?q=…` (`LookupFormRecord`; feature owner FormRecords). The OpenAPI artifact and the generated TypeScript types were regenerated.
+
+### 10.2 UI
+
+* **My Records:** a **Find a record** panel at the top, with a labelled input, **Search** and **Clear** buttons, and Enter to search. The existing form, status, sort, page-size, child and archived controls are unchanged below it.
+* **Outcomes, announced politely:**
+  * **Record found:** an **Open record** button.
+  * **Several records have this reference:** every match is listed with form, status and dates; none is chosen.
+  * **No record found:** the wording does not distinguish missing from inaccessible.
+  * **Invalid input:** an inline error.
+  * **Technical failure:** "The lookup could not be completed. This is a technical problem, not a missing record", with **Try again** and a support reference.
+  * **Too many records to check:** paste the full ID instead.
+* **Record Overview:** **Copy reference** next to the reference in the record summary. It announces "Reference copied"; if the clipboard is refused, it selects the text and explains how to copy it.
+
+### 10.3 Platform fix found while testing
+
+**The bug:** in the shared request coordinator (`packages/work-queue`), the executor emitted the last failure of a safe request still marked `retryable` after its three retries. The coordinator settles only non-retryable failures, so a persistent 503 left the request pending forever: the UI showed "loading" indefinitely instead of an error. This affected every safe GET, not only the lookup.
+
+**The fix:** failures that will not be retried are now marked `final`, and the coordinator settles them. `retryable` still says whether the error was transient.
+
+**The test:** an executor test covers it, and mutation-checked: it fails without the fix.
+
+### 10.4 Verification
+
+| Suite | Result |
+|---|---|
+| .NET (all four test projects, CI runner) | **360 / 360**: contract tests 164 (23 new lookup tests: input forms and refusals; authority-only matching over every discover page; unauthorized record with the same reference never requested from the business database; duplicates all returned; archived found; missing business metadata reported; authority failure propagates; fail-closed above the bound) |
+| Frontend unit (vitest) | **175 / 175**: new input-parser tests and the coordinator final-failure test |
+| Lint, typecheck, OpenAPI determinism | clean |
+| Docker integration (`RecordLookupTests`, new) | compiled locally; runs on the hosted stack (§10.5) |
+| Browser on the persistent dev stack, rebuilt `api` and `web` only (Vault, databases and SpiceDB not restarted): `record-lookup` (new), `record-lifecycle`, `records-workspace` | **14 / 14** |
+
+The new browser spec:
+* finds by reference with Enter and by full ID with the Search button, opens the record, and copies its reference (clipboard verified);
+* checks an unknown reference, invalid input, and an archived record that is hidden from the table yet found;
+* shows that a reader without access gets "No record found";
+* runs an axe scan.
+
+The duplicate-reference and technical-failure UI cases replace the server response in the browser, because the real server cannot be made to issue colliding record IDs or fail on demand. Their server side is covered by the .NET tests.
+
+### 10.5 Hosted verification
+
+Recorded after the hosted runs complete (see the commit message and decision C-48).
+
+### 10.6 Browser acceptance (owner)
+
+At **http://127.0.0.1:8091** (run `python scripts/devstack/devstack.py up` first if Docker or the machine restarted), signed in as **Avery Owner (owner)**:
+
+1. **Copy a reference:** open any record (for example REC-017EF770). In **Record summary**, press **Copy reference**; "Reference copied" appears.
+2. **Find by reference:** go to **My Records**, paste it into **Find a record** and press **Enter**. "Record found" appears with **Open record**; open it.
+3. **Find by ID:** paste a full record ID (from the address bar of a record page) and press **Search**. Same result.
+4. **No match:** search `REC-00000000`. "No record found" appears, with no other detail.
+5. **Invalid input:** search a word such as `Smith`. The field shows an error asking for a reference or full ID, and nothing is searched.
+6. **Archived:** archive a record (or use one archived earlier). It is not in the table by default, but **Find a record** finds it with an **Archived** badge.
+7. **No access:** sign in as **Riley Reader (reader)** and search the same reference. "No record found" appears, identical to step 4.
+8. **Shared:** sign in as **Casey Clerk (clerk)** and search REC-017EF770 (shared with the clerk). It is found.
+9. **Unchanged:** the form, status, sort, rows-per-page, related-records and archived controls and paging below the panel work as before.
+
+Duplicate references and technical failures cannot be produced on demand in the real application; they are covered by the automated tests.

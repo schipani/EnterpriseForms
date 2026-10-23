@@ -36,6 +36,11 @@ public static class FormRecordEndpoints
             .WithName("ListFormRecords")
             .WithSummary("My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection.");
 
+        records.MapGet("/lookup", static async Task<Ok<RecordLookupResponse>> (string? q, HttpContext http, LookupRecordHandler handler, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), RecordLookupQuery.Parse(q), cancellationToken).ConfigureAwait(false)))
+            .WithName("LookupFormRecord")
+            .WithSummary("Quick lookup by an exact record id or short reference (REC-XXXXXXXX). Matches come only from the authority (a Discover check of the id, or the caller's complete discoverable set for a reference); a missing record and an undiscoverable one give the same empty result. Archived and related records are included. Rows carry unverified local metadata only. Not a field-value search.");
+
         records.MapGet("/{formRecordId:guid}", static async Task<Ok<FormRecordResponse>> (Guid formRecordId, HttpContext http, GetFormRecordHandler handler, CancellationToken cancellationToken) =>
             {
                 var context = BusinessAuthentication.RequireContext(http);

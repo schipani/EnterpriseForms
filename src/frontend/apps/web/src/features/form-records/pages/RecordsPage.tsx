@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
-import { formatDateTime, recordStatusLabel, RECORD_STATUSES, SORT_CHOICES, sortChoiceFor, type RecordsSearch } from "../components/recordList";
+import { RecordLookup } from "../components/RecordLookup";
+import { formatDateTime, recordStatusLabel, referenceFor, RECORD_STATUSES, SORT_CHOICES, sortChoiceFor, type RecordsSearch } from "../components/recordList";
 
 /** Errors that mean "this page position is no longer meaningful": the list restarts from the first page. */
 const RESTART_CODES = new Set(["LIST_CHANGED", "CURSOR_INVALID", "CURSOR_SCOPE_MISMATCH"]);
@@ -93,7 +94,8 @@ export function RecordsPage() {
           </>
         }
       />
-      <Card>
+      <RecordLookup />
+      <Card className="mt-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="group" aria-label="Filter and sort records">
           <Select
             label="Form"
@@ -243,11 +245,6 @@ function CreatedCell({ row }: { row: RecordListItemResponse }) {
       {row.createdByCurrentUser ? <span className="text-xs text-muted">by you</span> : row.createdByDisplayName ? <span className="text-xs text-muted">by {row.createdByDisplayName}</span> : null}
     </span>
   );
-}
-
-/** Same short reference the server derives (display only). */
-function referenceFor(formRecordId: string): string {
-  return "REC-" + formRecordId.replace(/-/g, "").slice(-8).toUpperCase();
 }
 
 function clean(search: RecordsSearch): RecordsSearch {

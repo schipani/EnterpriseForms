@@ -46,7 +46,8 @@ export type ProblemDetails = {
 };
 
 export type OperationSuccess = { type: "succeeded"; operationId: string; status: number; result: unknown; etag?: string };
-export type OperationFailure = { type: "failed"; operationId: string; status: number; errorCode: string; retryable: boolean; problem?: ProblemDetails; correlationId?: string };
+/** `final` marks the last failure of an operation (no further automatic retry); `retryable` keeps saying whether the error is transient. */
+export type OperationFailure = { type: "failed"; operationId: string; status: number; errorCode: string; retryable: boolean; final?: boolean; problem?: ProblemDetails; correlationId?: string };
 export type OperationProgress = { type: "progress"; operationId: string; completedBytes: number; totalBytes: number };
 export type OperationStateChange = { type: "state"; operationId: string; state: OperationState };
 export type OperationEvent = OperationSuccess | OperationFailure | OperationProgress | OperationStateChange;

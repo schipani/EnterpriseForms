@@ -100,6 +100,7 @@ Run from the repository root. Docker Desktop must be running.
 | Vault restarted on its own | `python scripts/devstack/devstack.py unseal` | Unseals; the Authority recovers without a restart. |
 | Status | `python scripts/devstack/devstack.py status` | Containers, seal state, volumes, custody path, URL. |
 | Stop | `python scripts/devstack/devstack.py stop` | Stops containers; volumes stay. |
+| New application code | `python scripts/devstack/devstack.py rebuild [api worker web]` | Rebuilds those images from the working tree and recreates only those containers (the api first runs `business-migrate`). Vault, databases, SpiceDB and volumes are not restarted. |
 | Backup | `python scripts/devstack/devstack.py backup` | Records the expected verified state, stops the stack, tars every project volume to `Documents\EnterpriseForms-dev-backups\enterpriseforms-dev\<timestamp>\` with `manifest.json` (SHA-256, entry counts, commit, expected state), then restarts. |
 | Restore drill | `python scripts/devstack/devstack.py restore-test <backup dir>` | Verifies checksums. Restores into the disposable project `enterpriseforms-dev-restoretest` (own volumes, subnets `172.29.x`, ports 5281/8092), unseals with custody and compares against the manifest, then deletes **only** that disposable project. The live stack is not touched. |
 | Proofs | `verify-persistence`, `verify-workflow`, `prepare-acceptance` | See §5. Evidence JSON goes to `artifacts/dev-persistent/`. |

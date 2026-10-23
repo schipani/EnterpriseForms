@@ -67,3 +67,31 @@ export function formatDateTime(instant: string): string {
   const parsed = Date.parse(instant);
   return Number.isNaN(parsed) ? instant : new Date(parsed).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
+
+/** Same short reference the server derives from a record id (display only; the full id stays authoritative). */
+export function referenceFor(formRecordId: string): string {
+  return "REC-" + formRecordId.replace(/-/g, "").slice(-8).toUpperCase();
+}
+
+export type LookupInput = { kind: "RecordId"; value: string } | { kind: "Reference"; value: string };
+
+/**
+ * Quick lookup input, mirroring the server's rules: a full record id (hyphens and braces optional) or a short reference
+ * REC-XXXXXXXX. Anything else is rejected before a request is made. The server validates again.
+ */
+export function parseLookupInput(text: string): LookupInput | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0 || trimmed.length > 64) {
+    return null;
+  }
+  const unbraced = trimmed.startsWith("{") && trimmed.endsWith("}") ? trimmed.slice(1, -1) : trimmed;
+  const hex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(unbraced) ? unbraced.replace(/-/g, "") : /^[0-9a-f]{32}$/i.test(unbraced) ? unbraced : null;
+  if (hex && !/^0+$/.test(hex)) {
+    const lower = hex.toLowerCase();
+    return { kind: "RecordId", value: `${lower.slice(0, 8)}-${lower.slice(8, 12)}-${lower.slice(12, 16)}-${lower.slice(16, 20)}-${lower.slice(20)}` };
+  }
+  if (/^REC-[0-9a-f]{8}$/i.test(trimmed)) {
+    return { kind: "Reference", value: trimmed.toUpperCase() };
+  }
+  return null;
+}

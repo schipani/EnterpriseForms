@@ -77,6 +77,7 @@ export type RestoreVersionRequest = S["RestoreVersionRequest"];
 export type CreateRelationshipDefinitionRequest = S["CreateRelationshipDefinitionRequest"];
 export type RecordListResponse = S["RecordListResponse"];
 export type RecordListItemResponse = S["RecordListItemResponse"];
+export type RecordLookupResponse = S["RecordLookupResponse"];
 export type RecordProjectionResponse = S["RecordProjectionResponse"];
 export type FormRecordResponse = S["FormRecordResponse"];
 export type FieldValueResponse = S["FieldValueResponse"];
@@ -171,6 +172,8 @@ export function createApiClient(coordinator: IRequestCoordinator) {
     },
     records: {
       list: (query: RecordListQuery, signal?: AbortSignal) => read<RecordListResponse>("records.list", undefined, query, "interactive-read", signal),
+      /** Exact lookup by record id or short reference (REC-XXXXXXXX); matches are authority-decided, never a field-value search. */
+      lookup: (q: string, signal?: AbortSignal) => read<RecordLookupResponse>("records.lookup", undefined, { q }, "interactive-read", signal),
       create: (formDefinitionId: string, request: CreateFormRecordRequest) => write<FormRecordResponse>("POST", "records.create", { formDefinitionId }, request, { idempotent: true }),
       projection: (formRecordId: string, signal?: AbortSignal) => read<RecordProjectionResponse>("records.projection", { formRecordId }, undefined, "interactive-read", signal),
       lifecycle: (transition: RecordLifecycleTransition, formRecordId: string, request: RecordLifecycleRequest) => write<RecordLifecycleResponse>("POST", `records.${transition}`, { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),

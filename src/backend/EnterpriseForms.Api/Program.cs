@@ -59,6 +59,7 @@ public sealed class Program
         // My Records cursors (C-29) use the host's Data Protection key ring, like the session cookie; only the API serves lists.
         builder.Services.AddSingleton<EnterpriseForms.Application.Common.IOpaqueCursorProtector, DataProtectionCursorProtector>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.ListRecordsHandler>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.LookupRecordHandler>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));
         builder.Services.AddHostedService<DocumentProviderStartupGuard>();
         builder.Services.AddHostedService<DocumentProcessingHostedService>();

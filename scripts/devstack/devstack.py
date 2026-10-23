@@ -11,6 +11,7 @@ passed on a command line or written into the working tree.
     python scripts/devstack/devstack.py unseal               # unseal only (e.g. after `docker restart` of vault)
     python scripts/devstack/devstack.py status
     python scripts/devstack/devstack.py stop                 # stop containers; volumes are kept
+    python scripts/devstack/devstack.py rebuild [api worker web]  # new application images; Vault and data untouched
     python scripts/devstack/devstack.py backup               # consistent cold backup of every volume of the project
     python scripts/devstack/devstack.py restore-test DIR     # restore a backup into a DISPOSABLE project and verify it
     python scripts/devstack/devstack.py verify-persistence   # restart/kill/stop-start proofs against the live stack
@@ -531,6 +532,26 @@ def cmd_unseal(args) -> None:
     print("[unseal] vault unsealed")
 
 
+APPLICATION_SERVICES = ("api", "worker", "web")
+
+
+def cmd_rebuild(args) -> None:
+    """Rebuilds application images from the working tree and recreates only those containers (no dependencies): Vault,
+    the databases, SpiceDB and their volumes are not restarted. Migrations run when the api starts if it needs them."""
+    services = args.services or list(APPLICATION_SERVICES)
+    unknown = [s for s in services if s not in APPLICATION_SERVICES]
+    if unknown:
+        raise DevStackError(f"rebuild only recreates application services {APPLICATION_SERVICES}; refused: {unknown}")
+    stack = Stack(args.project, load_custody(args.project))
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    stack.compose("build", *services, timeout=3600)  # business-migrate shares the api image
+    if "api" in services:
+        stack.compose("up", "--no-deps", "--force-recreate", "--exit-code-from", "business-migrate", "business-migrate", timeout=900)
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", *services, timeout=900)
+    print(f"[rebuild] recreated {', '.join(services)}; Vault and data services untouched")
+
+
 def cmd_stop(args) -> None:
     stack = Stack(args.project, load_custody(args.project))
     stack.compose("stop")
@@ -879,6 +900,9 @@ def main() -> int:
                           ("backup", cmd_backup), ("verify-persistence", cmd_verify_persistence), ("verify-workflow", cmd_verify_workflow),
                           ("prepare-acceptance", cmd_prepare_acceptance)):
         commands.add_parser(name).set_defaults(handler=handler)
+    rebuild = commands.add_parser("rebuild", help="rebuild and recreate application services only (api, worker, web)")
+    rebuild.add_argument("services", nargs="*")
+    rebuild.set_defaults(handler=cmd_rebuild)
     restore = commands.add_parser("restore-test")
     restore.add_argument("backup_dir")
     restore.add_argument("--keep", action="store_true", help="leave the disposable restore project running for inspection")
