@@ -1,7 +1,8 @@
 # Enterprise Forms — local trust-separated stack (ADR-PB-005, PB05_DEPLOYMENT_BLUEPRINT.md).
 #
 # Usage (always combine with exactly one override file):
-#   development:    docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d
+#   development:    python scripts/devstack/devstack.py up   (persistent Vault, compose.dev-persistent.yaml; C-47)
+#   retired dev:    docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d   (in-memory Vault; do not use)
 #   integration:    docker compose -f compose.yaml -f compose.integration.yaml --env-file .env up -d --wait
 #   security-test:  docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --wait
 # Copy env.example to .env first. Values in env.example are synthetic development credentials only.

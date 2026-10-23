@@ -2,7 +2,7 @@
 
 Branch `phase-c/record-lifecycle` from main `f859e42`. Architecture: `docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md` (revision 1), approved for controlled development by the owner on 2026-10-22 (decision **C-43**). Implementation decision: **C-44**.
 
-**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7. AC-1 and AC-2 are approved but **not started**; AC-3 is deferred; nothing is merged to main.
+**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), and the recoverable development environment for browser acceptance in §9 (C-47). AC-1 is approved but not started; AC-3 is deferred; nothing is merged to main; M2 is not started.
 
 **What this is not:**
 * not an independent security review;
@@ -229,6 +229,8 @@ One failure on the way (run 39872908214 on `2c6b2f3`, integration 79 / 80, brows
 
 ### 8.4 Local development stack — blocked (found 2026-10-22), backup taken
 
+*Resolved by §9 (C-47): a separate persistent development stack; the retired project below was preserved, not reused.*
+
 * **Finding.** When I began item 3, the Docker engine on this machine was **not running** (it had stopped before this session; I did not stop it). I started Docker Desktop (no development service has an auto-restart policy, so nothing else started) and inspected read-only: every development container is `Exited (255)` — killed when the engine stopped. The persistent volumes are intact.
 * **Consequence.** The development Vault runs `server -dev` **in memory** with no volume, so the **development organization signing keys no longer exist**. Starting the stack would leave every existing record unverifiable, and making them readable would require regenerating keys — which the owner prohibited. **I did not start, migrate or rebuild the development stack.** No volume, database, Vault, SpiceDB or key was modified.
 * **Backup (recoverable, verified).** Read-only tar copies of all six volumes in `C:\Users\tsch\Documents\EnterpriseForms-dev-backups\20261022-193852\` with `MANIFEST.txt` (entries and SHA-256) and `containers.txt` (container inventory): business-db (1,563 entries, PostgreSQL 18 data directory), authority-db (1,412), spicedb-db (1,368), dev-seed (3); azurite and archive-store volumes were empty (development blobs were never persisted). They are crash-consistent copies (the databases were killed by the engine stop), so a restore performs normal PostgreSQL crash recovery.
@@ -241,7 +243,7 @@ One failure on the way (run 39872908214 on `2c6b2f3`, integration 79 / 80, brows
 2. **Reset the existing development project** (`down -v` and `up`): new keys, the old development data deleted from the volumes (the backup remains). Needs explicit authorization.
 3. **Review on the hosted evidence only** (§7.2, §8.3) without a local stack.
 
-Root cause to fix later (not done, needs its own decision): the development Vault keeps its transit keys only in memory. A file-backed development Vault (or a documented key export) would survive engine restarts.
+The owner chose option 1 (C-47); see §9. The root cause (in-memory Vault) is fixed for the new stack.
 
 ### 8.6 Browser acceptance (once a stack is available)
 
@@ -258,3 +260,89 @@ Personas: **Avery Owner (owner)**, **Casey Clerk (clerk)**. Use a Draft record y
 
 G06, G19, G20, G21; U1–U11; the C-12 and C-28 Authority reviews; independent review of AC-2 (new, recorded with G20's Authority-review family); PB-14 manual accessibility; PB-08 step-up; R-01 for owner edits; My Records scalability; Form Designer usability debt; every production Level 2 gate. Nothing here is a Level 2 claim.
 
+## 9. Recoverable development environment and M1 acceptance (decision C-47)
+
+Owner instruction: a fresh, isolated development stack that keeps the old databases, volumes and backups, and a development Vault whose keys survive restarts. Full procedures and evidence: `docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md`.
+
+### 9.1 Old environment — preserved
+
+* **Backups re-verified:** all six archives in `C:\Users\tsch\Documents\EnterpriseForms-dev-backups\20261022-193852\` match `MANIFEST.txt` (SHA-256 and entry counts).
+* **Recovery sources checked:**
+  * the old Vault container (`-dev`, nothing on disk; its anonymous `/vault/file` and `/vault/logs` volumes are empty);
+  * every Docker volume on the machine, read-only;
+  * the host user profile;
+  * the Authority, which creates keys non-exportable with no plaintext backup.
+
+  **No copy of the old signing keys exists.** No key was generated under the old identity (organization `01a1579b-…24a0`), which the tool now refuses.
+* **Second defect found, Azurite:** the security-event archive and document blobs were stored in the containers' writable layer, not in their volumes (that is why those volumes were empty). I copied them read-only (`docker cp` from the stopped containers) to `...\20261022-193852-container-layers\` with `MANIFEST.sha256`.
+* **Untouched:** the old project's containers (stopped), volumes, networks and images (`:local`) were not started, modified, reused or removed. The new Vault is not connected to the old databases.
+
+### 9.2 New persistent stack
+
+* **Project and isolation:** Compose project `enterpriseforms-dev`, with its own volumes, subnets (`172.31.0.0/24`, `172.31.1.0/24`), `:dev` image tags and host ports. No old network had to be removed.
+* **Vault:** Raft storage on its own volume. It starts **sealed** and is unsealed from a custody file outside the repository (owner-only ACL) holding the unseal key, root token, Authority token and per-environment KEK.
+* **Authority token:** least-privilege, and after seeding pinned to the single organization key. The pin was shown to deny the key's `config`, `rotate`, and creation of any other key.
+* **Azurite:** now writes to its volumes (`--location /data`).
+* **Data:** M0 and M1 migrations applied on a fresh database (the business migration ran at startup). New synthetic organization `01a16640-87f6-7488-a1f1-664db54fbff3`, with the owner, designer, clerk and reader personas.
+* **Unchanged:** contributor editing stays disabled; the Production guard, the signing formats and the Authority are unchanged.
+* **Operation:** `python scripts/devstack/devstack.py init | up | unseal | status | stop | backup | restore-test | verify-persistence | verify-workflow | prepare-acceptance`.
+
+### 9.3 Persistence and restore evidence (2026-10-22)
+
+| Check | Result |
+|---|---|
+| Vault container restart | sealed; verified read refused `503 SIGNING_UNAVAILABLE`; after unseal the probe record verifies identically (values, Authority head, key properties, probe MAC) |
+| Vault container SIGKILL | same |
+| `compose stop` / `up` of the whole stack | identical |
+| `compose down` (volumes kept) / `up`, every container recreated | identical |
+| Backup (7 volumes) → restore into a disposable project (own subnets and ports) → unseal with custody → verify | identical; disposable project removed; live stack untouched |
+
+Not done:
+* **Docker Desktop restart:** it would have stopped other projects' containers on this machine.
+* **Host reboot.**
+
+Both keep the named volumes and stop the containers, which the kill and full-recreation phases cover.
+
+### 9.4 Verification on the new stack
+
+| Suite | Result |
+|---|---|
+| `verify-workflow` (API, owner and clerk sessions) | **15 / 15** |
+| Browser (Playwright, against the `:dev` web container at `127.0.0.1:8091`): `record-lifecycle`, `form-management`, `records-workspace`, `accused-workflow` | **14 / 14** |
+
+The 15 API checks cover:
+* Draft with Submit/Archive offered;
+* Submit refused with `422` naming the missing required field;
+* Submitted lock (owner edit `409 RECORD_NOT_EDITABLE`);
+* the clerk sees the status but has no actions (reopen `403`, edit `409`);
+* Reopen without a reason `422 REASON_REQUIRED`;
+* Reopen with a reason gives Draft, and the edit is saved;
+* Archive from Submitted;
+* hidden from the default list, listed with `includeArchived`;
+* Unarchive gives Submitted, and Draft archive/unarchive gives Draft;
+* a Contributor share's edit is refused `403 CONTRIBUTOR_WRITES_DISABLED` (default off).
+
+The browser suites include document uploads (ClamAV, worker, Azurite) and related lists. These test runs added synthetic forms and records to the new environment.
+
+### 9.5 Browser acceptance (owner)
+
+Open **http://127.0.0.1:8091** (if the machine or Docker restarted, first run `python scripts/devstack/devstack.py up`). Sign in with **Avery Owner (owner)**. The prepared form is **M1 Acceptance - Case intake**, with two Draft records:
+* **REC-017EF770** "M1 acceptance case": complete; Casey Clerk has a Reader share of *Case title*;
+* **REC-255FB708** "M1 acceptance case - missing case number": created before *Case number* became required.
+
+1. **Submit validation:** open REC-255FB708 → **Submit**. The dialog names *Case number*, and the record stays Draft.
+2. **Submit:** open REC-017EF770 → **Submit** → **Submit record**. Expect a Submitted badge and the lock banner, no **Edit**, and **Reopen as draft** and **Archive** offered.
+3. **Reopen with a reason:** **Reopen as draft**. The confirm button stays disabled until you type a reason; after confirming, **Edit** returns.
+4. **Edit after reopening:** **Edit** → change *Internal notes* → save. The value persists, and the activity shows the reopen reason.
+5. **Archive:** **Submit** again, then **Archive** → **Archive record**. Expect an Archived badge and only **Unarchive**.
+6. **Archived visibility:** **My Records**. The record is hidden; tick **Include archived records** (or filter by status Archived) and it appears.
+7. **Unarchive:** open it → **Unarchive**. It returns to **Submitted**, the state it was archived from; a Draft you archive returns to **Draft**.
+8. **Clerk restrictions:** sign out and sign in as **Casey Clerk (clerk)**, then open REC-017EF770. You see *Case title* only, plus the status and lock; there are no lifecycle buttons and no **Edit shared fields**. `/app/records/<id>/edit` explains the lock.
+
+### 9.6 Still open
+
+Everything in §8.7, plus:
+* independent review of the development Vault custody design (development only);
+* a Vault audit device, which is not configured.
+
+Nothing in this section is a production or Level 2 claim.
