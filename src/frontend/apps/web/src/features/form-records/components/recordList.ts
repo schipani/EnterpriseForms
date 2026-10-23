@@ -4,6 +4,8 @@ export interface RecordsSearch {
   status?: string | undefined;
   children?: boolean | undefined;
   archived?: boolean | undefined;
+  /** Exact search: a full record id or short reference (normalized); combined with the other filters. */
+  q?: string | undefined;
   sort?: string | undefined;
   size?: number | undefined;
 }
@@ -52,6 +54,12 @@ export function parseRecordsSearch(search: Record<string, unknown>): RecordsSear
   }
   if (search["archived"] === true || search["archived"] === "true") {
     result.archived = true;
+  }
+  if (typeof search["q"] === "string") {
+    const parsed = parseLookupInput(search["q"]);
+    if (parsed) {
+      result.q = parsed.value;
+    }
   }
   if (typeof search["sort"] === "string" && SORT_CHOICES.some((choice) => choice.key === search["sort"])) {
     result.sort = search["sort"];

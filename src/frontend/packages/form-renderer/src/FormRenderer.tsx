@@ -445,15 +445,15 @@ function MultiSelectControl({ element, field, value, label, helpText, note, erro
         {required ? <span className="ml-1 text-[#991b1b]" aria-hidden="true">*</span> : null}
         {required ? <span className="sr-only"> (required)</span> : null}
       </legend>
+      {choices.length === 0 ? <p className="text-sm text-muted">No options are available.</p> : null}
+      {choices.map((choice) => (
+        <Checkbox key={choice.optionKey} label={choiceLabel(choice, parentLabel)} checked={selected.includes(choice.optionKey)} onCheckedChange={(checked) => toggle(choice.optionKey, checked)} />
+      ))}
       {helpText ? (
         <p id={`${id}-help`} className="text-sm text-muted">
           {helpText}
         </p>
       ) : null}
-      {choices.length === 0 ? <p className="text-sm text-muted">No options are available.</p> : null}
-      {choices.map((choice) => (
-        <Checkbox key={choice.optionKey} label={choiceLabel(choice, parentLabel)} checked={selected.includes(choice.optionKey)} onCheckedChange={(checked) => toggle(choice.optionKey, checked)} />
-      ))}
       {note ? (
         <p id={`${id}-note`} className="text-sm text-muted">
           {note}

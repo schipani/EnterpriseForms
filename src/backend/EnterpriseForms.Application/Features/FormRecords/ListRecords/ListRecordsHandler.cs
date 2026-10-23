@@ -27,15 +27,20 @@ public sealed class ListRecordsHandler(IBusinessStore store, IAuthorizationAutho
         ArgumentNullException.ThrowIfNull(query);
         var user = context.ToDelegatedUser();
         var authorized = await AuthorizedRecordEnumerator.EnumerateAsync(authority, user, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+        // Unified exact search: the ids that match are decided from the authority's complete discoverable set (never from the
+        // business database), so an unauthorized or missing record is simply absent. Everything below then filters, sorts and
+        // pages these matches like any other listing (AND semantics).
+        var search = query.SearchQuery;
+        var searchIds = search is null ? authorized.FormRecordIds : search.Match(authorized.FormRecordIds);
         var offset = string.IsNullOrEmpty(continuationToken) ? 0 : RecordListCursor.Decode(cursors, continuationToken, context, query, authorized.AuthorizationRevision).Offset;
 
         List<Domain.Features.FormRecords.FormRecord> records = [];
         Dictionary<Guid, string> formNames = [];
         Dictionary<Guid, string> userNames = [];
-        if (authorized.FormRecordIds.Count > 0)
+        if (searchIds.Count > 0)
         {
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-            records = await scope.GetFormRecordsAsync(context.OrganizationId, authorized.FormRecordIds, cancellationToken).ConfigureAwait(false);
+            records = await scope.GetFormRecordsAsync(context.OrganizationId, searchIds, cancellationToken).ConfigureAwait(false);
             formNames = (await scope.GetFormDefinitionsAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false)).ToDictionary(d => d.FormDefinitionId, d => d.FormDefinitionName);
             userNames = (await scope.GetUsersAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false)).ToDictionary(u => u.UserId, u => u.DisplayName);
         }
@@ -43,8 +48,8 @@ public sealed class ListRecordsHandler(IBusinessStore store, IAuthorizationAutho
         // The authority's set is the boundary: a business row whose id the authority did not list is never shown (the
         // query is by those ids), and an authorized id without a business row is reported instead of disappearing.
         var described = records.Select(r => r.FormRecordId).ToHashSet();
-        var unavailable = authorized.FormRecordIds.Where(id => !described.Contains(id)).ToList();
-        var scopeRecords = records.Where(r => query.IncludeChildren || r.ParentFormRecordId is null).ToList();
+        var unavailable = searchIds.Where(id => !described.Contains(id)).ToList();
+        var scopeRecords = records.Where(r => search is not null || query.IncludeChildren || r.ParentFormRecordId is null).ToList();
         var availableForms = scopeRecords.Select(r => r.FormDefinitionId).Distinct()
             .Select(id => new RecordListFormOption(id, formNames.GetValueOrDefault(id, string.Empty)))
             .OrderBy(f => f.FormDefinitionName, StringComparer.OrdinalIgnoreCase).ThenBy(f => f.FormDefinitionId)

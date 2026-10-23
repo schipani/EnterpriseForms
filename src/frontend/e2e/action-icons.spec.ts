@@ -39,7 +39,7 @@ test.describe("Action button icons", () => {
 
     // Names are the visible text only (the icon is decorative).
     const newRecord = page.getByRole("button", { name: "New record", exact: true });
-    const search = page.getByRole("search", { name: "Find a record by reference or ID" }).getByRole("button", { name: "Search", exact: true });
+    const search = page.getByRole("search", { name: "Search records by reference or ID" }).getByRole("button", { name: "Search", exact: true });
     await expect(newRecord).toBeVisible();
     await expect(search).toBeVisible();
 

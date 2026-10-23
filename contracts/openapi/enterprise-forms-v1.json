@@ -1234,7 +1234,7 @@
         "tags": [
           "FormRecords"
         ],
-        "summary": "My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection.",
+        "summary": "My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, search, sort and authorization revision. q (optional) narrows the list to an exact record id or short reference REC-XXXXXXXX decided from the same complete authorized set (never a field-value search; anything else is 422 LOOKUP_INVALID); an exact search also finds archived and related records, and the Form and Status filters still apply. Rows carry unverified local metadata only; open a record for the verified projection.",
         "operationId": "ListFormRecords",
         "parameters": [
           {
@@ -1264,6 +1264,13 @@
             "in": "query",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -1307,36 +1314,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RecordListResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/form-records/lookup": {
-      "get": {
-        "tags": [
-          "FormRecords"
-        ],
-        "summary": "Quick lookup by an exact record id or short reference (REC-XXXXXXXX). Matches come only from the authority (a Discover check of the id, or the caller's complete discoverable set for a reference); a missing record and an undiscoverable one give the same empty result. Archived and related records are included. Rows carry unverified local metadata only. Not a field-value search.",
-        "operationId": "LookupFormRecord",
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecordLookupResponse"
                 }
               }
             }
@@ -5450,54 +5427,6 @@
           "sortDirection": {
             "type": "string",
             "default": "desc"
-          }
-        }
-      },
-      "RecordLookupResponse": {
-        "required": [
-          "normalizedQuery",
-          "lookupKind",
-          "matches",
-          "matchCount",
-          "unavailableRecordIds",
-          "authorizationRevision"
-        ],
-        "type": "object",
-        "properties": {
-          "normalizedQuery": {
-            "type": "string"
-          },
-          "lookupKind": {
-            "type": "string"
-          },
-          "matches": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RecordListItemResponse"
-            }
-          },
-          "matchCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "unavailableRecordIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "authorizationRevision": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int64"
           }
         }
       },

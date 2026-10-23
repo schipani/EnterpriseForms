@@ -1,12 +1,11 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import type { RecordListItemResponse, RecordListQuery, RecordListResponse } from "@enterpriseforms/api-client";
-import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ErrorPanel } from "../../support";
-import { RecordLookup } from "../components/RecordLookup";
-import { formatDateTime, recordStatusLabel, referenceFor, RECORD_STATUSES, SORT_CHOICES, sortChoiceFor, type RecordsSearch } from "../components/recordList";
+import { formatDateTime, parseLookupInput, recordStatusLabel, referenceFor, RECORD_STATUSES, SORT_CHOICES, sortChoiceFor, type RecordsSearch } from "../components/recordList";
 
 /** Errors that mean "this page position is no longer meaningful": the list restarts from the first page. */
 const RESTART_CODES = new Set(["LIST_CHANGED", "CURSOR_INVALID", "CURSOR_SCOPE_MISMATCH"]);
@@ -22,6 +21,13 @@ export function RecordsPage() {
   const search = useSearch({ from: "/app/records" });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [restarted, setRestarted] = useState(false);
+  // The search box holds what the person is typing; only Enter or Search turns it into the filter in the address (search.q).
+  const [searchText, setSearchText] = useState(search.q ?? "");
+  const [searchError, setSearchError] = useState<string | null>(null);
+  useEffect(() => {
+    setSearchText(search.q ?? "");
+    setSearchError(null);
+  }, [search.q]);
   const sort = sortChoiceFor(search.sort);
   const pageSize = search.size ?? 25;
   const query: RecordListQuery = {
@@ -29,6 +35,7 @@ export function RecordsPage() {
     ...(search.status ? { recordStatus: search.status } : {}),
     ...(search.children ? { includeChildren: true } : {}),
     ...(search.archived ? { includeArchived: true } : {}),
+    ...(search.q ? { q: search.q } : {}),
     sortBy: sort.sortBy,
     sortDirection: sort.sortDirection,
     pageSize,
@@ -57,13 +64,40 @@ export function RecordsPage() {
     setRestarted(false);
     void navigate({ to: "/app/records", search: (current: RecordsSearch) => clean({ ...current, ...next }) });
   };
-  const filtered = Boolean(search.form || search.status || search.children || search.archived);
+  const filtered = Boolean(search.form || search.status || search.children || search.archived || search.q);
   const data = records.data;
   const rows = data?.items ?? [];
   const formOptions = data?.availableForms ?? [];
   const selectedFormMissing = search.form && !formOptions.some((form) => form.formDefinitionId === search.form);
   const total = Number(data?.totalCount ?? 0);
   const unavailable = Number(data?.unavailableRecordCount ?? 0);
+  const submitSearch = (event: FormEvent) => {
+    event.preventDefault();
+    if (searchText.trim() === "") {
+      // An empty box means "no search": it behaves like Clear for the search filter only.
+      setSearchError(null);
+      update({ q: undefined });
+      return;
+    }
+    const parsed = parseLookupInput(searchText);
+    if (parsed === null) {
+      setSearchError("Enter a record reference such as REC-1A2B3C4D or a full record ID.");
+      return;
+    }
+    setSearchError(null);
+    setSearchText(parsed.value);
+    update({ q: parsed.value });
+  };
+  const clearSearch = () => {
+    setSearchText("");
+    setSearchError(null);
+    update({ q: undefined });
+  };
+  const clearAll = () => {
+    setSearchText("");
+    setSearchError(null);
+    update({ q: undefined, form: undefined, status: undefined, children: undefined, archived: undefined, sort: undefined, size: undefined });
+  };
   const first = total > 0 ? Number(data!.pageStart) : 0;
   const last = total > 0 ? first + rows.length - 1 : 0;
 
@@ -94,9 +128,35 @@ export function RecordsPage() {
           </>
         }
       />
-      <RecordLookup />
-      <Card className="mt-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="group" aria-label="Filter and sort records">
+      <Card title="Find and filter records" aria-label="Find and filter records">
+        <form role="search" aria-label="Search records by reference or ID" onSubmit={submitSearch} noValidate>
+          <TextInput
+            label="Search records"
+            helpText="Enter an exact record reference (for example REC-017EF770) or a full record ID. This finds one record; it does not search inside records."
+            value={searchText}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              setSearchError(null);
+            }}
+            error={searchError ?? undefined}
+            className="max-w-3xl"
+            actions={
+              <>
+                <Button type="submit" icon={ActionIcons.search} busy={records.isFetching && Boolean(search.q)}>
+                  Search
+                </Button>
+                {search.q || searchText ? (
+                  <Button type="button" variant="secondary" icon={ActionIcons.reset} onClick={clearSearch}>
+                    Clear
+                  </Button>
+                ) : null}
+              </>
+            }
+          />
+        </form>
+        <div className="grid items-start gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4" role="group" aria-label="Filter and sort records">
           <Select
             label="Form"
             value={search.form ?? "all"}
@@ -107,16 +167,19 @@ export function RecordsPage() {
           <Select label="Sort by" value={sort.key} options={SORT_CHOICES.map((choice) => ({ value: choice.key, label: choice.label }))} onValueChange={(value) => update({ sort: value === SORT_CHOICES[0]!.key ? undefined : value })} />
           <Select label="Rows per page" value={String(pageSize)} options={["10", "25", "50", "100"].map((size) => ({ value: size, label: size }))} onValueChange={(value) => update({ size: value === "25" ? undefined : Number(value) })} />
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-x-6 gap-y-2">
-            <Checkbox label="Include related (child) records" checked={Boolean(search.children)} onCheckedChange={(checked) => update({ children: checked ? true : undefined })} />
-            <Checkbox label="Include archived records" checked={Boolean(search.archived) || search.status === "Archived"} disabled={search.status === "Archived"} onCheckedChange={(checked) => update({ archived: checked ? true : undefined })} />
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
+              <Checkbox label="Include related (child) records" checked={Boolean(search.children)} onCheckedChange={(checked) => update({ children: checked ? true : undefined })} />
+              <Checkbox label="Include archived records" checked={Boolean(search.archived) || search.status === "Archived"} disabled={search.status === "Archived"} onCheckedChange={(checked) => update({ archived: checked ? true : undefined })} />
+            </div>
+            {filtered || search.sort || search.size ? (
+              <Button variant="ghost" size="sm" icon={ActionIcons.reset} onClick={clearAll}>
+                Clear filters
+              </Button>
+            ) : null}
           </div>
-          {filtered || search.sort || search.size ? (
-            <Button variant="ghost" size="sm" icon={ActionIcons.reset} onClick={() => update({ form: undefined, status: undefined, children: undefined, archived: undefined, sort: undefined, size: undefined })}>
-              Clear filters
-            </Button>
-          ) : null}
+          <p className="text-sm text-muted">Archived records are hidden unless you include them or choose the Archived status. An exact search also finds archived and related records; the Form and Status filters still narrow it.</p>
         </div>
       </Card>
 
@@ -144,8 +207,8 @@ export function RecordsPage() {
         ) : null}
         {data && total === 0 ? (
           filtered ? (
-            <EmptyState title="No records match these filters" actions={<Button variant="secondary" icon={ActionIcons.reset} onClick={() => update({ form: undefined, status: undefined, children: undefined, archived: undefined })}>Clear filters</Button>}>
-              Try another form or status, or include related records.
+            <EmptyState title={search.q ? "No record found" : "No records match these filters"} actions={<Button variant="secondary" icon={ActionIcons.reset} onClick={clearAll}>Clear filters</Button>}>
+              {search.q ? `No record ${search.q.startsWith("REC-") ? "with reference" : "with ID"} ${search.q} that you can access matches the selected filters. Check the ${search.q.startsWith("REC-") ? "reference" : "ID"}, the Form and Status filters, or ask the record's owner to share it with you.` : "Try another form or status, or include related records."}
             </EmptyState>
           ) : (
             <EmptyState

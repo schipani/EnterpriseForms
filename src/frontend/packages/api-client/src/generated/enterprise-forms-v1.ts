@@ -532,23 +532,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/form-records/lookup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Quick lookup by an exact record id or short reference (REC-XXXXXXXX). Matches come only from the authority (a Discover check of the id, or the caller's complete discoverable set for a reference); a missing record and an undiscoverable one give the same empty result. Archived and related records are included. Rows carry unverified local metadata only. Not a field-value search. */
-        get: operations["LookupFormRecord"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/form-records/{formRecordId}": {
         parameters: {
             query?: never;
@@ -1844,16 +1827,6 @@ export interface components {
             /** @default desc */
             sortDirection: string;
         };
-        RecordLookupResponse: {
-            normalizedQuery: string;
-            lookupKind: string;
-            matches: components["schemas"]["RecordListItemResponse"][];
-            /** Format: int32 */
-            matchCount: number | string;
-            unavailableRecordIds: string[];
-            /** Format: int64 */
-            authorizationRevision: number | string;
-        };
         RecordOccurrenceResponse: {
             /** Format: uuid */
             formRecordGroupId: string;
@@ -2995,6 +2968,7 @@ export interface operations {
                 recordStatus?: string;
                 includeChildren?: boolean;
                 includeArchived?: boolean;
+                q?: string;
                 sortBy?: string;
                 sortDirection?: string;
                 pageSize?: number | string;
@@ -3013,28 +2987,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecordListResponse"];
-                };
-            };
-        };
-    };
-    LookupFormRecord: {
-        parameters: {
-            query?: {
-                q?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecordLookupResponse"];
                 };
             };
         };

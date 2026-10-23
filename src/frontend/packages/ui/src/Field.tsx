@@ -1,5 +1,5 @@
 import * as Label from "@radix-ui/react-label";
-import { createContext, forwardRef, useContext, useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 
 export interface FieldShellProps {
   label: string;
@@ -8,46 +8,45 @@ export interface FieldShellProps {
   note?: string | undefined;
   error?: string | undefined;
   required?: boolean | undefined;
+  /**
+   * Buttons that belong to this control (for example Search and Clear next to a search box). They sit in the same row as the
+   * control, top-aligned with it at the control's height, and wrap beneath it on narrow screens; help text and the error always
+   * stay below the whole group, so a message appearing never moves them.
+   */
+  actions?: ReactNode;
   /** Children receive the ids needed to wire aria attributes to the control. */
   children: (ids: { inputId: string; describedBy: string | undefined; invalid: boolean }) => ReactNode;
   className?: string;
 }
 
 /**
- * Where help text sits relative to its control. Defaults to the record-entry renderer's existing, tested order
- * (help text orients the person before they reach the control — `FormRenderer.test.tsx` "places the designer's help
- * text above the input"), unaffected by this provider. The Form Designer and its configuration dialogs wrap
- * themselves in `<FieldLayoutProvider helpAfterControl>` (Phase C3 usability corrections: label, then the control,
- * then help text, matching "Field key" in Add Field and every field in Configure Field) so every `TextInput`/
- * `TextArea`/`Select` inside gets the new order without touching each call site individually.
+ * Deprecated no-op kept so existing wrappers keep compiling. Help text now ALWAYS follows the control everywhere (see
+ * `docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md`); there is no longer a per-screen order.
  */
-const FieldLayoutContext = createContext(false);
-
-export function FieldLayoutProvider({ helpAfterControl = true, children }: { helpAfterControl?: boolean; children: ReactNode }) {
-  return <FieldLayoutContext.Provider value={helpAfterControl}>{children}</FieldLayoutContext.Provider>;
+export function FieldLayoutProvider({ children }: { helpAfterControl?: boolean; children: ReactNode }) {
+  return <>{children}</>;
 }
 
 /**
- * Label, then — depending on `FieldLayoutProvider` — help text before or after the control, then the status note and
- * error message. `aria-describedby` associates help/note/error with the control regardless of visual order
- * (WCAG 1.3.1 / 3.3.1).
+ * The one field layout of the application (docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md), top to bottom:
+ *  1. label (with the required marker),
+ *  2. the control (and its own action buttons, same row),
+ *  3. help text, then a status note,
+ *  4. the validation message.
+ * Help text is never placed between the label and the control. `aria-describedby` ties help, note and error to the control
+ * (WCAG 1.3.1 / 3.3.1); the error is announced when it appears.
  */
-export function FieldShell({ label, helpText, note, error, required, children, className = "" }: FieldShellProps) {
-  const helpAfterControl = useContext(FieldLayoutContext);
+export function FieldShell({ label, helpText, note, error, required, actions, children, className = "" }: FieldShellProps) {
   const id = useId();
   const inputId = `${id}-input`;
   const helpId = `${id}-help`;
   const errorId = `${id}-error`;
   const noteId = `${id}-note`;
   const describedBy = [helpText ? helpId : null, note ? noteId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
-  const help = helpText ? (
-    <p id={helpId} className="text-sm text-muted">
-      {helpText}
-    </p>
-  ) : null;
+  const control = children({ inputId, describedBy, invalid: Boolean(error) });
   return (
-    <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
-      <Label.Root htmlFor={inputId} className="text-sm font-medium text-body">
+    <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
+      <Label.Root htmlFor={inputId} className="text-sm font-medium leading-5 text-body">
         {label}
         {required ? (
           <span className="ml-1 text-[#991b1b]" aria-hidden="true">
@@ -56,18 +55,32 @@ export function FieldShell({ label, helpText, note, error, required, children, c
         ) : null}
         {required ? <span className="sr-only"> (required)</span> : null}
       </Label.Root>
-      {helpAfterControl ? null : help}
-      {children({ inputId, describedBy, invalid: Boolean(error) })}
-      {helpAfterControl ? help : null}
-      {note ? (
-        <p id={noteId} className="text-sm text-muted">
-          {note}
-        </p>
-      ) : null}
-      {error ? (
-        <p id={errorId} role="alert" className="text-sm font-medium text-[#991b1b]">
-          {error}
-        </p>
+      {actions ? (
+        <div className="flex flex-wrap items-start gap-2">
+          <div className="min-w-[min(100%,14rem)] flex-1">{control}</div>
+          <div className="flex flex-wrap items-start gap-2">{actions}</div>
+        </div>
+      ) : (
+        control
+      )}
+      {helpText || note || error ? (
+        <div className="flex flex-col gap-1">
+          {helpText ? (
+            <p id={helpId} className="text-sm text-muted">
+              {helpText}
+            </p>
+          ) : null}
+          {note ? (
+            <p id={noteId} className="text-sm text-muted">
+              {note}
+            </p>
+          ) : null}
+          {error ? (
+            <p id={errorId} role="alert" className="text-sm font-medium text-[#991b1b]">
+              {error}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -80,11 +93,13 @@ export interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   helpText?: string | undefined;
   note?: string | undefined;
   error?: string | undefined;
+  /** Buttons shown in the same row as the input (see FieldShell). */
+  actions?: ReactNode;
 }
 
-export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function TextInput({ label, helpText, note, error, required, className = "", ...rest }, ref) {
+export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function TextInput({ label, helpText, note, error, required, actions, className = "", ...rest }, ref) {
   return (
-    <FieldShell label={label} helpText={helpText} note={note} error={error} required={required} className={className}>
+    <FieldShell label={label} helpText={helpText} note={note} error={error} required={required} actions={actions} className={className}>
       {({ inputId, describedBy, invalid }) => <input ref={ref} id={inputId} aria-describedby={describedBy} aria-invalid={invalid || undefined} aria-required={required || undefined} className={inputClass} {...rest} />}
     </FieldShell>
   );

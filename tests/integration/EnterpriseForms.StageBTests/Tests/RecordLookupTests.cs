@@ -16,14 +16,15 @@ public sealed class RecordLookupTests(StageBFixture fixture)
 {
     private static string Reference(Guid id) => "REC-" + id.ToString("N")[^8..].ToUpperInvariant();
 
-    private Task<HttpResult> LookupAsync(StageBScenario s, TestUser user, string input) =>
-        fixture.Api.GetAsync("/api/v1/form-records/lookup?q=" + Uri.EscapeDataString(input), s.Token(user));
+    /// <summary>The unified My Records search: the ordinary list with q (and any other filters).</summary>
+    private Task<HttpResult> LookupAsync(StageBScenario s, TestUser user, string input, string extra = "") =>
+        fixture.Api.GetAsync("/api/v1/form-records?pageSize=100&q=" + Uri.EscapeDataString(input) + extra, s.Token(user));
 
-    private static List<Guid> MatchIds(HttpResult result) => result.Root.GetProperty("matches").EnumerateArray().Select(m => m.GetProperty("formRecordId").GetGuid()).ToList();
+    private static List<Guid> MatchIds(HttpResult result) => result.Root.GetProperty("items").EnumerateArray().Select(m => m.GetProperty("formRecordId").GetGuid()).ToList();
 
-    /// <summary>The response with the echoed query removed: what an unauthorized caller learns must equal "does not exist".</summary>
+    /// <summary>What an unauthorized caller learns must equal "does not exist": no rows, no counts, no forms, no unavailable ids.</summary>
     private static string Shape(HttpResult result) =>
-        JsonSerializer.Serialize(new { matches = result.Root.GetProperty("matches").GetArrayLength(), count = result.Root.GetProperty("matchCount").GetInt32(), unavailable = result.Root.GetProperty("unavailableRecordIds").GetArrayLength() });
+        JsonSerializer.Serialize(new { items = result.Root.GetProperty("items").GetArrayLength(), total = result.Root.GetProperty("totalCount").GetInt32(), unavailable = result.Root.GetProperty("unavailableRecordCount").GetInt32(), forms = result.Root.GetProperty("availableForms").GetArrayLength() });
 
     [Fact]
     public async Task ExactLookupFindsOwnedSharedAndArchivedRecordsAndRevealsNothingWithoutAccess()
@@ -40,7 +41,7 @@ public sealed class RecordLookupTests(StageBFixture fixture)
             var found = await LookupAsync(s, s.Clerk, input);
             Assert.True(found.IsSuccess, found.Body);
             Assert.Equal([record], MatchIds(found));
-            Assert.Equal(Reference(record), found.Root.GetProperty("matches")[0].GetProperty("recordReference").GetString());
+            Assert.Equal(Reference(record), found.Root.GetProperty("items")[0].GetProperty("recordReference").GetString());
         }
 
         // A member with no grant: identical answer to a record that does not exist, for both kinds of lookup.
@@ -55,7 +56,7 @@ public sealed class RecordLookupTests(StageBFixture fixture)
 
         Assert.Equal(Shape(missingReference), Shape(hiddenByReference));
         Assert.Equal(Shape(missingId), Shape(hiddenById));
-        Assert.Equal(0, hiddenByReference.Root.GetProperty("matchCount").GetInt32());
+        Assert.Equal(0, hiddenByReference.Root.GetProperty("totalCount").GetInt32());
 
         // After a share the same member finds it.
         var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
@@ -71,7 +72,13 @@ public sealed class RecordLookupTests(StageBFixture fixture)
         Assert.DoesNotContain(list.Root.GetProperty("items").EnumerateArray(), i => i.GetProperty("formRecordId").GetGuid() == record);
         var afterArchive = await LookupAsync(s, s.Clerk, Reference(record));
         Assert.Equal([record], MatchIds(afterArchive));
-        Assert.Equal("Archived", afterArchive.Root.GetProperty("matches")[0].GetProperty("recordStatus").GetString());
+        Assert.Equal("Archived", afterArchive.Root.GetProperty("items")[0].GetProperty("recordStatus").GetString());
+
+        // The other filters still apply to the search (AND): an explicit Status or Form that excludes the record empties the result.
+        Assert.Equal([record], MatchIds(await LookupAsync(s, s.Clerk, Reference(record), "&recordStatus=Archived")));
+        Assert.Empty(MatchIds(await LookupAsync(s, s.Clerk, Reference(record), "&recordStatus=Draft")));
+        Assert.Equal([record], MatchIds(await LookupAsync(s, s.Clerk, Reference(record), $"&formDefinitionId={s.AccusedFormId:D}")));
+        Assert.Empty(MatchIds(await LookupAsync(s, s.Clerk, Reference(record), $"&formDefinitionId={Guid.CreateVersion7():D}")));
     }
 
     [Theory]

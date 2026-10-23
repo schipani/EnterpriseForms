@@ -15,6 +15,8 @@ export type RecordListQuery = {
   recordStatus?: string;
   includeChildren?: boolean;
   includeArchived?: boolean;
+  /** Exact record id or short reference (REC-XXXXXXXX); combined with the other filters. */
+  q?: string;
   sortBy?: "modifiedOn" | "createdOn" | "formName" | "recordStatus";
   sortDirection?: "asc" | "desc";
   pageSize?: number;
@@ -77,7 +79,6 @@ export type RestoreVersionRequest = S["RestoreVersionRequest"];
 export type CreateRelationshipDefinitionRequest = S["CreateRelationshipDefinitionRequest"];
 export type RecordListResponse = S["RecordListResponse"];
 export type RecordListItemResponse = S["RecordListItemResponse"];
-export type RecordLookupResponse = S["RecordLookupResponse"];
 export type RecordVersionItemResponse = S["RecordVersionItemResponse"];
 export type RecordVersionListResponse = S["RecordVersionListResponse"];
 export type RecordVersionViewResponse = S["RecordVersionViewResponse"];
@@ -175,8 +176,6 @@ export function createApiClient(coordinator: IRequestCoordinator) {
     },
     records: {
       list: (query: RecordListQuery, signal?: AbortSignal) => read<RecordListResponse>("records.list", undefined, query, "interactive-read", signal),
-      /** Exact lookup by record id or short reference (REC-XXXXXXXX); matches are authority-decided, never a field-value search. */
-      lookup: (q: string, signal?: AbortSignal) => read<RecordLookupResponse>("records.lookup", undefined, { q }, "interactive-read", signal),
       /** Phase C6 M2: accepted versions, oldest first (Authority-listed); `after` continues from a version number. */
       versions: (formRecordId: string, after?: number, signal?: AbortSignal) => read<RecordVersionListResponse>("records.versions", { formRecordId }, after === undefined ? undefined : { after }, "interactive-read", signal),
       /** Phase C6 M2: one earlier version, verified and read-only. */

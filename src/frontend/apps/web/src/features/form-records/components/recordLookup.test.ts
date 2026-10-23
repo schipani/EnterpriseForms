@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLookupInput, referenceFor } from "./recordList";
+import { parseLookupInput, parseRecordsSearch, referenceFor } from "./recordList";
 
 describe("Find a record input (Phase C6 quick lookup)", () => {
   const id = "975a62c5-c1db-8456-99ca-c53c017ef770";
@@ -24,5 +24,15 @@ describe("Find a record input (Phase C6 quick lookup)", () => {
 
   it("derives the same short reference as the server", () => {
     expect(referenceFor(id)).toBe("REC-017EF770");
+  });
+});
+
+describe("unified My Records search state", () => {
+  it("keeps a valid exact search in the address (normalized) and drops anything else", () => {
+    expect(parseRecordsSearch({ q: "rec-017ef770" }).q).toBe("REC-017EF770");
+    expect(parseRecordsSearch({ q: "975A62C5-C1DB-8456-99CA-C53C017EF770" }).q).toBe("975a62c5-c1db-8456-99ca-c53c017ef770");
+    expect(parseRecordsSearch({ q: "Smith" }).q).toBeUndefined();
+    expect(parseRecordsSearch({ q: 42 }).q).toBeUndefined();
+    expect(parseRecordsSearch({ q: "REC-017EF770", status: "Archived", archived: "true", size: "50" })).toEqual({ q: "REC-017EF770", status: "Archived", archived: true, size: 50 });
   });
 });

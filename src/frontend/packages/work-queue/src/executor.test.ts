@@ -85,7 +85,7 @@ describe("OperationExecutor (same-origin transport policy)", () => {
       calls++;
       return jsonResponse(503, { title: "AUTHORITY_UNAVAILABLE" });
     });
-    executor.handle({ type: "enqueue", operation: { operationId: "down", lane: "interactive-read", method: "GET", endpointKey: "records.lookup", query: { q: "REC-11111111" } } });
+    executor.handle({ type: "enqueue", operation: { operationId: "down", lane: "interactive-read", method: "GET", endpointKey: "records.list", query: { q: "REC-11111111" } } });
     const last = await settle(events, (e) => e.type === "failed" && e.operationId === "down" && e.final === true, 15000);
     expect(last).toMatchObject({ errorCode: "AUTHORITY_UNAVAILABLE", status: 503, retryable: true, final: true });
     expect(calls).toBe(4); // the first attempt and three retries

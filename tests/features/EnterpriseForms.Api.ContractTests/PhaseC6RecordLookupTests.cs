@@ -11,10 +11,10 @@ using Xunit;
 namespace EnterpriseForms.Api.ContractTests;
 
 /// <summary>
-/// Phase C6 quick record lookup: exact input only; matches decided by the authority (a Discover check of an id, or the
-/// complete discoverable set for a short reference); the business database only describes matches; unauthorized and
-/// missing records are indistinguishable; duplicate references are all returned; archived records are found; authority
-/// failures propagate as failures, never as "not found".
+/// Phase C6 unified search: exact input only; matches decided from the authority's complete discoverable set; the business
+/// database only describes matches; unauthorized and missing records are indistinguishable; duplicate references are all
+/// returned in the one table with filters, sorting and paging; archived records are found; authority failures propagate
+/// as failures, never as "not found".
 /// </summary>
 public sealed class PhaseC6RecordLookupTests
 {
@@ -77,36 +77,68 @@ public sealed class PhaseC6RecordLookupTests
         Assert.Empty(query.Match([other]));
     }
 
-    // ---- handler ----
+    // ---- unified list handler (search + filters) ----
+
+    private sealed class TestProtector : IOpaqueCursorProtector
+    {
+        public string Protect(string payload, TimeSpan lifetime) => "ok." + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(payload));
+
+        public string? Unprotect(string token) => token.StartsWith("ok.", StringComparison.Ordinal) ? System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(token[3..])) : null;
+    }
+
+    private static ListRecordsHandler Handler(FakeStore store, FakeAuthority authority) => new(store.Proxy, authority.Proxy, new TestProtector());
+
+    private static RecordListQuery Query(string? search, string? status = null, Guid? form = null, bool archived = false, bool children = false, int pageSize = 25) =>
+        RecordListQuery.Create(form, status, children, null, null, pageSize, archived, search);
 
     [Fact]
-    public async Task AnExactIdTheAuthorityDoesNotLetTheCallerDiscoverReturnsTheSameEmptyAnswerAsAMissingRecord()
+    public async Task AnExactIdTheAuthorityDoesNotListGivesTheSameEmptyAnswerAsAMissingRecordAndReadsNothingElse()
     {
-        var authority = new FakeAuthority { DiscoverAllowed = _ => false };
-        var store = new FakeStore([]);
-        var result = await new LookupRecordHandler(store.Proxy, authority.Proxy).HandleAsync(Context, RecordLookupQuery.Parse(Guid.CreateVersion7().ToString()), CancellationToken.None);
+        var hidden = Guid.CreateVersion7();
+        var visible = Guid.CreateVersion7();
+        var authority = new FakeAuthority { Authorized = [visible] };
+        var store = new FakeStore([Record(hidden, "Draft"), Record(visible, "Draft")]);
+        var handler = Handler(store, authority);
 
-        Assert.Empty(result.Matches);
-        Assert.Equal(0, result.MatchCount);
-        Assert.Empty(result.UnavailableRecordIds);
-        Assert.Equal(0, store.Scopes); // nothing is read from the business database for a refused id
-        Assert.Equal(ProtectedAction.Discover, Assert.Single(authority.SingleChecks).Action);
+        var refused = await handler.HandleAsync(Context, Query(hidden.ToString("D")), null, CancellationToken.None);
+        var missing = await handler.HandleAsync(Context, Query(Guid.CreateVersion7().ToString("D")), null, CancellationToken.None);
+
+        foreach (var result in new[] { refused, missing })
+        {
+            Assert.Empty(result.Items);
+            Assert.Equal(0, result.TotalCount);
+            Assert.Equal(0, result.UnavailableRecordCount);
+            Assert.Empty(result.AvailableForms ?? []);
+        }
+
+        Assert.DoesNotContain(hidden, store.RequestedIds); // an undiscoverable record is never even requested from the business database
     }
 
     [Fact]
-    public async Task AnExactIdTheCallerMayDiscoverIsDescribedIncludingAnArchivedRecord()
+    public async Task AnExactIdFindsAnAuthorizedArchivedRecordThatTheOrdinaryListHides()
     {
         var id = Guid.CreateVersion7();
-        var authority = new FakeAuthority { DiscoverAllowed = candidate => candidate == id, EditAllowed = _ => false };
-        var store = new FakeStore([Record(id, "Archived")]);
-        var result = await new LookupRecordHandler(store.Proxy, authority.Proxy).HandleAsync(Context, RecordLookupQuery.Parse(id.ToString("N")), CancellationToken.None);
+        var authority = new FakeAuthority { Authorized = [id], EditAllowed = _ => false };
+        var handler = Handler(new FakeStore([Record(id, "Archived")]), authority);
 
-        var match = Assert.Single(result.Matches);
-        Assert.Equal(id, match.FormRecordId);
-        Assert.Equal("Archived", match.RecordStatus);
-        Assert.Equal(RecordListQuery.ReferenceFor(id), match.RecordReference);
-        Assert.False(match.CanEdit);
-        Assert.Equal("RecordId", result.LookupKind);
+        Assert.Empty((await handler.HandleAsync(Context, Query(null), null, CancellationToken.None)).Items); // hidden by default
+        var found = await handler.HandleAsync(Context, Query(id.ToString("N")), null, CancellationToken.None);
+
+        var item = Assert.Single(found.Items);
+        Assert.Equal(("Archived", RecordListQuery.ReferenceFor(id), false), (item.RecordStatus, item.RecordReference, item.CanEdit));
+    }
+
+    [Fact]
+    public async Task AnExplicitStatusAndFormFilterNarrowTheSearchWithAndSemantics()
+    {
+        var id = Guid.CreateVersion7();
+        var authority = new FakeAuthority { Authorized = [id] };
+        var handler = Handler(new FakeStore([Record(id, "Archived")]), authority);
+
+        Assert.Single((await handler.HandleAsync(Context, Query(RecordListQuery.ReferenceFor(id), status: "Archived"), null, CancellationToken.None)).Items);
+        Assert.Empty((await handler.HandleAsync(Context, Query(RecordListQuery.ReferenceFor(id), status: "Draft"), null, CancellationToken.None)).Items);
+        Assert.Single((await handler.HandleAsync(Context, Query(RecordListQuery.ReferenceFor(id), form: Form), null, CancellationToken.None)).Items);
+        Assert.Empty((await handler.HandleAsync(Context, Query(RecordListQuery.ReferenceFor(id), form: Guid.CreateVersion7()), null, CancellationToken.None)).Items);
     }
 
     [Fact]
@@ -116,46 +148,55 @@ public sealed class PhaseC6RecordLookupTests
         var notMine = IdWithSuffix("1A2B3C4D", 11); // exists in the business database, not discoverable by the caller
         var authority = new FakeAuthority { Authorized = [mine, .. Enumerable.Range(0, 600).Select(i => IdWithSuffix($"{i:X8}", 100 + i))] };
         var store = new FakeStore([Record(mine, "Draft"), Record(notMine, "Draft")]);
-        var result = await new LookupRecordHandler(store.Proxy, authority.Proxy).HandleAsync(Context, RecordLookupQuery.Parse("REC-1A2B3C4D"), CancellationToken.None);
+        var result = await Handler(store, authority).HandleAsync(Context, Query("REC-1A2B3C4D"), null, CancellationToken.None);
 
-        Assert.Equal(mine, Assert.Single(result.Matches).FormRecordId);
-        Assert.Equal(1, result.MatchCount);
+        Assert.Equal(mine, Assert.Single(result.Items).FormRecordId);
+        Assert.Equal(1, result.TotalCount);
         Assert.True(authority.DiscoverPages > 1); // every page of the authority's discover set was read
         Assert.DoesNotContain(notMine, store.RequestedIds);
     }
 
     [Fact]
-    public async Task DuplicateReferencesReturnEveryAuthorizedMatchWithoutChoosingOne()
+    public async Task DuplicateReferencesReturnEveryAuthorizedMatchInTheOneTableWithSortingAndPaging()
     {
         var older = IdWithSuffix("C0FFEE00", 20);
         var newer = IdWithSuffix("C0FFEE00", 21);
-        var authority = new FakeAuthority { Authorized = [older, newer] };
-        var store = new FakeStore([Record(older, "Submitted", minutesAgo: 60), Record(newer, "Draft", minutesAgo: 1)]);
-        var result = await new LookupRecordHandler(store.Proxy, authority.Proxy).HandleAsync(Context, RecordLookupQuery.Parse("REC-C0FFEE00"), CancellationToken.None);
+        var oldest = IdWithSuffix("C0FFEE00", 22);
+        var authority = new FakeAuthority { Authorized = [older, newer, oldest] };
+        var store = new FakeStore([Record(older, "Submitted", minutesAgo: 60), Record(newer, "Draft", minutesAgo: 1), Record(oldest, "Draft", minutesAgo: 600)]);
+        var handler = Handler(store, authority);
 
-        Assert.Equal(2, result.MatchCount);
-        Assert.Equal([newer, older], result.Matches.Select(m => m.FormRecordId)); // most recently changed first, both listed
+        var all = await handler.HandleAsync(Context, Query("REC-C0FFEE00"), null, CancellationToken.None);
+        Assert.Equal(3, all.TotalCount);
+        Assert.Equal([newer, older, oldest], all.Items.Select(m => m.FormRecordId)); // most recently changed first; none chosen for the user
+
+        var first = await handler.HandleAsync(Context, Query("REC-C0FFEE00", pageSize: 2), null, CancellationToken.None);
+        Assert.Equal(2, first.Items.Count);
+        Assert.NotNull(first.ContinuationToken);
+        var second = await handler.HandleAsync(Context, Query("REC-C0FFEE00", pageSize: 2), first.ContinuationToken, CancellationToken.None);
+        Assert.Equal([oldest], second.Items.Select(m => m.FormRecordId));
+
+        // A page position belongs to the search it came from.
+        var mismatch = await Assert.ThrowsAsync<BusinessException>(() => handler.HandleAsync(Context, Query("REC-DEADBEEF", pageSize: 2), first.ContinuationToken, CancellationToken.None));
+        Assert.Equal("CURSOR_SCOPE_MISMATCH", mismatch.ErrorCode);
     }
 
     [Fact]
     public async Task AnAuthorizedMatchWithoutBusinessMetadataIsReportedNotDropped()
     {
         var orphan = IdWithSuffix("DEADBEEF", 30);
-        var authority = new FakeAuthority { Authorized = [orphan] };
-        var result = await new LookupRecordHandler(new FakeStore([]).Proxy, authority.Proxy).HandleAsync(Context, RecordLookupQuery.Parse("REC-DEADBEEF"), CancellationToken.None);
+        var result = await Handler(new FakeStore([]), new FakeAuthority { Authorized = [orphan] }).HandleAsync(Context, Query("REC-DEADBEEF"), null, CancellationToken.None);
 
-        Assert.Empty(result.Matches);
-        Assert.Equal(1, result.MatchCount);
-        Assert.Equal(orphan, Assert.Single(result.UnavailableRecordIds));
+        Assert.Empty(result.Items);
+        Assert.Equal(1, result.UnavailableRecordCount);
+        Assert.Equal(orphan, Assert.Single(result.UnavailableRecordIds!));
     }
 
-    [Theory]
-    [InlineData("REC-1A2B3C4D")]
-    [InlineData("975a62c5-c1db-8456-99ca-c53c017ef770")]
-    public async Task AnAuthorityFailureIsATechnicalFailureNeverAnEmptyResult(string input)
+    [Fact]
+    public async Task AnAuthorityFailureIsATechnicalFailureNeverAnEmptyResult()
     {
         var authority = new FakeAuthority { Failure = new AuthorityClientException("AUTHORITY_UNAVAILABLE", 503, true) };
-        var failure = await Assert.ThrowsAsync<AuthorityClientException>(() => new LookupRecordHandler(new FakeStore([]).Proxy, authority.Proxy).HandleAsync(Context, RecordLookupQuery.Parse(input), CancellationToken.None));
+        var failure = await Assert.ThrowsAsync<AuthorityClientException>(() => Handler(new FakeStore([]), authority).HandleAsync(Context, Query("REC-1A2B3C4D"), null, CancellationToken.None));
         Assert.Equal("AUTHORITY_UNAVAILABLE", failure.ErrorCode);
     }
 
@@ -163,8 +204,16 @@ public sealed class PhaseC6RecordLookupTests
     public async Task ADiscoverSetAboveTheEnumerationBoundFailsClosedInsteadOfAnsweringFromAPartialSet()
     {
         var authority = new FakeAuthority { Authorized = Enumerable.Range(0, AuthorizedRecordEnumerator.MaximumRecords + 1).Select(i => IdWithSuffix($"{i:X8}", i)).ToList() };
-        var failure = await Assert.ThrowsAsync<BusinessException>(() => new LookupRecordHandler(new FakeStore([]).Proxy, authority.Proxy).HandleAsync(Context, RecordLookupQuery.Parse("REC-00000001"), CancellationToken.None));
+        var failure = await Assert.ThrowsAsync<BusinessException>(() => Handler(new FakeStore([]), authority).HandleAsync(Context, Query("REC-00000001"), null, CancellationToken.None));
         Assert.Equal("RECORD_LIST_TOO_LARGE", failure.ErrorCode);
+    }
+
+    [Fact]
+    public void ASearchThatIsNotAnExactReferenceOrIdIsRefusedWhenTheQueryIsBuilt()
+    {
+        Assert.Equal("LOOKUP_INVALID", Assert.Throws<BusinessException>(() => Query("Smith")).ErrorCode);
+        Assert.Null(Query("   ").Search); // an empty box is no search
+        Assert.Equal("REC-017EF770", Query("rec-017ef770").Search);
     }
 
     private static FormRecord Record(Guid id, string status, int minutesAgo = 5) => new()

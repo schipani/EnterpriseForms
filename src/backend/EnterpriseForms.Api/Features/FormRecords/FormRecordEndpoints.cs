@@ -29,18 +29,13 @@ public static class FormRecordEndpoints
 
         var records = endpoints.MapGroup(ApiVersions.V1Prefix + "/form-records").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
 
-        records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, string? recordStatus, bool? includeChildren, bool? includeArchived, string? sortBy, string? sortDirection, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
+        records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, string? recordStatus, bool? includeChildren, bool? includeArchived, string? q, string? sortBy, string? sortDirection, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
             {
-                var query = RecordListQuery.Create(formDefinitionId, recordStatus, includeChildren ?? false, sortBy, sortDirection, pageSize ?? 25, includeArchived ?? false);
+                var query = RecordListQuery.Create(formDefinitionId, recordStatus, includeChildren ?? false, sortBy, sortDirection, pageSize ?? 25, includeArchived ?? false, q);
                 return TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), query, continuationToken, cancellationToken).ConfigureAwait(false));
             })
             .WithName("ListFormRecords")
-            .WithSummary("My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection.");
-
-        records.MapGet("/lookup", static async Task<Ok<RecordLookupResponse>> (string? q, HttpContext http, LookupRecordHandler handler, CancellationToken cancellationToken) =>
-                TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), RecordLookupQuery.Parse(q), cancellationToken).ConfigureAwait(false)))
-            .WithName("LookupFormRecord")
-            .WithSummary("Quick lookup by an exact record id or short reference (REC-XXXXXXXX). Matches come only from the authority (a Discover check of the id, or the caller's complete discoverable set for a reference); a missing record and an undiscoverable one give the same empty result. Archived and related records are included. Rows carry unverified local metadata only. Not a field-value search.");
+            .WithSummary("My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, search, sort and authorization revision. q (optional) narrows the list to an exact record id or short reference REC-XXXXXXXX decided from the same complete authorized set (never a field-value search; anything else is 422 LOOKUP_INVALID); an exact search also finds archived and related records, and the Form and Status filters still apply. Rows carry unverified local metadata only; open a record for the verified projection.");
 
         records.MapGet("/{formRecordId:guid}", static async Task<Ok<FormRecordResponse>> (Guid formRecordId, HttpContext http, GetFormRecordHandler handler, CancellationToken cancellationToken) =>
             {

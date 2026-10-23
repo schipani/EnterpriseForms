@@ -1,4 +1,5 @@
 import * as RadixSelect from "@radix-ui/react-select";
+import type { ReactNode } from "react";
 import { FieldShell } from "./Field";
 
 export interface SelectOption {
@@ -19,12 +20,14 @@ export interface SelectProps {
   required?: boolean | undefined;
   disabled?: boolean | undefined;
   name?: string | undefined;
+  /** Buttons that belong to this control, in the same row (see FieldShell). */
+  actions?: ReactNode;
 }
 
 /** Radix Select: keyboard typeahead, roving focus, portal-safe; the trigger is the labelled control. */
-export function Select({ label, value, onValueChange, options, placeholder = "Select an option", helpText, note, error, required, disabled, name }: SelectProps) {
+export function Select({ label, value, onValueChange, options, placeholder = "Select an option", helpText, note, error, required, disabled, name, actions }: SelectProps) {
   return (
-    <FieldShell label={label} helpText={helpText} note={note} error={error} required={required}>
+    <FieldShell label={label} helpText={helpText} note={note} error={error} required={required} actions={actions}>
       {({ inputId, describedBy, invalid }) => (
         <RadixSelect.Root value={value ?? ""} onValueChange={onValueChange} {...(disabled !== undefined ? { disabled } : {})} {...(name !== undefined ? { name } : {})} {...(required !== undefined ? { required } : {})}>
           <RadixSelect.Trigger

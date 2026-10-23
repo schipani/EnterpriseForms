@@ -2,7 +2,7 @@
 
 Branch `phase-c/record-lifecycle` from main `f859e42`. Architecture: `docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md` (revision 1), approved for controlled development by the owner on 2026-10-22 (decision **C-43**). Implementation decision: **C-44**.
 
-**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), the recoverable development environment for browser acceptance in §9 (C-47), the quick record lookup in §10 (C-48), the owner's functional acceptance of M1 in §11 (C-49), and Milestone 2, trusted record history with AC-1, in §12 (C-50). AC-3 is deferred; restoration (the owner's M3) is not started; nothing is merged to main.
+**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), the recoverable development environment for browser acceptance in §9 (C-47), the quick record lookup in §10 (C-48), the owner's functional acceptance of M1 in §11 (C-49), Milestone 2, trusted record history with AC-1, in §12 (C-50), icons in §13 (C-51), and the form-control layout standard, unified My Records search and Activity-log correction in §14 (C-52). AC-3 is deferred; restoration (the owner's M3) is not started; nothing is merged to main.
 
 **What this is not:**
 * not an independent security review;
@@ -563,4 +563,58 @@ Owner request during M2 usability work. Labeled action buttons carry a recogniza
 * **Not applied:** document and file "Download" are links, not Buttons, so they were left as they are; there is no Export or Save Draft button in the application yet.
 * **Verification:** typecheck and lint clean; vitest 178 / 178; new Playwright `action-icons` (New record and Search: icon present, decorative, left of the label, same size, 4 to 12 px gap, same black primary colors, keyboard focus ring, 320 px layout; Cancel has no icon) plus the broader suites touching these screens: **35 / 35** on the persistent dev stack (only `web` was rebuilt). Hosted run: not yet.
 * **Not found:** the request refers to a "unified My Records search" and an "Activity Log correction". I have no specification for either beyond the Find a record lookup (C-48) and the Activity tab rename (C-50), so nothing further was changed for them.
+
+## 14. Form-control layout standard, unified My Records search, Activity log (decision C-52)
+
+Owner request: fix recurring field-alignment problems at the shared-component level, make the exact lookup and the My Records filters one interface, and stop the raw NOT_FOUND on the Activity log of field-scoped users. Authority protocol, signing, Merkle, encryption and the journal are unchanged.
+
+### 14.1 Reusable layout standard
+
+Documented in `docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md` (referenced from `CLAUDE-DESIGN.MD` §7).
+* **Order, everywhere:** label, control (with its own buttons in the same row), help text, status note, validation message. Help text is never between the label and the control. The old per-screen "help above the input" default (a tested exception in the record renderer) is gone: `FieldShell` has one order, `FieldLayoutProvider` is a no-op, the renderer's multi-select puts help after the choices, and the renderer test now asserts the new order.
+* **`actions` slot** on `FieldShell`, `TextInput` and `Select`: buttons beside the control, top-aligned at control height, wrapping below the control (above the help) on narrow screens; help and error stay below the group so a message never moves the buttons.
+* **Consistent sizes and spacing:** inputs, selects and medium buttons share a 44 px height; fixed label-to-control and control-to-help gaps; `items-start` rows.
+* **Validation timing:** nothing is validated while typing; the search validates on submit and clears when edited.
+
+### 14.2 Screens corrected
+
+* **My Records:** the search box (label, input with Search and Clear on the input's row, help and error below) and the four filters (Form, Status, Sort by, Rows per page) now share one grid with aligned labels and controls.
+* **Form Designer option dialogs:** "Option list" with "New list…", "New option" with "Add option", "New item" with "Add item" now use the shared `actions` slot (they used a private `items-end` row or a stacked button).
+* **Record entry, Add and Configure Field, Sharing and Access, lifecycle dialogs, organization settings:** audited. They already use the shared components, so they receive the standard through them (the only raw form markup left in the application is radio buttons and file pickers). The designer's Add field dialog is covered by a geometry test.
+
+### 14.3 Unified My Records search
+
+* **One interface, one table.** The separate "Find a record" panel and result list are removed. A single "Find and filter records" area holds Search records, Form, Status, Sort by, Rows per page, Include related records, Include archived records and Clear filters. Results go into the existing My Records table (same columns, rightmost Actions column, paging and sorting).
+* **Search** runs on Enter or the Search button, never per keystroke. It accepts an exact reference (REC-017EF770) or a full record ID; anything else is refused at once, with the error below the field. The search lives in the address (`q`) so a result can be reloaded or shared with the same filters.
+* **AND semantics.** The server applies the search to the caller's authority-listed records, then Form, Status, Include archived and children, sorting and paging. Changing a filter resets the paging; a page position belongs to its search, so a mismatched one is refused (`CURSOR_SCOPE_MISMATCH`).
+* **Duplicate short references** return every authorized match in the table; none is chosen for the user.
+* **Archived and related records.** The ordinary list hides archived records by default. An exact search also finds authorized archived and related records, unless a Status filter is chosen explicitly (then it applies). A note under the checkboxes says so.
+* **Clear** removes only the search. **Clear filters** resets everything (search, form, status, options, sort, rows).
+* **Empty and failure states.** "No record found" never says whether an inaccessible record exists; a technical failure is shown as an error with a retry and is never reported as "no record found".
+* **Backend:** `GET /api/v1/form-records?q=…` (OpenAPI regenerated). The matching ids come from the Authority's complete discoverable set (every discover page at one authorization revision, fails closed above 10,000 records), so an unauthorized record is never requested from the business database and there is no leak of existence, metadata or counts. The separate lookup endpoint, handler and client call from C-48 were removed; their input rules and tests moved onto the list.
+* **Limits.** This is an exact id or reference search, not a field-value search; G06 (search completeness) remains open. The business database still only describes the matched records (unverified listing metadata).
+
+### 14.4 Activity log
+
+* The record page shows **Activity and History only to people who can read the whole record** (the projection reports this). A field-share recipient such as Casey Clerk no longer sees an Activity tab, so the technical NOT_FOUND no longer appears; a direct address for those sections falls back to Details.
+* If a refusal still happens (access removed while the page was open), the Activity panel shows "Activity isn't available for this record" with no error code or correlation id. A genuine service failure keeps the error panel with a retry.
+* The server is unchanged: activity and history stay refused (404) to field-scoped users. Owners and other full readers keep both.
+* The former "Activity and history" tab was already renamed "Activity" (C-50).
+
+### 14.5 Verification
+
+| Check | Result |
+|---|---|
+| .NET (CI runner, four projects) | **379 / 379** (Authority 108, contract 171, architecture 66, integrity 34) |
+| Frontend unit (vitest) | **179 / 179** (renderer order, search state parsing) |
+| Lint, typecheck, OpenAPI determinism | clean |
+| Browser, entire suite on the persistent dev stack (`web` and `api` rebuilt only; Vault, databases, SpiceDB untouched) | **77 / 77**, including the new `form-control-layout` (4), `activity-field-scoped` (4), rewritten `record-lookup` (5) and `action-icons` (2) |
+
+The geometry spec measures the real browser with a 2 px tolerance: label above control, help and error below, Search and Clear on the input's row and height, the four filters aligned and at the input's height, an error that does not move the buttons, 640 px and 320 px without horizontal scroll, and the same order in the Add field dialog. I also looked at screenshots at desktop and 320 px.
+
+Not changed by design: the renamed `RecordLookup` component, the C-48 `lookup` endpoint and client method no longer exist.
+
+### 14.6 Hosted verification
+
+Recorded after the hosted runs complete.
 

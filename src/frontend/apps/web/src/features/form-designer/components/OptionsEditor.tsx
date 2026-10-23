@@ -1,7 +1,7 @@
 import type { FieldDefinitionResponse } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
 import type { FieldElement } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Checkbox, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Checkbox, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -172,11 +172,8 @@ export function OptionsEditor({ formDefinitionId, field, element, canDesign, onE
       </ol>
       {canDesign ? (
         <div className="flex flex-col gap-2 border-t border-line pt-3">
-          <TextInput label="New option" value={newLabel} maxLength={200} error={problem ?? undefined} helpText="Added to the end; its key is derived from the label and then never changes." onChange={(event) => setNewLabel(event.target.value.replace(/[<>]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); add(); } }} />
+          <TextInput label="New option" value={newLabel} maxLength={200} error={problem ?? undefined} helpText="Added to the end; its key is derived from the label and then never changes." actions={<Button variant="secondary" icon={ActionIcons.add} disabled={newLabel.trim() === ""} onClick={add}>Add option</Button>} onChange={(event) => setNewLabel(event.target.value.replace(/[<>]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); add(); } }} />
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" disabled={newLabel.trim() === ""} onClick={add}>
-              Add option
-            </Button>
             <Button size="sm" busy={save.isPending} disabled={!dirty || emptyLabel} onClick={() => save.mutate()}>
               Save options
             </Button>
