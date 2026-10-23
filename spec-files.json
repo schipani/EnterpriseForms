@@ -74,8 +74,8 @@
     },
     {
       "path": "docs/PHASE_C6_STATUS.md",
-      "sha256": "1fd3e81de4feff93a0a4f4d17c44fb2d07d45972d2d844fdecee48900a8d248f",
-      "bytes": 90254
+      "sha256": "8d3aa7d31937286e238aad0e7de0e0a2b712ebda5b674733b9bc8af5c5cb0ec1",
+      "bytes": 91152
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "444dc2d8ed3050531e74af09fa41b8c7e4ecb1f9e422d4b4586c20824260802c",
-      "bytes": 74824
+      "sha256": "95821cf70a90187de5b94acc63bb75083e22ed885494596abd25b38032689e6f",
+      "bytes": 74972
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
