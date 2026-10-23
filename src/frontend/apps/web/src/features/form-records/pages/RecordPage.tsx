@@ -12,6 +12,7 @@ import { RecordAccessPanel } from "../../sharing";
 import { ErrorPanel } from "../../support";
 import { CopyReference } from "../components/CopyReference";
 import { LifecycleActions } from "../components/LifecycleActions";
+import { RecordHistory } from "../components/RecordHistory";
 import { formatDateTime, recordStatusLabel } from "../components/recordList";
 import { parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
 import type { RecordTab } from "../components/recordTabs";
@@ -50,7 +51,8 @@ export function RecordPage() {
   const relatedElements = layout ? relatedListsOf(layout) : [];
   const documentElements = layout ? documentCollectionsOf(layout) : [];
   const relationshipsById = new Map(data.relationships.map((relationship) => [relationship.formRelationshipDefinitionId, relationship]));
-  const sections: RecordTab[] = ["details", ...(relatedElements.length > 0 ? (["related"] as const) : []), ...(documentElements.length > 0 ? (["documents"] as const) : []), "sharing", "activity"];
+  // Phase C6 M2: history is part of the record's content, so only a person who can read the whole record sees it (a shared view never does).
+  const sections: RecordTab[] = ["details", ...(relatedElements.length > 0 ? (["related"] as const) : []), ...(documentElements.length > 0 ? (["documents"] as const) : []), "sharing", "activity", ...(data.permissions.isCompleteProjection ? (["history"] as const) : [])];
   const tab: RecordTab = search.tab && sections.includes(search.tab) ? search.tab : "details";
   const showTab = (next: RecordTab) => void navigate({ to: "/app/records/$formRecordId", params: { formRecordId }, search: (current) => ({ ...current, tab: next === "details" ? undefined : next }), replace: true });
 
@@ -161,7 +163,8 @@ export function RecordPage() {
             : []),
           ...(documentElements.length > 0 ? [{ value: "documents", label: "Documents", content: <div className="flex flex-col gap-4">{documentElements.map(renderDocuments)}</div> }] : []),
           { value: "sharing", label: "Sharing and access", content: <RecordAccessPanel formRecordId={formRecordId} projection={data} /> },
-          { value: "activity", label: "Activity and history", content: <Card title="Audit history"><RecordActivity formRecordId={formRecordId} /></Card> },
+          { value: "activity", label: "Activity", content: <Card title="Activity log"><RecordActivity formRecordId={formRecordId} /></Card> },
+          ...(data.permissions.isCompleteProjection ? [{ value: "history", label: "History", content: <RecordHistory formRecordId={formRecordId} /> }] : []),
         ]}
       />
     </>

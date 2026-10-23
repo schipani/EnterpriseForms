@@ -124,6 +124,16 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) =>
             context.ManifestCommits.AsNoTracking().FirstOrDefaultAsync(c => c.OrganizationId == organizationId && c.FormRecordId == formRecordId && c.CommittedOperationId == committedOperationId, cancellationToken);
 
+        public Task<List<RecordManifestCommit>> GetManifestCommitsAsync(Guid organizationId, Guid formRecordId, long afterRevision, int limit, CancellationToken cancellationToken) =>
+            context.ManifestCommits.AsNoTracking()
+                .Where(c => c.OrganizationId == organizationId && c.FormRecordId == formRecordId && c.CommittedContentRevision > afterRevision)
+                .OrderBy(c => c.CommittedContentRevision)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+
+        public Task<List<ContentChangeOperation>> GetOperationsAsync(IReadOnlyCollection<Guid> contentChangeOperationIds, CancellationToken cancellationToken) =>
+            context.ContentOperations.AsNoTracking().Where(o => contentChangeOperationIds.Contains(o.ContentChangeOperationId)).ToListAsync(cancellationToken);
+
         public void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint) => context.ContentCheckpoints.Add(checkpoint);
 
         public Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken) =>

@@ -2,6 +2,7 @@ using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Api.Features.FormDefinitions;
 using EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 using EnterpriseForms.Application.Features.FormRecords.GetFormRecord;
+using EnterpriseForms.Application.Features.FormRecords.History;
 using EnterpriseForms.Application.Features.FormRecords.ListRecords;
 using EnterpriseForms.Application.Features.FormRecords.TransferOwnership;
 using EnterpriseForms.Application.Features.FormRecords.UpdateFormRecord;
@@ -59,6 +60,16 @@ public static class FormRecordEndpoints
             })
             .WithName("GetRecordProjection")
             .WithSummary("Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag.");
+
+        records.MapGet("/{formRecordId:guid}/versions", static async Task<Ok<RecordVersionListResponse>> (Guid formRecordId, long? after, int? pageSize, HttpContext http, RecordHistoryHandler handler, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handler.ListAsync(BusinessAuthentication.RequireContext(http), formRecordId, after, pageSize, cancellationToken).ConfigureAwait(false)))
+            .WithName("ListRecordVersions")
+            .WithSummary("Phase C6 M2: accepted versions of a record in chronological order, from the Authorization Authority (AC-1): version number, accepted time, actor, current marker. Action labels carry their source (Authority or the unverified activity log). Only a person who may read the whole record now; anyone else gets 404.");
+
+        records.MapGet("/{formRecordId:guid}/versions/{contentRevision:long}", static async Task<Ok<RecordVersionViewResponse>> (Guid formRecordId, long contentRevision, HttpContext http, RecordHistoryHandler handler, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handler.ViewAsync(BusinessAuthentication.RequireContext(http), formRecordId, contentRevision, cancellationToken).ConfigureAwait(false)))
+            .WithName("GetRecordVersion")
+            .WithSummary("Phase C6 M2: one earlier version, read-only, after the Authority verified its exact rows against the manifest it accepted for that version (any mismatch fails closed: 423, the record is quarantined as for the current version). Current form layout and labels; the version's values, documents and status.");
 
         records.MapPatch("/{formRecordId:guid}", static async Task<Ok<FormRecordResponse>> (Guid formRecordId, UpdateFormRecordRequest request, HttpContext http, UpdateFormRecordHandler handler, CancellationToken cancellationToken) =>
             {

@@ -78,6 +78,9 @@ export type CreateRelationshipDefinitionRequest = S["CreateRelationshipDefinitio
 export type RecordListResponse = S["RecordListResponse"];
 export type RecordListItemResponse = S["RecordListItemResponse"];
 export type RecordLookupResponse = S["RecordLookupResponse"];
+export type RecordVersionItemResponse = S["RecordVersionItemResponse"];
+export type RecordVersionListResponse = S["RecordVersionListResponse"];
+export type RecordVersionViewResponse = S["RecordVersionViewResponse"];
 export type RecordProjectionResponse = S["RecordProjectionResponse"];
 export type FormRecordResponse = S["FormRecordResponse"];
 export type FieldValueResponse = S["FieldValueResponse"];
@@ -174,6 +177,10 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       list: (query: RecordListQuery, signal?: AbortSignal) => read<RecordListResponse>("records.list", undefined, query, "interactive-read", signal),
       /** Exact lookup by record id or short reference (REC-XXXXXXXX); matches are authority-decided, never a field-value search. */
       lookup: (q: string, signal?: AbortSignal) => read<RecordLookupResponse>("records.lookup", undefined, { q }, "interactive-read", signal),
+      /** Phase C6 M2: accepted versions, oldest first (Authority-listed); `after` continues from a version number. */
+      versions: (formRecordId: string, after?: number, signal?: AbortSignal) => read<RecordVersionListResponse>("records.versions", { formRecordId }, after === undefined ? undefined : { after }, "interactive-read", signal),
+      /** Phase C6 M2: one earlier version, verified and read-only. */
+      version: (formRecordId: string, contentRevision: number, signal?: AbortSignal) => read<RecordVersionViewResponse>("records.version", { formRecordId, contentRevision: String(contentRevision) }, undefined, "interactive-read", signal),
       create: (formDefinitionId: string, request: CreateFormRecordRequest) => write<FormRecordResponse>("POST", "records.create", { formDefinitionId }, request, { idempotent: true }),
       projection: (formRecordId: string, signal?: AbortSignal) => read<RecordProjectionResponse>("records.projection", { formRecordId }, undefined, "interactive-read", signal),
       lifecycle: (transition: RecordLifecycleTransition, formRecordId: string, request: RecordLifecycleRequest) => write<RecordLifecycleResponse>("POST", `records.${transition}`, { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),

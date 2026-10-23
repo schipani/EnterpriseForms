@@ -99,6 +99,11 @@ public sealed record CommitContentChangeRequest(Guid OrganizationId, Guid FormRe
 
 public sealed record AcceptedContentRevision(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, string CommittedManifestRootBase64, long AuthorizationRevision, int IntegrityKeyVersion, int CurrentSigningKeyVersion, string ArchiveState, Guid CorrelationId);
 
+/// <summary>AC-1 (Phase C6): one accepted revision as the Authority records it (see the Authority contract of the same name).</summary>
+public sealed record ContentHistoryEntry(long ContentRevision, Guid CommittedOperationId, DateTimeOffset AcceptedOn, string ActorKind, Guid? ActorAuthorityUserId, Guid? ReprotectionCommandId, long ManifestLeafCount, int RowSignatureKeyVersion, bool VerifiableNow, bool IsCurrent);
+
+public sealed record ContentHistoryPage(Guid OrganizationId, Guid FormRecordId, long CurrentContentRevision, IReadOnlyList<ContentHistoryEntry> Entries, long? NextAfterRevision, long AuthorizationRevision, Guid CorrelationId);
+
 /// <summary>HistoricCommittedOperationId: verify an earlier accepted manifest of the record (historic document versions; full readers only).</summary>
 public sealed record VerifyRecordProjectionRequest(Guid OrganizationId, Guid FormRecordId, ProtectedAction RequestedAction, IReadOnlyList<StagedContentItem> ObservedItems, Guid? HistoricCommittedOperationId = null);
 
@@ -149,6 +154,9 @@ public interface IAuthorizationAuthorityClient
     Task<AcceptedContentRevision> GetCommittedContentRevisionAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);
 
     Task<VerifyRecordProjectionResult> VerifyRecordProjectionAsync(DelegatedUserContext user, VerifyRecordProjectionRequest request, CancellationToken cancellationToken);
+
+    /// <summary>AC-1 (Phase C6): accepted content revisions of a record, ascending from <paramref name="afterRevision"/>; full readers only (404 otherwise).</summary>
+    Task<ContentHistoryPage> GetContentHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, long? afterRevision, int limit, CancellationToken cancellationToken);
 
     // Workload reprotection operations (B-28): no delegated user; the authority authorizes them from the effective PublishFormSecurityRevision command only.
     Task<AcceptedContentRevision> GetCommittedContentRevisionForReprotectionAsync(Guid organizationId, Guid formRecordId, Guid reprotectionCommandId, CancellationToken cancellationToken);

@@ -42,6 +42,8 @@ export const ENDPOINTS = {
   "forms.createRelationship": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/relationships" },
   "records.list": { method: "GET", path: "/api/v1/form-records" },
   "records.lookup": { method: "GET", path: "/api/v1/form-records/lookup" },
+  "records.versions": { method: "GET", path: "/api/v1/form-records/{formRecordId}/versions" },
+  "records.version": { method: "GET", path: "/api/v1/form-records/{formRecordId}/versions/{contentRevision}" },
   "records.create": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/records" },
   "records.get": { method: "GET", path: "/api/v1/form-records/{formRecordId}" },
   "records.projection": { method: "GET", path: "/api/v1/form-records/{formRecordId}/projection" },

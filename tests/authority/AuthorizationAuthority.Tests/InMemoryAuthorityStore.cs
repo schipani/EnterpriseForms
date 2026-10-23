@@ -114,6 +114,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) =>
             Task.FromResult(s.Commits.FirstOrDefault(c => c.OrganizationId == organizationId && c.FormRecordId == formRecordId && c.CommittedOperationId == committedOperationId));
 
+        public Task<List<RecordManifestCommit>> GetManifestCommitsAsync(Guid organizationId, Guid formRecordId, long afterRevision, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commits.Where(c => c.OrganizationId == organizationId && c.FormRecordId == formRecordId && c.CommittedContentRevision > afterRevision).OrderBy(c => c.CommittedContentRevision).Take(limit).ToList());
+
+        public Task<List<ContentChangeOperation>> GetOperationsAsync(IReadOnlyCollection<Guid> contentChangeOperationIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Operations.Where(o => contentChangeOperationIds.Contains(o.ContentChangeOperationId)).ToList());
+
         public void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint) => s.Checkpoints.Add(checkpoint);
 
         public Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken) =>

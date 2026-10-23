@@ -376,6 +376,10 @@ public sealed class CommandPlannerTests
 
         public Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken ct) => Task.FromResult<RecordManifestCommit?>(null);
 
+        public Task<List<RecordManifestCommit>> GetManifestCommitsAsync(Guid organizationId, Guid formRecordId, long afterRevision, int limit, CancellationToken ct) => Task.FromResult(new List<RecordManifestCommit>());
+
+        public Task<List<ContentChangeOperation>> GetOperationsAsync(IReadOnlyCollection<Guid> contentChangeOperationIds, CancellationToken ct) => Task.FromResult(new List<ContentChangeOperation>());
+
         public Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken ct) => Task.FromResult(Bindings.FirstOrDefault(b => b.IdentityBindingId == identityBindingId));
 
         public Task<SecurityCommand?> FindCommandAsync(Guid id, CancellationToken ct) => Task.FromResult(Commands.TryGetValue(id, out var command) ? command : null);

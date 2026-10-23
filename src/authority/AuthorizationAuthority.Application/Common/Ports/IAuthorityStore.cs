@@ -90,6 +90,12 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>The accepted manifest commit of one earlier operation of a record (historic verification), or null.</summary>
     Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken);
 
+    /// <summary>AC-1: accepted manifest commits of a record with a revision above <paramref name="afterRevision"/>, ascending, at most <paramref name="limit"/>. Read-only.</summary>
+    Task<List<RecordManifestCommit>> GetManifestCommitsAsync(Guid organizationId, Guid formRecordId, long afterRevision, int limit, CancellationToken cancellationToken);
+
+    /// <summary>AC-1: the content operations with the given ids (read-only; actor and reprotection attribution).</summary>
+    Task<List<ContentChangeOperation>> GetOperationsAsync(IReadOnlyCollection<Guid> contentChangeOperationIds, CancellationToken cancellationToken);
+
     void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint);
 
     Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken);

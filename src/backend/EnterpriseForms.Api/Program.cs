@@ -60,6 +60,7 @@ public sealed class Program
         builder.Services.AddSingleton<EnterpriseForms.Application.Common.IOpaqueCursorProtector, DataProtectionCursorProtector>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.ListRecordsHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.LookupRecordHandler>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordHistoryHandler>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));
         builder.Services.AddHostedService<DocumentProviderStartupGuard>();
         builder.Services.AddHostedService<DocumentProcessingHostedService>();

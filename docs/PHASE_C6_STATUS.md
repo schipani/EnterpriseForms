@@ -2,7 +2,7 @@
 
 Branch `phase-c/record-lifecycle` from main `f859e42`. Architecture: `docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md` (revision 1), approved for controlled development by the owner on 2026-10-22 (decision **C-43**). Implementation decision: **C-44**.
 
-**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), the recoverable development environment for browser acceptance in §9 (C-47), and the quick record lookup in §10 (C-48). AC-1 is approved but not started; AC-3 is deferred; nothing is merged to main; M2 is not started.
+**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), the recoverable development environment for browser acceptance in §9 (C-47), the quick record lookup in §10 (C-48), the owner's functional acceptance of M1 in §11 (C-49), and Milestone 2, trusted record history with AC-1, in §12 (C-50). AC-3 is deferred; restoration (the owner's M3) is not started; nothing is merged to main.
 
 **What this is not:**
 * not an independent security review;
@@ -429,3 +429,119 @@ At **http://127.0.0.1:8091** (run `python scripts/devstack/devstack.py up` first
 9. **Unchanged:** the form, status, sort, rows-per-page, related-records and archived controls and paging below the panel work as before.
 
 Duplicate references and technical failures cannot be produced on demand in the real application; they are covered by the automated tests.
+
+## 11. Milestone 1 — owner functional acceptance (decision C-49)
+
+On 2026-10-23 the owner personally tested M1 on the persistent development stack (§9) and accepted, for continued development:
+* Submit;
+* Reopen with a reason;
+* Archive;
+* Unarchive (back to the state it was archived from);
+* record locking;
+* archived-record visibility in My Records.
+
+This is owner functional acceptance for continued development. It is **not**:
+* an independent security review;
+* manual accessibility certification (PB-14);
+* Level 2 production approval.
+
+Every security finding and limit in §5, §7.4, §8 and §8.7 stands. In particular, AC-2 is not independently reviewed, and R-01 (owner edits enforced by the business API only) is unchanged.
+
+## 12. Milestone 2 — trusted record history (decision C-50)
+
+Owner instruction: an Authority-backed version list (AC-1) and a read-only historical version viewer in the Record Workspace.
+
+**Numbering.** The owner's "M2" covers the architecture's M2 (AC-1) and M3 (history UI). The owner's "M3", restoration (the architecture's M4), is **not started**. AC-3 stays deferred, and the Authority journal format is unchanged.
+
+### 12.1 What was built
+
+**AC-1, the Authority content history read:** `GET /internal/v1/content-revisions/{organizationId}/{formRecordId}/history?after=&limit=` (`GetContentHistory`).
+* **Source:** the Authority's own rows only (`record_manifest_commits`, `content_change_operations`, `identity_bindings`).
+* **Each entry:** revision, accepted time, actor kind (User with the Authority user id, ProtectionMigration with the reprotection command, or Unknown if an accepted commit lacks a consistent operation), leaf count, key version, `verifiableNow` and `isCurrent`.
+* **Order and paging:** ascending (chronological), cursor by revision, default 50 and at most 100 per page.
+* **Who may read it:** `form_record.read` (full reader now) at the projection ZedToken with the gate open. Everyone else, other records and other organizations get a concealment-safe 404; an unbound actor gets 403.
+* **Fail-closed cases:** a quarantined head returns 423. The authorization state is re-read after the list is built, and if it moved the result is 503.
+* **Read-only:** no state change, no journal entry, no row bytes and no signature work.
+* **Store additions:** two read-only methods (`GetManifestCommitsAsync`, `GetOperationsAsync`). No schema, migration, signing, manifest, journal or SpiceDB change; the Authority diff adds lines only.
+
+**Business API:**
+* **`GET /api/v1/form-records/{id}/versions?after=&pageSize=`** (`ListRecordVersions`). It maps actor ids to display names from the local directory ("Unknown user" if absent).
+  * **Authority-established action labels:** "Created" for version 1, and "Protection update (system)" for protection migrations.
+  * **Other labels:** the local activity event of the same revision, used only when its actor equals the Authority's actor and marked `ActivityLog` (unverified). Otherwise the label is `None`, shown as "Not recorded".
+* **`GET /api/v1/form-records/{id}/versions/{revision}`** (`GetRecordVersion`).
+  * Resolves the revision's operation from AC-1, never from business rows.
+  * Refuses a revision whose key is no longer accepted (`503 HISTORIC_VERSION_UNVERIFIABLE`) before reading anything.
+  * Reads that operation's exact staged rows and has the Authority verify them against the manifest it accepted for that revision (the existing `HistoricCommittedOperationId`). It then checks that the verified revision is the one requested.
+  * Returns a read-only projection: the current layout and labels, with the version's values, documents and status, no permissions, no transitions and no ETag.
+  * Protected values are decrypted only after verification, for a full reader; an unavailable key fails the whole request.
+  * Never updates the current-head projections.
+  * Writes audit event `RECORD_VERSION_VIEWED` (revisions and operation id only, never values).
+
+**UI:**
+* **History tab** in the Record Workspace, for full readers only: version, saved time, person, change (with "from the activity log" where applicable), a Current badge, and View; Show more and an independent Refresh. The former "Activity and history" tab is now "Activity", so two tabs don't both say "history".
+* **Version page** `/app/records/:id/versions/:revision`:
+  * a prominent "You are viewing an earlier version: version N of M … read-only" banner;
+  * an "About this version" card with "Checked when opened" and the version's status;
+  * the note that field names and arrangement are today's while values are the version's;
+  * the read-only renderer, with documents of that version downloadable through the existing historic download;
+  * "Other values saved in this version" for fields no longer in the form;
+  * related records noted as not part of a version;
+  * plain-language unavailable, could-not-be-verified and key-unavailable messages.
+* No cryptographic terms are shown to ordinary users.
+
+### 12.2 Security behaviour
+
+| Concern | Behaviour | Evidence |
+|---|---|---|
+| Unauthorized history access | No grant, design rights only: 404 for list and view | integration `OnlyAPersonWhoMayReadTheWholeRecordNowSeesHistory`; Playwright |
+| Cross-tenant | Another organization's user: 404; Authority-level request through another organization: 404 | integration; Authority `AnotherOrganizationsRecordIsNotFound…` |
+| Field-share reader | Sees the current shared field, but no History tab and 404 for list and view. V1 rule: history needs full read now, so field-level restrictions are never relaxed (field-scoped history is FR-C6-01 and would need a further Authority change) | integration; Playwright; Authority test |
+| Revoked / stale authorization | After ownership transfer the former owner gets 404 at once; the new owner sees all versions. Authorization moving during the read: 503 | integration; Authority test (mutation-checked: the guard checking `discover` instead of `read` fails the test) |
+| Tampered historical value | `423 INTEGRITY_VERIFICATION_FAILED`, nothing released; the record is quarantined and the list refused (AC-4 current behaviour kept) | integration (Theory: tampered); Authority (tampered, extra, rows of another revision) |
+| Missing historical rows | Same as tampered | integration (Theory: missing); Authority |
+| Forged revisions | Version 0, 5, 99: 404, nothing quarantined; an abandoned candidate, another record's operation or a random operation is not a version | integration; Authority |
+| Encrypted historical fields | Decrypted only after verification for a full reader; the historical value matches the version (an encrypted field) | integration |
+| Fields no longer in the current form | Value returned with the version and shown under "Other values saved in this version" with today's name | integration; Playwright |
+| Listing integrity | Exactly the Authority's accepted manifest commits, contiguous, ascending; abandoned candidates never listed | integration (compares with `record_manifest_commits`); Authority |
+
+### 12.3 Verification
+
+| Suite | Result |
+|---|---|
+| .NET (CI runner, four projects) | **378 / 378**: Authority 108 (12 new AC-1 and historic-verification tests), contract 170 (6 new history tests) |
+| Frontend unit (vitest) | **178 / 178**: new history presentation tests |
+| Lint, typecheck, OpenAPI determinism (business and Authority internal artifacts regenerated) | clean |
+| Browser on the persistent dev stack (authority, api and web rebuilt only; Vault, databases and SpiceDB not restarted): `record-history` (new, 5), `record-lifecycle`, `record-lookup`, `records-workspace`, `accused-workflow`, `pb14-accessibility` | **24 / 24** |
+| Hosted Docker integration, browser, SEC-P | §12.5 |
+
+One failure on the way, caused by the test, not the product: the history spec's setup submitted immediately after an edit, while the edit's integrity checkpoint was still waiting for its archive receipt (`503 AWAITING_ARCHIVE`, retryable by design). The setup now waits until the edited version is readable, as the UI does.
+
+The owner's own M1 acceptance record (REC-017EF770) shows its real history on the dev stack: created, submitted, reopened, edited, submitted, archived. Version 1 opens with its original values, and the clerk (a field-share reader) gets 404.
+
+### 12.4 Limits and risks (for the independent reviewer)
+
+* **AC-1 is implemented for development and not independently reviewed** (R-02: it exposes actor ids and operation timing of every accepted revision to full readers).
+* **Action labels other than "Created" and protection updates come from the local activity projection** and are labelled as such (AC-3 deferred). A hostile business-database administrator could alter or remove them; the version list, times and actors would still be correct.
+* **Labels and layout shown with a version are today's** (G21: unsigned metadata). The UI says so.
+* **AC-4 is unchanged:** one tampered historical row quarantines the current record (R-03). This must be decided before any history retention purge (PB-13, G16).
+* **Field-share readers see no history (V1).** Child records keep their own histories.
+* **Historic KEKs:** the local key provider holds one KEK. After a KEK rotation, older encrypted versions would fail closed (Stage B §7.1).
+
+### 12.5 Hosted verification
+
+Recorded after the hosted runs complete.
+
+### 12.6 Browser acceptance (owner)
+
+At **http://127.0.0.1:8091** (run `python scripts/devstack/devstack.py up` first if Docker or the machine restarted), signed in as **Avery Owner (owner)**:
+
+1. **History list:** open REC-017EF770 (M1 Acceptance – Case intake) and choose the **History** tab. Expect every saved version, oldest first, with when, who and what changed. "Created" is shown plainly; the other changes say "from the activity log"; the last row is marked **Current**.
+2. **Open an earlier version:** press **View** on version 1 (keyboard: Tab to it, Enter). Expect the banner "You are viewing an earlier version: version 1 of …", "Status in this version: Draft", and the original values. There is nothing to edit.
+3. **Compare:** open another version and check that its values and status differ where the record changed. **Back to version history** returns to the tab; **Open current record** goes to the record.
+4. **Removed field:** if a field was removed from a form after a version was saved, that version shows it under **Other values saved in this version**.
+5. **Unavailable version:** change the address to `/versions/99`. Expect "This version isn't available".
+6. **Shared reader:** sign in as **Casey Clerk (clerk)** and open REC-017EF770. There is no History tab, and `/app/records/<id>/versions/1` says the version isn't available.
+7. **No access:** sign in as **Riley Reader (reader)** and open the same version URL. Expect the same "isn't available" message.
+8. **Phone width:** narrow the window to about 320 px; the version page should stay readable without sideways scrolling.
+
+Tampered or missing history can't be produced safely in the browser; the automated tests cover it (§12.2).

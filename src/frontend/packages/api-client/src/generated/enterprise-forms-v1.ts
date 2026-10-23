@@ -584,6 +584,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-records/{formRecordId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase C6 M2: accepted versions of a record in chronological order, from the Authorization Authority (AC-1): version number, accepted time, actor, current marker. Action labels carry their source (Authority or the unverified activity log). Only a person who may read the whole record now; anyone else gets 404. */
+        get: operations["ListRecordVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase C6 M2: one earlier version, read-only, after the Authority verified its exact rows against the manifest it accepted for that version (any mismatch fails closed: 423, the record is quarantined as for the current version). Current form layout and labels; the version's values, documents and status. */
+        get: operations["GetRecordVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-records/{formRecordId}/submit": {
         parameters: {
             query?: never;
@@ -1899,6 +1933,37 @@ export interface components {
             shareRevokedOn: null | string;
             fieldKeys: string[];
         };
+        RecordVersionItemResponse: {
+            /** Format: int64 */
+            contentRevision: number | string;
+            /** Format: date-time */
+            acceptedOn: string;
+            actorKind: string;
+            /** Format: uuid */
+            actorUserId: null | string;
+            actorDisplayName: null | string;
+            isCurrent: boolean;
+            verifiableNow: boolean;
+            actionLabel: null | string;
+            actionSource: string;
+        };
+        RecordVersionListResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            /** Format: int64 */
+            currentContentRevision: number | string;
+            versions: components["schemas"]["RecordVersionItemResponse"][];
+            /** Format: int64 */
+            nextAfterRevision: null | number | string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+        };
+        RecordVersionViewResponse: {
+            version: components["schemas"]["RecordVersionItemResponse"];
+            projection: components["schemas"]["RecordProjectionResponse"];
+            /** Format: int64 */
+            currentContentRevision: number | string;
+        };
         RelationshipDefinitionResponse: {
             /** Format: uuid */
             formRelationshipDefinitionId: string;
@@ -3040,6 +3105,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecordProjectionResponse"];
+                };
+            };
+        };
+    };
+    ListRecordVersions: {
+        parameters: {
+            query?: {
+                after?: number | string;
+                pageSize?: number | string;
+            };
+            header?: never;
+            path: {
+                formRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordVersionListResponse"];
+                };
+            };
+        };
+    };
+    GetRecordVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                contentRevision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordVersionViewResponse"];
                 };
             };
         };

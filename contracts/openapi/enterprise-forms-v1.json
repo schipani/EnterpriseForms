@@ -1448,6 +1448,104 @@
         }
       }
     },
+    "/api/v1/form-records/{formRecordId}/versions": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Phase C6 M2: accepted versions of a record in chronological order, from the Authorization Authority (AC-1): version number, accepted time, actor, current marker. Action labels carry their source (Authority or the unverified activity log). Only a person who may read the whole record now; anyone else gets 404.",
+        "operationId": "ListRecordVersions",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordVersionListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Phase C6 M2: one earlier version, read-only, after the Authority verified its exact rows against the manifest it accepted for that version (any mismatch fails closed: 423, the record is quarantined as for the current version). Current form layout and labels; the version's values, documents and status.",
+        "operationId": "GetRecordVersion",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "contentRevision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordVersionViewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-records/{formRecordId}/submit": {
       "post": {
         "tags": [
@@ -5725,6 +5823,136 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "RecordVersionItemResponse": {
+        "required": [
+          "contentRevision",
+          "acceptedOn",
+          "actorKind",
+          "actorUserId",
+          "actorDisplayName",
+          "isCurrent",
+          "verifiableNow",
+          "actionLabel",
+          "actionSource"
+        ],
+        "type": "object",
+        "properties": {
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "acceptedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorKind": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "verifiableNow": {
+            "type": "boolean"
+          },
+          "actionLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actionSource": {
+            "type": "string"
+          }
+        }
+      },
+      "RecordVersionListResponse": {
+        "required": [
+          "formRecordId",
+          "currentContentRevision",
+          "versions",
+          "nextAfterRevision",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordVersionItemResponse"
+            }
+          },
+          "nextAfterRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "RecordVersionViewResponse": {
+        "required": [
+          "version",
+          "projection",
+          "currentContentRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/RecordVersionItemResponse"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/RecordProjectionResponse"
+          },
+          "currentContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },

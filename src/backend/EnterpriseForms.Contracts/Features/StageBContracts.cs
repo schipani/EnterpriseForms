@@ -216,6 +216,24 @@ public sealed record RecordProjectionSummaryResponse(string RecordReference, Dat
 /// </summary>
 public sealed record RecordLifecycleStateResponse(string Status, DateTimeOffset? SubmittedOn, IReadOnlyList<string> AllowedTransitions, bool ContentEditable);
 
+/// <summary>
+/// Phase C6 M2: one accepted version of a record. Revision, <c>AcceptedOn</c>, actor (<c>ActorKind</c> User,
+/// ProtectionMigration or Unknown), <c>IsCurrent</c> and <c>VerifiableNow</c> are Authorization Authority facts; the display name
+/// is the local user directory's name for that actor. <c>ActionLabel</c> is reported with its source: <c>Authority</c> (first
+/// version, protection migration), <c>ActivityLog</c> (the local, unverified activity projection) or <c>None</c>.
+/// </summary>
+public sealed record RecordVersionItemResponse(long ContentRevision, DateTimeOffset AcceptedOn, string ActorKind, Guid? ActorUserId, string? ActorDisplayName, bool IsCurrent, bool VerifiableNow, string? ActionLabel, string ActionSource);
+
+/// <summary>Phase C6 M2: accepted versions of a record in chronological order; <c>NextAfterRevision</c> continues the list.</summary>
+public sealed record RecordVersionListResponse(Guid FormRecordId, long CurrentContentRevision, IReadOnlyList<RecordVersionItemResponse> Versions, long? NextAfterRevision, long AuthorizationRevision);
+
+/// <summary>
+/// Phase C6 M2: one earlier version, verified by the Authority against the manifest it accepted for that version, read-only.
+/// <c>Projection</c> uses the current form layout and current field labels (labels are not part of the signed content); its
+/// values, documents and status are those of the version.
+/// </summary>
+public sealed record RecordVersionViewResponse(RecordVersionItemResponse Version, RecordProjectionResponse Projection, long CurrentContentRevision);
+
 /// <summary>Request of a lifecycle transition. <c>ExpectedStatus</c> guards against acting on a stale view; <c>Reason</c> is mandatory for Reopen (1..500 characters) and optional for Archive.</summary>
 public sealed record RecordLifecycleRequest(long ExpectedContentRevision, string? ExpectedStatus = null, string? Reason = null);
 

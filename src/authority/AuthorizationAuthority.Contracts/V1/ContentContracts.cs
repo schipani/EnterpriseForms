@@ -72,6 +72,43 @@ public sealed record ContentRevision(
     Guid CorrelationId);
 
 /// <summary>
+/// AC-1 (Phase C6): one accepted content revision of a record, from the Authority's own rows only (accepted manifest commit,
+/// the operation that produced it, the actor's identity binding). <c>ActorKind</c> is <c>User</c> (with the actor's Authority
+/// user id) or <c>ProtectionMigration</c> (with the authorizing reprotection command). <c>VerifiableNow</c>: the revision's
+/// integrity key version is still accepted for verification. Says nothing about whether the business rows of the revision
+/// are intact — that is decided when the revision is verified.
+/// </summary>
+public sealed record ContentHistoryEntry(
+    long ContentRevision,
+    Guid CommittedOperationId,
+    DateTimeOffset AcceptedOn,
+    string ActorKind,
+    Guid? ActorAuthorityUserId,
+    Guid? ReprotectionCommandId,
+    long ManifestLeafCount,
+    int RowSignatureKeyVersion,
+    bool VerifiableNow,
+    bool IsCurrent);
+
+/// <summary>AC-1 page of accepted revisions in ascending revision order; <c>NextAfterRevision</c> continues the listing.</summary>
+/// <summary>Actor kinds of <see cref="ContentHistoryEntry"/>.</summary>
+public static class ContentHistoryActorKinds
+{
+    public const string User = "User";
+    public const string ProtectionMigration = "ProtectionMigration";
+    public const string Unknown = "Unknown";
+}
+
+public sealed record ContentHistoryPage(
+    Guid OrganizationId,
+    Guid FormRecordId,
+    long CurrentContentRevision,
+    IReadOnlyList<ContentHistoryEntry> Entries,
+    long? NextAfterRevision,
+    long AuthorizationRevision,
+    Guid CorrelationId);
+
+/// <summary>
 /// historic_committed_operation_id (optional): verify the observed items against the complete manifest the authority accepted
 /// for that earlier operation of the same record instead of the current head (historic document versions). Requires full
 /// read permission now, an open gate and an unquarantined head; never authorizes anything the current head would not.
