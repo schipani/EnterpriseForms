@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type APIResponse, type Locator, type Page } from "@playwright/test";
 import { signIn } from "./support";
 
 /**
@@ -6,6 +6,37 @@ import { signIn } from "./support";
  * size of the button, without changing the accessible name, the default black primary style or keyboard focus.
  * Geometry assertions are used instead of pixel baselines so the check holds across platforms and organization themes.
  */
+
+type Json = Record<string, unknown>;
+
+async function ok(response: APIResponse): Promise<Json> {
+  expect(response.ok(), `${response.url()} → ${response.status()}: ${await response.text()}`).toBe(true);
+  return (await response.json()) as Json;
+}
+
+/** The spec makes its own form and record: a fresh stack has neither, and "New record" and "Open" only exist with them. */
+async function seed(page: Page) {
+  const run = Date.now().toString(36);
+  await signIn(page, "owner");
+  const session = (await (await page.request.get("/api/v1/session")).json()) as { csrfToken: string };
+  const headers = () => ({ "X-CSRF-Token": session.csrfToken, "Idempotency-Key": `e2e-icons-${run}-${Math.random().toString(36).slice(2)}` });
+  const get = async (path: string) => ok(await page.request.get(path));
+  const post = async (path: string, data: unknown) => ok(await page.request.post(path, { data, headers: headers() }));
+  const put = async (path: string, data: unknown) => ok(await page.request.put(path, { data, headers: headers() }));
+  const users = (await get("/api/v1/users")) as unknown as Array<{ userId: string; displayName: string }>;
+  const ownerId = users.find((user) => /Avery Owner/.test(user.displayName))!.userId;
+  const name = `C6 Icons ${run}`;
+  const created = await post("/api/v1/form-definitions/designer", { formDefinitionName: name, formDefinitionDescription: "synthetic icons", formUserUserIds: [ownerId], formUserTeamIds: [] });
+  const formId = (created["summary"] as Json)["formDefinitionId"] as string;
+  const added = await post(`/api/v1/form-definitions/${formId}/fields`, { fieldKey: "case_title", fieldDisplayName: "Case title", fieldDescription: "", fieldDataType: "String", options: null, groupDefinitionId: null });
+  const detail = await get(`/api/v1/form-definitions/${formId}`);
+  const draft = detail["draft"] as Json | null;
+  const element = { kind: "field", fieldDefinitionId: added["fieldDefinitionId"], control: "text", label: "Case title", required: true, layout: { columnSpan: 2, startOnNewRow: false }, validation: {} };
+  const saved = await put(`/api/v1/form-definitions/${formId}/draft`, { expectedDraftRevision: draft ? Number(draft["draftRevision"]) : 0, layoutJson: JSON.stringify({ layoutSchemaVersion: 2, title: name, sections: [{ sectionKey: "main", title: "Case", gridColumns: 4, elements: [element] }] }) });
+  await post(`/api/v1/form-definitions/${formId}/publish`, { expectedDraftRevision: Number(saved["draftRevision"]), expectedCurrentVersionNumber: 0, changeReason: "icons" });
+  await post(`/api/v1/form-definitions/${formId}/records`, { values: { case_title: `Icons case ${run}` }, ownerTeamId: null, groups: [] });
+}
+
 async function iconFacts(button: Locator) {
   return button.evaluate((element) => {
     const svg = element.querySelector("svg");
@@ -34,7 +65,8 @@ async function focusRing(page: Page, button: Locator) {
 
 test.describe("Action button icons", () => {
   test("New record and Search have a left, decorative, consistently sized icon and keep their names, style and focus ring", async ({ page }, info) => {
-    await signIn(page, "owner");
+    test.setTimeout(180_000);
+    await seed(page);
     await page.goto("/app/records");
 
     // Names are the visible text only (the icon is decorative).
@@ -69,7 +101,8 @@ test.describe("Action button icons", () => {
   });
 
   test("Simple Cancel buttons and the lifecycle actions follow the convention", async ({ page }) => {
-    await signIn(page, "owner");
+    test.setTimeout(180_000);
+    await seed(page);
     await page.goto("/app/records");
     // Clear filters (shown once a filter is active) carries the reset icon.
     await page.getByRole("checkbox", { name: "Include related (child) records" }).check();
