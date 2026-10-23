@@ -182,3 +182,79 @@ Use the hosted evidence above, or a stack you choose to rebuild: **the new busin
 7. As the owner, **Archive** (optional reason). The record disappears from **My Records**; tick **Include archived records** (or choose status Archived) to find it. Open it → **Unarchive** → it returns to Submitted (if it had been submitted) or Draft.
 8. Activity history tab: submitted / reopened (with your reason) / archived / unarchived events.
 
+---
+
+## 8. M1 hardening — AC-2 and regression coverage (decision C-46)
+
+**Status: implemented for development and verified on disposable hosted stacks. AC-2 is NOT independently reviewed or certified.** Final commit `e2f6dc7` (AC-2 and tests `2c6b2f3`; harness fix `e2f6dc7`). The owner accepted the Unarchive rule (back to the state the record was archived from).
+
+### 8.1 AC-2 — the Authority's own lifecycle lock for shared contributors
+
+| Point | Implementation |
+|---|---|
+| Rule | The Authorization Authority refuses a **share editor's** content write unless the record's **accepted, signed** header status is `Draft` (new error code `RECORD_NOT_EDITABLE`, 409). An unreadable or missing status fails closed. |
+| Source of truth | The `record_status` column of the signed header in the accepted head, decoded by the Authority — never the business `form_records.record_status` projection, never a value the business API asserts. |
+| At prepare | In the share-editor branch, **after** the supplied current snapshot is bound to the accepted head (D4: exact coverage, per-item digests, recomputed root and leaf-index digest). Nothing is signed or stored for a refused attempt. A candidate that tries to flip the status back to Draft is refused by the same check. |
+| At commit | For share-editor operations, on the **verified** staged header (equal to the accepted header except the operation binding, D15); a refusal aborts the operation (`RECORD_LOCKED_BEFORE_COMMIT`). Independently, the head compare-and-swap already rejects any candidate prepared before a lifecycle transition committed (`CONTENT_REVISION_CONFLICT`). |
+| Owners | Unchanged: lifecycle transitions are owner content writes and remain allowed; ordinary owner edits of locked records are still refused by the business API only (R-01 for owners). |
+| Unchanged | Signed row formats, Merkle manifests, the journal format, SpiceDB schema, the contributor-write switch (off by default everywhere) and the Production startup guard. AC-1 and AC-3 are not implemented. |
+| Business API | Maps the Authority's refusal to `409 RECORD_NOT_EDITABLE` ("the Authorization Authority refused the change …"). |
+
+**How AC-2 was shown to work (adversarial):**
+* **Authority protocol tests** (real `ContentService`, real canonical encoding and HMAC, in-memory store — exactly the calls a compromised or bypassed business API would make with a contributor's valid share and the switch on): locked Submitted and Archived records refuse an otherwise perfect contributor candidate with nothing stored; a status flip back to Draft is refused; the owner's transitions still work; after the owner reopens, the same contributor write is accepted; a transition committed between a contributor's prepare and commit defeats the commit; the commit-time check fails closed for every non-Draft value and for a missing header; with the switch off the switch refusal still comes first. **Mutation check:** with the prepare-time guard removed, both attack tests fail (the write is accepted); with it restored, all pass.
+* **Docker test** `WithTheBusinessLockBypassedTheAuthorityAloneRefusesContributorWritesToLockedRecords`: the api container is recreated with the Testing-only hook `Testing:BypassContributorLifecycleLock=true` (business lock off on the contributor path; the hook refuses to start outside the Testing environment, unit-tested). Through that bypassed API the contributor edits the Draft record (control), then the Authority refuses the same edit on the Submitted and on the Archived record: `409 RECORD_NOT_EDITABLE` with the Authority's message, **no new operation in AuthorityDb**, head revision unchanged, value unchanged. The hook is switched off again afterwards.
+
+### 8.2 Regression coverage (expected behaviour, fail-closed outcome, recovery, audit)
+
+| Case | Expected behaviour (tested) | Recovery | Audit |
+|---|---|---|---|
+| Archive while a field's encryption migration has not reached the record (worker held paused) | `409 FIELD_PROTECTION_MIGRATION_PENDING`: the verbatim copy still carries the legacy plaintext row and the Authority's protection barrier refuses it. Nothing committed; status unchanged; nothing decrypted. | When the worker converts the record (the migration processes records in any lifecycle state), the same archive succeeds; the value is preserved and now encrypted. | No lifecycle event for the refused attempt (nothing changed); the migration's own events as before. |
+| An upload processed while Draft, record then locked | Submit waits (`409 UPLOADS_IN_PROGRESS`, OD-04). Archive is allowed; the later commit is refused `409 RECORD_NOT_EDITABLE`, the session stays `Processed`, no document is added, the head is unchanged. | After Unarchive, the same session commits (while within its 24-hour lifetime); Submit then succeeds. An unused session expires and its staging object is purged by the existing sweep. | `DOCUMENT_READY` only on the successful commit. |
+| Replay of a successful transition with the same Idempotency-Key (retry after a lost response, double click) | The committed result is returned (same operation id and revision, `previousStatus` reconstructed); nothing is staged; no second audit event. | — | One `RECORD_SUBMITTED` (asserted). |
+| The same transition with a **new** key after success | Refused as stale (`409 LIFECYCLE_STATE_CONFLICT` or `CONTENT_REVISION_CONFLICT`); never applied twice. | Reload. | none |
+
+Residual noted (not hidden): two identical requests with the same key arriving **concurrently** resolve to one accepted operation (Authority idempotency), but each request writes its own business audit event, so the local timeline can show the event twice with the same operation id. The trusted Authority journal holds one commit.
+
+### 8.3 Verification
+
+| Check | Result |
+|---|---|
+| .NET (CI-equivalent, Release) | **337 / 337**: Authority 96 (+5 AC-2), contract 141 (+1 hook guard), architecture 66, integrity 34 |
+| Hosted Docker integration on `e2f6dc7` (run 39874573992) | **80 / 80** (12 m 22 s): adds the AC-2 bypass test and the three regression tests |
+| Hosted browser on `e2f6dc7` (run 39874573992) | **61 / 61** (5.3 m) |
+| Hosted SEC-P01…SEC-P12 on `e2f6dc7` (run 39874578091) | **13 / 13**; also 13 / 13 on `2c6b2f3` (run 39872912968) |
+| Combined gate (run 39874573992) | passed |
+
+One failure on the way (run 39872908214 on `2c6b2f3`, integration 79 / 80, browser 61 / 61): my test verified the hook by running `printenv` inside the api container, whose image has no shell utilities. The attack step never ran. Fixed by reading the container environment with `docker inspect` (`e2f6dc7`); no product change.
+
+### 8.4 Local development stack — blocked (found 2026-10-22), backup taken
+
+* **Finding.** When I began item 3, the Docker engine on this machine was **not running** (it had stopped before this session; I did not stop it). I started Docker Desktop (no development service has an auto-restart policy, so nothing else started) and inspected read-only: every development container is `Exited (255)` — killed when the engine stopped. The persistent volumes are intact.
+* **Consequence.** The development Vault runs `server -dev` **in memory** with no volume, so the **development organization signing keys no longer exist**. Starting the stack would leave every existing record unverifiable, and making them readable would require regenerating keys — which the owner prohibited. **I did not start, migrate or rebuild the development stack.** No volume, database, Vault, SpiceDB or key was modified.
+* **Backup (recoverable, verified).** Read-only tar copies of all six volumes in `C:\Users\tsch\Documents\EnterpriseForms-dev-backups\20261022-193852\` with `MANIFEST.txt` (entries and SHA-256) and `containers.txt` (container inventory): business-db (1,563 entries, PostgreSQL 18 data directory), authority-db (1,412), spicedb-db (1,368), dev-seed (3); azurite and archive-store volumes were empty (development blobs were never persisted). They are crash-consistent copies (the databases were killed by the engine stop), so a restore performs normal PostgreSQL crash recovery.
+* **Migration review (done).** The only new migration since main is the business migration `PhaseC6ProtectionStatusVerification` (M0). Forward steps: replace one check constraint with a more permissive one; rename one index; add nullable columns and checks that existing data satisfies; two data updates on `field_protection_migrations` (record existing verification results; re-queue instantly completed migrations). No drop, truncate or rewrite of record data. M1 and AC-2 add no migration (Business or Authority).
+* **Decision needed from the owner** (§8.5).
+
+### 8.5 Options for browser acceptance
+
+1. **Fresh development stack, keep the old volumes untouched (recommended).** Run a fresh dev stack under a new compose project name with new volumes and new development keys; the old project's volumes stay as they are (and are backed up). The old project's *networks* must be removed first because both projects pin the same subnets (networks hold no data and are recreated). The old records stay unreadable in either case, because their keys are gone.
+2. **Reset the existing development project** (`down -v` and `up`): new keys, the old development data deleted from the volumes (the backup remains). Needs explicit authorization.
+3. **Review on the hosted evidence only** (§7.2, §8.3) without a local stack.
+
+Root cause to fix later (not done, needs its own decision): the development Vault keeps its transit keys only in memory. A file-backed development Vault (or a documented key export) would survive engine restarts.
+
+### 8.6 Browser acceptance (once a stack is available)
+
+Personas: **Avery Owner (owner)**, **Casey Clerk (clerk)**. Use a Draft record you own (or create one).
+
+1. **Submit.** Record page → **Submit** → confirm **Submit record**. Expect "Record submitted. It is now locked.", a **Submitted** badge, the lock banner, no **Edit**; **Reopen as draft** and **Archive** appear. A record with an empty required field stays in the dialog with the field named; nothing changes.
+2. **Reopen with a reason.** **Reopen as draft** → the confirm button stays disabled until a reason is typed → confirm. **Edit** returns; the activity tab shows the reopen with your reason.
+3. **Archive.** **Archive** (optional reason) → **Archive record**. Expect "Record archived.", an **Archived** badge, the lock banner, only **Unarchive**.
+4. **Unarchive.** **Unarchive** → it returns to **Submitted** if it had been submitted (and not reopened) before archiving, otherwise **Draft**.
+5. **Editing restrictions.** While Submitted or Archived: no **Edit**; document upload/remove and related-record add/remove are gone; opening `/app/records/<id>/edit` shows "This record is submitted (or archived) and can't be edited". As the clerk with a shared field: status and lock visible, no lifecycle buttons, no **Edit shared fields**.
+6. **Archived visibility in My Records.** After archiving, the record is not listed; tick **Include archived records** (or choose status **Archived**) and it appears; after Unarchive it is listed again.
+
+### 8.7 Still open
+
+G06, G19, G20, G21; U1–U11; the C-12 and C-28 Authority reviews; independent review of AC-2 (new, recorded with G20's Authority-review family); PB-14 manual accessibility; PB-08 step-up; R-01 for owner edits; My Records scalability; Form Designer usability debt; every production Level 2 gate. Nothing here is a Level 2 claim.
+
