@@ -198,7 +198,10 @@ public sealed class EncryptionTests(StageBFixture fixture)
         var edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{recordId:D}", s.Token(s.Clerk), new { expectedContentRevision = legacy.Root.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["plain_note"] = "legacy plaintext note" } });
         if (!edit.IsSuccess)
         {
-            Assert.Equal("CONTENT_REVISION_CONFLICT", edit.ErrorCode); // the worker committed first
+            // The worker committed first. Either the compare-and-swap refused the stale revision, or the edit's verified read met
+            // the worker's new head before its checkpoint held the archive receipt and was refused, retryable, until it does
+            // (SEC-P12: nothing is released before the receipt). Both leave the record unchanged; the edit is redone on the new head.
+            Assert.Contains(edit.ErrorCode, new[] { "CONTENT_REVISION_CONFLICT", "AUTHORITY_NOT_READY" });
             var head = await s.WaitProjectionAsync(s.Clerk, recordId);
             edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{recordId:D}", s.Token(s.Clerk), new { expectedContentRevision = head.Root.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["plain_note"] = "legacy plaintext note" } });
             Assert.True(edit.IsSuccess, edit.Body);
