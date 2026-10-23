@@ -598,6 +598,7 @@ public sealed class RecordLifecycleTests(StageBFixture fixture)
         var first = await TransitionAsync(s, s.Clerk, record, "submit", Revision(view), "Draft", idempotencyKey: key);
         Assert.True(first.IsSuccess, first.Body);
         var operationsAfterFirst = AuthorityOperationCount(record);
+        await s.WaitProjectionAsync(s.Clerk, record); // the committed head is readable (its checkpoint archived) before the retry, as a client's retry would wait
 
         var replay = await TransitionAsync(s, s.Clerk, record, "submit", Revision(view), "Draft", idempotencyKey: key);
         Assert.True(replay.IsSuccess, replay.Body);
