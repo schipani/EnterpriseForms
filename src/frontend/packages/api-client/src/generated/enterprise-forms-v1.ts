@@ -522,7 +522,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection. */
+        /** My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, search, sort and authorization revision. q (optional) narrows the list to an exact record id or short reference REC-XXXXXXXX decided from the same complete authorized set (never a field-value search; anything else is 422 LOOKUP_INVALID); an exact search also finds archived and related records, and the Form and Status filters still apply. Rows carry unverified local metadata only; open a record for the verified projection. */
         get: operations["ListFormRecords"];
         put?: never;
         post?: never;
@@ -595,6 +595,40 @@ export interface paths {
         get: operations["GetRecordVersion"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}/restore-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase C6 M3: what restoring an earlier version would change (owner only; nothing is written). The version is verified through the Authority's history; current and restored values side by side (no-store), new entries, unchanged documents, current-form validation, values that would lose application encryption (OD-13), and whether the restore is possible now (Draft only). */
+        get: operations["PreviewRecordRestore"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the current form (all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity. */
+        post: operations["RestoreRecordVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1877,6 +1911,28 @@ export interface components {
             createdByDisplayName: null | string;
             createdByCurrentUser: boolean;
         };
+        RecordRestoreRequest: {
+            /** Format: int64 */
+            expectedCurrentContentRevision: number | string;
+            /** Format: uuid */
+            sourceOperationId: string;
+            restoreReason: null | string;
+            /** @default false */
+            acknowledgePlaintext: boolean;
+        };
+        RecordRestoreResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            /** Format: int64 */
+            restoredFromContentRevision: number | string;
+            /** Format: int64 */
+            contentRevision: number | string;
+            /** Format: uuid */
+            committedOperationId: null | string;
+            eTag: string;
+            changedFieldKeys: string[];
+            clearedFieldKeys: string[];
+        };
         RecordShareListResponse: {
             items: components["schemas"]["RecordShareSummaryResponse"][];
             /** Format: int64 */
@@ -1957,6 +2013,57 @@ export interface components {
             /** Format: int64 */
             expectedContentRevision: number | string;
             removalReason: string;
+        };
+        RestoreFieldChangeResponse: {
+            fieldKey: string;
+            label: string;
+            sectionPath: null | string;
+            currentValue: string;
+            restoredValue: string;
+            change: string;
+            inCurrentForm: boolean;
+            storedEncrypted: boolean;
+            plaintextAcknowledgementRequired: boolean;
+        };
+        RestorePreviewResponse: {
+            /** Format: uuid */
+            formRecordId: string;
+            version: components["schemas"]["RecordVersionItemResponse"];
+            /** Format: uuid */
+            sourceOperationId: string;
+            /** Format: int64 */
+            currentContentRevision: number | string;
+            currentETag: string;
+            currentStatus: string;
+            canRestore: boolean;
+            blockedReasonCode: null | string;
+            blockedReason: null | string;
+            hasChanges: boolean;
+            fields: components["schemas"]["RestoreFieldChangeResponse"][];
+            sections: components["schemas"]["RestoreSectionChangeResponse"][];
+            /** Format: int32 */
+            unchangedDocumentCount: number | string;
+            formHasRelatedRecords: boolean;
+            validation: null | components["schemas"]["RestoreValidationResponse"];
+            plaintextAcknowledgementFieldKeys: string[];
+        };
+        RestoreSectionChangeResponse: {
+            groupKey: string;
+            label: string;
+            /** Format: int32 */
+            currentEntryCount: number | string;
+            /** Format: int32 */
+            restoredEntryCount: number | string;
+            /** Format: int32 */
+            newEntryCount: number | string;
+            /** Format: int32 */
+            removedEntryCount: number | string;
+            inCurrentForm: boolean;
+        };
+        RestoreValidationResponse: {
+            code: string;
+            message: string;
+            fieldKeys: string[];
         };
         RestoreVersionRequest: {
             /** Format: uuid */
@@ -3105,6 +3212,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecordVersionViewResponse"];
+                };
+            };
+        };
+    };
+    PreviewRecordRestore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                contentRevision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestorePreviewResponse"];
+                };
+            };
+        };
+    };
+    RestoreRecordVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formRecordId: string;
+                contentRevision: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordRestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordRestoreResponse"];
                 };
             };
         };

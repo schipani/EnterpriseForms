@@ -1523,6 +1523,100 @@
         }
       }
     },
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}/restore-preview": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Phase C6 M3: what restoring an earlier version would change (owner only; nothing is written). The version is verified through the Authority's history; current and restored values side by side (no-store), new entries, unchanged documents, current-form validation, values that would lose application encryption (OD-13), and whether the restore is possible now (Draft only).",
+        "operationId": "PreviewRecordRestore",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "contentRevision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestorePreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}/restore": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the current form (all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity.",
+        "operationId": "RestoreRecordVersion",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "contentRevision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordRestoreResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-records/{formRecordId}/submit": {
       "post": {
         "tags": [
@@ -5639,6 +5733,94 @@
           }
         }
       },
+      "RecordRestoreRequest": {
+        "required": [
+          "expectedCurrentContentRevision",
+          "sourceOperationId",
+          "restoreReason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedCurrentContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "sourceOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "restoreReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "acknowledgePlaintext": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "RecordRestoreResponse": {
+        "required": [
+          "formRecordId",
+          "restoredFromContentRevision",
+          "contentRevision",
+          "committedOperationId",
+          "eTag",
+          "changedFieldKeys",
+          "clearedFieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "restoredFromContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committedOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "eTag": {
+            "type": "string"
+          },
+          "changedFieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "clearedFieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "RecordShareListResponse": {
         "required": [
           "items",
@@ -5958,6 +6140,234 @@
           },
           "removalReason": {
             "type": "string"
+          }
+        }
+      },
+      "RestoreFieldChangeResponse": {
+        "required": [
+          "fieldKey",
+          "label",
+          "sectionPath",
+          "currentValue",
+          "restoredValue",
+          "change",
+          "inCurrentForm",
+          "storedEncrypted",
+          "plaintextAcknowledgementRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sectionPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currentValue": {
+            "type": "string"
+          },
+          "restoredValue": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string"
+          },
+          "inCurrentForm": {
+            "type": "boolean"
+          },
+          "storedEncrypted": {
+            "type": "boolean"
+          },
+          "plaintextAcknowledgementRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RestorePreviewResponse": {
+        "required": [
+          "formRecordId",
+          "version",
+          "sourceOperationId",
+          "currentContentRevision",
+          "currentETag",
+          "currentStatus",
+          "canRestore",
+          "blockedReasonCode",
+          "blockedReason",
+          "hasChanges",
+          "fields",
+          "sections",
+          "unchangedDocumentCount",
+          "formHasRelatedRecords",
+          "validation",
+          "plaintextAcknowledgementFieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "$ref": "#/components/schemas/RecordVersionItemResponse"
+          },
+          "sourceOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "currentETag": {
+            "type": "string"
+          },
+          "currentStatus": {
+            "type": "string"
+          },
+          "canRestore": {
+            "type": "boolean"
+          },
+          "blockedReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blockedReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasChanges": {
+            "type": "boolean"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RestoreFieldChangeResponse"
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RestoreSectionChangeResponse"
+            }
+          },
+          "unchangedDocumentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "formHasRelatedRecords": {
+            "type": "boolean"
+          },
+          "validation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RestoreValidationResponse"
+              }
+            ]
+          },
+          "plaintextAcknowledgementFieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RestoreSectionChangeResponse": {
+        "required": [
+          "groupKey",
+          "label",
+          "currentEntryCount",
+          "restoredEntryCount",
+          "newEntryCount",
+          "removedEntryCount",
+          "inCurrentForm"
+        ],
+        "type": "object",
+        "properties": {
+          "groupKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "currentEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "restoredEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "newEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "removedEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "inCurrentForm": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RestoreValidationResponse": {
+        "required": [
+          "code",
+          "message",
+          "fieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

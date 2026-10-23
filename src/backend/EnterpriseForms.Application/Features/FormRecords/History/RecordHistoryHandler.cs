@@ -128,7 +128,11 @@ public sealed class RecordHistoryHandler(VerifiedRecordReader reader, IBusinessS
         {
             if (ContentRevisionOf(audit.EventMetadataJson) is { } revision)
             {
-                labels.TryAdd(revision, (audit.EventAction, audit.ActorUserId, audit.EventDescription));
+                // A restore names its source version in the label (still from the activity log, marked as such).
+                var description = audit.EventAction == AuditActions.RecordVersionRestored && ContentRevisionOf(audit.EventMetadataJson, "sourceContentRevision") is { } sourceRevision
+                    ? "Restored version " + sourceRevision.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : audit.EventDescription;
+                labels.TryAdd(revision, (audit.EventAction, audit.ActorUserId, description));
             }
         }
 
@@ -145,6 +149,7 @@ public sealed class RecordHistoryHandler(VerifiedRecordReader reader, IBusinessS
         [AuditActions.RecordUnarchived] = "Unarchived",
         [AuditActions.DocumentReady] = "Document added",
         [AuditActions.DocumentRemoved] = "Document removed",
+        [AuditActions.RecordVersionRestored] = "Restored an earlier version",
     };
 
     /// <summary>
@@ -171,7 +176,9 @@ public sealed class RecordHistoryHandler(VerifiedRecordReader reader, IBusinessS
         {
             label = local.Action == AuditActions.RecordUpdated && string.Equals(local.Description, UpdateFormRecord.UpdateFormRecordHandler.SharedEditAuditDescription, StringComparison.Ordinal)
                 ? "Shared fields edited"
-                : LocalLabels[local.Action];
+                : local.Action == AuditActions.RecordVersionRestored && local.Description.StartsWith("Restored version ", StringComparison.Ordinal)
+                    ? local.Description
+                    : LocalLabels[local.Action];
             source = ActionSources.ActivityLog;
         }
 
@@ -184,12 +191,12 @@ public sealed class RecordHistoryHandler(VerifiedRecordReader reader, IBusinessS
         return new RecordVersionItemResponse(entry.ContentRevision, entry.AcceptedOn, entry.ActorKind, entry.ActorKind == "User" ? entry.ActorAuthorityUserId : null, actorName, entry.IsCurrent, entry.VerifiableNow, label, source);
     }
 
-    private static long? ContentRevisionOf(string metadataJson)
+    private static long? ContentRevisionOf(string metadataJson, string property = "contentRevision")
     {
         try
         {
             using var document = JsonDocument.Parse(string.IsNullOrEmpty(metadataJson) ? "{}" : metadataJson);
-            return document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty("contentRevision", out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var revision)
+            return document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var revision)
                 ? revision
                 : null;
         }

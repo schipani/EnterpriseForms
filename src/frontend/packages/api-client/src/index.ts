@@ -82,6 +82,12 @@ export type RecordListItemResponse = S["RecordListItemResponse"];
 export type RecordVersionItemResponse = S["RecordVersionItemResponse"];
 export type RecordVersionListResponse = S["RecordVersionListResponse"];
 export type RecordVersionViewResponse = S["RecordVersionViewResponse"];
+export type RestorePreviewResponse = S["RestorePreviewResponse"];
+export type RestoreFieldChangeResponse = S["RestoreFieldChangeResponse"];
+export type RestoreSectionChangeResponse = S["RestoreSectionChangeResponse"];
+export type RestoreValidationResponse = S["RestoreValidationResponse"];
+export type RecordRestoreRequest = S["RecordRestoreRequest"];
+export type RecordRestoreResponse = S["RecordRestoreResponse"];
 export type RecordProjectionResponse = S["RecordProjectionResponse"];
 export type FormRecordResponse = S["FormRecordResponse"];
 export type FieldValueResponse = S["FieldValueResponse"];
@@ -180,6 +186,10 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       versions: (formRecordId: string, after?: number, signal?: AbortSignal) => read<RecordVersionListResponse>("records.versions", { formRecordId }, after === undefined ? undefined : { after }, "interactive-read", signal),
       /** Phase C6 M2: one earlier version, verified and read-only. */
       version: (formRecordId: string, contentRevision: number, signal?: AbortSignal) => read<RecordVersionViewResponse>("records.version", { formRecordId, contentRevision: String(contentRevision) }, undefined, "interactive-read", signal),
+      /** Phase C6 M3: what restoring a version would change (owner only, nothing written). */
+      restorePreview: (formRecordId: string, contentRevision: number, signal?: AbortSignal) => read<RestorePreviewResponse>("records.restorePreview", { formRecordId, contentRevision: String(contentRevision) }, undefined, "interactive-read", signal),
+      /** Phase C6 M3: restores a version as a new revision; If-Match carries the reviewed head, retries reuse the idempotency key. */
+      restore: (formRecordId: string, contentRevision: number, request: RecordRestoreRequest) => write<RecordRestoreResponse>("POST", "records.restore", { formRecordId, contentRevision: String(contentRevision) }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedCurrentContentRevision) }),
       create: (formDefinitionId: string, request: CreateFormRecordRequest) => write<FormRecordResponse>("POST", "records.create", { formDefinitionId }, request, { idempotent: true }),
       projection: (formRecordId: string, signal?: AbortSignal) => read<RecordProjectionResponse>("records.projection", { formRecordId }, undefined, "interactive-read", signal),
       lifecycle: (transition: RecordLifecycleTransition, formRecordId: string, request: RecordLifecycleRequest) => write<RecordLifecycleResponse>("POST", `records.${transition}`, { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),

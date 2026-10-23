@@ -2,7 +2,7 @@
 
 Branch `phase-c/record-lifecycle` from main `f859e42`. Architecture: `docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md` (revision 1), approved for controlled development by the owner on 2026-10-22 (decision **C-43**). Implementation decision: **C-44**.
 
-**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), the recoverable development environment for browser acceptance in §9 (C-47), the quick record lookup in §10 (C-48), the owner's functional acceptance of M1 in §11 (C-49), Milestone 2, trusted record history with AC-1, in §12 (C-50), icons in §13 (C-51), and the form-control layout standard, unified My Records search and Activity-log correction in §14 (C-52). AC-3 is deferred; restoration (the owner's M3) is not started; nothing is merged to main.
+**Milestone 0 (field-protection status-count stabilization, architecture §1.1) — provisionally accepted by the owner; final M0 commit `505b452`** (code `4a2bdca`; test-harness fixes `a6fa495`, `505b452`; documentation-only commits follow it). Milestone 1 (record lifecycle) is documented in §7, its AC-2 hardening in §8 (C-46), the recoverable development environment for browser acceptance in §9 (C-47), the quick record lookup in §10 (C-48), the owner's functional acceptance of M1 in §11 (C-49), Milestone 2, trusted record history with AC-1, in §12 (C-50), icons in §13 (C-51), the form-control layout standard, unified My Records search and Activity-log correction in §14 (C-52), and Milestone 3, restoring an earlier version as a new revision, in §15 (C-53). The owner accepted M1 and M2 for continued development (§11, §15). AC-3 is deferred; nothing is merged to main.
 
 **What this is not:**
 * not an independent security review;
@@ -626,3 +626,108 @@ Earlier hosted runs on the way (both CI-only causes, no product change):
 * The same run's integration test `ReplayingASuccessfulTransition…` (my earlier C-46 test) replayed immediately after a commit and met the retryable `503 AWAITING_ARCHIVE` gate (SEC-P12); it now waits until the committed head is readable, as a client retry would (`eb9baaa`).
 * `eb9baaa` (run 40033704862): integration 89 / 89; the browser job failed 2 of 81 because the C-51 `action-icons` spec assumed a form and a record that exist on the dev stack but not on a fresh stack; it now creates its own (`848349b`).
 
+## 15. Milestone 3 — restore an earlier version (decision C-53)
+
+**Acceptance recorded first.** The owner's M3 instruction states that M1 (record lifecycle, C-49) and M2 (trusted record history, C-50) **have been accepted by the owner for continued development**. As for M1, this is owner functional acceptance only: AC-1 and AC-2 are **not** independently reviewed, nothing here is Level 2 certification, and G06, G19, G20, G21, PB-08 and PB-14 stay open.
+
+**Numbering.** The owner's "M3" is the architecture's **M4 — restore** (§4 of the architecture document). AC-3 stays deferred (the Authority journal format is unchanged) and AC-4 keeps its current fail-closed behaviour.
+
+**Architecture check before coding.** The approved flow (§4.2) runs on the existing protocol (§5.1 "Restore as a new revision": an owner update prepared against the current head and committed by the Authority's CAS). No Authority capability, signed schema, Merkle, RowHmac, encryption-envelope or journal change was needed, and none was made: the diff touches the business API, the frontend and tests only. Owner-only is the Authority's policy, not a UI rule: a complete projection requires `form_record` read/edit, which the SpiceDB schema grants to `effective_owner` only, so a share recipient (even one covering every field) always gets a partial projection and the restore's 404.
+
+### 15.1 What was built
+
+**API (business, `FormRecords` feature):**
+* `GET /api/v1/form-records/{id}/versions/{revision}/restore-preview` (`PreviewRecordRestore`, `Cache-Control: no-store`). Nothing is written. Returns the version (Authority facts: revision, accepted time, person), its `sourceOperationId`, the current head and status, `canRestore` with a reason code (`RECORD_NOT_EDITABLE`, `RESTORE_UNSUPPORTED`, `RESTORE_NO_CHANGES`, `RESTORE_VALIDATION_FAILED`), every field's current and restored value with the change (Changed, Added, Cleared, Unchanged), whether it is still in the form (OD-12), how it will be stored under today's policy and whether it needs the OD-13 acknowledgement; per repeating section the entry counts (new entries, removed entries); the number of current documents that stay; whether the form has related records; and, if the dry run fails, the validation code and field keys.
+* `POST /api/v1/form-records/{id}/versions/{revision}/restore` (`RestoreRecordVersion`): body `{ expectedCurrentContentRevision, sourceOperationId, restoreReason, acknowledgePlaintext }`, optional `If-Match` (must agree; otherwise `412`), required `Idempotency-Key`. Returns the new revision, its operation, the ETag and the changed and cleared field keys.
+* `RecordRestoreHandler` and `RestorePlanner` (`Application/Features/FormRecords/History/`). Steps, in order: verified complete read of the current head with the Edit action (not an effective owner now → `404`, the same answer as a missing record); idempotent replay check; reason 1–500 characters (`422 REASON_REQUIRED`); Draft only (`409 RECORD_NOT_EDITABLE`); the reviewed head (`409 CONTENT_REVISION_CONFLICT`); the source revision and operation from the Authority's history (AC-1) only — bounds `404 VERSION_NOT_FOUND`, the current version `409 VERSION_IS_CURRENT`, a different operation `409 VERSION_CHANGED`, a key no longer accepted `503 HISTORIC_VERSION_UNVERIFIABLE`; the source's exact rows verified by the Authority against the manifest accepted for that revision (`423`, AC-4 quarantine, on tampering or missing rows); the plan; `422 RESTORE_UNSUPPORTED`, `422 RESTORE_NO_CHANGES`, `422 PLAINTEXT_ACKNOWLEDGEMENT_REQUIRED` (with field keys); the complete candidate through the **existing** owner write (`CandidateBuilder.ApplyValuesDetailed` with the current layout, fields, options, groups and protection; `422 RESTORE_VALIDATION_FAILED` with field keys, all-or-nothing); header and attachments carried from the current head; prepare → stage → read back → commit through `RecordCandidateStager` (the Authority's CAS, protection barrier and commit-time re-authorization); `409 FIELD_PROTECTION_MIGRATION_PENDING` if the barrier refuses; projection repair; audit `RECORD_VERSION_RESTORED`.
+* **Exact restore (OD-11):** every field gets the source's value; a field with a value now and none in the source is cleared. Repeating sections get the source's entries in the source's order. File fields are never planned (documents stay as they are now).
+* **Identity rule I-R:** a value or entry present in both the current head and the source keeps its id; anything that exists only in the source is written as **new** (a new item id or a new entry id). Old share edges therefore never cover restored items.
+* **Current protection:** every planned value is re-created by the write pipeline under the field's **current** policy (fresh DEK and nonce for encrypted fields; source ciphertext is never copied). A value that was encrypted in the source and would now be stored as plaintext (a field released under Amendment A1) needs the explicit acknowledgement; the acknowledgement cannot lower a field that is encrypted now.
+* **Audit:** `RECORD_VERSION_RESTORED` with the new revision and operation, the source revision and operation, changed and cleared field keys, the number of section changes, `plaintextAcknowledged` and the reason. Never values. The version list labels the new revision "Restored version N", marked "from the activity log" (AC-3 deferred).
+
+**UI (`form-records`):**
+* **Restore this version** on the read-only version page (icon `ActionIcons.restoreVersion`, Lucide "history"; icon left, black primary), shown only to an owner viewing an earlier version of a Draft record. A Submitted or Archived record shows an explanation ("Reopen the record as a draft first" / "Unarchive the record…") and no button; anyone else sees nothing (field-share users cannot open versions at all).
+* **Dialog** (large dialog, full screen below 640 px, focus trapped, Escape closes and returns focus to the button): the version, its trusted time and person, the activity-log change label marked as such, "restoring creates version N"; **What changes** (table: field, Now, After restore, change; badges "No longer in the form", "Encrypted", "Will not be encrypted"; count of unchanged fields); section entries before and after; **Not restored** (documents with their count, related records, sharing/access/ownership, status, protection settings); the blocked reason and the fields that fail validation; the OD-13 warning and checkbox; **Reason for restoring** (label → control → help → error); **Restore version N** (busy while running). A stale head shows "The record changed since this preview was prepared" with **Review the changes again**.
+* **After success:** "Version N was restored as version M" with **Edit the record** and **Version history**.
+* Regenerated API client (`restorePreview`, `restore` with `If-Match` and an idempotency key through the request coordinator).
+
+### 15.2 Security behaviour and tests
+
+Integration tests run on the real stack (PostgreSQL ×2, SpiceDB, Vault Transit, Authority, API, worker) in `RecordRestoreTests`; unit tests in `PhaseC6RestoreTests` (planner, contract project); browser tests in `record-restore.spec.ts`.
+
+| # | Requirement | Evidence |
+|---|---|---|
+| 1 | Owner restores a valid version of a Draft record | integration `AnOwnerRestores…`; browser |
+| 2 | New revision; every earlier revision preserved | integration (Authority manifest commits contiguous and extended; the replaced version still opens with its own values) |
+| 3 | History shows the new accepted revision | integration (version list, "Restored version 1", current); browser |
+| 4 | Reason recorded | integration (audit metadata holds the reason and no values) |
+| 5 | Empty reason rejected | integration `AnEmptyReason…` (`422 REASON_REQUIRED`); browser |
+| 6, 7 | Submitted and Archived rejected | integration (`409 RECORD_NOT_EDITABLE`, preview `canRestore=false`, nothing prepared); browser (explanation, no button) |
+| 8 | Field-share contributor cannot restore | integration `NobodyButAnOwner…` (contributor writes switched on: preview and restore 404); browser (Casey: no History tab, no Restore, version URL unavailable) |
+| 9 | Unauthorized direct API requests | integration (designer without data rights and another organization: 404; nothing committed) |
+| 10 | Tampered historical content | integration Theory `tampered` (`423 INTEGRITY_VERIFICATION_FAILED`, record quarantined, nothing prepared, no value in the body) |
+| 11 | Missing or unverifiable history | integration Theory `missing` (423 + quarantine); version 99 → 404; a `sourceOperationId` that is not the Authority's operation for the version → `409 VERSION_CHANGED`. The `503 HISTORIC_VERSION_UNVERIFIABLE` path (integrity key no longer accepted) is code-reviewed only: producing it needs a key rotation, which is not done on any shared stack |
+| 12 | Missing historical key material | unit `ASourceValueWhoseKeyIsUnavailableFailsTheWholeRestore` (`503 HISTORIC_KEY_UNAVAILABLE`, nothing planned). Not reproducible on the real stack: the local key provider holds one KEK and there is no historic-KEK retention yet (R-08) |
+| 13 | Concurrent modification → stale | integration `ForgedVersionsAStaleHead…` (`409 CONTENT_REVISION_CONFLICT`; nothing committed); the UI offers a fresh preview |
+| 14 | Idempotent retry | integration (same key: same revision and operation, no new Authority operation; same body with a new key after the commit: stale) |
+| 15 | Current-form validation rejects the whole restore | integration `AVersionThatFailsTheCurrentForm…` (newly required field: preview blocked with the field key, restore `422 RESTORE_VALIDATION_FAILED`, no operation, other fields unchanged); unit |
+| 16 | Repeating sections | integration `RepeatingSectionEntries…` (entries and order restored; surviving entry keeps its id; removed entry comes back with a new id); unit |
+| 17 | Documents and related records unchanged | integration (the current document and the child record list and child revision identical after restore); unit (File fields never planned) |
+| 18, 19 | No resurrected shares; new identities | integration `ARestoredValueIsANewItem…` (value shared, then removed, then restored: new item id; the old share does not show it to the recipient); unit (I-R) |
+| 20 | Current encryption policy | integration `ARestoredValueIsStoredUnderTheFieldsCurrentEncryptionPolicy` (plaintext in the version, field strengthened since: restored as a new encrypted row, no plaintext row); unit (fresh nonce, current mode) |
+| 21 | Downgrade without acknowledgement | integration `ValuesThatWouldLoseEncryptionNeedTheExplicitAcknowledgement` (field released under A1: `422 PLAINTEXT_ACKNOWLEDGEMENT_REQUIRED`, no operation; with the acknowledgement stored as today's policy says, audited `plaintextAcknowledged`); unit |
+| 22 | Classification floor not bypassed | integration (a forged `acknowledgePlaintext: true` on a field that is encrypted now still writes ciphertext only); the restore never reads the version's classification or protection mode: it writes through the current field policy, which the organization floor already governs |
+| 23 | Editing continues normally | integration (an ordinary edit after the restore commits the next revision) |
+| 24 | A failed restore leaves no partial revision | integration (validation failure, missing acknowledgement, tampered source, stale head, Submitted/Archived: no new Authority operation, manifest commits unchanged) |
+
+Browser (`record-restore.spec.ts`, 5): setup; preview with the before/after comparison and "Not restored", mandatory reason, success with the new version and both links, history row "Restored version 1 (from the activity log)", editor shows the restored values (axe clean in the dialog); Submitted and Archived explanations with no button; Casey sees no Restore action anywhere; 320 px dialog within the viewport without horizontal scroll (axe clean), keyboard-only open, Tab to the reason, Escape closes without restoring and returns focus to the button.
+
+### 15.3 Verification
+
+| Suite | Result |
+|---|---|
+| .NET (local, four projects) | **388 / 388** (Authority 108, contract 180 including 9 new restore tests, architecture 66, integrity 34) |
+| Frontend unit (vitest) | **184 / 184** (5 new restore presentation tests) |
+| Lint, typecheck, OpenAPI artifact regenerated by the build, TypeScript client regenerated | clean |
+| Browser on the persistent dev stack (`api` and `web` rebuilt only; Vault, databases, SpiceDB, Azurite untouched) | `record-restore` **5 / 5**; entire suite: §15.4 |
+| Hosted Docker integration (incl. 11 new `RecordRestoreTests` cases), browser, SEC-P | §15.5 |
+
+The browser fixtures use their own forms named "C6 Restore <run>"; the owner's acceptance records were not touched.
+
+**M2 evidence still applies.** `9cafc34` → `848349b` changed one lockfile entry (`fsevents`) and two tests (the lifecycle replay wait and the icon spec seed); `848349b` → `5292408` changed documentation, the spec manifest and checksums only. The Stage B run on `848349b` (integration 89/89, browser 81/81) and SEC-P 13/13 on `9cafc34` therefore describe the same product code as `5292408`.
+
+### 15.4 Browser suite on the dev stack
+
+RESULTS_DEV
+
+### 15.5 Hosted verification
+
+RESULTS_HOSTED
+
+### 15.6 Limits and risks (for the independent reviewer)
+
+* **Not independently reviewed.** M3 adds no Authority capability, but R-06 (restore must not become a downgrade path) needs the reviewer's confirmation; AC-1 and AC-2 reviews remain open.
+* **Restore provenance is local.** "Restored version N" and the reason live in the business activity log (AC-3 deferred). A hostile business-database administrator could alter or remove them; the version list, times, actors and contents stay Authority-verified.
+* **All-or-nothing has a cost.** A version whose values fail today's rules (a newly required field, a deactivated or organization-disabled option, a lowered section maximum, a read-only or hidden-by-rule field that differs) cannot be restored at all; field-level restore is FR-C6-02. A repeating section that is no longer placed but differs makes the version `RESTORE_UNSUPPORTED`.
+* **Historic keys.** Without historic-KEK retention (R-08, Stage B §7.1) a version sealed under a retired KEK fails closed (`503`); only the unit test proves that path.
+* **AC-4 unchanged.** A tampered or missing historical row quarantines the current record (R-03).
+* **Restricted fields.** PB-08 step-up is not available, so an owner restores Restricted values without a fresh FIDO2 step-up (existing residual R-12).
+* **Labels shown in the preview are today's** (G21: unsigned metadata).
+* **The preview is a snapshot.** It is not a reservation: any save after it makes the restore stale (by design).
+
+### 15.7 Browser acceptance (owner)
+
+At **http://127.0.0.1:8091** (run `python scripts/devstack/devstack.py up` first if Docker or the machine restarted), signed in as **Avery Owner (owner)**. Use a record you can change freely, or create one: New record, save, then edit and save a field so that the record has at least two versions.
+
+1. **Open a version:** open the record, choose **History**, press **View** on version 1. The page says "You are viewing an earlier version" and shows **Restore this version**.
+2. **Preview:** press **Restore this version**. The dialog shows the version, when and by whom it was saved, "restoring creates version N", the **What changes** table (Now / After restore), any section entry changes, and **Not restored** (documents, related records, sharing and ownership, status, protection settings).
+3. **Reason:** press **Restore version 1** without a reason. Expect "Enter a reason for restoring this version." and nothing restored.
+4. **Restore:** enter a reason and press **Restore version 1**. Expect "Version 1 was restored as version N" with **Edit the record** and **Version history**.
+5. **History:** press **Version history**. The new last row says "Restored version 1 (from the activity log)" and is Current; every earlier version is still listed and opens with its own values.
+6. **Editor:** press **Edit the record** (or open it from the record page): the restored values are there, and saving an ordinary change works.
+7. **Documents and related records:** if the record has documents or related records, they are exactly as before the restore.
+8. **Submitted / Archived:** submit (or archive) the record, open an earlier version: there is no Restore button, only an explanation. Reopen it as a draft and the button returns.
+9. **Casey:** sign in as **Casey Clerk (clerk)** on a record shared with Casey: no History tab and no Restore action; the version URL says the version isn't available.
+10. **Phone and keyboard:** at about 320 px the dialog fills the screen without sideways scrolling; Tab moves through it, Escape closes it and returns to the Restore button.
+
+Tampered or missing history, missing keys and concurrent saves can't be produced safely in the browser; the automated tests cover them (§15.2).

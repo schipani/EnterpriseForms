@@ -1,6 +1,6 @@
 # Phase C6 — Architecture review: record lifecycle and history
 
-**Status: Revision 1 — APPROVED FOR CONTROLLED DEVELOPMENT (owner, 2026-10-22, decision C-43). Milestone 0 implemented and provisionally accepted (§1.1.4); Milestone 1 implemented, awaiting owner browser acceptance (decision C-45, `docs/PHASE_C6_STATUS.md` §7); Milestones 2–5 not started.**
+**Status: Revision 1 — APPROVED FOR CONTROLLED DEVELOPMENT (owner, 2026-10-22, decision C-43). Milestone 0 implemented and provisionally accepted (§1.1.4); Milestone 1 accepted by the owner for continued development (C-49); Milestones 2 and 3 (the owner's "M2", trusted history with AC-1) accepted by the owner for continued development (C-50, C-53); Milestone 4 (the owner's "M3", restore) implemented for development, awaiting owner functional acceptance (C-53, `docs/PHASE_C6_STATUS.md` §15); Milestone 5 not started. None of this is an independent review or Level 2 certification.**
 
 Approval terms (C-43): OD-01…OD-13 approved as recommended, with these clarifications — Submitted records are locked until an authorized owner reopens them with a reason; archive and unarchive preserve existing field values without revalidating them; restoration is exact and all-or-nothing; historical views clearly distinguish current labels from historical content; restoring values into a currently plaintext field requires explicit acknowledgement but can never bypass organizational encryption requirements. AC-1 and AC-2 approved for controlled development (not yet implemented); **AC-3 deferred** (the Authority journal format does not change); AC-4: the existing fail-closed behaviour is kept for V1. Only Milestone 0 is authorized so far. This is not production approval, an independent security review or Level 2 certification.
 
@@ -508,7 +508,7 @@ The existing `Audit history` card stays, with its "local audit projection" note,
 | **M1 — lifecycle** | Transition endpoints, `LifecycleTransitionBuilder`, status gates in every content-writing handler, projection, audit, UI actions and dialogs; AC-2 if approved | C6-L-* pass; contributor and owner suites unchanged |
 | **M2 — Authority history read (and AC-3 if approved)** | AC-1 (and AC-3), Authority unit tests, internal OpenAPI artifact | Authority tests pass; independent-review package updated; SEC-P 13/13 — **AC-1 implemented (C-50); AC-3 deferred** |
 | **M3 — history UI** | Versions list and version view, layout handling, error states | C6-H-* pass; axe clean — **implemented together with M2 as the owner's "M2 — Trusted Record History" (C-50); see `docs/PHASE_C6_STATUS.md` §12** |
-| **M4 — restore** | Preview and restore endpoints, `RestoreBuilder`, dialog | C6-R-* pass |
+| **M4 — restore** | Preview and restore endpoints, `RestoreBuilder`, dialog | C6-R-* pass — **implemented for development as the owner's "M3" (C-53): `RestorePlanner` + `RecordRestoreHandler` on the existing owner write; see `docs/PHASE_C6_STATUS.md` §15 for the C6-R mapping and the paths only unit-tested (historic KEK)** |
 | **M5 — evidence and closure** | `docs/PHASE_C6_STATUS.md`, decision log entries, gap register update, hosted evidence | Owner acceptance; independent review still outstanding |
 
 Order: M0 first (it touches the same projection that M1 maintains). M1 does not depend on M2. M3 and M4 depend on M2.

@@ -1,18 +1,21 @@
 import { DOWNLOAD_PATH, presentError, resolvePath, useApi } from "@enterpriseforms/app-runtime";
-import type { RecordVersionViewResponse } from "@enterpriseforms/api-client";
+import type { RecordRestoreResponse, RecordVersionViewResponse } from "@enterpriseforms/api-client";
 import { FormRenderer, type FormLayout } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { ErrorPanel } from "../../support";
 import { actorText, changeText, otherRecordedValues } from "../components/historyModel";
+import { RestoreVersionAction } from "../components/RecordRestore";
 import { formatDateTime, recordStatusLabel } from "../components/recordList";
 import { parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
 
 /**
  * Phase C6 M2 — one earlier version of a record, read-only. The server shows it only after the Authorization Authority has
  * checked that version's saved content, and only to someone who can read the whole record now. Field names and the
- * arrangement of the form are today's; the values, documents and status are the version's.
+ * arrangement of the form are today's; the values, documents and status are the version's. Phase C6 M3: the owner of a Draft
+ * record can restore this version as a new version (the server checks every condition again).
  */
 export function RecordVersionPage() {
   const { formRecordId, contentRevision } = useParams({ from: "/app/records/$formRecordId/versions/$contentRevision" });
@@ -24,6 +27,9 @@ export function RecordVersionPage() {
     enabled: Number.isInteger(revision) && revision > 0,
     retry: false,
   });
+  // The current record (permissions and status) decides whether Restore is offered; the server decides whether it happens.
+  const current = useQuery({ queryKey: ["records", "projection", formRecordId], queryFn: () => api.records.projection(formRecordId).then((r) => r.result), retry: false });
+  const [restored, setRestored] = useState<RecordRestoreResponse | null>(null);
   const back = (
     <Link to="/app/records/$formRecordId" params={{ formRecordId }} search={{ tab: "history" }}>
       <Button variant="secondary">Back to version history</Button>
@@ -54,7 +60,7 @@ export function RecordVersionPage() {
   const projection = data.projection;
   const item = data.version;
   const { layout, error } = parseProjectionLayout(projection);
-  const current = Number(data.currentContentRevision);
+  const currentRevision = Number(data.currentContentRevision);
   const change = changeText(item);
   const others = layout ? otherRecordedValues(layout, projection.record.values, projection.fields) : [];
   const documentsOf = (fieldDefinitionId: string) => projection.documents.filter((document) => document.fieldDefinitionId === fieldDefinitionId);
@@ -63,7 +69,7 @@ export function RecordVersionPage() {
     <>
       <PageHeader
         title={projection.formDefinitionName}
-        lead={`Version ${revision} of ${current} (read-only)`}
+        lead={`Version ${revision} of ${currentRevision} (read-only)`}
         actions={
           <>
             {back}
@@ -73,10 +79,35 @@ export function RecordVersionPage() {
           </>
         }
       />
-      <div className="mb-4">
-        <StatusMessage tone={item.isCurrent ? "info" : "warning"} title={item.isCurrent ? `This is the current version (${revision})` : `You are viewing an earlier version: version ${revision} of ${current}`}>
+      {restored ? (
+        <div className="mb-4">
+          <StatusMessage
+            tone="success"
+            title={`Version ${revision} was restored as version ${String(restored.contentRevision)}`}
+            actions={
+              <>
+                <Link to="/app/records/$formRecordId/edit" params={{ formRecordId }}>
+                  <Button size="sm" icon={ActionIcons.edit}>Edit the record</Button>
+                </Link>
+                <Link to="/app/records/$formRecordId" params={{ formRecordId }} search={{ tab: "history" }}>
+                  <Button size="sm" variant="secondary">Version history</Button>
+                </Link>
+              </>
+            }
+          >
+            The record now has this version's values as a new version. Every earlier version, including the one you replaced, is still in the history.
+          </StatusMessage>
+        </div>
+      ) : null}
+      <div className="mb-4 flex flex-col gap-3">
+        <StatusMessage tone={item.isCurrent ? "info" : "warning"} title={item.isCurrent ? `This is the current version (${revision})` : `You are viewing an earlier version: version ${revision} of ${currentRevision}`}>
           Saved {formatDateTime(item.acceptedOn)} by {actorText(item)}. This page is read-only: nothing can be changed here.
         </StatusMessage>
+        {restored ? null : (
+          <div className="flex flex-wrap items-start gap-2">
+            <RestoreVersionAction formRecordId={formRecordId} version={item} projection={current.data} onRestored={setRestored} />
+          </div>
+        )}
       </div>
       <Card title="About this version" aria-label="About this version" className="mb-4">
         <div className="flex flex-wrap gap-2">

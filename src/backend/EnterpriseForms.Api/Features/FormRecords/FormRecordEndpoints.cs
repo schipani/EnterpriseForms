@@ -66,6 +66,38 @@ public static class FormRecordEndpoints
             .WithName("GetRecordVersion")
             .WithSummary("Phase C6 M2: one earlier version, read-only, after the Authority verified its exact rows against the manifest it accepted for that version (any mismatch fails closed: 423, the record is quarantined as for the current version). Current form layout and labels; the version's values, documents and status.");
 
+        records.MapGet("/{formRecordId:guid}/versions/{contentRevision:long}/restore-preview", static async Task<Ok<RestorePreviewResponse>> (Guid formRecordId, long contentRevision, HttpContext http, RecordRestoreHandler handler, CancellationToken cancellationToken) =>
+            {
+                var response = await handler.PreviewAsync(BusinessAuthentication.RequireContext(http), formRecordId, contentRevision, cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(response);
+            })
+            .WithName("PreviewRecordRestore")
+            .WithSummary("Phase C6 M3: what restoring an earlier version would change (owner only; nothing is written). The version is verified through the Authority's history; current and restored values side by side (no-store), new entries, unchanged documents, current-form validation, values that would lose application encryption (OD-13), and whether the restore is possible now (Draft only).");
+
+        records.MapPost("/{formRecordId:guid}/versions/{contentRevision:long}/restore", static async Task<Ok<RecordRestoreResponse>> (Guid formRecordId, long contentRevision, RecordRestoreRequest request, HttpContext http, RecordRestoreHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                var header = http.Request.Headers.IfMatch.ToString().Trim().Trim('"');
+                var effective = request;
+                if (header.Length > 0)
+                {
+                    var revisionText = header.Contains('-', StringComparison.Ordinal) ? header[..header.IndexOf('-', StringComparison.Ordinal)] : header;
+                    if (!long.TryParse(revisionText, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var revision) || (request.ExpectedCurrentContentRevision != 0 && request.ExpectedCurrentContentRevision != revision))
+                    {
+                        throw new Application.Common.BusinessException("PRECONDITION_FAILED", 412, "If-Match must carry the current content revision ETag and agree with expectedCurrentContentRevision");
+                    }
+
+                    effective = request with { ExpectedCurrentContentRevision = revision };
+                }
+
+                var response = await handler.RestoreAsync(context, formRecordId, contentRevision, effective, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.ETag = response.ETag;
+                return TypedResults.Ok(response);
+            })
+            .WithName("RestoreRecordVersion")
+            .WithSummary("Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the current form (all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity.");
+
         records.MapPatch("/{formRecordId:guid}", static async Task<Ok<FormRecordResponse>> (Guid formRecordId, UpdateFormRecordRequest request, HttpContext http, UpdateFormRecordHandler handler, CancellationToken cancellationToken) =>
             {
                 var context = BusinessAuthentication.RequireContext(http);

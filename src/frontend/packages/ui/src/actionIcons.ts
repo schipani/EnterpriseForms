@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Download, Pencil, Plus, RotateCcw, Save, Search, Send, Settings, Trash2, Undo2, type LucideIcon } from "lucide-react";
+import { Archive, ArchiveRestore, Download, History, Pencil, Plus, RotateCcw, Save, Search, Send, Settings, Trash2, Undo2, type LucideIcon } from "lucide-react";
 
 export type ActionIconComponent = LucideIcon;
 
@@ -19,4 +19,6 @@ export const ActionIcons = {
   configure: Settings,
   delete: Trash2,
   download: Download,
+  /** Restore an earlier version of a record as a new version (Phase C6 M3). */
+  restoreVersion: History,
 } as const satisfies Record<string, ActionIconComponent>;

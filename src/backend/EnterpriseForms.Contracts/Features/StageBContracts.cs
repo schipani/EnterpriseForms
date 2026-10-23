@@ -231,6 +231,54 @@ public sealed record RecordVersionListResponse(Guid FormRecordId, long CurrentCo
 /// </summary>
 public sealed record RecordVersionViewResponse(RecordVersionItemResponse Version, RecordProjectionResponse Projection, long CurrentContentRevision);
 
+/// <summary>
+/// Phase C6 M3: restore request. <c>SourceOperationId</c> is the operation the Authority's history lists for the version (the
+/// preview returns it); <c>ExpectedCurrentContentRevision</c> is the head the person reviewed. <c>RestoreReason</c> is required
+/// (1–500 characters, recorded in the activity log). <c>AcknowledgePlaintext</c> must be true when the preview listed values that
+/// would now be stored as plaintext (OD-13).
+/// </summary>
+public sealed record RecordRestoreRequest(long ExpectedCurrentContentRevision, Guid SourceOperationId, string? RestoreReason, bool AcknowledgePlaintext = false);
+
+/// <summary>Phase C6 M3: the new accepted revision created by a restore (earlier revisions are unchanged).</summary>
+public sealed record RecordRestoreResponse(Guid FormRecordId, long RestoredFromContentRevision, long ContentRevision, Guid? CommittedOperationId, string ETag, IReadOnlyList<string> ChangedFieldKeys, IReadOnlyList<string> ClearedFieldKeys);
+
+/// <summary>
+/// Phase C6 M3: one field in a restore preview. Values are shown to the owner only (Cache-Control: no-store). <c>Change</c> is
+/// Unchanged, Changed, Added or Cleared. <c>InCurrentForm</c> false = the field is no longer placed (OD-12). <c>StoredEncrypted</c>
+/// says how the restored value will be stored under the field's CURRENT policy; <c>PlaintextAcknowledgementRequired</c> marks a
+/// value that was encrypted in the version and would now be stored as plaintext (OD-13).
+/// </summary>
+public sealed record RestoreFieldChangeResponse(string FieldKey, string Label, string? SectionPath, string CurrentValue, string RestoredValue, string Change, bool InCurrentForm, bool StoredEncrypted, bool PlaintextAcknowledgementRequired);
+
+/// <summary>Phase C6 M3: entries of one repeating section before and after a restore (new entries get new identities).</summary>
+public sealed record RestoreSectionChangeResponse(string GroupKey, string Label, int CurrentEntryCount, int RestoredEntryCount, int NewEntryCount, int RemovedEntryCount, bool InCurrentForm);
+
+/// <summary>Phase C6 M3: why the restored record would not pass the current form's rules (nothing is restored partially).</summary>
+public sealed record RestoreValidationResponse(string Code, string Message, IReadOnlyList<string> FieldKeys);
+
+/// <summary>
+/// Phase C6 M3: restore preview of one verified earlier version against the verified current head. Nothing is written.
+/// <c>CanRestore</c> is false with a reason when the record is not a Draft, the version cannot be restored exactly, or the result
+/// would fail validation. Documents and related records are never restored; the counts say what stays as it is.
+/// </summary>
+public sealed record RestorePreviewResponse(
+    Guid FormRecordId,
+    RecordVersionItemResponse Version,
+    Guid SourceOperationId,
+    long CurrentContentRevision,
+    string CurrentETag,
+    string CurrentStatus,
+    bool CanRestore,
+    string? BlockedReasonCode,
+    string? BlockedReason,
+    bool HasChanges,
+    IReadOnlyList<RestoreFieldChangeResponse> Fields,
+    IReadOnlyList<RestoreSectionChangeResponse> Sections,
+    int UnchangedDocumentCount,
+    bool FormHasRelatedRecords,
+    RestoreValidationResponse? Validation,
+    IReadOnlyList<string> PlaintextAcknowledgementFieldKeys);
+
 /// <summary>Request of a lifecycle transition. <c>ExpectedStatus</c> guards against acting on a stale view; <c>Reason</c> is mandatory for Reopen (1..500 characters) and optional for Archive.</summary>
 public sealed record RecordLifecycleRequest(long ExpectedContentRevision, string? ExpectedStatus = null, string? Reason = null);
 
