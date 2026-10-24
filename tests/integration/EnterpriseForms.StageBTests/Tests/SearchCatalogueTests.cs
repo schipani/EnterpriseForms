@@ -278,7 +278,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
             await s.BootstrapAsync();
             await s.BuildAccusedWorkspaceAsync();
             var created = new System.Collections.Concurrent.ConcurrentBag<Guid>();
-            await Parallel.ForEachAsync(Enumerable.Range(0, size), new ParallelOptions { MaxDegreeOfParallelism = 3, CancellationToken = TestContext.Current.CancellationToken }, async (index, ct) => created.Add(await CreateWithRetryAsync(s, $"c7-bench-{s.OrganizationId:N}-{index}", ct)));
+            await Parallel.ForEachAsync(Enumerable.Range(0, size), new ParallelOptions { MaxDegreeOfParallelism = 2, CancellationToken = TestContext.Current.CancellationToken }, async (index, ct) => created.Add(await CreateWithRetryAsync(s, $"c7-bench-{s.OrganizationId:N}-{index}", ct)));
             Assert.Equal(size, created.Count);
             foreach (var id in created)
             {
@@ -353,16 +353,23 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
     /// <summary>Record registration is optimistic on the organization's authorization revision; concurrent creations retry that conflict with the SAME idempotency key, so a create that committed but answered "not ready" is never registered twice.</summary>
     private async Task<Guid> CreateWithRetryAsync(StageBScenario s, string idempotencyKey, CancellationToken cancellationToken)
     {
+        var key = idempotencyKey;
         for (var attempt = 0; ; attempt++)
         {
-            var created = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/records", s.Token(s.Clerk), new { values = StageBScenario.AccusedValues(), ownerTeamId = (Guid?)null }, idempotencyKey);
+            var created = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/records", s.Token(s.Clerk), new { values = StageBScenario.AccusedValues(), ownerTeamId = (Guid?)null }, key);
             if (created.Status is HttpStatusCode.Created or HttpStatusCode.OK)
             {
                 return created.Root.GetProperty("formRecordId").GetGuid();
             }
 
-            // Fail-closed back-pressure (archive receipt pending) and revision races are expected under bulk creation: back off and retry.
             Assert.True(attempt < 150 && created.ErrorCode is "STALE_AUTHORIZATION_REVISION" or "AUTHORITY_NOT_READY" or "COMMAND_PENDING", "create failed: " + created.Body);
+            if (created.ErrorCode == "STALE_AUTHORIZATION_REVISION")
+            {
+                // The registration was rejected (nothing registered): a fresh key starts a new attempt.
+                key = $"{idempotencyKey}-{attempt}";
+            }
+
+            // Not ready / pending may have committed: the same key resolves to the same record.
             await Task.Delay(Random.Shared.Next(250, 1200), cancellationToken);
         }
     }
