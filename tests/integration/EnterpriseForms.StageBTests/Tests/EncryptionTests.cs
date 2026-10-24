@@ -198,7 +198,10 @@ public sealed class EncryptionTests(StageBFixture fixture)
         var edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{recordId:D}", s.Token(s.Clerk), new { expectedContentRevision = legacy.Root.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["plain_note"] = "legacy plaintext note" } });
         if (!edit.IsSuccess)
         {
-            Assert.Equal("CONTENT_REVISION_CONFLICT", edit.ErrorCode); // the worker committed first
+            // The worker committed first. Either the compare-and-swap refused the stale revision, or the edit's verified read met
+            // the worker's new head before its checkpoint held the archive receipt and was refused, retryable, until it does
+            // (SEC-P12: nothing is released before the receipt). Both leave the record unchanged; the edit is redone on the new head.
+            Assert.Contains(edit.ErrorCode, new[] { "CONTENT_REVISION_CONFLICT", "AUTHORITY_NOT_READY" });
             var head = await s.WaitProjectionAsync(s.Clerk, recordId);
             edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{recordId:D}", s.Token(s.Clerk), new { expectedContentRevision = head.Root.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["plain_note"] = "legacy plaintext note" } });
             Assert.True(edit.IsSuccess, edit.Body);
@@ -208,7 +211,9 @@ public sealed class EncryptionTests(StageBFixture fixture)
         Assert.Equal("legacy plaintext note", value.GetProperty("stringValue").GetString());
         Assert.True(value.GetProperty("applicationEncrypted").GetBoolean());
         Assert.False(value.GetProperty("legacyPlaintext").GetBoolean());
-        var latestOperation = fixture.Stack.AttackerSql($"SELECT content_change_operation_id FROM form_record_revisions WHERE form_record_id = '{recordId:D}' ORDER BY content_revision DESC LIMIT 1;").Trim();
+        // The accepted head comes from the Authority (Phase C6 M0 oracle): after a lost commit race two staged candidates can share
+        // the highest revision, so "the highest staged revision" is not the record's state.
+        var latestOperation = AuthorityOracle.Head(fixture.Stack, recordId).OperationId!.Value.ToString("D");
         Assert.Equal("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_string_values WHERE form_record_id = '{recordId:D}' AND content_change_operation_id = '{latestOperation}';").Trim());
         Assert.Equal("1", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values WHERE form_record_id = '{recordId:D}' AND content_change_operation_id = '{latestOperation}';").Trim());
         var deadline = DateTime.UtcNow.AddSeconds(120);

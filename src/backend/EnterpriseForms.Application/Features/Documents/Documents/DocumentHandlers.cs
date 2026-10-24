@@ -117,6 +117,8 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             throw new BusinessException("FORBIDDEN", 403, "removing documents requires record ownership");
         }
 
+        FormRecords.Lifecycle.RecordLifecycle.RequireContentEditable(verified);
+
         if (request.ExpectedContentRevision != verified.Head.CommittedContentRevision)
         {
             throw new BusinessException("CONTENT_REVISION_CONFLICT", 409, "expected_content_revision is stale");
@@ -145,7 +147,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             }
 
             var record = await scope.FindFormRecordAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
-            if (record is not null && accepted.CommittedOperationId is { } acceptedOperation && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
+            if (record is not null && accepted.CommittedOperationId is not null && await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, accepted.CommittedContentRevision, accepted.CommittedOperationId, cancellationToken).ConfigureAwait(false))
             {
                 record.ModifiedOn = clock.GetUtcNow();
                 record.ModifiedByUserId = context.LocalUserId;

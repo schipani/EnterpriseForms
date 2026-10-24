@@ -12,15 +12,18 @@ namespace EnterpriseForms.Application.Features.FormRecords.ListRecords;
 /// over the caller's complete authorized set (authority-sourced ids) joined with business metadata — never over a single
 /// authority page — so ordering is deterministic across pages (record id is the final tie-break).
 /// </summary>
-public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatus, bool IncludeChildren, string SortBy, string SortDirection, int PageSize)
+public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatus, bool IncludeChildren, string SortBy, string SortDirection, int PageSize, bool IncludeArchived = false, string? Search = null)
 {
     public const int MaximumPageSize = 100;
+
+    /// <summary>The parsed exact search (record id or short reference), or null.</summary>
+    public RecordLookupQuery? SearchQuery => Search is null ? null : RecordLookupQuery.Parse(Search);
 
     public static readonly IReadOnlyList<string> SortFields = ["modifiedOn", "createdOn", "formName", "recordStatus"];
 
     public static readonly IReadOnlyList<string> Statuses = ["Draft", "Submitted", "Archived", "Deleted"];
 
-    public static RecordListQuery Create(Guid? formDefinitionId, string? recordStatus, bool includeChildren, string? sortBy, string? sortDirection, int pageSize)
+    public static RecordListQuery Create(Guid? formDefinitionId, string? recordStatus, bool includeChildren, string? sortBy, string? sortDirection, int pageSize, bool includeArchived = false, string? search = null)
     {
         var sort = string.IsNullOrEmpty(sortBy) ? "modifiedOn" : sortBy;
         if (!SortFields.Contains(sort, StringComparer.Ordinal))
@@ -39,13 +42,15 @@ public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatu
             throw new BusinessException("INVALID_REQUEST", 422, "recordStatus must be one of: " + string.Join(", ", Statuses));
         }
 
-        return new RecordListQuery(formDefinitionId, recordStatus, includeChildren, sort, direction, Math.Clamp(pageSize, 1, MaximumPageSize));
+        // Phase C6 unified search: an exact record id or short reference (anything else is refused, never searched as text).
+        var normalizedSearch = string.IsNullOrWhiteSpace(search) ? null : RecordLookupQuery.Parse(search).Normalized;
+        return new RecordListQuery(formDefinitionId, recordStatus, includeChildren, sort, direction, Math.Clamp(pageSize, 1, MaximumPageSize), includeArchived, normalizedSearch);
     }
 
     /// <summary>Stable digest of everything that shapes the ordered result; a cursor is valid only for the same scope.</summary>
     public string ScopeDigest()
     {
-        var text = string.Join('|', FormDefinitionId?.ToString("D") ?? "-", RecordStatus ?? "-", IncludeChildren ? "1" : "0", SortBy, SortDirection, PageSize.ToString(CultureInfo.InvariantCulture));
+        var text = string.Join('|', FormDefinitionId?.ToString("D") ?? "-", RecordStatus ?? "-", IncludeChildren ? "1" : "0", IncludeArchived ? "a" : "-", Search ?? "-", SortBy, SortDirection, PageSize.ToString(CultureInfo.InvariantCulture));
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 
@@ -55,9 +60,13 @@ public sealed record RecordListQuery(Guid? FormDefinitionId, string? RecordStatu
         ArgumentNullException.ThrowIfNull(records);
         ArgumentNullException.ThrowIfNull(formNames);
         var filtered = records
-            .Where(r => IncludeChildren || r.ParentFormRecordId is null)
+            // An exact search names a record: it finds archived and related records too (the Status and Form filters still apply).
+            .Where(r => Search is not null || IncludeChildren || r.ParentFormRecordId is null)
             .Where(r => FormDefinitionId is null || r.FormDefinitionId == FormDefinitionId)
-            .Where(r => RecordStatus is null || string.Equals(r.RecordStatus, RecordStatus, StringComparison.Ordinal));
+            .Where(r => RecordStatus is null || string.Equals(r.RecordStatus, RecordStatus, StringComparison.Ordinal))
+            // Phase C6 M1: Archived records are hidden from the ordinary list unless asked for (explicit status filter or includeArchived).
+            // The status here is the unsigned listing projection; opening a record always shows its verified status.
+            .Where(r => RecordStatus is not null || Search is not null || IncludeArchived || !string.Equals(r.RecordStatus, RecordLifecycleStatuses.Archived, StringComparison.Ordinal));
         var descending = SortDirection == "desc";
         IOrderedEnumerable<FormRecord> ordered = SortBy switch
         {
@@ -129,4 +138,10 @@ public sealed record RecordListCursor(Guid OrganizationId, Guid UserId, long Aut
     }
 
     private sealed record Payload(int V, Guid O, Guid U, long R, string Q, int S);
+}
+
+/// <summary>Status literals used by listing (the lifecycle rules live in <c>Lifecycle.RecordLifecycle</c>).</summary>
+internal static class RecordLifecycleStatuses
+{
+    public const string Archived = "Archived";
 }

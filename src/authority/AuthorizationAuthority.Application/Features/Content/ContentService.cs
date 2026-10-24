@@ -274,13 +274,16 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             mutations[Convert.ToHexStringLower(removed.ManifestItemKey)] = ContentMutationKinds.Remove;
         }
 
+        var shareEditorOperation = false;
         if (reprotection is null)
         {
             try
             {
                 // Commit-time authorization against the CURRENT desired edges, inside the transaction that holds the
                 // organization lock and advances the head: a revocation committed before this point aborts the write.
-                AuthorizeMutations(new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false)), bound, request.FormRecordId, mutations);
+                var commitGraph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
+                AuthorizeMutations(commitGraph, bound, request.FormRecordId, mutations);
+                shareEditorOperation = !commitGraph.IsRecordOwner(bound.AuthorityUserId, request.FormRecordId);
             }
             catch (AuthorityException)
             {
@@ -300,6 +303,24 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         if (verified is not null)
         {
             throw new AuthorityException(AuthorityErrorCodes.CandidateMismatch, 409, false, verified);
+        }
+
+        if (shareEditorOperation)
+        {
+            // AC-2 at commit, on the verified staged header (equal to the accepted header except the operation binding, D15).
+            // The head compare-and-swap above already rejects a candidate prepared before a lifecycle transition committed;
+            // this re-check keeps the lock independent of that reasoning.
+            try
+            {
+                RequireShareEditableStatus(RowCanonicalDecoder.Decode(Convert.FromBase64String(request.StagedItems.Single(i => i.ItemKind == ManifestItemKind.RecordHeader).CanonicalBytesBase64)), "commit");
+            }
+            catch (AuthorityException)
+            {
+                operation.OperationStateName = ContentOperationStates.Aborted;
+                operation.OperationQuarantineReasonCode = "RECORD_LOCKED_BEFORE_COMMIT";
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                throw;
+            }
         }
 
         faultInjector.CrashIfArmed(FaultNames.CrashAfterContentHeadCommit + ":before");
@@ -401,6 +422,103 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
 
         return await ToRevisionAsync(scope, state, head, correlationId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public const int DefaultHistoryPageSize = 50;
+
+    public const int MaximumHistoryPageSize = 100;
+
+    /// <summary>
+    /// AC-1 (Phase C6): the accepted content revisions of a record, ascending, from the Authority's own rows only (accepted
+    /// manifest commits, their operations, the actors' identity bindings). Requires full read of the record now (effective
+    /// owner) at the projection ZedToken with the gate open, and re-reads the authorization state afterwards like
+    /// <see cref="VerifyProjectionAsync"/>. Anyone else gets the same 404 as for a record that does not exist. Read-only: no state
+    /// change, no journal entry, no row bytes and no signature work (each revision is verified when it is opened).
+    /// </summary>
+    public async Task<ContentHistoryPage> GetHistoryAsync(VerifiedActor actor, Guid organizationId, Guid formRecordId, long? afterRevision, int? limit, Guid correlationId, CancellationToken cancellationToken)
+    {
+        if (afterRevision is < 0)
+        {
+            throw AuthorityException.Invalid("after must be zero or a positive revision");
+        }
+
+        var pageSize = Math.Clamp(limit ?? DefaultHistoryPageSize, 1, MaximumHistoryPageSize);
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
+                    ?? throw AuthorityException.NotRegistered("organization is not registered");
+        var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
+        OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
+
+        var resource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, formRecordId, cancellationToken).ConfigureAwait(false);
+        var head = await scope.FindContentHeadAsync(state.OrganizationId, formRecordId, false, cancellationToken).ConfigureAwait(false);
+        if (resource is null || resource.ResourceLifecycleState != ResourceLifecycleStates.Active || head is null)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+        }
+
+        // History is part of the record's content: only a full reader now (V1, architecture section 3.3), never a share reader,
+        // a revoked recipient or a former owner, whatever they could see when a revision was accepted.
+        var read = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "read", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+        if (read != SpiceDbCheckOutcome.Allowed)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false); // concealment-safe
+        }
+
+        if (head.ContentHeadQuarantined)
+        {
+            throw AuthorityException.Quarantined("record content is quarantined");
+        }
+
+        var commits = await scope.GetManifestCommitsAsync(state.OrganizationId, formRecordId, afterRevision ?? 0, pageSize + 1, cancellationToken).ConfigureAwait(false);
+        var hasMore = commits.Count > pageSize;
+        if (hasMore)
+        {
+            commits = commits.Take(pageSize).ToList();
+        }
+
+        var operations = (await scope.GetOperationsAsync(commits.Select(c => c.CommittedOperationId).ToList(), cancellationToken).ConfigureAwait(false)).ToDictionary(o => o.ContentChangeOperationId);
+        var key = await scope.FindKeyRegistrationAsync(state.OrganizationId, IntegrityKeyPurposes.RowIntegrityV1, cancellationToken).ConfigureAwait(false);
+        var users = new Dictionary<Guid, Guid?>();
+        var entries = new List<ContentHistoryEntry>(commits.Count);
+        foreach (var commit in commits)
+        {
+            // An accepted commit always has its committed operation of the same record; anything else is reported, not guessed.
+            var operation = operations.GetValueOrDefault(commit.CommittedOperationId);
+            var consistent = operation is not null && operation.OrganizationId == state.OrganizationId && operation.FormRecordId == formRecordId && operation.OperationStateName == ContentOperationStates.Committed;
+            string actorKind;
+            Guid? actorUser = null;
+            if (!consistent)
+            {
+                actorKind = ContentHistoryActorKinds.Unknown;
+            }
+            else if (operation!.ReprotectionCommandId is not null)
+            {
+                actorKind = ContentHistoryActorKinds.ProtectionMigration;
+            }
+            else
+            {
+                if (!users.TryGetValue(operation.ActorIdentityBindingId, out actorUser))
+                {
+                    var binding = await scope.FindIdentityBindingByIdAsync(operation.ActorIdentityBindingId, cancellationToken).ConfigureAwait(false);
+                    actorUser = binding is not null && binding.OrganizationId == state.OrganizationId ? binding.AuthorityUserId : null;
+                    users[operation.ActorIdentityBindingId] = actorUser;
+                }
+
+                actorKind = actorUser is null ? ContentHistoryActorKinds.Unknown : ContentHistoryActorKinds.User;
+            }
+
+            entries.Add(new ContentHistoryEntry(commit.CommittedContentRevision, commit.CommittedOperationId, commit.ManifestCommittedOn, actorKind, actorUser,
+                consistent ? operation!.ReprotectionCommandId : null, commit.ManifestLeafCount, commit.RowSignatureKeyVersion,
+                key is not null && commit.RowSignatureKeyVersion >= key.MinimumVerificationKeyVersion, commit.CommittedOperationId == head.CommittedOperationId));
+        }
+
+        var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
+        if (after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision)
+        {
+            throw AuthorityException.NotReady("authorization state moved during the history read");
+        }
+
+        return new ContentHistoryPage(state.OrganizationId, formRecordId, head.CommittedContentRevision, entries, hasMore ? entries[^1].ContentRevision : null, state.AuthorizationRevision, correlationId);
     }
 
     public async Task<VerifyRecordProjectionResult> VerifyProjectionAsync(VerifiedActor actor, VerifyRecordProjectionRequest request, Guid correlationId, CancellationToken cancellationToken)
@@ -764,6 +882,21 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
     }
 
+    /// <summary>
+    /// AC-2 (Phase C6, approved C-43): a share editor may change content only while the record's signed header status is
+    /// Draft. Submitted and Archived records are locked; an unreadable or missing status fails closed. Owners are not
+    /// subject to this rule here (their lifecycle transitions are owner content writes; the business API locks their
+    /// ordinary edits, R-01). Signed formats, manifests and the journal are unchanged.
+    /// </summary>
+    public static void RequireShareEditableStatus(RowCanonicalDocument? header, string stage)
+    {
+        var status = header?.Column("record_status") is { IsNull: false } column ? column.AsText() : null;
+        if (!string.Equals(status, "Draft", StringComparison.Ordinal))
+        {
+            throw new AuthorityException(AuthorityErrorCodes.RecordNotEditable, 409, false, $"RECORD_LOCKED: shared contributors cannot change a record whose accepted status is {status ?? "unknown"} ({stage})");
+        }
+    }
+
     /// <summary>A non-owner may write only through an explicit contributor/manager share, and only while the switch is enabled (fail closed).</summary>
     private IReadOnlySet<Guid> RequireShareEditor(DesiredStateGraph graph, BoundActor actor, Guid formRecordId)
     {
@@ -823,6 +956,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.CurrentSnapshotMismatch, 409, false, failure);
         }
+
+        // AC-2: the lifecycle lock, decided from the signed header of the accepted head (the snapshot was just bound to it).
+        RequireShareEditableStatus(current.Where(i => i.Kind == ManifestItemKind.RecordHeader).Select(i => i.Document).SingleOrDefault(), "prepare");
 
         var candidate = parsed.Select(p => new ContentDeltaRules.DecodedItem(p.Kind, p.ItemId, p.Key, p.Document, p.Digest)).ToList();
         var shareScope = new ContentDeltaRules.ShareScope(state.OrganizationId, request.FormRecordId, head.CommittedContentRevision, headOperation, candidateRevision, operationId,

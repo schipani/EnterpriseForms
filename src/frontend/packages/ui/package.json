@@ -19,6 +19,7 @@
     "@radix-ui/react-select": "2.2.5",
     "@radix-ui/react-tabs": "1.1.12",
     "@radix-ui/react-visually-hidden": "1.2.3",
+    "lucide-react": "1.61.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   }

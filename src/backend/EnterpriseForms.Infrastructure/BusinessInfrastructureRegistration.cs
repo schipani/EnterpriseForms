@@ -61,6 +61,8 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<GetFormRecordHandler>();
         services.AddSingleton<GetRecordProjectionHandler>();
         services.AddSingleton<UpdateFormRecordHandler>();
+        services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Lifecycle.RecordLifecycleHandler>();
+        services.AddSingleton(EnterpriseForms.Application.Features.FormRecords.Lifecycle.LifecycleTestingHooks.Disabled);
         services.AddSingleton<TransferOwnershipHandler>();
         services.AddSingleton<ChildRecordHandlers>();
         services.AddSingleton<CreateShareHandler>();

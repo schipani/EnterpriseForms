@@ -1,5 +1,5 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, DataTable, LoadingBlock, PageHeader, RowActions } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, LoadingBlock, PageHeader, RowActions } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ErrorPanel } from "../../support";
@@ -59,7 +59,7 @@ export function FormsPage() {
                         ) : null}
                         {row.canCreateRecord && row.currentVersionNumber !== null ? (
                           <Link to="/app/forms/$formDefinitionId/records/new" params={{ formDefinitionId: row.formDefinitionId }}>
-                            <Button size="sm">New record</Button>
+                            <Button size="sm" icon={ActionIcons.add}>New record</Button>
                           </Link>
                         ) : null}
                       </>

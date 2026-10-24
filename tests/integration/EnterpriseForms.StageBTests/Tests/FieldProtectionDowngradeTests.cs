@@ -100,11 +100,13 @@ public sealed class FieldProtectionDowngradeTests(StageBFixture fixture)
 
     private static string MigrationState(JsonElement status) => status.GetProperty("migration").GetProperty("migrationState").GetString()!;
 
+    /// <summary>Encrypted rows of the field in each record's <b>Authority-accepted</b> head (Phase C6 M0 oracle; never the business projection the status estimate reads).</summary>
     private string EncryptedRowsInLatestSnapshots(Workspace w, Guid fieldId) =>
-        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_encrypted_values v WHERE v.field_definition_id = '{fieldId:D}' AND v.content_change_operation_id = (SELECT COALESCE(f.accepted_content_change_operation_id, (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1)) FROM form_records f WHERE f.form_record_id = v.form_record_id);").Trim();
+        AuthorityOracle.RowsInAcceptedHeads(fixture.Stack, "field_encrypted_values", fieldId, w.Records).Values.ToString(CultureInfo.InvariantCulture);
 
+    /// <summary>Typed plaintext string rows of the field in each record's Authority-accepted head (Phase C6 M0 oracle).</summary>
     private string PlaintextRowsInLatestSnapshots(Workspace w, Guid fieldId) =>
-        fixture.Stack.AttackerSql($@"SELECT count(*) FROM field_string_values v WHERE v.field_definition_id = '{fieldId:D}' AND v.content_change_operation_id = (SELECT COALESCE(f.accepted_content_change_operation_id, (SELECT r.content_change_operation_id FROM form_record_revisions r WHERE r.form_record_id = v.form_record_id ORDER BY r.content_revision DESC LIMIT 1)) FROM form_records f WHERE f.form_record_id = v.form_record_id);").Trim();
+        AuthorityOracle.RowsInAcceptedHeads(fixture.Stack, "field_string_values", fieldId, w.Records).Values.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>The activity feed is actor-scoped; service events of a migration are attributed to the administrator who started it.</summary>
     private async Task<List<string?>> ActionsAsync(Workspace w, TestUser? user = null) =>
@@ -242,6 +244,9 @@ END $$;");
         Assert.Equal(0, done.GetProperty("migration").GetProperty("failedRecordCount").GetInt32());
         Assert.NotNull(done.GetProperty("migration").GetProperty("verifiedOn").GetString());
         Assert.Equal(0, done.GetProperty("legacyEncryptedRecordCount").GetInt32());
+        Assert.Equal(0, done.GetProperty("verification").GetProperty("remainingRecordCount").GetInt32());
+        Assert.Equal(6, done.GetProperty("verification").GetProperty("checkedRecordCount").GetInt32());
+        Assert.Equal(string.Empty, AuthorityOracle.ProjectionMismatches(fixture.Stack, w.Records));
 
         // 3. Business PostgreSQL: no encrypted row of the field in any latest snapshot, a typed plaintext row instead; the other fields untouched; one new revision per record; history kept.
         Assert.Equal("0", EncryptedRowsInLatestSnapshots(w, w.InternalId));
@@ -480,7 +485,14 @@ END $$;");
         var items = MigrationItemsDiagnostic(w.InternalId);
         Assert.True(ended.GetProperty("migration").GetProperty("completedRecordCount").GetInt32() == 4, "expected 4 completed records; tampered=" + tampered.ToString("D") + "; items: " + items + "; status: " + ended.GetRawText());
         Assert.True(ended.GetProperty("migration").GetProperty("failedRecordCount").GetInt32() == 1, "expected 1 failed record; items: " + items);
+        // Oracle (Phase C6 M0): exactly the tampered record still holds an encrypted row in its Authority-accepted head; the local
+        // estimate (after the post-check repaired every projection) and the stored check both agree with the Authority. Before
+        // Phase C6 the estimate read a stale projection left by the interruption and could count 2 here.
+        Assert.Equal((1, 1), AuthorityOracle.RowsInAcceptedHeads(fixture.Stack, "field_encrypted_values", w.InternalId, w.Records));
         Assert.Equal(1, ended.GetProperty("legacyEncryptedRecordCount").GetInt32());
+        Assert.Equal(0, ended.GetProperty("estimateUnresolvedRecordCount").GetInt32());
+        Assert.Equal(1, ended.GetProperty("verification").GetProperty("remainingRecordCount").GetInt32());
+        Assert.Equal(string.Empty, AuthorityOracle.ProjectionMismatches(fixture.Stack, w.Records));
         Assert.Equal("Failed", fixture.Stack.AttackerSql($"SELECT item_state FROM field_protection_migration_items WHERE form_record_id = '{tampered:D}';").Trim());
         Assert.Contains(await ActionsAsync(w, w.Scenario.Administrator), a => a == "FIELD_PROTECTION_MIGRATION_FAILED");
 
@@ -544,5 +556,65 @@ END $$;");
         Assert.Contains("exposureWindowStart", fixture.Stack.AttackerSql($"SELECT event_metadata_json FROM audit_events WHERE audit_event_id = '{cancelEvent.GetProperty("auditEventId").GetGuid():D}';"), StringComparison.Ordinal);
         // The plaintext written during the window is still in the immutable history of the business database: the test states the residual, it does not hide it.
         Assert.True(int.Parse(fixture.Stack.AttackerSql($"SELECT count(*) FROM field_string_values WHERE field_definition_id = '{w.InternalId:D}';").Trim(), CultureInfo.InvariantCulture) >= 2);
+    }
+
+    /// <summary>
+    /// Phase C6 M0 reproduction, decrypt direction (the InterruptedAndTampered… intermittent count of 2 instead of 1): the
+    /// Authority accepts the worker's deprotection commit and terminates before answering (Testing-only crash point
+    /// CrashAfterContentHeadCommit, armed before the release so the worker's commit is the first content commit). The
+    /// business projection is not updated by the lost response; the next pass finds the record already in plaintext,
+    /// repairs the projection from the Authority head and attributes the completion to the worker's own operation. The
+    /// legacy-encrypted estimate then equals the Authority truth (0) and "fully plaintext" is claimed only after the
+    /// worker's Authority-backed check. Deterministic.
+    /// </summary>
+    [Fact]
+    public async Task ALostDeprotectionCommitResponseIsRepairedFromTheAuthorityHeadAndAttributedToTheWorker()
+    {
+        var w = await EncryptedWorkspaceAsync("lost-deprotect-response", 2);
+        await PermitDowngradesAsync(w.Scenario);
+        var revision = (await StatusAsync(w, w.InternalId)).Root.GetProperty("protectionPolicyRevision").GetInt64();
+        const string Marker = "FAULT-INJECTION: terminating process at 'CrashAfterContentHeadCommit'";
+        var crashesBefore = CountOccurrences(fixture.Stack.Logs("authority", 5000), Marker);
+        var arm = await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "CrashAfterContentHeadCommit" });
+        Assert.True(arm.IsSuccess, arm.Body);
+        JsonElement done;
+        Guid commandId;
+        try
+        {
+            var released = await DowngradeAsync(w, w.Scenario.Administrator, w.InternalId, revision);
+            Assert.True(released.IsSuccess, released.Body);
+            commandId = released.Root.GetProperty("migration").GetProperty("authorityCommandId").GetGuid();
+            done = await WaitMigrationAsync(w, w.InternalId, s => s.GetProperty("fullyPlaintext").GetBoolean(), TimeSpan.FromSeconds(300));
+        }
+        finally
+        {
+            await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/fault-injection", new { fault_name = "None" });
+        }
+
+        Assert.Equal(crashesBefore + 1, CountOccurrences(fixture.Stack.Logs("authority", 5000), Marker));
+        Assert.Equal("Completed", MigrationState(done));
+        Assert.Equal(2, done.GetProperty("migration").GetProperty("completedRecordCount").GetInt32());
+        Assert.Equal((0, 0), AuthorityOracle.RowsInAcceptedHeads(fixture.Stack, "field_encrypted_values", w.InternalId, w.Records));
+        Assert.Equal(0, done.GetProperty("legacyEncryptedRecordCount").GetInt32());
+        Assert.Equal(0, done.GetProperty("verification").GetProperty("remainingRecordCount").GetInt32());
+        Assert.Equal(string.Empty, AuthorityOracle.ProjectionMismatches(fixture.Stack, w.Records));
+        foreach (var record in w.Records)
+        {
+            var head = AuthorityOracle.Head(fixture.Stack, record);
+            Assert.Equal(commandId, AuthorityOracle.ReprotectionCommandOf(fixture.Stack, head.OperationId!.Value));
+        }
+
+        Assert.Equal("2", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_protection_migration_items i JOIN field_protection_migrations m ON m.field_protection_migration_id = i.field_protection_migration_id WHERE m.field_definition_id = '{w.InternalId:D}' AND i.completed_by_operation_kind = 'MigrationWorker' AND i.completed_by_user_commit = false;").Trim());
+    }
+
+    private static int CountOccurrences(string text, string marker)
+    {
+        var count = 0;
+        for (var index = text.IndexOf(marker, StringComparison.Ordinal); index >= 0; index = text.IndexOf(marker, index + marker.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
     }
 }

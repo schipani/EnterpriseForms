@@ -52,10 +52,15 @@ public sealed class Program
 
         builder.Services.AddTrustAuthorityReadinessProbe(builder.Configuration);
         builder.Services.AddBusinessInfrastructure(builder.Configuration);
+        // Phase C6 AC-2 tests: Testing-only bypass of the business lifecycle lock on the contributor path; refuses to start elsewhere.
+        builder.Services.AddSingleton(EnterpriseForms.Application.Features.FormRecords.Lifecycle.LifecycleTestingHooks.FromConfiguration(
+            builder.Configuration.GetValue<bool>(EnterpriseForms.Application.Features.FormRecords.Lifecycle.LifecycleTestingHooks.ConfigurationKey), builder.Environment.EnvironmentName));
         builder.Services.AddBusinessAuthentication(builder.Configuration, builder.Environment);
         // My Records cursors (C-29) use the host's Data Protection key ring, like the session cookie; only the API serves lists.
         builder.Services.AddSingleton<EnterpriseForms.Application.Common.IOpaqueCursorProtector, DataProtectionCursorProtector>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.ListRecordsHandler>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordHistoryHandler>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordRestoreHandler>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));
         builder.Services.AddHostedService<DocumentProviderStartupGuard>();
         builder.Services.AddHostedService<DocumentProcessingHostedService>();

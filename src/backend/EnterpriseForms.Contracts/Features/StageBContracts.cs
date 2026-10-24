@@ -77,9 +77,30 @@ public sealed record AddFieldDefinitionRequest(string FieldKey, string FieldDisp
 /// <summary>Strengthening only (higher classification and/or Standard → ApplicationEncrypted); a reason is recorded with the audit event.</summary>
 public sealed record StrengthenFieldProtectionRequest(string? TargetClassification, string? TargetProtectionMode, string ChangeReason, long ExpectedProtectionRevision);
 
-/// <summary>Protection state of a field. <c>MigrationState</c>: Plaintext, Encrypted, or EncryptionPendingRewrite (records still carrying a legacy plaintext copy: <c>LegacyPlaintextRecordCount</c>, a business-table estimate). <c>FullyEncrypted</c> / <c>FullyPlaintext</c> mean "every record the business database lists was converted and the worker's post-check against their authority-accepted versions passed"; they are not an independently verified completeness guarantee (security finding G19).</summary>
+/// <summary>
+/// Protection state of a field. <c>MigrationState</c>: Plaintext, Encrypted, or EncryptionPendingRewrite (records still
+/// carrying a legacy plaintext copy). <c>LegacyPlaintextRecordCount</c> / <c>LegacyEncryptedRecordCount</c> are a local
+/// business-database <b>estimate</b> over records whose accepted version resolves locally; <c>EstimateUnresolvedRecordCount</c>
+/// counts records holding rows of the field whose accepted version cannot be resolved locally (never guessed, Phase C6 M0).
+/// <c>Verification</c> is the migration worker's last check against the Authorization Authority's accepted versions, stored in
+/// the business database. <c>FullyEncrypted</c> / <c>FullyPlaintext</c> mean "every record the business database lists was
+/// converted, the worker's check against their Authority-accepted versions found none remaining or unreadable, and the local
+/// estimate agrees"; they are not an independently verified completeness guarantee (security finding G19) and not
+/// protected against a hostile business-database administrator.
+/// </summary>
 public sealed record FieldProtectionResponse(Guid FieldDefinitionId, string FieldKey, string FieldClassification, string FieldProtectionMode, long ProtectionPolicyRevision, DateTimeOffset? ProtectionChangedOn, string MigrationState, int LegacyPlaintextRecordCount, string SearchImpact, string OrganizationMinimumClassification, bool OrganizationPermitsPlaintext,
-    bool FullyEncrypted = false, FieldProtectionMigrationResponse? Migration = null, bool FullyPlaintext = false, int LegacyEncryptedRecordCount = 0);
+    bool FullyEncrypted = false, FieldProtectionMigrationResponse? Migration = null, bool FullyPlaintext = false, int LegacyEncryptedRecordCount = 0,
+    int EstimateUnresolvedRecordCount = 0, FieldProtectionVerificationResponse? Verification = null);
+
+/// <summary>
+/// The migration worker's last post-check (Phase C6 M0): it read the Authority-accepted version of each record the business
+/// database lists and counted rows of the old form in exactly that version. <c>RemainingRecordCount</c> / <c>RemainingValueCount</c>:
+/// records and rows still in the old form; <c>UnverifiedRecordCount</c>: listed records whose accepted version could not be
+/// read (never counted as converted); <c>CheckedRecordCount</c> is null for checks recorded before Phase C6. The result is
+/// stored in the business database, so it is not protected against a hostile business-database administrator, and it covers
+/// only the records the business database lists (G19). <c>Basis</c> says this in words for display.
+/// </summary>
+public sealed record FieldProtectionVerificationResponse(DateTimeOffset CheckedOn, int? CheckedRecordCount, int RemainingRecordCount, int RemainingValueCount, int UnverifiedRecordCount, string Basis);
 
 /// <summary>
 /// Progress of the background plaintext→encrypted migration of a field (B-28). <c>MigrationState</c>: Queued, Running,
@@ -167,7 +188,8 @@ public sealed record RecordProjectionResponse(
     Guid? FormRelationshipDefinitionId,
     string ETag,
     RecordProjectionSummaryResponse? Summary = null,
-    IReadOnlyList<SharedFieldAccessResponse>? SharedFieldAccess = null);
+    IReadOnlyList<SharedFieldAccessResponse>? SharedFieldAccess = null,
+    RecordLifecycleStateResponse? Lifecycle = null);
 
 /// <summary>
 /// Phase C5: for a share editor's partial projection, whether each readable field can be changed and, if not, why
@@ -183,6 +205,86 @@ public sealed record SharedFieldAccessResponse(string FieldKey, bool Editable, s
 public sealed record RecordProjectionSummaryResponse(string RecordReference, DateTimeOffset? CreatedOn, DateTimeOffset? ModifiedOn, string? CreatedByDisplayName, bool CreatedByCurrentUser);
 
 /// <summary><c>CanEditSharedFields</c> (Phase C5): a share editor may change at least one shared value now; <c>ContributorWritesEnabled</c> reports the Authority's switch (D10).</summary>
+/// <summary>
+/// Lifecycle state from the Authority-verified signed header (Phase C6 M1). <c>Status</c> is Draft, Submitted or Archived
+/// (also for a partial share projection: status is not field content). <c>AllowedTransitions</c> lists what the caller may
+/// start now (owner only); <c>ContentEditable</c> is false once the record is Submitted or Archived. Advisory for the UI —
+/// the server decides every transition and every content write again.
+/// </summary>
+public sealed record RecordLifecycleStateResponse(string Status, DateTimeOffset? SubmittedOn, IReadOnlyList<string> AllowedTransitions, bool ContentEditable);
+
+/// <summary>
+/// Phase C6 M2: one accepted version of a record. Revision, <c>AcceptedOn</c>, actor (<c>ActorKind</c> User,
+/// ProtectionMigration or Unknown), <c>IsCurrent</c> and <c>VerifiableNow</c> are Authorization Authority facts; the display name
+/// is the local user directory's name for that actor. <c>ActionLabel</c> is reported with its source: <c>Authority</c> (first
+/// version, protection migration), <c>ActivityLog</c> (the local, unverified activity projection) or <c>None</c>.
+/// </summary>
+public sealed record RecordVersionItemResponse(long ContentRevision, DateTimeOffset AcceptedOn, string ActorKind, Guid? ActorUserId, string? ActorDisplayName, bool IsCurrent, bool VerifiableNow, string? ActionLabel, string ActionSource);
+
+/// <summary>Phase C6 M2: accepted versions of a record in chronological order; <c>NextAfterRevision</c> continues the list.</summary>
+public sealed record RecordVersionListResponse(Guid FormRecordId, long CurrentContentRevision, IReadOnlyList<RecordVersionItemResponse> Versions, long? NextAfterRevision, long AuthorizationRevision);
+
+/// <summary>
+/// Phase C6 M2: one earlier version, verified by the Authority against the manifest it accepted for that version, read-only.
+/// <c>Projection</c> uses the current form layout and current field labels (labels are not part of the signed content); its
+/// values, documents and status are those of the version.
+/// </summary>
+public sealed record RecordVersionViewResponse(RecordVersionItemResponse Version, RecordProjectionResponse Projection, long CurrentContentRevision);
+
+/// <summary>
+/// Phase C6 M3: restore request. <c>SourceOperationId</c> is the operation the Authority's history lists for the version (the
+/// preview returns it); <c>ExpectedCurrentContentRevision</c> is the head the person reviewed. <c>RestoreReason</c> is required
+/// (1–500 characters, recorded in the activity log). <c>AcknowledgePlaintext</c> must be true when the preview listed values that
+/// would now be stored as plaintext (OD-13).
+/// </summary>
+public sealed record RecordRestoreRequest(long ExpectedCurrentContentRevision, Guid SourceOperationId, string? RestoreReason, bool AcknowledgePlaintext = false);
+
+/// <summary>Phase C6 M3: the new accepted revision created by a restore (earlier revisions are unchanged).</summary>
+public sealed record RecordRestoreResponse(Guid FormRecordId, long RestoredFromContentRevision, long ContentRevision, Guid? CommittedOperationId, string ETag, IReadOnlyList<string> ChangedFieldKeys, IReadOnlyList<string> ClearedFieldKeys);
+
+/// <summary>
+/// Phase C6 M3: one field in a restore preview. Values are shown to the owner only (Cache-Control: no-store). <c>Change</c> is
+/// Unchanged, Changed, Added or Cleared. <c>InCurrentForm</c> false = the field is no longer placed (OD-12). <c>StoredEncrypted</c>
+/// says how the restored value will be stored under the field's CURRENT policy; <c>PlaintextAcknowledgementRequired</c> marks a
+/// value that was encrypted in the version and would now be stored as plaintext (OD-13).
+/// </summary>
+public sealed record RestoreFieldChangeResponse(string FieldKey, string Label, string? SectionPath, string CurrentValue, string RestoredValue, string Change, bool InCurrentForm, bool StoredEncrypted, bool PlaintextAcknowledgementRequired);
+
+/// <summary>Phase C6 M3: entries of one repeating section before and after a restore (new entries get new identities).</summary>
+public sealed record RestoreSectionChangeResponse(string GroupKey, string Label, int CurrentEntryCount, int RestoredEntryCount, int NewEntryCount, int RemovedEntryCount, bool InCurrentForm);
+
+/// <summary>Phase C6 M3: why the restored record would not pass the current form's rules (nothing is restored partially).</summary>
+public sealed record RestoreValidationResponse(string Code, string Message, IReadOnlyList<string> FieldKeys);
+
+/// <summary>
+/// Phase C6 M3: restore preview of one verified earlier version against the verified current head. Nothing is written.
+/// <c>CanRestore</c> is false with a reason when the record is not a Draft, the version cannot be restored exactly, or the result
+/// would fail validation. Documents and related records are never restored; the counts say what stays as it is.
+/// </summary>
+public sealed record RestorePreviewResponse(
+    Guid FormRecordId,
+    RecordVersionItemResponse Version,
+    Guid SourceOperationId,
+    long CurrentContentRevision,
+    string CurrentETag,
+    string CurrentStatus,
+    bool CanRestore,
+    string? BlockedReasonCode,
+    string? BlockedReason,
+    bool HasChanges,
+    IReadOnlyList<RestoreFieldChangeResponse> Fields,
+    IReadOnlyList<RestoreSectionChangeResponse> Sections,
+    int UnchangedDocumentCount,
+    bool FormHasRelatedRecords,
+    RestoreValidationResponse? Validation,
+    IReadOnlyList<string> PlaintextAcknowledgementFieldKeys);
+
+/// <summary>Request of a lifecycle transition. <c>ExpectedStatus</c> guards against acting on a stale view; <c>Reason</c> is mandatory for Reopen (1..500 characters) and optional for Archive.</summary>
+public sealed record RecordLifecycleRequest(long ExpectedContentRevision, string? ExpectedStatus = null, string? Reason = null);
+
+/// <summary>Result of a committed lifecycle transition (the new accepted revision and the state it produced).</summary>
+public sealed record RecordLifecycleResponse(Guid FormRecordId, string Transition, string PreviousStatus, string Status, DateTimeOffset? SubmittedOn, long ContentRevision, Guid? CommittedOperationId, string ETag, IReadOnlyList<string> AllowedTransitions);
+
 public sealed record RecordPermissionsResponse(bool CanRead, bool CanEdit, bool CanManageAccess, bool CanTransferOwnership, bool IsCompleteProjection, bool CanEditSharedFields = false, bool ContributorWritesEnabled = false);
 
 public sealed record CreateChildRecordRequest(Guid FormRelationshipDefinitionId, IReadOnlyDictionary<string, string> Values, IReadOnlyList<RecordGroupValuesRequest>? Groups = null);

@@ -48,9 +48,11 @@ public sealed class FormRecord
     public Guid? AcceptedContentChangeOperationId { get; set; }
 
     /// <summary>
-    /// Records an authority-accepted head (taken from the authority's commit response, never from business rows); never
+    /// The projection rule for an authority-accepted head (taken from the authority, never from business rows): never
     /// moves the projection backwards when commits finish out of order. At an equal revision the authority's answer wins:
     /// two accepted operations cannot share a revision, so a different stored pointer there is stale or forged.
+    /// Persisted writers use <c>IBusinessScope.ProjectAcceptedHeadAsync</c>, which applies exactly this rule as one
+    /// conditional UPDATE so concurrent writers cannot regress it (Phase C6 M0); this in-memory form documents and tests it.
     /// </summary>
     public bool RecordAcceptedContent(long contentRevision, Guid operationId)
     {

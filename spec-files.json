@@ -4,8 +4,8 @@
   "entries": [
     {
       "path": "CLAUDE-DESIGN.MD",
-      "sha256": "04c3e73cc757db53e1a0a376056d653cad03a00d38dbb7ffdbd4f5152c2186d6",
-      "bytes": 165918
+      "sha256": "a010cba6658fd6144505e711d74a807479550b6cd2950220376b6831ed39418d",
+      "bytes": 166135
     },
     {
       "path": "CLAUDE.md",
@@ -73,6 +73,11 @@
       "bytes": 34615
     },
     {
+      "path": "docs/PHASE_C6_STATUS.md",
+      "sha256": "7e27fd76dfd8e93bad822ed14739b339cfbbbd465ee2164dd4d5c6b3f96343ee",
+      "bytes": 98554
+    },
+    {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
       "sha256": "94aed64050704da8ec31a90ad594b98345b719ca94a8fa3dc9dd5093211d1fd9",
       "bytes": 3799
@@ -131,6 +136,11 @@
       "path": "docs/architecture/PHASE_C5_COLLABORATION_CONTRIBUTOR_WRITES.md",
       "sha256": "baec68fa068e7480fd5590aafdd518a2206e56371872c230f9844bf40b18f511",
       "bytes": 57561
+    },
+    {
+      "path": "docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md",
+      "sha256": "a524a9aa45022289f8bb236219fb2709d4cb5c5c21b413f0ad74aabc157a82d8",
+      "bytes": 65888
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -219,8 +229,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "795fa03406aa7705c1f1d1f3956e8663873f481e684edaa0a68c12d206c44a7a",
-      "bytes": 55094
+      "sha256": "c02fd78792b246aa4044a1edef578718c18768cd0194bb8126bfc4428157c63d",
+      "bytes": 76453
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -281,6 +291,11 @@
       "path": "docs/identity/PB08_IDENTITY_ASSURANCE_STANDARD.md",
       "sha256": "5cbca36ab705d1bf8856e3576b1fbb52d5c8314030d8e51f3a14ca8b9da653b9",
       "bytes": 7162
+    },
+    {
+      "path": "docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md",
+      "sha256": "351584a8f8f473da1c4f3436075798d02abde451ba2f88eb654faf889391c504",
+      "bytes": 12123
     },
     {
       "path": "docs/infrastructure/PB05_DEPLOYMENT_BLUEPRINT.md",
@@ -371,6 +386,11 @@
       "path": "docs/ui/C1_DESIGNER_UX_VISUAL_REFERENCE.png",
       "sha256": "cec0999216be7fc615843894cb873b98a3e33d6f0e051eb802c5fe899be78943",
       "bytes": 1824577
+    },
+    {
+      "path": "docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md",
+      "sha256": "7fb5ab06affbf72abf8cb21c0efc8b03a7853c5ad25f557628aa37fdb00c48f4",
+      "bytes": 3928
     },
     {
       "path": "docs/ui/PB14_COLOR_CONTRAST.reference.ts",
@@ -481,6 +501,11 @@
       "path": "scripts/dev/test.ps1",
       "sha256": "e5ca4a8fe0dcb8d1792c5b154ebcbd59b24378bb571b532a78032c1e9e701470",
       "bytes": 7815
+    },
+    {
+      "path": "scripts/devstack/devstack.py",
+      "sha256": "fb509954f29d355b4da43fc3fb6072f0b3ab13d6e87998e94df09be5bbe7cfa6",
+      "bytes": 51524
     },
     {
       "path": "scripts/generate-spec-manifest.py",

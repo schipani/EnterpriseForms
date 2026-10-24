@@ -363,6 +363,71 @@
         }
       }
     },
+    "/internal/v1/content-revisions/{organizationId}/{formRecordId}/history": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "AC-1: accepted content revisions of a record (ascending, cursor by revision, at most 100 per page) from the Authority's own rows: revision, accepted time, actor or protection-migration attribution, key version and whether it is still verifiable. Full read of the record now is required (concealment-safe 404 otherwise). Read-only; no row content and no signature work.",
+        "operationId": "GetContentHistory",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentHistoryPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/integrity/verify-record-projection": {
       "post": {
         "tags": [
@@ -706,6 +771,135 @@
             "items": {
               "$ref": "#/components/schemas/StagedContentItem"
             }
+          }
+        }
+      },
+      "ContentHistoryEntry": {
+        "required": [
+          "content_revision",
+          "committed_operation_id",
+          "accepted_on",
+          "actor_kind",
+          "actor_authority_user_id",
+          "reprotection_command_id",
+          "manifest_leaf_count",
+          "row_signature_key_version",
+          "verifiable_now",
+          "is_current"
+        ],
+        "type": "object",
+        "properties": {
+          "content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accepted_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor_kind": {
+            "type": "string"
+          },
+          "actor_authority_user_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "reprotection_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "manifest_leaf_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "row_signature_key_version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "verifiable_now": {
+            "type": "boolean"
+          },
+          "is_current": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ContentHistoryPage": {
+        "required": [
+          "organization_id",
+          "form_record_id",
+          "current_content_revision",
+          "entries",
+          "next_after_revision",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentHistoryEntry"
+            }
+          },
+          "next_after_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },

@@ -1,7 +1,7 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import type { RecordProjectionResponse } from "@enterpriseforms/api-client";
 import { FormRenderer, displayValue, groupPayload, validateGroups, validateValues, type ErrorMap, type FormLayout, type GroupValueMap, type RecordGroupPayload, type RendererField, type ValueMap } from "@enterpriseforms/form-renderer";
-import { Button, Dialog, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
+import { ActionIcons, Button, Dialog, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -125,6 +125,13 @@ export function EditRecordPage() {
     );
   }
   const shared = !data.permissions.isCompleteProjection;
+  if (data.lifecycle && !data.lifecycle.contentEditable) {
+    return (
+      <StatusMessage tone="info" title={`This record is ${data.lifecycle.status.toLowerCase()} and can't be edited`} actions={<Link to="/app/records/$formRecordId" params={{ formRecordId }}><Button variant="secondary">Back to the record</Button></Link>}>
+        {data.lifecycle.status === "Archived" ? "The owner can unarchive it to work on it again." : "The owner can reopen it with a reason to make changes."}
+      </StatusMessage>
+    );
+  }
   if (!data.permissions.canEdit && !(shared && data.permissions.canEditSharedFields)) {
     return (
       <StatusMessage tone="danger" title="You cannot edit this record" actions={<Link to="/app/records/$formRecordId" params={{ formRecordId }}><Button variant="secondary">Back to the record</Button></Link>}>
@@ -150,7 +157,9 @@ export function EditRecordPage() {
     ? { ...parsedLayout, sections: parsedLayout.sections.map((section) => ({ ...section, elements: section.elements.map((element) => (element.kind === "field" && !editableKeys.has(keyById.get(element.fieldDefinitionId) ?? "") ? { ...element, readOnly: true } : element)) })) }
     : parsedLayout;
   const presented = update.isError ? presentError(update.error) : null;
-  const conflict = presented?.kind === "conflict";
+  // A locked record (submitted or archived in the meantime) is a different answer from "someone else saved": no merge helps.
+  const lockedNow = presented?.code === "RECORD_NOT_EDITABLE";
+  const conflict = presented?.kind === "conflict" && !lockedNow;
   const applyRules = data.permissions.isCompleteProjection;
   const infos = toGroupInfos(data.record.groups);
   const unresolved = report?.conflicts ?? [];
@@ -338,7 +347,7 @@ export function EditRecordPage() {
           renderDocumentCollection={(element) => <p className="text-sm text-muted">{element.label || "Documents"} are managed from the record page (Documents).</p>}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" busy={update.isPending} disabled={conflict}>
+          <Button type="submit" icon={ActionIcons.save} busy={update.isPending} disabled={conflict}>
             Save changes
           </Button>
           <Button

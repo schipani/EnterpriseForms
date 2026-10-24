@@ -2,7 +2,7 @@ import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "
 import { useApi } from "@enterpriseforms/app-runtime";
 import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findOptionFilterCycle, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, setSectionRepeat, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
 import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useParams } from "@tanstack/react-router";
@@ -509,8 +509,8 @@ export function DesignerPage() {
         <>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <Button variant="secondary">
-                <span aria-hidden="true">+</span> Add Field <Caret />
+              <Button variant="secondary" icon={ActionIcons.add}>
+                Add Field <Caret />
               </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
@@ -527,14 +527,14 @@ export function DesignerPage() {
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-          <Button variant="secondary" onClick={addSection} disabled={!layout}>
-            <span aria-hidden="true">+</span> Add Section
+          <Button variant="secondary" icon={ActionIcons.add} onClick={addSection} disabled={!layout}>
+            Add Section
           </Button>
-          <Button variant="secondary" onClick={addRow} disabled={!layout || sectionTargetIndex === null} title={!layout || sectionTargetIndex !== null ? undefined : "Select a section, a field or a cell first"}>
-            <span aria-hidden="true">+</span> Add Row
+          <Button variant="secondary" icon={ActionIcons.add} onClick={addRow} disabled={!layout || sectionTargetIndex === null} title={!layout || sectionTargetIndex !== null ? undefined : "Select a section, a field or a cell first"}>
+            Add Row
           </Button>
-          <Button variant="secondary" onClick={addColumn} disabled={!layout || !columnSlotFor(layout, selection)}>
-            <span aria-hidden="true">+</span> Add Column
+          <Button variant="secondary" icon={ActionIcons.add} onClick={addColumn} disabled={!layout || !columnSlotFor(layout, selection)}>
+            Add Column
           </Button>
           <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-line sm:inline-block" />
           <Button variant="ghost" disabled={undoStack.current.length === 0} onClick={undo} aria-label="Undo last layout change" title="Undo (Ctrl+Z)">

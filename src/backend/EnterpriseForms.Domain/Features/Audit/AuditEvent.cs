@@ -25,6 +25,13 @@ public static class AuditActions
     public const string RecordCreated = "RECORD_CREATED";
     public const string RecordViewed = "RECORD_VIEWED";
     public const string RecordUpdated = "RECORD_UPDATED";
+    public const string RecordSubmitted = "RECORD_SUBMITTED";
+    public const string RecordReopened = "RECORD_REOPENED";
+    public const string RecordArchived = "RECORD_ARCHIVED";
+    public const string RecordUnarchived = "RECORD_UNARCHIVED";
+    public const string RecordLifecycleDenied = "RECORD_LIFECYCLE_DENIED";
+    public const string RecordVersionViewed = "RECORD_VERSION_VIEWED";
+    public const string RecordVersionRestored = "RECORD_VERSION_RESTORED";
     public const string ChildRecordLinked = "CHILD_RECORD_LINKED";
     public const string ChildRecordUnlinked = "CHILD_RECORD_UNLINKED";
     public const string DocumentUploadStarted = "DOCUMENT_UPLOAD_STARTED";

@@ -100,12 +100,12 @@ export class RequestCoordinator implements IRequestCoordinator {
       const pending = this.pending.get(event.operationId);
       this.pending.delete(event.operationId);
       pending?.resolve(event.etag !== undefined ? { result: event.result, etag: event.etag, status: event.status } : { result: event.result, status: event.status });
-    } else if (event.type === "failed" && !event.retryable) {
+    } else if (event.type === "failed" && (!event.retryable || event.final)) {
       const pending = this.pending.get(event.operationId);
       this.pending.delete(event.operationId);
       pending?.reject(new OperationError(event));
     } else if (event.type === "failed" && event.retryable) {
-      // retried by the executor; final failure arrives as a non-retryable event after MAX_RETRIES
+      // retried by the executor; the last failure arrives marked final (after MAX_RETRIES, or when it cannot be retried)
       const pending = this.pending.get(event.operationId);
       if (pending && event.errorCode === "CANCELLED") {
         this.pending.delete(event.operationId);

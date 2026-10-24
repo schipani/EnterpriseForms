@@ -1,6 +1,6 @@
 import type { OptionListResponse } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Checkbox, Dialog, LoadingBlock, Select, TextArea, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Checkbox, Dialog, LoadingBlock, Select, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -111,15 +111,10 @@ export function OptionListsDialog({ open, onOpenChange, canDesign }: { open: boo
       {lists.isError ? <ErrorPanel error={lists.error} onRetry={() => void lists.refetch()} /> : null}
       {lists.data ? (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-48 flex-1">
-              <Select label="Option list" value={selectedId || undefined} placeholder={lists.data.length === 0 ? "No lists yet" : "Choose a list"} options={lists.data.map((list) => ({ value: list.optionListId, label: `${list.optionListName} (${list.items.filter((item) => item.isActive).length} active${list.boundFieldCount ? `, used by ${list.boundFieldCount} field${list.boundFieldCount === 1 ? "" : "s"}` : ""})` }))} onValueChange={(value) => { setCreating(false); setSelectedId(value); }} />
+          <div>
+            <div>
+              <Select actions={canDesign ? <Button variant="secondary" icon={ActionIcons.add} onClick={() => { setCreating(true); setSelectedId(""); }}>New list…</Button> : undefined} label="Option list" value={selectedId || undefined} placeholder={lists.data.length === 0 ? "No lists yet" : "Choose a list"} options={lists.data.map((list) => ({ value: list.optionListId, label: `${list.optionListName} (${list.items.filter((item) => item.isActive).length} active${list.boundFieldCount ? `, used by ${list.boundFieldCount} field${list.boundFieldCount === 1 ? "" : "s"}` : ""})` }))} onValueChange={(value) => { setCreating(false); setSelectedId(value); }} />
             </div>
-            {canDesign ? (
-              <Button variant="secondary" onClick={() => { setCreating(true); setSelectedId(""); }}>
-                New list…
-              </Button>
-            ) : null}
           </div>
 
           {creating ? (
@@ -172,11 +167,8 @@ export function OptionListsDialog({ open, onOpenChange, canDesign }: { open: boo
               </ol>
               {canDesign ? (
                 <>
-                  <TextInput label="New item" value={newLabel} maxLength={200} onChange={(event) => setNewLabel(event.target.value.replace(/[<>]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addItem(); } }} />
+                  <TextInput label="New item" value={newLabel} maxLength={200} actions={<Button variant="secondary" icon={ActionIcons.add} disabled={newLabel.trim() === ""} onClick={addItem}>Add item</Button>} onChange={(event) => setNewLabel(event.target.value.replace(/[<>]/g, ""))} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addItem(); } }} />
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" disabled={newLabel.trim() === ""} onClick={addItem}>
-                      Add item
-                    </Button>
                     <Button size="sm" busy={save.isPending} disabled={!dirty || name.trim() === "" || rows.some((row) => row.label.trim() === "")} onClick={() => save.mutate()}>
                       Save list
                     </Button>

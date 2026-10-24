@@ -36,6 +36,7 @@ const recordsRoute = createRoute({ getParentRoute: () => appRoute, path: "/recor
 const newRecordRoute = createRoute({ getParentRoute: () => appRoute, path: "/forms/$formDefinitionId/records/new", component: lazyRouteComponent(() => import("../features/form-records"), "NewRecordPage") });
 const recordRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId", component: lazyRouteComponent(() => import("../features/form-records"), "RecordPage"), validateSearch: parseRecordTabSearch });
 const editRecordRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/edit", component: lazyRouteComponent(() => import("../features/form-records"), "EditRecordPage") });
+const recordVersionRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/versions/$contentRevision", component: lazyRouteComponent(() => import("../features/form-records"), "RecordVersionPage") });
 const newChildRoute = createRoute({ getParentRoute: () => appRoute, path: "/records/$formRecordId/related/$formRelationshipDefinitionId/new", component: lazyRouteComponent(() => import("../features/related-forms"), "NewChildRecordPage") });
 const uploadsRoute = createRoute({ getParentRoute: () => appRoute, path: "/uploads", component: lazyRouteComponent(() => import("../features/jobs"), "UploadCenterPage") });
 const activityRoute = createRoute({ getParentRoute: () => appRoute, path: "/activity", component: lazyRouteComponent(() => import("../features/audit"), "MyActivityPage") });
@@ -47,7 +48,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, preferencesRoute, galleryRoute, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, preferencesRoute, galleryRoute, noPermissionRoute]),
 ]);
 
 export function createAppRouter() {

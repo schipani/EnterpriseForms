@@ -1,6 +1,6 @@
 import type { RelationshipDefinitionResponse } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, RowActions, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, Dialog, LoadingBlock, RowActions, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -122,7 +122,7 @@ export function ChildRecordList({ parentFormRecordId, relationship, label, canEd
             <Button variant="secondary" onClick={() => setUnlinkTarget(null)} disabled={unlink.isPending}>
               Cancel
             </Button>
-            <Button variant="danger" busy={unlink.isPending} disabled={reason.trim().length < 3} onClick={() => unlinkTarget && unlink.mutate(unlinkTarget)}>
+            <Button variant="danger" icon={ActionIcons.delete} busy={unlink.isPending} disabled={reason.trim().length < 3} onClick={() => unlinkTarget && unlink.mutate(unlinkTarget)}>
               Remove from list
             </Button>
           </>

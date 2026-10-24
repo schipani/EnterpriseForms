@@ -474,7 +474,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             await RequireNoRunningMigrationAsync(scope, fieldDefinitionId, cancellationToken).ConfigureAwait(false);
             if (mode == FieldProtectionModes.ApplicationEncrypted && field.FieldProtectionMode != FieldProtectionModes.ApplicationEncrypted && field.FieldDataType != FieldDataTypes.File)
             {
-                legacyRecords = await scope.GetLegacyPlaintextRecordsAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+                legacyRecords = (await scope.EstimateOldFormRecordsAsync(fieldDefinitionId, encryptedForm: false, cancellationToken).ConfigureAwait(false)).RecordsToVisit();
             }
 
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -643,7 +643,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             }
 
             await RequireNoRunningMigrationAsync(scope, fieldDefinitionId, cancellationToken).ConfigureAwait(false);
-            encryptedRecords = await scope.GetLegacyEncryptedRecordsAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            encryptedRecords = (await scope.EstimateOldFormRecordsAsync(fieldDefinitionId, encryptedForm: true, cancellationToken).ConfigureAwait(false)).RecordsToVisit();
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -710,7 +710,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                 throw new BusinessException("NO_DOWNGRADE_TO_CANCEL", 409, "the field's latest protection change is not an active or completed downgrade");
             }
 
-            plaintextRecords = await scope.GetLegacyPlaintextRecordsAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            plaintextRecords = (await scope.EstimateOldFormRecordsAsync(fieldDefinitionId, encryptedForm: false, cancellationToken).ConfigureAwait(false)).RecordsToVisit();
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -871,15 +871,16 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             AuthorityCommandId = commandId,
             MigrationDirection = direction,
             RollbackOfMigrationId = rollbackOf,
-            MigrationState = records.Count == 0 ? FieldProtectionMigrationStates.Completed : FieldProtectionMigrationStates.Queued,
+            // Phase C6 M0: always queued, even when the local estimate finds nothing to convert. Completion (and the
+            // "all listed records" claim) comes only from the worker's post-check against the Authority-accepted heads; a
+            // stale local projection must never be able to mark a migration verified on its own.
+            MigrationState = FieldProtectionMigrationStates.Queued,
             TotalRecordCount = records.Count,
             TotalValueCount = records.Sum(r => r.PlaintextValueCount),
-            NextAttemptOn = records.Count == 0 ? DateTimeOffset.MaxValue : now,
+            NextAttemptOn = now,
             StartedByUserId = context.LocalUserId,
             MigrationCreatedOn = now,
             MigrationModifiedOn = now,
-            MigrationCompletedOn = records.Count == 0 ? now : null,
-            MigrationVerifiedOn = records.Count == 0 ? now : null,
         };
         scope.AddProtectionMigration(migration);
         foreach (var record in records)
@@ -887,65 +888,49 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             scope.AddProtectionMigrationItem(new FieldProtectionMigrationItem { FieldProtectionMigrationItemId = Guid.CreateVersion7(), FieldProtectionMigrationId = migration.FieldProtectionMigrationId, TenantId = context.OrganizationId, FormRecordId = record.FormRecordId, ItemModifiedOn = now });
         }
 
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.FieldProtectionMigrationStarted, records.Count == 0 ? "no existing value in the old form; nothing to migrate" : $"background {direction.ToLowerInvariant()} migration of existing values queued (authority-governed operations)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, targetEntityType: "field_protection_migration", targetEntityId: migration.FieldProtectionMigrationId, metadata: new { authorityCommandId = commandId, direction, totalRecordCount = migration.TotalRecordCount, totalValueCount = migration.TotalValueCount, rollbackOfMigrationId = rollbackOf });
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.FieldProtectionMigrationStarted, records.Count == 0 ? "no existing value in the old form found locally; the migration worker verifies every listed record against the Authorization Authority" : $"background {direction.ToLowerInvariant()} migration of existing values queued (authority-governed operations)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, targetEntityType: "field_protection_migration", targetEntityId: migration.FieldProtectionMigrationId, metadata: new { authorityCommandId = commandId, direction, totalRecordCount = migration.TotalRecordCount, totalValueCount = migration.TotalValueCount, rollbackOfMigrationId = rollbackOf });
         return migration.FieldProtectionMigrationId;
     }
 
     /// <summary>
-    /// Status: <c>FullyEncrypted</c> is true only when the field is application-encrypted, no latest snapshot holds a plaintext
-    /// copy (recomputed now, never read from the migration row alone) and, when an encrypt migration exists, it completed
-    /// and the worker's post-check recorded it. <c>FullyPlaintext</c> mirrors this for a released field. A forged "Completed"
-    /// row alone cannot make either claim, but both rest on business-database data: an administrator who writes several
-    /// tables consistently, or removes records from form_records, can make them wrong. They are display/status flags only —
-    /// never used for authorization, decryption, reads or search — and NOT an independently verified completeness
-    /// guarantee; Authority-backed completeness verification is open security finding G19 (SECURITY_GAP_ASSESSMENT.md).
+    /// Status (Phase C6 M0): the worker-verified result of the latest migration and the local estimate are reported separately
+    /// and combined by <see cref="ProtectionMigration.FieldProtectionStatusEvaluator"/>. <c>FullyEncrypted</c> /
+    /// <c>FullyPlaintext</c> need a completed migration whose stored post-check (Authority-accepted heads of every listed
+    /// record) found nothing remaining and nothing unreadable, <b>and</b> a local estimate that agrees with no unresolved
+    /// record. A forged "Completed" row alone cannot make either claim, but everything here rests on business-database data:
+    /// an administrator who writes several tables consistently, or removes records from form_records, can make it wrong.
+    /// Display/status flags only — never used for authorization, decryption, reads or search — and NOT an independently
+    /// verified completeness guarantee (G19, SECURITY_GAP_ASSESSMENT.md).
     /// </summary>
     private static async Task<FieldProtectionResponse> ProtectionResponseAsync(IBusinessScope scope, FieldDefinition field, Domain.Features.Organizations.OrganizationSecurityPolicy policy, CancellationToken cancellationToken)
     {
         var encrypted = field.FieldProtectionMode == FieldProtectionModes.ApplicationEncrypted;
         var isFile = field.FieldDataType == FieldDataTypes.File;
-        var legacyPlaintext = encrypted && !isFile ? await scope.CountLegacyPlaintextRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false) : 0;
-        var legacyEncrypted = !encrypted && !isFile ? await scope.CountLegacyEncryptedRecordsAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false) : 0;
+        var estimate = isFile ? new LegacyRecordEstimate([], []) : await scope.EstimateOldFormRecordsAsync(field.FieldDefinitionId, encryptedForm: !encrypted, cancellationToken).ConfigureAwait(false);
         var migration = isFile ? null : await scope.FindLatestProtectionMigrationAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
         FieldProtectionMigrationResponse? progress = null;
+        FieldProtectionVerificationResponse? verification = null;
         if (migration is not null)
         {
             var pending = await scope.CountPendingProtectionMigrationItemsAsync(migration.FieldProtectionMigrationId, cancellationToken).ConfigureAwait(false);
             progress = new FieldProtectionMigrationResponse(migration.FieldProtectionMigrationId, migration.MigrationState, migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, migration.FailedRecordCount, pending, migration.LastErrorCode, migration.MigrationCreatedOn, migration.MigrationCompletedOn, migration.MigrationVerifiedOn, migration.AuthorityCommandId, migration.MigrationDirection, migration.MigrationCancelledOn, migration.RollbackOfMigrationId);
+            if (migration.VerificationCheckedOn is { } checkedOn)
+            {
+                verification = new FieldProtectionVerificationResponse(checkedOn, migration.VerifiedRecordCount, migration.VerifiedRemainingRecordCount ?? 0, migration.VerifiedRemainingValueCount ?? 0, migration.UnverifiedRecordCount ?? 0, VerificationBasis);
+            }
         }
 
-        var migrationMatchesMode = migration is null || (encrypted ? migration.MigrationDirection == FieldProtectionMigrationDirections.Encrypt : migration.MigrationDirection == FieldProtectionMigrationDirections.Decrypt);
-        var verified = migration is null || (migration.MigrationState == FieldProtectionMigrationStates.Completed && migration.MigrationVerifiedOn is not null);
-        var fullyEncrypted = encrypted && legacyPlaintext == 0 && migrationMatchesMode && verified;
-        var fullyPlaintext = !encrypted && !isFile && legacyEncrypted == 0 && migrationMatchesMode && verified && migration is not null;
-        string state;
-        if (encrypted)
-        {
-            state = fullyEncrypted ? "Encrypted" : migration is null || !migrationMatchesMode ? "EncryptionPendingRewrite" : migration.MigrationState switch
-            {
-                FieldProtectionMigrationStates.Queued => "EncryptionMigrationQueued",
-                FieldProtectionMigrationStates.Running => "EncryptionMigrationRunning",
-                FieldProtectionMigrationStates.Blocked => "EncryptionMigrationBlocked",
-                FieldProtectionMigrationStates.Failed => "EncryptionMigrationFailed",
-                _ => "EncryptionMigrationIncomplete",
-            };
-        }
-        else
-        {
-            state = legacyEncrypted == 0 && (migration is null || fullyPlaintext) ? "Plaintext" : migration is null || !migrationMatchesMode ? "DecryptionPendingRewrite" : migration.MigrationState switch
-            {
-                FieldProtectionMigrationStates.Queued => "DecryptionMigrationQueued",
-                FieldProtectionMigrationStates.Running => "DecryptionMigrationRunning",
-                FieldProtectionMigrationStates.Blocked => "DecryptionMigrationBlocked",
-                FieldProtectionMigrationStates.Failed => "DecryptionMigrationFailed",
-                _ => "DecryptionMigrationIncomplete",
-            };
-        }
-
-        return new FieldProtectionResponse(field.FieldDefinitionId, field.FieldKey, field.FieldClassification, field.FieldProtectionMode, field.ProtectionPolicyRevision, field.ProtectionChangedOn, state, legacyPlaintext,
+        var status = ProtectionMigration.FieldProtectionStatusEvaluator.Evaluate(encrypted, isFile, estimate, migration);
+        var legacyPlaintext = encrypted && !isFile ? estimate.HolderValueCount : 0;
+        var legacyEncrypted = !encrypted && !isFile ? estimate.HolderRecordCount : 0;
+        return new FieldProtectionResponse(field.FieldDefinitionId, field.FieldKey, field.FieldClassification, field.FieldProtectionMode, field.ProtectionPolicyRevision, field.ProtectionChangedOn, status.State, legacyPlaintext,
             encrypted ? "Encrypted for privacy — not searchable in V1 (ADR-PB-004). Authorized users see the value on the record; no plaintext copy exists in the business database." : "Plaintext: searchable within authorization, and readable by a database administrator.",
-            policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, fullyEncrypted, progress, fullyPlaintext, legacyEncrypted);
+            policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, status.FullyEncrypted, progress, status.FullyPlaintext, legacyEncrypted,
+            isFile ? 0 : estimate.UnresolvedRecordIds.Count, verification);
     }
+
+    /// <summary>What the stored post-check result does and does not establish (shown with it).</summary>
+    public const string VerificationBasis = "Checked by the migration worker against the Authorization Authority's accepted version of each record the business database lists. The result is stored in the business database: it is not protected against a database administrator, and records missing from the business database are not covered (security finding G19).";
 
     /// <summary>
     /// Adds, relabels, reorders or deactivates options of a dropdown field. Option ids and keys are permanent and nothing is

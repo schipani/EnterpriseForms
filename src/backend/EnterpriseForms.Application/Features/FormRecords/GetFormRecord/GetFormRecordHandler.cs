@@ -92,12 +92,14 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
             fields,
             documents,
             relationships.Where(r => verified.IsComplete || visibleRelationshipIds.Contains(r.FormRelationshipDefinitionId)).Select(r => new RelationshipDefinitionResponse(r.FormRelationshipDefinitionId, r.ParentFormDefinitionId, r.ChildFormDefinitionId, formNames.GetValueOrDefault(r.ChildFormDefinitionId, string.Empty), r.RelationshipDefinitionKey, r.RelationshipDisplayName, r.MinimumChildCount, r.MaximumChildCount, r.LifecycleStatus)).ToList(),
-            new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed, verified.IsComplete, sharedAccess?.Any(a => a.Editable) == true, verified.Verification.ContributorWritesEnabled),
+            new RecordPermissionsResponse(true, decisions[0].Allowed, decisions[1].Allowed, decisions[2].Allowed, verified.IsComplete, sharedAccess?.Any(a => a.Editable) == true && Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus), verified.Verification.ContributorWritesEnabled),
             verified.Header.ParentFormRecordId,
             verified.Header.FormRelationshipDefinitionId,
             verified.ETag,
             summary,
-            sharedAccess);
+            sharedAccess,
+            // Phase C6 M1: status from the Authority-verified signed header (also for a partial projection); transitions only for the owner.
+            new RecordLifecycleStateResponse(verified.Header.RecordStatus, verified.Header.SubmittedOn, verified.IsComplete ? Lifecycle.RecordLifecycle.AllowedFor(verified.Header.RecordStatus) : [], Lifecycle.RecordLifecycle.IsContentEditable(verified.Header.RecordStatus)));
     }
 
     /// <summary>

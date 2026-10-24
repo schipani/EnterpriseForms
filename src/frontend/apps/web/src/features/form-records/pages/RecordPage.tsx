@@ -1,7 +1,7 @@
 import { useApi } from "@enterpriseforms/app-runtime";
 import type { RecordProjectionResponse } from "@enterpriseforms/api-client";
 import { FormRenderer, type DocumentElement, type FormLayout, type RelatedElement } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -10,6 +10,9 @@ import { DocumentCollection } from "../../documents";
 import { ChildRecordList } from "../../related-forms";
 import { RecordAccessPanel } from "../../sharing";
 import { ErrorPanel } from "../../support";
+import { CopyReference } from "../components/CopyReference";
+import { LifecycleActions } from "../components/LifecycleActions";
+import { RecordHistory } from "../components/RecordHistory";
 import { formatDateTime, recordStatusLabel } from "../components/recordList";
 import { parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValueMap } from "../components/recordModel";
 import type { RecordTab } from "../components/recordTabs";
@@ -26,6 +29,7 @@ export function RecordPage() {
   const api = useApi();
   const projection = useQuery({ queryKey: ["records", "projection", formRecordId], queryFn: () => api.records.projection(formRecordId).then((r) => r.result) });
   const [savedNotice, setSavedNotice] = useState(false);
+  const [lifecycleNotice, setLifecycleNotice] = useState<string | null>(null);
   useEffect(() => {
     if (search.saved) {
       // Confirm once, then drop the flag from the URL so a reload does not repeat it.
@@ -42,16 +46,20 @@ export function RecordPage() {
   }
   const data = projection.data;
   const { layout, error } = parseProjectionLayout(data);
+  // Phase C6 M1: Submitted and Archived records are locked; the server decides, this only follows its verified state.
+  const contentEditable = data.lifecycle?.contentEditable !== false;
   const relatedElements = layout ? relatedListsOf(layout) : [];
   const documentElements = layout ? documentCollectionsOf(layout) : [];
   const relationshipsById = new Map(data.relationships.map((relationship) => [relationship.formRelationshipDefinitionId, relationship]));
-  const sections: RecordTab[] = ["details", ...(relatedElements.length > 0 ? (["related"] as const) : []), ...(documentElements.length > 0 ? (["documents"] as const) : []), "sharing", "activity"];
+  // Activity and history both need full read of the record (a shared view never has them, and the server refuses them anyway).
+  // Phase C6 M2: history is part of the record's content, so only a person who can read the whole record sees it (a shared view never does).
+  const sections: RecordTab[] = ["details", ...(relatedElements.length > 0 ? (["related"] as const) : []), ...(documentElements.length > 0 ? (["documents"] as const) : []), "sharing", ...(data.permissions.isCompleteProjection ? (["activity", "history"] as const) : [])];
   const tab: RecordTab = search.tab && sections.includes(search.tab) ? search.tab : "details";
   const showTab = (next: RecordTab) => void navigate({ to: "/app/records/$formRecordId", params: { formRecordId }, search: (current) => ({ ...current, tab: next === "details" ? undefined : next }), replace: true });
 
   const renderDocuments = (element: DocumentElement) => {
     const field = data.fields.find((candidate) => candidate.fieldDefinitionId === element.fieldDefinitionId);
-    return <DocumentCollection key={element.fieldDefinitionId} formRecordId={formRecordId} fieldDefinitionId={element.fieldDefinitionId} label={element.label || field?.fieldDisplayName || "Documents"} documents={data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId)} policy={element.upload} canEdit={data.permissions.canEdit} contentRevision={Number(data.record.contentRevision)} onChanged={() => void projection.refetch()} />;
+    return <DocumentCollection key={element.fieldDefinitionId} formRecordId={formRecordId} fieldDefinitionId={element.fieldDefinitionId} label={element.label || field?.fieldDisplayName || "Documents"} documents={data.documents.filter((document) => document.fieldDefinitionId === element.fieldDefinitionId)} policy={element.upload} canEdit={data.permissions.canEdit && contentEditable} contentRevision={Number(data.record.contentRevision)} onChanged={() => void projection.refetch()} />;
   };
 
   return (
@@ -69,13 +77,14 @@ export function RecordPage() {
             <Button variant="secondary" aria-label="Refresh this record" busy={projection.isFetching} onClick={() => void projection.refetch()}>
               Refresh
             </Button>
-            {data.permissions.canEdit ? (
+            <LifecycleActions formRecordId={formRecordId} data={data} onDone={setLifecycleNotice} />
+            {data.permissions.canEdit && contentEditable ? (
               <Link to="/app/records/$formRecordId/edit" params={{ formRecordId }}>
-                <Button>Edit</Button>
+                <Button icon={ActionIcons.edit}>Edit</Button>
               </Link>
-            ) : !data.permissions.isCompleteProjection && data.permissions.canEditSharedFields ? (
+            ) : !data.permissions.isCompleteProjection && data.permissions.canEditSharedFields && contentEditable ? (
               <Link to="/app/records/$formRecordId/edit" params={{ formRecordId }}>
-                <Button>Edit shared fields</Button>
+                <Button icon={ActionIcons.edit}>Edit shared fields</Button>
               </Link>
             ) : null}
           </>
@@ -85,6 +94,22 @@ export function RecordPage() {
         <div className="mb-4">
           <StatusMessage tone="success" title="Changes saved" actions={<Button size="sm" variant="ghost" onClick={() => setSavedNotice(false)}>Dismiss</Button>}>
             Your changes were saved and the record was verified again.
+          </StatusMessage>
+        </div>
+      ) : null}
+      {lifecycleNotice ? (
+        <div className="mb-4">
+          <StatusMessage tone="success" title={lifecycleNotice} actions={<Button size="sm" variant="ghost" onClick={() => setLifecycleNotice(null)}>Dismiss</Button>}>
+            The change was verified and recorded in the activity history.
+          </StatusMessage>
+        </div>
+      ) : null}
+      {!contentEditable ? (
+        <div className="mb-4">
+          <StatusMessage tone="info" title={data.lifecycle?.status === "Archived" ? "This record is archived" : "This record is submitted"}>
+            {data.lifecycle?.status === "Archived"
+              ? "Archived records are read-only. The owner can unarchive it to work on it again."
+              : "Submitted records are locked: values, documents and related records can't be changed. The owner can reopen it with a reason."}
           </StatusMessage>
         </div>
       ) : null}
@@ -125,7 +150,7 @@ export function RecordPage() {
                       {relatedElements.map((element) => {
                         const relationship = relationshipsById.get(element.formRelationshipDefinitionId);
                         return relationship ? (
-                          <ChildRecordList key={element.formRelationshipDefinitionId} parentFormRecordId={formRecordId} relationship={relationship} label={element.label} canEdit={data.permissions.canEdit} summaryFieldKeys={element.summaryFieldKeys} />
+                          <ChildRecordList key={element.formRelationshipDefinitionId} parentFormRecordId={formRecordId} relationship={relationship} label={element.label} canEdit={data.permissions.canEdit && contentEditable} summaryFieldKeys={element.summaryFieldKeys} />
                         ) : (
                           <p key={element.formRelationshipDefinitionId} className="text-sm text-muted">
                             {element.label}: this list is not available.
@@ -139,7 +164,12 @@ export function RecordPage() {
             : []),
           ...(documentElements.length > 0 ? [{ value: "documents", label: "Documents", content: <div className="flex flex-col gap-4">{documentElements.map(renderDocuments)}</div> }] : []),
           { value: "sharing", label: "Sharing and access", content: <RecordAccessPanel formRecordId={formRecordId} projection={data} /> },
-          { value: "activity", label: "Activity and history", content: <Card title="Audit history"><RecordActivity formRecordId={formRecordId} /></Card> },
+          ...(data.permissions.isCompleteProjection
+            ? [
+                { value: "activity", label: "Activity", content: <Card title="Activity log"><RecordActivity formRecordId={formRecordId} /></Card> },
+                { value: "history", label: "History", content: <RecordHistory formRecordId={formRecordId} /> },
+              ]
+            : []),
         ]}
       />
     </>
@@ -151,7 +181,7 @@ function RecordSummary({ data }: { data: RecordProjectionResponse }) {
   const complete = data.permissions.isCompleteProjection;
   const sharedEditable = (data.sharedFieldAccess ?? []).filter((item) => item.editable).length;
   const access = complete
-    ? data.permissions.canEdit
+    ? data.permissions.canEdit && data.lifecycle?.contentEditable !== false
       ? "Full access: you can view and edit this record"
       : "You can view this record"
     : sharedEditable > 0
@@ -163,12 +193,13 @@ function RecordSummary({ data }: { data: RecordProjectionResponse }) {
         <Badge tone={data.record.integrityStatus === "Verified" ? "success" : "danger"}>Integrity: {data.record.integrityStatus}</Badge>
         <Badge tone="neutral">Revision {String(data.record.contentRevision)}</Badge>
         <Badge tone="neutral">Layout v{data.layoutVersion.versionNumber}</Badge>
+        <Badge tone={data.lifecycle?.status === "Archived" ? "warning" : data.lifecycle?.status === "Submitted" ? "info" : "neutral"}>{recordStatusLabel(data.lifecycle?.status ?? data.record.recordStatus)}</Badge>
         {!complete ? <Badge tone="warning">Partial view (shared fields only)</Badge> : null}
       </div>
       <DescriptionList
         items={[
-          { term: "Reference", detail: summary?.recordReference ?? "—" },
-          ...(complete ? [{ term: "Status", detail: recordStatusLabel(data.record.recordStatus) }] : []),
+          { term: "Reference", detail: summary?.recordReference ? <CopyReference reference={summary.recordReference} /> : "—" },
+          { term: "Status", detail: recordStatusLabel(data.lifecycle?.status ?? data.record.recordStatus) },
           { term: "Created", detail: summary?.createdOn ? `${formatDateTime(summary.createdOn)}${summary.createdByCurrentUser ? " by you" : summary.createdByDisplayName ? ` by ${summary.createdByDisplayName}` : ""}` : "—" },
           { term: "Last changed", detail: summary?.modifiedOn ? formatDateTime(summary.modifiedOn) : "—" },
           { term: "Your access", detail: access },

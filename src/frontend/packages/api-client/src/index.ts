@@ -14,6 +14,9 @@ export type RecordListQuery = {
   formDefinitionId?: string;
   recordStatus?: string;
   includeChildren?: boolean;
+  includeArchived?: boolean;
+  /** Exact record id or short reference (REC-XXXXXXXX); combined with the other filters. */
+  q?: string;
   sortBy?: "modifiedOn" | "createdOn" | "formName" | "recordStatus";
   sortDirection?: "asc" | "desc";
   pageSize?: number;
@@ -48,6 +51,11 @@ export type UpdateFieldDefinitionRequest = S["UpdateFieldDefinitionRequest"];
 export type FieldProtectionResponse = S["FieldProtectionResponse"];
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
 export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
+export type FieldProtectionVerificationResponse = S["FieldProtectionVerificationResponse"];
+export type RecordLifecycleRequest = S["RecordLifecycleRequest"];
+export type RecordLifecycleResponse = S["RecordLifecycleResponse"];
+export type RecordLifecycleStateResponse = S["RecordLifecycleStateResponse"];
+export type RecordLifecycleTransition = "submit" | "reopen" | "archive" | "unarchive";
 export type RetryFieldProtectionMigrationRequest = S["RetryFieldProtectionMigrationRequest"];
 export type ReclassifyFieldRequest = S["ReclassifyFieldRequest"];
 export type DowngradeFieldProtectionRequest = S["DowngradeFieldProtectionRequest"];
@@ -71,6 +79,15 @@ export type RestoreVersionRequest = S["RestoreVersionRequest"];
 export type CreateRelationshipDefinitionRequest = S["CreateRelationshipDefinitionRequest"];
 export type RecordListResponse = S["RecordListResponse"];
 export type RecordListItemResponse = S["RecordListItemResponse"];
+export type RecordVersionItemResponse = S["RecordVersionItemResponse"];
+export type RecordVersionListResponse = S["RecordVersionListResponse"];
+export type RecordVersionViewResponse = S["RecordVersionViewResponse"];
+export type RestorePreviewResponse = S["RestorePreviewResponse"];
+export type RestoreFieldChangeResponse = S["RestoreFieldChangeResponse"];
+export type RestoreSectionChangeResponse = S["RestoreSectionChangeResponse"];
+export type RestoreValidationResponse = S["RestoreValidationResponse"];
+export type RecordRestoreRequest = S["RecordRestoreRequest"];
+export type RecordRestoreResponse = S["RecordRestoreResponse"];
 export type RecordProjectionResponse = S["RecordProjectionResponse"];
 export type FormRecordResponse = S["FormRecordResponse"];
 export type FieldValueResponse = S["FieldValueResponse"];
@@ -165,8 +182,17 @@ export function createApiClient(coordinator: IRequestCoordinator) {
     },
     records: {
       list: (query: RecordListQuery, signal?: AbortSignal) => read<RecordListResponse>("records.list", undefined, query, "interactive-read", signal),
+      /** Phase C6 M2: accepted versions, oldest first (Authority-listed); `after` continues from a version number. */
+      versions: (formRecordId: string, after?: number, signal?: AbortSignal) => read<RecordVersionListResponse>("records.versions", { formRecordId }, after === undefined ? undefined : { after }, "interactive-read", signal),
+      /** Phase C6 M2: one earlier version, verified and read-only. */
+      version: (formRecordId: string, contentRevision: number, signal?: AbortSignal) => read<RecordVersionViewResponse>("records.version", { formRecordId, contentRevision: String(contentRevision) }, undefined, "interactive-read", signal),
+      /** Phase C6 M3: what restoring a version would change (owner only, nothing written). */
+      restorePreview: (formRecordId: string, contentRevision: number, signal?: AbortSignal) => read<RestorePreviewResponse>("records.restorePreview", { formRecordId, contentRevision: String(contentRevision) }, undefined, "interactive-read", signal),
+      /** Phase C6 M3: restores a version as a new revision; If-Match carries the reviewed head, retries reuse the idempotency key. */
+      restore: (formRecordId: string, contentRevision: number, request: RecordRestoreRequest) => write<RecordRestoreResponse>("POST", "records.restore", { formRecordId, contentRevision: String(contentRevision) }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedCurrentContentRevision) }),
       create: (formDefinitionId: string, request: CreateFormRecordRequest) => write<FormRecordResponse>("POST", "records.create", { formDefinitionId }, request, { idempotent: true }),
       projection: (formRecordId: string, signal?: AbortSignal) => read<RecordProjectionResponse>("records.projection", { formRecordId }, undefined, "interactive-read", signal),
+      lifecycle: (transition: RecordLifecycleTransition, formRecordId: string, request: RecordLifecycleRequest) => write<RecordLifecycleResponse>("POST", `records.${transition}`, { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
       update: (formRecordId: string, request: UpdateFormRecordRequest) => write<FormRecordResponse>("PATCH", "records.update", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
     },
     related: {

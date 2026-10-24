@@ -64,6 +64,11 @@ const titles: Record<string, string> = {
   CHANGE_AFFECTS_OTHER_FIELDS: "This change would affect fields you cannot change",
   FIELD_PROTECTION_MIGRATION_PENDING: "This field's protection is being updated; try again later",
   NO_CHANGE: "There are no changes to save",
+  RECORD_NOT_EDITABLE: "This record is locked",
+  LIFECYCLE_TRANSITION_NOT_ALLOWED: "That action is not available for this record",
+  LIFECYCLE_STATE_CONFLICT: "The record's status changed",
+  REASON_REQUIRED: "A reason is required",
+  UPLOADS_IN_PROGRESS: "Documents are still being uploaded",
 };
 
 /** Maps a coordinator failure into safe, user-facing copy. Internal details stay in the correlation id only. */

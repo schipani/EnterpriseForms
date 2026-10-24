@@ -36,6 +36,14 @@ public static class ContentEndpoints
             })
             .WithName("GetCurrentContentRevision");
 
+        group.MapGet("/content-revisions/{organizationId:guid}/{formRecordId:guid}/history", static async Task<Ok<ContentHistoryPage>> (Guid organizationId, Guid formRecordId, long? after, int? limit, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+            {
+                var actor = InternalAuthentication.RequireActor(context, validator);
+                return TypedResults.Ok(await service.GetHistoryAsync(actor, organizationId, formRecordId, after, limit, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetContentHistory")
+            .WithSummary("AC-1: accepted content revisions of a record (ascending, cursor by revision, at most 100 per page) from the Authority's own rows: revision, accepted time, actor or protection-migration attribution, key version and whether it is still verifiable. Full read of the record now is required (concealment-safe 404 otherwise). Read-only; no row content and no signature work.");
+
         group.MapPost("/integrity/verify-record-projection", static async Task<Ok<VerifyRecordProjectionResult>> (VerifyRecordProjectionRequest request, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
             {
                 var actor = InternalAuthentication.RequireActor(context, validator);

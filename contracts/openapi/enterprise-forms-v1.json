@@ -1234,7 +1234,7 @@
         "tags": [
           "FormRecords"
         ],
-        "summary": "My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection.",
+        "summary": "My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, search, sort and authorization revision. q (optional) narrows the list to an exact record id or short reference REC-XXXXXXXX decided from the same complete authorized set (never a field-value search; anything else is 422 LOOKUP_INVALID); an exact search also finds archived and related records, and the Form and Status filters still apply. Rows carry unverified local metadata only; open a record for the verified projection.",
         "operationId": "ListFormRecords",
         "parameters": [
           {
@@ -1257,6 +1257,20 @@
             "in": "query",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "includeArchived",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -1404,6 +1418,366 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RecordProjectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/versions": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Phase C6 M2: accepted versions of a record in chronological order, from the Authorization Authority (AC-1): version number, accepted time, actor, current marker. Action labels carry their source (Authority or the unverified activity log). Only a person who may read the whole record now; anyone else gets 404.",
+        "operationId": "ListRecordVersions",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordVersionListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Phase C6 M2: one earlier version, read-only, after the Authority verified its exact rows against the manifest it accepted for that version (any mismatch fails closed: 423, the record is quarantined as for the current version). Current form layout and labels; the version's values, documents and status.",
+        "operationId": "GetRecordVersion",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "contentRevision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordVersionViewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}/restore-preview": {
+      "get": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Phase C6 M3: what restoring an earlier version would change (owner only; nothing is written). The version is verified through the Authority's history; current and restored values side by side (no-store), new entries, unchanged documents, current-form validation, values that would lose application encryption (OD-13), and whether the restore is possible now (Draft only).",
+        "operationId": "PreviewRecordRestore",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "contentRevision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestorePreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/versions/{contentRevision}/restore": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the current form (all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity.",
+        "operationId": "RestoreRecordVersion",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "contentRevision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordRestoreResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/submit": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Lifecycle transition 'Submit' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.",
+        "operationId": "SubmitFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/reopen": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Lifecycle transition 'Reopen' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.",
+        "operationId": "ReopenFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/archive": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Lifecycle transition 'Archive' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.",
+        "operationId": "ArchiveFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLifecycleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/{formRecordId}/unarchive": {
+      "post": {
+        "tags": [
+          "FormRecords"
+        ],
+        "summary": "Lifecycle transition 'Unarchive' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.",
+        "operationId": "UnarchiveFormRecord",
+        "parameters": [
+          {
+            "name": "formRecordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordLifecycleResponse"
                 }
               }
             }
@@ -3975,6 +4349,78 @@
             ],
             "format": "int32",
             "default": 0
+          },
+          "estimateUnresolvedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "verification": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FieldProtectionVerificationResponse"
+              }
+            ]
+          }
+        }
+      },
+      "FieldProtectionVerificationResponse": {
+        "required": [
+          "checkedOn",
+          "checkedRecordCount",
+          "remainingRecordCount",
+          "remainingValueCount",
+          "unverifiedRecordCount",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "checkedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "remainingRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "remainingValueCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unverifiedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "basis": {
+            "type": "string"
           }
         }
       },
@@ -4780,6 +5226,124 @@
           }
         }
       },
+      "RecordLifecycleRequest": {
+        "required": [
+          "expectedContentRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expectedStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RecordLifecycleResponse": {
+        "required": [
+          "formRecordId",
+          "transition",
+          "previousStatus",
+          "status",
+          "submittedOn",
+          "contentRevision",
+          "committedOperationId",
+          "eTag",
+          "allowedTransitions"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "transition": {
+            "type": "string"
+          },
+          "previousStatus": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "submittedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committedOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "eTag": {
+            "type": "string"
+          },
+          "allowedTransitions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RecordLifecycleStateResponse": {
+        "required": [
+          "status",
+          "submittedOn",
+          "allowedTransitions",
+          "contentEditable"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "submittedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "allowedTransitions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contentEditable": {
+            "type": "boolean"
+          }
+        }
+      },
       "RecordListFormOption": {
         "required": [
           "formDefinitionId",
@@ -5118,6 +5682,16 @@
             "items": {
               "$ref": "#/components/schemas/SharedFieldAccessResponse"
             }
+          },
+          "lifecycle": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RecordLifecycleStateResponse"
+              }
+            ]
           }
         }
       },
@@ -5156,6 +5730,94 @@
           },
           "createdByCurrentUser": {
             "type": "boolean"
+          }
+        }
+      },
+      "RecordRestoreRequest": {
+        "required": [
+          "expectedCurrentContentRevision",
+          "sourceOperationId",
+          "restoreReason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedCurrentContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "sourceOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "restoreReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "acknowledgePlaintext": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "RecordRestoreResponse": {
+        "required": [
+          "formRecordId",
+          "restoredFromContentRevision",
+          "contentRevision",
+          "committedOperationId",
+          "eTag",
+          "changedFieldKeys",
+          "clearedFieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "restoredFromContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committedOperationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "eTag": {
+            "type": "string"
+          },
+          "changedFieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "clearedFieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -5275,6 +5937,136 @@
           }
         }
       },
+      "RecordVersionItemResponse": {
+        "required": [
+          "contentRevision",
+          "acceptedOn",
+          "actorKind",
+          "actorUserId",
+          "actorDisplayName",
+          "isCurrent",
+          "verifiableNow",
+          "actionLabel",
+          "actionSource"
+        ],
+        "type": "object",
+        "properties": {
+          "contentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "acceptedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorKind": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "verifiableNow": {
+            "type": "boolean"
+          },
+          "actionLabel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actionSource": {
+            "type": "string"
+          }
+        }
+      },
+      "RecordVersionListResponse": {
+        "required": [
+          "formRecordId",
+          "currentContentRevision",
+          "versions",
+          "nextAfterRevision",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordVersionItemResponse"
+            }
+          },
+          "nextAfterRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "RecordVersionViewResponse": {
+        "required": [
+          "version",
+          "projection",
+          "currentContentRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/RecordVersionItemResponse"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/RecordProjectionResponse"
+          },
+          "currentContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "RelationshipDefinitionResponse": {
         "required": [
           "formRelationshipDefinitionId",
@@ -5348,6 +6140,234 @@
           },
           "removalReason": {
             "type": "string"
+          }
+        }
+      },
+      "RestoreFieldChangeResponse": {
+        "required": [
+          "fieldKey",
+          "label",
+          "sectionPath",
+          "currentValue",
+          "restoredValue",
+          "change",
+          "inCurrentForm",
+          "storedEncrypted",
+          "plaintextAcknowledgementRequired"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sectionPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currentValue": {
+            "type": "string"
+          },
+          "restoredValue": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string"
+          },
+          "inCurrentForm": {
+            "type": "boolean"
+          },
+          "storedEncrypted": {
+            "type": "boolean"
+          },
+          "plaintextAcknowledgementRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RestorePreviewResponse": {
+        "required": [
+          "formRecordId",
+          "version",
+          "sourceOperationId",
+          "currentContentRevision",
+          "currentETag",
+          "currentStatus",
+          "canRestore",
+          "blockedReasonCode",
+          "blockedReason",
+          "hasChanges",
+          "fields",
+          "sections",
+          "unchangedDocumentCount",
+          "formHasRelatedRecords",
+          "validation",
+          "plaintextAcknowledgementFieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "$ref": "#/components/schemas/RecordVersionItemResponse"
+          },
+          "sourceOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currentContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "currentETag": {
+            "type": "string"
+          },
+          "currentStatus": {
+            "type": "string"
+          },
+          "canRestore": {
+            "type": "boolean"
+          },
+          "blockedReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blockedReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasChanges": {
+            "type": "boolean"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RestoreFieldChangeResponse"
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RestoreSectionChangeResponse"
+            }
+          },
+          "unchangedDocumentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "formHasRelatedRecords": {
+            "type": "boolean"
+          },
+          "validation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RestoreValidationResponse"
+              }
+            ]
+          },
+          "plaintextAcknowledgementFieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RestoreSectionChangeResponse": {
+        "required": [
+          "groupKey",
+          "label",
+          "currentEntryCount",
+          "restoredEntryCount",
+          "newEntryCount",
+          "removedEntryCount",
+          "inCurrentForm"
+        ],
+        "type": "object",
+        "properties": {
+          "groupKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "currentEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "restoredEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "newEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "removedEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "inCurrentForm": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RestoreValidationResponse": {
+        "required": [
+          "code",
+          "message",
+          "fieldKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

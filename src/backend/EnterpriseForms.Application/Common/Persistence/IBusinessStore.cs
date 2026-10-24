@@ -17,6 +17,27 @@ namespace EnterpriseForms.Application.Common.Persistence;
 /// </summary>
 public sealed record LegacyPlaintextRecord(Guid FormRecordId, int PlaintextValueCount);
 
+/// <summary>
+/// Local estimate of records holding rows of a field in the old form (Phase C6 M0, S3). <see cref="Holders"/> are records
+/// whose accepted operation the local projection resolves (with the row count in that operation); <see cref="UnresolvedRecordIds"/>
+/// are records with rows of the field whose accepted operation cannot be resolved locally (missing, dangling or uncorroborated
+/// projection). Unresolved records are never guessed: they are reported separately and checked against the Authority by
+/// the migration worker. Neither list is an authorization or completeness decision.
+/// </summary>
+public sealed record LegacyRecordEstimate(IReadOnlyList<LegacyPlaintextRecord> Holders, IReadOnlyList<Guid> UnresolvedRecordIds)
+{
+    public int HolderRecordCount => Holders.Count;
+
+    public int HolderValueCount => Holders.Sum(h => h.PlaintextValueCount);
+
+    /// <summary>Records a migration must visit: resolved holders and every unresolved record (a record is never skipped on a guess).</summary>
+    public List<LegacyPlaintextRecord> RecordsToVisit() =>
+        Holders.Concat(UnresolvedRecordIds.Where(id => Holders.All(h => h.FormRecordId != id)).Select(id => new LegacyPlaintextRecord(id, 0))).OrderBy(r => r.FormRecordId).ToList();
+}
+
+/// <summary>One protection-migration item of a record: the migration and the item's attempt counter (operation-identity attribution, Phase C6 M0 S4).</summary>
+public sealed record ProtectionMigrationAttempt(Guid FieldProtectionMigrationId, int AttemptCount);
+
 public interface IBusinessStore
 {
     Task<IBusinessScope> BeginScopeAsync(CancellationToken cancellationToken);
@@ -104,6 +125,26 @@ public interface IBusinessScope : IAsyncDisposable
     // FormRecords
     Task<FormRecord?> FindFormRecordAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Projects an Authority-accepted head onto form_records (Phase C6 M0, S2) in one conditional UPDATE, so concurrent
+    /// writers can never move it backwards: applied only when <paramref name="acceptedContentRevision"/> is higher than the
+    /// projected revision, or equal with a different operation (the Authority's answer wins over a stale or forged pointer).
+    /// <paramref name="acceptedOperationId"/> null with revision 0 records "the Authority holds no accepted content", applied
+    /// only while no accepted operation is projected. Returns true when the row changed. The caller commits.
+    /// </summary>
+    Task<bool> ProjectAcceptedHeadAsync(Guid tenantId, Guid formRecordId, long acceptedContentRevision, Guid? acceptedOperationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Projects the lifecycle status of the Authority-verified signed header onto form_records (record_status, submitted_on)
+    /// only while the projected revision still equals <paramref name="atContentRevision"/>, so a slower writer never
+    /// overwrites a newer revision's status. The projection serves listing and filtering only; every lifecycle decision
+    /// uses the verified header. Returns true when the row changed. The caller commits.
+    /// </summary>
+    Task<bool> ProjectLifecycleAsync(Guid tenantId, Guid formRecordId, long atContentRevision, string recordStatus, DateTimeOffset? submittedOn, CancellationToken cancellationToken);
+
+    /// <summary>Upload sessions of the record that could still add a document (open, completed or processed and not yet committed, within the session lifetime).</summary>
+    Task<int> CountInFlightUploadSessionsAsync(Guid tenantId, Guid formRecordId, DateTimeOffset notBefore, CancellationToken cancellationToken);
+
     Task<List<FormRecord>> GetFormRecordsAsync(Guid tenantId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
 
     void AddFormRecord(FormRecord record);
@@ -184,18 +225,15 @@ public interface IBusinessScope : IAsyncDisposable
 
     void AddSecurityPolicy(OrganizationSecurityPolicy policy);
 
-    Task<int> CountLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
-
-    /// <summary>Records whose latest committed snapshot still holds plaintext rows of the field, with the number of such rows (projection estimate).</summary>
-    Task<List<LegacyPlaintextRecord>> GetLegacyPlaintextRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Local estimate of records whose projected accepted operation holds rows of the field in the old form: typed plaintext
+    /// rows (<paramref name="encryptedForm"/> false) or encrypted rows (true). Phase C6 M0: unresolved records are reported
+    /// separately, never guessed (see <see cref="LegacyRecordEstimate"/>).
+    /// </summary>
+    Task<LegacyRecordEstimate> EstimateOldFormRecordsAsync(Guid fieldDefinitionId, bool encryptedForm, CancellationToken cancellationToken);
 
     /// <summary>Plaintext rows of the field inside one operation's staged snapshot (used with the authority-accepted head operation for the verified post-check).</summary>
     Task<int> CountPlaintextRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken);
-
-    /// <summary>Records whose latest staged snapshot still holds encrypted rows of the field (projection estimate for a decrypt migration).</summary>
-    Task<List<LegacyPlaintextRecord>> GetLegacyEncryptedRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
-
-    Task<int> CountLegacyEncryptedRecordsAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
 
     Task<int> CountEncryptedRowsInOperationAsync(Guid fieldDefinitionId, Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken);
 
@@ -215,6 +253,12 @@ public interface IBusinessScope : IAsyncDisposable
     Task<FieldProtectionMigrationItem?> FindProtectionMigrationItemAsync(Guid fieldProtectionMigrationItemId, CancellationToken cancellationToken);
 
     Task<HashSet<Guid>> GetProtectionMigrationItemRecordIdsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
+
+    /// <summary>Every item of a migration, tracked (post-check results are written onto them).</summary>
+    Task<List<FieldProtectionMigrationItem>> GetProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
+
+    /// <summary>Items of one record across every protection migration of the form (operation-identity attribution).</summary>
+    Task<List<ProtectionMigrationAttempt>> GetProtectionMigrationAttemptsForRecordAsync(Guid formDefinitionId, Guid formRecordId, CancellationToken cancellationToken);
 
     /// <summary>Every business record of a form (migration post-check scope; untrusted list, verified record-by-record against the authority).</summary>
     Task<List<Guid>> GetFormRecordIdsOfFormAsync(Guid formDefinitionId, CancellationToken cancellationToken);

@@ -2,6 +2,7 @@ using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Api.Features.FormDefinitions;
 using EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 using EnterpriseForms.Application.Features.FormRecords.GetFormRecord;
+using EnterpriseForms.Application.Features.FormRecords.History;
 using EnterpriseForms.Application.Features.FormRecords.ListRecords;
 using EnterpriseForms.Application.Features.FormRecords.TransferOwnership;
 using EnterpriseForms.Application.Features.FormRecords.UpdateFormRecord;
@@ -28,13 +29,13 @@ public static class FormRecordEndpoints
 
         var records = endpoints.MapGroup(ApiVersions.V1Prefix + "/form-records").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
 
-        records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, string? recordStatus, bool? includeChildren, string? sortBy, string? sortDirection, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
+        records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, string? recordStatus, bool? includeChildren, bool? includeArchived, string? q, string? sortBy, string? sortDirection, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
             {
-                var query = RecordListQuery.Create(formDefinitionId, recordStatus, includeChildren ?? false, sortBy, sortDirection, pageSize ?? 25);
+                var query = RecordListQuery.Create(formDefinitionId, recordStatus, includeChildren ?? false, sortBy, sortDirection, pageSize ?? 25, includeArchived ?? false, q);
                 return TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), query, continuationToken, cancellationToken).ConfigureAwait(false));
             })
             .WithName("ListFormRecords")
-            .WithSummary("My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, sort and authorization revision. Rows carry unverified local metadata only; open a record for the verified projection.");
+            .WithSummary("My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, search, sort and authorization revision. q (optional) narrows the list to an exact record id or short reference REC-XXXXXXXX decided from the same complete authorized set (never a field-value search; anything else is 422 LOOKUP_INVALID); an exact search also finds archived and related records, and the Form and Status filters still apply. Rows carry unverified local metadata only; open a record for the verified projection.");
 
         records.MapGet("/{formRecordId:guid}", static async Task<Ok<FormRecordResponse>> (Guid formRecordId, HttpContext http, GetFormRecordHandler handler, CancellationToken cancellationToken) =>
             {
@@ -55,6 +56,48 @@ public static class FormRecordEndpoints
             .WithName("GetRecordProjection")
             .WithSummary("Verified projection for the UI: layout version, field metadata, authorized values and documents, permitted actions, ETag.");
 
+        records.MapGet("/{formRecordId:guid}/versions", static async Task<Ok<RecordVersionListResponse>> (Guid formRecordId, long? after, int? pageSize, HttpContext http, RecordHistoryHandler handler, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handler.ListAsync(BusinessAuthentication.RequireContext(http), formRecordId, after, pageSize, cancellationToken).ConfigureAwait(false)))
+            .WithName("ListRecordVersions")
+            .WithSummary("Phase C6 M2: accepted versions of a record in chronological order, from the Authorization Authority (AC-1): version number, accepted time, actor, current marker. Action labels carry their source (Authority or the unverified activity log). Only a person who may read the whole record now; anyone else gets 404.");
+
+        records.MapGet("/{formRecordId:guid}/versions/{contentRevision:long}", static async Task<Ok<RecordVersionViewResponse>> (Guid formRecordId, long contentRevision, HttpContext http, RecordHistoryHandler handler, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handler.ViewAsync(BusinessAuthentication.RequireContext(http), formRecordId, contentRevision, cancellationToken).ConfigureAwait(false)))
+            .WithName("GetRecordVersion")
+            .WithSummary("Phase C6 M2: one earlier version, read-only, after the Authority verified its exact rows against the manifest it accepted for that version (any mismatch fails closed: 423, the record is quarantined as for the current version). Current form layout and labels; the version's values, documents and status.");
+
+        records.MapGet("/{formRecordId:guid}/versions/{contentRevision:long}/restore-preview", static async Task<Ok<RestorePreviewResponse>> (Guid formRecordId, long contentRevision, HttpContext http, RecordRestoreHandler handler, CancellationToken cancellationToken) =>
+            {
+                var response = await handler.PreviewAsync(BusinessAuthentication.RequireContext(http), formRecordId, contentRevision, cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(response);
+            })
+            .WithName("PreviewRecordRestore")
+            .WithSummary("Phase C6 M3: what restoring an earlier version would change (owner only; nothing is written). The version is verified through the Authority's history; current and restored values side by side (no-store), new entries, unchanged documents, current-form validation, values that would lose application encryption (OD-13), and whether the restore is possible now (Draft only).");
+
+        records.MapPost("/{formRecordId:guid}/versions/{contentRevision:long}/restore", static async Task<Ok<RecordRestoreResponse>> (Guid formRecordId, long contentRevision, RecordRestoreRequest request, HttpContext http, RecordRestoreHandler handler, CancellationToken cancellationToken) =>
+            {
+                var context = BusinessAuthentication.RequireContext(http);
+                var header = http.Request.Headers.IfMatch.ToString().Trim().Trim('"');
+                var effective = request;
+                if (header.Length > 0)
+                {
+                    var revisionText = header.Contains('-', StringComparison.Ordinal) ? header[..header.IndexOf('-', StringComparison.Ordinal)] : header;
+                    if (!long.TryParse(revisionText, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var revision) || (request.ExpectedCurrentContentRevision != 0 && request.ExpectedCurrentContentRevision != revision))
+                    {
+                        throw new Application.Common.BusinessException("PRECONDITION_FAILED", 412, "If-Match must carry the current content revision ETag and agree with expectedCurrentContentRevision");
+                    }
+
+                    effective = request with { ExpectedCurrentContentRevision = revision };
+                }
+
+                var response = await handler.RestoreAsync(context, formRecordId, contentRevision, effective, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.ETag = response.ETag;
+                return TypedResults.Ok(response);
+            })
+            .WithName("RestoreRecordVersion")
+            .WithSummary("Phase C6 M3: restores the field values and repeating-section entries of an earlier version as a NEW revision (owner, Draft, reason required, optimistic by If-Match/expected revision, idempotent). The source is verified through the Authority's history; values are validated against the current form (all-or-nothing) and stored under the current protection policy; documents, related records, status, owners and shares are not restored; anything that exists only in the version gets a new identity.");
+
         records.MapPatch("/{formRecordId:guid}", static async Task<Ok<FormRecordResponse>> (Guid formRecordId, UpdateFormRecordRequest request, HttpContext http, UpdateFormRecordHandler handler, CancellationToken cancellationToken) =>
             {
                 var context = BusinessAuthentication.RequireContext(http);
@@ -66,6 +109,21 @@ public static class FormRecordEndpoints
             .WithName("UpdateFormRecord")
             .WithSummary("Optimistic (expected_content_revision or If-Match) full-snapshot typed update staged as a new immutable candidate and committed by the authority.");
 
+        foreach (var transition in new[] { Application.Features.FormRecords.Lifecycle.RecordLifecycle.Submit, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Reopen, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Archive, Application.Features.FormRecords.Lifecycle.RecordLifecycle.Unarchive })
+        {
+            var captured = transition;
+            records.MapPost("/{formRecordId:guid}/" + captured.ToLowerInvariant(), async Task<Ok<RecordLifecycleResponse>> (Guid formRecordId, RecordLifecycleRequest request, HttpContext http, Application.Features.FormRecords.Lifecycle.RecordLifecycleHandler handler, CancellationToken cancellationToken) =>
+                {
+                    var context = BusinessAuthentication.RequireContext(http);
+                    var effective = RequireIfMatchRevision(http, request);
+                    var response = await handler.HandleAsync(context, formRecordId, captured, effective, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false);
+                    http.Response.Headers.ETag = response.ETag;
+                    return TypedResults.Ok(response);
+                })
+                .WithName(captured + "FormRecord")
+                .WithSummary($"Lifecycle transition '{captured}' (owner only): optimistic by If-Match/expected revision and expected status, committed as a new accepted revision through the authority; the verified signed header carries the status.");
+        }
+
         records.MapPost("/{formRecordId:guid}/transfer-ownership", static async Task<Ok<CommandStatusResponse>> (Guid formRecordId, TransferOwnershipRequest request, HttpContext http, TransferOwnershipHandler handler, CancellationToken cancellationToken) =>
             {
                 var context = BusinessAuthentication.RequireContext(http);
@@ -74,6 +132,13 @@ public static class FormRecordEndpoints
             .WithName("TransferRecordOwnership");
 
         return endpoints;
+    }
+
+    /// <summary>Lifecycle transitions: the same If-Match rule as updates (the header may carry the content-revision ETag).</summary>
+    internal static RecordLifecycleRequest RequireIfMatchRevision(HttpContext http, RecordLifecycleRequest request)
+    {
+        var carrier = RequireIfMatchRevision(http, new UpdateFormRecordRequest(request.ExpectedContentRevision, new Dictionary<string, string>()));
+        return request with { ExpectedContentRevision = carrier.ExpectedContentRevision };
     }
 
     /// <summary>PB-06: `If-Match: "revision"` overrides/validates the body revision; 412 on mismatch between the two.</summary>

@@ -89,7 +89,19 @@ public static class RecordGroupProjection
 /// </summary>
 public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAuthorityClient authority, RecordCandidateStager stager, Encryption.IFieldEncryptionService encryption)
 {
-    public async Task<VerifiedRecord> ReadAsync(RequestContext context, Guid formRecordId, ProtectedAction action, CancellationToken cancellationToken)
+    public Task<VerifiedRecord> ReadAsync(RequestContext context, Guid formRecordId, ProtectedAction action, CancellationToken cancellationToken) =>
+        ReadCoreAsync(context, formRecordId, action, null, cancellationToken);
+
+    /// <summary>
+    /// Phase C6 M2: verified read of one earlier accepted revision. <paramref name="historicOperationId"/> must come from the
+    /// Authority's history (AC-1), never from business rows. The exact staged rows of that operation are verified by the
+    /// Authority against the manifest it accepted for it (full read of the record now is required). Projections of the
+    /// current head are not touched. On any mismatch nothing is released (and, AC-4, the Authority quarantines the record).
+    /// </summary>
+    public Task<VerifiedRecord> ReadHistoricAsync(RequestContext context, Guid formRecordId, Guid historicOperationId, CancellationToken cancellationToken) =>
+        ReadCoreAsync(context, formRecordId, ProtectedAction.Read, historicOperationId, cancellationToken);
+
+    private async Task<VerifiedRecord> ReadCoreAsync(RequestContext context, Guid formRecordId, ProtectedAction action, Guid? historicOperationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var user = context.ToDelegatedUser();
@@ -99,8 +111,9 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
             throw new BusinessException("NO_COMMITTED_CONTENT", 404, "record has no accepted content");
         }
 
-        var staged = await stager.ReadStagedAsync(formRecordId, head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false);
-        var verification = await authority.VerifyRecordProjectionAsync(user, new VerifyRecordProjectionRequest(context.OrganizationId, formRecordId, action, staged.Items), cancellationToken).ConfigureAwait(false);
+        var historic = historicOperationId is { } requested && requested != head.CommittedOperationId ? historicOperationId : null;
+        var staged = await stager.ReadStagedAsync(formRecordId, historic ?? head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false);
+        var verification = await authority.VerifyRecordProjectionAsync(user, new VerifyRecordProjectionRequest(context.OrganizationId, formRecordId, action, staged.Items, historic), cancellationToken).ConfigureAwait(false);
         if (!verification.Verified)
         {
             // Fail closed: nothing from the record is released (MRK-01/02/04/18). The authority has quarantined the head and journaled an incident.
@@ -131,6 +144,20 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
             fields = await scope.GetFieldDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             options = await scope.GetFieldOptionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
             groups = await scope.GetGroupDefinitionsAsync(definition.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+
+            // Phase C6 M0 (S2): the head just verified by the Authority is projected onto form_records (monotonic, atomic), so a
+            // projection left stale by a lost commit response is repaired by the next verified read. Not a modification of the record.
+            // Phase C6 M1: the verified signed header's lifecycle status is projected too (listing/filtering only), at the verified revision.
+            // Phase C6 M2: never from an earlier revision (the projections describe the current head only).
+            if (historic is null)
+            {
+                var headChanged = await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, verification.CommittedContentRevision, verification.CommittedOperationId, cancellationToken).ConfigureAwait(false);
+                var statusChanged = await scope.ProjectLifecycleAsync(context.OrganizationId, formRecordId, verification.CommittedContentRevision, staged.Header.RecordStatus, staged.Header.SubmittedOn, cancellationToken).ConfigureAwait(false);
+                if (headChanged || statusChanged)
+                {
+                    await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
         }
 
         return new VerifiedRecord(head, verification, staged.Header, staged.Rows, authorizedRows, definition, version, FormLayoutCodec.Parse(version.LayoutJson), fields, options, encryption, groups, staged.Items);

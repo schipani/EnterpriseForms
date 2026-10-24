@@ -282,6 +282,103 @@ public sealed class ContributorWriteProtocolTests
         Assert.Contains("SHARE_ITEM_NOT_UPDATABLE", (await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Contributor, op2, h.Stage(document, op2), withCurrent: true))).Message, StringComparison.Ordinal);
     }
 
+    // ---- AC-2 (Phase C6): the Authority's own lifecycle lock for share editors ----
+    // Each test drives the real ContentService exactly as a compromised or bypassed business API would: a contributor
+    // with a valid share, the switch on, a well-formed candidate and the exact current snapshot. Only the signed status of
+    // the accepted header stops it.
+
+    private static List<Row> WithStatus(List<Row> rows, Guid record, string status) => Change(rows, record, r => r.With("record_status", RowValue.Text(status)));
+
+    [Theory]
+    [InlineData("Submitted")]
+    [InlineData("Archived")]
+    public async Task AContributorWithAValidShareCannotWriteALockedRecordThroughTheAuthority(string locked)
+    {
+        var h = await new Harness().CreatedAsync();
+        h.ShareWithContributor();
+
+        // The owner's lifecycle transition is an ordinary owner content write and stays allowed.
+        Assert.Equal(2, (await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, locked), withCurrent: false)).CommittedContentRevision);
+
+        // The contributor's candidate is otherwise perfect: the accepted header unchanged, only the shared value edited.
+        var operation = Guid.CreateVersion7();
+        var candidate = h.Stage(WithStatus(Change(h.Rows(), h.Shared, r => r.With("string_value", RowValue.Text("after lock"))), h.Record, locked), operation);
+        var refused = await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Contributor, operation, candidate, withCurrent: true));
+        Assert.Equal(AuthorityErrorCodes.RecordNotEditable, refused.ErrorCode);
+        Assert.Equal(409, refused.HttpStatusCode);
+        Assert.Contains(locked, refused.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(h.Store.Operations, o => o.ContentChangeOperationId == operation); // nothing signed or stored
+        Assert.Equal(2, h.Head.CommittedContentRevision);
+
+        // A contributor cannot unlock it either: a candidate that flips the status back to Draft is refused by the same lock.
+        var unlock = Guid.CreateVersion7();
+        var flip = h.Stage(Change(h.Rows(), h.Shared, r => r.With("string_value", RowValue.Text("unlocked"))), unlock);
+        Assert.Equal(AuthorityErrorCodes.RecordNotEditable, (await Assert.ThrowsAsync<AuthorityException>(() => h.PrepareAsync(h.Contributor, unlock, flip, withCurrent: true))).ErrorCode);
+
+        // Once the owner returns the record to Draft, the same contributor write is accepted (the lock is the only difference).
+        await h.WriteAsync(h.Owner, h.Rows(), withCurrent: false);
+        var allowed = Guid.CreateVersion7();
+        var accepted = h.Stage(Change(h.Rows(), h.Shared, r => r.With("string_value", RowValue.Text("after unlock"))), allowed);
+        var prepared = await h.PrepareAsync(h.Contributor, allowed, accepted, withCurrent: true);
+        Assert.Equal(4, (await h.CommitAsync(h.Contributor, prepared, accepted)).CommittedContentRevision);
+    }
+
+    [Fact]
+    public async Task ALifecycleTransitionCommittedBetweenPrepareAndCommitDefeatsTheContributorCommit()
+    {
+        var h = await new Harness().CreatedAsync();
+        h.ShareWithContributor();
+        var operation = Guid.CreateVersion7();
+        var candidate = h.Stage(Change(h.Rows(), h.Shared, r => r.With("string_value", RowValue.Text("racing the submit"))), operation);
+        var prepared = await h.PrepareAsync(h.Contributor, operation, candidate, withCurrent: true); // prepared while Draft
+
+        var submit = Guid.CreateVersion7();
+        var submitCandidate = h.Stage(WithStatus(h.Rows(), h.Record, "Submitted"), submit);
+        await h.CommitAsync(h.Owner, await h.PrepareAsync(h.Owner, submit, submitCandidate, withCurrent: false), submitCandidate);
+
+        var stale = await Assert.ThrowsAsync<AuthorityException>(() => h.CommitAsync(h.Contributor, prepared, candidate));
+        Assert.Equal(AuthorityErrorCodes.ContentRevisionConflict, stale.ErrorCode);
+        Assert.Equal(submit, h.Head.CommittedOperationId);
+        Assert.Equal(ContentOperationStates.Aborted, h.Store.Operations.Single(o => o.ContentChangeOperationId == operation).OperationStateName);
+    }
+
+    [Fact]
+    public void TheCommitTimeCheckReadsTheSignedStatusAndFailsClosed()
+    {
+        var org = Guid.CreateVersion7();
+        var record = Guid.CreateVersion7();
+        RowCanonicalDocument Decoded(string status) => RowCanonicalDecoder.Decode(Encode(Header(org, record, status), org, Guid.CreateVersion7(), 2).Bytes);
+
+        ContentService.RequireShareEditableStatus(Decoded("Draft"), "commit");
+        foreach (var locked in new[] { "Submitted", "Archived", "Deleted", "draft", "" })
+        {
+            Assert.Equal(AuthorityErrorCodes.RecordNotEditable, Assert.Throws<AuthorityException>(() => ContentService.RequireShareEditableStatus(Decoded(locked), "commit")).ErrorCode);
+        }
+
+        Assert.Equal(AuthorityErrorCodes.RecordNotEditable, Assert.Throws<AuthorityException>(() => ContentService.RequireShareEditableStatus(null, "commit")).ErrorCode);
+    }
+
+    [Fact]
+    public async Task OwnersAndTheSwitchAreUnaffectedByTheLock()
+    {
+        // Owners: every transition and an owner write on a locked record are not refused by the Authority (the business API locks ordinary owner edits, R-01).
+        var h = await new Harness().CreatedAsync();
+        foreach (var status in new[] { "Submitted", "Draft", "Archived", "Submitted" })
+        {
+            await h.WriteAsync(h.Owner, WithStatus(h.Rows(), h.Record, status), withCurrent: false);
+        }
+
+        Assert.Equal(5, h.Head.CommittedContentRevision);
+
+        // Switch off: a contributor is refused for the switch first, whatever the status (the default stays fail-closed).
+        var off = await new Harness(contributorWritesEnabled: false).CreatedAsync();
+        off.ShareWithContributor();
+        await off.WriteAsync(off.Owner, WithStatus(off.Rows(), off.Record, "Submitted"), withCurrent: false);
+        var operation = Guid.CreateVersion7();
+        var candidate = off.Stage(WithStatus(Change(off.Rows(), off.Shared, r => r.With("string_value", RowValue.Text("x"))), off.Record, "Submitted"), operation);
+        Assert.Equal(AuthorityErrorCodes.ContributorWritesDisabled, (await Assert.ThrowsAsync<AuthorityException>(() => off.PrepareAsync(off.Contributor, operation, candidate, withCurrent: true))).ErrorCode);
+    }
+
     [Fact]
     public async Task ConcurrentWritesOnTheSameHeadAcceptExactlyOne()
     {

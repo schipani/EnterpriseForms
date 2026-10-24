@@ -1,4 +1,4 @@
-import type { FieldDefinitionResponse, FieldProtectionMigrationResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
+import type { FieldDefinitionResponse, FieldProtectionMigrationResponse, FieldProtectionVerificationResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
 import { Badge, Button, Checkbox, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -87,6 +87,34 @@ const MIGRATION_LABELS: Record<string, { tone: "info" | "warning" | "danger" | "
  */
 const COMPLETENESS_NOTE =
   "Checked by the migration worker against the Authorization Authority's accepted version of every record the business database lists for this form. This is not an independently verified completeness guarantee: a record hidden from the business database would not be covered (security finding G19).";
+
+/**
+ * Phase C6 M0: the migration worker's last check against the Authorization Authority is shown apart from the local estimate,
+ * with what it does not establish. Records the business database cannot match to their accepted version are reported as
+ * not known locally, never counted either way.
+ */
+function VerificationSummary({ verification, unresolvedRecords }: { verification: FieldProtectionVerificationResponse | null; unresolvedRecords: number }) {
+  if (verification === null && unresolvedRecords === 0) {
+    return null;
+  }
+
+  const remaining = Number(verification?.remainingRecordCount ?? 0);
+  const unverified = Number(verification?.unverifiedRecordCount ?? 0);
+  return (
+    <div className="flex flex-col gap-1 text-xs text-muted" role="group" aria-label="Migration check">
+      {verification ? (
+        <p>
+          {`Last check by the migration worker (${new Date(verification.checkedOn).toLocaleString()}): `}
+          {remaining === 0 && unverified === 0
+            ? "no checked record still holds the old form."
+            : `${remaining} record(s) still hold the old form${unverified > 0 ? `, ${unverified} record(s) could not be checked` : ""}.`}
+          {` ${verification.basis}`}
+        </p>
+      ) : null}
+      {unresolvedRecords > 0 ? <p>{`${unresolvedRecords} record(s) could not be matched to their accepted version locally; the migration worker checks them against the Authorization Authority.`}</p> : null}
+    </div>
+  );
+}
 
 /** Progress of the background re-encryption (B-28) or decryption (Amendment A1) of existing values. Shown until the server reports every listed record as converted (see COMPLETENESS_NOTE: not an independent completeness proof). */
 function MigrationProgress({ migration, legacyRecords, canRetry, onRetry, retrying, retryError }: { migration: FieldProtectionMigrationResponse; legacyRecords: number; canRetry: boolean; onRetry: () => void; retrying: boolean; retryError: unknown }) {
@@ -210,6 +238,7 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         {status.data?.migrationState === "DecryptionPendingRewrite" ? <Badge tone="warning">{status.data.legacyEncryptedRecordCount} record(s) still hold an encrypted copy</Badge> : null}
       </div>
       {status.data?.fullyEncrypted || status.data?.fullyPlaintext ? <p className="text-xs text-muted">{COMPLETENESS_NOTE}</p> : null}
+      {status.data ? <VerificationSummary verification={status.data.verification ?? null} unresolvedRecords={Number(status.data.estimateUnresolvedRecordCount ?? 0)} /> : null}
       {migration && !status.data?.fullyEncrypted && !status.data?.fullyPlaintext && migration.migrationState !== "Cancelled" ? (
         <MigrationProgress migration={migration} legacyRecords={Number(migration.migrationDirection === "Decrypt" ? status.data?.legacyEncryptedRecordCount : status.data?.legacyPlaintextRecordCount)} canRetry={migration.migrationDirection === "Decrypt" ? administrator : canEdit} onRetry={() => retry.mutate()} retrying={retry.isPending} retryError={retry.error} />
       ) : null}

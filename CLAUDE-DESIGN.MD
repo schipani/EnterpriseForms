@@ -492,6 +492,8 @@ BFF must enforce CSRF, safe streaming request size, chunk indexes, bounded concu
 
 ## 7. Form Designer and Renderer visual contracts
 
+**Form controls everywhere** follow `docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md` (label, control with its buttons, help text, then the error; shared components only). It supersedes any per-screen help-text order below.
+
 ### 7.1 Form Designer
 
 - Designer home: cards/list with draft/published badge, last edited by, form version, preview/publish actions.

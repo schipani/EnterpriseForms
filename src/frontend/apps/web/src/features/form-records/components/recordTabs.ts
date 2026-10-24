@@ -1,5 +1,5 @@
 /** Record workspace sections (C-30), addressable by URL so links can open a section directly. */
-export const RECORD_TABS = ["details", "related", "documents", "sharing", "activity"] as const;
+export const RECORD_TABS = ["details", "related", "documents", "sharing", "activity", "history"] as const;
 
 export type RecordTab = (typeof RECORD_TABS)[number];
 

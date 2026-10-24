@@ -1,0 +1,96 @@
+# Persistent development stack (Phase C6, C-47). DEVELOPMENT ONLY.
+#
+# Operate it ONLY through scripts/devstack/devstack.py (init | up | unseal | status | stop | backup | restore-test),
+# which supplies the custody secrets below from outside the repository:
+#   python scripts/devstack/devstack.py up
+# Equivalent raw command (the script sets the DEVSTACK_* secrets from the custody file):
+#   docker compose -p enterpriseforms-dev -f compose.yaml -f compose.dev-persistent.yaml --env-file .env up -d --wait
+#
+# Differences from compose.dev.yaml (the retired 'enterpriseforms' project, whose in-memory dev Vault lost its keys):
+#   * Vault runs a real server on Raft integrated storage in its own named volume, starts SEALED after every restart and
+#     is unsealed from the custody file (docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md). The Authority holds a
+#     least-privilege transit token (vault/authority-transit-policy.hcl), never the root token.
+#   * Distinct project, volumes, pinned subnets (172.31.0.0/24, 172.31.1.0/24), host ports and image tags, so the retired
+#     project, its volumes and the security-test stack are never reused, overwritten or disturbed.
+#   * The business LocalDevelopment KEK is generated per environment and held in custody, not taken from .env.
+# Required variables have no default on purpose: a raw `docker compose` run without the custody values fails fast instead
+# of starting with the retired environment's KEK or without a Vault token.
+name: ${DEVSTACK_PROJECT:-enterpriseforms-dev}
+
+networks:
+  business-net:
+    ipam:
+      config: [{ subnet: "${DEVSTACK_BUSINESS_SUBNET:-172.31.0.0/24}" }]
+  authority-net:
+    ipam:
+      config: [{ subnet: "${DEVSTACK_AUTHORITY_SUBNET:-172.31.1.0/24}" }]
+
+services:
+  business-db:
+    volumes:
+      - ${DEVSTACK_PG_HBA_DIR:-./postgres/dev-persistent}/pg_hba.business.conf:/etc/postgresql/pg_hba.conf:ro
+      - business-db-data:/var/lib/postgresql
+  authority-db:
+    volumes:
+      - ${DEVSTACK_PG_HBA_DIR:-./postgres/dev-persistent}/pg_hba.authority.conf:/etc/postgresql/pg_hba.conf:ro
+      - authority-db-data:/var/lib/postgresql
+  spicedb-db:
+    volumes: [spicedb-db-data:/var/lib/postgresql]
+  # Azurite keeps its data in its working directory unless --location is given; without it the security-event archive and the
+  # document blobs live in the container layer and are lost when a container is recreated or restored (found in C-47).
+  archive-store:
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose", "--location", "/data"]
+    volumes: [archive-store-data:/data]
+  azurite:
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck", "--loose", "--location", "/data"]
+    volumes: [azurite-data:/data]
+
+  vault:
+    # DEVELOPMENT ONLY. Persistent, sealed-at-rest Vault (Raft). The image entrypoint loads /vault/config/*.hcl.
+    command: ["server"]
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+      SKIP_SETCAP: "true"
+    volumes:
+      - ./vault/vault-dev-persistent.hcl:/vault/config/vault.hcl:ro
+      - ./vault/authority-transit-policy.hcl:/vault/policies/authority-transit.hcl:ro
+      - vault-data:/vault/file
+
+  vault-transit-init:
+    # The transit engine, policy and Authority token are created once by `devstack.py init`. This gate only proves, before
+    # the Authority starts, that Vault is unsealed and the Authority's token is valid (fail fast, nothing is created).
+    entrypoint: ["sh", "-c", "vault status -address=http://vault:8200 >/dev/null && vault token lookup -address=http://vault:8200 >/dev/null && echo 'vault unsealed; authority token valid'"]
+    environment:
+      VAULT_TOKEN: ${DEVSTACK_VAULT_AUTHORITY_TOKEN:?use scripts/devstack/devstack.py (the custody file supplies the Vault token)}
+
+  authority-migrate:
+    image: enterpriseforms/authority:dev
+  authority:
+    image: enterpriseforms/authority:dev
+    environment:
+      Signing__VaultTransit__Token: ${DEVSTACK_VAULT_AUTHORITY_TOKEN:?use scripts/devstack/devstack.py (the custody file supplies the Vault token)}
+
+  business-migrate:
+    image: enterpriseforms/api:dev
+  api:
+    image: enterpriseforms/api:dev
+    environment:
+      Encryption__LocalDevelopmentKekBase64: ${DEVSTACK_LOCAL_DEV_KEK_BASE64:?use scripts/devstack/devstack.py (the custody file supplies the KEK)}
+    ports: ["127.0.0.1:${DEVSTACK_API_PORT:-5280}:8080"]
+  worker:
+    image: enterpriseforms/worker:dev
+    environment:
+      Encryption__LocalDevelopmentKekBase64: ${DEVSTACK_LOCAL_DEV_KEK_BASE64:?use scripts/devstack/devstack.py (the custody file supplies the KEK)}
+  web:
+    image: enterpriseforms/web:dev
+    ports: ["127.0.0.1:${DEVSTACK_WEB_PORT:-8091}:8080"]
+  dev-seed:
+    image: enterpriseforms/dev-seed:dev
+
+volumes:
+  business-db-data: {}
+  authority-db-data: {}
+  spicedb-db-data: {}
+  archive-store-data: {}
+  azurite-data: {}
+  vault-data: {}

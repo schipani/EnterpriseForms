@@ -78,6 +78,21 @@ describe("OperationExecutor (same-origin transport policy)", () => {
     expect(postCalls).toBe(1);
   });
 
+  it("marks the last failure final when retries are exhausted, so the caller is settled instead of waiting forever", async () => {
+    let calls = 0;
+    const events: OperationEvent[] = [];
+    const executor = new OperationExecutor((e) => events.push(e), async () => {
+      calls++;
+      return jsonResponse(503, { title: "AUTHORITY_UNAVAILABLE" });
+    });
+    executor.handle({ type: "enqueue", operation: { operationId: "down", lane: "interactive-read", method: "GET", endpointKey: "records.list", query: { q: "REC-11111111" } } });
+    const last = await settle(events, (e) => e.type === "failed" && e.operationId === "down" && e.final === true, 15000);
+    expect(last).toMatchObject({ errorCode: "AUTHORITY_UNAVAILABLE", status: 503, retryable: true, final: true });
+    expect(calls).toBe(4); // the first attempt and three retries
+    expect(events.filter((e) => e.type === "failed" && e.operationId === "down" && e.final === true)).toHaveLength(1);
+    expect(events.filter((e) => e.type === "failed" && e.operationId === "down" && !e.final)).toHaveLength(3);
+  }, 20000);
+
   it("clears the queue when the security context is cleared", async () => {
     const events: OperationEvent[] = [];
     const executor = new OperationExecutor((e) => events.push(e), async () => {

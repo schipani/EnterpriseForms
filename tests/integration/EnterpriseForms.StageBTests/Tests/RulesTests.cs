@@ -251,7 +251,7 @@ public sealed class RulesTests(StageBFixture fixture)
         Assert.Equal("Acme Synthetic Ltd", hidden["company_name"]);
         Assert.False(hidden.ContainsKey("side_note"));
         Assert.Equal("person", hidden["applicant_kind"]);
-        Assert.Equal("1", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values e JOIN field_definitions f ON f.field_definition_id = e.field_definition_id WHERE e.form_record_id = '{record:D}' AND f.field_key = 'company_name' AND e.content_change_operation_id = (SELECT accepted_content_change_operation_id FROM form_records WHERE form_record_id = '{record:D}');").Trim());
+        Assert.Equal("1", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_encrypted_values e JOIN field_definitions f ON f.field_definition_id = e.field_definition_id WHERE e.form_record_id = '{record:D}' AND f.field_key = 'company_name' AND e.content_change_operation_id = '{AuthorityOracle.Head(fixture.Stack, record).OperationId!.Value:D}';").Trim());
 
         // While hidden, the value cannot be changed or cleared; switching back shows the retained value again, and the cleared one starts empty.
         Assert.Equal("FIELD_HIDDEN_BY_RULE", (await EditAsync(s, record, s.Clerk, new() { ["company_name"] = "Changed" })).ErrorCode);

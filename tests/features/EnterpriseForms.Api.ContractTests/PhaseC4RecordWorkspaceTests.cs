@@ -147,6 +147,8 @@ public sealed class PhaseC4RecordWorkspaceTests
 
         public Task<VerifyRecordProjectionResult> VerifyRecordProjectionAsync(DelegatedUserContext user, VerifyRecordProjectionRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
 
+        public Task<ContentHistoryPage> GetContentHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, long? afterRevision, int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<AcceptedContentRevision> GetCommittedContentRevisionForReprotectionAsync(Guid organizationId, Guid formRecordId, Guid reprotectionCommandId, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public Task<PreparedContentOperation> PrepareReprotectionAsync(PrepareContentChangeRequest request, string idempotencyKey, CancellationToken cancellationToken) => throw new NotSupportedException();

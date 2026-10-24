@@ -1,4 +1,5 @@
 export { Button, type ButtonProps, type ButtonVariant } from "./Button";
+export { ActionIcons, type ActionIconComponent } from "./actionIcons";
 export { FieldLayoutProvider, FieldShell, TextArea, TextInput, inputClass, type TextAreaProps, type TextInputProps } from "./Field";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
 export { Select, type SelectOption, type SelectProps } from "./Select";

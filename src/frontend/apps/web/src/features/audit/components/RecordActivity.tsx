@@ -1,4 +1,4 @@
-import { useApi } from "@enterpriseforms/app-runtime";
+import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import { Button, LoadingBlock, StatusMessage } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorPanel } from "../../support";
@@ -11,6 +11,16 @@ export function RecordActivity({ formRecordId }: { formRecordId: string }) {
     return <LoadingBlock label="Loading activity" />;
   }
   if (activity.isError) {
+    // Expected refusal (the person can't read the whole record, e.g. a field-share recipient who opened the address directly,
+    // or access was just removed): a plain unavailable state, not a technical error. Real failures keep the error panel.
+    const refusal = presentError(activity.error);
+    if (refusal.status === 404 || refusal.status === 403) {
+      return (
+        <StatusMessage tone="info" title="Activity isn't available for this record">
+          The activity log is shown to people who can see the whole record. Your access to this record is limited to what was shared with you.
+        </StatusMessage>
+      );
+    }
     return <ErrorPanel error={activity.error} onRetry={() => void activity.refetch()} />;
   }
   return (

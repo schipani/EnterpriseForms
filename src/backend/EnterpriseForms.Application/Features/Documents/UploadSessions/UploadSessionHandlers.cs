@@ -49,6 +49,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
 
         // Authorization: the record must verify and the caller must hold Edit (owner or parent owner); document fields come from the layout.
         var verified = await reader.ReadAsync(context, request.FormRecordId, ProtectedAction.Edit, cancellationToken).ConfigureAwait(false);
+        FormRecords.Lifecycle.RecordLifecycle.RequireContentEditable(verified);
         var edit = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormRecord, request.FormRecordId), ProtectedAction.Edit), cancellationToken).ConfigureAwait(false);
         if (!edit.Allowed)
         {
@@ -298,6 +299,8 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
             throw new BusinessException("FORBIDDEN", 403, "committing documents requires record ownership");
         }
 
+        FormRecords.Lifecycle.RecordLifecycle.RequireContentEditable(verified);
+
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var rows = new List<ISignedContentRow>();
         rows.AddRange(verified.AllRows.OfType<FieldValueRowBase>().Select(v => CloneValue(v)));
@@ -324,7 +327,7 @@ public sealed class UploadSessionHandlers(IBusinessStore store, IAuthorizationAu
                 }
 
                 var record = await scope.FindFormRecordAsync(context.OrganizationId, session.FormRecordId, cancellationToken).ConfigureAwait(false);
-                if (record is not null && accepted.CommittedOperationId is { } acceptedOperation && record.RecordAcceptedContent(accepted.CommittedContentRevision, acceptedOperation))
+                if (record is not null && accepted.CommittedOperationId is not null && await scope.ProjectAcceptedHeadAsync(context.OrganizationId, session.FormRecordId, accepted.CommittedContentRevision, accepted.CommittedOperationId, cancellationToken).ConfigureAwait(false))
                 {
                     record.ModifiedOn = clock.GetUtcNow();
                     record.ModifiedByUserId = context.LocalUserId;
