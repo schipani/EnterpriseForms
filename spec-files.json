@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "e6212803b961f869642c1fd5e2e26bc6423bd10ed3b2ebf108f39c2f804a8c4b",
-      "bytes": 27784
+      "sha256": "0f483867a9a3f8aee01877a65bf2f57652425924aa3ce3eedece79f5c6fd6d4c",
+      "bytes": 29027
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "c02fd78792b246aa4044a1edef578718c18768cd0194bb8126bfc4428157c63d",
-      "bytes": 76453
+      "sha256": "0ae57b7e9b1a8c6d27335dcf922d27ebcf4dc31cef25a96b7c48ec9ed13009ab",
+      "bytes": 77719
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -326,6 +326,11 @@
       "path": "docs/security/DOCUMENT_ENCRYPTION_AUDIT.md",
       "sha256": "0cef9d3ddb8d8689f1df57777a34de5bb7af28c8358d60b796a9067e5cf6fc71",
       "bytes": 13412
+    },
+    {
+      "path": "docs/security/G22_SESSION_CSRF_HOTFIX.md",
+      "sha256": "5f8212b7bd64f7aef0ee75922abdda6e37a34ad80f99c6a2064b9dbe1a98b716",
+      "bytes": 5717
     },
     {
       "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_ATTESTATION_TEMPLATE.md",
