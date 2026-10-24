@@ -64,7 +64,8 @@ test.describe("Phase C7 M2 search approval", () => {
     formId = (created["summary"] as Json)["formDefinitionId"] as string;
     const reference = (await owner.post(`/api/v1/form-definitions/${formId}/fields`, { fieldKey: "case_reference", fieldDisplayName: "Case reference", fieldDescription: "", fieldDataType: "String", options: null, fieldClassification: "Internal", fieldProtectionMode: "Standard" }))["fieldDefinitionId"] as string;
     const note = (await owner.post(`/api/v1/form-definitions/${formId}/fields`, { fieldKey: "case_note", fieldDisplayName: "Case note", fieldDescription: "", fieldDataType: "String", options: null, fieldClassification: "Confidential", fieldProtectionMode: "ApplicationEncrypted" }))["fieldDefinitionId"] as string;
-    const saved = await owner.put(`/api/v1/form-definitions/${formId}/draft`, { expectedDraftRevision: 0, layoutJson: JSON.stringify({ layoutSchemaVersion: 2, title: formName, sections: [{ sectionKey: "main", title: "Case", gridColumns: 4, elements: [field(reference, "Case reference"), field(note, "Case note")] }] }) });
+    const draft = (await owner.get(`/api/v1/form-definitions/${formId}`))["draft"] as Json | null;
+    const saved = await owner.put(`/api/v1/form-definitions/${formId}/draft`, { expectedDraftRevision: draft ? Number(draft["draftRevision"]) : 0, layoutJson: JSON.stringify({ layoutSchemaVersion: 2, title: formName, sections: [{ sectionKey: "main", title: "Case", gridColumns: 4, elements: [field(reference, "Case reference"), field(note, "Case note")] }] }) });
     const version = await owner.post(`/api/v1/form-definitions/${formId}/publish`, { expectedDraftRevision: Number(saved["draftRevision"]), expectedCurrentVersionNumber: 0, changeReason: "search e2e" });
     expect(version["authorityRegistered"]).toBe(true);
     await signOut(page);
@@ -153,6 +154,8 @@ test.describe("Phase C7 M2 search approval", () => {
     await withdraw.getByRole("textbox", { name: "Reason" }).fill("e2e withdrawal");
     await withdraw.getByRole("button", { name: "Withdraw search approval" }).click();
     await expect(modal.getByText("Approval withdrawn", { exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(modal).toBeHidden();
     await signOut(page);
 
     await signIn(page, "clerk");

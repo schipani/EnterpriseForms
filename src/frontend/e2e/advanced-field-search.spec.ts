@@ -116,11 +116,17 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
     const headers = { "X-CSRF-Token": session.csrfToken };
     const condition = { fieldDefinitionId: "0199a2b3-c4d5-7e6f-8123-456789abcde1", operator: "equals", valueType: "String", value: sentinel };
 
+    // Phase C7 M2: every condition is authorized against the Authority's approvals before the (still closed) execution
+    // gate, so a field nobody approved is refused as not allowed; an approved condition reaches the 503 gate
+    // (FieldSearchApprovalTests on the real stack).
     const refused = await page.request.post("/api/v1/form-records/field-search", { data: { formDefinitionId: someForm, conditions: [condition], pageSize: 25 }, headers });
-    expect(refused.status()).toBe(503);
+    expect(refused.status()).toBe(422);
     const problem = (await refused.json()) as Record<string, unknown>;
-    expect(problem).toMatchObject({ title: "SEARCH_VERIFICATION_UNAVAILABLE", unavailable_reason: "TRUSTED_SEARCH_NOT_ENABLED", retryable: false });
+    expect(problem).toMatchObject({ title: "SEARCH_FIELD_NOT_ALLOWED", retryable: false });
     expect(problem).not.toHaveProperty("items");
+    const noConditions = await page.request.post("/api/v1/form-records/field-search", { data: { formDefinitionId: someForm, conditions: [], pageSize: 25 }, headers });
+    expect(noConditions.status()).toBeGreaterThanOrEqual(422);
+    expect(await noConditions.text()).not.toContain('"items"');
 
     const tooMany = await page.request.post("/api/v1/form-records/field-search", { data: { formDefinitionId: someForm, conditions: Array(6).fill(condition), pageSize: 25 }, headers });
     expect(tooMany.status()).toBe(422);
