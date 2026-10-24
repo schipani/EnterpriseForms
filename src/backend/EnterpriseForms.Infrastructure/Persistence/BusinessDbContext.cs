@@ -52,6 +52,8 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
 
     public DbSet<FormRecord> FormRecords => Set<FormRecord>();
 
+    public DbSet<FormRecordCreationAttempt> FormRecordCreationAttempts => Set<FormRecordCreationAttempt>();
+
     public DbSet<FormRecordRevision> FormRecordRevisions => Set<FormRecordRevision>();
 
     public DbSet<FieldStringValue> FieldStringValues => Set<FieldStringValue>();

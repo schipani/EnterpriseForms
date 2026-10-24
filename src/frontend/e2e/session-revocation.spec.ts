@@ -32,7 +32,6 @@ test("signing out ends the session everywhere, including a copied cookie in anot
   await copied.close();
 
   // Back in the first browser: protected pages stay closed after sign-out, and a fresh sign-in works.
-  await page.goBack();
   await page.goto("/app/records");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in", exact: true })).toBeVisible();
   await signIn(page, "owner");
