@@ -278,7 +278,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
             await s.BootstrapAsync();
             await s.BuildAccusedWorkspaceAsync();
             var created = new System.Collections.Concurrent.ConcurrentBag<Guid>();
-            await Parallel.ForEachAsync(Enumerable.Range(0, size), new ParallelOptions { MaxDegreeOfParallelism = 3, CancellationToken = TestContext.Current.CancellationToken }, async (_, ct) => created.Add(await CreateWithRetryAsync(s, ct)));
+            await Parallel.ForEachAsync(Enumerable.Range(0, size), new ParallelOptions { MaxDegreeOfParallelism = 3, CancellationToken = TestContext.Current.CancellationToken }, async (index, ct) => created.Add(await CreateWithRetryAsync(s, $"c7-bench-{s.OrganizationId:N}-{index}", ct)));
             Assert.Equal(size, created.Count);
             foreach (var id in created)
             {
@@ -325,10 +325,17 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
                 verificationBatches = last.GetProperty("verificationBatches").GetInt32(),
                 verifiedBytes = last.GetProperty("verifiedBytes").GetInt64(),
             });
+            await WriteReportAsync(report);
         }
 
+        await WriteReportAsync(report);
+    }
+
+    private static async Task WriteReportAsync(List<object> report)
+    {
         var json = JsonSerializer.Serialize(new { measuredOn = DateTimeOffset.UtcNow, environment = "GitHub-hosted isolated Docker stack (compose.security-test)", note = "provisional engineering measurement; small sample sizes; p99 of n<=15 runs is the maximum", scenarios = report }, Indented);
         TestContext.Current.TestOutputHelper?.WriteLine(json);
+        Console.WriteLine("C7-M1-BENCHMARK " + JsonSerializer.Serialize(report));
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "EnterpriseForms.All.slnx")))
         {
@@ -343,13 +350,13 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         }
     }
 
-    /// <summary>Record registration is optimistic on the organization's authorization revision; concurrent creations retry that conflict.</summary>
-    private async Task<Guid> CreateWithRetryAsync(StageBScenario s, CancellationToken cancellationToken)
+    /// <summary>Record registration is optimistic on the organization's authorization revision; concurrent creations retry that conflict with the SAME idempotency key, so a create that committed but answered "not ready" is never registered twice.</summary>
+    private async Task<Guid> CreateWithRetryAsync(StageBScenario s, string idempotencyKey, CancellationToken cancellationToken)
     {
         for (var attempt = 0; ; attempt++)
         {
-            var created = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/records", s.Token(s.Clerk), new { values = StageBScenario.AccusedValues(), ownerTeamId = (Guid?)null });
-            if (created.Status == HttpStatusCode.Created)
+            var created = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/records", s.Token(s.Clerk), new { values = StageBScenario.AccusedValues(), ownerTeamId = (Guid?)null }, idempotencyKey);
+            if (created.Status is HttpStatusCode.Created or HttpStatusCode.OK)
             {
                 return created.Root.GetProperty("formRecordId").GetGuid();
             }
