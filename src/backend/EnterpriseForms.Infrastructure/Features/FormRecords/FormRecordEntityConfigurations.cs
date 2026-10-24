@@ -33,6 +33,20 @@ public sealed class FormRecordConfiguration : IEntityTypeConfiguration<FormRecor
     }
 }
 
+/// <summary>F-C7-01 creation fingerprints. No FK to form_records: the attempt is recorded before the record exists.</summary>
+public sealed class FormRecordCreationAttemptConfiguration : IEntityTypeConfiguration<FormRecordCreationAttempt>
+{
+    public void Configure(EntityTypeBuilder<FormRecordCreationAttempt> builder)
+    {
+        builder.MapSnakeCase("form_record_creation_attempts");
+        builder.HasKey(a => a.FormRecordCreationAttemptId);
+        builder.Property(a => a.FingerprintKeyEnvelopeJson).HasMaxLength(4000);
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(a => a.TenantId).HasConstraintName("fk_form_record_creation_attempts_tenant");
+        builder.HasIndex(a => new { a.TenantId, a.FormRecordId }).IsUnique().HasDatabaseName("uq_form_record_creation_attempts_record");
+        builder.ToTable(t => t.HasCheckConstraint("ck_form_record_creation_attempts_fingerprint", "octet_length(creation_request_fingerprint) = 32"));
+    }
+}
+
 public sealed class FormRecordRevisionConfiguration : IEntityTypeConfiguration<FormRecordRevision>
 {
     public void Configure(EntityTypeBuilder<FormRecordRevision> builder)

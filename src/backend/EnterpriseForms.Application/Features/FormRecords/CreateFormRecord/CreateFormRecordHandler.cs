@@ -18,8 +18,16 @@ namespace EnterpriseForms.Application.Features.FormRecords.CreateFormRecord;
 /// Create: authority RegisterRecord (owner = creator or an eligible team; or a child of a parent the actor owns) →
 /// Effective → typed, validated candidate v1 → staged → committed head. Local projections (record, link, audit) are
 /// written only after the authority command is Effective.
+/// <para>
+/// F-C7-01 (C-65): the idempotency key identifies one creation. The record id is derived from it, the request's
+/// fingerprint is recorded before anything else, and a retry with the same request completes whatever the earlier
+/// attempt left: an accepted head is answered from a verified read; a staged candidate is committed as staged (the
+/// Authority checks it against what it signed); a candidate that was prepared but never staged is superseded by a fresh
+/// operation (the abandoned one expires at the Authority). A different request with the same key is a conflict. Nothing
+/// is deleted or repaired from business-database data, and only one content revision can be accepted for the creation.
+/// </para>
 /// </summary>
-public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption, Projection.VerifiedRecordReader reader)
+public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, RecordCandidateStager stager, TimeProvider clock, Encryption.IFieldEncryptionService encryption, Projection.VerifiedRecordReader reader, IWriteFaultInjector faults)
 {
     public Task<FormRecordResponse> HandleAsync(RequestContext context, Guid formDefinitionId, CreateFormRecordRequest request, string idempotencyKey, CancellationToken cancellationToken)
     {
@@ -111,6 +119,9 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             }
         }
 
+        var canonicalRequest = CreationRequestFingerprint.Canonicalize(new CreationRequestFingerprint.Request(context.IssuerUri, context.SubjectIdentifier, formDefinitionId, ownerTeamId, child?.ParentId, child?.Relationship.FormRelationshipDefinitionId, values, groupValues));
+        await RequireSameRequestAsync(context, formRecordId, canonicalRequest, now, cancellationToken).ConfigureAwait(false);
+
         var revisionDecision = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.ManageOrganization), cancellationToken).ConfigureAwait(false);
         var payload = JsonSerializer.SerializeToElement(new
         {
@@ -127,6 +138,8 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         {
             throw new PendingCommandException(new CommandOutcome(command.CommandId, command.CommandStatus.ToString(), command.AuthorizationRevision, false));
         }
+
+        faults.Checkpoint(WriteFaultCheckpoints.RecordRegistered);
 
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -173,7 +186,14 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             }
         }
 
+        faults.Checkpoint(WriteFaultCheckpoints.RecordProjected);
         var head = await authority.GetCommittedContentRevisionAsync(context.ToDelegatedUser(), context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+        if (head.CommittedContentRevision > 0)
+        {
+            // A retry of a creation whose content was already accepted: the same record, never a second version.
+            return await CompletedAsync(context, formRecordId, cancellationToken).ConfigureAwait(false);
+        }
+
         var header = new FormRecordRevision
         {
             FormRecordRevisionId = Guid.CreateVersion7(),
@@ -189,7 +209,14 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             RelationshipSortOrder = child?.SortOrder,
         };
 
-        var accepted = await stager.StageAndCommitAsync(context, head, new RecordCandidateStager.CandidateInput(header, candidateValues.Cast<ISignedContentRow>().Concat(applied.Occurrences).ToList()), idempotencyKey, cancellationToken).ConfigureAwait(false);
+        var accepted = await CommitInitialContentAsync(context, head, new RecordCandidateStager.CandidateInput(header, candidateValues.Cast<ISignedContentRow>().Concat(applied.Occurrences).ToList()), idempotencyKey, cancellationToken).ConfigureAwait(false);
+        if (accepted is null)
+        {
+            // Another attempt of this same request was accepted first.
+            return await CompletedAsync(context, formRecordId, cancellationToken).ConfigureAwait(false);
+        }
+
+        faults.Checkpoint(WriteFaultCheckpoints.ContentCommitted);
         if (accepted.CommittedOperationId is { } acceptedOperation)
         {
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
@@ -203,5 +230,98 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
             "Committed(" + accepted.ArchiveState + ")",
             Projection.RecordGroupProjection.Build(groups, layout, applied.Occurrences));
+    }
+
+    /// <summary>Records the first attempt's fingerprint, or proves that this request is the same one (fixed-time MAC compare).</summary>
+    private async Task RequireSameRequestAsync(RequestContext context, Guid formRecordId, byte[] canonicalRequest, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var existing = await scope.FindCreationAttemptAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+        if (existing is null)
+        {
+            var attempt = CreationRequestFingerprint.Create(encryption, context.OrganizationId, formRecordId, context.LocalUserId, now, canonicalRequest);
+            if (await scope.TryAddCreationAttemptAsync(attempt, cancellationToken).ConfigureAwait(false))
+            {
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            existing = await scope.FindCreationAttemptAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false); // an identical request raced this one
+        }
+
+        if (existing is null || !CreationRequestFingerprint.Matches(encryption, existing, canonicalRequest))
+        {
+            throw new BusinessException("IDEMPOTENCY_CONFLICT", 409, "this idempotency key was already used for a different record-creation request");
+        }
+    }
+
+    /// <summary>
+    /// Commits the creation's first content revision exactly once. Returns null when another attempt of the same request
+    /// was accepted first (the head moved past revision 0). Integrity failures propagate: staged rows that do not match
+    /// what the Authority signed are never replaced silently.
+    /// </summary>
+    private async Task<AcceptedContentRevision?> CommitInitialContentAsync(RequestContext context, AcceptedContentRevision head, RecordCandidateStager.CandidateInput candidate, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        var formRecordId = candidate.Header.FormRecordId;
+        var operationId = RecordCandidateStager.DeriveOperationId(context.OrganizationId, formRecordId, idempotencyKey);
+
+        // 1. An earlier attempt staged its signed candidate: commit exactly those rows (the Authority verifies them).
+        var staged = await stager.ReadStagedAsync(formRecordId, operationId, cancellationToken).ConfigureAwait(false);
+        if (staged.Header is not null)
+        {
+            try
+            {
+                return await authority.CommitContentChangeAsync(context.ToDelegatedUser(), operationId, new CommitContentChangeRequest(context.OrganizationId, formRecordId, staged.Items), cancellationToken).ConfigureAwait(false);
+            }
+            catch (AuthorityClientException ex) when (ex.ErrorCode is "OPERATION_EXPIRED" or "OPERATION_STATE_INVALID")
+            {
+                // The earlier operation expired or was aborted: it can never be accepted; a fresh one follows.
+            }
+            catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTENT_REVISION_CONFLICT")
+            {
+                return null;
+            }
+        }
+
+        // 2. The creation's own operation (prepare is idempotent per key) — the normal first-attempt path.
+        try
+        {
+            return await stager.StageAndCommitAsync(context, head, candidate, idempotencyKey, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityClientException ex) when (ex.ErrorCode == "IDEMPOTENCY_CONFLICT")
+        {
+            // An earlier attempt prepared a different (never staged, or expired) candidate under this key.
+        }
+        catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTENT_REVISION_CONFLICT")
+        {
+            return null;
+        }
+
+        // 3. A fresh operation for this retry; the abandoned prepared one expires at the Authority and can never commit
+        //    afterwards, because the head compare-and-swap admits only one first revision.
+        var retryKey = "content-retry:" + Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(idempotencyKey))).TrimEnd('=').Replace('+', '-').Replace('/', '_') + ":" + Guid.CreateVersion7().ToString("N");
+        try
+        {
+            return await stager.StageAndCommitAsync(context, head, candidate, retryKey, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTENT_REVISION_CONFLICT")
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The accepted record, read back and verified (a completed earlier attempt of this request).</summary>
+    private async Task<FormRecordResponse> CompletedAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)
+    {
+        var verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, cancellationToken).ConfigureAwait(false);
+        if (verified.Head.CommittedOperationId is { } operation)
+        {
+            await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+            await scope.ProjectAcceptedHeadAsync(context.OrganizationId, formRecordId, verified.Head.CommittedContentRevision, operation, cancellationToken).ConfigureAwait(false);
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return new FormRecordResponse(formRecordId, context.OrganizationId, verified.Header.FormDefinitionId, verified.Header.RecordStatus, verified.Head.CommittedContentRevision, verified.Head.CommittedOperationId, verified.Head.AuthorizationRevision, verified.IsComplete,
+            verified.ToValueResponses(), "Committed(" + verified.Head.ArchiveState + ")", Projection.RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
     }
 }
