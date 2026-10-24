@@ -144,8 +144,8 @@
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
-      "sha256": "7ccab72c1b69652d91673845efc4ce78369d99862f1560f5314b20b56e4d9936",
-      "bytes": 9908
+      "sha256": "4eb5a19004109a5ab5d2169b55a747bee29819f33c87d9c6af11e5c98182caf5",
+      "bytes": 10406
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -234,8 +234,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "bf8fbe67d8f2be0e3f1d04e00e96c6f6dbcb80c31194eae6e2f3c8e58660271e",
-      "bytes": 82293
+      "sha256": "04cab2a56ec200db9e508d7313dcbe8822b476a76b49cecab8a33b3f11055ba7",
+      "bytes": 82533
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

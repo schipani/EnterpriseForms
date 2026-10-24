@@ -188,9 +188,9 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
 
         faults.Checkpoint(WriteFaultCheckpoints.RecordProjected);
         var head = await authority.GetCommittedContentRevisionAsync(context.ToDelegatedUser(), context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
-        if (head.CommittedContentRevision > 0)
+        if (head.CommittedContentRevision > 1)
         {
-            // A retry of a creation whose content was already accepted: the same record, never a second version.
+            // A retry of a creation that was accepted and edited since: the current verified record, never a new version.
             return await CompletedAsync(context, formRecordId, cancellationToken).ConfigureAwait(false);
         }
 
@@ -209,14 +209,25 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             RelationshipSortOrder = child?.SortOrder,
         };
 
-        var accepted = await CommitInitialContentAsync(context, head, new RecordCandidateStager.CandidateInput(header, candidateValues.Cast<ISignedContentRow>().Concat(applied.Occurrences).ToList()), idempotencyKey, cancellationToken).ConfigureAwait(false);
-        if (accepted is null)
+        AcceptedContentRevision accepted;
+        if (head.CommittedContentRevision == 1)
         {
-            // Another attempt of this same request was accepted first.
-            return await CompletedAsync(context, formRecordId, cancellationToken).ConfigureAwait(false);
+            // This creation was already accepted (only the creation writes revision 1, and the fingerprint proved this is
+            // the same request): replay its outcome — the request's values with the Authority's head — like the first answer.
+            accepted = head;
+        }
+        else
+        {
+            accepted = await CommitInitialContentAsync(context, head, new RecordCandidateStager.CandidateInput(header, candidateValues.Cast<ISignedContentRow>().Concat(applied.Occurrences).ToList()), idempotencyKey, cancellationToken).ConfigureAwait(false)
+                       ?? await authority.GetCommittedContentRevisionAsync(context.ToDelegatedUser(), context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false); // another attempt of this request won
+            if (accepted.CommittedContentRevision > 1)
+            {
+                return await CompletedAsync(context, formRecordId, cancellationToken).ConfigureAwait(false);
+            }
+
+            faults.Checkpoint(WriteFaultCheckpoints.ContentCommitted);
         }
 
-        faults.Checkpoint(WriteFaultCheckpoints.ContentCommitted);
         if (accepted.CommittedOperationId is { } acceptedOperation)
         {
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
