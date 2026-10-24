@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
@@ -45,6 +46,10 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<IntegrityKeyRegistration> KeyRegistrations => Set<IntegrityKeyRegistration>();
 
     public DbSet<OrganizationProtectionPolicy> ProtectionPolicies => Set<OrganizationProtectionPolicy>();
+
+    public DbSet<SearchCatalogueSnapshot> CatalogueSnapshots => Set<SearchCatalogueSnapshot>();
+
+    public DbSet<SearchCatalogueSnapshotEntry> CatalogueSnapshotEntries => Set<SearchCatalogueSnapshotEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

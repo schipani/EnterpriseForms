@@ -67,6 +67,7 @@ public sealed class Program
         fieldSearchLimits.Validate();
         builder.Services.AddSingleton(fieldSearchLimits);
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchHandler>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.Verification.TrustedScopeVerifier>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));
         builder.Services.AddHostedService<DocumentProviderStartupGuard>();
         builder.Services.AddHostedService<DocumentProcessingHostedService>();
@@ -100,6 +101,11 @@ public sealed class Program
         app.MapDashboardEndpoints();
         app.MapOrganizationEndpoints();
         app.MapSearchEndpoints();
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            // Phase C7 M1: real-stack proof of the AC-5 verification path. Never mapped outside the isolated Testing stack.
+            app.MapSearchTestingEndpoints();
+        }
 
         app.Run();
         return 0;

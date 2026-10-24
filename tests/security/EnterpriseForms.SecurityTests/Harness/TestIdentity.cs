@@ -14,6 +14,7 @@ public static class TestIdentity
     private const string UserKeyBase64 = "dGVzdC1pZHAtZGV2LW9ubHktc2lnbmluZy1rZXktMDAwMDAwMDAwMA==";
     private const string OperatorKeyBase64 = "b3BlcmF0b3ItZGV2LW9ubHktc2hhcmVkLWtleS0wMDAwMDAwMDAwMA==";
     private const string WorkloadKeyBase64 = "d29ya2xvYWQtZGV2LW9ubHktc2hhcmVkLWtleS0wMDAwMDAwMDAwMA==";
+    private const string VerifierKeyBase64 = "dmVyaWZpZXItdGVzdC1vbmx5LXNoYXJlZC1rZXktMDAwMDAwMDAw";
 
     private static readonly JsonWebTokenHandler Handler = new();
 
@@ -31,6 +32,10 @@ public static class TestIdentity
     /// <summary>A business-workload token: used by SEC-P11 to prove the business credential cannot reach the operator plane.</summary>
     public static string WorkloadToken() =>
         Mint(WorkloadKeyBase64, "enterpriseforms-business-api", "authorization-authority", "enterpriseforms-api", new Dictionary<string, object> { ["workload_role"] = "business-api", ["workload_name"] = "sec-p11-harness" }, TimeSpan.FromMinutes(2));
+
+    /// <summary>Phase C7 OD-1: the field-protection verifier workload (compose.security-test.yaml synthetic credential).</summary>
+    public static string VerifierToken(string workloadName = "field-protection-verifier") =>
+        Mint(VerifierKeyBase64, "enterpriseforms-field-protection-verifier", "authorization-authority-verifier", "c7-verifier-harness", new Dictionary<string, object> { ["workload_role"] = "field-protection-verifier", ["workload_name"] = workloadName }, TimeSpan.FromMinutes(5));
 
     /// <summary>A token signed with a key the authority does not trust (forged issuer).</summary>
     public static string ForgedUserToken(TestUser user, Guid organizationId) =>

@@ -82,6 +82,15 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<VerifyRecordProjectionResult> VerifyRecordProjectionAsync(DelegatedUserContext user, VerifyRecordProjectionRequest request, CancellationToken cancellationToken) =>
         SendAsync<VerifyRecordProjectionResult>(HttpMethod.Post, "internal/v1/integrity/verify-record-projection", user, request, null, cancellationToken);
 
+    public Task<SearchCatalogue> IssueSearchCatalogueAsync(DelegatedUserContext user, SearchCatalogueRequest request, CancellationToken cancellationToken) =>
+        SendAsync<SearchCatalogue>(HttpMethod.Post, "internal/v1/search-catalogue", user, request, null, cancellationToken);
+
+    public Task<CatalogueSnapshotValidation> ValidateSearchCatalogueAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, CancellationToken cancellationToken) =>
+        SendAsync<CatalogueSnapshotValidation>(HttpMethod.Post, $"internal/v1/search-catalogue/{searchCatalogueSnapshotId:D}/validate", user, null, null, cancellationToken);
+
+    public Task<VerifyRecordProjectionsResponse> VerifyRecordProjectionsAsync(DelegatedUserContext user, VerifyRecordProjectionsRequest request, CancellationToken cancellationToken) =>
+        SendAsync<VerifyRecordProjectionsResponse>(HttpMethod.Post, "internal/v1/integrity/verify-record-projections", user, request, null, cancellationToken);
+
     public Task<ContentHistoryPage> GetContentHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, long? afterRevision, int limit, CancellationToken cancellationToken) =>
         SendAsync<ContentHistoryPage>(HttpMethod.Get, $"internal/v1/content-revisions/{organizationId:D}/{formRecordId:D}/history?limit={limit.ToString(System.Globalization.CultureInfo.InvariantCulture)}" + (afterRevision is { } after ? "&after=" + after.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty), user, null, null, cancellationToken);
 

@@ -459,6 +459,207 @@
         }
       }
     },
+    "/internal/v1/integrity/verify-record-projections": {
+      "post": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Phase C7 OD-6: batch of 1..50 records, each verified exactly like VerifyRecordProjection (registry, discover/read, quarantine, archive receipt, complete leaf set, every signature, root, readable field scope) against the head the caller expects. Per-record typed results; mismatches quarantine the record; read action only. Not a signature oracle: every record needs the caller's own read or discover permission.",
+        "operationId": "VerifyRecordProjections",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRecordProjectionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyRecordProjectionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-catalogue": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "AC-5: the registered records of one form (registry parent) that the delegated user may discover, each with its accepted head, fixed as an Authority-held snapshot at one authorization, projection and content revision. More eligible records than maximum_entries ⇒ 422 LIMIT_EXCEEDED with no entries. Quarantined heads and resources are listed with their flag (a trusted search over them must fail).",
+        "operationId": "IssueSearchCatalogue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchCatalogueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchCatalogueResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-catalogue/{snapshotId}/validate": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Validates the caller's own snapshot against current Authority state: expiry, gate, authorization and projection revision (any change invalidates, OD-5), and — when the organization's content revision moved — every entry's head, quarantine and registry state. The id alone proves nothing.",
+        "operationId": "ValidateSearchCatalogue",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueSnapshotValidation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "OD-1 (verifier workload only): the complete registered population of the form scoped by an effective PublishFormSecurityRevision command — records no user can discover included — with heads, quarantine and registry state, as a paged Authority-held snapshot. Issuance and denials are journaled on the audit stream. Never routed through the business API.",
+        "operationId": "IssueMigrationCatalogue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MigrationCatalogueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MigrationCataloguePage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue/{snapshotId}/entries": {
+      "get": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "A further page of the verifier's own migration catalogue snapshot (409 after expiry).",
+        "operationId": "ReadMigrationCatalogue",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MigrationCataloguePage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue/{snapshotId}/validate": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Validates the verifier's snapshot like the user snapshot, plus that the scoping command is still the field's current protection decision.",
+        "operationId": "ValidateMigrationCatalogue",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueSnapshotValidation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/operator/organizations": {
       "post": {
         "tags": [
@@ -627,6 +828,81 @@
           }
         }
       },
+      "BatchVerificationItem": {
+        "required": [
+          "form_record_id",
+          "expected_committed_operation_id",
+          "observed_items"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_committed_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observed_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
+            }
+          }
+        }
+      },
+      "BatchVerificationResult": {
+        "required": [
+          "form_record_id",
+          "verified",
+          "failure_reason_code",
+          "committed_content_revision",
+          "committed_operation_id",
+          "is_complete_projection",
+          "readable_items"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "failure_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "is_complete_projection": {
+            "type": "boolean"
+          },
+          "readable_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerifiedProjectionItem"
+            }
+          }
+        }
+      },
       "BootstrapIdentity": {
         "required": [
           "authority_user_id",
@@ -738,6 +1014,89 @@
           },
           "canonical_bytes_base64": {
             "type": "string"
+          }
+        }
+      },
+      "CatalogueEntry": {
+        "required": [
+          "form_record_id",
+          "committed_content_revision",
+          "committed_operation_id",
+          "content_head_quarantined",
+          "resource_quarantined"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "content_head_quarantined": {
+            "type": "boolean"
+          },
+          "resource_quarantined": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CatalogueSnapshotValidation": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "valid",
+          "invalidation_reason",
+          "current_authorization_revision",
+          "current_content_integrity_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "invalidation_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "current_authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "current_content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -1161,6 +1520,104 @@
           "AttachmentLifecycle"
         ]
       },
+      "MigrationCataloguePage": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "organization_id",
+          "form_definition_id",
+          "security_command_id",
+          "authorization_revision",
+          "content_integrity_revision",
+          "total_entry_count",
+          "entries",
+          "next_offset",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "total_entry_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogueEntry"
+            }
+          },
+          "next_offset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "MigrationCatalogueRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "security_command_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "OperationStatus": {
         "required": [
           "command_id",
@@ -1550,6 +2007,98 @@
           }
         }
       },
+      "SearchCatalogueRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "maximum_entries"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maximum_entries": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SearchCatalogueResponse": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "organization_id",
+          "form_definition_id",
+          "authorization_revision",
+          "projection_revision",
+          "content_integrity_revision",
+          "entries",
+          "snapshot_expires_on",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogueEntry"
+            }
+          },
+          "snapshot_expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SecurityCommandKind": {
         "enum": [
           "RegisterTeam",
@@ -1800,6 +2349,53 @@
             "default": false
           }
         }
+      },
+      "VerifyRecordProjectionsRequest": {
+        "required": [
+          "organization_id",
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchVerificationItem"
+            }
+          }
+        }
+      },
+      "VerifyRecordProjectionsResponse": {
+        "required": [
+          "results",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchVerificationResult"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       }
     }
   },
@@ -1815,6 +2411,9 @@
     },
     {
       "name": "Content"
+    },
+    {
+      "name": "Catalogue"
     },
     {
       "name": "Operator"

@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using System.Security.Cryptography;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Journal;
@@ -194,5 +195,17 @@ public sealed class ArchiveProcessorTests
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => throw new NotSupportedException();
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityResource>> GetFormRecordResourcesAsync(Guid org, Guid form, IReadOnlyCollection<string> states, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityResource>> GetResourcesAsync(Guid org, string type, IReadOnlyCollection<Guid> ids, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<RecordContentHead>> GetContentHeadsAsync(Guid org, IReadOnlyCollection<Guid> ids, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddCatalogueSnapshot(SearchCatalogueSnapshot snapshot, IEnumerable<SearchCatalogueSnapshotEntry> entries) => throw new NotSupportedException();
+
+        public Task<SearchCatalogueSnapshot?> FindCatalogueSnapshotAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesAsync(Guid id, int offset, int? limit, CancellationToken ct) => throw new NotSupportedException();
     }
 }

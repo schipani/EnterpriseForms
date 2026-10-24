@@ -52,6 +52,14 @@ public static class ContentEndpoints
             .WithName("VerifyRecordProjection")
             .WithSummary("Compares the observed staged items with the complete accepted leaf index, verifies every signature and the root, and returns the authorized subset.");
 
+        group.MapPost("/integrity/verify-record-projections", static async Task<Ok<VerifyRecordProjectionsResponse>> (VerifyRecordProjectionsRequest request, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+            {
+                var actor = InternalAuthentication.RequireActor(context, validator);
+                return TypedResults.Ok(await service.VerifyProjectionsAsync(actor, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("VerifyRecordProjections")
+            .WithSummary("Phase C7 OD-6: batch of 1..50 records, each verified exactly like VerifyRecordProjection (registry, discover/read, quarantine, archive receipt, complete leaf set, every signature, root, readable field scope) against the head the caller expects. Per-record typed results; mismatches quarantine the record; read action only. Not a signature oracle: every record needs the caller's own read or discover permission.");
+
         return endpoints;
     }
 }

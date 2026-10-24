@@ -23,6 +23,150 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshot", b =>
+                {
+                    b.Property<Guid>("SearchCatalogueSnapshotId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_catalogue_snapshot_id");
+
+                    b.Property<byte[]>("CatalogueDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("catalogue_digest");
+
+                    b.Property<int>("CatalogueEntryCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("catalogue_entry_count");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid?>("RequestingAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requesting_authority_user_id");
+
+                    b.Property<string>("RequestingWorkloadName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("requesting_workload_name");
+
+                    b.Property<Guid?>("ScopingSecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scoping_security_command_id");
+
+                    b.Property<long>("SnapshotAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("snapshot_authorization_revision");
+
+                    b.Property<long>("SnapshotContentIntegrityRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("snapshot_content_integrity_revision");
+
+                    b.Property<DateTimeOffset>("SnapshotExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("snapshot_expires_on");
+
+                    b.Property<DateTimeOffset?>("SnapshotInvalidatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("snapshot_invalidated_on");
+
+                    b.Property<string>("SnapshotInvalidationReason")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("snapshot_invalidation_reason");
+
+                    b.Property<DateTimeOffset>("SnapshotIssuedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("snapshot_issued_on");
+
+                    b.Property<long>("SnapshotProjectionRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("snapshot_projection_revision");
+
+                    b.Property<string>("SnapshotScopeKind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("snapshot_scope_kind");
+
+                    b.HasKey("SearchCatalogueSnapshotId");
+
+                    b.HasIndex("OrganizationId", "SnapshotExpiresOn")
+                        .HasDatabaseName("ix_search_catalogue_snapshots_expiry");
+
+                    b.ToTable("search_catalogue_snapshots", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_catalogue_entry_count", "catalogue_entry_count >= 0 AND octet_length(catalogue_digest) = 32");
+
+                            t.HasCheckConstraint("ck_search_catalogue_scope_actor", "(snapshot_scope_kind = 'UserSearch' AND requesting_authority_user_id IS NOT NULL AND scoping_security_command_id IS NULL) OR (snapshot_scope_kind = 'MigrationVerification' AND requesting_workload_name IS NOT NULL AND scoping_security_command_id IS NOT NULL AND requesting_authority_user_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_search_catalogue_scope_kind", "snapshot_scope_kind IN ('UserSearch','MigrationVerification')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshotEntry", b =>
+                {
+                    b.Property<Guid>("SearchCatalogueSnapshotEntryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_catalogue_snapshot_entry_id");
+
+                    b.Property<int>("CatalogueEntryPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("catalogue_entry_position");
+
+                    b.Property<long>("CommittedContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("committed_content_revision");
+
+                    b.Property<Guid?>("CommittedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("committed_operation_id");
+
+                    b.Property<bool>("ContentHeadQuarantined")
+                        .HasColumnType("boolean")
+                        .HasColumnName("content_head_quarantined");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("ResourceLifecycleState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("resource_lifecycle_state");
+
+                    b.Property<Guid>("SearchCatalogueSnapshotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_catalogue_snapshot_id");
+
+                    b.HasKey("SearchCatalogueSnapshotEntryId");
+
+                    b.HasIndex("SearchCatalogueSnapshotId", "CatalogueEntryPosition")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_catalogue_entry_position");
+
+                    b.HasIndex("SearchCatalogueSnapshotId", "FormRecordId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_catalogue_entry_record");
+
+                    b.ToTable("search_catalogue_snapshot_entries", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_catalogue_entry_revision", "committed_content_revision >= 0 AND catalogue_entry_position >= 0");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.ContentCandidateLeaf", b =>
                 {
                     b.Property<Guid>("ContentCandidateLeafId")
@@ -653,6 +797,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_authority_resource");
 
+                    b.HasIndex("OrganizationId", "ResourceTypeName", "ParentResourceEntityId", "ResourceLifecycleState")
+                        .HasDatabaseName("ix_authority_resources_form_scope");
+
                     b.ToTable("authority_resources", "authority", t =>
                         {
                             t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined')");
@@ -714,6 +861,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_authorization_state_id");
 
+                    b.Property<long>("AuditJournalRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("audit_journal_revision");
+
                     b.Property<long>("AuthorizationRevision")
                         .HasColumnType("bigint")
                         .HasColumnName("authorization_revision");
@@ -736,6 +887,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("integrity_quarantine_reason_code");
+
+                    b.Property<byte[]>("LatestAuditJournalDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("latest_audit_journal_digest");
 
                     b.Property<byte[]>("LatestContentJournalDigest")
                         .HasColumnType("bytea")
@@ -1078,6 +1233,27 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_security_command_state", "command_state_name IN ('Pending','CommittedAwaitingProjection','Effective','Rejected','FailedReconciliation')");
                         });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshot", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_catalogue_snapshot_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshotEntry", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("SearchCatalogueSnapshotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_catalogue_entry_snapshot");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.ContentCandidateLeaf", b =>

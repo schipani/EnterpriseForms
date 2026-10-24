@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
@@ -63,6 +64,8 @@ public sealed class AuthorityResourceConfiguration : IEntityTypeConfiguration<Au
         builder.Property(e => e.ResourceTypeName).HasMaxLength(40);
         builder.Property(e => e.ResourceLifecycleState).HasMaxLength(20);
         builder.HasIndex(e => new { e.OrganizationId, e.ResourceTypeName, e.ResourceEntityId }).IsUnique().HasDatabaseName("uq_authority_resource");
+        // Phase C7 AC-5: form-scoped catalogue enumeration without scanning the organization's registry.
+        builder.HasIndex(e => new { e.OrganizationId, e.ResourceTypeName, e.ParentResourceEntityId, e.ResourceLifecycleState }).HasDatabaseName("ix_authority_resources_form_scope");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_resource_org");
         builder.ToTable(t => t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined')"));
     }
@@ -259,5 +262,40 @@ public sealed class IntegrityKeyRegistrationConfiguration : IEntityTypeConfigura
         builder.Property(e => e.ProviderKeyName).HasMaxLength(200);
         builder.HasIndex(e => new { e.OrganizationId, e.KeyPurposeName }).IsUnique().HasDatabaseName("uq_integrity_key_org_purpose");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_integrity_key_org");
+    }
+}
+
+public sealed class SearchCatalogueSnapshotConfiguration : IEntityTypeConfiguration<SearchCatalogueSnapshot>
+{
+    public void Configure(EntityTypeBuilder<SearchCatalogueSnapshot> builder)
+    {
+        builder.MapSnakeCase("search_catalogue_snapshots");
+        builder.HasKey(e => e.SearchCatalogueSnapshotId);
+        builder.Property(e => e.SnapshotScopeKind).HasMaxLength(30);
+        builder.Property(e => e.RequestingWorkloadName).HasMaxLength(100);
+        builder.Property(e => e.SnapshotInvalidationReason).HasMaxLength(60);
+        builder.HasIndex(e => new { e.OrganizationId, e.SnapshotExpiresOn }).HasDatabaseName("ix_search_catalogue_snapshots_expiry");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_search_catalogue_snapshot_org");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_search_catalogue_scope_kind", "snapshot_scope_kind IN ('UserSearch','MigrationVerification')");
+            t.HasCheckConstraint("ck_search_catalogue_scope_actor",
+                "(snapshot_scope_kind = 'UserSearch' AND requesting_authority_user_id IS NOT NULL AND scoping_security_command_id IS NULL) OR (snapshot_scope_kind = 'MigrationVerification' AND requesting_workload_name IS NOT NULL AND scoping_security_command_id IS NOT NULL AND requesting_authority_user_id IS NULL)");
+            t.HasCheckConstraint("ck_search_catalogue_entry_count", "catalogue_entry_count >= 0 AND octet_length(catalogue_digest) = 32");
+        });
+    }
+}
+
+public sealed class SearchCatalogueSnapshotEntryConfiguration : IEntityTypeConfiguration<SearchCatalogueSnapshotEntry>
+{
+    public void Configure(EntityTypeBuilder<SearchCatalogueSnapshotEntry> builder)
+    {
+        builder.MapSnakeCase("search_catalogue_snapshot_entries");
+        builder.HasKey(e => e.SearchCatalogueSnapshotEntryId);
+        builder.Property(e => e.ResourceLifecycleState).HasMaxLength(20);
+        builder.HasIndex(e => new { e.SearchCatalogueSnapshotId, e.CatalogueEntryPosition }).IsUnique().HasDatabaseName("uq_search_catalogue_entry_position");
+        builder.HasIndex(e => new { e.SearchCatalogueSnapshotId, e.FormRecordId }).IsUnique().HasDatabaseName("uq_search_catalogue_entry_record");
+        builder.HasOne<SearchCatalogueSnapshot>().WithMany().HasForeignKey(e => e.SearchCatalogueSnapshotId).HasConstraintName("fk_search_catalogue_entry_snapshot");
+        builder.ToTable(t => t.HasCheckConstraint("ck_search_catalogue_entry_revision", "committed_content_revision >= 0 AND catalogue_entry_position >= 0"));
     }
 }

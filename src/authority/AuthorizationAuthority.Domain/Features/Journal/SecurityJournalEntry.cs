@@ -53,4 +53,7 @@ public static class JournalStreamNames
 {
     public const string Authorization = "authorization";
     public const string Content = "content";
+
+    /// <summary>Phase C7 M1 (OD-8): non-gating audit evidence (catalogue issuance/denials). Archived like every stream.</summary>
+    public const string Audit = "audit";
 }

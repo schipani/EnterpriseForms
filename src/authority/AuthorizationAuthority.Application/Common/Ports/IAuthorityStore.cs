@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
@@ -104,6 +105,23 @@ public interface IAuthorityScope : IAsyncDisposable
 
     /// <summary>Record IDs registered and active for the organization (authority-sourced discovery candidates).</summary>
     Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 AC-5: registered form_record resources of one form (registry parent = form) in the given lifecycle states, in id order.</summary>
+    Task<List<AuthorityResource>> GetFormRecordResourcesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken);
+
+    /// <summary>Registry rows of the given resources (any lifecycle state), for snapshot validation.</summary>
+    Task<List<AuthorityResource>> GetResourcesAsync(Guid organizationId, string resourceTypeName, IReadOnlyCollection<Guid> resourceEntityIds, CancellationToken cancellationToken);
+
+    /// <summary>Accepted content heads of the given records (read-only).</summary>
+    Task<List<RecordContentHead>> GetContentHeadsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    void AddCatalogueSnapshot(SearchCatalogueSnapshot snapshot, IEnumerable<SearchCatalogueSnapshotEntry> entries);
+
+    /// <summary>Tracked, so an invalidation can be recorded on it.</summary>
+    Task<SearchCatalogueSnapshot?> FindCatalogueSnapshotAsync(Guid searchCatalogueSnapshotId, CancellationToken cancellationToken);
+
+    /// <summary>Entries in catalogue order; <paramref name="limit"/> null = all.</summary>
+    Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesAsync(Guid searchCatalogueSnapshotId, int offset, int? limit, CancellationToken cancellationToken);
 
     Task CommitAsync(CancellationToken cancellationToken);
 }

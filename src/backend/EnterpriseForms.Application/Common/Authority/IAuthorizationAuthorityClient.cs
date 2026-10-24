@@ -120,6 +120,26 @@ public sealed record FormAccessState(Guid FormDefinitionId, long AuthorizationRe
 
 public sealed record RecordDiscoveryPage(IReadOnlyList<Guid> FormRecordIds, long AuthorizationRevision, string? ContinuationToken);
 
+// Phase C7 M1 — AC-5 record catalogue and OD-6 batch verification (mirrors of the Authority's internal contract).
+
+public sealed record SearchCatalogueRequest(Guid OrganizationId, Guid FormDefinitionId, int MaximumEntries);
+
+public sealed record CatalogueEntry(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, bool ContentHeadQuarantined, bool ResourceQuarantined);
+
+/// <summary>The Authority's expected population of one form for the caller, with accepted heads, at one snapshot.</summary>
+public sealed record SearchCatalogue(Guid SearchCatalogueSnapshotId, Guid OrganizationId, Guid FormDefinitionId, long AuthorizationRevision, long ProjectionRevision, long ContentIntegrityRevision,
+    IReadOnlyList<CatalogueEntry> Entries, DateTimeOffset SnapshotExpiresOn, Guid CorrelationId);
+
+public sealed record CatalogueSnapshotValidation(Guid SearchCatalogueSnapshotId, bool Valid, string? InvalidationReason, long CurrentAuthorizationRevision, long CurrentContentIntegrityRevision, Guid CorrelationId);
+
+public sealed record BatchVerificationItem(Guid FormRecordId, Guid ExpectedCommittedOperationId, IReadOnlyList<StagedContentItem> ObservedItems);
+
+public sealed record VerifyRecordProjectionsRequest(Guid OrganizationId, IReadOnlyList<BatchVerificationItem> Records);
+
+public sealed record BatchVerificationResult(Guid FormRecordId, bool Verified, string? FailureReasonCode, long CommittedContentRevision, Guid? CommittedOperationId, bool IsCompleteProjection, IReadOnlyList<VerifiedProjectionItem> ReadableItems);
+
+public sealed record VerifyRecordProjectionsResponse(IReadOnlyList<BatchVerificationResult> Results, long AuthorizationRevision, Guid CorrelationId);
+
 /// <summary>Stable authority error surfaced to callers; the business API maps it to a Problem Details response without leaking internals.</summary>
 public sealed class AuthorityClientException(string errorCode, int httpStatusCode, bool retryable, string? detail = null) : Exception(detail ?? errorCode)
 {
@@ -154,6 +174,15 @@ public interface IAuthorizationAuthorityClient
     Task<AcceptedContentRevision> GetCommittedContentRevisionAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);
 
     Task<VerifyRecordProjectionResult> VerifyRecordProjectionAsync(DelegatedUserContext user, VerifyRecordProjectionRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 AC-5: the user-scoped catalogue of one form (Authority snapshot).</summary>
+    Task<SearchCatalogue> IssueSearchCatalogueAsync(DelegatedUserContext user, SearchCatalogueRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 AC-5: validates the caller's own snapshot against current Authority state.</summary>
+    Task<CatalogueSnapshotValidation> ValidateSearchCatalogueAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 OD-6: verifies 1..50 records, each independently against its expected accepted head.</summary>
+    Task<VerifyRecordProjectionsResponse> VerifyRecordProjectionsAsync(DelegatedUserContext user, VerifyRecordProjectionsRequest request, CancellationToken cancellationToken);
 
     /// <summary>AC-1 (Phase C6): accepted content revisions of a record, ascending from <paramref name="afterRevision"/>; full readers only (404 otherwise).</summary>
     Task<ContentHistoryPage> GetContentHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, long? afterRevision, int limit, CancellationToken cancellationToken);

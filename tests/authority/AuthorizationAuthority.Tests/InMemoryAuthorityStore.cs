@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
@@ -26,6 +27,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<SecurityJournalEntry> Journal { get; } = [];
     public List<ContentIntegrityCheckpoint> Checkpoints { get; } = [];
     public List<IntegrityKeyRegistration> Keys { get; } = [];
+    public List<SearchCatalogueSnapshot> Snapshots { get; } = [];
+    public List<SecurityCommand> Commands { get; } = [];
+    public List<SearchCatalogueSnapshotEntry> SnapshotEntries { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -69,7 +73,7 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) => Task.FromResult<SecurityCommand?>(null);
 
-        public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) => Task.FromResult<SecurityCommand?>(null);
+        public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) => Task.FromResult(s.Commands.FirstOrDefault(c => c.SecurityCommandId == securityCommandId));
 
         public void AddCommand(SecurityCommand command) => throw new NotSupportedException();
 
@@ -128,6 +132,30 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => s.Keys.Add(registration);
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(new List<Guid>());
+
+        public Task<List<AuthorityResource>> GetFormRecordResourcesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.FormRecord && r.ParentResourceEntityId == formDefinitionId && lifecycleStates.Contains(r.ResourceLifecycleState)).OrderBy(r => r.ResourceEntityId).ToList());
+
+        public Task<List<AuthorityResource>> GetResourcesAsync(Guid organizationId, string resourceTypeName, IReadOnlyCollection<Guid> resourceEntityIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == resourceTypeName && resourceEntityIds.Contains(r.ResourceEntityId)).ToList());
+
+        public Task<List<RecordContentHead>> GetContentHeadsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Heads.Where(h => h.OrganizationId == organizationId && formRecordIds.Contains(h.FormRecordId)).ToList());
+
+        public void AddCatalogueSnapshot(SearchCatalogueSnapshot snapshot, IEnumerable<SearchCatalogueSnapshotEntry> entries)
+        {
+            s.Snapshots.Add(snapshot);
+            s.SnapshotEntries.AddRange(entries);
+        }
+
+        public Task<SearchCatalogueSnapshot?> FindCatalogueSnapshotAsync(Guid searchCatalogueSnapshotId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Snapshots.FirstOrDefault(x => x.SearchCatalogueSnapshotId == searchCatalogueSnapshotId));
+
+        public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesAsync(Guid searchCatalogueSnapshotId, int offset, int? limit, CancellationToken cancellationToken)
+        {
+            var query = s.SnapshotEntries.Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId).OrderBy(e => e.CatalogueEntryPosition).Skip(offset);
+            return Task.FromResult((limit is { } take ? query.Take(take) : query).ToList());
+        }
 
         public Task CommitAsync(CancellationToken cancellationToken)
         {

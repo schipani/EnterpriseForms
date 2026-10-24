@@ -77,3 +77,24 @@ public sealed record FieldSearchResponse(
     string ScopeStatement,
     string? ContinuationToken = null,
     string? PreviousToken = null);
+
+/// <summary>
+/// Testing environment only (Phase C7 M1 proof, never part of the published API): outcome and cost of verifying the caller's
+/// complete scope of one form through the Authority catalogue and batch verification. Counts and identifiers only.
+/// </summary>
+public sealed record SearchScopeVerificationResponse(
+    Guid SearchCatalogueSnapshotId,
+    Guid FormDefinitionId,
+    long AuthorizationRevision,
+    long ContentIntegrityRevision,
+    int CatalogueEntryCount,
+    int RecordsWithoutContent,
+    int VerifiedRecordCount,
+    int CompleteProjectionCount,
+    IReadOnlyList<Guid> VerifiedRecordIds,
+    int AuthorityCalls,
+    int VerificationBatches,
+    long VerifiedBytes,
+    double ElapsedMilliseconds);
+
+public sealed record SearchScopeVerificationRequest(Guid FormDefinitionId);

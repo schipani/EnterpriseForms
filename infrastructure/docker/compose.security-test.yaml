@@ -21,6 +21,11 @@ services:
       FaultInjection__Enabled: "true"
       # C-28: a small lookup page makes every multi-record discovery test cross SpiceDB cursor pages (production keeps 1000).
       SpiceDb__LookupPageSize: "20"
+      # Phase C7 OD-1: synthetic field-protection verifier credential for this isolated stack only (TestIdentity.VerifierToken
+      # mirrors it). Other stacks set nothing, so the migration catalogue is unreachable there (fail closed).
+      Identity__Verifier__Issuer: enterpriseforms-field-protection-verifier
+      Identity__Verifier__Audience: authorization-authority-verifier
+      Identity__Verifier__SharedKeyBase64: dmVyaWZpZXItdGVzdC1vbmx5LXNoYXJlZC1rZXktMDAwMDAwMDAw
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
   api:

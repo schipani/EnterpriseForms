@@ -49,6 +49,13 @@ public sealed class EndpointOwnershipTests : IClassFixture<WebApplicationFactory
         Assert.DoesNotContain(RoutedEndpoints(), e => (e.RoutePattern.RawText ?? string.Empty).StartsWith("/internal", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void TestingOnlyRoutesAreNotMappedOutsideTheTestingEnvironment()
+    {
+        // Phase C7 M1: the scope-verification proof route exists only in the isolated Testing stack.
+        Assert.DoesNotContain(RoutedEndpoints(), e => (e.RoutePattern.RawText ?? string.Empty).Contains("/testing/", StringComparison.Ordinal));
+    }
+
     private List<RouteEndpoint> RoutedEndpoints() =>
         factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .OfType<RouteEndpoint>()

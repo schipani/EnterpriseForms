@@ -530,16 +530,132 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
-        var resource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, request.FormRecordId, cancellationToken).ConfigureAwait(false);
-        var head = await scope.FindContentHeadAsync(state.OrganizationId, request.FormRecordId, lockForUpdate: true, cancellationToken).ConfigureAwait(false);
+        var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, bound, request.FormRecordId, request.RequestedAction, request.ObservedItems, request.HistoricCommittedOperationId, null, includeEditable: true, correlationId, cancellationToken).ConfigureAwait(false);
+        if (quarantined)
+        {
+            // Tamper evidence is committed and the failure returned (the authorization re-read cannot change that outcome).
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return result;
+        }
+
+        if (!result.Verified)
+        {
+            return result;
+        }
+
+        var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
+        if (after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision)
+        {
+            throw AuthorityException.NotReady("authorization state moved during verification");
+        }
+
+        return result;
+    }
+
+    /// <summary>Phase C7 OD-6: at most this many records per batch verification call.</summary>
+    public const int MaximumBatchRecords = 50;
+
+    /// <summary>The caller's expected head is no longer the accepted head (batch verification): nothing was verified.</summary>
+    public const string HeadChanged = "HEAD_CHANGED";
+
+    /// <summary>Not registered, not active or not discoverable for the caller (concealment-safe, like the single operation's 404).</summary>
+    public const string RecordUnavailable = "RECORD_UNAVAILABLE";
+
+    /// <summary>
+    /// Phase C7 M1 (OD-6): verifies 1..50 records in one call. Each record goes through exactly the same verification as
+    /// <see cref="VerifyProjectionAsync"/> — registry, discover/read authorization, quarantine, archive receipt, complete leaf
+    /// set, every signature, root, readable field scope — against the head the caller expects; nothing is shared between
+    /// records except the organization lock and the projection token. Per-record problems are typed results (the caller
+    /// must fail its whole search on any of them, D3); provider outages fail the whole call; tamper evidence is committed
+    /// even when the authorization state moved meanwhile (then the call fails as not ready). Read action only.
+    /// </summary>
+    public async Task<VerifyRecordProjectionsResponse> VerifyProjectionsAsync(VerifiedActor actor, VerifyRecordProjectionsRequest request, Guid correlationId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Records is null || request.Records.Count is 0 or > MaximumBatchRecords)
+        {
+            throw AuthorityException.Invalid($"records must contain 1..{MaximumBatchRecords} items");
+        }
+
+        if (request.Records.Select(r => r.FormRecordId).Distinct().Count() != request.Records.Count)
+        {
+            throw AuthorityException.Invalid("each record may appear once per batch");
+        }
+
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
+                    ?? throw AuthorityException.NotRegistered("organization is not registered");
+        var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
+        OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
+
+        var results = new List<BatchVerificationResult>(request.Records.Count);
+        var anyQuarantined = false;
+        foreach (var item in request.Records)
+        {
+            try
+            {
+                var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, bound, item.FormRecordId, RequestedAction.Read, item.ObservedItems ?? [], null, item.ExpectedCommittedOperationId, includeEditable: false, correlationId, cancellationToken).ConfigureAwait(false);
+                anyQuarantined |= quarantined;
+                var readable = !result.Verified ? [] : result.IsCompleteProjection ? result.AuthorizedItems : result.ReadableItems ?? [];
+                results.Add(new BatchVerificationResult(item.FormRecordId, result.Verified, result.FailureReasonCode, result.CommittedContentRevision, result.CommittedOperationId, result.IsCompleteProjection, readable));
+            }
+            catch (AuthorityException ex) when (ex.ErrorCode is AuthorityErrorCodes.NotFound or AuthorityErrorCodes.IntegrityQuarantine || (ex.ErrorCode == AuthorityErrorCodes.AuthorityNotReady && ex.Message == "AwaitingArchive") || (ex.ErrorCode == AuthorityErrorCodes.KeyUnavailable && !ex.Retryable))
+            {
+                var code = ex.ErrorCode switch
+                {
+                    AuthorityErrorCodes.NotFound => RecordUnavailable,
+                    AuthorityErrorCodes.IntegrityQuarantine => "QUARANTINED",
+                    AuthorityErrorCodes.AuthorityNotReady => "AWAITING_ARCHIVE",
+                    _ => AuthorityErrorCodes.KeyUnavailable,
+                };
+                results.Add(new BatchVerificationResult(item.FormRecordId, false, code, 0, null, false, []));
+            }
+        }
+
+        var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
+        var moved = after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision;
+        if (anyQuarantined)
+        {
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (moved)
+        {
+            throw AuthorityException.NotReady("authorization state moved during verification");
+        }
+
+        return new VerifyRecordProjectionsResponse(results, state.AuthorizationRevision, correlationId);
+    }
+
+    /// <summary>
+    /// One record's verification (shared by the single and the batch operation). Throws the single operation's typed
+    /// failures (not found, quarantined, awaiting archive, key unavailable); returns a failure result for missing content,
+    /// a changed head (batch) and integrity mismatches, in which case the quarantine is recorded on the scope and
+    /// <c>Quarantined</c> is true so the caller commits it.
+    /// </summary>
+    private async Task<(VerifyRecordProjectionResult Result, bool Quarantined)> VerifyRecordCoreAsync(
+        IAuthorityScope scope,
+        OrganizationAuthorizationState state,
+        BoundActor bound,
+        Guid formRecordId,
+        RequestedAction requestedAction,
+        IReadOnlyList<StagedContentItem> observedItems,
+        Guid? historicCommittedOperationId,
+        Guid? expectedCommittedOperationId,
+        bool includeEditable,
+        Guid correlationId,
+        CancellationToken cancellationToken)
+    {
+        var resource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, formRecordId, cancellationToken).ConfigureAwait(false);
+        var head = await scope.FindContentHeadAsync(state.OrganizationId, formRecordId, lockForUpdate: true, cancellationToken).ConfigureAwait(false);
         if (resource is null || resource.ResourceLifecycleState != ResourceLifecycleStates.Active || head is null)
         {
             throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
         }
 
         var subject = bound.AuthorityUserId.ToString("D");
-        var recordId = request.FormRecordId.ToString("D");
-        var fullRead = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, request.RequestedAction == RequestedAction.Edit ? "edit" : "read", ResourceTypeNames.User, subject), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false) == SpiceDbCheckOutcome.Allowed;
+        var recordId = formRecordId.ToString("D");
+        var fullRead = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, requestedAction == RequestedAction.Edit ? "edit" : "read", ResourceTypeNames.User, subject), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false) == SpiceDbCheckOutcome.Allowed;
         if (!fullRead)
         {
             var discover = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, "discover", ResourceTypeNames.User, subject), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
@@ -556,7 +672,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         if (head.CommittedContentRevision == 0 || head.CurrentRecordManifestCommitId is null)
         {
-            return new VerifyRecordProjectionResult(false, "NO_COMMITTED_CONTENT", 0, null, state.AuthorizationRevision, [], fullRead, correlationId);
+            return (new VerifyRecordProjectionResult(false, "NO_COMMITTED_CONTENT", 0, null, state.AuthorizationRevision, [], fullRead, correlationId), false);
+        }
+
+        if (expectedCommittedOperationId is { } expectedOperation && head.CommittedOperationId != expectedOperation)
+        {
+            return (new VerifyRecordProjectionResult(false, HeadChanged, head.CommittedContentRevision, head.CommittedOperationId, state.AuthorizationRevision, [], fullRead, correlationId), false);
         }
 
         // Protected bytes are never released before the content checkpoint holds its archive receipt (SEC-P12).
@@ -573,14 +694,14 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var verifiedOperationId = head.CommittedOperationId!.Value;
         var verifiedRoot = head.CommittedManifestRoot;
         var verifiedKeyVersion = head.SignatureKeyVersion;
-        if (request.HistoricCommittedOperationId is { } historicOperationId && historicOperationId != verifiedOperationId)
+        if (historicCommittedOperationId is { } historicOperationId && historicOperationId != verifiedOperationId)
         {
             if (!fullRead)
             {
                 throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
             }
 
-            var historic = await scope.FindManifestCommitByOperationAsync(state.OrganizationId, request.FormRecordId, historicOperationId, cancellationToken).ConfigureAwait(false);
+            var historic = await scope.FindManifestCommitByOperationAsync(state.OrganizationId, formRecordId, historicOperationId, cancellationToken).ConfigureAwait(false);
             if (historic is null || historic.CommittedContentRevision >= head.CommittedContentRevision)
             {
                 throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
@@ -602,7 +723,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw new AuthorityException(AuthorityErrorCodes.KeyUnavailable, 503, false, "accepted key version is no longer verifiable");
         }
 
-        var failure = await VerifyStagedAgainstLeavesAsync(request.ObservedItems, expected.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList(), state.OrganizationId, keyReference, verifiedRevision, verifiedOperationId, verifiedRoot, cancellationToken).ConfigureAwait(false);
+        var failure = await VerifyStagedAgainstLeavesAsync(observedItems, expected.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList(), state.OrganizationId, keyReference, verifiedRevision, verifiedOperationId, verifiedRoot, cancellationToken).ConfigureAwait(false);
         if (failure is not null)
         {
             // Tamper evidence: quarantine the record head and journal a minimal incident; never auto-repair or re-sign.
@@ -610,10 +731,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             head.QuarantineReasonCode = failure;
             head.ContentHeadModifiedOn = clock.GetUtcNow();
             state.ContentIntegrityRevision++;
-            var incident = new IntegrityIncidentBody(request.FormRecordId, verifiedRevision, verifiedOperationId, failure, bound.AuthorityUserId, correlationId);
+            var incident = new IntegrityIncidentBody(formRecordId, verifiedRevision, verifiedOperationId, failure, bound.AuthorityUserId, correlationId);
             scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
-            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return new VerifyRecordProjectionResult(false, failure, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, [], fullRead, correlationId);
+            return (new VerifyRecordProjectionResult(false, failure, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, [], fullRead, correlationId), true);
         }
 
         List<VerifiedProjectionItem> authorized;
@@ -629,17 +749,11 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             // Phase C5 (D7): both the readable and the editable subsets are returned, so a partial editor needs one verification; advisory only — prepare/commit decide.
             var fieldLeaves = expected.Where(l => l.ManifestItemKindCode is (byte)ManifestItemKind.FieldValue or (byte)ManifestItemKind.FieldSelection).ToList();
             readable = await CheckFieldLeavesAsync(fieldLeaves, "read", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
-            editable = await CheckFieldLeavesAsync(fieldLeaves, "edit", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
-            authorized = request.RequestedAction == RequestedAction.Edit ? editable : readable;
+            editable = includeEditable ? await CheckFieldLeavesAsync(fieldLeaves, "edit", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false) : [];
+            authorized = requestedAction == RequestedAction.Edit ? editable : readable;
         }
 
-        var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
-        if (after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision)
-        {
-            throw AuthorityException.NotReady("authorization state moved during verification");
-        }
-
-        return new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId, readable, editable, contributorWrites.Enabled);
+        return (new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId, readable, editable, contributorWrites.Enabled), false);
     }
 
     private async Task<List<VerifiedProjectionItem>> CheckFieldLeavesAsync(List<RecordManifestLeaf> fieldLeaves, string permission, string subject, string zedToken, CancellationToken cancellationToken)
@@ -1016,32 +1130,11 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw AuthorityException.Invalid("a reprotection operation is a workload operation and carries no delegated user");
         }
 
-        var command = await scope.FindCommandAsync(reprotectionCommandId.Value, cancellationToken).ConfigureAwait(false);
-        if (command is null || command.OrganizationId != state.OrganizationId || command.CommandKindName != SecurityCommandKinds.PublishFormSecurityRevision || command.CommandStateName != SecurityCommandStates.Effective)
-        {
-            throw AuthorityException.Forbidden("reprotection requires an effective PublishFormSecurityRevision command of this organization");
-        }
-
-        PublishFormSecurityRevisionPayload payload;
-        using (var document = System.Text.Json.JsonDocument.Parse(command.CommandPayloadJson))
-        {
-            payload = CanonicalJson.Deserialize<PublishFormSecurityRevisionPayload>(document.RootElement);
-        }
-
-        var binding = await scope.FindIdentityBindingByIdAsync(command.ActorIdentityBindingId, cancellationToken).ConfigureAwait(false)
-                      ?? throw AuthorityException.Forbidden("the command's actor binding no longer exists");
-        var direction = payload.RequiredProtectionMode == "Standard" ? ProtectionDirection.Decrypt : ProtectionDirection.Encrypt;
-
-        // The command must still be the field's current protection decision: a later command in the other direction supersedes it.
-        var currentType = direction == ProtectionDirection.Encrypt ? ResourceTypeNames.FieldProtectionRequirement : ResourceTypeNames.FieldProtectionRelease;
-        var current = await scope.FindResourceAsync(state.OrganizationId, currentType, payload.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
-        if (current is null || current.ResourceLifecycleState != ResourceLifecycleStates.Active || current.RegisteredBySecurityCommandId != command.SecurityCommandId)
-        {
-            throw AuthorityException.Forbidden("the command no longer describes the field's current protection (superseded or cancelled)");
-        }
-
+        var decision = await ProtectionCommandResolver.ResolveAsync(scope, state.OrganizationId, reprotectionCommandId.Value, cancellationToken).ConfigureAwait(false);
+        var binding = decision.ActorBinding;
+        var direction = decision.Direction;
         var recorded = new VerifiedActor(binding.IdentityIssuerUri, binding.IdentitySubjectIdentifier, direction == ProtectionDirection.Encrypt ? "reprotection-worker" : "deprotection-worker");
-        return (new BoundActor(recorded, binding), new ReprotectionContext(command.SecurityCommandId, payload.FormDefinitionId, payload.FieldDefinitionId, direction));
+        return (new BoundActor(recorded, binding), new ReprotectionContext(decision.CommandId, decision.FormDefinitionId, decision.FieldDefinitionId, direction));
     }
 
     /// <summary>

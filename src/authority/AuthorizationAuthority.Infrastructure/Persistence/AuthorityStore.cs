@@ -1,4 +1,5 @@
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
@@ -143,6 +144,33 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.Resources.AsNoTracking().Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.FormRecord && r.ResourceLifecycleState == ResourceLifecycleStates.Active).Select(r => r.ResourceEntityId).ToListAsync(cancellationToken);
+
+        public Task<List<AuthorityResource>> GetFormRecordResourcesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken) =>
+            context.Resources.AsNoTracking()
+                .Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.FormRecord && r.ParentResourceEntityId == formDefinitionId && lifecycleStates.Contains(r.ResourceLifecycleState))
+                .OrderBy(r => r.ResourceEntityId)
+                .ToListAsync(cancellationToken);
+
+        public Task<List<AuthorityResource>> GetResourcesAsync(Guid organizationId, string resourceTypeName, IReadOnlyCollection<Guid> resourceEntityIds, CancellationToken cancellationToken) =>
+            context.Resources.AsNoTracking().Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == resourceTypeName && resourceEntityIds.Contains(r.ResourceEntityId)).ToListAsync(cancellationToken);
+
+        public Task<List<RecordContentHead>> GetContentHeadsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            context.ContentHeads.AsNoTracking().Where(h => h.OrganizationId == organizationId && formRecordIds.Contains(h.FormRecordId)).ToListAsync(cancellationToken);
+
+        public void AddCatalogueSnapshot(SearchCatalogueSnapshot snapshot, IEnumerable<SearchCatalogueSnapshotEntry> entries)
+        {
+            context.CatalogueSnapshots.Add(snapshot);
+            context.CatalogueSnapshotEntries.AddRange(entries);
+        }
+
+        public Task<SearchCatalogueSnapshot?> FindCatalogueSnapshotAsync(Guid searchCatalogueSnapshotId, CancellationToken cancellationToken) =>
+            context.CatalogueSnapshots.AsTracking().FirstOrDefaultAsync(s => s.SearchCatalogueSnapshotId == searchCatalogueSnapshotId, cancellationToken);
+
+        public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesAsync(Guid searchCatalogueSnapshotId, int offset, int? limit, CancellationToken cancellationToken)
+        {
+            var query = context.CatalogueSnapshotEntries.AsNoTracking().Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId).OrderBy(e => e.CatalogueEntryPosition).Skip(offset);
+            return (limit is { } take ? query.Take(take) : query).ToListAsync(cancellationToken);
+        }
 
         public async Task CommitAsync(CancellationToken cancellationToken)
         {

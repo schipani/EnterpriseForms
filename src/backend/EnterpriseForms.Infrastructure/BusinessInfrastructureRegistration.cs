@@ -50,6 +50,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AuthorityCommandAwaiter>();
         services.AddSingleton<RecordCandidateStager>();
+        services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IAcceptedRecordItemsReader, EnterpriseForms.Application.Features.FormRecords.Ports.AcceptedRecordItemsReader>();
         services.AddSingleton<VerifiedRecordReader>();
         services.AddSingleton<EnsureIdentityProjectionHandler>();
         services.AddSingleton<CreateFormDefinitionHandler>();

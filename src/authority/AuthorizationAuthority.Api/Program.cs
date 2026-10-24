@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Api.Composition;
 using AuthorizationAuthority.Api.Features.Authorization;
+using AuthorizationAuthority.Api.Features.Catalogue;
 using AuthorizationAuthority.Api.Features.Content;
 using AuthorizationAuthority.Api.Features.Health;
 using AuthorizationAuthority.Api.Features.OperatorPlane;
@@ -57,6 +58,11 @@ public sealed class Program
             builder.Environment.IsProduction(),
             builder.Environment.IsEnvironment("Testing")));
         builder.Services.AddInternalAuthentication(builder.Configuration);
+        // Phase C7 M1 (AC-5): provisional catalogue limits (section Catalogue, C-56 D4); a bad value fails at startup.
+        var catalogueOptions = builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions.SectionName).Get<AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions>() ?? new AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions();
+        AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptionsValidation.Validate(catalogueOptions);
+        builder.Services.AddSingleton(catalogueOptions);
+        builder.Services.AddSingleton<AuthorizationAuthority.Application.Features.Catalogue.SearchCatalogueService>();
         builder.Services.AddSingleton<SpiceDbSchemaInitializer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SpiceDbSchemaInitializer>());
         builder.Services.AddHostedService<AuthorityWorkLoop>();
@@ -78,6 +84,7 @@ public sealed class Program
         app.MapFormAccessEndpoints();
         app.MapSecurityCommandEndpoints();
         app.MapContentEndpoints();
+        app.MapCatalogueEndpoints();
         app.MapOperatorEndpoints();
 
         app.Run();
