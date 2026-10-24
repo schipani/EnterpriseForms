@@ -31,7 +31,7 @@
 
 ## 3. Verification
 
-All runs below are local, on the M0 implementation commit (see §5) unless marked hosted.
+All runs below are on the M0 implementation commit c7604ab; local unless marked hosted.
 
 | Suite | Result |
 |---|---|
@@ -42,7 +42,10 @@ All runs below are local, on the M0 implementation commit (see §5) unless marke
 | Playwright `advanced-field-search.spec.ts` (6) + `responsive.spec.ts` (2, 320 px) against the dev API (5280) with the working-tree frontend | **8 / 8 passed** |
 | Playwright `form-control-layout.spec.ts` (updated filter-layout test + 320 px search test) | 2 / 2 passed |
 | Playwright `pb14-accessibility.spec.ts` (axe at all widths, includes My Records) | 3 / 3 passed |
-| Hosted `stage-b-integration` (integration + full browser suite on an isolated stack) | See §5 |
+| **Hosted** `stage-b-integration` run 40051180610 on c7604ab (isolated stack): integration tests | **100 / 100 passed** |
+| **Hosted** same run: full browser suite (desktop + 320 px projects; includes `records-workspace`, `record-lookup`, `form-control-layout`, `pb14-accessibility` and the new specs) | **93 / 93 passed** |
+| **Hosted** `security-gate-a` run 40051183432 on c7604ab: SEC-P01..SEC-P12 against the isolated Docker stack | **13 / 13 passed** |
+| Playwright M0 specs against the rebuilt development container (`http://127.0.0.1:8091`) | 8 / 8 passed |
 
 Tests that write data were **not** run against the development environment. They run on the isolated hosted stack.
 
@@ -96,9 +99,10 @@ The development application at `http://127.0.0.1:8091` was rebuilt with `devstac
 | Commit | Content |
 |---|---|
 | 9edddb7 | C-55 assessment (docs) |
-| *(M0 commit — see the final report)* | M0 implementation, docs C-56/C-57/C-58 |
+| c7604ab | M0 implementation; docs C-56/C-57/C-58 |
+| *(this docs commit)* | hosted results recorded |
 
-Hosted results are recorded in the final report for this milestone.
+Hosted runs on c7604ab: `stage-b-integration` 40051180610 (success), `security-gate-a` 40051183432 (success). `ci.yml` runs only on pull requests and `main`; its steps (build with OpenAPI diff, architecture/contract/Authority/integrity tests, lint, typecheck, Vitest, web build) were run locally with the results in §3.
 
 ## 6. Outstanding decisions and blockers
 
