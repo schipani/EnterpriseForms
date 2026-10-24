@@ -10,14 +10,17 @@
   * C-59: G22 corrected;
   * C-60: OD-1..OD-8 approved;
   * C-61: G22 hotfix merged;
-  * C-62: M1 implemented.
-- **G06, G19, G21:** OPEN. **G22:** corrected (independent review pending). **G23:** new, OPEN.
+  * C-62: M1 implemented;
+  * C-63/C-64: G23 hotfix (merged to `main`, integrated here);
+  * C-65/C-66: F-C7-01 correction (merged to `main`, integrated here); final AC-5 review;
+  * C-67: M2 (AC-6) implemented.
+- **G06, G19, G21:** OPEN. **G22, G23:** corrected (independent review pending). **PB-08:** not resolved (production/staging search approvals disabled).
 - **State (2026-10-24):**
   * M0 implemented (owner visual acceptance **pending**).
-  * G22 hotfix merged to `main` and into this branch (§7).
-  * **M1 — AC-5 — implemented and verified (§8); stopped for owner review and acceptance.**
-  * Field-value search is still disabled.
-  * AC-6 (M2), M3 and M4 are not started.
+  * G22, G23 and F-C7-01 merged to `main` and into this branch (§7, §10).
+  * M1 — AC-5 — implemented; final review done (§11).
+  * **M2 — AC-6 — implemented and verified (§12); stopped for owner review and acceptance.**
+  * Field-value search is still disabled. M3 and M4 are not started. This branch is not merged to `main`.
 
 ## 1. History
 
@@ -225,12 +228,149 @@ The development stack at `http://127.0.0.1:8091` was backed up first (`Documents
 * Repeat §4 steps 1–8 (M0 layout, exact search, disabled Advanced Search with the explanation, gallery preview, keyboard, 320 px). Nothing in the UI changed in M1.
 * G22: everything you do in the browser (editing, submitting, sharing, uploads, publishing, signing out) must keep working. A rejection would show as a 403 "CSRF_TOKEN_INVALID" error.
 
-## 9. Outstanding decisions and blockers
+## 9. Outstanding decisions and blockers (superseded by §14)
 
-* **Owner review and acceptance of M1** (this section and architecture §6A); M0 visual acceptance.
-* **Before M3:** the performance trade-off of §8.6 (500 records ≈ 6 s versus the < 3 s PB-09 target).
-* **F-C7-01:** idempotent completion of partially failed record creation.
-* **G23:** server-side session revocation.
-* **AC-6 (M2):** depends on PB-08 step-up for production approvals (OD-7) and on OD-3 form-version registration in the Authority.
-* **G06, G19, G21:** open. M1 is a precondition, not a closure. G19 needs M4.
-* **Independent review:** the Authority changes (catalogue, verifier credential, batch verification, audit stream, checkpoint lookup) and the G22 fix need independent security review, like C-12, C-28, AC-1 and AC-2. There is no Azure staging evidence.
+See §14.
+
+## 10. G23 and F-C7-01 (C-63..C-66)
+
+### 10.1 G23 — server-side session revocation
+
+* Hotfix PR #21, merged to `main` as ce6c365 and into this branch (e7ac3be). Session state is held by the independent Authority and checked on every cookie request; sign-out revokes it first (`docs/security/G23_SESSION_REVOCATION_HOTFIX.md`, C-63/C-64).
+* Hosted on cf100d5: `ci` .NET 430/430, Stage B integration 113/113, browser 89 passed, SEC-P01..SEC-P12 passed.
+* **Review requirement:** independent review of the Authority session store and the BFF validation path; session events into the audit stream; production key-ring storage; Entra CAE. G23 is corrected for development, not independently reviewed.
+
+### 10.2 F-C7-01 — partial record creation (C-65)
+
+* **Cause:** `RegisterRecord` was already idempotent. The content step was not: a retry rebuilt a candidate that can never match the first (new item ids, timestamp, AEAD nonces) under the same deterministic operation and key, so the Authority answered `IDEMPOTENCY_CONFLICT` and the registered record could never receive content.
+* **Fix (no Authority protocol change):** one insert-only `form_record_creation_attempts` row per derived record id holds an HMAC-SHA-256 fingerprint of the canonical request under a random per-attempt key sealed as a field-encryption envelope (no values, no testable digest in BusinessDb). A retry with the same request completes what exists (accepted head ⇒ the original outcome; staged candidate ⇒ committed as staged and verified by the Authority; expired or aborted ⇒ a fresh, separately keyed attempt); a different request with the same key ⇒ `409 IDEMPOTENCY_CONFLICT`. Nothing is deleted or repaired from BusinessDb data. `docs/architecture/RECORD_CREATION_IDEMPOTENCY.md`.
+* **Outcomes 1–9 of the owner's list:** one accepted record; same request ⇒ same outcome; transient failure retryable; genuine conflict rejected; no second Authority version for the same operation; no usable incomplete record; existing content intact; orphans left for approved reconciliation (not built); no deletion or repair from unverified BusinessDb data.
+* **Tests (real stack, `RecordCreationIdempotencyTests`, 16):** fault injection at all five checkpoints; request interruption; BusinessDb and Authority failure; commit followed by a lost response; ambiguous retry; concurrent identical and conflicting requests; API restart; missing business data; no unauthorized exposure; error codes distinguishing retryable failures from conflicts. Plus 4 unit tests.
+* **Hosted (PR #22):** first head 799f31f — `ci` passed, SEC-P01..SEC-P12 passed (run 40106822212), Stage B integration failed once on the known `RecordHistoryTests` AwaitingArchive timing (a fail-closed retryable read immediately after a write). Test-only fix fd6c257 (the history test retries the retryable read, like a client): `ci` .NET 434/434, Stage B integration **129/129**, browser **89 passed**, level3 passed. Merged as `main` **216a04b**; merged into this branch (fe071ae).
+* **Residual:** a registered record whose client never retries stays registered without content (fails closed, never usable); an operator reconciliation listing is a later item. The fingerprint table needs a retention rule (PB-13).
+
+## 11. Final AC-5 (M1) review (C-66)
+
+### 11.1 Snapshot completeness
+
+| Owner case | Test | Result |
+|---|---|---|
+| New registration | `ANewlyGrantedDiscoverableRecord…` (unit), real-stack snapshot test | New record ⇒ old snapshot invalid; next catalogue includes it |
+| Record moving into or out of a form | `ARecordMovingBetweenFormsInTheRegistry…` (unit) | Registry parent change invalidates; the record appears only under its current form |
+| Newly granted discoverable record | real-stack snapshot test (reader's pre-grant snapshot invalidated) | Pass |
+| Revocation | `…SnapshotsDieOnRevocation…` | Pass |
+| New head | content-head change tests (unit + real stack) | Pass |
+| Missing or quarantined records | quarantined/revision-0 entries listed with state, never dropped; deleted rows fail the scope | Pass |
+| Cross-organization movement or tampering | `ResourcesOfAnotherOrganizationNeverEnter…` (unit), `CrossOrganizationBusinessTamperingCannotMove…` (real stack) | Pass |
+| Full migration population | migration-catalogue tests (Registered + undiscoverable records included) | Pass |
+
+Local real-stack run of `SearchCatalogueTests` + `FieldSearchApprovalTests`: 17/17.
+
+### 11.2 Audit reliability — the "never blocks reads" wording
+
+The earlier description ("non-gating audit stream") was imprecise and is corrected here:
+
+* **Issuance blocks on audit.** A catalogue is issued only together with its `SearchCatalogueIssued` event, in one AuthorityDb transaction. If the event cannot be written, no catalogue exists.
+* **Refusals are journaled before they are returned** (`SearchCatalogueRefused`, `MigrationCatalogueDenied`, `MigrationCatalogueRefused`), each in its own committed transaction (c7 commit 21efdf2; `RefusedUserAndMigrationCataloguesAreJournaled` unit test, `EveryIssuedOrRefusedCatalogueHasDurableAuditEvidenceThatReachesTheArchive` real-stack test).
+* **What is non-gating is the archive copy:** audit entries are archived and anchored asynchronously by the existing processor; archive lag of the audit stream does not close the organization gate (security commands, by contrast, cannot become Effective before archival).
+* **Residual — explicit blocker AUD-C7-01 (production):** between commit and archival, catalogue evidence exists only in AuthorityDb (independently administered, but a loss of AuthorityDb in that window loses it). Before production, either mandatory search-audit events must gate on archival as security commands do, or a measured and monitored archive-lag objective must be independently accepted. No competing audit system was added.
+
+### 11.3 Performance (PB-09; engineering measurement, not a capacity claim)
+
+The 500-record ceiling is unchanged. Benchmark `BenchmarkA200RecordScopeSequentiallyAndUnderConcurrency`: 200 Accused records, background edits on another form every 250 ms, concurrency 1/4/8. Typed refusals are counted, never hidden; no run returned a partial scope.
+
+**Local (developer laptop, isolated Docker stack):**
+
+| Concurrency | Attempts | Verified | Retryable refusals | Time-limit refusals | p50 | p95 | p99 (= max) |
+|---|---|---|---|---|---|---|---|
+| 1 | 21 | 12 | 8 | 0 | 5.94 s | 6.30 s | 6.30 s |
+| 4 | 28 | 10 | 12 | 3 | 13.66 s | 14.98 s | 14.98 s |
+| 8 | 40 | 0 | 16 | 24 | — | — | — |
+
+**Hosted (GitHub runner, run 40118191733 on 51f2658; raw data `docs/evidence/phase-c7/c7-ac5-benchmark-200-51f2658.json`; the first round of each level is a warm-up and is not measured):**
+
+| Concurrency | Attempts | Verified (measured) | Retryable refusals | Time-limit refusals | p50 | p95 | p99 (= max) |
+|---|---|---|---|---|---|---|---|
+| 1 | 21 | 20 | 0 | 0 | 2.60 s | 2.69 s | 2.69 s |
+| 4 | 28 | 15 | 9 | 0 | 6.73 s | 7.67 s | 7.67 s |
+| 8 | 40 | 11 | 25 | 0 | 13.14 s | 15.00 s | 15.00 s |
+
+Findings:
+
+* **Is 3 s achievable at 200 records?** For a single search on the hosted runner, yes, narrowly: p99 2.69 s (≈ 13 ms per record, consistent with M1), with about 0.3 s of headroom. Under concurrency, no: 4 concurrent searches take p50 6.7 s and 8 take p50 13.1 s with p95 at the 15 s budget. On the developer laptop even a single search takes ≈ 6 s. **3 s at 500 records is not achievable** with the V1 per-record verification design and must not be implied.
+* **Concurrency degrades roughly linearly with the number of concurrent searches** (verification work is serialized at the Authority and Vault Transit). Hosted, 8 concurrent searches reach the 15 s budget; locally every one of them was refused with `SEARCH_VERIFICATION_LIMIT` (time). No run returned a truncated scope.
+* **Unrelated writes cause retryable refusals:** while other records' changes are archiving, the gate is briefly closed and a verification is refused `SEARCH_SNAPSHOT_CHANGED`/`SEARCH_VERIFICATION_UNAVAILABLE` (retryable) — hosted 9 of 28 attempts at concurrency 4 and 25 of 40 at concurrency 8. For M3 this means a bounded retry policy and a user-facing "busy, try again" state, and it should be weighed in the performance decision.
+* G06 and G19 stay OPEN.
+
+## 12. M2 — AC-6 search approval (C-67)
+
+### 12.1 What was built
+
+See architecture §6B. In short:
+
+* **Authority:** published-version registration (OD-3), approvals bound to the registered version (only `administer_security`, OD-2 A), Public/Internal plaintext only, operators per type, `field_searcher` query permission (OD-4 A), invalidation on strengthening, republish and policy change, the environment-locked synthetic step-up gate (OD-7), capabilities, and journaled rejections (OD-8). Additive migration `FieldSearchApprovals`.
+* **Business:** publish registers the version; search-policy endpoints relay security commands; capabilities and per-condition authorization come from the Authority; execution still refused (`TRUSTED_SEARCH_NOT_ENABLED`); `plaintextSearchPermitted` on the organization policy (additive migration `PhaseC7FieldSearchPolicy`).
+* **Frontend:** Configure Field → **Search**; Form permissions → **Who can search field values** (security administrators); Organization settings toggle; Advanced Search fields and conditions from the capabilities with **Search records disabled**.
+* **Dev seed:** a "security" persona (Sam Security, System Administrator) for organizations bootstrapped from now on. There is deliberately no operator path that adds identities to an existing organization, so the persistent development organization does **not** get it (§13).
+
+### 12.2 Defects found and fixed during verification
+
+* **False invalidation on republish:** the approval's option snapshot is stored as jsonb, which PostgreSQL reformats; it was compared as JSON text, so every Option approval was invalidated by the next version. Now compared by value (unit regression test simulating the reformatting).
+* **Option order:** options were stored sorted by id; they now keep the published order.
+* **Cross-organization configuration read:** another organization's security administrator received an empty configuration (200) for this form's id. No data was disclosed, but it differed from an unknown form. The Authority now answers configuration only for an Active form of the caller's own organization (otherwise the same empty answer ⇒ 404).
+* **Architecture rule:** search-approval administration may write audit events and read directory display names through the business store, never records (rule narrowed and extended, not removed).
+
+### 12.3 Test coverage (owner's list and AC6-T01..T12)
+
+| # | Owner test | Where |
+|---|---|---|
+| 1 | Authorized admin approval | Authority unit; `FieldSearchApprovalTests.ASecurityAdministratorApprovesAPublicField…` (real stack); `field-search-approval.spec.ts` |
+| 2 | Designer denial | unit; real stack (business API **and** direct Authority command) |
+| 3 | Organization owner without security permission denied | unit; real stack (Designer persona = owner + designer) |
+| 4 | Cross-organization denial | unit; real stack |
+| 5 | Confidential/Restricted denial | unit; real stack |
+| 6 | Encrypted field denial | unit; real stack; browser (no approval control, "Encrypted for privacy — not searchable.") |
+| 7 | Unsupported operator | unit; real stack (approval and search request) |
+| 8 | Form-version substitution | unit; real stack (approval of another form's field; forged registration with mismatched protection refused) |
+| 9 | Field identity substitution | real stack (unregistered field ⇒ `FORM_VERSION_UNTRUSTED`) |
+| 10 | Tampered dropdown/layout metadata | real stack (DBA relabels, swaps an option id, marks an encrypted field Public/searchable: capabilities unchanged, injected option refused) |
+| 11 | Strengthening and invalidation | unit; real stack (`FIELD_STRENGTHENED`, `FORM_VERSION_CHANGED`, `ORGANIZATION_POLICY_CHANGED`) |
+| 12 | Search-permission revocation | real stack; browser (withdrawal) |
+| 13 | Unauthorized capability discovery | real stack (reader, record owner, designer get no fields; configuration only for designers/admins; searcher list only for admins) |
+| 14 | Forged API requests | real stack (forged value type, unapproved field, injected option, direct Authority commands) |
+| 15 | Dev-only isolation | unit (`TheDevelopmentStepUpPathCannotBeEnabledInStagingOrProductionOrWithARealIdentityProvider`): startup refused outside Development/Testing or with a real IdP |
+| 16 | Production/staging step-up enforcement | unit (default gate refuses every approval `STEP_UP_REQUIRED`); real stack (approval without the step-up and with a forged marker refused) |
+| 17 | Correct audit evidence | real stack (committed commands in the authorization stream; `FieldSearchCommandRejected` in the audit stream; business `FIELD_SEARCH_*` events) |
+| 18 | My Records and Form Designer regression | full local integration and browser suites; hosted Stage B |
+
+AC6-T01..T08, T10 and T12 are covered as above. **AC6-T09** (revocation mid-search) and **AC6-T11** (forged value rows under another field's id) concern execution and remain M3 tests.
+
+### 12.4 Verification (merged tree: C7 + F-C7-01 + M2)
+
+* **Local:** .NET Authority 159/159, contract 285/285, architecture 67/67, integrity 34/34; frontend lint, typecheck, 206/206 unit tests, build, no generated-client or OpenAPI drift; real-stack integration **145/145** (one container-recreating test excluded locally only, as before); browser **97 passed, 4 skipped** (pre-existing skips).
+* **Hosted (dispatched on 51f2658):** `stage-b-integration` run 40118191733 — integration **146/146** (incl. `FieldSearchApprovalTests`, `RecordCreationIdempotencyTests`, the AC-5 completeness, audit and 200-record benchmark tests), browser **101 passed** (incl. `field-search-approval.spec.ts`); `security-gate-a` run 40118194188 — SEC-P01..SEC-P12 **13/13**.
+* The C7 branch has no pull request, so the `ci` workflow (pull_request/main only) does not run on it; its checks were run locally as listed.
+
+## 13. Browser acceptance instructions (M0 and M2)
+
+**Development environment (`http://127.0.0.1:8091`)** — needs `scripts/devstack/devstack.py rebuild authority api web` (additive migrations only; Vault, databases, SpiceDB, Azurite, keys and data untouched; back up first as before). After G23 everyone signs in again.
+
+1. **M0 layout (unchanged):** My Records — reference/ID search on top; Form | Status; Sort by | Rows per page; Advanced Search collapsed; one results table. Exact reference search works.
+2. **Policy:** as Avery Owner, Organization settings → tick "Permit search approvals for plaintext Public/Internal fields", save.
+3. **Republish:** forms published before M2 are not registered with the Authority (OD-3). Publish a form again; the Search tab then shows "published version N".
+4. **Search tab:** Form Designer → a field → Configure Field → **Search**. Encrypted fields read "Encrypted for privacy — not searchable." Plaintext Public/Internal fields read "Can be approved", list their conditions, and say approving is done by a security administrator. No control changes encryption.
+5. **Approval in the development organization is not possible:** the persistent organization has no system administrator persona (it predates the security persona, and no operator path adds one). This is the expected, documented state; Advanced Search there shows "No searchable fields".
+6. **Approval end to end — isolated security-test stack** (disposable; never the development stack): start it from `infrastructure/docker` with `compose.yaml` + `compose.security-test.yaml`, then serve the web app with `cd src/frontend; $env:API_TARGET="http://127.0.0.1:5180"; npm run dev -w apps/web -- --host 127.0.0.1` and open `http://127.0.0.1:5173`. As Avery Owner, permit search in Organization settings, create and publish a form with a plaintext Internal text field, and grant Sam Security create-record permission (Form permissions) so Sam can open it. Sign in as **Sam Security (System Administrator)**, open the form, Configure Field → Search: choose conditions, enter an approval reference, tick "Confirm with the development-only step-up", Approve. Form permissions → "Who can search field values" → grant Casey Clerk. As Casey Clerk, My Records → choose the form → Advanced Search: the approved field and its conditions can be chosen; **Search records stays disabled**. Withdraw as Sam: the field disappears. (`field-search-approval.spec.ts` automates this.)
+7. **Gallery** (`/app/gallery`): the synthetic preview is unchanged.
+8. Keyboard and 320 px: the Search tab and Advanced Search remain operable.
+
+## 14. Outstanding decisions and blockers
+
+* **Owner review and acceptance of M2** (§12, architecture §6B) and of the AC-5 review (§11); M0 visual acceptance (§13).
+* **Performance before M3 (§11.3):** < 3 s is not met at 200 records under concurrency and is not achievable at 500; concurrency degrades sharply; retryable refusals during unrelated writes. Options: lower the limit, accept slower complete searches, or a V2 trusted index (separate ADR).
+* **AUD-C7-01 (production blocker):** archive copy of mandatory search-audit events is asynchronous (§11.2).
+* **PB-08:** production and staging approvals stay disabled until real step-up evidence exists.
+* **Security administration UX:** a security administrator needs designer or form-user access to reach a form's Search tab; a dedicated list is not in M2.
+* **G06** (execution, M3), **G19** (M4), **G21** (search part addressed for versions published since M2; editing still reads unsigned metadata): OPEN.
+* **Independent review** of the Authority changes (catalogue, verifier credential, batch verification, audit stream, session store, AC-6 commands and capabilities) and of G22/G23. No Azure staging evidence; no Level 2 claim.
+* Not started: M3, M4. C7 is not merged to `main`.
