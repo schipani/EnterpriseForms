@@ -7,7 +7,9 @@ using System.Text.Json;
 using EnterpriseForms.Api.Composition;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using EnterpriseForms.Application.Common.Authority;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,11 +26,14 @@ namespace EnterpriseForms.Api.ContractTests;
 /// format (its Data Protection key ring), exactly as <c>StartSessionAsync</c> produces them; the business store and the
 /// Authority are pointed at closed ports, so a request that passes the check fails at the store and can never mutate data.
 /// The end-to-end path with real development logins runs in the Stage B integration suite (<c>SessionCsrfTests</c>).
+/// G23: the Authority's session state is a <see cref="FakeSessionStateAuthority"/> here (every issued ticket registered as
+/// active), so these tests keep isolating the CSRF check; revocation is covered by <c>SessionRevocationContractTests</c>.
 /// </summary>
 public sealed class SessionCsrfTests : IDisposable
 {
     private const string CookieName = BusinessAuthentication.DevelopmentSessionCookieName;
     private readonly CapturingLoggerProvider logs = new();
+    private readonly FakeSessionStateAuthority sessions = new();
     private readonly WebApplicationFactory<Program> api;
 
     public SessionCsrfTests()
@@ -40,6 +45,7 @@ public sealed class SessionCsrfTests : IDisposable
             b.UseSetting("ConnectionStrings:BusinessDb", "Host=127.0.0.1;Port=9;Database=none;Username=none;Password=none;Timeout=2");
             b.UseSetting("TrustAuthority:BaseAddress", "http://127.0.0.1:9");
             b.ConfigureLogging(l => l.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
+            b.ConfigureTestServices(s => s.AddSingleton<IBrowserSessionStateAuthority>(sessions));
         });
     }
 
@@ -87,8 +93,10 @@ public sealed class SessionCsrfTests : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
         Assert.Contains(logout.Headers.TryGetValues("Set-Cookie", out var cleared) ? cleared : [], c => c.StartsWith(CookieName + "=;", StringComparison.Ordinal));
         // A business mutation with the right token passes the check and the authorization policy; it then fails only at
-        // the (deliberately unreachable) store — proof that the check did not reject it.
-        var update = await SendAsync("PUT", "/api/v1/me/ui-preferences", session.Cookie, session.CsrfToken, new { textScalePreferenceMode = "OrganizationDefault", explicitTextScalePercent = (decimal?)null });
+        // the (deliberately unreachable) store — proof that the check did not reject it. (A new session: since G23 the
+        // signed-out one is revoked and no longer authenticates.)
+        var active = NewSession();
+        var update = await SendAsync("PUT", "/api/v1/me/ui-preferences", active.Cookie, active.CsrfToken, new { textScalePreferenceMode = "OrganizationDefault", explicitTextScalePercent = (decimal?)null });
         Assert.NotEqual(HttpStatusCode.Forbidden, update.StatusCode);
         Assert.NotEqual("CSRF_TOKEN_INVALID", await TitleAsync(update));
         Assert.Equal(HttpStatusCode.ServiceUnavailable, update.StatusCode);
@@ -232,51 +240,11 @@ public sealed class SessionCsrfTests : IDisposable
     /// <summary>A session cookie exactly as StartSessionAsync issues it, protected with the host's own ticket format.</summary>
     private Session NewSession(TimeSpan? expiresIn = null)
     {
-        var csrf = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        var settings = api.Services.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value;
-        var identity = new ClaimsIdentity(BusinessAuthentication.SessionScheme);
-        identity.AddClaim(new Claim("iss", settings.Issuer ?? string.Empty));
-        identity.AddClaim(new Claim("sub", "g22-csrf-test"));
-        identity.AddClaim(new Claim("org", Guid.CreateVersion7().ToString("D")));
-        identity.AddClaim(new Claim("authority_user_id", Guid.CreateVersion7().ToString("D")));
-        identity.AddClaim(new Claim("name", "G22 test"));
-        identity.AddClaim(new Claim(BusinessAuthentication.AssertionClaim, MintAssertion()));
-        identity.AddClaim(new Claim(BusinessAuthentication.CsrfClaim, csrf));
-        var now = DateTimeOffset.UtcNow;
-        var properties = new AuthenticationProperties { IsPersistent = false, IssuedUtc = now, ExpiresUtc = now + (expiresIn ?? TimeSpan.FromHours(1)), AllowRefresh = false };
-        var options = api.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(BusinessAuthentication.SessionScheme);
-        var value = options.TicketDataFormat.Protect(new AuthenticationTicket(new ClaimsPrincipal(identity), properties, BusinessAuthentication.SessionScheme));
-        return new Session(ChunkedCookie(value), csrf);
+        var issued = SessionTestSupport.Issue(api, sessions, expiresIn);
+        return new Session(issued.Cookie, issued.CsrfToken);
     }
 
-    /// <summary>The cookie manager splits values above 4050 characters into "chunks-N" plus C1..CN cookies.</summary>
-    private static string ChunkedCookie(string value)
-    {
-        const int chunk = 4000;
-        if (value.Length <= chunk)
-        {
-            return $"{CookieName}={value}";
-        }
-
-        var parts = Enumerable.Range(0, (value.Length + chunk - 1) / chunk).Select(i => value.Substring(i * chunk, Math.Min(chunk, value.Length - (i * chunk)))).ToList();
-        return $"{CookieName}=chunks-{parts.Count}; " + string.Join("; ", parts.Select((p, i) => $"{CookieName}C{i + 1}={p}"));
-    }
-
-    private string MintAssertion()
-    {
-        var settings = api.Services.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value;
-        var now = DateTime.UtcNow;
-        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
-        {
-            Issuer = settings.Issuer,
-            Audience = settings.Audience,
-            IssuedAt = now,
-            NotBefore = now.AddSeconds(-5),
-            Expires = now.AddMinutes(30),
-            Claims = new Dictionary<string, object> { ["sub"] = "g22-csrf-test", ["org"] = Guid.CreateVersion7().ToString("D"), ["authority_user_id"] = Guid.CreateVersion7().ToString("D"), ["name"] = "G22 test" },
-            SigningCredentials = new SigningCredentials(settings.SymmetricKey(), SecurityAlgorithms.HmacSha256),
-        });
-    }
+    private string MintAssertion() => SessionTestSupport.MintAssertion(api);
 
     private sealed class CapturingLoggerProvider : ILoggerProvider
     {

@@ -194,5 +194,9 @@ public sealed class ArchiveProcessorTests
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => throw new NotSupportedException();
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession?> FindSessionByDigestAsync(byte[] digest, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddSession(AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession session) => throw new NotSupportedException();
     }
 }

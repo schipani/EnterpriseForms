@@ -41,6 +41,7 @@ const titles: Record<string, string> = {
   MALWARE_DETECTED: "The file was rejected by the malware scanner",
   SCAN_ERROR: "The file could not be scanned",
   CSRF_TOKEN_INVALID: "Your session token is stale; reload the page",
+  SESSION_STATE_UNAVAILABLE: "Your session could not be verified",
   ORGANIZATION_OPTION_DISABLED: "A selected option is no longer available",
   THEME_CONTRAST_FAILED: "The colours do not meet the accessibility floor",
   QUEUE_FULL: "Too many pending requests; try again shortly",

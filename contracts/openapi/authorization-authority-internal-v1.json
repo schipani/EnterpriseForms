@@ -601,6 +601,99 @@
           }
         }
       }
+    },
+    "/internal/v1/sessions": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Registers the SHA-256 digest of a new session secret for the delegated user (bound identity required) and revokes the session it replaces.",
+        "operationId": "CreateSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/sessions/validate": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Valid only when not revoked, within absolute and idle expiry, and bound to the same enabled identity. Never extends the absolute expiry.",
+        "operationId": "ValidateSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionDigestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/sessions/revoke": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Idempotent revocation by the session's own identity (sign-out).",
+        "operationId": "RevokeSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionDigestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStatus"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -998,6 +1091,33 @@
           },
           "configured_enabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "CreateSessionRequest": {
+        "required": [
+          "organization_id",
+          "session_digest_base64",
+          "absolute_expires_on"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session_digest_base64": {
+            "type": "string"
+          },
+          "absolute_expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "replaced_session_digest_base64": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1616,6 +1736,53 @@
           }
         }
       },
+      "SessionDigestRequest": {
+        "required": [
+          "organization_id",
+          "session_digest_base64"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session_digest_base64": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionStatus": {
+        "required": [
+          "valid",
+          "invalid_reason",
+          "expires_on",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "invalid_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SignedCandidateItem": {
         "required": [
           "item_kind",
@@ -1818,6 +1985,9 @@
     },
     {
       "name": "Operator"
+    },
+    {
+      "name": "Sessions"
     }
   ]
 }
