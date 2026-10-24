@@ -104,16 +104,27 @@ public static class BusinessAuthentication
         return services;
     }
 
-    /// <summary>Double-submit CSRF for cookie sessions: every non-safe method must carry the header matching the ticket claim.</summary>
+    /// <summary>
+    /// Double-submit CSRF for cookie sessions: every non-safe method that presents a valid session cookie must carry the
+    /// header matching that session's ticket claim — whether or not a bearer assertion is also present, so adding a bearer
+    /// can never switch the check off.
+    /// <para>
+    /// G22 (C-58): the default authentication scheme is the bearer, so <c>UseAuthentication</c> does not authenticate the
+    /// session cookie; the authorization policy does that later, at the endpoint. The check therefore authenticates the
+    /// session scheme itself (the handler caches the result for the rest of the request) instead of reading
+    /// <c>HttpContext.User</c>, which before this fix was always the anonymous principal for cookie requests.
+    /// </para>
+    /// </summary>
     public static IApplicationBuilder UseSessionCsrfProtection(this IApplicationBuilder app)
     {
         return app.Use(static async (context, next) =>
         {
             var method = context.Request.Method;
             var isSafe = HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method);
-            if (!isSafe && context.User.Identity?.IsAuthenticated == true && context.User.Identity.AuthenticationType == SessionScheme)
+            var session = isSafe ? null : await context.AuthenticateAsync(SessionScheme).ConfigureAwait(false);
+            if (session is { Succeeded: true, Principal: { } principal })
             {
-                var expected = context.User.FindFirstValue(CsrfClaim);
+                var expected = principal.FindFirstValue(CsrfClaim);
                 var provided = context.Request.Headers[CsrfHeader].ToString();
                 if (string.IsNullOrEmpty(expected) || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(expected), System.Text.Encoding.UTF8.GetBytes(provided)))
                 {
