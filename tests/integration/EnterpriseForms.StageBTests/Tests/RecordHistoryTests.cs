@@ -47,10 +47,28 @@ public sealed class RecordHistoryTests(StageBFixture fixture)
     }
 
     private Task<HttpResult> VersionsAsync(StageBScenario s, TestUser user, Guid record, string query = "") =>
-        fixture.Api.GetAsync($"/api/v1/form-records/{record:D}/versions{query}", s.Token(user));
+        WhileArchivingAsync(() => fixture.Api.GetAsync($"/api/v1/form-records/{record:D}/versions{query}", s.Token(user)));
 
     private Task<HttpResult> VersionAsync(StageBScenario s, TestUser user, Guid record, long revision) =>
-        fixture.Api.GetAsync($"/api/v1/form-records/{record:D}/versions/{revision}", s.Token(user));
+        WhileArchivingAsync(() => fixture.Api.GetAsync($"/api/v1/form-records/{record:D}/versions/{revision}", s.Token(user)));
+
+    /// <summary>
+    /// A verified read fails closed (503 AUTHORITY_NOT_READY, retryable) until the Authority has archived the latest
+    /// journal entries; a client retries, so the tests do too, briefly. Any other outcome is returned unchanged.
+    /// </summary>
+    private static async Task<HttpResult> WhileArchivingAsync(Func<Task<HttpResult>> read)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var result = await read();
+            if (result.ErrorCode != "AUTHORITY_NOT_READY" || attempt >= 40)
+            {
+                return result;
+            }
+
+            await Task.Delay(250, TestContext.Current.CancellationToken);
+        }
+    }
 
     private Guid OperationOf(Guid record, long revision) =>
         Guid.Parse(fixture.Stack.AuthorityObserverSql($"SELECT committed_operation_id FROM record_manifest_commits WHERE form_record_id = '{record:D}' AND committed_content_revision = {revision};").Trim());
