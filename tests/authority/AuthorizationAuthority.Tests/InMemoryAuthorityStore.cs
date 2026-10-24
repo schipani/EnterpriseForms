@@ -4,6 +4,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sessions;
 
 namespace AuthorizationAuthority.Tests;
 
@@ -26,6 +27,7 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<SecurityJournalEntry> Journal { get; } = [];
     public List<ContentIntegrityCheckpoint> Checkpoints { get; } = [];
     public List<IntegrityKeyRegistration> Keys { get; } = [];
+    public List<AuthenticatedSession> Sessions { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -128,6 +130,11 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => s.Keys.Add(registration);
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(new List<Guid>());
+
+        public Task<AuthenticatedSession?> FindSessionByDigestAsync(byte[] sessionSecretDigest, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Sessions.FirstOrDefault(x => x.SessionSecretDigest.AsSpan().SequenceEqual(sessionSecretDigest)));
+
+        public void AddSession(AuthenticatedSession session) => s.Sessions.Add(session);
 
         public Task CommitAsync(CancellationToken cancellationToken)
         {

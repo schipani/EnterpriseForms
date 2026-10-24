@@ -3,6 +3,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sessions;
 
 namespace AuthorizationAuthority.Application.Common.Ports;
 
@@ -104,6 +105,11 @@ public interface IAuthorityScope : IAsyncDisposable
 
     /// <summary>Record IDs registered and active for the organization (authority-sourced discovery candidates).</summary>
     Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>G23: the session with this secret digest (tracked, so revocation/last-seen updates commit with the scope), or null.</summary>
+    Task<AuthenticatedSession?> FindSessionByDigestAsync(byte[] sessionSecretDigest, CancellationToken cancellationToken);
+
+    void AddSession(AuthenticatedSession session);
 
     Task CommitAsync(CancellationToken cancellationToken);
 }

@@ -1080,6 +1080,77 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession", b =>
+                {
+                    b.Property<Guid>("AuthenticatedSessionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("authenticated_session_id");
+
+                    b.Property<string>("CreatedByWorkloadName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by_workload_name");
+
+                    b.Property<Guid>("IdentityBindingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("identity_binding_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset>("SessionCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("session_created_on");
+
+                    b.Property<DateTimeOffset>("SessionExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("session_expires_on");
+
+                    b.Property<int>("SessionIdleTimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("session_idle_timeout_seconds");
+
+                    b.Property<DateTimeOffset>("SessionLastSeenOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("session_last_seen_on");
+
+                    b.Property<string>("SessionRevocationReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("session_revocation_reason");
+
+                    b.Property<DateTimeOffset?>("SessionRevokedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("session_revoked_on");
+
+                    b.Property<byte[]>("SessionSecretDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("session_secret_digest");
+
+                    b.HasKey("AuthenticatedSessionId");
+
+                    b.HasIndex("IdentityBindingId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("SessionSecretDigest")
+                        .IsUnique()
+                        .HasDatabaseName("uq_session_secret_digest");
+
+                    b.ToTable("authenticated_sessions", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_session_digest_length", "octet_length(session_secret_digest) = 32");
+
+                            t.HasCheckConstraint("ck_session_expiry_order", "session_expires_on > session_created_on AND session_idle_timeout_seconds > 0");
+
+                            t.HasCheckConstraint("ck_session_revocation", "(session_revoked_on IS NULL AND session_revocation_reason IS NULL) OR (session_revoked_on IS NOT NULL AND session_revocation_reason IN ('LOGOUT','REPLACED_BY_NEW_SIGN_IN'))");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.ContentCandidateLeaf", b =>
                 {
                     b.HasOne("AuthorizationAuthority.Domain.Features.Content.ContentChangeOperation", null)
@@ -1272,6 +1343,24 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_security_command_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.IdentityBinding", null)
+                        .WithMany()
+                        .HasForeignKey("IdentityBindingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_session_identity");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_session_org");
                 });
 #pragma warning restore 612, 618
         }

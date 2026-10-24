@@ -5,6 +5,7 @@ using AuthorizationAuthority.Application.Features.Journal;
 using AuthorizationAuthority.Application.Features.OperatorPlane;
 using AuthorizationAuthority.Application.Features.Projection;
 using AuthorizationAuthority.Application.Features.SecurityCommands;
+using AuthorizationAuthority.Application.Features.Sessions;
 using AuthorizationAuthority.Infrastructure.Archive;
 using AuthorizationAuthority.Infrastructure.Faults;
 using AuthorizationAuthority.Infrastructure.Persistence;
@@ -70,6 +71,10 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton<ProjectionProcessor>();
         services.AddSingleton<ArchiveProcessor>();
         services.AddSingleton<OrganizationBootstrapService>();
+        var sessionOptions = configuration.GetSection(SessionOptions.SectionName).Get<SessionOptions>() ?? new SessionOptions();
+        SessionOptions.Validate(sessionOptions);
+        services.AddSingleton(sessionOptions);
+        services.AddSingleton<SessionService>();
         return services;
     }
 

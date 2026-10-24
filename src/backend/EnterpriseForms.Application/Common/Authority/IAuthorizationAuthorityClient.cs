@@ -165,3 +165,22 @@ public interface IAuthorizationAuthorityClient
 
     Task<AcceptedContentRevision> CommitReprotectionAsync(Guid operationId, CommitContentChangeRequest request, CancellationToken cancellationToken);
 }
+
+/// <summary>G23: the Authority's verdict on a browser session (reason for the trusted business API only, never the browser).</summary>
+public sealed record BrowserSessionState(bool Valid, string? InvalidReason, DateTimeOffset? ExpiresOn, Guid CorrelationId);
+
+/// <summary>
+/// G23: server-side browser session state, held by the Authority (outside BusinessDb). Only SHA-256 digests of session
+/// secrets are sent; the secret itself stays in the encrypted session cookie. Separate from
+/// <see cref="IAuthorizationAuthorityClient"/> because only the BFF session composition uses it.
+/// </summary>
+public interface IBrowserSessionStateAuthority
+{
+    /// <summary>Registers a new session and revokes <paramref name="replacedSessionDigestBase64"/> (the session the browser presented), if any.</summary>
+    Task<BrowserSessionState> CreateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, DateTimeOffset absoluteExpiresOn, string? replacedSessionDigestBase64, CancellationToken cancellationToken);
+
+    Task<BrowserSessionState> ValidateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, CancellationToken cancellationToken);
+
+    /// <summary>Idempotent.</summary>
+    Task<BrowserSessionState> RevokeSessionAsync(DelegatedUserContext user, string sessionDigestBase64, CancellationToken cancellationToken);
+}

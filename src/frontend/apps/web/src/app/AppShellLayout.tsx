@@ -32,6 +32,13 @@ export function AppShellLayout({ children }: PropsWithChildren) {
         </div>
         {session.status === "authenticated" ? <PrimaryNav wide={wide} /> : null}
       </header>
+      {session.status === "authenticated" && session.error ? (
+        <div className={`mx-auto w-full ${wide ? "max-w-[100rem]" : "max-w-7xl"} px-4 pt-4`}>
+          <StatusMessage tone="danger" title="You are still signed in" actions={<Button onClick={() => void session.logout().catch(() => undefined)}>Try signing out again</Button>}>
+            {session.error}
+          </StatusMessage>
+        </div>
+      ) : null}
       <main id="main-content" tabIndex={-1} className={`mx-auto w-full px-4 ${wide ? "max-w-[100rem] py-4" : "max-w-7xl py-6"}`}>
         {children}
       </main>
@@ -91,7 +98,10 @@ function UserMenu() {
           <DropdownMenu.Item
             className="flex min-h-10 cursor-default items-center rounded px-3 text-base outline-none data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground"
             onSelect={() => {
-              void session.logout().then(() => navigate({ to: "/login" }));
+              void session.logout().then(
+                () => navigate({ to: "/login" }),
+                () => undefined, // shown by the shell (sign-out not confirmed; still signed in)
+              );
             }}
           >
             Sign out

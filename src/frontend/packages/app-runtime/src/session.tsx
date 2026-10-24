@@ -86,14 +86,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await api.session.logout();
-    } finally {
-      uploads.reset();
-      coordinator.clearSecurityContext();
-      queryClient.clear();
-      resetBranding();
-      organizationRef.current = null;
-      setState({ status: "anonymous", session: null, bootstrap: null, identityProviderKind: state.identityProviderKind, error: null });
+    } catch (error) {
+      const presented = presentError(error);
+      if (presented.code === "SESSION_STATE_UNAVAILABLE") {
+        // G23: the server could not confirm that the session was revoked, so it may still be valid. Stay signed in and
+        // say so, rather than showing a sign-out that did not happen; the user can retry.
+        setState((current) => ({ ...current, error: `Sign-out could not be confirmed. ${presented.detail}` }));
+        throw error;
+      }
     }
+    uploads.reset();
+    coordinator.clearSecurityContext();
+    queryClient.clear();
+    resetBranding();
+    organizationRef.current = null;
+    setState({ status: "anonymous", session: null, bootstrap: null, identityProviderKind: state.identityProviderKind, error: null });
   }, [api, coordinator, queryClient, state.identityProviderKind, uploads]);
 
   const value = useMemo<SessionApi>(

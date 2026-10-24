@@ -3,6 +3,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -259,5 +260,25 @@ public sealed class IntegrityKeyRegistrationConfiguration : IEntityTypeConfigura
         builder.Property(e => e.ProviderKeyName).HasMaxLength(200);
         builder.HasIndex(e => new { e.OrganizationId, e.KeyPurposeName }).IsUnique().HasDatabaseName("uq_integrity_key_org_purpose");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_integrity_key_org");
+    }
+}
+
+public sealed class AuthenticatedSessionConfiguration : IEntityTypeConfiguration<AuthenticatedSession>
+{
+    public void Configure(EntityTypeBuilder<AuthenticatedSession> builder)
+    {
+        builder.MapSnakeCase("authenticated_sessions");
+        builder.HasKey(e => e.AuthenticatedSessionId);
+        builder.Property(e => e.SessionRevocationReason).HasMaxLength(40);
+        builder.Property(e => e.CreatedByWorkloadName).HasMaxLength(100);
+        builder.HasIndex(e => e.SessionSecretDigest).IsUnique().HasDatabaseName("uq_session_secret_digest");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_session_org");
+        builder.HasOne<IdentityBinding>().WithMany().HasForeignKey(e => e.IdentityBindingId).HasConstraintName("fk_session_identity");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_session_digest_length", "octet_length(session_secret_digest) = 32");
+            t.HasCheckConstraint("ck_session_expiry_order", "session_expires_on > session_created_on AND session_idle_timeout_seconds > 0");
+            t.HasCheckConstraint("ck_session_revocation", "(session_revoked_on IS NULL AND session_revocation_reason IS NULL) OR (session_revoked_on IS NOT NULL AND session_revocation_reason IN ('LOGOUT','REPLACED_BY_NEW_SIGN_IN'))");
+        });
     }
 }

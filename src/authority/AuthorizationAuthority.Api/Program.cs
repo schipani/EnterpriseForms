@@ -4,6 +4,7 @@ using AuthorizationAuthority.Api.Features.Content;
 using AuthorizationAuthority.Api.Features.Health;
 using AuthorizationAuthority.Api.Features.OperatorPlane;
 using AuthorizationAuthority.Api.Features.SecurityCommands;
+using AuthorizationAuthority.Api.Features.Sessions;
 using AuthorizationAuthority.Infrastructure;
 
 namespace AuthorizationAuthority.Api;
@@ -79,6 +80,7 @@ public sealed class Program
         app.MapSecurityCommandEndpoints();
         app.MapContentEndpoints();
         app.MapOperatorEndpoints();
+        app.MapSessionEndpoints();
 
         app.Run();
         return 0;
