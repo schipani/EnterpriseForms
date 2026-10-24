@@ -48,6 +48,7 @@ Advanced Search (`apps/web/src/features/search`) is the reference pattern for re
 * A group's Remove button (ghost, `size="sm"`, delete icon, accessible name "Remove condition N") sits below the group's controls, never beside a field.
 * The group actions (Add condition, then the primary Search records) form one row below the last group, with the shared icons; a limit message sits beneath that row.
 * Disabled states keep the full layout and say why (for example "Not available yet") instead of hiding controls.
+* Controls are enabled only where they work (Phase C7 M2): Field and Condition come from the server's approved capabilities and can be used to compose conditions, while the action that cannot run yet (Search records) stays disabled with the reason beside it.
 
 ## 5. When to validate
 

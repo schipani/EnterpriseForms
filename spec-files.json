@@ -124,8 +124,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "22036cf979e6eecd15f47f9d7f194f5965ec02a7ace40aeec26ab033ed184529",
-      "bytes": 8585
+      "sha256": "7310ed0548d80b4aa78c9b964f9dc2e5bacfc4ebdc4ee979b574511eca0405e1",
+      "bytes": 8907
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -414,8 +414,8 @@
     },
     {
       "path": "docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md",
-      "sha256": "235f10b2956cb50d4e0324fbba7b102f3afc1286023c62ff936b543829a1e8d9",
-      "bytes": 5161
+      "sha256": "3beac00d1001fa49d871f9414e2dd4e839c3ea81b30bf14d4310740fc15c30b8",
+      "bytes": 5420
     },
     {
       "path": "docs/ui/PB14_COLOR_CONTRAST.reference.ts",
@@ -589,8 +589,8 @@
     },
     {
       "path": "security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md",
-      "sha256": "ce604c2833151ad6589ca905d27f27fe5a69f570f0d54d05211b051c578fa330",
-      "bytes": 6036
+      "sha256": "e102795ba25bccd4b89ef81157b1539e1acb49aa04b6d905c4ce7439e91891b7",
+      "bytes": 7000
     },
     {
       "path": "security_hardening/SECURITY_ACCEPTANCE_TESTS.md",
