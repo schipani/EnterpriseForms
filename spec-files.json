@@ -74,8 +74,8 @@
     },
     {
       "path": "docs/PHASE_C6_STATUS.md",
-      "sha256": "8d3aa7d31937286e238aad0e7de0e0a2b712ebda5b674733b9bc8af5c5cb0ec1",
-      "bytes": 91152
+      "sha256": "7e27fd76dfd8e93bad822ed14739b339cfbbbd465ee2164dd4d5c6b3f96343ee",
+      "bytes": 98554
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md",
-      "sha256": "8f1f6ead8bb2b170fe0e835827761ee79a822655536fb3d24e164d463eb6b50b",
-      "bytes": 65746
+      "sha256": "a524a9aa45022289f8bb236219fb2709d4cb5c5c21b413f0ad74aabc157a82d8",
+      "bytes": 65888
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "95821cf70a90187de5b94acc63bb75083e22ed885494596abd25b38032689e6f",
-      "bytes": 74972
+      "sha256": "c02fd78792b246aa4044a1edef578718c18768cd0194bb8126bfc4428157c63d",
+      "bytes": 76453
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
