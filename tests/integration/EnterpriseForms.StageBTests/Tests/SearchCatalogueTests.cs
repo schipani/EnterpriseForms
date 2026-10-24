@@ -85,7 +85,9 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
     public async Task DeletedValueRowsFailTheWholeScopeAndAreNeverReportedAsFewerRecords()
     {
         var (s, records) = await WorkspaceAsync("c7-delete", 3);
-        var deleted = fixture.Stack.AttackerSql($"DELETE FROM field_string_values WHERE form_record_id = '{records[1]:D}'; SELECT count(*) FROM field_string_values WHERE form_record_id = '{records[1]:D}';").Trim();
+        // Text fields are Confidential (encrypted) by default (ADR-PB-004); the date of birth is a plaintext typed row.
+        Assert.NotEqual("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM field_date_values WHERE form_record_id = '{records[1]:D}';").Trim());
+        var deleted = fixture.Stack.AttackerSql($"DELETE FROM field_date_values WHERE form_record_id = '{records[1]:D}'; SELECT count(*) FROM field_date_values WHERE form_record_id = '{records[1]:D}';").Trim();
         Assert.EndsWith("0", deleted, StringComparison.Ordinal);
         var result = await VerifyAsync(s, s.Clerk);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, result.Status);
@@ -101,17 +103,18 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
     public async Task AlteredAndRolledBackValuesFailTheScope()
     {
         var (s, records) = await WorkspaceAsync("c7-alter", 2);
-        var altered = fixture.Stack.AttackerSql($"UPDATE field_string_values SET string_value = string_value || ' (hidden)' WHERE form_record_id = '{records[0]:D}'; SELECT count(*) FROM field_string_values WHERE form_record_id = '{records[0]:D}';").Trim();
+        var altered = fixture.Stack.AttackerSql($"UPDATE field_date_values SET date_value = DATE '2001-01-01' WHERE form_record_id = '{records[0]:D}'; SELECT count(*) FROM field_date_values WHERE form_record_id = '{records[0]:D}' AND date_value = DATE '2001-01-01';").Trim();
         Assert.NotEqual("0", altered);
         Assert.Equal("RECORD_VERIFICATION_FAILED", (await VerifyAsync(s, s.Clerk)).Root.GetProperty("unavailable_reason").GetString());
 
         var (r, rolled) = await WorkspaceAsync("c7-rollback", 1);
-        var edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{rolled[0]:D}", r.Token(r.Clerk), new { expectedContentRevision = 1, values = new Dictionary<string, string> { ["given_name"] = "Second" } });
+        var edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{rolled[0]:D}", r.Token(r.Clerk), new { expectedContentRevision = 1, values = new Dictionary<string, string> { ["date_of_birth"] = "1991-03-01" } });
         Assert.True(edit.IsSuccess, edit.Body);
         Assert.True((await r.WaitProjectionAsync(r.Clerk, rolled[0])).IsSuccess);
         Assert.True((await VerifyAsync(r, r.Clerk)).IsSuccess);
         // The business DBA restores the first revision's value into the current rows (a rollback of the content).
-        fixture.Stack.AttackerSql($"UPDATE field_string_values v SET string_value = o.string_value FROM field_string_values o WHERE v.form_record_id = '{rolled[0]:D}' AND o.form_record_id = v.form_record_id AND o.field_definition_id = v.field_definition_id AND o.content_change_operation_id <> v.content_change_operation_id AND o.string_value <> v.string_value;");
+        var restored = fixture.Stack.AttackerSql($"UPDATE field_date_values v SET date_value = o.date_value FROM field_date_values o WHERE v.form_record_id = '{rolled[0]:D}' AND o.form_record_id = v.form_record_id AND o.field_definition_id = v.field_definition_id AND o.content_change_operation_id <> v.content_change_operation_id AND o.date_value <> v.date_value; SELECT count(*) FROM field_date_values WHERE form_record_id = '{rolled[0]:D}' AND date_value = DATE '1990-02-28';").Trim();
+        Assert.NotEqual("0", restored);
         var result = await VerifyAsync(r, r.Clerk);
         Assert.Equal("SEARCH_VERIFICATION_UNAVAILABLE", result.ErrorCode);
     }
@@ -135,7 +138,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         Assert.Equal(2, injected.Root.GetProperty("catalogueEntryCount").GetInt32());
 
         // An injected extra value row inside a real record (a false match candidate) breaks that record's leaf set.
-        var extra = fixture.Stack.AttackerSql($"INSERT INTO field_string_values SELECT (jsonb_populate_record(NULL::field_string_values, to_jsonb(v) || jsonb_build_object('field_string_value_id', '{Guid.CreateVersion7():D}', 'field_definition_id', '{s.AccusedFields["external_reference"]:D}'))).* FROM field_string_values v WHERE v.form_record_id = '{records[1]:D}' LIMIT 1; SELECT count(*) FROM field_string_values WHERE form_record_id = '{records[1]:D}' AND field_definition_id = '{s.AccusedFields["external_reference"]:D}';").Trim();
+        var extra = fixture.Stack.AttackerSql($"INSERT INTO field_date_values SELECT (jsonb_populate_record(NULL::field_date_values, to_jsonb(v) || jsonb_build_object('field_date_value_id', '{Guid.CreateVersion7():D}', 'field_definition_id', '{s.AccusedFields["given_name"]:D}'))).* FROM field_date_values v WHERE v.form_record_id = '{records[1]:D}' LIMIT 1; SELECT count(*) FROM field_date_values WHERE form_record_id = '{records[1]:D}' AND field_definition_id = '{s.AccusedFields["given_name"]:D}';").Trim();
         Assert.EndsWith("1", extra, StringComparison.Ordinal);
         var tampered = await VerifyAsync(s, s.Clerk);
         Assert.Equal("SEARCH_VERIFICATION_UNAVAILABLE", tampered.ErrorCode);
@@ -224,7 +227,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         Assert.Equal(HttpStatusCode.Forbidden, denied.Status);
 
         // A real strengthening command of this form scopes it: the complete population, including records the reader cannot discover.
-        var field = s.AccusedFields["family_name"];
+        var field = s.AccusedFields["date_of_birth"]; // plaintext (Standard) date; text fields are already encrypted
         var strengthen = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/fields/{field:D}/protection", s.Token(s.Designer), new { targetClassification = "Confidential", targetProtectionMode = "ApplicationEncrypted", changeReason = "C7 migration catalogue proof", expectedProtectionRevision = 1 });
         Assert.True(strengthen.IsSuccess, strengthen.Body);
         await s.WaitGateReadyAsync();
@@ -275,8 +278,13 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
             await s.BootstrapAsync();
             await s.BuildAccusedWorkspaceAsync();
             var created = new System.Collections.Concurrent.ConcurrentBag<Guid>();
-            await Parallel.ForEachAsync(Enumerable.Range(0, size), new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = TestContext.Current.CancellationToken }, async (_, _) => created.Add(await s.CreateAccusedAsync(s.Clerk)));
-            Assert.True((await s.WaitProjectionAsync(s.Clerk, created.First())).IsSuccess);
+            await Parallel.ForEachAsync(Enumerable.Range(0, size), new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = TestContext.Current.CancellationToken }, async (_, ct) => created.Add(await CreateWithRetryAsync(s, ct)));
+            Assert.Equal(size, created.Count);
+            foreach (var id in created)
+            {
+                Assert.True((await s.WaitProjectionAsync(s.Clerk, id)).IsSuccess);
+            }
+
             await s.WaitGateReadyAsync();
 
             var server = new List<double>();
@@ -332,6 +340,22 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
             var directory = Path.Combine(root.FullName, "artifacts", "stage-b");
             Directory.CreateDirectory(directory);
             await File.WriteAllTextAsync(Path.Combine(directory, "c7-m1-benchmark.json"), json, TestContext.Current.CancellationToken);
+        }
+    }
+
+    /// <summary>Record registration is optimistic on the organization's authorization revision; concurrent creations retry that conflict.</summary>
+    private async Task<Guid> CreateWithRetryAsync(StageBScenario s, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var created = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/records", s.Token(s.Clerk), new { values = StageBScenario.AccusedValues(), ownerTeamId = (Guid?)null });
+            if (created.Status == HttpStatusCode.Created)
+            {
+                return created.Root.GetProperty("formRecordId").GetGuid();
+            }
+
+            Assert.True(attempt < 20 && created.ErrorCode is "STALE_AUTHORIZATION_REVISION" or "AUTHORITY_NOT_READY" or "COMMAND_PENDING", "create failed: " + created.Body);
+            await Task.Delay(Random.Shared.Next(50, 400), cancellationToken);
         }
     }
 
