@@ -2961,6 +2961,170 @@
           }
         }
       }
+    },
+    "/api/v1/form-records/search-capabilities": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Server-authoritative Advanced Search capabilities for one form and the caller: the fields that may be used as predicates, their value types and allowed operators, and fields the caller may know about that cannot be searched (Encrypted for privacy — not searchable). A field the caller may not know about is in neither list. Phase C7 M0: fieldValueSearchAvailable is false (TRUSTED_SEARCH_NOT_ENABLED) and no fields are offered, for every form.",
+        "operationId": "GetFieldSearchCapabilities",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchCapabilitiesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/field-search": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Phase C7 M0: every well-formed request is refused with 503 SEARCH_VERIFICATION_UNAVAILABLE (unavailable_reason TRUSTED_SEARCH_NOT_ENABLED, retryable false); malformed requests get 422 SEARCH_REQUEST_INVALID or SEARCH_OPERATOR_NOT_SUPPORTED.",
+        "operationId": "SearchFormRecordsByFieldValues",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-records/field-search/page": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Another page of a verified advanced-search result: the opaque cursor is bound to the caller, session, query digest and verified snapshot; a changed authorization or content snapshot returns 409 SEARCH_SNAPSHOT_CHANGED (restart from page one). Phase C7 M0: refused with 503 SEARCH_VERIFICATION_UNAVAILABLE / TRUSTED_SEARCH_NOT_ENABLED.",
+        "operationId": "PageFieldSearchResults",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSearchPageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4448,6 +4612,339 @@
           }
         }
       },
+      "FieldSearchCapabilitiesResponse": {
+        "required": [
+          "formDefinitionId",
+          "fieldValueSearchAvailable",
+          "unavailableReasonCode",
+          "maximumConditions",
+          "conditionJoin",
+          "fields",
+          "notSearchableFields",
+          "policyRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldValueSearchAvailable": {
+            "type": "boolean"
+          },
+          "unavailableReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "maximumConditions": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "conditionJoin": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchCapabilityField"
+            }
+          },
+          "notSearchableFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchNotSearchableField"
+            }
+          },
+          "policyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "FieldSearchCapabilityField": {
+        "required": [
+          "fieldDefinitionId",
+          "displayLabel",
+          "valueType",
+          "operators",
+          "options",
+          "minimumTextLength",
+          "maximumTextLength"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayLabel": {
+            "type": "string"
+          },
+          "valueType": {
+            "type": "string"
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchOptionChoice"
+            }
+          },
+          "minimumTextLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maximumTextLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "FieldSearchCondition": {
+        "required": [
+          "fieldDefinitionId",
+          "operator",
+          "valueType"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operator": {
+            "type": "string"
+          },
+          "valueType": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lowerBound": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "upperBound": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "FieldSearchNotSearchableField": {
+        "required": [
+          "fieldDefinitionId",
+          "displayLabel",
+          "reasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayLabel": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "type": "string"
+          }
+        }
+      },
+      "FieldSearchOptionChoice": {
+        "required": [
+          "fieldOptionId",
+          "displayText"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldOptionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayText": {
+            "type": "string"
+          }
+        }
+      },
+      "FieldSearchPageRequest": {
+        "required": [
+          "cursor"
+        ],
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "FieldSearchRequest": {
+        "required": [
+          "formDefinitionId",
+          "conditions"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conditions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchCondition"
+            }
+          },
+          "recordStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "includeArchived": {
+            "type": "boolean",
+            "default": false
+          },
+          "includeChildren": {
+            "type": "boolean",
+            "default": false
+          },
+          "sortBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sortDirection": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 25
+          }
+        }
+      },
+      "FieldSearchResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "pageStart",
+          "pageSize",
+          "snapshotReference",
+          "authorizationRevision",
+          "completeness",
+          "scopeStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordListItemResponse"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "snapshotReference": {
+            "type": "string"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "completeness": {
+            "type": "string"
+          },
+          "scopeStatement": {
+            "type": "string"
+          },
+          "continuationToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "FieldValueResponse": {
         "required": [
           "fieldDefinitionId",
@@ -5111,6 +5608,44 @@
           },
           "serviceName": {
             "type": "string"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -7168,6 +7703,9 @@
     },
     {
       "name": "UserPreferences"
+    },
+    {
+      "name": "Search"
     }
   ]
 }

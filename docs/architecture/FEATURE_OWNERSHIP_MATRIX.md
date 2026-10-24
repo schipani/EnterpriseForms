@@ -23,6 +23,8 @@ relationships, publish/restore), `FormRecords` typed value tables + projection, 
 `Organizations` branding, `UserPreferences`, `Dashboard`. Everything else in the table below remains *planned*. The
 page-ID ownership rows are unchanged and remain the source the architecture test compares with `CLAUDE-DESIGN.MD` §17.
 
+**Phase C7 M0 (2026-10-23, C-57)** shipped the first `Search` slice: backend `Application/Features/Search/FieldSearch` + `Api/Features/Search` (`/api/v1/form-records/search-capabilities`, `/field-search`, `/field-search/page`; no owned tables; execution gated off until Authority AC-5/AC-6) and frontend `features/search` (Advanced Search panel used by the PG-015 My Records page, which still lives in `form-records`). The Search feature has no business-store dependency (architecture test `FieldSearchHasNoDirectBusinessDatabaseAccess`).
+
 | UI feature | Owned page IDs | Backend feature | Owned tables (planned) | Public ports (planned) | Tests (planned) | Release gate |
 |---|---|---|---|---|---|---|
 | `audit` | PG-025, PG-054, PG-055 | `Audit` | audit_events, audit_event_types, audit_field_changes, audit_event_outbox, audit_retention_policies, audit_archive_checkpoints | audit investigation query API; audit event ingestion port | SIM-01..12 subset, timeline ordering, tenant-scoped ACL | Phase 1C |

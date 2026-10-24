@@ -1,292 +1,413 @@
-# Phase C7 — Advanced Field Search: architecture assessment and security checkpoint
+# Phase C7 — Advanced Field Search: architecture
 
-- **Status:** PROPOSED — awaiting owner review. **Security checkpoint reached (§0).** No search engine, Authority change, API endpoint, migration or UI for C7 has been implemented.
-- **Branch:** `phase-c7/advanced-field-search` (from `main` 4c00ce7).
-- **Decision:** C-55 (`docs/decisions/PHASE_C_DECISION_LOG.md`).
-- **Binding sources:** `CLAUDE.md` §§4C.6, 4H, 4L.5, 4T.4, 4T.1 and Phase 4; `docs/decisions/ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md` (+ Amendment A1); `security_hardening/SEARCH_CAPABILITY_MATRIX.csv`; `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` (ENC-SR-01..18); `SECURITY_GAP_ASSESSMENT.md` G06 and G19; `trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md`; `docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md`; `docs/PHASE_C6_STATUS.md` §16.5 (owner-approved UI direction).
-- **Not claimed:** G06 and G19 stay **OPEN**. Nothing here is implemented or tested, and nothing in it is production Level 2 evidence.
+- **Status (2026-10-23):**
+  * Owner decisions D1–D7 approved (C-56, §1).
+  * **M0 implemented** (C-57, §6): approved UI, versioned contracts, request validation, typed errors, server-side gate. Field-value execution is disabled.
+  * **AC-5 and AC-6 refined for review** (§3, §4). They are **not implemented**, and M1 is not authorized.
+- **Branch:** `phase-c7/advanced-field-search` (from `main` 4c00ce7). Not merged.
+- **Binding sources:** `CLAUDE.md` §§4C.6, 4H, 4L.5, 4M–4R, 4T.1, 4T.4 and Phase 4; `docs/decisions/ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md` (+ Amendment A1); `security_hardening/SEARCH_CAPABILITY_MATRIX.csv`; `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` (ENC-SR-01..18); `SECURITY_GAP_ASSESSMENT.md` G06, G19, G21; `trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md`; `trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md`; `docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md`; `docs/PHASE_C6_STATUS.md` §16.5.
+- **Not claimed:**
+  * G06, G19 and G21 stay **OPEN**.
+  * No independent security review has taken place.
+  * Nothing here is production Level 2 evidence.
 
-## 0. Checkpoint verdict
+## 0. Checkpoint summary (C-55)
 
-ADR-PB-004 §4 requires the **Authorization Authority**, not Business PostgreSQL, to supply the complete eligible catalogue: record ids, tenant, **form**, **accepted content heads** and the **authorization revision**, at one coherent snapshot. The Authority today supplies only part of this:
+The Authority enumerates the caller's complete discoverable set at one authorization revision (`DiscoverAsync`, C-28). It also verifies one record's complete leaf set (`VerifyRecordProjection`). It does not provide:
 
-| Required by ADR-PB-004 / the C7 brief | Exists today? |
-|---|---|
-| Complete enumeration of the caller's discoverable records at one authorization revision | **Yes**: `POST /internal/v1/authorization/discover` (registry ∩ SpiceDB `discover`, fully enumerated, gate re-read, C-28) |
-| The same enumeration **narrowed to one Authority-registered form** | **No.** The registry stores the form on every `form_record` resource (`authority_resources.parent_resource_entity_id`), but discovery does not filter by it or return it |
-| Accepted content head (revision, operation id, root, quarantine) **for every catalogue entry, at the catalogue's snapshot** | **No.** Heads are only available one record at a time (`GET content-revisions/{org}/{record}`), each read at a different moment |
-| A coherent authorization + content **snapshot token** that later pages can re-check cheaply | **No.** `organization_authorization_states.content_integrity_revision` exists, but no API exposes it |
-| Per-record verification of the complete value set, with the caller's readable subset | **Yes**: `POST /internal/v1/integrity/verify-record-projection` (complete leaf set, HMAC, Merkle root, `authorized_items` / `readable_items`) |
-| Authority-held **search approval** for a field (explicit Public/Internal approval, not weakenable by the business database) | **No.** `field_definitions.is_searchable` and `field_classification` are unsigned business rows; `is_searchable` is always written `false` and no workflow can set it |
-| Organization policy that permits plaintext searchable fields | **No.** The Authority policy has `plaintext_internal_fields_permitted` and `plaintext_downgrade_permitted`, but nothing about search |
+* form-scoped trusted enumeration;
+* accepted content heads at a coherent snapshot;
+* Authority-held search approval.
 
-Therefore, in line with the brief's security checkpoint, **the security-sensitive implementation stops here for owner review**. Two Authority capabilities are proposed (**AC-5** search catalogue, **AC-6** field search policy, §4). §10 lists the owner decisions that block or shape the work.
+`field_definitions.is_searchable` and `field_classification` are unsigned business rows, and `is_searchable` is always written `false`. No BusinessDb-only substitute was built.
 
-A V1 that is *technically* complete **could** be built on today's primitives alone (§2.8, option B). It would have to verify **every** record the caller can discover across all forms, because a form selection could not be trusted to narrow the set. It would make 2–3 Authority calls per record per search, and its search approval would rest on business-database metadata. It is described so the owner can choose it knowingly. **It is not recommended**, and it would not give G19 its completeness basis.
+## 1. Approved decisions (C-56, recorded as approved by the owner)
 
-## 1. Scope (V1 as briefed)
-
-* One Advanced Search section on My Records, results in the same table (§7).
-* Predicates are allowed **only** on fields of the **selected form** that are explicitly approved Public/Internal, permitted by organization policy, published as searchable in the form version and readable by the caller on the record. No Confidential/Restricted predicate of any kind, including equality.
-* Operators follow the field's type and server capability (§5.3). Conditions are joined by **AND** only. No OR, no nesting, no expressions, no regex, no semantic/vector search, no blind indexes, no ciphertext scanning.
-* Out of V1: related-form (child) predicates, repeating-group predicates, documents, sorting on field values, facets on field values, and export. Each needs its own proof of relationship/occurrence authorization and completeness (REL-xx, G06).
-* The existing exact reference/UUID lookup (C-48) and metadata filters keep working unchanged.
-
-## 2. Assessment (the eight questions of the brief)
-
-### 2.1 Trusted enumeration capabilities today
-
-* `DiscoverAsync` returns the caller's complete set of discoverable `form_record` ids (registered **active** ∩ SpiceDB `discover` at the Authority-held ZedToken), sorted, cursor-paged and bound to the authorization revision. It fails closed if the state moved during the lookup (`NOT_READY`), on more than 50,000 records (`LIMIT_EXCEEDED`, nothing partial), and with `CONTINUATION_INVALIDATED` on a revision change.
-* Per record, `GetCommittedContentRevision` returns the accepted head, and `VerifyRecordProjection` proves that the observed staged rows **equal** the Authority's complete leaf index for that head. The proof covers every row HMAC and the recomputed Merkle root, and it returns the subset the caller may release. On mismatch it quarantines the head (AC-4) and journals an incident.
-* The signed record header (`BusinessSignedSchemas.EncodeHeader`) binds `form_definition_id` and `record_status`. Plaintext values (`field_string_values` …) and ciphertext (`field_encrypted_values`) are different signed row schemas. A verified record therefore proves which form it belongs to, its status, and whether each value is plaintext or encrypted.
-* Missing: form-scoped enumeration, catalogue-with-heads, a snapshot token, and Authority-held search policy (§0).
-
-### 2.2 What prevents G06 from being closed
-
-G06 needs proof that a search returned **every** authorized match. Four things are missing:
-
-1. **Bounded trusted scope.** A form-scoped catalogue does not exist. Narrowing by the business `form_records.form_definition_id` column is exactly the untrusted narrowing ADR-PB-004 §5 forbids. My Records' Form filter is labelled unverified for this reason (`ListRecordsHandler` remarks).
-2. **Snapshot.** Nothing proves that all candidates were evaluated at one authorization revision **and** one content state.
-3. **Policy trust.** Which fields are searchable, and with which operators, is not Authority-held.
-4. **Evidence.** ENC-SR-01..18 have never run; G06 also requires scale measurement (PB-09).
-
-Items 1–3 are design gaps that this document resolves (§4). Item 4 requires implementation, hosted runs and independent review.
-
-### 2.3 G19 dependencies that affect search
-
-G19: the field-protection migration worker verifies only the records that the **business database lists** for a form. A hostile business DBA can hide records from that list, so "all records encrypted" is not a completeness guarantee. This affects search in three ways:
-
-* **The same missing primitive.** AC-5's form-scoped Authority catalogue is the "independently maintained, revision-fenced enumeration of each form's records" that G19's remediation names. Building it for search gives the migration worker its completeness basis. G19 stays open until the worker uses it and adversarial tests run.
-* **Mixed-protection fields.** While a field is migrating (strengthening, or an A1 release), some records hold ciphertext and others plaintext. A field with an Authority `field_protection_requirement`, or with a pending/active reprotection, is **never searchable**. Search never decrypts. If a verified candidate holds an **encrypted** leaf for a predicate field, the whole search fails (`SEARCH_VERIFICATION_UNAVAILABLE`, reason `PREDICATE_VALUE_ENCRYPTED`). Treating the record as a non-match would silently drop it (§5.6).
-* **Strengthening never exposes history.** AC-6 approval is cleared by any strengthening command. The historic plaintext values of a field that was later encrypted are reached only through historic reads (C6 M2), which are not a search surface (ENC-SR-17).
-
-### 2.4 Detecting deletion, omission, rollback or manipulation by a business DBA
-
-The **catalogue comes from the Authority**. Business rows are then only a source of bytes, and every byte is verified against the head that the catalogue fixed.
-
-| Attack (business DBA) | Detection | Search outcome |
+| # | Decision | Approved as |
 |---|---|---|
-| Delete a matching record's rows (ENC-SR-08) | Catalogue still lists it; staged rows missing → leaf-set mismatch | Fail `SEARCH_VERIFICATION_UNAVAILABLE` (record quarantined); never "0 matches" |
-| Alter or delete a value or index row to drop a hit (ENC-SR-09) | HMAC or leaf-set mismatch against the accepted manifest | Fail closed, same as above |
-| Remove a record from local indexes or listings (ENC-SR-10) | The catalogue does not use business listings | The record is still evaluated |
-| Inject a false match (ENC-SR-11) | A business row not in the catalogue is never read; an extra value row breaks the leaf set | Not shown; the candidate fails |
-| Roll back rows to an earlier valid signed revision | Rows of the old operation do not match the **current** head's manifest | Fail closed |
-| Move a record to another form in business columns | The form comes from the signed header and the Authority registry parent | Not affected |
-| Flip `is_searchable` / downgrade `field_classification` / change `field_data_type` | Search approval comes from AC-6 (Authority); the value type comes from the signed row schema | Not affected |
-| Stop the Authority or SpiceDB, or corrupt the projection | Gate closed / not ready | `SEARCH_VERIFICATION_UNAVAILABLE` (ENC-SR-13) |
-| Read approved plaintext values directly | **Not prevented** (ADR-PB-004 §3 residual risk) | Documented; shown to the approver |
+| **D1** | **Approve AC-5.** Build an independently verifiable Authority-owned record catalogue. **Option B is rejected** (scanning all accessible records with today's contracts; does not resolve G19). | AC-5 must support: (1) trusted records grouped by organization and form; (2) accepted record versions/content heads; (3) authorization revision information; (4) independently verifiable completeness; (5) authorized search enumeration; (6) snapshot consistency and invalidation; (7) a privileged completeness-verification mechanism suitable for encryption migration. **Modification:** a per-user discoverable list is not, by itself, sufficient for G19. The independently maintained registry must also let a **separately authorized administrative/migration operation** establish the **entire expected organizational record population**, including records inaccessible to any ordinary user. Privileged registry contents are never exposed through user search APIs. User-scoped search enumeration and organization-scoped migration verification have **distinct authorization boundaries**. G19 is not resolved merely because AC-5 allows searching by form. |
+| **D2** | **Approve AC-6.** Searchability approval is independently maintained and enforced by the Authorization Authority. An authorized organization owner or security administrator may approve search of permitted fields, subject to explicit policy. | The Authority rejects approval when: the field is Confidential or Restricted; its data is application-encrypted; the organization floor prohibits plaintext indexing; the actor lacks permission; the applicable published form-version policy is not trustworthy; or previously encrypted data would be silently exposed. Approvals bind to stable field identity, the correct published form version, field type, classification and supported operators. G21 is considered explicitly: tampering with unsigned form or dropdown metadata must not substitute a different field or altered policy under an existing approval. Revocation and invalidation on policy changes are defined. Approvals never make encrypted historical values searchable. A client Searchable checkbox is never proof of authorization. |
+| **D3** | **Fail the entire search.** | If any record in the eligible verified scope cannot be authenticated or its required contents verified, the whole search fails. This covers missing records, invalid signatures/manifests, stale accepted versions, broken relationships required by the predicate, inconsistent authorization or snapshot state, Authority unavailability and exceeded limits. The response is the approved typed failure, never a partial result and never "zero matches". |
+| **D4** | **Provisional limits, as initial engineering limits only.** | 500 eligible records; 64 MiB verified data; 15-second execution budget; five AND conditions. All are configurable and enforced server-side. They must be measured (p50/p95/p99, query cost, Authority calls, verification time, failure behaviour). They are not production limits until benchmarks and review support them. Exceeding one returns `SEARCH_VERIFICATION_LIMIT` with no partial results. |
+| **D5** | **Searchable-field visibility, approved with modification.** | **Not** a blanket "anyone with form access sees every searchable field". A field is shown as a predicate only when authoritative policy lets the caller discover **and** query it. That requires organization access, form access, field-level discovery/query authorization, approved classification and searchability, and the relevant role permissions. Designers and organization administrators get broader field-configuration access only when explicitly authorized. Record ownership does not override organizational field policy or classification. Capability responses never expose hidden field names, existence, values or metadata. The server enforces this independently of the UI. |
+| **D6** | **V1 scope.** | Approved current-version scalar typed field values; operators from server capabilities; AND only. Excluded: repeating-group items, related-form/child-record predicates, document-content search, sorting by arbitrary field values, facets and aggregates, export from advanced search, semantic/vector search, regex, Confidential/Restricted values, and blind indexes without separate approval. Existing metadata sorting and My Records features remain. |
+| **D7** | **Authorize M0.** | Approved UI, versioned API and capability contracts, request validation and typed errors, execution clearly disabled until AC-5 and AC-6 are ready, focused tests and documentation. No unsafe temporary execution, and no field-value search by querying Business PostgreSQL. |
 
-### 2.5 Independent authorization of every predicate
-
-Two layers, both evaluated before any value is compared. Both depend on Authority answers, never on browser input:
-
-1. **Field-policy layer (once per request, before any record is touched).** Each `fieldDefinitionId` must be in the server-computed capability list for (caller, form, current published version). That list is AC-6 approval ∩ organization policy ∩ published `searchable` snapshot ∩ field type ∩ "no protection requirement or pending reprotection". Any other id is rejected with **one** response: `SEARCH_FIELD_NOT_ALLOWED`. The response is the same for an unknown id, a hidden field, a Confidential field or a field of another form, so it reveals nothing about existence. The operator is checked only after the field is allowed (`SEARCH_OPERATOR_NOT_SUPPORTED`).
-2. **Per-record layer.** For each catalogue record, `VerifyRecordProjection(Read)` returns `readable_items`. A record is a **candidate for evaluation** only if every value leaf of every predicate field is in the readable set, **and** the caller's share scope covers the field. A missing value cannot be distinguished from an unshared field, so a share-scoped caller must hold the field in their scope (Authority `field_item`/share field list), not merely lack a value. A record where any predicate field is not readable is **excluded before evaluation**. It is excluded identically whatever its value, so the exclusion reveals nothing. Completeness is therefore stated precisely as: *all records of the form you can discover **and** whose predicate fields you can read, at snapshot S*. The UI says so.
-
-### 2.6 Coherent snapshot
-
-AC-5 returns, from **one** Authority read transaction behind the organization gate:
-
-* `authorizationRevision` and `projectionRevision`;
-* the form-scoped catalogue entries `(formRecordId, committedContentRevision, committedOperationId, manifestRootBase64, quarantined)`;
-* a **snapshot token**: an Authority MAC over (organization, actor, form, authorization revision, sorted entries).
-
-Every per-record verification must report the **same** authorization revision **and** the catalogue's head for that record. Otherwise the search restarts once and then fails `SEARCH_SNAPSHOT_CHANGED`. At the end of execution, and before every later page, the business API calls `POST …/search-catalogue/check` with the token. The Authority recomputes the token from current state, so the check is one call rather than N, and fails if any head or the authorization revision moved. Results are never mixed across revisions (ENC-SR-15). Revocation advances the authorization revision, so every outstanding snapshot and cursor dies (ENC-SR-14).
-
-### 2.7 Safe limits (initial values; must be measured — PB-09)
-
-| Limit | Initial value | On breach |
-|---|---|---|
-| Catalogue entries per search (form-scoped) | 500 | `SEARCH_VERIFICATION_LIMIT` **before** any verification work; guidance to narrow scope |
-| Conditions per search | 5 | `400` validation (not a search code) |
-| Bytes of staged rows read per search | 64 MiB | `SEARCH_VERIFICATION_LIMIT` |
-| Elapsed verification time | 15 s (cancellation-aware) | `SEARCH_VERIFICATION_LIMIT`; no partial output |
-| Concurrent searches per user / per organization | 1 / 4 | `429` (existing rate-limit Problem) |
-| Text value length; minimum length for contains/prefix | 200 chars; 3 chars | `400` validation |
-| Verified result retention for paging | 5 min, per API instance, bound to snapshot token + user + session | Cache miss → full re-execution at the **same** token, or `SEARCH_SNAPSHOT_CHANGED` |
-
-Rationale: per-record verification is two Authority calls plus one business staged-row read. 500 records is at most about 1,000 internal calls. That is acceptable for an interactive request only if measured; the number is a starting point, not a promise.
-
-### 2.8 Work required before trustworthy pagination, sorting and counts
-
-* **Pagination** is a slice of one verified, deterministically ordered match list bound to the snapshot token. Page *n* is served only after the token check succeeds. It is never a fresh SQL query.
-* **Counts** (`totalCount`) are returned only for a complete verified result, and only as the size of that result, never as a count of the form or of excluded records.
-* **Sorting** applies to the existing columns, using **verified** header values (status, created/modified where signed). Columns that come from unverified projection metadata (form name, creator display name) keep the existing "local metadata" caveat. Sorting by field values is deferred (matrix: allowed later over complete results).
-* **Facets:** none in V1. The Form list is a selector, not a facet of the result.
-
-**Option B (not recommended):** without AC-5, scope = every discoverable record organization-wide (the 500 limit is hit quickly). Heads would be re-read per record at the end (N extra calls), and search policy would come from business rows, accepted as a documented residual risk. It is complete, but it gives no G19 basis and does not scale.
-
-## 3. Threat analysis
+## 2. Threat model summary (unchanged in substance; refined by D1/D2/D5)
 
 | ID | Threat | Control | Test |
 |---|---|---|---|
-| T1 | Handwritten request with a Confidential/Restricted/unknown field | Field-policy layer before execution; single indistinguishable error | ENC-SR-05/06, C7-API-03 |
-| T2 | Unauthorized predicate on visible records (share scope) | Per-record readable-set exclusion before evaluation; no counts from excluded records | ENC-SR-07 |
-| T3 | Business DBA suppresses, injects, rolls back or alters a match | Authority catalogue + per-record full manifest verification + snapshot check | ENC-SR-08..11 |
-| T4 | Scope too large → silent truncation | Limit check on catalogue size before work; typed error | ENC-SR-12 |
-| T5 | Authority/SpiceDB/manifest unavailable → SQL fallback | No fallback path exists; typed 503 | ENC-SR-13 |
-| T6 | Revocation mid-search or stale cursor | Authorization revision in token; check before every page; cursor bound to user + session + token | ENC-SR-14 |
-| T7 | Content changed mid-search | Per-record head must equal the catalogue head; final token check | ENC-SR-15 |
-| T8 | Cross-tenant or child-record leakage | Catalogue is organization- and form-scoped by the Authority; child predicates out of V1; child records listed only when their own registry form matches | ENC-SR-16 |
-| T9 | Classification strengthened → old plaintext searchable | AC-6 approval cleared on strengthening; protection-requirement fields never searchable; encrypted leaf ⇒ failure | ENC-SR-17 |
-| T10 | Predicate values in logs, telemetry, URLs, audit | POST body only; values never logged; audit records field ids, operators, counts, outcome | ENC-SR-18 |
-| T11 | Timing or side channels between denied and unknown fields | Decision taken from the precomputed capability list; no record access before it | C7-API-04 |
-| T12 | Field names disclosed to users who may not know the form's fields | Capability list returned only to callers with `CreateRecord` or `DesignForm` on the form, or owners of a record of the form (D5) | C7-API-05 |
-| T13 | Search used as a decryption or verification oracle | Never decrypts; verification failures quarantine and fail the whole search | C7-SEC-01 |
-| T14 | Expensive repeated scans (DoS) | Concurrency limits, cancellation, no automatic retry of `SEARCH_VERIFICATION_LIMIT` by the request coordinator | C7-API-07 |
-| T15 | Designer weakens protection by ticking Searchable | Search approval is an Authority command by an organization owner/security administrator; impossible on encrypted or Confidential/Restricted fields | ENC-SR-03/04 |
+| T1 | Handwritten request with a Confidential/Restricted/unknown field | Capability list computed from AC-6 + D5 before any record is touched; single indistinguishable `SEARCH_FIELD_NOT_ALLOWED` | ENC-SR-05/06, AC6-T05 |
+| T2 | Predicate on a field the caller may not query on visible records | D5 query authorization (form-level) + per-record readable-set exclusion before evaluation | ENC-SR-07, AC6-T08 |
+| T3 | Business DBA suppresses, injects, rolls back or alters a match | AC-5 catalogue + per-record full manifest verification + snapshot validation | ENC-SR-08..11, AC5-T01..06 |
+| T4 | Scope too large → silent truncation | Catalogue-size check before any work; typed limit error | ENC-SR-12, AC5-T09 |
+| T5 | Authority/SpiceDB/manifest unavailable → SQL fallback | No fallback path (M0 architecture test); typed 503 | ENC-SR-13, M0 tests |
+| T6 | Revocation mid-search or stale cursor | Snapshot validated at the Authority before every page | ENC-SR-14, AC5-T07 |
+| T7 | Content changed mid-search | Snapshot content-revision vector re-validated | ENC-SR-15, AC5-T08 |
+| T8 | Cross-tenant or child-record leakage | Organization-bound catalogue; child predicates out of V1 (D6) | ENC-SR-16 |
+| T9 | Strengthened classification → old plaintext searchable | AC-6 approval revoked in the same Authority revision as strengthening; encrypted leaf ⇒ failure | ENC-SR-17, AC6-T10 |
+| T10 | Predicate values in logs, telemetry, URLs, audit | POST bodies only; values never logged or echoed | ENC-SR-18, M0 tests |
+| T11 | Unsigned label/option metadata substituted under an approval (G21) | AC-6 binds approval to field id, type, classification, operators and Authority-held label/option snapshots | AC6-T06/T07 |
+| T12 | Privileged migration catalogue reached by a user identity | Separate workload identity, command-bound, not routed through the business API | AC5-T11/T12 |
+| T13 | Search used as a decryption or verification oracle | Never decrypts; failures quarantine and fail the whole search | C7-SEC-01 |
+| T14 | Expensive repeated scans | Concurrency limits; the coordinator does not retry non-retryable search failures | C7-API-07 |
 
-Residual (documented, not mitigated): a business DBA can read approved Public/Internal plaintext (ADR-PB-004 §3); the plaintext of a shown match has already been delivered; the Authority runtime is trusted (§4M).
+Residual risks, documented and not mitigated:
 
-## 4. Proposed Authority capabilities (require owner approval; Authority changes need production review like C-12/C-28/AC-1/AC-2)
+* a business DBA can read approved Public/Internal plaintext (ADR-PB-004 §3);
+* a delivered match has already been seen;
+* the Authority runtime and its database administrators are trusted (§4M).
 
-### AC-5 — Form-scoped search catalogue (also G19's completeness basis)
+## 3. AC-5 — Authority record catalogue (refined design for review; not implemented)
 
-* `POST /internal/v1/search-catalogue` `{organizationId, formDefinitionId, maximumEntries}` → `{authorizationRevision, projectionRevision, entries:[{formRecordId, committedContentRevision, committedOperationId, manifestRootBase64, contentHeadQuarantined}], snapshotToken}`.
-  * Registry: `form_record` resources with `resource_lifecycle_state = Active` **and** `parent_resource_entity_id = formDefinitionId`, ∩ SpiceDB `discover` for the actor at the Authority-held token; heads read in the same transaction; gate re-read after the lookup (as C-28).
-  * More entries than `maximumEntries` → `LIMIT_EXCEEDED` (422) with **no entries**. The count itself is not returned, because it would reveal the form's size beyond the caller's limit tier. Records without content (revision 0) are excluded and reported as a count.
-* `POST /internal/v1/search-catalogue/check` `{organizationId, snapshotToken}` → `{current: bool}`. The token is recomputed from current state.
-* Workload operation for the migration worker (G19): the same catalogue **without** a discover filter, callable only by the worker identity, for its post-check. This is a later step, not part of the search milestone.
-* Tests: registry/discover intersection, form isolation, quarantined heads, token tamper, token after revoke/edit, lookup paging >1000, limit with no partial output.
+### 3.1 Registry schema and ownership
 
-### AC-6 — Field search policy held by the Authority
+The Authority already owns the trusted registry in its independently administered PostgreSQL (schema `authority`):
 
-* Organization policy gains `plaintext_search_permitted` (default **false**), changed only by `UpdateMandatoryPolicy` (owner/security administrator).
-* New security command `ApproveFieldSearch` / `WithdrawFieldSearch` `{formDefinitionId, fieldDefinitionId, classification ∈ {Public, Internal}, operators[], approvalReference}`.
-  * Allowed only for an organization owner or system administrator.
-  * Rejected while the field has a `field_protection_requirement`, a pending reprotection or a pending reclassification, or when the organization policy forbids plaintext search or Internal plaintext.
-  * Registered as a `field_search_approval` resource and journaled like every security command.
-  * Any strengthening command (`PublishFormSecurityRevision` to encryption, a Confidential/Restricted classification) **revokes** it in the same revision.
-* `GET /internal/v1/forms/{org}/{form}/search-policy` → the approved fields and operators at the current authorization revision.
-* The business API publishes a field as searchable in a form version only if AC-6 approves it at publish time. It re-checks AC-6 at **every** search. The published snapshot can narrow but never widen AC-6.
+* `authority_resources`: one row per registered resource. For `form_record`, `parent_resource_entity_id` is the registered form definition and `resource_lifecycle_state` is the lifecycle.
+* `record_content_heads`: one row per record — accepted revision, committed operation, manifest root, quarantine flag.
+* `organization_authorization_states`: per organization, the `authorization_revision`, `projection_applied_revision`, `content_integrity_revision`, gate and journal digests.
 
-## 5. Business search design (built only after approval)
+Rows are written only by journaled security commands (`RegisterRecord`, …) and accepted content commits. Every write appends to the archived, checkpoint-anchored security or content journal (G02/G14).
 
-### 5.1 Ownership
+AC-5 adds (owner: Authority `Catalogue` feature; descriptive multiword snake_case, UUID v7 keys):
 
-`Search` feature (ADR-ARCH-001): `Application/Features/Search/FieldSearch/` (`FieldSearchQuery`, `FieldSearchValidator`, `FieldSearchCapabilitiesHandler`, `FieldSearchHandler`, `VerifiedCandidateEvaluator`, `SearchResultCache`). It uses `FormRecords`' public verified-read port, which gains a **non-decrypting, non-auditing-per-record** search variant of `VerifiedRecordReader` that releases only plaintext typed values of the predicate fields. `FormDefinitions` provides the published-version field snapshot through its public port. No new tables are expected; if a result cache table is ever needed it is owned by `Search`.
+* Index `ix_authority_resources_form_scope (organization_id, resource_type_name, parent_resource_entity_id, resource_lifecycle_state)`. Form-scoped enumeration must not scan the organization.
+* Table `search_catalogue_snapshots`:
+  * `search_catalogue_snapshot_id` PK, `organization_id`;
+  * `snapshot_scope_kind` (`UserSearch` | `MigrationVerification`), `requesting_authority_user_id` (UserSearch) or `requesting_workload_name` + `security_command_id` (MigrationVerification);
+  * `form_definition_id`;
+  * `snapshot_authorization_revision`, `snapshot_content_integrity_revision`, `snapshot_projection_revision`;
+  * `catalogue_entry_count`, `catalogue_digest` (SHA-256 over the canonical sorted entry list), `snapshot_issued_on`, `snapshot_expires_on`, `snapshot_invalidated_on`, `snapshot_invalidation_reason`.
+  * Retention: expired rows purged after 24 h. They hold no record contents.
+* Table `search_catalogue_snapshot_entries` (`search_catalogue_snapshot_entry_id`, `search_catalogue_snapshot_id`, `form_record_id`, `committed_content_revision`, `committed_operation_id`): the exact head vector the snapshot fixed. It is needed for the content check when the organization content revision moved.
 
-### 5.2 Public API (`/api/v1`, PB-06; requests and responses in the generated client)
+### 3.2 Two enumeration boundaries (D1 modification)
 
-* `GET /api/v1/form-records/search-capabilities?formDefinitionId=` → `{formDefinitionId, searchAvailable, unavailableReasonCode?, fields:[{fieldDefinitionId, displayLabel, fieldDataType, control, operators[], optionsSnapshot?}], notSearchableFields:[{fieldDefinitionId, displayLabel, reasonCode: "ENCRYPTED" | "NOT_APPROVED"}], policyRevision}`. `notSearchableFields` is returned only to callers allowed to know the form's fields (D5). Otherwise both lists are empty and `searchAvailable=false`.
-* `POST /api/v1/form-records/field-search` `{formDefinitionId, conditions:[{fieldDefinitionId, operator, value | lowerBound/upperBound}], recordStatus?, includeArchived?, includeChildren?, sortBy?, sortDirection?, pageSize}` → `{items: RecordListItemResponse[], totalCount, pageSize, snapshotReference, nextCursor?, previousCursor?, completeness: "Complete", scopeStatement}`. Predicate values are in the body only, never in the URL.
-* `POST /api/v1/form-records/field-search/page` `{cursor}` → the same shape. The cursor is Data Protection-sealed and contains organization, local user, session, snapshot token, query digest and offset. It holds no predicate values; the query digest is a keyed hash.
-* Problem Details `errorCode` mapping (RFC 9457, safe detail only):
+| | **User-scoped search enumeration** | **Organization-scoped migration verification** |
+|---|---|---|
+| Caller | Business API with the delegated user assertion (existing workload credential + DUA) | A separate workload identity `field-protection-verifier`, used by the worker only, with its own credential, network policy and Authority role. The business API runtime cannot use it. |
+| Authorization | Organization gate open; SpiceDB `discover` for the actor at the Authority-held ZedToken; AC-6/D5 query policy checked by the business before the call and **again by the Authority** for each predicate field id the request names | An accepted `ReprotectionOperation`/`FieldProtectionMigration` security command (or an A1 downgrade command) naming the form and field. No user assertion. Never callable "for any form". |
+| Population returned | `Active` `form_record` resources with `parent = form` **∩** the actor's discover set, each with its accepted head | **All** `Active` and `Quarantined` `form_record` resources with `parent = form`, including records no user can discover, with head and quarantine state |
+| Endpoint | `POST /internal/v1/search-catalogue` (private Authority API) | `POST /internal/v1/operator/migration-catalogue` (operator plane, distinct route group and authentication policy) |
+| Exposed to users | Only as verified search results (records the user may discover) | **Never**. Consumed by the worker's post-check and reconciliation only. Results are not projected into any user API, count or UI. |
+| Audit | Search audit event (field ids, operators, counts) | Journaled `MigrationCatalogueIssued` with command id and entry count |
 
-| errorCode | HTTP | Retryable | When |
-|---|---|---|---|
-| `SEARCH_FIELD_NOT_ALLOWED` | 422 | no | Any predicate field not in the caller's capability list (single indistinguishable response) |
-| `SEARCH_OPERATOR_NOT_SUPPORTED` | 422 | no | Operator or value shape not allowed for an allowed field |
-| `SEARCH_VERIFICATION_LIMIT` | 422 | no | Catalogue, bytes or time ceiling; extension `limitKind` (`records`/`bytes`/`time`) |
-| `SEARCH_SNAPSHOT_CHANGED` | 409 | yes (restart from page 1) | Authorization or content moved during the search or since the snapshot |
-| `SEARCH_VERIFICATION_UNAVAILABLE` | 503 | yes (after a delay) | Authority/SpiceDB unavailable, gate closed, a candidate failed verification (extension `unverifiableRecordCount`, the caller's own records only), or an encrypted predicate leaf |
+The migration catalogue gives G19 its expected-population basis. **G19 stays open** until the worker reconciles against it in both directions (an Authority record missing from business rows, and a business row not in the registry), and REL/G19 adversarial tests pass.
 
-### 5.3 Operators (V1)
+### 3.3 Catalogue request and response (user scope)
 
-| Field type | Operators |
+`POST /internal/v1/search-catalogue`
+
+* Request: `{ organization_id, form_definition_id, maximum_entries }`. The business API passes the configured `MaximumEligibleRecords` (D4) and never chooses a larger one; the Authority enforces its own ceiling.
+* Response: `{ search_catalogue_snapshot_id, authorization_revision, projection_revision, content_integrity_revision, entries: [{ form_record_id, committed_content_revision, committed_operation_id, manifest_root_base64, content_head_quarantined }], records_without_content, snapshot_expires_on }`.
+
+The Authority builds the response in **one read transaction**:
+
+1. Bind the actor and read the organization state (gate must be open).
+2. Run the SpiceDB `discover` lookup at the state's ZedToken, cursor-paged to completion (C-28).
+3. Intersect with registry rows `parent = form`, `Active`.
+4. Read every intersected head in the same transaction.
+5. Re-read the organization state. If the authorization, projection or content revision moved, fail `NOT_READY` (retryable). The business API maps this to `SEARCH_SNAPSHOT_CHANGED`.
+6. Persist the snapshot row and its entry vector, then return.
+
+Rules:
+
+* More than `maximum_entries` → `LIMIT_EXCEEDED` (422) with **no entries and no count** (D3/D4).
+* A quarantined head is returned with its flag. The business API then fails the search with `SEARCH_VERIFICATION_UNAVAILABLE` (D3), not silently skipped.
+* Records with revision 0 (never committed) cannot match any predicate. They are excluded and only their count is returned. That count reveals nothing new: these are the caller's own discoverable records.
+
+### 3.4 Snapshot validation (genuine consistency, not a signed token)
+
+The snapshot reference the business receives is only an id. **Validity is always decided by re-reading Authority state**; nothing is trusted from the token itself. A signed token without revision validation is insufficient.
+
+`POST /internal/v1/search-catalogue/{snapshotId}/validate` → `{ valid, invalidation_reason }`. The snapshot is valid iff all of the following hold:
+
+1. It exists, belongs to this organization and **this actor** (same authority user id from the delegated assertion), is not expired (default 5 minutes, maximum 15) and is not invalidated.
+2. The organization gate is open and `authorization_revision == snapshot_authorization_revision`. Any security change — revocation, share, team, role or policy — invalidates. V1 is deliberately conservative; a later optimization may re-run the discover lookup and compare, but only with tests.
+3. Content check:
+   * **Fast path:** `content_integrity_revision == snapshot_content_integrity_revision`. The content revision advances on every accepted content commit and every integrity incident, and each step is journaled and archived, so nothing in the organization changed.
+   * **Slow path** (the organization's content revision moved): every `(form_record_id, committed_content_revision, committed_operation_id)` in the snapshot's entry vector still equals the current head, and none is quarantined. Records committed elsewhere in the organization do not invalidate the snapshot.
+4. AC-6 search policy revision for the form is unchanged (§4.6).
+
+Validation happens:
+
+* after the business has verified every entry (end of execution);
+* before serving any further page from the business API cache;
+* before re-executing on a cache miss.
+
+Invalid → `SEARCH_SNAPSHOT_CHANGED` (409). The client restarts from page 1. Results are never combined across snapshots.
+
+### 3.5 Business execution against the catalogue (M3, for completeness)
+
+1. For each entry, read staged rows of `committed_operation_id` and call batch verification (§3.7, OD-6) with `ReadSearch` semantics: complete leaf-set, HMAC and root check, and the caller's readable item set.
+2. Every verification must report the snapshot's authorization revision and the entry's head; otherwise fail `SEARCH_SNAPSHOT_CHANGED`.
+3. Any failure, quarantine, missing row or extra row fails the whole search (D3).
+4. Records where a predicate field is not readable are excluded before evaluation (D5 / §4.7).
+5. Predicates are evaluated only over verified plaintext typed values. An encrypted leaf for a predicate field fails the search (`PREDICATE_VALUE_ENCRYPTED`). Search never decrypts.
+
+### 3.6 Failure behaviour (business records versus the catalogue)
+
+| Situation | Detected by | Outcome |
+|---|---|---|
+| Catalogue record has no business rows (deleted) | Staged read empty → leaf-set mismatch | Whole search fails `SEARCH_VERIFICATION_UNAVAILABLE`; Authority quarantines the head (AC-4) |
+| A value row deleted, altered or index manipulated | HMAC or leaf-set mismatch | Same |
+| Rows rolled back to an earlier valid signed revision | Rows of the old operation do not match the head's manifest | Same |
+| Business row with no registry entry (injected) | Never read: the catalogue drives | Not shown; reported by the migration reconciliation (G19) |
+| Business row moved to another form | Signed header + registry parent | No effect on scope |
+| Head changed after the catalogue | Verification revision ≠ entry; snapshot validation | `SEARCH_SNAPSHOT_CHANGED` |
+| Head quarantined | Catalogue flag or verification | `SEARCH_VERIFICATION_UNAVAILABLE` |
+| Authority, SpiceDB or archive gate unavailable | Gate check | `SEARCH_VERIFICATION_UNAVAILABLE` (retryable) |
+| More than the limit of entries, bytes or time | Catalogue / executor | `SEARCH_VERIFICATION_LIMIT` (limit_kind) |
+
+### 3.7 Performance and scalability constraints
+
+* Catalogue cost: one SpiceDB lookup (existing, paged), one indexed registry range, one head join, one snapshot insert. It is O(discoverable ∩ form) and bounded by the 500 limit.
+* Verification cost today is one `GetCommittedContentRevision` plus one `VerifyRecordProjection` per record. At 500 records that is about 1,000 internal calls, which is unlikely to fit 15 s.
+  * **OD-6:** add a batch verification operation (`verify-record-projections`, up to 50 records per call, each verified fully and independently, results per record).
+  * Staged reads are batched on the business side.
+* Measure per PB-09 with Level 2 controls on: 100/250/500 records × 10/50 fields; p50/p95/p99; Authority calls; HSM/Vault MAC operations; bytes; time to first failure. The D4 limits may have to drop.
+* Snapshot rows are small, so expired-row purge is cheap.
+
+### 3.8 AC-5 adversarial proof tests (to be implemented with M1; real Authority, PostgreSQL ×2, SpiceDB, Vault)
+
+| Test | Attack / condition | Pass |
+|---|---|---|
+| AC5-T01 | Business DBA deletes a matching record's rows | Search fails closed; never "0 matches" (ENC-SR-08) |
+| AC5-T02 | DBA alters a matching value so it would not match | HMAC/leaf mismatch → failure (ENC-SR-09) |
+| AC5-T03 | DBA removes the record from business listings and indexes | Still in the catalogue; evaluated or failure (ENC-SR-10) |
+| AC5-T04 | DBA injects a record row and value rows for the form | Not in the catalogue; never returned (ENC-SR-11) |
+| AC5-T05 | DBA restores an earlier signed revision's rows | Mismatch → failure |
+| AC5-T06 | DBA changes `form_records.form_definition_id` | Catalogue scope unchanged |
+| AC5-T07 | Share revoked between catalogue and page 2 | `SEARCH_SNAPSHOT_CHANGED`; nothing from the revoked record served (ENC-SR-14) |
+| AC5-T08 | Record edited during execution; another record of the org edited (slow path) | First → snapshot changed; second → snapshot still valid (ENC-SR-15) |
+| AC5-T09 | Catalogue larger than the limit | `LIMIT_EXCEEDED` with no entries/count; business 422 (ENC-SR-12) |
+| AC5-T10 | Snapshot id from another user / organization / expired / forged | Invalid; no data |
+| AC5-T11 | Business API workload calls the migration catalogue | Rejected by authentication policy |
+| AC5-T12 | Verifier workload without a matching accepted command | Rejected; journaled denial |
+| AC5-T13 | Record no user can discover | Absent from every user catalogue; present in the migration catalogue |
+| AC5-T14 | SpiceDB lookup > 1,000 pages; projection lag; gate closed | Complete or `NOT_READY`; never partial |
+| AC5-T15 | Quarantined head in scope | Whole search fails |
+
+## 4. AC-6 — Authority-held field search policy (refined design for review; not implemented)
+
+### 4.1 Principals
+
+| Action | Allowed principals (SpiceDB) | Additional requirement |
+|---|---|---|
+| Set organization search policy (`plaintext_search_permitted`) | `organization#administer_security` (system administrator) or organization owner via `manage_configuration` — **OD-2** decides which | Fresh step-up per PB-08 (dependency: PB-08 step-up evidence is not implemented — **OD-7**) |
+| Approve / withdraw search of a field | Same principals as the organization search policy | Governance approval reference; step-up |
+| Grant query access to a form's approved fields (D5) | Organization owner / security administrator; form designer **only if explicitly granted** `manage_field_search` | Journaled command |
+| Query an approved field | Holders of the form's `field_searcher` relation (user or team#participant), per D5 | Plus per-record field readability at execution |
+| Designer | Can see a field's search *status* in Configure Field only with `design` on the form; cannot approve unless separately granted | — |
+
+Record owners gain **nothing** from ownership here (D5). A user who owns records of a form but is not a `field_searcher` sees no searchable fields.
+
+### 4.2 Organization policy floors
+
+`organization_protection_policies` gains `plaintext_search_permitted` (default **false**) and `search_policy_revision`, both changed only by `UpdateMandatoryPolicy`. Approval requires all of:
+
+* `plaintext_search_permitted = true`;
+* the field's classification is `Public`, or `Internal` with `plaintext_internal_fields_permitted = true`, and is at or above `minimum_field_classification`.
+
+Turning `plaintext_search_permitted` off withdraws **all** approvals of the organization in the same revision.
+
+### 4.3 Binding (form version, field identity, type, classification, operators) and G21
+
+An approval is an Authority resource `field_search_approval` (entity = field definition id, parent = form), with `field_search_approvals` rows storing:
+
+* `form_definition_id`, `field_definition_id`;
+* `approved_field_data_type` (String/Integer/Decimal/Date/DateTime/Boolean/Option);
+* `approved_field_classification`;
+* `approved_operators` (array);
+* `approved_form_version_number` — the published version the approval was made against;
+* `approved_field_label_snapshot` (display text frozen at approval);
+* for Option fields, `approved_option_snapshot` (option id → label pairs frozen at approval);
+* `approval_reference`, `approved_by_security_command_id`, `approval_state` (`Active`/`Withdrawn`/`Invalidated`), `invalidation_reason`.
+
+How each G21 substitution is defeated:
+
+* **Different field under the same approval.** Execution matches predicates by `field_definition_id`. Each verified value row carries its signed `field_definition_id` and signed row schema, which fixes the storage type. A DBA cannot make field B's values answer for field A's approval.
+* **Changed type.** Execution requires the verified row schema to equal `approved_field_data_type`. A mismatch fails the search.
+* **Relabelled field or option.** The capability response takes labels and option lists from the **Authority snapshots**, not from unsigned `form_versions` / `field_options` rows. A DBA relabelling business rows cannot change what the searcher is told they are searching. Option predicates use the stable `field_option_id` (M0 contract), checked against the approved option snapshot.
+* **Injected option (G21 U11).** An option id not in `approved_option_snapshot` is rejected (`SEARCH_OPERATOR_NOT_SUPPORTED`, value not allowed).
+* **"Published form-version policy not trustworthy" (D2).** Form-version layouts are unsigned today (G21/G18). Approval therefore relies only on Authority-held facts:
+  * the field must have **no** `field_protection_requirement` and no pending reprotection or reclassification;
+  * it must have a recorded type and classification from an Authority command;
+  * its current published version number must be the one the Authority recorded.
+  
+  The Authority records published versions only through `PublishFormSecurityRevision` today, so **OD-3** decides whether publishing must register the version number and a layout digest with the Authority for every published version. Until then, approval is refused for fields whose type or classification the Authority has never recorded.
+
+**Residual (G21, documented):** the record-editing UI still renders labels from unsigned rows, which is outside search. G21 remains open.
+
+### 4.4 Approval, denial, withdrawal and invalidation flows
+
+| Event | Effect |
 |---|---|
-| String | `equals` (exact, case-sensitive, NFC); `startsWith`, `contains` only if approved per field (AC-6 `operators`) |
-| Integer, Decimal | `equals`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `between` (inclusive) |
-| Date | `equals`, `before`, `after`, `between` (date-only, never zone-shifted) |
-| DateTime | `before`, `after`, `between` (UTC instants; the UI converts from the user's effective zone) |
-| Option (single/multi) | `is` (option id); for multi-select `includes` |
-| Boolean | `isTrue`, `isFalse` |
-| Guid, File, encrypted, any field in a repeating group | none |
+| `ApproveFieldSearch` accepted | `Active` approval at a new authorization revision; `search_policy_revision` increments |
+| `ApproveFieldSearch` rejected | Journaled rejection with reason: `FIELD_ENCRYPTED`, `CLASSIFICATION_NOT_PERMITTED`, `ORGANIZATION_SEARCH_DISABLED`, `ACTOR_NOT_PERMITTED`, `FORM_VERSION_UNTRUSTED`, `PROTECTION_PENDING`, `OPERATOR_NOT_APPLICABLE` |
+| `WithdrawFieldSearch` | `Withdrawn` |
+| Strengthening (`PublishFormSecurityRevision` to ApplicationEncrypted, or reclassification to Confidential/Restricted) | **Same command and revision** sets the approval `Invalidated` (`FIELD_STRENGTHENED`). Search of historical plaintext is never re-enabled; re-approval is impossible while the field is encrypted. |
+| A1 downgrade (encrypted → plaintext) completes | Does **not** create an approval. A new explicit approval is required after the migration's verified completion (which itself depends on the AC-5 migration catalogue). |
+| Organization turns `plaintext_search_permitted` off, or raises `minimum_field_classification` | All non-conforming approvals `Invalidated` in the same revision |
+| New form version published with a different field type or classification (impossible for type; classification only strengthens) | Approval `Invalidated` (`FORM_VERSION_CHANGED`) — **OD-3** |
+| Field retired | `Invalidated` |
 
-### 5.4 Execution flow
+Every change advances the authorization revision, so every outstanding search snapshot dies (§3.4).
 
-1. Authenticate, resolve tenant and session. Validate shape (≤5 conditions, lengths).
-2. Read AC-6 policy and the published version snapshot, compute capabilities, then reject disallowed fields or operators (§2.5 layer 1). No record has been touched yet.
-3. Call AC-5 with `maximumEntries = 500` → catalogue + token (or `LIMIT_EXCEEDED` → `SEARCH_VERIFICATION_LIMIT`).
-4. Filter by `recordStatus` / archived / children **after** verification, using signed header values.
-5. Verify each catalogue entry in bounded parallel batches: staged rows of `committedOperationId` → `VerifyRecordProjection(Read)`. Require the same authorization revision and head. Any failure aborts the search (§5.6). Track bytes and time against the limits.
-6. Exclude records where a predicate field is not readable (§2.5 layer 2). Evaluate the AND of predicates over verified plaintext values. An encrypted leaf on a predicate field aborts the search.
-7. Order deterministically by the sort key, then by `formRecordId`.
-8. `search-catalogue/check(token)`; if stale, restart once, then return `SEARCH_SNAPSHOT_CHANGED`.
-9. Cache the ordered match ids under the token. Return page 1 with Edit permission decisions as in `ListRecordsHandler`.
-10. Audit one `RECORD_SEARCH_EXECUTED` event: field ids, operators, result count, catalogue size, duration and outcome. **No values.** Denials and failures are audited with their error code.
+### 4.5 Field-level predicate authorization
 
-### 5.5 Pagination
+There are two layers, both from the Authority:
 
-A page request unseals the cursor and checks user, session and query digest, then calls `search-catalogue/check(token)`. If the token is still current, the page is served from the cache. On a cache miss (another API instance), steps 3–8 are re-run and the new token must equal the cursor's token. Otherwise the response is `SEARCH_SNAPSHOT_CHANGED`.
+1. **Query permission (D5)**, checked once per request before any record is read. For each predicate field id, the caller must have SpiceDB `form_definition#query_fields` (= `field_searcher` relation) **and** the field must have an `Active` approval with the operator in `approved_operators`. Any failure is the single `SEARCH_FIELD_NOT_ALLOWED`, identical for unknown, hidden, encrypted or unapproved fields.
+2. **Per-record readability**, checked at execution. A record is evaluated only if the caller can read every value leaf of every predicate field on that record (`readable_items`). Otherwise the record is excluded before evaluation, independently of its value. The scope statement says so.
 
-### 5.6 Failure semantics
+### 4.6 Complete capability-response design (D5)
 
-The whole search fails if any single candidate fails verification. One deleted row can then make search unavailable for that form, which is an availability trade-off accepted by ADR-PB-004 §4. The failed record is also quarantined by the Authority, which is a security event. The UI never shows "No records found" for a failure.
+`GET /api/v1/form-records/search-capabilities?formDefinitionId=` (M0 contract, unchanged when enabled):
 
-## 6. Form Designer and policy integration
+* `fieldValueSearchAvailable`, `unavailableReasonCode`, `maximumConditions`, `conditionJoin` (`And`), `policyRevision` (the Authority `search_policy_revision`);
+* `fields`: only fields with an `Active` approval **and** caller `query_fields` on the form. Each has its label from the Authority snapshot, the approved type and the approved operators, and for Option fields the approved option snapshot. Text length limits come from configuration;
+* `notSearchableFields`: returned **only** to callers with `design` on the form or `administer_security` (configuration access, D5), listing the fields' encryption or approval status (`ENCRYPTED`, `NOT_APPROVED`). Ordinary searchers get an empty list, so they learn nothing about fields they cannot query;
+* a caller with no form access gets the same "no fields" response as for a non-existent form.
 
-* **Configure Field → "Search" section** (existing section pattern):
-  * shows classification and protection;
-  * for ApplicationEncrypted, Confidential or Restricted fields: "Encrypted for privacy — not searchable", with no control;
-  * for Public/Internal plaintext fields: "Searchable in Advanced Search", enabled only when AC-6 has approved the field; otherwise "Requires approval by an organization owner", with a request link.
-  * Ticking it in the draft only *publishes* an already approved capability. It cannot change classification or protection.
-* **Organization settings → Data protection:** `plaintext_search_permitted` switch and the per-field approval list, with the DBA-readable residual-risk statement (ENC-SR-04). The approval action needs step-up (PB-08) and a governance reference.
-* Published versions stay immutable. A new version can withdraw searchability; withdrawal and strengthening take effect at the next search immediately (AC-6 is re-checked every time).
+M0 returns `fieldValueSearchAvailable=false`, reason `TRUSTED_SEARCH_NOT_ENABLED`, and empty lists for every form (§6).
 
-## 7. UI (owner-approved layout, C6 §16.5)
+### 4.7 Classification strengthening and migration rules
 
-```
-Search records
-[ Record reference or ID ................ ] [🔍 Search]
-[ Form ▾ ]                    [ Status ▾ ]
-[ Sort by ▾ ] [ Rows per page ▾ ]  ☐ Include related  ☐ Include archived
+* Approval is impossible while a field has a `field_protection_requirement`, a pending reprotection or a pending reclassification.
+* Strengthening invalidates the approval atomically (§4.4). Business typed plaintext indexes for that field are dropped by the migration (ENC-SR-17).
+* Historical plaintext revisions remain reachable only through authorized historic reads (C6 M2), which are not a search surface.
+* An encrypted leaf encountered during evaluation fails the search. This covers a record migrated between catalogue and verification, or a concealed record (G19).
 
-Advanced Search
-  Condition 1
-  [ Field ▾ ]                 [ Condition ▾ ]
-  [ Value .................................. ]
-  [ + Add condition ]  [ 🔍 Search records ]
-```
+### 4.8 AC-6 adversarial tests (with M2)
 
-* Advanced Search is enabled only when a Form is selected and `searchAvailable` is true. Otherwise it explains why ("Select a form to search its fields", "This form has no fields approved for searching", "Encrypted for privacy — not searchable").
-* The Field list comes from `search-capabilities`. Condition options follow the selected field's server operators. The Value control is typed: text, number, date or date range, option select, true/false.
-* Each condition is a `fieldset` with a legend ("Condition 2") and a Remove action. Conditions are joined by AND, and the UI says so.
-* Results render in the existing My Records table with the same columns, Actions, sort, rows per page and pagination. A scope line reads: "Complete for records of *Form* that you can access and whose searched fields you can read."
-* Errors use `StatusMessage` with the codes in §5.2 and retry/narrow guidance. `SEARCH_SNAPSHOT_CHANGED` offers "Run search again".
-* Predicate values stay in component state and are never written to the URL. The URL keeps only the existing metadata parameters.
-* Layout follows `FORM_CONTROL_LAYOUT_STANDARD.md` (label → control → help → error; buttons aligned with inputs), Lucide `ActionIcons` (`search`, `addCondition` new), black primary buttons, organization theme, and one column at 320 px.
-
-## 8. Test plan
-
-* **Security (real Authority, PostgreSQL, SpiceDB, Vault; isolated `sectest` fixtures):**
-  * ENC-SR-01..18 → `tests/integration/FieldSearch*` plus Authority tests for AC-5/AC-6.
-  * ENC-SR-08..11 use the hostile-DBA fixture (direct SQL on BusinessDb).
-  * ENC-SR-13 uses the existing fault injection.
-  * ENC-SR-14/15 use revoke and edit between pages.
-  * ENC-SR-17 strengthens a field after approval.
-  * Additional: C7-API-01..08 (validation, single error, timing parity sampled, capability disclosure D5, cursor binding, concurrency limits, no URL/log values). C7-SEC-01 (no decryption call during search, asserted on the encryption service).
-* **Functional:** text equals / prefix / contains (only when approved), number and date ranges, option and multi-option, boolean, multiple AND conditions, combined Form/Status, sort, pages, empty result, Clear search, Clear filters, C-48 lookup regression, existing My Records tests unchanged.
-* **Browser (Playwright, dev stack + hosted):** layout matches §7; fields refresh on Form change; operators follow type; add/remove conditions; results in the same table; aligned controls; keyboard-only path; axe; 320/768/1440 px; 200%/400% zoom.
-* **Performance:** catalogue of 100/250/500 records with 10/50 fields; p50/p95/p99, Authority calls per search (PB-09 matrix rows).
-
-## 9. Proposed milestones
-
-| Milestone | Content | Security-sensitive |
+| Test | Attack / condition | Pass |
 |---|---|---|
-| **M0** | Approved UI layout restructure + `search-capabilities` and `field-search` contracts behind a server switch that returns `searchAvailable=false` / `SEARCH_VERIFICATION_UNAVAILABLE`; ActionIcons; layout/a11y tests | No (no data path) |
-| **M1** | AC-5 Authority catalogue + check (with Authority tests) | **Yes** |
-| **M2** | AC-6 policy, `ApproveFieldSearch` command, org settings UI, Designer Search section | **Yes** |
-| **M3** | Business `FieldSearchHandler`, verified evaluator, paging cache, audit, ENC-SR suite, browser acceptance | **Yes** |
-| **M4** | Hosted verification, performance measurement, owner acceptance | — |
+| AC6-T01 | Approve a Confidential/Restricted field; an ApplicationEncrypted field; with search disabled by policy | Rejected with the typed reason; journaled |
+| AC6-T02 | Designer without explicit grant approves | Rejected |
+| AC6-T03 | Business DBA sets `is_searchable=true` / `field_classification='Public'` | No capability appears; predicate → `SEARCH_FIELD_NOT_ALLOWED` |
+| AC6-T04 | Client sends the field id of an unapproved field | Same single denial, same timing class |
+| AC6-T05 | Unknown id, hidden field, other form's field | Indistinguishable denials (ENC-SR-05/07) |
+| AC6-T06 | DBA relabels an approved field or its options | Capability labels unchanged (Authority snapshot) |
+| AC6-T07 | DBA injects an option and submits its id | Rejected |
+| AC6-T08 | Record owner without `field_searcher` | No fields offered; predicates denied |
+| AC6-T09 | Revoke `field_searcher` mid-search | Snapshot invalid → `SEARCH_SNAPSHOT_CHANGED` |
+| AC6-T10 | Strengthen an approved field | Approval invalidated in the same revision; search denied; history not searchable (ENC-SR-17) |
+| AC6-T11 | Value rows of field B presented under field A's id (forged) | HMAC/manifest failure |
+| AC6-T12 | Turning `plaintext_search_permitted` off | All approvals invalidated |
 
-## 10. Owner decisions required
+## 5. Unresolved architectural decisions (for the next review)
 
-| # | Decision | Recommendation |
+| # | Question | Options | Recommendation |
+|---|---|---|---|
+| OD-1 | Identity for the migration catalogue | (a) new workload `field-protection-verifier` with its own credential; (b) reuse the worker's existing Authority credential with a role claim | **(a)** — distinct boundary per D1 |
+| OD-2 | Who may set organization search policy and approve fields | (a) system administrator (`administer_security`) only; (b) also organization owner (`manage_configuration`); (c) two-person: owner proposes, security administrator approves | **(c)** for Restricted-adjacent orgs, otherwise **(a)** — owner decision |
+| OD-3 | Trust of published form versions for approval binding | (a) Authority records each published version number + layout digest (partial G21/G18 remediation); (b) approve only fields whose type and classification the Authority recorded, and invalidate on any new version | **(a)**; (b) as the interim rule |
+| OD-4 | Query grant model (D5) | (a) explicit `field_searcher` relation per form; (b) reuse `form_user` (create-record) | **(a)** — D5 forbids blanket form access |
+| OD-5 | Snapshot invalidation on unrelated authorization changes | (a) any authorization revision invalidates (V1); (b) re-run the discover lookup and compare sets | **(a)** first; measure restart rate |
+| OD-6 | Batch verification operation in the Authority | (a) add `verify-record-projections` (≤50 per call); (b) keep per-record calls and lower the record limit | **(a)** — needed for D4 |
+| OD-7 | Step-up for approvals | (a) block approvals until PB-08 step-up evidence exists; (b) allow with a recorded governance reference only, in development | **(a)** for production; (b) for development only |
+| OD-8 | Search audit sink | (a) business `AuditEvents` projection only; (b) also the Authority's independent intake for sensitive read evidence | **(b)** for denials and executions |
+
+## 6. M0 — implemented (C-57)
+
+### 6.1 Backend (`Search` feature)
+
+* `Application/Features/Search/FieldSearch/`:
+  * `FieldSearchHandler` — capabilities, search, page;
+  * `FieldSearchRequestValidator` — request shape only;
+  * `FieldSearchLimits` — D4, configuration section `FieldSearch`, validated at startup; `MaximumConditions` may be lowered, never raised above 5;
+  * `FieldSearchVocabulary` — operators, value types, error codes;
+  * `SearchException`.
+* `Api/Features/Search/SearchEndpoints.cs`: feature owner `Search`; responses `no-store`.
+* **Gate:** every well-formed search or page request → `503 SEARCH_VERIFICATION_UNAVAILABLE` with problem extensions `unavailable_reason: TRUSTED_SEARCH_NOT_ENABLED` and `retryable: false`. It is never an empty 200.
+* `FieldSearchHandler` depends only on `FieldSearchLimits`. An architecture test forbids `Application.Features.Search` from depending on `Application.Common.Persistence` or FormRecords' domain or listing types.
+
+### 6.2 Endpoints (`/api/v1`)
+
+| Route | Request | M0 response |
 |---|---|---|
-| D1 | Build Authority AC-5 (form-scoped catalogue + snapshot token), or accept option B (organization-wide exhaustive verification on today's APIs) | **AC-5** |
-| D2 | Search approval held by the Authority (AC-6, owner/security administrator approves per field) or by business metadata with a documented residual risk | **AC-6** |
-| D3 | One unverifiable candidate fails the whole search (§5.6) | **Yes** (ADR-PB-004 §4) |
-| D4 | Initial limits in §2.7 (500 records, 64 MiB, 15 s, 5 conditions) | Accept, then measure |
-| D5 | Who may see a form's searchable and not-searchable field list: form users/designers and owners of a record of the form; share-only recipients see none in V1 | Accept |
-| D6 | V1 excludes child, repeating-group and document predicates, field-value sorting, facets and export | Accept |
-| D7 | Authorize M0 now (safe UI/contracts) while D1/D2 are reviewed | Yes |
+| `GET /form-records/search-capabilities?formDefinitionId=` | — | 200 `{fieldValueSearchAvailable:false, unavailableReasonCode:"TRUSTED_SEARCH_NOT_ENABLED", maximumConditions:5, conditionJoin:"And", fields:[], notSearchableFields:[], policyRevision:null}` for every form; 422 for an empty or invalid id |
+| `POST /form-records/field-search` | `FieldSearchRequest` | 422 `SEARCH_REQUEST_INVALID` / `SEARCH_OPERATOR_NOT_SUPPORTED` for malformed requests; otherwise 503 gate |
+| `POST /form-records/field-search/page` | `{cursor}` | 422 if no cursor; otherwise 503 gate |
 
-## 11. Open risks and review requirements
+### 6.3 Request contract
 
-* G06 and G19 remain **OPEN** until AC-5, the worker reconciliation and the ENC-SR suite have run, been measured and been independently reviewed.
-* AC-5/AC-6 are Authority changes and need independent production review (like C-12, C-28, AC-1, AC-2).
-* Verification cost per record is not measured. The 500 limit may have to drop.
+* `formDefinitionId` (required).
+* `conditions[1..5]`, each `{ fieldDefinitionId, operator, valueType, value?, lowerBound?, upperBound? }`. Values are invariant text:
+  * String, NFC, 1–200 characters; contains/startsWith at least 3;
+  * Integer `-?digits`;
+  * Decimal `-?digits[.digits]`, no exponent or separators;
+  * Date `yyyy-MM-dd`;
+  * DateTime ISO 8601 **with offset**;
+  * Option: a field option **id** (never key or label, G21).
+* `between` takes both bounds (lower ≤ upper); `isTrue`/`isFalse` take nothing; every other operator takes `value`.
+* Metadata filters: `recordStatus`, `includeArchived`, `includeChildren`, `sortBy` (modifiedOn/createdOn/formName/recordStatus only; no field-value sort, D6), `sortDirection`, `pageSize` ∈ {10, 25, 50, 100}.
+
+### 6.4 Operators per value type
+
+| Value type | Operators |
+|---|---|
+| String | equals, startsWith, contains |
+| Integer, Decimal | equals, greaterThan, greaterThanOrEqual, lessThan, lessThanOrEqual, between |
+| Date | equals, before, after, between |
+| DateTime | before, after, between |
+| Boolean | isTrue, isFalse |
+| Option | is, includes |
+
+Whether a particular field offers an operator will come from AC-6.
+
+### 6.5 Response and error codes
+
+**Response (when enabled):** `{ items: RecordListItemResponse[], totalCount, pageStart, pageSize, snapshotReference, authorizationRevision, completeness:"Complete", scopeStatement, continuationToken?, previousToken? }`. Rows reuse the My Records item, so results go into the same table.
+
+**Error mapping** (RFC 9457; `title` = code; details name conditions by position only and never echo values):
+
+| errorCode | HTTP | retryable | Notes |
+|---|---|---|---|
+| `SEARCH_REQUEST_INVALID` | 422 | false | Shape errors (count, value presence/format, filters, page size) |
+| `SEARCH_OPERATOR_NOT_SUPPORTED` | 422 | false | Unknown operator, or operator not applicable to the value type |
+| `SEARCH_FIELD_NOT_ALLOWED` | 422 | false | (AC-6) any field not in the capability list; single indistinguishable response |
+| `SEARCH_VERIFICATION_LIMIT` | 422 | false | (AC-5) `limit_kind` records/bytes/time |
+| `SEARCH_SNAPSHOT_CHANGED` | 409 | true | (AC-5) restart from page 1 |
+| `SEARCH_VERIFICATION_UNAVAILABLE` | 503 | M0 false / otherwise true | `unavailable_reason` (M0: `TRUSTED_SEARCH_NOT_ENABLED`) |
+
+### 6.6 Frontend
+
+* **`features/search`** (PG-015 owner):
+  * `AdvancedFieldSearch` — collapsible disclosure; each condition is a fieldset "Condition N" with Field | Condition side by side and Value beneath; typed value controls; Add condition and Search records with Lucide icons;
+  * `conditionModel` — AND conditions, ≤5, request builder;
+  * `searchFailure` — typed messages, never "no records".
+* **My Records** (`RecordsPage`):
+  * reference/ID search on top;
+  * Form | Status, then Sort by | Rows per page, in two columns;
+  * related/archived checkboxes and Clear filters;
+  * Advanced Search below, in the same card;
+  * capabilities fetched from the server for the selected form;
+  * `onSearch` is wired only when the server reports field-value search available, so in M0 Search records is disabled and nothing is sent;
+  * a failure shows its typed explanation instead of the table, and a result renders in the **same** My Records table. Predicate values never enter the URL.
+* **PG-069 gallery:** "Advanced Search (synthetic preview)" with synthetic capabilities, clearly labelled, sending nothing. It lets the enabled layout be reviewed.
+* **Coordinator:** endpoints `search.capabilities` (GET), `search.fieldSearch` and `search.fieldSearchPage` (POST, interactive-read lane, not idempotency-keyed, so failures are final and not retried).
+* **Not in M0:** Form Designer "Search" section and organization search-policy UI (depend on AC-6/M2). DateTime predicates convert from the browser's zone. Conversion via the user's effective IANA zone, with DST gap/fold handling, is an M3 item.
+
+## 7. Proposed milestones
+
+| Milestone | Content | Status |
+|---|---|---|
+| M0 | UI, contracts, validation, typed errors, server gate, tests | **Implemented (C-57); awaiting owner functional acceptance** |
+| M1 | AC-5 Authority catalogue (user scope + migration scope), snapshot validation, batch verification (OD-6), AC5-T01..T15 | Not authorized; design for review (§3) |
+| M2 | AC-6 policy + approvals + `field_searcher` grants + Designer "Search" section + organization policy UI, AC6-T01..T12 | Not authorized; design for review (§4) |
+| M3 | Trusted executor, paging cache, audit, ENC-SR-01..18, browser acceptance with real results, performance measurement | Not authorized |
+| M4 | Worker G19 reconciliation against the migration catalogue | Not authorized |
+
+**Proposed next:** owner review of §3–§5, then **M1 (AC-5)**, since both search and G19 depend on it.
+
+## 8. Open risks
+
+* G06, G19 and G21 remain **OPEN**.
+* AC-5 and AC-6 are Authority changes and need independent production review (like C-12, C-28, AC-1, AC-2).
+* The D4 limits have not been measured.
+* New finding **G22** (C-58): session CSRF double-submit is not enforced for cookie sessions. This pre-existing pipeline defect was found by the M0 browser tests; it is outside C7 and needs an owner decision.
 * Approved plaintext stays readable to a business DBA (ADR-PB-004 §3).
-* Unverified display metadata (form name, creator name) in result rows keeps its existing caveat.
-* G18 (form-version metadata integrity) is not addressed. Labels and operators shown come from business rows, but AC-6 bounds what can be searched.
+* Unverified display metadata (form name, creator) in result rows keeps the existing caveat.

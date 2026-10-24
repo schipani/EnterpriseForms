@@ -78,6 +78,14 @@ export type PublishFormRequest = S["PublishFormRequest"];
 export type RestoreVersionRequest = S["RestoreVersionRequest"];
 export type CreateRelationshipDefinitionRequest = S["CreateRelationshipDefinitionRequest"];
 export type RecordListResponse = S["RecordListResponse"];
+export type FieldSearchCapabilitiesResponse = S["FieldSearchCapabilitiesResponse"];
+export type FieldSearchCapabilityField = S["FieldSearchCapabilityField"];
+export type FieldSearchNotSearchableField = S["FieldSearchNotSearchableField"];
+export type FieldSearchOptionChoice = S["FieldSearchOptionChoice"];
+export type FieldSearchCondition = S["FieldSearchCondition"];
+export type FieldSearchRequest = S["FieldSearchRequest"];
+export type FieldSearchPageRequest = S["FieldSearchPageRequest"];
+export type FieldSearchResponse = S["FieldSearchResponse"];
 export type RecordListItemResponse = S["RecordListItemResponse"];
 export type RecordVersionItemResponse = S["RecordVersionItemResponse"];
 export type RecordVersionListResponse = S["RecordVersionListResponse"];
@@ -194,6 +202,13 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       projection: (formRecordId: string, signal?: AbortSignal) => read<RecordProjectionResponse>("records.projection", { formRecordId }, undefined, "interactive-read", signal),
       lifecycle: (transition: RecordLifecycleTransition, formRecordId: string, request: RecordLifecycleRequest) => write<RecordLifecycleResponse>("POST", `records.${transition}`, { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
       update: (formRecordId: string, request: UpdateFormRecordRequest) => write<FormRecordResponse>("PATCH", "records.update", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
+    },
+    search: {
+      /** Phase C7: server-authoritative searchable fields and operators for one form (M0: none, trusted search not enabled). */
+      capabilities: (formDefinitionId: string, signal?: AbortSignal) => read<FieldSearchCapabilitiesResponse>("search.capabilities", undefined, { formDefinitionId }, "interactive-read", signal),
+      /** Phase C7: advanced field search; a POST so predicate values never enter a URL. Not idempotency-keyed: a search changes nothing. */
+      fieldSearch: (request: FieldSearchRequest) => write<FieldSearchResponse>("POST", "search.fieldSearch", undefined, request, { lane: "interactive-read" }),
+      page: (request: FieldSearchPageRequest) => write<FieldSearchResponse>("POST", "search.fieldSearchPage", undefined, request, { lane: "interactive-read" }),
     },
     related: {
       list: (formRecordId: string, formRelationshipDefinitionId: string, signal?: AbortSignal) => read<ChildRecordListResponse>("related.list", { formRecordId, formRelationshipDefinitionId }, undefined, "interactive-read", signal),

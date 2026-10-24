@@ -8,6 +8,7 @@ using EnterpriseForms.Api.Features.Identity;
 using EnterpriseForms.Api.Features.Organizations;
 using EnterpriseForms.Api.Features.Platform;
 using EnterpriseForms.Api.Features.RelatedForms;
+using EnterpriseForms.Api.Features.Search;
 using EnterpriseForms.Api.Features.Sharing;
 using EnterpriseForms.Api.Features.Teams;
 using EnterpriseForms.Infrastructure;
@@ -61,6 +62,11 @@ public sealed class Program
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.ListRecordsHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordHistoryHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordRestoreHandler>();
+        // Phase C7 D4: provisional field-search limits (configuration FieldSearch); a bad value fails at startup.
+        var fieldSearchLimits = builder.Configuration.GetSection(EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits.SectionName).Get<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits>() ?? new EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits();
+        fieldSearchLimits.Validate();
+        builder.Services.AddSingleton(fieldSearchLimits);
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchHandler>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));
         builder.Services.AddHostedService<DocumentProviderStartupGuard>();
         builder.Services.AddHostedService<DocumentProcessingHostedService>();
@@ -93,6 +99,7 @@ public sealed class Program
         app.MapTeamEndpoints();
         app.MapDashboardEndpoints();
         app.MapOrganizationEndpoints();
+        app.MapSearchEndpoints();
 
         app.Run();
         return 0;

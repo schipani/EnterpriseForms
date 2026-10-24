@@ -1172,6 +1172,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-records/search-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Server-authoritative Advanced Search capabilities for one form and the caller: the fields that may be used as predicates, their value types and allowed operators, and fields the caller may know about that cannot be searched (Encrypted for privacy — not searchable). A field the caller may not know about is in neither list. Phase C7 M0: fieldValueSearchAvailable is false (TRUSTED_SEARCH_NOT_ENABLED) and no fields are offered, for every form. */
+        get: operations["GetFieldSearchCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/field-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Phase C7 M0: every well-formed request is refused with 503 SEARCH_VERIFICATION_UNAVAILABLE (unavailable_reason TRUSTED_SEARCH_NOT_ENABLED, retryable false); malformed requests get 422 SEARCH_REQUEST_INVALID or SEARCH_OPERATOR_NOT_SUPPORTED. */
+        post: operations["SearchFormRecordsByFieldValues"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/field-search/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Another page of a verified advanced-search result: the opaque cursor is bound to the caller, session, query digest and verified snapshot; a changed authorization or content snapshot returns 409 SEARCH_SNAPSHOT_CHANGED (restart from page one). Phase C7 M0: refused with 503 SEARCH_VERIFICATION_UNAVAILABLE / TRUSTED_SEARCH_NOT_ENABLED. */
+        post: operations["PageFieldSearchResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1568,6 +1619,87 @@ export interface components {
             fieldDisplayName: string;
             fieldDataType: string;
         };
+        FieldSearchCapabilitiesResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            fieldValueSearchAvailable: boolean;
+            unavailableReasonCode: null | string;
+            /** Format: int32 */
+            maximumConditions: number | string;
+            conditionJoin: string;
+            fields: components["schemas"]["FieldSearchCapabilityField"][];
+            notSearchableFields: components["schemas"]["FieldSearchNotSearchableField"][];
+            /** Format: int64 */
+            policyRevision: null | number | string;
+        };
+        FieldSearchCapabilityField: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            displayLabel: string;
+            valueType: string;
+            operators: string[];
+            options: components["schemas"]["FieldSearchOptionChoice"][];
+            /** Format: int32 */
+            minimumTextLength: null | number | string;
+            /** Format: int32 */
+            maximumTextLength: null | number | string;
+        };
+        FieldSearchCondition: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            operator: string;
+            valueType: string;
+            value?: null | string;
+            lowerBound?: null | string;
+            upperBound?: null | string;
+        };
+        FieldSearchNotSearchableField: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            displayLabel: string;
+            reasonCode: string;
+        };
+        FieldSearchOptionChoice: {
+            /** Format: uuid */
+            fieldOptionId: string;
+            displayText: string;
+        };
+        FieldSearchPageRequest: {
+            cursor: null | string;
+        };
+        FieldSearchRequest: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            conditions: null | components["schemas"]["FieldSearchCondition"][];
+            recordStatus?: null | string;
+            /** @default false */
+            includeArchived: boolean;
+            /** @default false */
+            includeChildren: boolean;
+            sortBy?: null | string;
+            sortDirection?: null | string;
+            /**
+             * Format: int32
+             * @default 25
+             */
+            pageSize: number | string;
+        };
+        FieldSearchResponse: {
+            items: components["schemas"]["RecordListItemResponse"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            /** Format: int32 */
+            pageStart: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            snapshotReference: string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            completeness: string;
+            scopeStatement: string;
+            continuationToken?: null | string;
+            previousToken?: null | string;
+        };
         FieldValueResponse: {
             /** Format: uuid */
             fieldDefinitionId: string;
@@ -1744,6 +1876,14 @@ export interface components {
         ProbeResponse: {
             probeStatus: string;
             serviceName: string;
+        };
+        ProblemDetails: {
+            type?: null | string;
+            title?: null | string;
+            /** Format: int32 */
+            status?: null | number | string;
+            detail?: null | string;
+            instance?: null | string;
         };
         PublishFormRequest: {
             /** Format: int64 */
@@ -4170,6 +4310,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DirectoryUserResponse"][];
+                };
+            };
+        };
+    };
+    GetFieldSearchCapabilities: {
+        parameters: {
+            query: {
+                formDefinitionId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchCapabilitiesResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SearchFormRecordsByFieldValues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PageFieldSearchResults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldSearchPageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

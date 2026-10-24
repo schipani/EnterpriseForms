@@ -41,6 +41,10 @@ export const ENDPOINTS = {
   "forms.versions": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/versions" },
   "forms.createRelationship": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/relationships" },
   "records.list": { method: "GET", path: "/api/v1/form-records" },
+  // Phase C7 Advanced Field Search: predicate values travel in POST bodies only, never in URLs (ADR-PB-004).
+  "search.capabilities": { method: "GET", path: "/api/v1/form-records/search-capabilities" },
+  "search.fieldSearch": { method: "POST", path: "/api/v1/form-records/field-search" },
+  "search.fieldSearchPage": { method: "POST", path: "/api/v1/form-records/field-search/page" },
   "records.versions": { method: "GET", path: "/api/v1/form-records/{formRecordId}/versions" },
   "records.version": { method: "GET", path: "/api/v1/form-records/{formRecordId}/versions/{contentRevision}" },
   "records.restorePreview": { method: "GET", path: "/api/v1/form-records/{formRecordId}/versions/{contentRevision}/restore-preview" },

@@ -35,6 +35,7 @@ Explicitly document which POST routes permit a retry and which operations are no
 - `409`: conflicting business operation, such as idempotency-key reused with a different payload; `412`: stale `If-Match`; `428`: required revision precondition absent.
 - `413`: disallowed upload size; `429`: resource/tenant rate limit.
 - `503`: mandatory Authority/signing/integrity/checkpoint dependency unavailable, quarantined or unable to establish correctness. Do not return success or partial search results in fail-closed cases.
+- Search (ADR-PB-004, Phase C7): `SEARCH_REQUEST_INVALID` 422, `SEARCH_OPERATOR_NOT_SUPPORTED` 422, `SEARCH_FIELD_NOT_ALLOWED` 422 (one indistinguishable response for unknown, hidden, encrypted or unapproved fields), `SEARCH_VERIFICATION_LIMIT` 422 (`limit_kind`), `SEARCH_SNAPSHOT_CHANGED` 409 (restart), `SEARCH_VERIFICATION_UNAVAILABLE` 503 (`unavailable_reason`, `retryable`). Predicate values travel only in request bodies, never in URLs, and are never echoed. See `docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md` §6.
 - Use stable domain-specific error codes for client messages and accessibility; never echo secrets, internal SQL, object keys, sensitive field labels, or raw exception data.
 
 These are defaults to refine per endpoint without changing protocol semantics.

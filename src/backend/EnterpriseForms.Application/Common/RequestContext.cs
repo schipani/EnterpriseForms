@@ -14,7 +14,7 @@ public sealed record RequestContext(Guid OrganizationId, Guid LocalUserId, strin
 }
 
 /// <summary>Application-level failure mapped to RFC 9457 Problem Details by the host.</summary>
-public sealed class BusinessException(string errorCode, int httpStatusCode, string? detail = null) : Exception(detail ?? errorCode)
+public class BusinessException(string errorCode, int httpStatusCode, string? detail = null) : Exception(detail ?? errorCode)
 {
     public string ErrorCode { get; } = errorCode;
 
