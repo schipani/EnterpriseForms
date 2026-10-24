@@ -185,6 +185,20 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public void AddFormRecord(FormRecord record) => context.FormRecords.Add(record);
 
+        public Task<FormRecordCreationAttempt?> FindCreationAttemptAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken) =>
+            context.FormRecordCreationAttempts.AsNoTracking().FirstOrDefaultAsync(a => a.TenantId == tenantId && a.FormRecordId == formRecordId, cancellationToken);
+
+        public async Task<bool> TryAddCreationAttemptAsync(FormRecordCreationAttempt attempt, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(attempt);
+            // Parameterized; ON CONFLICT keeps the first attempt's fingerprint when two identical requests race.
+            var inserted = await context.Database.ExecuteSqlInterpolatedAsync($@"INSERT INTO form_record_creation_attempts
+                (form_record_creation_attempt_id, tenant_id, form_record_id, creation_request_fingerprint, fingerprint_key_envelope_json, created_on, created_by_user_id)
+                VALUES ({attempt.FormRecordCreationAttemptId}, {attempt.TenantId}, {attempt.FormRecordId}, {attempt.CreationRequestFingerprint}, {attempt.FingerprintKeyEnvelopeJson}, {attempt.CreatedOn}, {attempt.CreatedByUserId})
+                ON CONFLICT (tenant_id, form_record_id) DO NOTHING", cancellationToken).ConfigureAwait(false);
+            return inserted == 1;
+        }
+
         public void StageCandidate(FormRecordRevision headerRevision, IEnumerable<ISignedContentRow> rows)
         {
             context.FormRecordRevisions.Add(headerRevision);

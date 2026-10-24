@@ -38,6 +38,8 @@ services:
       # Phase C6 AC-2 adversarial tests only: skip the business lifecycle lock on the contributor path so the Authority's own
       # lock is what is exercised. Off unless a test recreates the api container with the variable set; Testing-only (startup guard).
       Testing__BypassContributorLifecycleLock: ${API_TESTING_BYPASS_CONTRIBUTOR_LIFECYCLE_LOCK:-false}
+      # F-C7-01 fault-injection tests: requests may arm one write checkpoint with X-Testing-Fault (Testing-only; refused elsewhere).
+      Testing__WriteFaultInjection: "true"
       # G23: both API instances decrypt the same session cookies (one key ring); session validity is decided by the Authority.
       DataProtection__KeyRingDirectory: /keyring
     volumes:

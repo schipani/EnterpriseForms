@@ -2348,6 +2348,52 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FormRecordCreationAttempt", b =>
+                {
+                    b.Property<Guid>("FormRecordCreationAttemptId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_creation_attempt_id");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<byte[]>("CreationRequestFingerprint")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("creation_request_fingerprint");
+
+                    b.Property<string>("FingerprintKeyEnvelopeJson")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("fingerprint_key_envelope_json");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("FormRecordCreationAttemptId");
+
+                    b.HasIndex("TenantId", "FormRecordId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_form_record_creation_attempts_record");
+
+                    b.ToTable("form_record_creation_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_form_record_creation_attempts_fingerprint", "octet_length(creation_request_fingerprint) = 32");
+                        });
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FormRecordGroupRevision", b =>
                 {
                     b.Property<Guid>("FormRecordGroupRevisionId")
@@ -3745,6 +3791,16 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_form_records_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FormRecordCreationAttempt", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_form_record_creation_attempts_tenant");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormRecords.FormRecordGroupRevision", b =>

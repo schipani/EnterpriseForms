@@ -57,6 +57,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setState({ status: "authenticated", session: bootstrap.session, bootstrap, identityProviderKind: session.identityProviderKind, error: null });
     } catch (error) {
       const presented = presentError(error);
+      if (presented.code === "CANCELLED") {
+        // A probe cancelled because a concurrent probe already settled the session (e.g. it found no session and
+        // cleared the security context) is not a failure; the settled state stands.
+        return;
+      }
       setState((current) => ({ ...current, status: presented.kind === "session-expired" ? "expired" : "unavailable", error: `${presented.title}: ${presented.detail}` }));
     }
   }, [api, coordinator, queryClient, uploads]);

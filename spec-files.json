@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "c182bf9f5e2f7f2cd621ab466d6e77a467d67c9bf90ddaabe67c29eaf55b63a6",
-      "bytes": 30166
+      "sha256": "f9db3afa9a943864218c6aaf6a37996fde115637d966551961a4f24621cfd637",
+      "bytes": 31565
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -124,8 +124,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "5c1bd4423c80d1e595fe3bc69ad213da75f40785623769ee7641667db263346e",
-      "bytes": 8522
+      "sha256": "22036cf979e6eecd15f47f9d7f194f5965ec02a7ace40aeec26ab033ed184529",
+      "bytes": 8585
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -149,8 +149,13 @@
     },
     {
       "path": "docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md",
-      "sha256": "1ce00307ced888f8b502f1c046e01fb6cc25430c31b38ae5447e55e1d80424cf",
-      "bytes": 52917
+      "sha256": "ceb8c44fa30c7a51299b3f6eb89e66bca01de282c05e12372cbeaa383a1607af",
+      "bytes": 61371
+    },
+    {
+      "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
+      "sha256": "4eb5a19004109a5ab5d2169b55a747bee29819f33c87d9c6af11e5c98182caf5",
+      "bytes": 10406
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -239,8 +244,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "326e5283dc553d816153def51d3c169d75c415d4ed8cfc3f1e35adb95a0bba6f",
-      "bytes": 94571
+      "sha256": "b306a7842ae14871d0eaf458dd20466ba5f584ea2a47b4a2defaa9aaecf4e544",
+      "bytes": 97246
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -759,8 +764,8 @@
     },
     {
       "path": "trust_authority/spicedb.schema.zed",
-      "sha256": "94adb59a65e626e88e6dc24601d72f032e9ba97e61108ade847c3f0c5f23027f",
-      "bytes": 2507
+      "sha256": "bc1fc8022af81133f7f28a3648fef683fc777fac7b5d163eff360da3535b11f2",
+      "bytes": 2725
     },
     {
       "path": "trust_authority/trust-authority.openapi.yaml",
