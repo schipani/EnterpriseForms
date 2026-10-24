@@ -5,6 +5,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sessions;
 
 namespace AuthorizationAuthority.Tests;
 
@@ -30,6 +31,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<SearchCatalogueSnapshot> Snapshots { get; } = [];
     public List<SecurityCommand> Commands { get; } = [];
     public List<SearchCatalogueSnapshotEntry> SnapshotEntries { get; } = [];
+
+    public List<AuthenticatedSession> Sessions { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -160,6 +163,11 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             var query = s.SnapshotEntries.Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId).OrderBy(e => e.CatalogueEntryPosition).Skip(offset);
             return Task.FromResult((limit is { } take ? query.Take(take) : query).ToList());
         }
+
+        public Task<AuthenticatedSession?> FindSessionByDigestAsync(byte[] sessionSecretDigest, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Sessions.FirstOrDefault(x => x.SessionSecretDigest.AsSpan().SequenceEqual(sessionSecretDigest)));
+
+        public void AddSession(AuthenticatedSession session) => s.Sessions.Add(session);
 
         public Task CommitAsync(CancellationToken cancellationToken)
         {

@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -110,6 +110,24 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
     public Task<AcceptedContentRevision> CommitReprotectionAsync(Guid operationId, CommitContentChangeRequest request, CancellationToken cancellationToken) =>
         SendAsync<AcceptedContentRevision>(HttpMethod.Post, $"internal/v1/content-changes/{operationId:D}/commit", null, request, null, cancellationToken);
+
+    public Task<BrowserSessionState> CreateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, DateTimeOffset absoluteExpiresOn, string? replacedSessionDigestBase64, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return SendAsync<BrowserSessionState>(HttpMethod.Post, "internal/v1/sessions", user, new SessionCreateBody(user.OrganizationId, sessionDigestBase64, absoluteExpiresOn, replacedSessionDigestBase64), null, cancellationToken);
+    }
+
+    public Task<BrowserSessionState> ValidateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return SendAsync<BrowserSessionState>(HttpMethod.Post, "internal/v1/sessions/validate", user, new SessionDigestBody(user.OrganizationId, sessionDigestBase64), null, cancellationToken);
+    }
+
+    public Task<BrowserSessionState> RevokeSessionAsync(DelegatedUserContext user, string sessionDigestBase64, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        return SendAsync<BrowserSessionState>(HttpMethod.Post, "internal/v1/sessions/revoke", user, new SessionDigestBody(user.OrganizationId, sessionDigestBase64), null, cancellationToken);
+    }
 
     /// <summary>user == null: workload-only call (reprotection); the authority then requires the operation's own authorization reference.</summary>
     private async Task<T> SendAsync<T>(HttpMethod method, string path, DelegatedUserContext? user, object? body, string? idempotencyKey, CancellationToken cancellationToken)
@@ -201,6 +219,10 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     }
 
     private sealed record BatchResponse(IReadOnlyList<PermissionDecision> Decisions);
+
+    private sealed record SessionCreateBody(Guid OrganizationId, string SessionDigestBase64, DateTimeOffset AbsoluteExpiresOn, string? ReplacedSessionDigestBase64);
+
+    private sealed record SessionDigestBody(Guid OrganizationId, string SessionDigestBase64);
 
     private sealed record ErrorBody(string? ErrorCode, Guid? CorrelationId, bool? Retryable, string? Detail);
 }

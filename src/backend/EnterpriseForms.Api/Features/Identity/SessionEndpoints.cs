@@ -23,6 +23,12 @@ public static class SessionEndpoints
         anonymous.MapGet("/", static async Task<Ok<SessionResponse>> (HttpContext http, DevelopmentIdentityProvider development) =>
             {
                 var result = await http.AuthenticateAsync(BusinessAuthentication.SessionScheme).ConfigureAwait(false);
+                if (BusinessAuthentication.IsSessionStateUnavailable(http))
+                {
+                    // G23: fail closed, but do not report a sign-out the user did not perform.
+                    throw new BusinessException(BusinessAuthentication.SessionStateUnavailableCode, 503, "The session could not be verified. Try again shortly.");
+                }
+
                 if (!result.Succeeded || result.Principal is null)
                 {
                     return TypedResults.Ok(new SessionResponse(false, null, null, null, null, [], string.Empty, null, development.IsAvailable ? "TestIdentityProvider" : "EntraId"));
@@ -53,7 +59,7 @@ public static class SessionEndpoints
                     ["authority_user_id"] = persona.AuthorityUserId.ToString("D"),
                     ["name"] = persona.DisplayName,
                 };
-                var csrf = await BusinessAuthentication.StartSessionAsync(http, assertion, claims, expires).ConfigureAwait(false);
+                (var csrf, expires) = await BusinessAuthentication.StartSessionAsync(http, assertion, claims, expires, cancellationToken).ConfigureAwait(false);
                 var context = new RequestContext(persona.OrganizationId, persona.AuthorityUserId, claims["iss"], persona.SubjectIdentifier, persona.DisplayName, assertion, Guid.CreateVersion7());
                 await projection.HandleAsync(context, cancellationToken).ConfigureAwait(false);
                 // Development only: project the other seeded personas of this organization so directory pickers (form users,
@@ -64,12 +70,18 @@ public static class SessionEndpoints
             .WithName("DevelopmentLogin")
             .WithSummary("Development/Testing only: starts a BFF session for a seeded persona. Refused elsewhere by construction.");
 
-        anonymous.MapPost("/logout", static async Task<NoContent> (HttpContext http) =>
+        anonymous.MapPost("/logout", static async Task<NoContent> (HttpContext http, CancellationToken cancellationToken) =>
             {
-                await http.SignOutAsync(BusinessAuthentication.SessionScheme).ConfigureAwait(false);
+                // G23: the session is revoked at the Authority first; a copied cookie stops working everywhere at once.
+                if (!await BusinessAuthentication.EndSessionAsync(http, cancellationToken).ConfigureAwait(false))
+                {
+                    throw new BusinessException(BusinessAuthentication.SessionStateUnavailableCode, 503, "Sign-out could not be confirmed. Try again.");
+                }
+
                 return TypedResults.NoContent();
             })
-            .WithName("Logout");
+            .WithName("Logout")
+            .WithSummary("Revokes the session at the Authority, then deletes the cookie. 503 SESSION_STATE_UNAVAILABLE if revocation cannot be confirmed (cookie kept for a retry).");
 
         var authenticated = endpoints.MapGroup(ApiVersions.V1Prefix + "/bootstrap").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
         authenticated.MapGet("/", static async Task<Ok<BootstrapResponse>> (HttpContext http, EnsureIdentityProjectionHandler projection, BrandingHandlers branding, DashboardHandler dashboard, IAuthorizationAuthorityClient authority, CancellationToken cancellationToken) =>

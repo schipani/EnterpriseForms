@@ -45,7 +45,9 @@ public static class BusinessInfrastructureRegistration
 
         services.Configure<AuthorityClientOptions>(configuration.GetSection(AuthorityClientOptions.SectionName));
         services.AddHttpClient(AuthorityHttpClient.HttpClientName);
-        services.AddSingleton<IAuthorizationAuthorityClient, AuthorityHttpClient>();
+        services.AddSingleton<AuthorityHttpClient>();
+        services.AddSingleton<IAuthorizationAuthorityClient>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<IBrowserSessionStateAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AuthorityCommandAwaiter>();

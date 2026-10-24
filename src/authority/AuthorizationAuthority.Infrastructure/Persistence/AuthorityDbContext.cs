@@ -4,6 +4,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuthorizationAuthority.Infrastructure.Persistence;
@@ -50,6 +51,8 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<SearchCatalogueSnapshot> CatalogueSnapshots => Set<SearchCatalogueSnapshot>();
 
     public DbSet<SearchCatalogueSnapshotEntry> CatalogueSnapshotEntries => Set<SearchCatalogueSnapshotEntry>();
+
+    public DbSet<AuthenticatedSession> Sessions => Set<AuthenticatedSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

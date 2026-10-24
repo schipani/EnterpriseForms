@@ -209,5 +209,9 @@ public sealed class ArchiveProcessorTests
         public Task<SearchCatalogueSnapshot?> FindCatalogueSnapshotAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesAsync(Guid id, int offset, int? limit, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession?> FindSessionByDigestAsync(byte[] digest, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddSession(AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession session) => throw new NotSupportedException();
     }
 }

@@ -34,7 +34,30 @@ services:
       # Phase C6 AC-2 adversarial tests only: skip the business lifecycle lock on the contributor path so the Authority's own
       # lock is what is exercised. Off unless a test recreates the api container with the variable set; Testing-only (startup guard).
       Testing__BypassContributorLifecycleLock: ${API_TESTING_BYPASS_CONTRIBUTOR_LIFECYCLE_LOCK:-false}
+      # G23: both API instances decrypt the same session cookies (one key ring); session validity is decided by the Authority.
+      DataProtection__KeyRingDirectory: /keyring
+    volumes:
+      - api-keyring:/keyring
     ports: ["127.0.0.1:5180:8080"]
+  # G23: a second business API instance behind the "same front end" (same key ring), so the integration suite can prove that a
+  # session revoked through one instance is refused by the other. Request handling only (no in-process background loops).
+  api-secondary:
+    extends:
+      file: compose.yaml
+      service: api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+      DataProtection__KeyRingDirectory: /keyring
+    volumes:
+      - api-keyring:/keyring
+    ports: ["127.0.0.1:5181:8080"]
+    depends_on:
+      api:
+        condition: service_healthy
+      # Starts after the one-shot seed; as a completed dependency it also keeps `up --wait` from treating the seed's
+      # normal exit as a failure (the second instance's later health check would otherwise race the seed's exit).
+      dev-seed:
+        condition: service_completed_successfully
   worker:
     environment:
       DOTNET_ENVIRONMENT: Testing
@@ -52,3 +75,10 @@ services:
     depends_on:
       business-db:
         condition: service_healthy
+volumes:
+  # Ephemeral (tmpfs) key ring shared by the two API containers; owned by the runtime image's non-root user (APP_UID 1654).
+  api-keyring:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "uid=1654,gid=1654,mode=0700"

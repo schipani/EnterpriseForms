@@ -115,6 +115,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Revokes the session at the Authority, then deletes the cookie. 503 SESSION_STATE_UNAVAILABLE if revocation cannot be confirmed (cookie kept for a retry). */
         post: operations["Logout"];
         delete?: never;
         options?: never;

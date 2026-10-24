@@ -5,6 +5,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
+using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -177,6 +178,11 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             var query = context.CatalogueSnapshotEntries.AsNoTracking().Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId).OrderBy(e => e.CatalogueEntryPosition).Skip(offset);
             return (limit is { } take ? query.Take(take) : query).ToListAsync(cancellationToken);
         }
+
+        public Task<AuthenticatedSession?> FindSessionByDigestAsync(byte[] sessionSecretDigest, CancellationToken cancellationToken) =>
+            context.Sessions.AsTracking().FirstOrDefaultAsync(s => s.SessionSecretDigest == sessionSecretDigest, cancellationToken);
+
+        public void AddSession(AuthenticatedSession session) => context.Sessions.Add(session);
 
         public async Task CommitAsync(CancellationToken cancellationToken)
         {
