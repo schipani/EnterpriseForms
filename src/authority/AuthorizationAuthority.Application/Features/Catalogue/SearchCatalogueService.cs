@@ -77,6 +77,7 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         }
         catch (SpiceDbLookupLimitExceededException)
         {
+            await JournalRefusalAsync(state.OrganizationId, "SearchCatalogueRefused", s => new CatalogueAuditBody(null, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, bound.AuthorityUserId, null, null, 0, null, s.AuthorizationRevision, s.ContentIntegrityRevision, "DISCOVERY_CEILING", correlationId), cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, "the discoverable set exceeds the lookup ceiling; nothing partial is returned");
         }
 
@@ -87,6 +88,7 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         if (resources.Count > request.MaximumEntries)
         {
             // D3/D4: a scope that cannot be verified completely is refused before any work — no entries and no count.
+            await JournalRefusalAsync(state.OrganizationId, "SearchCatalogueRefused", s => new CatalogueAuditBody(null, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, bound.AuthorityUserId, null, null, 0, null, s.AuthorizationRevision, s.ContentIntegrityRevision, "VERIFICATION_LIMIT", correlationId), cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, "the form's eligible records exceed the verification limit");
         }
 
@@ -148,20 +150,14 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         catch (AuthorityException denied) when (denied.ErrorCode == AuthorityErrorCodes.Forbidden)
         {
             // OD-8: a refused privileged enumeration is evidence too.
-            await using var auditScope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-            var auditState = await auditScope.LockOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
-            if (auditState is not null)
-            {
-                Audit(auditScope, auditState, "MigrationCatalogueDenied", new CatalogueAuditBody(null, CatalogueScopeKinds.MigrationVerification, request.FormDefinitionId, null, workloadName, request.SecurityCommandId, 0, null, auditState.AuthorizationRevision, auditState.ContentIntegrityRevision, "COMMAND_NOT_SCOPING", correlationId), clock.GetUtcNow());
-                await auditScope.CommitAsync(cancellationToken).ConfigureAwait(false);
-            }
-
+            await JournalRefusalAsync(state.OrganizationId, "MigrationCatalogueDenied", s => new CatalogueAuditBody(null, CatalogueScopeKinds.MigrationVerification, request.FormDefinitionId, null, workloadName, request.SecurityCommandId, 0, null, s.AuthorizationRevision, s.ContentIntegrityRevision, "COMMAND_NOT_SCOPING", correlationId), cancellationToken).ConfigureAwait(false);
             throw;
         }
 
         var resources = await scope.GetFormRecordResourcesAsync(state.OrganizationId, request.FormDefinitionId, MigrationScopeStates, cancellationToken).ConfigureAwait(false);
         if (resources.Count > settings.MaximumMigrationEntries)
         {
+            await JournalRefusalAsync(state.OrganizationId, "MigrationCatalogueRefused", s => new CatalogueAuditBody(null, CatalogueScopeKinds.MigrationVerification, request.FormDefinitionId, null, workloadName, decision.CommandId, 0, null, s.AuthorizationRevision, s.ContentIntegrityRevision, "MIGRATION_CEILING", correlationId), cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, "the form's population exceeds the migration catalogue ceiling; nothing partial is returned");
         }
 
@@ -352,6 +348,24 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
             SnapshotIssuedOn = now,
             SnapshotExpiresOn = now.AddSeconds(Math.Clamp(lifetimeSeconds, 1, 900)),
         };
+    }
+
+    /// <summary>
+    /// A refusal is journaled in its own committed transaction before the refusal is returned (the request's own scope is
+    /// rolled back). If the journal entry cannot be committed the caller gets that failure instead of the refusal: a
+    /// refused sensitive enumeration is never reported without its evidence.
+    /// </summary>
+    private async Task JournalRefusalAsync(Guid organizationId, string eventKind, Func<OrganizationAuthorizationState, CatalogueAuditBody> body, CancellationToken cancellationToken)
+    {
+        await using var auditScope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var auditState = await auditScope.LockOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        if (auditState is null)
+        {
+            return;
+        }
+
+        Audit(auditScope, auditState, eventKind, body(auditState), clock.GetUtcNow());
+        await auditScope.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private void Audit(IAuthorityScope scope, OrganizationAuthorizationState locked, string eventKind, CatalogueAuditBody body, DateTimeOffset now)

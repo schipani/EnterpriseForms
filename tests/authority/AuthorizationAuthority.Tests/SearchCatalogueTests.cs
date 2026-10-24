@@ -382,6 +382,80 @@ public sealed class SearchCatalogueTests
         Assert.Equal(CatalogueInvalidationReasons.Expired, (await h.ValidateAsync(h.Owner, mine)).InvalidationReason);
     }
 
+    // ---- final AC-5 review (C-66): completeness cases named by the owner ----
+
+    [Fact]
+    public async Task ANewlyGrantedDiscoverableRecordInvalidatesTheRecipientsEarlierSnapshotAndEntersTheNextOne()
+    {
+        var h = new Harness();
+        var record = await h.RecordAsync(h.FormA);
+        var before = await h.UserCatalogueAsync(h.Other, h.FormA);
+        Assert.Empty(before.Entries);
+
+        h.Allow(ResourceTypeNames.FormRecord, record, "discover", h.Other); // the grant (a security command) …
+        h.AdvanceAuthorization();                                          // … advances the authorization revision
+        Assert.Equal(CatalogueInvalidationReasons.AuthorizationChanged, (await h.ValidateAsync(h.Other, before.SearchCatalogueSnapshotId)).InvalidationReason);
+        Assert.Equal([record], (await h.UserCatalogueAsync(h.Other, h.FormA)).Entries.Select(e => e.FormRecordId));
+    }
+
+    [Fact]
+    public async Task ARecordMovingBetweenFormsInTheRegistryInvalidatesAndMovesBetweenCatalogues()
+    {
+        // No command re-parents a record today; if a registry change ever moves one, it is a security change (authorization
+        // revision) and both forms' catalogues follow the registry, never a business column.
+        var h = new Harness();
+        var record = await h.RecordAsync(h.FormA);
+        var formA = await h.UserCatalogueAsync(h.Owner, h.FormA);
+        var formB = await h.UserCatalogueAsync(h.Owner, h.FormB);
+        Assert.Equal([record], formA.Entries.Select(e => e.FormRecordId));
+        Assert.Empty(formB.Entries);
+
+        h.Resource(record).ParentResourceEntityId = h.FormB;
+        h.AdvanceAuthorization();
+        Assert.False((await h.ValidateAsync(h.Owner, formA.SearchCatalogueSnapshotId)).Valid);
+        Assert.False((await h.ValidateAsync(h.Owner, formB.SearchCatalogueSnapshotId)).Valid);
+        Assert.Empty((await h.UserCatalogueAsync(h.Owner, h.FormA)).Entries);
+        Assert.Equal([record], (await h.UserCatalogueAsync(h.Owner, h.FormB)).Entries.Select(e => e.FormRecordId));
+    }
+
+    [Fact]
+    public async Task ResourcesOfAnotherOrganizationNeverEnterTheCatalogueEvenUnderTheSameFormId()
+    {
+        var h = new Harness();
+        var own = await h.RecordAsync(h.FormA);
+        var foreignOrganization = Guid.CreateVersion7();
+        var foreign = Guid.CreateVersion7();
+        h.Store.Resources.Add(new AuthorityResource { AuthorityResourceId = Guid.CreateVersion7(), OrganizationId = foreignOrganization, ResourceTypeName = ResourceTypeNames.FormRecord, ResourceEntityId = foreign, ParentResourceEntityId = h.FormA, ResourceLifecycleState = ResourceLifecycleStates.Active });
+        h.Allow(ResourceTypeNames.FormRecord, foreign, "discover", h.Owner); // even a (forged) discover answer for it does not admit it
+
+        var entries = (await h.UserCatalogueAsync(h.Owner, h.FormA)).Entries.Select(e => e.FormRecordId).ToList();
+        Assert.Equal([own], entries);
+        var migration = await h.Catalogue.IssueMigrationCatalogueAsync("field-protection-verifier", new MigrationCatalogueRequest(h.Org, h.FormA, h.ProtectionCommand(h.FormA)), Guid.CreateVersion7(), CancellationToken.None);
+        Assert.Equal(1, migration.TotalEntryCount);
+    }
+
+    [Fact]
+    public async Task RefusedUserAndMigrationCataloguesAreJournaledBeforeTheRefusalIsReturned()
+    {
+        var h = new Harness();
+        for (var i = 0; i < 3; i++)
+        {
+            await h.RecordAsync(h.FormA, withContent: false);
+        }
+
+        await Assert.ThrowsAsync<AuthorityException>(() => h.UserCatalogueAsync(h.Owner, h.FormA, maximum: 2));
+        var refused = Assert.Single(h.Store.Journal, j => j.JournalStreamName == JournalStreamNames.Audit);
+        Assert.Equal("SearchCatalogueRefused", refused.JournalEventKind);
+        Assert.Contains("VERIFICATION_LIMIT", refused.JournalEventBodyJson, StringComparison.Ordinal);
+        Assert.Contains(h.Owner.ToString("D"), refused.JournalEventBodyJson, StringComparison.Ordinal);
+        Assert.Empty(h.Store.Snapshots);
+
+        h.Options.MaximumMigrationEntries = 2;
+        await Assert.ThrowsAsync<AuthorityException>(() => h.Catalogue.IssueMigrationCatalogueAsync("field-protection-verifier", new MigrationCatalogueRequest(h.Org, h.FormA, h.ProtectionCommand(h.FormA)), Guid.CreateVersion7(), CancellationToken.None));
+        Assert.Contains(h.Store.Journal, j => j.JournalStreamName == JournalStreamNames.Audit && j.JournalEventKind == "MigrationCatalogueRefused" && j.JournalEventBodyJson.Contains("MIGRATION_CEILING", StringComparison.Ordinal));
+        Assert.Equal(2, h.State.AuditJournalRevision);
+    }
+
     // ---- privileged migration catalogue ----
 
     [Fact]

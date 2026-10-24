@@ -176,10 +176,16 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         Assert.True((await s.WaitProjectionAsync(s.Clerk, added)).IsSuccess);
         Assert.Equal("AUTHORIZATION_REVISION_CHANGED", (await ValidateAsync(s, s.Clerk, snapshot3)).Root.GetProperty("invalidation_reason").GetString());
 
-        // A revocation invalidates the recipient's snapshot; the record leaves the next catalogue.
+        // A grant invalidates the recipient's earlier snapshot (taken while the record was not discoverable to them) …
+        var readerBefore = await CatalogueAsync(s, s.Reader);
+        Assert.Empty(Ids(readerBefore, "entries"));
+        var readerBeforeSnapshot = readerBefore.Root.GetProperty("search_catalogue_snapshot_id").GetGuid();
+
+        // … and a revocation invalidates the recipient's snapshot; the record leaves the next catalogue.
         var share = await fixture.Api.PostAsync($"/api/v1/form-records/{records[0]:D}/shares", s.Token(s.Clerk), new { recipientUserId = s.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "given_name" } });
         Assert.True(share.IsSuccess, share.Body);
         await s.WaitGateReadyAsync();
+        Assert.Equal("AUTHORIZATION_REVISION_CHANGED", (await ValidateAsync(s, s.Reader, readerBeforeSnapshot)).Root.GetProperty("invalidation_reason").GetString());
         var readerCatalogue = await CatalogueAsync(s, s.Reader);
         Assert.Equal([records[0]], Ids(readerCatalogue, "entries"));
         var readerSnapshot = readerCatalogue.Root.GetProperty("search_catalogue_snapshot_id").GetGuid();
@@ -261,6 +267,167 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         var stale = await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/integrity/verify-record-projections", TestIdentity.WorkloadToken(), new { organizationId = s.OrganizationId, records = new[] { new { formRecordId = records[0], expectedCommittedOperationId = Guid.CreateVersion7(), observedItems = Array.Empty<object>() } } }, s.Token(s.Clerk));
         Assert.Equal("HEAD_CHANGED", stale.Root.GetProperty("results")[0].GetProperty("failure_reason_code").GetString());
         Assert.True((await VerifyAsync(s, s.Clerk)).IsSuccess); // still intact
+    }
+
+    [Fact]
+    public async Task CrossOrganizationBusinessTamperingCannotMoveARecordIntoAnotherCatalogue()
+    {
+        var (s, records) = await WorkspaceAsync("c7-cross-org-a", 2);
+        var (other, otherRecords) = await WorkspaceAsync("c7-cross-org-b", 1);
+
+        // The hostile business DBA re-homes a record of organization A into organization B's tenant and form.
+        fixture.Stack.AttackerSql($"UPDATE form_records SET tenant_id = '{other.OrganizationId:D}', form_definition_id = '{other.AccusedFormId:D}' WHERE form_record_id = '{records[0]:D}';");
+
+        var otherScope = await VerifyAsync(other, other.Clerk);
+        Assert.True(otherScope.IsSuccess, otherScope.Body);
+        Assert.Equal(otherRecords, Ids(otherScope, "verifiedRecordIds"));
+        var ownScope = await VerifyAsync(s, s.Clerk);
+        Assert.True(ownScope.IsSuccess, ownScope.Body);
+        Assert.Equal(records.Order(), Ids(ownScope, "verifiedRecordIds").Order());
+
+        // A user of organization B naming A's record or A's form gets nothing from the Authority.
+        var foreignCatalogue = await CatalogueAsync(other, other.Clerk, form: s.AccusedFormId);
+        Assert.True(!foreignCatalogue.IsSuccess || Ids(foreignCatalogue, "entries").Count == 0, foreignCatalogue.Body);
+    }
+
+    [Fact]
+    public async Task EveryIssuedOrRefusedCatalogueHasDurableAuditEvidenceThatReachesTheArchive()
+    {
+        var (s, _) = await WorkspaceAsync("c7-audit", 2);
+        var issued = await CatalogueAsync(s, s.Clerk);
+        Assert.True(issued.IsSuccess, issued.Body);
+        var snapshot = issued.Root.GetProperty("search_catalogue_snapshot_id").GetGuid();
+        var refused = await CatalogueAsync(s, s.Clerk, maximum: 1);
+        Assert.Equal("LIMIT_EXCEEDED", refused.ErrorCode);
+        Assert.True((await VerifyAsync(s, s.Clerk)).IsSuccess);
+
+        // No snapshot of this organization exists without its issuance event (same AuthorityDb transaction), and the
+        // refusal was journaled before it was returned.
+        var orphans = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM search_catalogue_snapshots c WHERE c.organization_id = '{s.OrganizationId:D}' AND NOT EXISTS (SELECT 1 FROM security_journal_entries j WHERE j.organization_id = c.organization_id AND j.journal_stream_name = 'audit' AND j.journal_event_body_json LIKE '%' || c.search_catalogue_snapshot_id::text || '%');").Trim();
+        Assert.Equal("0", orphans);
+        Assert.Equal("1", fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{s.OrganizationId:D}' AND journal_stream_name = 'audit' AND journal_event_body_json LIKE '%{snapshot:D}%';").Trim());
+        Assert.Equal("1", fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{s.OrganizationId:D}' AND journal_stream_name = 'audit' AND journal_event_kind = 'SearchCatalogueRefused';").Trim());
+
+        // The audit stream is delivered to the independent archive by the existing processor (durable, retried, hash-chained).
+        var deadline = DateTime.UtcNow + TimeSpan.FromMinutes(2);
+        string pending;
+        while ((pending = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{s.OrganizationId:D}' AND journal_stream_name = 'audit' AND archive_delivery_state <> 'Anchored';").Trim()) != "0" && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal("0", pending);
+    }
+
+    /// <summary>
+    /// C-66 (owner's final AC-5 review): a ~200-record operational scope with realistic values, measured sequentially and
+    /// under 4 and 8 concurrent verifications while other records are being edited. p50/p95/p99 per load level, written to
+    /// artifacts/stage-b/c7-m1-benchmark-200.json. It fails only if a verification fails, never on a latency number.
+    /// </summary>
+    [Fact]
+    public async Task BenchmarkA200RecordScopeSequentiallyAndUnderConcurrency()
+    {
+        var s = new StageBScenario(fixture, "c7-bench-200");
+        await s.BootstrapAsync();
+        await s.BuildAccusedWorkspaceAsync();
+        var created = new List<Guid>();
+        for (var index = 0; index < 200; index++)
+        {
+            await s.WaitGateReadyAsync();
+            var values = StageBScenario.AccusedValues("Given" + index.ToString(CultureInfo.InvariantCulture), new string('F', 8 + (index % 40)));
+            values["case_status"] = index % 3 == 0 ? "closed" : "open";
+            created.Add(await CreateWithRetryAsync(s, $"c7-bench200-{s.OrganizationId:N}-{index}", TestContext.Current.CancellationToken, values));
+        }
+
+        foreach (var id in created)
+        {
+            Assert.True((await s.WaitProjectionAsync(s.Clerk, id)).IsSuccess);
+        }
+
+        // Background workload on another form: address records of a few parents, edited while the scopes are verified.
+        var addresses = new List<Guid>();
+        for (var i = 0; i < 4; i++)
+        {
+            addresses.Add(await s.CreateAddressAsync(s.Clerk, created[i], $"{i} Bench St"));
+        }
+
+        await s.WaitGateReadyAsync();
+        var levels = new List<object>();
+        foreach (var (concurrency, rounds) in new[] { (1, 20), (4, 6), (8, 4) })
+        {
+            using var stop = new CancellationTokenSource();
+            var background = Task.Run(async () =>
+            {
+                var revision = new Dictionary<Guid, long>();
+                var n = 0;
+                while (!stop.IsCancellationRequested)
+                {
+                    var address = addresses[n++ % addresses.Count];
+                    try
+                    {
+                        var current = (await s.WaitProjectionAsync(s.Clerk, address)).Root.GetProperty("record").GetProperty("contentRevision").GetInt64();
+                        await fixture.Api.PatchAsync($"/api/v1/form-records/{address:D}", s.Token(s.Clerk), new { expectedContentRevision = current, values = new Dictionary<string, string> { ["street_address"] = $"{n} Bench St" } });
+                    }
+                    catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or HttpRequestException)
+                    {
+                        // background load only: a transient failure of an edit is not part of the measurement
+                    }
+
+                    await Task.Delay(250, TestContext.Current.CancellationToken);
+                }
+            }, TestContext.Current.CancellationToken);
+
+            var server = new List<double>();
+            var client = new List<double>();
+            var failures = 0;
+            for (var round = 0; round <= rounds; round++)
+            {
+                var results = await Task.WhenAll(Enumerable.Range(0, concurrency).Select(async _ =>
+                {
+                    var watch = Stopwatch.StartNew();
+                    var result = await VerifyAsync(s, s.Clerk);
+                    watch.Stop();
+                    return (result, watch.Elapsed.TotalMilliseconds);
+                }));
+                foreach (var (result, elapsed) in results)
+                {
+                    if (!result.IsSuccess)
+                    {
+                        // A typed, retryable refusal (snapshot moved by the background edits' archive settling) is counted, never hidden.
+                        Assert.True(result.ErrorCode is "SEARCH_SNAPSHOT_CHANGED" or "SEARCH_VERIFICATION_UNAVAILABLE", result.Body);
+                        failures++;
+                        continue;
+                    }
+
+                    Assert.Equal(200, result.Root.GetProperty("verifiedRecordCount").GetInt32());
+                    if (round > 0)
+                    {
+                        server.Add(result.Root.GetProperty("elapsedMilliseconds").GetDouble());
+                        client.Add(elapsed);
+                    }
+                }
+            }
+
+            await stop.CancelAsync();
+            await background;
+            Assert.NotEmpty(server);
+            levels.Add(new { concurrency, rounds, verifications = server.Count, typedRetryableRefusals = failures, serverMilliseconds = Percentiles(server), clientMilliseconds = Percentiles(client) });
+        }
+
+        var json = JsonSerializer.Serialize(new { measuredOn = DateTimeOffset.UtcNow, records = 200, valueProfile = "Accused form: 8 fields incl. encrypted names (name lengths 8..47), plaintext date/boolean/option/datetime/guid", backgroundWorkload = "address edits on another form every 250 ms", note = "engineering measurement; small samples; p99 of small n is near the maximum; not a capacity claim", levels }, Indented);
+        TestContext.Current.TestOutputHelper?.WriteLine(json);
+        Console.WriteLine("C7-AC5-BENCHMARK-200 " + JsonSerializer.Serialize(levels));
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "EnterpriseForms.All.slnx")))
+        {
+            root = root.Parent;
+        }
+
+        if (root is not null)
+        {
+            Directory.CreateDirectory(Path.Combine(root.FullName, "artifacts", "stage-b"));
+            await File.WriteAllTextAsync(Path.Combine(root.FullName, "artifacts", "stage-b", "c7-m1-benchmark-200.json"), json, TestContext.Current.CancellationToken);
+        }
     }
 
     /// <summary>
@@ -366,12 +533,12 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
     }
 
     /// <summary>Record registration is optimistic on the organization's authorization revision; concurrent creations retry that conflict with the SAME idempotency key, so a create that committed but answered "not ready" is never registered twice.</summary>
-    private async Task<Guid> CreateWithRetryAsync(StageBScenario s, string idempotencyKey, CancellationToken cancellationToken)
+    private async Task<Guid> CreateWithRetryAsync(StageBScenario s, string idempotencyKey, CancellationToken cancellationToken, Dictionary<string, string>? values = null)
     {
         var key = idempotencyKey;
         for (var attempt = 0; ; attempt++)
         {
-            var created = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/records", s.Token(s.Clerk), new { values = StageBScenario.AccusedValues(), ownerTeamId = (Guid?)null }, key);
+            var created = await fixture.Api.PostAsync($"/api/v1/form-definitions/{s.AccusedFormId:D}/records", s.Token(s.Clerk), new { values = values ?? StageBScenario.AccusedValues(), ownerTeamId = (Guid?)null }, key);
             if (created.Status is HttpStatusCode.Created or HttpStatusCode.OK)
             {
                 return created.Root.GetProperty("formRecordId").GetGuid();
