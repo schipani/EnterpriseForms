@@ -204,7 +204,7 @@ Invalid → `SEARCH_SNAPSHOT_CHANGED` (409). The client restarts from page 1. Re
 | AC5-T14 | SpiceDB lookup > 1,000 pages; projection lag; gate closed | Complete or `NOT_READY`; never partial |
 | AC5-T15 | Quarantined head in scope | Whole search fails |
 
-## 4. AC-6 — Authority-held field search policy (refined design for review; not implemented)
+## 4. AC-6 — Authority-held field search policy (design; implemented in M2 — see §6B for what was built and where it differs)
 
 ### 4.1 Principals
 
@@ -462,17 +462,61 @@ Before the checkpoint-lookup fix: 50 → 0.84 s, 150 → 4.46 s, 480 → over th
 * **G21 stays OPEN.**
 * No independent review of the Authority changes, no Azure staging evidence, no production limits.
 
+## 6B. M2 — AC-6 implemented (C-67)
+
+### 6B.1 Authority (independently administered)
+
+| Element | Implementation |
+|---|---|
+| Published versions (OD-3) | `RegisterPublishedFormVersion` security command, submitted by the business publish path after its commit (key `form-version:{versionId}`). The Authority records `published_form_versions`: form, version number (strictly increasing), SHA-256 of the canonical layout (`layout-digest/v1`), and a field manifest (id, type, classification, protection, label, Option snapshot) — the Authority's own record of what was published. Only a designer of the form or an organization administrator may register. An entry claiming plaintext for a field the Authority holds an encryption requirement for is refused `FORM_VERSION_UNTRUSTED`. Versions published before M2 are never registered after the fact (OD-3): the designer publishes again. |
+| Approvals | `ApproveFieldSearch` (`administer_security` only — `organization#administer_security = system_administrator`, OD-2 A). Binds `field_search_approvals` to the **latest registered version**: version number, layout digest, type, classification, protection, label and option snapshot are copied from the Authority's manifest, never from the request. Requires: the organization policy published with `plaintext_search_permitted`; the field `Eligible` (plaintext, Public or Internal at or above the floor and allowed by `plaintext_internal_fields_permitted`, no Authority-held encryption requirement or pending change, searchable type); operators a non-empty, distinct subset of the type's vocabulary; a governance reference (1..200); and the step-up gate. At most one `Active` approval per field (filtered unique index). |
+| Step-up gate (OD-7) | `FieldSearch:ApprovalStepUp`: `Unavailable` (default; every approval refused `STEP_UP_REQUIRED`, capability reason `PB08_STEP_UP_NOT_AVAILABLE`) or `SyntheticDevelopment`. The synthetic mode is accepted only when the environment is `Development` or `Testing` **and** delegated users come from the synthetic `TestIdentityProvider`; any other combination **refuses startup**. The request must carry the fixed marker `synthetic-development-step-up`; it proves nothing about the person. It is set only in `compose.security-test.yaml` and `compose.dev-persistent.yaml`. **PB-08 is not resolved.** |
+| Withdrawal and query grants | `WithdrawFieldSearch` (reason required) and `UpdateFieldSearchers` (the `field_searcher` relation on the form; users or `team#participant`; 1..100 changes) — `administer_security` only. SpiceDB `permission query_fields = field_searcher` (OD-4 A); no other relation implies it. |
+| Invalidation | In the command that causes it: `PublishFormSecurityRevision` to ApplicationEncrypted (`FIELD_STRENGTHENED`); a newly registered version that changes the field's type, classification, protection, label or options, or removes it (`FORM_VERSION_CHANGED`; unchanged fields keep their approval); `UpdateMandatoryPolicy` turning search off or raising the floors (`ORGANIZATION_POLICY_CHANGED`). Each advances `search_policy_revision`. |
+| Capabilities | `POST /internal/v1/field-search/capabilities`: one batch permission check (`query_fields`, `design`, `administer_security`) at one authorization revision. `fields` only with query permission and the policy switch on, with labels and options from the approval snapshots. `configuration` (per-field status, eligibility, permitted and approved operators, approval state and reason, registered version, `canApprove`, `approvalOperational`) only for designers of the form and security administrators; the current `field_searcher` subjects only for security administrators. Fails closed (`AUTHORITY_NOT_READY`) if the revision moved during the read. |
+| Audit (OD-8) | Accepted approvals, withdrawals, grants and registrations are committed security commands in the hash-chained authorization stream. Rejected AC-6 commands (actor not permitted, not eligible, untrusted version, step-up missing) append `FieldSearchCommandRejected` to the archived audit stream in their own transaction (reason code; detail only for eligibility; never values). |
+| Migration | `*_FieldSearchApprovals` — additive: `published_form_versions`, `field_search_approvals`, two policy columns (`plaintext_search_permitted`, `search_policy_revision`). |
+
+### 6B.2 Business
+
+* **Publish:** after the version commits, the handler registers it with the Authority (retrying a stale revision with the same key) and records `FORM_VERSION_AUTHORITY_REGISTERED` or `FORM_VERSION_AUTHORITY_REGISTRATION_FAILED`. The response carries `authorityRegistered`. A failed registration leaves the version published but not approvable.
+* **Search policy** (`FieldSearchPolicyHandlers`, owner `Search`): `GET /api/v1/form-definitions/{id}/field-search` (404 for anyone without configuration access, like an unknown form), `POST …/fields/{fieldId}/search-approval`, `POST …/search-approval/withdraw`, `PUT …/field-searchers`. Each relays a security command; the business pre-check (`administer_security`) only spares a pointless command — the Authority decides. Business audit actions `FIELD_SEARCH_APPROVED`, `FIELD_SEARCH_WITHDRAWN`, `FIELD_SEARCHERS_CHANGED`.
+* **Capabilities and the execution gate:** `search-capabilities` returns the Authority's fields; `field-search` authorizes every condition (field, value type, operator, and Option id against the frozen snapshot → `SEARCH_FIELD_NOT_ALLOWED` / `SEARCH_OPERATOR_NOT_SUPPORTED`) and then still refuses with `TRUSTED_SEARCH_NOT_ENABLED`. Nothing reads BusinessDb records.
+* **Organization policy:** `plaintextSearchPermitted` on the security policy, published to the Authority with the rest of the policy.
+
+### 6B.3 Frontend
+
+* **Configure Field → Search** (new tab, field elements only): classification, protection ("Encrypted for privacy — not searchable." for encrypted fields), eligibility with its reason, permitted conditions, approval state (approved conditions and version, or why the approval is no longer valid). Viewing is separate from granting: approval and withdrawal controls appear only to security administrators; where the Authority cannot accept approvals the section says so and the controls are inert. No control changes encryption. The development step-up is an explicit, labelled checkbox.
+* **Form permissions → Who can search field values:** shown only to security administrators (from the Authority's list); grant and remove people and teams.
+* **Organization settings:** "Permit search approvals for plaintext Public/Internal fields".
+* **Advanced Search:** the Field and Condition controls are populated from the capability response, so approved fields can be chosen and conditions composed. **Search records stays disabled** and the panel says nothing is searched until trusted search is turned on. Layout unchanged (reference/ID search on top; Form | Status; Field | Condition with Value beneath; Add condition and Search records; one results table). The gallery preview is unchanged.
+* A security administrator reaches Configure Field through the read-only designer only if they can open the form (designer or form user). A dedicated security-administration list of forms is not part of M2.
+
+### 6B.4 Differences from the reviewed design (§4)
+
+* Query grants are restricted to `administer_security` (the design also allowed organization owners and explicitly granted designers) — stricter, per OD-2 A.
+* Released (downgraded) fields stay `ProtectionPending` for approval purposes until the G19/M4 reconciliation can verify the migration's completeness.
+* There is no "request approval" workflow: designers see the status and the reasons; approving is a security administrator's action.
+* AC6-T09 (revocation mid-search) and AC6-T11 (forged value rows) concern execution and remain M3 tests; M2 proves the capability and predicate-authorization layers they depend on.
+
+### 6B.5 What M2 does not establish
+
+* No field-value search runs (M3). **G06 OPEN.**
+* **G19 OPEN** (M4). **G21 OPEN:** approvals no longer depend on unsigned business metadata, but record editing still renders unsigned labels, and only versions published since M2 are registered.
+* **PB-08 not resolved:** production and staging approvals stay disabled; the synthetic path is development/test only.
+* No independent review of the Authority changes and no Azure staging evidence.
+
 ## 7. Proposed milestones
 
 | Milestone | Content | Status |
 |---|---|---|
 | M0 | UI, contracts, validation, typed errors, server gate, tests | **Implemented (C-57); awaiting owner functional acceptance** |
 | M1 | AC-5 Authority catalogue (user scope + migration scope), snapshot validation, batch verification (OD-6), AC5-T01..T15 | **Implemented (C-62, §6A); awaiting owner review** |
-| M2 | AC-6 policy + approvals + `field_searcher` grants + Designer "Search" section + organization policy UI, AC6-T01..T12 | Not authorized; design for review (§4) |
+| M2 | AC-6 policy + approvals + `field_searcher` grants + Designer "Search" section + organization policy UI, AC6-T01..T12 | **Implemented (C-67, §6B); awaiting owner review** |
 | M3 | Trusted executor, paging cache, audit, ENC-SR-01..18, browser acceptance with real results, performance measurement | Not authorized |
 | M4 | Worker G19 reconciliation against the migration catalogue | Not authorized |
 
-**Proposed next:** owner review of M1, then **M2 (AC-6 search policy, OD-2/OD-3/OD-4/OD-7)**. M2 production approvals depend on PB-08 step-up; M4 (G19 reconciliation) can follow M1 independently.
+**Proposed next:** owner review of M1 and M2. M3 (execution) is not authorized; production approvals depend on PB-08 step-up; M4 (G19 reconciliation) can follow independently.
 
 ## 8. Open risks
 

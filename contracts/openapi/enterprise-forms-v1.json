@@ -2968,7 +2968,7 @@
         "tags": [
           "Search"
         ],
-        "summary": "Server-authoritative Advanced Search capabilities for one form and the caller: the fields that may be used as predicates, their value types and allowed operators, and fields the caller may know about that cannot be searched (Encrypted for privacy — not searchable). A field the caller may not know about is in neither list. Phase C7 M0: fieldValueSearchAvailable is false (TRUSTED_SEARCH_NOT_ENABLED) and no fields are offered, for every form.",
+        "summary": "Server-authoritative Advanced Search capabilities for one form and the caller: the fields that may be used as predicates, their value types and allowed operators, and fields the caller may know about that cannot be searched (Encrypted for privacy — not searchable). A field the caller may not know about is in neither list. Phase C7 M2: fields come from the Authority (AC-6 approvals and the caller's field_searcher permission, with the approval's frozen labels and options); fieldValueSearchAvailable stays false (TRUSTED_SEARCH_NOT_ENABLED) because execution (M3) is not enabled.",
         "operationId": "GetFieldSearchCapabilities",
         "parameters": [
           {
@@ -3010,7 +3010,7 @@
         "tags": [
           "Search"
         ],
-        "summary": "Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Phase C7 M0: every well-formed request is refused with 503 SEARCH_VERIFICATION_UNAVAILABLE (unavailable_reason TRUSTED_SEARCH_NOT_ENABLED, retryable false); malformed requests get 422 SEARCH_REQUEST_INVALID or SEARCH_OPERATOR_NOT_SUPPORTED.",
+        "summary": "Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Phase C7 M2: each condition is authorized against the Authority's capabilities first (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED), then every request is refused with 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED, retryable false) because execution (M3) is not enabled.",
         "operationId": "SearchFormRecordsByFieldValues",
         "requestBody": {
           "content": {
@@ -3126,6 +3126,195 @@
           }
         }
       }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/field-search": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Search configuration of the form's latest Authority-registered published version: per field its classification, protection, eligibility, approval state and operators. Designers of the form and security administrators only (others: 404). Encrypted fields are reported as Encrypted (Encrypted for privacy — not searchable).",
+        "operationId": "GetFieldSearchConfiguration",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchConfigurationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/search-approval": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Asks the Authority to approve plaintext value search of a field for the given operators (security administrators only; governance reference required). The Authority refuses encrypted, Confidential/Restricted and below-floor fields, unregistered versions and unsupported operators, and refuses every approval while step-up assurance (PB-08) is unavailable — in production and staging always.",
+        "operationId": "ApproveFieldSearch",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveFieldSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchConfigurationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/search-approval/withdraw": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Withdraws a field's search approval (security administrators only, reason required).",
+        "operationId": "WithdrawFieldSearch",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawFieldSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchConfigurationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/form-definitions/{formDefinitionId}/field-searchers": {
+      "put": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Grants or revokes the form's field_searcher relation (query permission for its approved fields) for users or teams. Security administrators only. Form access, record ownership and design access never imply it.",
+        "operationId": "UpdateFieldSearchers",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFieldSearchersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3192,6 +3381,34 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "ApproveFieldSearchRequest": {
+        "required": [
+          "operators",
+          "approvalReference"
+        ],
+        "type": "object",
+        "properties": {
+          "operators": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "approvalReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -4765,6 +4982,69 @@
           }
         }
       },
+      "FieldSearchConfigurationResponse": {
+        "required": [
+          "formDefinitionId",
+          "plaintextSearchPermitted",
+          "searchPolicyRevision",
+          "canApprove",
+          "approvalOperational",
+          "approvalUnavailableReason",
+          "registeredFormVersionNumber",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plaintextSearchPermitted": {
+            "type": "boolean"
+          },
+          "searchPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "canApprove": {
+            "type": "boolean"
+          },
+          "approvalOperational": {
+            "type": "boolean"
+          },
+          "approvalUnavailableReason": {
+            "type": "string"
+          },
+          "registeredFormVersionNumber": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchStatusResponse"
+            }
+          },
+          "fieldSearchers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubjectResponse"
+            }
+          }
+        }
+      },
       "FieldSearchNotSearchableField": {
         "required": [
           "fieldDefinitionId",
@@ -4943,6 +5223,63 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "FieldSearchStatusResponse": {
+        "required": [
+          "fieldDefinitionId",
+          "fieldLabel",
+          "fieldDataType",
+          "fieldClassification",
+          "protectionMode",
+          "eligibility",
+          "approvalState",
+          "invalidationReason",
+          "approvedOperators",
+          "permittedOperators"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldDefinitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fieldLabel": {
+            "type": "string"
+          },
+          "fieldDataType": {
+            "type": "string"
+          },
+          "fieldClassification": {
+            "type": "string"
+          },
+          "protectionMode": {
+            "type": "string"
+          },
+          "eligibility": {
+            "type": "string"
+          },
+          "approvalState": {
+            "type": "string"
+          },
+          "invalidationReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approvedOperators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "permittedOperators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -5393,6 +5730,10 @@
           "publishedByUserId": {
             "type": "string",
             "format": "uuid"
+          },
+          "authorityRegistered": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -5594,6 +5935,10 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "plaintextSearchPermitted": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -7333,6 +7678,57 @@
           }
         }
       },
+      "UpdateFieldSearchersRequest": {
+        "required": [
+          "grantUserIds",
+          "grantTeamIds",
+          "revokeUserIds",
+          "revokeTeamIds"
+        ],
+        "type": "object",
+        "properties": {
+          "grantUserIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "grantTeamIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "revokeUserIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "revokeTeamIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "UpdateFormAccessRequest": {
         "required": [
           "grantUserIds",
@@ -7472,6 +7868,10 @@
             "format": "int64"
           },
           "plaintextDowngradePermitted": {
+            "type": "boolean",
+            "default": false
+          },
+          "plaintextSearchPermitted": {
             "type": "boolean",
             "default": false
           }
@@ -7656,6 +8056,20 @@
             "format": "int32"
           },
           "scanVerdict": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "WithdrawFieldSearchRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
             "type": [
               "null",
               "string"

@@ -17,6 +17,10 @@ public sealed class SearchException(string errorCode, int httpStatusCode, string
 
     public static SearchException RequestInvalid(string detail) => new(SearchErrorCodes.RequestInvalid, 422, detail, retryable: false);
 
+    /// <summary>AC-6 (D5): any field the caller may not query — unknown, hidden, encrypted, unapproved or of another form — gets this one response.</summary>
+    public static SearchException FieldNotAllowed(int conditionNumber) =>
+        new(SearchErrorCodes.FieldNotAllowed, 422, $"condition {conditionNumber}: the field cannot be searched", retryable: false);
+
     public static SearchException OperatorNotSupported(int conditionNumber) =>
         new(SearchErrorCodes.OperatorNotSupported, 422, $"condition {conditionNumber}: the operator is not supported for this value type", retryable: false);
 

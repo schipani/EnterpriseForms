@@ -1,6 +1,7 @@
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
@@ -33,6 +34,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<SearchCatalogueSnapshotEntry> SnapshotEntries { get; } = [];
 
     public List<AuthenticatedSession> Sessions { get; } = [];
+    public List<PublishedFormVersion> PublishedVersions { get; } = [];
+    public List<FieldSearchApproval> Approvals { get; } = [];
+    public List<OrganizationProtectionPolicy> Policies { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -65,9 +69,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
             Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToList());
 
-        public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult<OrganizationProtectionPolicy?>(null);
+        public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Policies.FirstOrDefault(p => p.OrganizationId == organizationId));
 
-        public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => throw new NotSupportedException();
+        public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => s.Policies.Add(policy);
 
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid organizationId, CancellationToken cancellationToken) =>
             Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null).ToList());
@@ -168,6 +172,16 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             Task.FromResult(s.Sessions.FirstOrDefault(x => x.SessionSecretDigest.AsSpan().SequenceEqual(sessionSecretDigest)));
 
         public void AddSession(AuthenticatedSession session) => s.Sessions.Add(session);
+
+        public Task<PublishedFormVersion?> FindLatestPublishedFormVersionAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PublishedVersions.Where(v => v.OrganizationId == organizationId && v.FormDefinitionId == formDefinitionId).OrderByDescending(v => v.FormVersionNumber).FirstOrDefault());
+
+        public void AddPublishedFormVersion(PublishedFormVersion version) => s.PublishedVersions.Add(version);
+
+        public Task<List<FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid organizationId, Guid? formDefinitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Approvals.Where(a => a.OrganizationId == organizationId && (formDefinitionId == null || a.FormDefinitionId == formDefinitionId)).ToList());
+
+        public void AddFieldSearchApproval(FieldSearchApproval approval) => s.Approvals.Add(approval);
 
         public Task CommitAsync(CancellationToken cancellationToken)
         {

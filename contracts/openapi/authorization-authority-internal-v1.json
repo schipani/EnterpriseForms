@@ -895,6 +895,37 @@
           }
         }
       }
+    },
+    "/internal/v1/field-search/capabilities": {
+      "post": {
+        "tags": [
+          "FieldSearch"
+        ],
+        "summary": "Searchable fields of a form for the delegated user (query_fields + active AC-6 approvals; labels and options from the approval snapshot) and, for designers and security administrators only, the search configuration of the latest registered published version. Identical empty answer for no access and unknown forms.",
+        "operationId": "GetFieldSearchCapabilities",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSearchCapabilitiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchCapabilitiesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1569,6 +1600,198 @@
           }
         }
       },
+      "FieldSearchCapabilitiesRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FieldSearchCapabilitiesResponse": {
+        "required": [
+          "form_definition_id",
+          "plaintext_search_permitted",
+          "search_policy_revision",
+          "authorization_revision",
+          "fields",
+          "configuration",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plaintext_search_permitted": {
+            "type": "boolean"
+          },
+          "search_policy_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchableFieldCapability"
+            }
+          },
+          "configuration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FieldSearchConfiguration"
+              }
+            ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FieldSearchConfiguration": {
+        "required": [
+          "can_approve",
+          "approval_operational",
+          "approval_unavailable_reason",
+          "registered_form_version_number",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "can_approve": {
+            "type": "boolean"
+          },
+          "approval_operational": {
+            "type": "boolean"
+          },
+          "approval_unavailable_reason": {
+            "type": "string"
+          },
+          "registered_form_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchStatus"
+            }
+          },
+          "field_searchers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubject"
+            }
+          }
+        }
+      },
+      "FieldSearchOption": {
+        "required": [
+          "field_option_id",
+          "option_label"
+        ],
+        "type": "object",
+        "properties": {
+          "field_option_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "option_label": {
+            "type": "string"
+          }
+        }
+      },
+      "FieldSearchStatus": {
+        "required": [
+          "field_definition_id",
+          "field_label",
+          "field_data_type",
+          "field_classification",
+          "protection_mode",
+          "eligibility",
+          "approval_state",
+          "invalidation_reason",
+          "approved_operators",
+          "permitted_operators"
+        ],
+        "type": "object",
+        "properties": {
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_label": {
+            "type": "string"
+          },
+          "field_data_type": {
+            "type": "string"
+          },
+          "field_classification": {
+            "type": "string"
+          },
+          "protection_mode": {
+            "type": "string"
+          },
+          "eligibility": {
+            "type": "string"
+          },
+          "approval_state": {
+            "type": "string"
+          },
+          "invalidation_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approved_operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "permitted_operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "FormAccessState": {
         "required": [
           "form_definition_id",
@@ -2098,7 +2321,8 @@
           "DesignForm",
           "CreateRecord",
           "ManageOrganization",
-          "AdministerSecurity"
+          "AdministerSecurity",
+          "QueryFields"
         ]
       },
       "ResourceKind": {
@@ -2124,6 +2348,49 @@
           "resource_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "SearchableFieldCapability": {
+        "required": [
+          "field_definition_id",
+          "field_label",
+          "field_data_type",
+          "operators",
+          "options",
+          "approved_form_version_number"
+        ],
+        "type": "object",
+        "properties": {
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_label": {
+            "type": "string"
+          },
+          "field_data_type": {
+            "type": "string"
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchOption"
+            }
+          },
+          "approved_form_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -2236,7 +2503,11 @@
           "PublishFormSecurityRevision",
           "UnlinkChildRecord",
           "UpdateFormUsers",
-          "ReclassifyField"
+          "ReclassifyField",
+          "RegisterPublishedFormVersion",
+          "ApproveFieldSearch",
+          "WithdrawFieldSearch",
+          "UpdateFieldSearchers"
         ]
       },
       "SecurityCommandRequest": {
@@ -2587,6 +2858,9 @@
     },
     {
       "name": "Sessions"
+    },
+    {
+      "name": "FieldSearch"
     }
   ]
 }

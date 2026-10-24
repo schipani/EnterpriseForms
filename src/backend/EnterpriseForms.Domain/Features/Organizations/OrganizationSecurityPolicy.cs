@@ -21,6 +21,9 @@ public sealed class OrganizationSecurityPolicy
     /// <summary>Explicit permission for encrypted → plaintext migrations of Public/Internal fields (Amendment A1); never implied. Default false.</summary>
     public bool PlaintextDowngradePermitted { get; set; }
 
+    /// <summary>Phase C7 M2: plaintext value search may be approved (mirrors the Authority-held flag; the Authority decides).</summary>
+    public bool PlaintextSearchPermitted { get; set; }
+
     /// <summary>The authority's effective UpdateMandatoryPolicy command that holds this policy (null for the unreviewed development default).</summary>
     public Guid? AuthorityCommandId { get; set; }
 

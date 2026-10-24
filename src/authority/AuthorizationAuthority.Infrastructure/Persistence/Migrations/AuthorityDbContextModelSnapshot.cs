@@ -596,6 +596,184 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval", b =>
+                {
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<string>("ApprovalReferenceText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("approval_reference_text");
+
+                    b.Property<string>("ApprovalStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("approval_state_name");
+
+                    b.Property<Guid>("ApprovedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by_security_command_id");
+
+                    b.Property<string>("ApprovedFieldClassification")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("approved_field_classification");
+
+                    b.Property<string>("ApprovedFieldDataType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("approved_field_data_type");
+
+                    b.Property<string>("ApprovedFieldLabelSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("approved_field_label_snapshot");
+
+                    b.Property<int>("ApprovedFormVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("approved_form_version_number");
+
+                    b.Property<byte[]>("ApprovedLayoutDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("approved_layout_digest");
+
+                    b.Property<DateTimeOffset>("ApprovedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_on");
+
+                    b.Property<string>("ApprovedOperatorsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("approved_operators_json");
+
+                    b.Property<string>("ApprovedOptionSnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("approved_option_snapshot_json");
+
+                    b.Property<string>("ApprovedProtectionMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("approved_protection_mode");
+
+                    b.Property<Guid?>("ChangedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_security_command_id");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<string>("InvalidationReasonCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("invalidation_reason_code");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset?>("StateChangedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("state_changed_on");
+
+                    b.HasKey("FieldSearchApprovalId");
+
+                    b.HasIndex("ApprovedBySecurityCommandId");
+
+                    b.HasIndex("OrganizationId", "FieldDefinitionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_field_search_approval_active")
+                        .HasFilter("approval_state_name = 'Active'");
+
+                    b.HasIndex("OrganizationId", "FormDefinitionId", "FieldDefinitionId")
+                        .HasDatabaseName("ix_field_search_approvals_field");
+
+                    b.ToTable("field_search_approvals", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_field_search_approval_classification", "approved_field_classification IN ('Public','Internal')");
+
+                            t.HasCheckConstraint("ck_field_search_approval_digest", "octet_length(approved_layout_digest) = 32");
+
+                            t.HasCheckConstraint("ck_field_search_approval_protection", "approved_protection_mode = 'Standard'");
+
+                            t.HasCheckConstraint("ck_field_search_approval_state", "approval_state_name IN ('Active','Withdrawn','Invalidated')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion", b =>
+                {
+                    b.Property<Guid>("PublishedFormVersionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("published_form_version_id");
+
+                    b.Property<string>("FieldManifestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("field_manifest_json");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<int>("FormVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("form_version_number");
+
+                    b.Property<byte[]>("LayoutDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("layout_digest");
+
+                    b.Property<string>("LayoutDigestScheme")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("layout_digest_scheme");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("RegisteredBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("registered_by_security_command_id");
+
+                    b.Property<DateTimeOffset>("RegisteredOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registered_on");
+
+                    b.HasKey("PublishedFormVersionId");
+
+                    b.HasIndex("RegisteredBySecurityCommandId");
+
+                    b.HasIndex("OrganizationId", "FormDefinitionId", "FormVersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("uq_published_form_version_number");
+
+                    b.ToTable("published_form_versions", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_published_form_version_digest", "octet_length(layout_digest) = 32");
+
+                            t.HasCheckConstraint("ck_published_form_version_number", "form_version_number >= 1");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Journal.SecurityJournalEntry", b =>
                 {
                     b.Property<Guid>("SecurityJournalEntryId")
@@ -969,6 +1147,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("plaintext_internal_fields_permitted");
 
+                    b.Property<bool>("PlaintextSearchPermitted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("plaintext_search_permitted");
+
                     b.Property<long>("PolicyRevision")
                         .HasColumnType("bigint")
                         .HasColumnName("policy_revision");
@@ -976,6 +1158,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("PolicyUpdatedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("policy_updated_on");
+
+                    b.Property<long>("SearchPolicyRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("search_policy_revision");
 
                     b.Property<Guid>("UpdatedBySecurityCommandId")
                         .HasColumnType("uuid")
@@ -1408,6 +1594,42 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_manifest_leaf_commit");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovedBySecurityCommandId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_search_approval_command");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_search_approval_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_published_form_version_org");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("RegisteredBySecurityCommandId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_published_form_version_command");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Journal.SecurityJournalEntry", b =>

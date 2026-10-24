@@ -370,9 +370,8 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
 
     private void Audit(IAuthorityScope scope, OrganizationAuthorizationState locked, string eventKind, CatalogueAuditBody body, DateTimeOffset now)
     {
-        locked.AuditJournalRevision++;
-        locked.StateModifiedOn = now;
-        scope.AddJournalEntry(JournalChain.Append(locked, JournalStreamNames.Audit, locked.AuditJournalRevision, eventKind, body, null, null, clock));
+        _ = now;
+        AuditJournal.Append(scope, locked, eventKind, body, clock);
     }
 
     private static CatalogueEntry ToContract(SearchCatalogueSnapshotEntry e) =>

@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-export type Persona = "owner" | "designer" | "clerk" | "reader";
+export type Persona = "owner" | "designer" | "clerk" | "reader" | "security";
 
 /** Development-login persona buttons end in "(<key>)"; the dev-seed organization is shared across specs, so each spec creates uniquely named forms. */
 export async function signIn(page: Page, persona: Persona) {

@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
@@ -131,6 +132,16 @@ public interface IAuthorityScope : IAsyncDisposable
     Task<AuthenticatedSession?> FindSessionByDigestAsync(byte[] sessionSecretDigest, CancellationToken cancellationToken);
 
     void AddSession(AuthenticatedSession session);
+
+    /// <summary>Phase C7 M2 (OD-3): the highest registered published version of a form, or null (read-only).</summary>
+    Task<PublishedFormVersion?> FindLatestPublishedFormVersionAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
+
+    void AddPublishedFormVersion(PublishedFormVersion version);
+
+    /// <summary>Phase C7 M2 (AC-6): approvals of the organization (optionally one form), tracked so commands can change their state.</summary>
+    Task<List<FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid organizationId, Guid? formDefinitionId, CancellationToken cancellationToken);
+
+    void AddFieldSearchApproval(FieldSearchApproval approval);
 
     Task CommitAsync(CancellationToken cancellationToken);
 }

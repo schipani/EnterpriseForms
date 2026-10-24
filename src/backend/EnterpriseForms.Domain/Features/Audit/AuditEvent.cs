@@ -44,6 +44,11 @@ public static class AuditActions
     public const string RecordAccessRevoked = "RECORD_ACCESS_REVOKED";
     public const string RecordOwnershipTransferred = "RECORD_OWNERSHIP_TRANSFERRED";
     public const string AccessDenied = "ACCESS_DENIED";
+    public const string FieldSearchApproved = "FIELD_SEARCH_APPROVED";
+    public const string FieldSearchWithdrawn = "FIELD_SEARCH_WITHDRAWN";
+    public const string FieldSearchersChanged = "FIELD_SEARCHERS_CHANGED";
+    public const string FormVersionAuthorityRegistered = "FORM_VERSION_AUTHORITY_REGISTERED";
+    public const string FormVersionAuthorityRegistrationFailed = "FORM_VERSION_AUTHORITY_REGISTRATION_FAILED";
 }
 
 /// <summary>

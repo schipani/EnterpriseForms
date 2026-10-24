@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
@@ -53,6 +54,10 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<SearchCatalogueSnapshotEntry> CatalogueSnapshotEntries => Set<SearchCatalogueSnapshotEntry>();
 
     public DbSet<AuthenticatedSession> Sessions => Set<AuthenticatedSession>();
+
+    public DbSet<PublishedFormVersion> PublishedFormVersions => Set<PublishedFormVersion>();
+
+    public DbSet<FieldSearchApproval> FieldSearchApprovals => Set<FieldSearchApproval>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

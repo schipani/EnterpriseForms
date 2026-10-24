@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
@@ -319,6 +320,56 @@ public sealed class AuthenticatedSessionConfiguration : IEntityTypeConfiguration
             t.HasCheckConstraint("ck_session_digest_length", "octet_length(session_secret_digest) = 32");
             t.HasCheckConstraint("ck_session_expiry_order", "session_expires_on > session_created_on AND session_idle_timeout_seconds > 0");
             t.HasCheckConstraint("ck_session_revocation", "(session_revoked_on IS NULL AND session_revocation_reason IS NULL) OR (session_revoked_on IS NOT NULL AND session_revocation_reason IN ('LOGOUT','REPLACED_BY_NEW_SIGN_IN'))");
+        });
+    }
+}
+
+/// <summary>Phase C7 M2 (OD-3): immutable registered published form versions (append-only for the runtime).</summary>
+public sealed class PublishedFormVersionConfiguration : IEntityTypeConfiguration<PublishedFormVersion>
+{
+    public void Configure(EntityTypeBuilder<PublishedFormVersion> builder)
+    {
+        builder.MapSnakeCase("published_form_versions");
+        builder.HasKey(e => e.PublishedFormVersionId);
+        builder.Property(e => e.LayoutDigestScheme).HasMaxLength(40);
+        builder.Property(e => e.FieldManifestJson).HasColumnType("jsonb");
+        builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId, e.FormVersionNumber }).IsUnique().HasDatabaseName("uq_published_form_version_number");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_published_form_version_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.RegisteredBySecurityCommandId).HasConstraintName("fk_published_form_version_command");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_published_form_version_number", "form_version_number >= 1");
+            t.HasCheckConstraint("ck_published_form_version_digest", "octet_length(layout_digest) = 32");
+        });
+    }
+}
+
+/// <summary>Phase C7 M2 (AC-6): field search approvals; state changes only through security commands.</summary>
+public sealed class FieldSearchApprovalConfiguration : IEntityTypeConfiguration<FieldSearchApproval>
+{
+    public void Configure(EntityTypeBuilder<FieldSearchApproval> builder)
+    {
+        builder.MapSnakeCase("field_search_approvals");
+        builder.HasKey(e => e.FieldSearchApprovalId);
+        builder.Property(e => e.ApprovedFieldDataType).HasMaxLength(20);
+        builder.Property(e => e.ApprovedFieldClassification).HasMaxLength(20);
+        builder.Property(e => e.ApprovedProtectionMode).HasMaxLength(30);
+        builder.Property(e => e.ApprovedOperatorsJson).HasColumnType("jsonb");
+        builder.Property(e => e.ApprovedFieldLabelSnapshot).HasMaxLength(300);
+        builder.Property(e => e.ApprovedOptionSnapshotJson).HasColumnType("jsonb");
+        builder.Property(e => e.ApprovalReferenceText).HasMaxLength(200);
+        builder.Property(e => e.ApprovalStateName).HasMaxLength(20);
+        builder.Property(e => e.InvalidationReasonCode).HasMaxLength(60);
+        builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId, e.FieldDefinitionId }).HasDatabaseName("ix_field_search_approvals_field");
+        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId }).IsUnique().HasFilter("approval_state_name = 'Active'").HasDatabaseName("uq_field_search_approval_active");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_field_search_approval_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ApprovedBySecurityCommandId).HasConstraintName("fk_field_search_approval_command");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_field_search_approval_state", "approval_state_name IN ('Active','Withdrawn','Invalidated')");
+            t.HasCheckConstraint("ck_field_search_approval_classification", "approved_field_classification IN ('Public','Internal')");
+            t.HasCheckConstraint("ck_field_search_approval_protection", "approved_protection_mode = 'Standard'");
+            t.HasCheckConstraint("ck_field_search_approval_digest", "octet_length(approved_layout_digest) = 32");
         });
     }
 }

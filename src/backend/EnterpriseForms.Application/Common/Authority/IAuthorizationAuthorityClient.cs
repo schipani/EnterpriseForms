@@ -53,6 +53,10 @@ public enum SecurityCommandKind
     UnlinkChildRecord,
     UpdateFormUsers,
     ReclassifyField,
+    RegisterPublishedFormVersion,
+    ApproveFieldSearch,
+    WithdrawFieldSearch,
+    UpdateFieldSearchers,
 }
 
 public enum SecurityCommandStatus
@@ -212,4 +216,27 @@ public interface IBrowserSessionStateAuthority
 
     /// <summary>Idempotent.</summary>
     Task<BrowserSessionState> RevokeSessionAsync(DelegatedUserContext user, string sessionDigestBase64, CancellationToken cancellationToken);
+}
+
+// ---- Phase C7 M2 (AC-6): Authority field search capabilities (mirrors AuthorizationAuthority.Contracts.V1.FieldSearchContracts).
+
+public sealed record FieldSearchCapabilitiesQuery(Guid OrganizationId, Guid FormDefinitionId);
+
+public sealed record FieldSearchOptionSnapshot(Guid FieldOptionId, string OptionLabel);
+
+public sealed record AuthoritySearchableField(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, IReadOnlyList<string> Operators, IReadOnlyList<FieldSearchOptionSnapshot> Options, int ApprovedFormVersionNumber);
+
+public sealed record AuthorityFieldSearchStatus(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, string FieldClassification, string ProtectionMode, string Eligibility,
+    string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators);
+
+public sealed record AuthorityFieldSearchConfiguration(bool CanApprove, bool ApprovalOperational, string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<AuthorityFieldSearchStatus> Fields,
+    IReadOnlyList<FormAccessSubjectState>? FieldSearchers = null);
+
+public sealed record AuthorityFieldSearchCapabilities(Guid FormDefinitionId, bool PlaintextSearchPermitted, long SearchPolicyRevision, long AuthorizationRevision,
+    IReadOnlyList<AuthoritySearchableField> Fields, AuthorityFieldSearchConfiguration? Configuration, Guid CorrelationId);
+
+/// <summary>Phase C7 M2: the Authority's field search capabilities for the delegated user (narrow port; only the Search feature uses it).</summary>
+public interface IFieldSearchPolicyAuthority
+{
+    Task<AuthorityFieldSearchCapabilities> GetFieldSearchCapabilitiesAsync(DelegatedUserContext user, FieldSearchCapabilitiesQuery query, CancellationToken cancellationToken);
 }

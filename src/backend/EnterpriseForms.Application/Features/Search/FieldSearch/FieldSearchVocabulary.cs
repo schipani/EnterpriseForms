@@ -68,6 +68,8 @@ public static class FieldSearchOperators
 
     public static bool IsKnownValueType(string? valueType) => valueType is not null && ByValueType.ContainsKey(valueType);
 
+    public static IReadOnlyList<string> ForValueType(string valueType) => ByValueType.TryGetValue(valueType, out var list) ? list : [];
+
     public static bool IsKnownOperator(string? op) => op is not null && ByValueType.Values.Any(list => list.Contains(op, StringComparer.Ordinal));
 
     public static bool AppliesTo(string valueType, string op) => ByValueType.TryGetValue(valueType, out var list) && list.Contains(op, StringComparer.Ordinal);

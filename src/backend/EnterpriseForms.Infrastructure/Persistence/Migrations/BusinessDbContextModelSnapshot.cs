@@ -2759,6 +2759,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("plaintext_internal_fields_permitted");
 
+                    b.Property<bool>("PlaintextSearchPermitted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("plaintext_search_permitted");
+
                     b.Property<Guid?>("PolicyModifiedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("policy_modified_by_user_id");

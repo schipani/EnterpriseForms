@@ -5,10 +5,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Application.Common;
+using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Features.Search.FieldSearch;
 using EnterpriseForms.Contracts.Features;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -37,7 +39,28 @@ public sealed class PhaseC7FieldSearchTests
 
     private static FieldSearchRequest Request(params FieldSearchCondition[] conditions) => new(Form, conditions);
 
-    private static SearchException Refusal(FieldSearchRequest? request) => Assert.Throws<SearchException>(() => new FieldSearchHandler(Limits).Search(Context, request));
+    /// <summary>Phase C7 M2: a capability source that approves exactly the fields, operators and options a request uses, so the request reaches the execution gate.</summary>
+    internal sealed class ApprovingPolicy(Func<FieldSearchCapabilitiesQuery, AuthorityFieldSearchCapabilities>? answer = null) : IFieldSearchPolicyAuthority
+    {
+        public FieldSearchRequest? Request { get; set; }
+
+        public Task<AuthorityFieldSearchCapabilities> GetFieldSearchCapabilitiesAsync(DelegatedUserContext user, FieldSearchCapabilitiesQuery query, CancellationToken cancellationToken)
+        {
+            if (answer is not null)
+            {
+                return Task.FromResult(answer(query));
+            }
+
+            var fields = (Request?.Conditions ?? []).GroupBy(c => c.FieldDefinitionId).Select(g => new AuthoritySearchableField(g.Key, "Field", g.First().ValueType,
+                FieldSearchOperators.ForValueType(g.First().ValueType), g.Where(c => Guid.TryParse(c.Value, out _)).Select(c => new FieldSearchOptionSnapshot(Guid.Parse(c.Value!), "Option")).ToList(), 1)).ToList();
+            return Task.FromResult(new AuthorityFieldSearchCapabilities(query.FormDefinitionId, true, 0, 1, fields, null, Guid.CreateVersion7()));
+        }
+    }
+
+    private static FieldSearchHandler Handler(FieldSearchLimits? limits = null, FieldSearchRequest? request = null) => new(limits ?? Limits, new ApprovingPolicy { Request = request });
+
+    private static SearchException Refusal(FieldSearchRequest? request) =>
+        Assert.ThrowsAsync<SearchException>(() => Handler(request: request).SearchAsync(Context, request, TestContext.Current.CancellationToken)).GetAwaiter().GetResult();
 
     // ---- the gate ----
 
@@ -71,7 +94,7 @@ public sealed class PhaseC7FieldSearchTests
     [Fact]
     public void FiveConditionsWithMetadataFiltersAreWellFormedButStillRefused()
     {
-        var request = new FieldSearchRequest(Form, [Text(), Text("startsWith", "Jor"), new(Field, "lessThan", "Integer", "10"), new(Field, "isFalse", "Boolean"), new(Field, "after", "Date", "2026-01-01")],
+        var request = new FieldSearchRequest(Form, [Text(), Text("startsWith", "Jor"), new(Guid.CreateVersion7(), "lessThan", "Integer", "10"), new(Guid.CreateVersion7(), "isFalse", "Boolean"), new(Guid.CreateVersion7(), "after", "Date", "2026-01-01")],
             "Submitted", IncludeArchived: true, IncludeChildren: true, SortBy: "createdOn", SortDirection: "asc", PageSize: 50);
         Assert.Equal(SearchErrorCodes.VerificationUnavailable, Refusal(request).ErrorCode);
     }
@@ -85,30 +108,32 @@ public sealed class PhaseC7FieldSearchTests
     }
 
     [Fact]
-    public void CapabilitiesOfferNoFieldsAndSayWhyForAnyForm()
+    public async Task CapabilitiesOfferNoFieldsAndSayWhyForAnyForm()
     {
-        var handler = new FieldSearchHandler(Limits);
+        // Phase C7 M2: with no approvals (or no query permission) the Authority offers nothing, for any form.
+        var handler = Handler();
         foreach (var form in new[] { Form, Guid.CreateVersion7() })
         {
-            var capabilities = handler.Capabilities(Context, form);
+            var capabilities = await handler.CapabilitiesAsync(Context, form, TestContext.Current.CancellationToken);
             Assert.Equal(form, capabilities.FormDefinitionId);
             Assert.False(capabilities.FieldValueSearchAvailable);
             Assert.Equal(SearchUnavailableReasons.TrustedSearchNotEnabled, capabilities.UnavailableReasonCode);
             Assert.Empty(capabilities.Fields);
             Assert.Empty(capabilities.NotSearchableFields);
-            Assert.Null(capabilities.PolicyRevision);
+            Assert.Equal(0, capabilities.PolicyRevision);
             Assert.Equal(5, capabilities.MaximumConditions);
             Assert.Equal("And", capabilities.ConditionJoin);
         }
 
-        Assert.Equal(SearchErrorCodes.RequestInvalid, Assert.Throws<SearchException>(() => handler.Capabilities(Context, Guid.Empty)).ErrorCode);
+        Assert.Equal(SearchErrorCodes.RequestInvalid, (await Assert.ThrowsAsync<SearchException>(() => handler.CapabilitiesAsync(Context, Guid.Empty, TestContext.Current.CancellationToken))).ErrorCode);
     }
 
     [Fact]
     public void TheHandlerHasNoDependencyThatCouldReadBusinessRecords()
     {
         var parameters = typeof(FieldSearchHandler).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToList();
-        Assert.Equal([typeof(FieldSearchLimits)], parameters);
+        // Phase C7 M2: the Authority's capability port is the only addition; still nothing that reads business records.
+        Assert.Equal([typeof(FieldSearchLimits), typeof(IFieldSearchPolicyAuthority)], parameters);
     }
 
     // ---- request validation (422, never echoing values) ----
@@ -123,11 +148,11 @@ public sealed class PhaseC7FieldSearchTests
     }
 
     [Fact]
-    public void AConfiguredLowerConditionLimitIsEnforcedAndTheApprovedCeilingCannotBeRaised()
+    public async Task AConfiguredLowerConditionLimitIsEnforcedAndTheApprovedCeilingCannotBeRaised()
     {
         var limits = new FieldSearchLimits { MaximumConditions = 2 };
         limits.Validate();
-        Assert.Equal(SearchErrorCodes.RequestInvalid, Assert.Throws<SearchException>(() => new FieldSearchHandler(limits).Search(Context, Request(Text(), Text(), Text()))).ErrorCode);
+        Assert.Equal(SearchErrorCodes.RequestInvalid, (await Assert.ThrowsAsync<SearchException>(() => Handler(limits).SearchAsync(Context, Request(Text(), Text(), Text()), TestContext.Current.CancellationToken))).ErrorCode);
         Assert.Throws<InvalidOperationException>(() => new FieldSearchLimits { MaximumConditions = 6 }.Validate());
         Assert.Throws<InvalidOperationException>(() => new FieldSearchLimits { MaximumConditions = 0 }.Validate());
         Assert.Throws<InvalidOperationException>(() => new FieldSearchLimits { MaximumEligibleRecords = 0 }.Validate());
@@ -211,7 +236,7 @@ public sealed class PhaseC7FieldSearchTests
         var body = await capabilities.Content.ReadFromJsonAsync<JsonElement>(ct);
         Assert.False(body.GetProperty("fieldValueSearchAvailable").GetBoolean());
         Assert.Equal("TRUSTED_SEARCH_NOT_ENABLED", body.GetProperty("unavailableReasonCode").GetString());
-        Assert.Equal(0, body.GetProperty("fields").GetArrayLength());
+        Assert.Equal(1, body.GetProperty("fields").GetArrayLength()); // offered (M2), never executed
 
         var refused = await client.PostAsJsonAsync(new Uri("/api/v1/form-records/field-search", UriKind.Relative), Request(Text(), Text("contains", Sentinel)), ct);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
@@ -258,6 +283,9 @@ public sealed class PhaseC7FieldSearchTests
         {
             b.UseEnvironment("Development");
             b.ConfigureLogging(l => l.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
+            // Phase C7 M2: the Authority approves the one String field these requests use (the real Authority path runs against Docker).
+            b.ConfigureTestServices(s => s.AddSingleton<IFieldSearchPolicyAuthority>(new ApprovingPolicy(q => new AuthorityFieldSearchCapabilities(q.FormDefinitionId, true, 0, 1,
+                [new AuthoritySearchableField(Field, "Field", "String", FieldSearchOperators.ForValueType("String"), [], 1)], null, Guid.CreateVersion7()))));
         });
 
     /// <summary>A bearer assertion signed with the Development test-IdP key (the same token the development login issues).</summary>

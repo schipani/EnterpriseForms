@@ -98,3 +98,29 @@ public sealed record SearchScopeVerificationResponse(
     double ElapsedMilliseconds);
 
 public sealed record SearchScopeVerificationRequest(Guid FormDefinitionId);
+
+// ---- Phase C7 M2 (AC-6): search approval configuration (Form Designer "Search" section). Decisions are the Authority's.
+
+/// <summary>
+/// One field of the form's latest Authority-registered published version. <c>Eligibility</c>: Eligible, Encrypted,
+/// ClassificationNotPermitted, OrganizationSearchDisabled, OrganizationPolicyMissing, ProtectionPending, TypeNotSearchable.
+/// <c>ApprovalState</c>: None, Active, Withdrawn, Invalidated.
+/// </summary>
+public sealed record FieldSearchStatusResponse(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, string FieldClassification, string ProtectionMode, string Eligibility,
+    string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators);
+
+/// <summary>
+/// <c>CanApprove</c>: the caller holds administer_security. <c>ApprovalOperational</c>: the Authority can accept approvals
+/// at all (false in production and staging until PB-08 step-up exists; reason in <c>ApprovalUnavailableReason</c>).
+/// <c>RegisteredFormVersionNumber</c> is null when no published version is registered with the Authority.
+/// <c>FieldSearchers</c> (who may run field searches on this form) is listed only for security administrators; null otherwise.
+/// </summary>
+public sealed record FieldSearchConfigurationResponse(Guid FormDefinitionId, bool PlaintextSearchPermitted, long SearchPolicyRevision, bool CanApprove, bool ApprovalOperational,
+    string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<FieldSearchStatusResponse> Fields, IReadOnlyList<FormAccessSubjectResponse>? FieldSearchers = null);
+
+/// <summary><c>UseDevelopmentStepUp</c> presents the development-only synthetic step-up marker; the Authority accepts it only where that path is enabled (never production or staging).</summary>
+public sealed record ApproveFieldSearchRequest(IReadOnlyList<string>? Operators, string? ApprovalReference, bool UseDevelopmentStepUp = false);
+
+public sealed record WithdrawFieldSearchRequest(string? Reason);
+
+public sealed record UpdateFieldSearchersRequest(IReadOnlyList<Guid>? GrantUserIds, IReadOnlyList<Guid>? GrantTeamIds, IReadOnlyList<Guid>? RevokeUserIds, IReadOnlyList<Guid>? RevokeTeamIds);

@@ -59,7 +59,7 @@ public sealed class SecurityPolicyHandlers(IBusinessStore store, IAuthorizationA
         }
 
         // Authority first (Amendment A1 rule 1/3): the policy the downgrade planners enforce is the authority's own copy, written by this command.
-        var payload = JsonSerializer.SerializeToElement(new { minimum_field_classification = request.MinimumFieldClassification, plaintext_internal_fields_permitted = request.PlaintextInternalFieldsPermitted, plaintext_downgrade_permitted = request.PlaintextDowngradePermitted });
+        var payload = JsonSerializer.SerializeToElement(new { minimum_field_classification = request.MinimumFieldClassification, plaintext_internal_fields_permitted = request.PlaintextInternalFieldsPermitted, plaintext_downgrade_permitted = request.PlaintextDowngradePermitted, plaintext_search_permitted = request.PlaintextSearchPermitted });
         var command = await awaiter.SubmitAndAwaitAsync(context.ToDelegatedUser(), new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.UpdateMandatoryPolicy, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), decision.AuthorizationRevision, payload, statement), $"org-policy:{context.OrganizationId:N}:{expected + 1}", cancellationToken).ConfigureAwait(false);
         if (command.CommandStatus != SecurityCommandStatus.Effective)
         {
@@ -75,12 +75,14 @@ public sealed class SecurityPolicyHandlers(IBusinessStore store, IAuthorizationA
 
         var loosened = FieldProtectionPolicy.Rank(request.MinimumFieldClassification!) < FieldProtectionPolicy.Rank(policy.MinimumFieldClassification)
                        || (request.PlaintextInternalFieldsPermitted && !policy.PlaintextInternalFieldsPermitted)
-                       || (request.PlaintextDowngradePermitted && !policy.PlaintextDowngradePermitted);
+                       || (request.PlaintextDowngradePermitted && !policy.PlaintextDowngradePermitted)
+                       || (request.PlaintextSearchPermitted && !policy.PlaintextSearchPermitted);
         var now = clock.GetUtcNow();
-        var previous = new { policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, policy.PlaintextDowngradePermitted };
+        var previous = new { policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, policy.PlaintextDowngradePermitted, policy.PlaintextSearchPermitted };
         policy.MinimumFieldClassification = request.MinimumFieldClassification!;
         policy.PlaintextInternalFieldsPermitted = request.PlaintextInternalFieldsPermitted;
         policy.PlaintextDowngradePermitted = request.PlaintextDowngradePermitted;
+        policy.PlaintextSearchPermitted = request.PlaintextSearchPermitted;
         policy.AuthorityCommandId = command.CommandId;
         policy.PolicyStatementText = statement;
         policy.PolicyReviewedOn = now;
@@ -88,7 +90,7 @@ public sealed class SecurityPolicyHandlers(IBusinessStore store, IAuthorizationA
         policy.SecurityPolicyRevision++;
         policy.PolicyModifiedOn = now;
         policy.PolicyModifiedByUserId = context.LocalUserId;
-        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.OrganizationSecurityPolicyUpdated, loosened ? "organization data-protection policy loosened by the organization owner" : "organization data-protection policy reviewed/tightened by the organization owner", metadata: new { previous, minimumFieldClassification = policy.MinimumFieldClassification, plaintextInternalFieldsPermitted = policy.PlaintextInternalFieldsPermitted, plaintextDowngradePermitted = policy.PlaintextDowngradePermitted, loosened, revision = policy.SecurityPolicyRevision, authorityCommandId = command.CommandId });
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.OrganizationSecurityPolicyUpdated, loosened ? "organization data-protection policy loosened by the organization owner" : "organization data-protection policy reviewed/tightened by the organization owner", metadata: new { previous, minimumFieldClassification = policy.MinimumFieldClassification, plaintextInternalFieldsPermitted = policy.PlaintextInternalFieldsPermitted, plaintextDowngradePermitted = policy.PlaintextDowngradePermitted, plaintextSearchPermitted = policy.PlaintextSearchPermitted, loosened, revision = policy.SecurityPolicyRevision, authorityCommandId = command.CommandId });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToResponse(policy);
     }
@@ -117,5 +119,5 @@ public sealed class SecurityPolicyHandlers(IBusinessStore store, IAuthorizationA
     }
 
     private static OrganizationSecurityPolicyResponse ToResponse(OrganizationSecurityPolicy p) =>
-        new(p.MinimumFieldClassification, p.PlaintextInternalFieldsPermitted, p.PolicyStatementText, p.PolicyReviewedOn, p.PolicyReviewedByUserId, p.SecurityPolicyRevision, p.PolicyReviewedOn is null, p.PlaintextDowngradePermitted, p.AuthorityCommandId);
+        new(p.MinimumFieldClassification, p.PlaintextInternalFieldsPermitted, p.PolicyStatementText, p.PolicyReviewedOn, p.PolicyReviewedByUserId, p.SecurityPolicyRevision, p.PolicyReviewedOn is null, p.PlaintextDowngradePermitted, p.AuthorityCommandId, p.PlaintextSearchPermitted);
 }

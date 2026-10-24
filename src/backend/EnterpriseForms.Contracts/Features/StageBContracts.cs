@@ -37,7 +37,8 @@ public sealed record CreateGroupDefinitionRequest(string GroupKey, string GroupD
 
 public sealed record FieldOptionResponse(Guid FieldOptionId, string OptionKey, string OptionDisplayText, int OptionSortOrder, bool IsActive, Guid? OptionListItemId = null);
 
-public sealed record FormVersionResponse(Guid FormVersionId, int VersionNumber, int LayoutSchemaVersion, string LayoutJson, string ChangeReason, Guid? RestoredFromFormVersionId, DateTimeOffset PublishedOn, Guid PublishedByUserId);
+/// <summary><c>AuthorityRegistered</c> (Phase C7 M2, OD-3): the publish response says whether the Authority recorded this version; only registered versions can have fields approved for search.</summary>
+public sealed record FormVersionResponse(Guid FormVersionId, int VersionNumber, int LayoutSchemaVersion, string LayoutJson, string ChangeReason, Guid? RestoredFromFormVersionId, DateTimeOffset PublishedOn, Guid PublishedByUserId, bool AuthorityRegistered = false);
 
 public sealed record FormDraftResponse(Guid FormDraftId, Guid? BasedOnFormVersionId, int LayoutSchemaVersion, string LayoutJson, long DraftRevision, DateTimeOffset UpdatedOn);
 
@@ -121,9 +122,9 @@ public sealed record DowngradeFieldProtectionRequest(string ChangeReason, long E
 /// <summary>Amendment A1 rollback: re-require encryption; already decrypted active values are re-encrypted by a new migration. Historical plaintext revisions, logs, WAL and backups are not reversible.</summary>
 public sealed record CancelFieldProtectionDowngradeRequest(string ChangeReason);
 
-public sealed record OrganizationSecurityPolicyResponse(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, DateTimeOffset? PolicyReviewedOn, Guid? PolicyReviewedByUserId, long SecurityPolicyRevision, bool IsUnreviewedDefault, bool PlaintextDowngradePermitted = false, Guid? AuthorityCommandId = null);
+public sealed record OrganizationSecurityPolicyResponse(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, DateTimeOffset? PolicyReviewedOn, Guid? PolicyReviewedByUserId, long SecurityPolicyRevision, bool IsUnreviewedDefault, bool PlaintextDowngradePermitted = false, Guid? AuthorityCommandId = null, bool PlaintextSearchPermitted = false);
 
-public sealed record UpdateOrganizationSecurityPolicyRequest(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, long ExpectedPolicyRevision, bool PlaintextDowngradePermitted = false);
+public sealed record UpdateOrganizationSecurityPolicyRequest(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, string PolicyStatementText, long ExpectedPolicyRevision, bool PlaintextDowngradePermitted = false, bool PlaintextSearchPermitted = false);
 
 public sealed record CreateFieldOptionRequest(string OptionKey, string OptionDisplayText);
 

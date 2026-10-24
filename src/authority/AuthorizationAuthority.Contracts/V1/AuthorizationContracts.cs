@@ -32,6 +32,9 @@ public enum RequestedAction
 
     /// <summary>Organization-level security administration (SpiceDB <c>administer_security</c>: system administrators). Amendment A1 governance routes accept it alongside ManageOrganization.</summary>
     AdministerSecurity,
+
+    /// <summary>Phase C7 M2 (OD-4): query the form's approved fields (SpiceDB <c>form_definition#query_fields</c>).</summary>
+    QueryFields,
 }
 
 public sealed record ResourceRef(ResourceKind ResourceKind, Guid ResourceId);
@@ -79,6 +82,17 @@ public enum SecurityCommandKind
     UpdateFormUsers,
     /// <summary>Declassifies a field to Public/Internal (organization owner or system administrator, governance approval reference required). Amendment A1.</summary>
     ReclassifyField,
+
+    /// <summary>Phase C7 M2 (OD-3): records a published form version (number, canonical layout digest, field entries).</summary>
+    RegisterPublishedFormVersion,
+
+    /// <summary>Phase C7 M2 (AC-6): approves plaintext value search of one field (administer_security, step-up).</summary>
+    ApproveFieldSearch,
+
+    WithdrawFieldSearch,
+
+    /// <summary>Phase C7 M2 (OD-4): grants/revokes the per-form field_searcher relation.</summary>
+    UpdateFieldSearchers,
 }
 
 /// <summary>command_payload is validated against the exact command-specific schema in the authority; unknown fields are rejected.</summary>
@@ -136,7 +150,7 @@ public sealed record UpdateFormUsersPayload(Guid FormDefinitionId, IReadOnlyList
 public sealed record PublishFormSecurityRevisionPayload(Guid FormDefinitionId, Guid FieldDefinitionId, string RequiredProtectionMode, long ProtectionPolicyRevision, string? FieldClassification = null);
 
 /// <summary>The organization's data-protection policy as decided by its owner/system administrator; the authority keeps it for the reclassification and downgrade planners.</summary>
-public sealed record UpdateMandatoryPolicyPayload(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, bool PlaintextDowngradePermitted);
+public sealed record UpdateMandatoryPolicyPayload(string MinimumFieldClassification, bool PlaintextInternalFieldsPermitted, bool PlaintextDowngradePermitted, bool PlaintextSearchPermitted = false);
 
 /// <summary>Declassification of an encrypted field to Public or Internal; the approval reference identifies the governance decision and is journaled.</summary>
 public sealed record ReclassifyFieldPayload(Guid FormDefinitionId, Guid FieldDefinitionId, string TargetClassification, string ApprovalReference);

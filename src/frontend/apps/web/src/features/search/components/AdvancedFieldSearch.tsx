@@ -45,7 +45,10 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
   const available = formSelected && capabilities?.fieldValueSearchAvailable === true;
   const executable = available && onSearch !== undefined;
   const maximum = maximumConditions(capabilities);
-  const fields = available ? (capabilities?.fields ?? []) : [];
+  // Phase C7 M2: the fields are the Authority-approved ones this person may search. They can be chosen and conditions
+  // composed even while execution is off (M3), so the controls reflect real permissions; Search records stays disabled.
+  const fields = formSelected && !loadFailed ? (capabilities?.fields ?? []) : [];
+  const composable = fields.length > 0;
   const update = (next: ConditionDraft[]) => {
     setConditions(next);
     if (attempted) {
@@ -103,6 +106,9 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
             </StatusMessage>
           </div>
         ) : null}
+        {composable && !available ? (
+          <p className="text-sm text-muted">You can choose approved fields and conditions to see what can be searched, but nothing is searched until trusted search is turned on.</p>
+        ) : null}
         {available && fields.length === 0 ? (
           <StatusMessage tone="info" title="No fields can be searched in this form">
             None of this form's fields are approved for searching, or you cannot search them.
@@ -122,7 +128,7 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
               condition={condition}
               field={fieldFor(capabilities, condition.fieldDefinitionId)}
               fields={fields}
-              enabled={available}
+              enabled={composable}
               errors={errors.get(condition.key) ?? {}}
               removable={conditions.length > 1}
               onFieldChange={(fieldId) => update(setField(conditions, condition.key, fieldId, capabilities))}
@@ -133,14 +139,14 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
           ))}
           <div className="flex flex-col gap-1.5">
             <div className="flex flex-wrap items-start gap-2">
-              <Button type="button" variant="secondary" icon={ActionIcons.add} disabled={!available || conditions.length >= maximum} onClick={() => update(addCondition(conditions, maximum))} aria-describedby={unavailableReason ? unavailableId : undefined}>
+              <Button type="button" variant="secondary" icon={ActionIcons.add} disabled={!composable || conditions.length >= maximum} onClick={() => update(addCondition(conditions, maximum))} aria-describedby={unavailableReason ? unavailableId : undefined}>
                 Add condition
               </Button>
               <Button type="submit" icon={ActionIcons.search} disabled={!executable} busy={Boolean(searching)} aria-describedby={unavailableReason ? unavailableId : undefined}>
                 Search records
               </Button>
             </div>
-            {available ? <p className="text-sm text-muted">{conditions.length >= maximum ? `You can use up to ${maximum} conditions.` : `Up to ${maximum} conditions; all of them must match.`}</p> : null}
+            {composable ? <p className="text-sm text-muted">{conditions.length >= maximum ? `You can use up to ${maximum} conditions.` : `Up to ${maximum} conditions; all of them must match.`}</p> : null}
           </div>
         </form>
       </div>

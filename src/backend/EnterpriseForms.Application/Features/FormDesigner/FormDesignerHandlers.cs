@@ -1193,7 +1193,71 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         draft.UpdatedByUserId = context.LocalUserId;
         AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormVersionPublished, "immutable form version published", formDefinitionId: formDefinitionId, targetEntityType: "form_version", targetEntityId: version.FormVersionId, metadata: new { versionNumber = version.VersionNumber, changeReason = version.ChangeReason, elements = layout.Elements.Count() });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-        return ToVersion(version);
+        var registered = await RegisterPublishedVersionAsync(context, formDefinitionId, version, layout, catalogFields, canonical, cancellationToken).ConfigureAwait(false);
+        return ToVersion(version) with { AuthorityRegistered = registered };
+    }
+
+    /// <summary>
+    /// Phase C7 M2 (OD-3): records the version just published with the Authority — its number, the SHA-256 of the canonical
+    /// layout and, per field, the type, classification and protection the catalog holds now plus the label and option
+    /// snapshot this version froze. Search approvals bind to that record only, never to later business rows. A version
+    /// whose registration fails stays published but cannot be approved for search (it is never registered later from
+    /// business data); the designer publishes again. Returns whether the Authority accepted the registration.
+    /// </summary>
+    private async Task<bool> RegisterPublishedVersionAsync(RequestContext context, Guid formDefinitionId, FormVersion version, FormLayout layout, Dictionary<Guid, FieldDefinition> catalogFields, string canonicalLayout, CancellationToken cancellationToken)
+    {
+        var fields = layout.FieldElements
+            .Where(e => e.FieldDefinitionId is { } id && catalogFields.ContainsKey(id))
+            .GroupBy(e => e.FieldDefinitionId!.Value)
+            .Select(g =>
+            {
+                var element = g.First();
+                var field = catalogFields[g.Key];
+                return new
+                {
+                    field_definition_id = field.FieldDefinitionId,
+                    field_data_type = field.FieldDataType,
+                    field_classification = field.FieldClassification,
+                    protection_mode = field.FieldProtectionMode,
+                    field_label = element.Label.Length > 300 ? element.Label[..300] : element.Label,
+                    options = field.FieldDataType == "Option" ? (element.Options ?? []).Select(o => new { field_option_id = o.FieldOptionId, option_label = o.Label.Length > 300 ? o.Label[..300] : o.Label }).ToList() : null,
+                };
+            })
+            .ToList();
+        var payload = JsonSerializer.SerializeToElement(new
+        {
+            form_definition_id = formDefinitionId,
+            form_version_number = version.VersionNumber,
+            layout_digest_hex = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonicalLayout))),
+            fields,
+        });
+        string? failure = null;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                var decision = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.FormDefinition, formDefinitionId), ProtectedAction.DesignForm), cancellationToken).ConfigureAwait(false);
+                var command = await awaiter.SubmitAndAwaitAsync(context.ToDelegatedUser(), new SecurityCommandRequest(context.OrganizationId, SecurityCommandKind.RegisterPublishedFormVersion, new ResourceReference(ProtectedResourceKind.FormDefinition, formDefinitionId), decision.AuthorizationRevision, payload, $"register published version {version.VersionNumber}"), $"form-version:{version.FormVersionId:N}", cancellationToken).ConfigureAwait(false);
+                failure = command.CommandStatus == SecurityCommandStatus.Effective ? null : "COMMAND_" + command.CommandStatus.ToString().ToUpperInvariant();
+                break;
+            }
+            catch (AuthorityClientException ex) when (ex.ErrorCode == "STALE_AUTHORIZATION_REVISION" && attempt < 2)
+            {
+                // another security change committed meanwhile: the same key resubmits at the new revision
+            }
+            catch (AuthorityClientException ex)
+            {
+                failure = ex.ErrorCode;
+                break;
+            }
+        }
+
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Form, failure is null ? AuditActions.FormVersionAuthorityRegistered : AuditActions.FormVersionAuthorityRegistrationFailed,
+            failure is null ? "published version registered with the Authority" : "published version could not be registered with the Authority", formDefinitionId: formDefinitionId, targetEntityType: "form_version", targetEntityId: version.FormVersionId,
+            metadata: new { versionNumber = version.VersionNumber, fields = fields.Count, reason = failure }, outcome: failure is null ? "Success" : "Failure");
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return failure is null;
     }
 
     public async Task<FormDraftResponse> RestoreToDraftAsync(RequestContext context, Guid formDefinitionId, RestoreVersionRequest request, CancellationToken cancellationToken)

@@ -69,6 +69,9 @@ services:
     image: enterpriseforms/authority:dev
     environment:
       Signing__VaultTransit__Token: ${DEVSTACK_VAULT_AUTHORITY_TOKEN:?use scripts/devstack/devstack.py (the custody file supplies the Vault token)}
+      # Phase C7 M2 (AC-6): development-only synthetic step-up so search approvals can be tried locally (Development +
+      # TestIdentityProvider only; the Authority refuses to start with it anywhere else).
+      FieldSearch__ApprovalStepUp: SyntheticDevelopment
 
   business-migrate:
     image: enterpriseforms/api:dev

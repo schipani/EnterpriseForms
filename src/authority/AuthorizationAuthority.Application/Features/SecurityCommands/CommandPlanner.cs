@@ -2,6 +2,7 @@ using System.Text.Json;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Contracts.V1;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using EnterpriseForms.Integrity.Merkle;
@@ -27,6 +28,17 @@ public sealed class CommandPlan
 
     public bool ProtectionPolicyIsNew { get; set; }
 
+    /// <summary>Phase C7 M2 (OD-3): a newly registered published form version.</summary>
+    public PublishedFormVersion? PublishedVersion { get; set; }
+
+    /// <summary>Phase C7 M2 (AC-6): new approvals and tracked approvals whose state or binding this command changes.</summary>
+    public List<FieldSearchApproval> NewApprovals { get; } = [];
+
+    public List<FieldSearchApproval> ChangedApprovals { get; } = [];
+
+    /// <summary>The policy whose search_policy_revision advances because field search policy changed under this command.</summary>
+    public OrganizationProtectionPolicy? SearchPolicyToAdvance { get; set; }
+
     public string NormalizedPayloadJson { get; set; } = "{}";
 }
 
@@ -35,7 +47,7 @@ public sealed class CommandPlan
 /// actor privilege, same-organization binding and structural invariants (one owner, registered resources,
 /// bounded delegation). Unknown or unimplemented kinds are rejected; there is no generic relationship writer.
 /// </summary>
-public static class CommandPlanner
+public static partial class CommandPlanner
 {
     public static async Task<CommandPlan> PlanAsync(
         IAuthorityScope scope,
@@ -43,7 +55,8 @@ public static class CommandPlanner
         BoundActor actor,
         SecurityCommandRequest request,
         DesiredStateGraph graph,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        FieldSearchApprovalGate? approvalGate = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         return request.CommandKind switch
@@ -61,6 +74,10 @@ public static class CommandPlanner
             SecurityCommandKind.PublishFormSecurityRevision => await PublishFormSecurityRevisionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateMandatoryPolicy => await UpdateMandatoryPolicyAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.ReclassifyField => await ReclassifyFieldAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RegisterPublishedFormVersion => await RegisterPublishedFormVersionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.ApproveFieldSearch => await ApproveFieldSearchAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.WithdrawFieldSearch => await WithdrawFieldSearchAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.UpdateFieldSearchers => await UpdateFieldSearchersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             _ => throw new AuthorityException(AuthorityErrorCodes.CommandKindNotImplemented, 422, false, $"command kind {request.CommandKind} is not implemented in Stage A"),
         };
     }
@@ -240,7 +257,7 @@ public static class CommandPlanner
 
     private static readonly string[] Classifications = ["Public", "Internal", "Confidential", "Restricted"];
 
-    private static int Rank(string classification)
+    internal static int Rank(string classification)
     {
         var index = Array.IndexOf(Classifications, classification);
         return index >= 0 ? index : throw AuthorityException.Invalid("classification must be Public, Internal, Confidential or Restricted");
@@ -276,6 +293,17 @@ public static class CommandPlanner
         plan.ProtectionPolicy.MinimumFieldClassification = payload.MinimumFieldClassification;
         plan.ProtectionPolicy.PlaintextInternalFieldsPermitted = payload.PlaintextInternalFieldsPermitted;
         plan.ProtectionPolicy.PlaintextDowngradePermitted = payload.PlaintextDowngradePermitted;
+        var searchChanged = plan.ProtectionPolicy.PlaintextSearchPermitted != payload.PlaintextSearchPermitted;
+        plan.ProtectionPolicy.PlaintextSearchPermitted = payload.PlaintextSearchPermitted;
+
+        // AC-6 §4.2: turning search off, raising the minimum or disallowing plaintext Internal invalidates every approval
+        // that no longer conforms, in this same revision.
+        await InvalidateNonConformingApprovalsAsync(scope, organizationId, plan.ProtectionPolicy, plan, cancellationToken).ConfigureAwait(false);
+        if (searchChanged || plan.ChangedApprovals.Count > 0)
+        {
+            plan.SearchPolicyToAdvance = plan.ProtectionPolicy;
+        }
+
         return plan;
     }
 
@@ -392,6 +420,8 @@ public static class CommandPlanner
                 plan.RevokeResources.Add(release);
             }
 
+            // AC-6 §4.4: strengthening invalidates the field's search approval in the same command and revision.
+            await InvalidateFieldApprovalAsync(scope, organizationId, payload.FormDefinitionId, payload.FieldDefinitionId, plan, cancellationToken).ConfigureAwait(false);
             return plan;
         }
 

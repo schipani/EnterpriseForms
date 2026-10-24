@@ -14,6 +14,7 @@ using AuthorizationAuthority.Infrastructure.SpiceDb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace AuthorizationAuthority.Infrastructure;
@@ -64,6 +65,7 @@ public static class AuthorityInfrastructureRegistration
         }
 
         services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton(FieldSearchApprovalGate.Unavailable); // the API host registers the configured gate (OD-7)
         services.AddSingleton<SecurityCommandService>();
         services.AddSingleton<PermissionCheckService>();
         services.AddSingleton<FormAccessService>();
@@ -75,6 +77,7 @@ public static class AuthorityInfrastructureRegistration
         SessionOptions.Validate(sessionOptions);
         services.AddSingleton(sessionOptions);
         services.AddSingleton<SessionService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.FieldSearch.FieldSearchCapabilityService>();
         return services;
     }
 

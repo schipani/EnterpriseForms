@@ -2,6 +2,7 @@ using AuthorizationAuthority.Api.Composition;
 using AuthorizationAuthority.Api.Features.Authorization;
 using AuthorizationAuthority.Api.Features.Catalogue;
 using AuthorizationAuthority.Api.Features.Content;
+using AuthorizationAuthority.Api.Features.FieldSearch;
 using AuthorizationAuthority.Api.Features.Health;
 using AuthorizationAuthority.Api.Features.OperatorPlane;
 using AuthorizationAuthority.Api.Features.SecurityCommands;
@@ -59,6 +60,12 @@ public sealed class Program
             builder.Environment.IsProduction(),
             builder.Environment.IsEnvironment("Testing")));
         builder.Services.AddInternalAuthentication(builder.Configuration);
+        // Phase C7 M2 (OD-7): AC-6 approvals are unavailable unless the development-only synthetic step-up path is configured;
+        // Create refuses that path outside Development/Testing or without the synthetic TestIdentityProvider (startup failure).
+        builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.Create(
+            builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.ConfigurationKey],
+            builder.Environment.EnvironmentName,
+            builder.Configuration["Identity:UserAssertion:ProviderKind"]));
         // Phase C7 M1 (AC-5): provisional catalogue limits (section Catalogue, C-56 D4); a bad value fails at startup.
         var catalogueOptions = builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions.SectionName).Get<AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions>() ?? new AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions();
         AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptionsValidation.Validate(catalogueOptions);
@@ -88,6 +95,7 @@ public sealed class Program
         app.MapCatalogueEndpoints();
         app.MapOperatorEndpoints();
         app.MapSessionEndpoints();
+        app.MapFieldSearchEndpoints();
 
         app.Run();
         return 0;

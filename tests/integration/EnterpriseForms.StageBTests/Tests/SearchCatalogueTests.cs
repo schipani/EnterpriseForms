@@ -380,6 +380,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
             var server = new List<double>();
             var client = new List<double>();
             var failures = 0;
+            var timeLimitRefusals = 0;
             for (var round = 0; round <= rounds; round++)
             {
                 var results = await Task.WhenAll(Enumerable.Range(0, concurrency).Select(async _ =>
@@ -393,7 +394,16 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
                 {
                     if (!result.IsSuccess)
                     {
-                        // A typed, retryable refusal (snapshot moved by the background edits' archive settling) is counted, never hidden.
+                        // The D4 time budget (15 s) exceeded under load: a typed, non-partial refusal — counted and reported,
+                        // never a truncated scope. Any other failure must be the typed, retryable snapshot/availability refusal.
+                        if (result.ErrorCode == "SEARCH_VERIFICATION_LIMIT")
+                        {
+                            Assert.Equal("time", result.Root.GetProperty("limit_kind").GetString());
+                            Assert.False(result.Root.TryGetProperty("verifiedRecordCount", out _));
+                            timeLimitRefusals++;
+                            continue;
+                        }
+
                         Assert.True(result.ErrorCode is "SEARCH_SNAPSHOT_CHANGED" or "SEARCH_VERIFICATION_UNAVAILABLE", result.Body);
                         failures++;
                         continue;
@@ -410,8 +420,12 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
 
             await stop.CancelAsync();
             await background;
-            Assert.NotEmpty(server);
-            levels.Add(new { concurrency, rounds, verifications = server.Count, typedRetryableRefusals = failures, serverMilliseconds = Percentiles(server), clientMilliseconds = Percentiles(client) });
+            if (concurrency == 1)
+            {
+                Assert.NotEmpty(server); // sequentially, a 200-record scope must verify within the budget
+            }
+
+            levels.Add(new { concurrency, rounds, attempts = (rounds + 1) * concurrency, verifications = server.Count, typedRetryableRefusals = failures, timeLimitRefusals, serverMilliseconds = server.Count > 0 ? Percentiles(server) : null, clientMilliseconds = client.Count > 0 ? Percentiles(client) : null });
         }
 
         var json = JsonSerializer.Serialize(new { measuredOn = DateTimeOffset.UtcNow, records = 200, valueProfile = "Accused form: 8 fields incl. encrypted names (name lengths 8..47), plaintext date/boolean/option/datetime/guid", backgroundWorkload = "address edits on another form every 250 ms", note = "engineering measurement; small samples; p99 of small n is near the maximum; not a capacity claim", levels }, Indented);

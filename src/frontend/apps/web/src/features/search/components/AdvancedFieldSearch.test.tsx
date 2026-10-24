@@ -50,6 +50,24 @@ describe("AdvancedFieldSearch", () => {
     expect(onSearch).not.toHaveBeenCalled();
   });
 
+  it("with approved fields but execution off, lets conditions be composed from the server's fields and never runs them", async () => {
+    const onSearch = vi.fn();
+    const approvedButOff: FieldSearchCapabilitiesResponse = { ...unavailable, fields: available.fields };
+    render(<AdvancedFieldSearch formSelected capabilities={approvedButOff} defaultExpanded onSearch={onSearch} />);
+    expect(screen.getByText("Advanced field search is not available yet")).toBeInTheDocument();
+    const condition = screen.getByRole("group", { name: "Condition 1" });
+    // The Field control is live (its choices are exactly the server's approved fields; the browser test opens it).
+    expect(within(condition).getByRole("combobox", { name: "Field" })).toBeEnabled();
+    expect(within(condition).getByRole("combobox", { name: "Condition" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Add condition" }));
+    expect(screen.getAllByRole("group", { name: /^Condition \d$/ })).toHaveLength(2);
+    expect(screen.getByText(/nothing is searched until trusted search is turned on/)).toBeInTheDocument();
+    const run = screen.getByRole("button", { name: "Search records" });
+    expect(run).toBeDisabled();
+    run.closest("form")!.requestSubmit();
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
   it("without a selected form asks for one and offers nothing", () => {
     render(<AdvancedFieldSearch formSelected={false} capabilities={undefined} defaultExpanded />);
     expect(screen.getByText("Choose a form first")).toBeInTheDocument();

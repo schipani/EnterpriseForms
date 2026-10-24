@@ -8,8 +8,10 @@ using Microsoft.IdentityModel.Tokens;
 namespace EnterpriseForms.DevSeed;
 
 /// <summary>
-/// Bootstraps ONE synthetic development organization with four personas through the authority operator plane
+/// Bootstraps ONE synthetic development organization with five personas through the authority operator plane
 /// (idempotent: a second run reuses the persisted ids) and writes dev-personas.json. Configuration via DEVSEED_* env.
+/// The "security" persona (system administrator, Phase C7 M2) exists only in organizations bootstrapped since it was
+/// added: there is deliberately no operator path that adds identities or roles to an existing organization.
 /// Synthetic identities only; nothing here is a production provisioning path (ADR-PB-003 documented gap).
 /// </summary>
 public static class Program
@@ -38,6 +40,8 @@ public static class Program
             new("clerk", "Casey Clerk (record user)", ids.Clerk, "dev-clerk", ids.Organization, organizationName, []),
             new("reader", "Riley Reader (no grants)", ids.Reader, "dev-reader", ids.Organization, organizationName, []),
         };
+        var securityId = ids.Security ?? Guid.CreateVersion7();
+        var security = new Persona("security", "Sam Security (System Administrator)", securityId, "dev-security", ids.Organization, organizationName, ["system_administrator"]);
 
         using var client = new HttpClient { BaseAddress = new Uri(authority), Timeout = TimeSpan.FromSeconds(30) };
         for (var attempt = 1; attempt <= 60; attempt++)
@@ -60,6 +64,8 @@ public static class Program
         var gate = await client.GetAsync(new Uri($"internal/v1/operator/organizations/{ids.Organization:D}/gate", UriKind.Relative), Bearer(operatorIssuer, operatorAudience, operatorKey)).ConfigureAwait(false);
         if (gate.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
+            personas.Add(security);
+            ids = ids with { Security = securityId };
             var bootstrap = new
             {
                 organization_id = ids.Organization,
@@ -80,6 +86,14 @@ public static class Program
         else if (gate.IsSuccessStatusCode)
         {
             Console.WriteLine("Organization already bootstrapped: " + ids.Organization.ToString("D"));
+            if (ids.Security is not null)
+            {
+                personas.Add(security);
+            }
+            else
+            {
+                Console.WriteLine("This organization was bootstrapped before the security persona existed; it is not offered (no operator path adds identities to an existing organization).");
+            }
         }
         else
         {
@@ -118,7 +132,7 @@ public static class Program
 
     private static string Env(string name, string fallback) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value ? value : fallback;
 
-    private sealed record SeedIds(Guid Organization, Guid Owner, Guid Designer, Guid Clerk, Guid Reader);
+    private sealed record SeedIds(Guid Organization, Guid Owner, Guid Designer, Guid Clerk, Guid Reader, Guid? Security = null);
 
     private sealed record Persona(string PersonaKey, string DisplayName, Guid AuthorityUserId, string SubjectIdentifier, Guid OrganizationId, string OrganizationDisplayName, IReadOnlyList<string> OrganizationRoles);
 }
