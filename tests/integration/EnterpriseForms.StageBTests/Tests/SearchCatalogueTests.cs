@@ -337,6 +337,13 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         }
 
         await WriteReportAsync(report);
+
+        // Leave the shared stack as found: let the archive processor deliver the benchmark's journal backlog before other tests run.
+        var drained = Stopwatch.StartNew();
+        while (drained.Elapsed < TimeSpan.FromMinutes(5) && fixture.Stack.AuthorityObserverSql("SELECT count(*) FROM security_journal_entries WHERE archive_delivery_state = 'Pending';").Trim() != "0")
+        {
+            await Task.Delay(1000, TestContext.Current.CancellationToken);
+        }
     }
 
     private static async Task WriteReportAsync(List<object> report)

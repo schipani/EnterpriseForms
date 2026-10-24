@@ -143,6 +143,8 @@ public sealed class SecurityJournalEntryConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.LastArchiveErrorCode).HasMaxLength(100);
         builder.HasIndex(e => new { e.OrganizationId, e.JournalStreamName, e.JournalStreamRevision }).IsUnique().HasDatabaseName("uq_journal_stream_revision");
         builder.HasIndex(e => new { e.OrganizationId, e.ArchiveDeliveryState }).HasDatabaseName("ix_journal_pending_archive");
+        // Phase C7 M1: a record's checkpoint entry is found by its operation in one indexed lookup (verification was O(content revisions) per record).
+        builder.HasIndex(e => new { e.OrganizationId, e.JournalStreamName, e.ContentChangeOperationId }).HasDatabaseName("ix_journal_content_operation");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_journal_org");
         builder.ToTable(t =>
         {

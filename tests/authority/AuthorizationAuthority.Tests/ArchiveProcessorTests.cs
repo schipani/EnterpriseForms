@@ -156,6 +156,8 @@ public sealed class ArchiveProcessorTests
 
         public void AddJournalEntry(SecurityJournalEntry entry) => throw new NotSupportedException();
 
+        public Task<SecurityJournalEntry?> FindContentCommitJournalEntryAsync(Guid org, Guid operation, CancellationToken ct) => throw new NotSupportedException();
+
         public Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid org, string stream, long revision, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<int> CountPendingArchiveAsync(Guid org, string stream, CancellationToken ct) => throw new NotSupportedException();

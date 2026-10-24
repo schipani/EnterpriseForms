@@ -422,6 +422,8 @@ public sealed class CommandPlannerTests
 
         public void AddJournalEntry(SecurityJournalEntry entry) => throw new NotSupportedException();
 
+        public Task<SecurityJournalEntry?> FindContentCommitJournalEntryAsync(Guid org, Guid operation, CancellationToken ct) => throw new NotSupportedException();
+
         public Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid org, string stream, long revision, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid org, int limit, CancellationToken ct) => throw new NotSupportedException();

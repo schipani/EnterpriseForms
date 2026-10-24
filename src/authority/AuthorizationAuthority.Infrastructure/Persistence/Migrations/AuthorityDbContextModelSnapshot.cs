@@ -682,6 +682,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "ArchiveDeliveryState")
                         .HasDatabaseName("ix_journal_pending_archive");
 
+                    b.HasIndex("OrganizationId", "JournalStreamName", "ContentChangeOperationId")
+                        .HasDatabaseName("ix_journal_content_operation");
+
                     b.HasIndex("OrganizationId", "JournalStreamName", "JournalStreamRevision")
                         .IsUnique()
                         .HasDatabaseName("uq_journal_stream_revision");

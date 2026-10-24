@@ -1181,23 +1181,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
     private static async Task<SecurityJournalEntry?> FindContentJournalForHeadAsync(IAuthorityScope scope, Guid organizationId, RecordContentHead head, CancellationToken cancellationToken)
     {
-        // The checkpoint for this head is the content-stream entry whose operation id equals the committed operation.
-        var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
-        if (state is null)
-        {
-            return null;
-        }
-
-        for (var revision = state.ContentIntegrityRevision; revision >= 1; revision--)
-        {
-            var entry = await scope.FindJournalEntryAsync(organizationId, JournalStreamNames.Content, revision, cancellationToken).ConfigureAwait(false);
-            if (entry is not null && entry.ContentChangeOperationId == head.CommittedOperationId && entry.JournalEventKind == "ContentHeadCommitted")
-            {
-                return entry;
-            }
-        }
-
-        return null;
+        // The checkpoint for this head is the content-stream ContentHeadCommitted entry whose operation id equals the committed
+        // operation. Phase C7 M1: one indexed lookup instead of walking back through every content revision of the organization
+        // (that walk made each verification O(revisions since the record's commit) and a whole scope O(N²)). Same result: the
+        // latest such entry.
+        return head.CommittedOperationId is { } operation
+            ? await scope.FindContentCommitJournalEntryAsync(organizationId, operation, cancellationToken).ConfigureAwait(false)
+            : null;
     }
 
     private static async Task<ContentRevision> ToRevisionAsync(IAuthorityScope scope, OrganizationAuthorizationState state, RecordContentHead head, Guid correlationId, CancellationToken cancellationToken)

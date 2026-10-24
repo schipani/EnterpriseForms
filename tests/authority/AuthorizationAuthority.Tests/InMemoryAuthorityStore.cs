@@ -83,6 +83,10 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public void AddJournalEntry(SecurityJournalEntry entry) => s.Journal.Add(entry);
 
+        public Task<SecurityJournalEntry?> FindContentCommitJournalEntryAsync(Guid organizationId, Guid contentChangeOperationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Journal.Where(j => j.OrganizationId == organizationId && j.JournalStreamName == JournalStreamNames.Content && j.ContentChangeOperationId == contentChangeOperationId && j.JournalEventKind == "ContentHeadCommitted")
+                .OrderByDescending(j => j.JournalStreamRevision).FirstOrDefault());
+
         public Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken) =>
             Task.FromResult(s.Journal.FirstOrDefault(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName && j.JournalStreamRevision == streamRevision));
 

@@ -64,6 +64,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken);
 
+    /// <summary>The content-stream ContentHeadCommitted entry of an accepted operation (latest if ever repeated), by index — not by scanning revisions.</summary>
+    Task<SecurityJournalEntry?> FindContentCommitJournalEntryAsync(Guid organizationId, Guid contentChangeOperationId, CancellationToken cancellationToken);
+
     Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken);
 
     Task<int> CountPendingArchiveAsync(Guid organizationId, string streamName, CancellationToken cancellationToken);
