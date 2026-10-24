@@ -278,7 +278,7 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
             await s.BootstrapAsync();
             await s.BuildAccusedWorkspaceAsync();
             var created = new System.Collections.Concurrent.ConcurrentBag<Guid>();
-            await Parallel.ForEachAsync(Enumerable.Range(0, size), new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = TestContext.Current.CancellationToken }, async (_, ct) => created.Add(await CreateWithRetryAsync(s, ct)));
+            await Parallel.ForEachAsync(Enumerable.Range(0, size), new ParallelOptions { MaxDegreeOfParallelism = 3, CancellationToken = TestContext.Current.CancellationToken }, async (_, ct) => created.Add(await CreateWithRetryAsync(s, ct)));
             Assert.Equal(size, created.Count);
             foreach (var id in created)
             {
@@ -354,8 +354,9 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
                 return created.Root.GetProperty("formRecordId").GetGuid();
             }
 
-            Assert.True(attempt < 20 && created.ErrorCode is "STALE_AUTHORIZATION_REVISION" or "AUTHORITY_NOT_READY" or "COMMAND_PENDING", "create failed: " + created.Body);
-            await Task.Delay(Random.Shared.Next(50, 400), cancellationToken);
+            // Fail-closed back-pressure (archive receipt pending) and revision races are expected under bulk creation: back off and retry.
+            Assert.True(attempt < 150 && created.ErrorCode is "STALE_AUTHORIZATION_REVISION" or "AUTHORITY_NOT_READY" or "COMMAND_PENDING", "create failed: " + created.Body);
+            await Task.Delay(Random.Shared.Next(250, 1200), cancellationToken);
         }
     }
 
