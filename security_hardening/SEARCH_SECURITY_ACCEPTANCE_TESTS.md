@@ -76,6 +76,24 @@
 
 **Pass:** Audit codes but no protected query plaintext; consistent UI and API error handling.
 
+## Phase C7 implementation status (2026-10-24; not a pass of any ENC-SR case)
+
+M0 (C-57) and M1 (C-62) implement the gate, the contracts and the Authority catalogue. No field-value search exists yet, so **no ENC-SR case has passed as specified**. The cases below are covered at the level M1 makes testable. End-to-end execution evidence comes with M3.
+
+| Case | Covered now | Test | Still pending |
+|---|---|---|---|
+| ENC-SR-05/06/07 | Request validation and the disabled gate (no predicate is evaluated; nothing leaks) | `PhaseC7FieldSearchTests` | Field-policy denial (`SEARCH_FIELD_NOT_ALLOWED`) with AC-6, M2/M3 |
+| ENC-SR-08 | Deleted value rows fail the whole verified scope (never fewer records) | `SearchCatalogueTests.DeletedValueRowsFailTheWholeScope…` (real stack), AC5 unit tests | Search result semantics (M3) |
+| ENC-SR-09 | Altered or rolled-back values fail the scope | `…AlteredAndRolledBackValuesFailTheScope` | M3 |
+| ENC-SR-10 | Moving or hiding a record in business columns does not remove it from the scope | `…BusinessMetadataManipulation…` | M3 |
+| ENC-SR-11 | Injected business records are never in scope; an injected extra row fails its record | `…BusinessMetadataManipulation…` | M3 |
+| ENC-SR-12 | Catalogue limit refused with no entries; byte and time limits (business) | `…LimitsRefuseWithoutTruncation…`, `PhaseC7ScopeVerificationTests` | M3 limit on executed searches |
+| ENC-SR-13 | Authority/gate unavailable → typed failure, no SQL fallback (business unit level; architecture test) | `PhaseC7ScopeVerificationTests`, `FieldSearchHasNoDirectBusinessDatabaseAccess` | Real-stack Authority outage during a search (M3; SEC-P fail-closed suite covers reads) |
+| ENC-SR-14 | Revocation invalidates the snapshot; the record leaves the next catalogue | `…SnapshotsDieOnRevocation…` | Stale cursor replay (M3 paging) |
+| ENC-SR-15 | Content and authorization changes invalidate; changes elsewhere do not | `…SnapshotsDieOnRevocation…`, AC5 unit tests | M3 |
+| ENC-SR-16 | Cross-organization snapshots and catalogues refused | `…LimitsRefuseWithoutTruncation…` | Child-record predicates (out of V1, D6) |
+| ENC-SR-01..04, 17, 18 | — | — | AC-6 / M2–M3 |
+
 ## Evidence and release rules
 
 For each case provide executable test path, test run/commit/image digest, isolated environment, inputs and expected result, observed result, authority revision/snapshot evidence, checked absence of protected information, logs redacted of sensitive data, and independently reviewable pass/fail status. CI must gate on applicable tests; real Azure staging proof still applies to all Level 2 controls. A missing, skipped, mocked or inconclusive check is not a pass. **G06 search completeness remains OPEN until real results establish it.**

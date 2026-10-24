@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "0f483867a9a3f8aee01877a65bf2f57652425924aa3ce3eedece79f5c6fd6d4c",
-      "bytes": 29027
+      "sha256": "18735f17e566766f6ddce67102546979f9b5c93cbbba76e1f7c2371bcdbccbe1",
+      "bytes": 29681
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/PHASE_C7_STATUS.md",
-      "sha256": "e42c7bfc2adbc095d432fb0f67f85cb18eda55f4fdc677a9d4a9a2446b3095ac",
-      "bytes": 9309
+      "sha256": "aafc720883351e933d3b45bd88a60065a3caef1101d7de1594d993d220d513ba",
+      "bytes": 19314
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -149,8 +149,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md",
-      "sha256": "98f804cb852d527f58dc2d7bf74a6282063c1fdc5229c4152a4bf662fb1eaf35",
-      "bytes": 40514
+      "sha256": "1ce00307ced888f8b502f1c046e01fb6cc25430c31b38ae5447e55e1d80424cf",
+      "bytes": 52917
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -239,8 +239,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "66f115fee5b2111f257f0646413f985d3e2df483c46f034913a0f859c5128e0e",
-      "bytes": 84849
+      "sha256": "01897aea9853d03518abc88e7562834cf572632960eb526fa6c49c31441753d4",
+      "bytes": 90939
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -579,8 +579,8 @@
     },
     {
       "path": "security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md",
-      "sha256": "baa470d3e0498be7333b22d2dcd076dba8649fb56257dc335046004523d2c558",
-      "bytes": 3819
+      "sha256": "ce604c2833151ad6589ca905d27f27fe5a69f570f0d54d05211b051c578fa330",
+      "bytes": 6036
     },
     {
       "path": "security_hardening/SECURITY_ACCEPTANCE_TESTS.md",

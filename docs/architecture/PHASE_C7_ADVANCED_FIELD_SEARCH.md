@@ -1,9 +1,11 @@
 # Phase C7 — Advanced Field Search: architecture
 
-- **Status (2026-10-23):**
-  * Owner decisions D1–D7 approved (C-56, §1).
-  * **M0 implemented** (C-57, §6): approved UI, versioned contracts, request validation, typed errors, server-side gate. Field-value execution is disabled.
-  * **AC-5 and AC-6 refined for review** (§3, §4). They are **not implemented**, and M1 is not authorized.
+- **Status (2026-10-24):**
+  * Owner decisions D1–D7 approved (C-56, §1); OD-1..OD-8 approved (C-60, §1A).
+  * **M0 implemented** (C-57, §6): approved UI, versioned contracts, request validation, typed errors, server-side gate. Field-value execution is disabled. Owner visual acceptance pending.
+  * **G22 hotfix merged** to `main` (C-59/C-61) and into this branch.
+  * **M1 implemented — AC-5 Authority catalogue** (C-62, §6A): user-scoped catalogue, privileged migration catalogue, Authority-held snapshots, batch verification, audit stream. Field-value search is **still disabled**.
+  * AC-6 (§4) is designed, **not implemented**; M2–M4 are not authorized.
 - **Branch:** `phase-c7/advanced-field-search` (from `main` 4c00ce7). Not merged.
 - **Binding sources:** `CLAUDE.md` §§4C.6, 4H, 4L.5, 4M–4R, 4T.1, 4T.4 and Phase 4; `docs/decisions/ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md` (+ Amendment A1); `security_hardening/SEARCH_CAPABILITY_MATRIX.csv`; `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` (ENC-SR-01..18); `SECURITY_GAP_ASSESSMENT.md` G06, G19, G21; `trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md`; `trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md`; `docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md`; `docs/PHASE_C6_STATUS.md` §16.5.
 - **Not claimed:**
@@ -33,6 +35,19 @@ The Authority enumerates the caller's complete discoverable set at one authoriza
 | **D6** | **V1 scope.** | Approved current-version scalar typed field values; operators from server capabilities; AND only. Excluded: repeating-group items, related-form/child-record predicates, document-content search, sorting by arbitrary field values, facets and aggregates, export from advanced search, semantic/vector search, regex, Confidential/Restricted values, and blind indexes without separate approval. Existing metadata sorting and My Records features remain. |
 | **D7** | **Authorize M0.** | Approved UI, versioned API and capability contracts, request validation and typed errors, execution clearly disabled until AC-5 and AC-6 are ready, focused tests and documentation. No unsafe temporary execution, and no field-value search by querying Business PostgreSQL. |
 
+## 1A. Approved open decisions (C-60, recorded as approved by the owner)
+
+| # | Decision | Approved as |
+|---|---|---|
+| **OD-1** | Migration workload identity | **A** — a separate workload identity `field-protection-verifier` with independently controlled credentials and narrowly scoped permissions. The normal business API can never invoke privileged organization-wide migration enumeration. |
+| **OD-2** | Search approval administrators | **A for V1** — only principals explicitly granted `administer_security` may authorize plaintext field-value search. An organization owner with ordinary `manage_configuration` cannot approve searchable fields through ownership. Organization and tenant boundaries are kept; global application administration is not unlimited access to every organization's data. Two-person approval may come with a later policy tier. |
+| **OD-3** | Published form integrity | **A** — the Authority records a trustworthy published form-version number and a deterministic, versioned canonical layout digest. Approvals bind to independently authenticated field identities, types, classifications, versions and applicable option-catalogue metadata. An unsigned BusinessDb copy is never the source of an approved definition. Historical unsigned definitions are not backfilled or approved without independent verification. G21 remains open until all relevant metadata-integrity issues are addressed and reviewed. |
+| **OD-4** | Query permission | **A** — an explicit per-form `field_searcher` relation. Form-user, record-owner or designer access is not query permission; actual field- and record-level authorization is enforced. |
+| **OD-5** | Snapshot invalidation | **A** — in V1 any relevant organization authorization revision change invalidates the snapshot; no weaker cached discoverable set without independent revalidation. |
+| **OD-6** | Batch verification | **A** — an independently authorized Authority batch verification of up to 50 records per call; each record fully and independently verified against its accepted revision, manifest and authorized readable scope; batching never weakens per-record checks; one failure in a required verified scope fails the future search. |
+| **OD-7** | Step-up authentication | **Environment-specific.** Production and staging: AC-6 approval operations stay unavailable until real PB-08 step-up evidence is implemented and verified. Isolated development/test: a narrowly restricted synthetic approval path with a mandatory governance reference may be added later for AC-6 testing, structurally impossible to activate in production or staging; if that isolation cannot be demonstrated, approvals are rejected in all environments until PB-08 is ready. M1 implements no approvals. |
+| **OD-8** | Independent search auditing | **B** — sensitive search approvals, denials and executions produce independently protected Authority audit evidence (established journal infrastructure), never predicate values, protected contents or unauthorized metadata. |
+
 ## 2. Threat model summary (unchanged in substance; refined by D1/D2/D5)
 
 | ID | Threat | Control | Test |
@@ -58,7 +73,7 @@ Residual risks, documented and not mitigated:
 * a delivered match has already been seen;
 * the Authority runtime and its database administrators are trusted (§4M).
 
-## 3. AC-5 — Authority record catalogue (refined design for review; not implemented)
+## 3. AC-5 — Authority record catalogue (design; implemented in M1 — see §6A for what was built and where it differs)
 
 ### 3.1 Registry schema and ownership
 
@@ -297,7 +312,7 @@ M0 returns `fieldValueSearchAvailable=false`, reason `TRUSTED_SEARCH_NOT_ENABLED
 | AC6-T11 | Value rows of field B presented under field A's id (forged) | HMAC/manifest failure |
 | AC6-T12 | Turning `plaintext_search_permitted` off | All approvals invalidated |
 
-## 5. Unresolved architectural decisions (for the next review)
+## 5. Open decisions OD-1..OD-8 (resolved by C-60, §1A; the options below are kept for the record)
 
 | # | Question | Options | Recommendation |
 |---|---|---|---|
@@ -391,23 +406,80 @@ Whether a particular field offers an operator will come from AC-6.
 * **Coordinator:** endpoints `search.capabilities` (GET), `search.fieldSearch` and `search.fieldSearchPage` (POST, interactive-read lane, not idempotency-keyed, so failures are final and not retried).
 * **Not in M0:** Form Designer "Search" section and organization search-policy UI (depend on AC-6/M2). DateTime predicates convert from the browser's zone. Conversion via the user's effective IANA zone, with DST gap/fold handling, is an M3 item.
 
+## 6A. M1 — AC-5 implemented (C-62)
+
+### 6A.1 Authority (independently administered; AuthorityDb, SpiceDB, Vault/HSM)
+
+| Element | Implementation |
+|---|---|
+| Registry | Reuses `authority_resources` (form_record, `parent_resource_entity_id` = form, written only by journaled security commands) and `record_content_heads`. New index `ix_authority_resources_form_scope`. No second source of truth. |
+| Snapshots | `search_catalogue_snapshots` (scope kind, requesting user **or** workload + scoping command, form, authorization/projection/content-integrity revision, entry count, SHA-256 digest of the canonical sorted entries, issue/expiry/invalidation) and `search_catalogue_snapshot_entries` (record, position, accepted revision, committed operation, head quarantine flag, registry lifecycle). Check constraints tie each scope kind to its actor. The runtime role may INSERT/UPDATE but never DELETE. Expired rows are marked, not deleted (purge is a maintenance task, not a runtime privilege). |
+| User catalogue | `POST /internal/v1/search-catalogue` (business workload + delegated user). Registry rows of the form in `Active`/`Quarantined` ∩ the complete SpiceDB `discover` lookup at the Authority-held token (C-28 paging). Heads read in the same transaction. Under the organization lock, the authorization, projection and content-integrity revisions and the quarantine flag must be unchanged (otherwise `AUTHORITY_NOT_READY`). More than `maximum_entries` (≤ `Catalogue:MaximumUserEntries`, 500) → `422 LIMIT_EXCEEDED` with no entries and no count. Records with revision 0 and quarantined heads/resources are listed with their state, never dropped. |
+| Snapshot validation | `POST /internal/v1/search-catalogue/{id}/validate` — the caller's own snapshot only (anyone else: 404). Decided only from current state, in this order: recorded invalidation; expiry; gate closed (reported as transient, not recorded); authorization revision change (OD-5); projection revision change; scoping command superseded (migration scope); then, only if the content-integrity revision moved, every entry's head (revision, operation), quarantine flag and registry lifecycle/parent. An invalidation is recorded and never reverts. |
+| Migration catalogue | `POST /internal/v1/verifier/migration-catalogue`, `GET …/{id}/entries?offset=`, `POST …/{id}/validate` under the separate **Verifier** scheme and `field-protection-verifier` role (OD-1). Scoped by an Effective PublishFormSecurityRevision command of the requested form that is still the field's current protection decision (the shared `ProtectionCommandResolver`, the same rule as reprotection writes). Population: `Active`, `Quarantined` and `Registered` records of the form — including records no user can discover. Paged (`Catalogue:MigrationPageSize`, 1000), ceiling `MaximumMigrationEntries` 50,000. Snapshots are bound to the issuing workload name. Not called by any business component in M1 (G19 reconciliation is M4). |
+| Verifier credential | `Identity:Verifier` (issuer, audience, ≥256-bit key). Unconfigured: no scheme is registered and the policy denies everything, so the routes stay in the OpenAPI document but nothing passes. Partial configuration, or a key or issuer reused from the workload/operator/user-assertion credentials, refuses startup. Configured only on the isolated test stack (synthetic key); the development and other stacks set nothing. |
+| Batch verification | `POST /internal/v1/integrity/verify-record-projections` (business workload + delegated user), 1..50 distinct records, read action. Each record goes through the **unchanged** core of `VerifyRecordProjection` (registry, discover/read, quarantine, archive receipt, complete leaf set, every HMAC, root, readable field items), now shared by both operations, against the head the caller expects. A different current head → `HEAD_CHANGED` (nothing verified, nothing quarantined). Per-record typed results: `RECORD_UNAVAILABLE` (concealment-safe), `QUARANTINED`, `AWAITING_ARCHIVE`, `NO_COMMITTED_CONTENT`, `KEY_UNAVAILABLE` and the integrity codes (record quarantined, incident journaled). Provider outages fail the whole call. If the authorization state moved during the batch, the tamper evidence is committed and the call fails `AUTHORITY_NOT_READY`. |
+| Audit (OD-8) | New non-gating `audit` journal stream (`audit_journal_revision`, `latest_audit_journal_digest`; hash-chained, archived and anchored like the other streams by the unchanged archive processor). It never advances the content-integrity revision and never closes the gate. Events: `SearchCatalogueIssued`, `MigrationCatalogueIssued`, `MigrationCatalogueDenied` — snapshot id, scope, form, actor (user or workload + command), entry count, digest, revisions, correlation; never record ids, field values or predicates. |
+| Limits | `Catalogue` section (startup-validated): user ceiling 500, migration 50,000, page 1000, snapshot lifetimes 300 s (user) / 900 s (migration), at most 900 s. |
+| Migrations | `20261024051111_SearchCatalogueAndAuditStream` — additive only (2 tables, 2 columns, 4 indexes). `20261024074555_JournalContentOperationIndex` — one index. |
+| Checkpoint lookup (performance fix) | Verification finds the record head's archive checkpoint by its committed operation in one indexed query (`FindContentCommitJournalEntryAsync`, index `ix_journal_content_operation`). It previously walked back through every content revision of the organization on every verified read, making a scope O(N²). Same result (the latest ContentHeadCommitted entry of the operation). Measured effect in §6A.5. |
+
+### 6A.2 Business (no field-value search)
+
+* `Search/Verification/TrustedScopeVerifier`: catalogue → staged rows of each entry's committed operation through the FormRecords port `IAcceptedRecordItemsReader` → batches of 50 → final snapshot validation.
+  * **D3:** any failure fails the whole scope. A quarantined entry or record, an unverifiable record → `SEARCH_VERIFICATION_UNAVAILABLE` (`RECORD_QUARANTINED` / `RECORD_VERIFICATION_FAILED`). A changed head, an unavailable record or an invalid snapshot → `SEARCH_SNAPSHOT_CHANGED`. The Authority not ready → `SEARCH_SNAPSHOT_CHANGED`; the Authority unavailable → retryable `SEARCH_VERIFICATION_UNAVAILABLE`.
+  * **D4:** `LIMIT_EXCEEDED` → `SEARCH_VERIFICATION_LIMIT` (`records`); staged bytes above 64 MiB → `bytes`, checked before anything is sent; the 15 s budget → `time`.
+  * It evaluates no predicate and returns no values.
+* Authority client methods for the catalogue, its validation and batch verification.
+* `POST /api/v1/testing/search-scope-verification` — mapped **only** in the `Testing` environment (isolated Docker stack), not in the published OpenAPI. It returns counts, record ids of the caller's own verified scope and costs, so the real-stack hostile-database, limit and benchmark tests can drive the verification path. The public `field-search` endpoints keep refusing with `TRUSTED_SEARCH_NOT_ENABLED` (M0 gate unchanged).
+
+### 6A.3 Differences from the reviewed design (§3)
+
+* The contract entry carries no manifest root. The business side never needs it: verification happens at the Authority against the head it fixed.
+* The migration population also includes `Registered` records (registration not yet effective), so a pending record cannot be missed by migration verification.
+* Expired snapshots are marked, not purged by the runtime (no DELETE privilege).
+* Gate-closed validation is reported as transient and not recorded as an invalidation.
+* User catalogue issuance writes one audit event per catalogue. The single execution event of M3 (field ids, operators, counts) is still to come.
+
+### 6A.5 Measured cost (PB-09, provisional; `docs/PHASE_C7_STATUS.md` §8.6)
+
+| Records | p50 | p95 | Authority calls | Verified bytes |
+|---|---|---|---|---|
+| 50 | 0.59 s | 0.67 s | 3 | 0.18 MB |
+| 150 | 1.82 s | 1.85 s | 5 | 0.55 MB |
+| 480 | 6.12 s | 6.15 s | 12 | 1.76 MB |
+
+Before the checkpoint-lookup fix: 50 → 0.84 s, 150 → 4.46 s, 480 → over the 15 s budget.
+
+* Cost is now linear (≈ 12.7 ms per record), so 500 records fit the D4 budget.
+* The PB-09 < 3 s target holds only up to ≈ 230 records on this infrastructure. This is a decision for the owner before M3.
+
+### 6A.4 What M1 does not establish
+
+* No field-value search, capability, approval or Designer change (M0 gate unchanged).
+* **G06 stays OPEN:** the verified scope is the precondition of a complete result; predicate evaluation, ordering, paging and the ENC-SR execution tests come with M3.
+* **G19 stays OPEN:** the migration catalogue exists, but the worker does not use it yet (M4).
+* **G21 stays OPEN.**
+* No independent review of the Authority changes, no Azure staging evidence, no production limits.
+
 ## 7. Proposed milestones
 
 | Milestone | Content | Status |
 |---|---|---|
 | M0 | UI, contracts, validation, typed errors, server gate, tests | **Implemented (C-57); awaiting owner functional acceptance** |
-| M1 | AC-5 Authority catalogue (user scope + migration scope), snapshot validation, batch verification (OD-6), AC5-T01..T15 | Not authorized; design for review (§3) |
+| M1 | AC-5 Authority catalogue (user scope + migration scope), snapshot validation, batch verification (OD-6), AC5-T01..T15 | **Implemented (C-62, §6A); awaiting owner review** |
 | M2 | AC-6 policy + approvals + `field_searcher` grants + Designer "Search" section + organization policy UI, AC6-T01..T12 | Not authorized; design for review (§4) |
 | M3 | Trusted executor, paging cache, audit, ENC-SR-01..18, browser acceptance with real results, performance measurement | Not authorized |
 | M4 | Worker G19 reconciliation against the migration catalogue | Not authorized |
 
-**Proposed next:** owner review of §3–§5, then **M1 (AC-5)**, since both search and G19 depend on it.
+**Proposed next:** owner review of M1, then **M2 (AC-6 search policy, OD-2/OD-3/OD-4/OD-7)**. M2 production approvals depend on PB-08 step-up; M4 (G19 reconciliation) can follow M1 independently.
 
 ## 8. Open risks
 
 * G06, G19 and G21 remain **OPEN**.
 * AC-5 and AC-6 are Authority changes and need independent production review (like C-12, C-28, AC-1, AC-2).
 * The D4 limits have not been measured.
-* New finding **G22** (C-58): session CSRF double-submit is not enforced for cookie sessions. This pre-existing pipeline defect was found by the M0 browser tests; it is outside C7 and needs an owner decision.
+* **G22** (C-58): corrected by the hotfix (C-59/C-61); independent review of the authentication pipeline is still required for production assurance.
+* **G23** (new): logout is client-side only; stateless session tickets stay valid until they expire. Needs an owner decision.
 * Approved plaintext stays readable to a business DBA (ADR-PB-004 §3).
 * Unverified display metadata (form name, creator) in result rows keeps the existing caveat.

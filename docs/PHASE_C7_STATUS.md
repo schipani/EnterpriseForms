@@ -6,9 +6,18 @@
   * C-55: checkpoint;
   * C-56: owner decisions D1–D7;
   * C-57: M0 implemented;
-  * C-58: new finding G22.
-- **G06, G19, G21:** OPEN. **G22:** new, OPEN.
-- **State (2026-10-23):** M0 is implemented and verified (§3). It is **stopped for owner functional acceptance** and for the Authority-security architecture review of AC-5 and AC-6. AC-5/AC-6 are not implemented, and M1 is not started.
+  * C-58: G22 found;
+  * C-59: G22 corrected;
+  * C-60: OD-1..OD-8 approved;
+  * C-61: G22 hotfix merged;
+  * C-62: M1 implemented.
+- **G06, G19, G21:** OPEN. **G22:** corrected (independent review pending). **G23:** new, OPEN.
+- **State (2026-10-24):**
+  * M0 implemented (owner visual acceptance **pending**).
+  * G22 hotfix merged to `main` and into this branch (§7).
+  * **M1 — AC-5 — implemented and verified (§8); stopped for owner review and acceptance.**
+  * Field-value search is still disabled.
+  * AC-6 (M2), M3 and M4 are not started.
 
 ## 1. History
 
@@ -106,7 +115,122 @@ Hosted runs on c7604ab: `stage-b-integration` 40051180610 (success), `security-g
 
 ## 6. Outstanding decisions and blockers
 
-* **AC-5/AC-6 review:** architecture §3–§5, with open decisions OD-1..OD-8 (architecture §5).
-* **G22 (new, C-58):** session CSRF double-submit is not enforced for cookie sessions (`SECURITY_GAP_ASSESSMENT.md`). It needs an owner decision on a fix.
-* **PB-08 step-up** is not implemented. AC-6 approvals depend on it for production (OD-7).
-* **G21:** search labels and options will come from Authority snapshots (AC-6), but the record UI still renders unsigned labels.
+* Superseded by §9 (current outstanding items).
+
+## 7. G22 security hotfix (C-59, C-61)
+
+* **Defect:** the CSRF middleware ran before the session cookie was authenticated (the default scheme is the bearer), so unsafe cookie-session requests were accepted without `X-CSRF-Token`.
+* **Fix:** for non-safe methods the middleware authenticates the session scheme itself. When a valid session cookie is present, it requires that session's own token, also when a bearer is present. No route exemptions.
+* **Delivery:** PR #20 (`hotfix/g22-session-csrf`, only this change) squash-merged as `main` **65d25fa**, then merged into this branch (43790b8).
+* **Evidence:**
+  * required ci 4/4 and CodeQL;
+  * integration **106/106** and browser **87/87** (run 40063305131);
+  * SEC-P **13/13** (run 40063303932);
+  * 22 in-process pipeline cases, of which 18 fail on the unfixed middleware.
+* **Development stack:** a cookie-session POST without the token now gets 403.
+* **Details:** `docs/security/G22_SESSION_CSRF_HOTFIX.md`.
+* **Residual G23 (new, open):** logout only clears the browser cookie; stateless tickets stay valid until they expire. Fixing it needs server-side session state, which is an owner decision.
+
+## 8. M1 — AC-5 Authority record catalogue (C-62)
+
+### 8.1 What was built
+
+See architecture §6A for the full description and the differences from the reviewed design. In summary:
+
+* **Authority:**
+  * user-scoped search catalogue;
+  * Authority-held snapshots, validated only against current state (OD-5);
+  * privileged migration catalogue for the separate `field-protection-verifier` workload (OD-1; never reachable by the business workload; unconfigured ⇒ always denied);
+  * batch verification of 1..50 records over the unchanged single-record verification core (OD-6);
+  * non-gating, archived `audit` journal stream (OD-8);
+  * additive migrations `SearchCatalogueAndAuditStream` and `JournalContentOperationIndex`.
+* **Business:** `TrustedScopeVerifier` (D3 fail whole scope, D4 limits), Authority client methods, and a Testing-environment-only proof route. Public field-value search stays gated (`TRUSTED_SEARCH_NOT_ENABLED`).
+* **Performance fix found by the benchmark:** the Authority located a record's archive checkpoint by walking back through every content revision of the organization (one query per revision) on every verified read. That made a scope O(N²): before the fix, 150 records took 4.46 s and 480 records exceeded the 15 s budget (correctly refused with `SEARCH_VERIFICATION_LIMIT`, time). It is now one indexed lookup with the same result. This was pre-existing and also affected every ordinary verified record read in large organizations.
+
+### 8.2 Commits
+
+| Commit | Content |
+|---|---|
+| 906af67 | M1 implementation |
+| 03a0c95, 9b187d5, 5181534, 224a53c, fc20b8a | Real-stack test corrections (see §8.5) |
+| b146907 | Checkpoint lookup by operation (O(1)), index migration; benchmark drains the archive backlog |
+| *(docs commit)* | This documentation |
+
+### 8.3 Verification (final code b146907)
+
+| Suite | Result |
+|---|---|
+| .NET local (`run_dotnet_tests.py`): Architecture 67, Authority 126 (+18 AC-5 unit), API contract 272 (+16 scope verifier, +4 verifier boundary, +1 Testing-route absence), Integrity 34 | **499 / 499** |
+| Hosted `stage-b-integration` run 40075513114: integration (incl. 8 AC-5 real-stack proof tests and the benchmark) | **115 / 115** |
+| Same run: full browser suite | **94 / 94** |
+| Hosted `security-gate-a` run 40075514763: SEC-P01..SEC-P12 | **13 / 13** |
+| Playwright M0 specs against the rebuilt development stack (:8091) | 8 / 8 |
+
+No frontend code changed in M1.
+
+### 8.4 AC5-T01..T15 coverage
+
+| Test | Status | Where |
+|---|---|---|
+| T01 deleted rows | Pass (real stack) | `SearchCatalogueTests.DeletedValueRowsFailTheWholeScope…` |
+| T02 altered value | Pass (real stack) | `…AlteredAndRolledBackValuesFailTheScope` |
+| T03 removed from business listing/columns | Pass (real stack) | `…BusinessMetadataManipulation…` |
+| T04 injected record / extra row | Pass (real stack) | `…BusinessMetadataManipulation…` |
+| T05 rolled-back rows | Pass (real stack) | `…AlteredAndRolledBack…` |
+| T06 moved form in business columns | Pass (real stack) | `…BusinessMetadataManipulation…` |
+| T07 revocation | Pass (real stack + unit) | `…SnapshotsDieOnRevocation…` |
+| T08 edits in / out of scope; new record | Pass (real stack + unit) | `…SnapshotsDieOnRevocation…`, `SearchCatalogueTests` (unit) |
+| T09 limit | Pass (real stack + unit) | `…LimitsRefuseWithoutTruncation…` |
+| T10 foreign / unknown / expired snapshot | Pass (real stack + unit) | `…LimitsRefuse…`, unit `ExpiredForeignAndUnknown…` |
+| T11 business workload on migration catalogue | Pass (real stack + host pipeline) | `…OnlyTheVerifierWith…`, `VerifierBoundaryTests` |
+| T12 verifier without a scoping command | Pass (real stack + unit, denial journaled) | same |
+| T13 records no user can discover | Pass (real stack + unit) | same |
+| T14 lookup paging, projection lag, gate closed | Partial: complete-lookup reuse of C-28 paging (stack page size 20); gate/not-ready mapped (unit); no real Authority outage injected during a search | `PhaseC7ScopeVerificationTests` |
+| T15 quarantined head in scope | Pass (unit + real stack: the deleted-row test re-runs on the quarantined record) | `…DeletedValueRows…` |
+| Field-value matching, paging, sorting of results | **Pending: M3** (no executor exists) | — |
+
+### 8.5 Test corrections made during hosted verification (tests, not product code)
+
+1. Text fields are Confidential and encrypted by default, so the first tamper attacks hit empty plaintext tables and the verification correctly passed. The tests now attack plaintext date rows and first prove the rows exist.
+2. The benchmark's concurrent record creation met the Authority's correct fail-closed back-pressure and revision conflicts. After the idempotency problem in finding F-C7-01 (§8.7), it now creates records sequentially.
+
+### 8.6 Benchmark (PB-09; provisional, not a capacity claim)
+
+Hosted isolated stack (GitHub runner, Docker Compose, Vault Transit, SpiceDB, PostgreSQL ×2), Level 2 controls on, one user scope per form, Accused records of about 3.7 KB of signed rows each. The figure is the server-side elapsed time of the complete verification (catalogue + staged reads + batches + snapshot validation). Raw data: `docs/evidence/phase-c7/c7-m1-benchmark-b146907.json`.
+
+| Records | Runs | p50 | p95 | p99 (= max, small n) | Authority calls | Batches | Verified bytes |
+|---|---|---|---|---|---|---|---|
+| 50 | 15 | 0.59 s | 0.67 s | 0.67 s | 3 | 1 | 0.18 MB |
+| 150 | 12 | 1.82 s | 1.85 s | 1.85 s | 5 | 3 | 0.55 MB |
+| 480 | 8 | 6.12 s | 6.15 s | 6.15 s | 12 | 10 | 1.76 MB |
+
+Findings:
+
+* **Cost is linear** after the fix, at about 12.7 ms per record. The 500-record ceiling fits the 15 s budget, extrapolating to about 6.4 s.
+* **The PB-09 target of < 3 s** for a verified search is met only up to about 230 records on this infrastructure. D4's 500 records / 15 s are workable engineering limits, but not a < 3 s product experience. The owner should decide before M3 whether to lower the record limit, accept slower complete searches, or invest in a V2 trusted index (separate ADR).
+* **Bytes are far below 64 MiB** (≈ 3.7 KB per record), so the byte limit is not the binding constraint for this form shape.
+* **Failure behaviour was observed directly:** over budget ⇒ `SEARCH_VERIFICATION_LIMIT` (time); a scope over 500 ⇒ `SEARCH_VERIFICATION_LIMIT` (records). Neither returned a partial result.
+* **Not measured:** larger forms (250 fields), many child records or documents, concurrent searches, Azure Managed HSM latency (Vault Transit here), production hardware.
+
+### 8.7 Findings
+
+* **F-C7-01 (pre-existing robustness defect, not security):** a record creation that registered the record but then hit a transient Authority answer (for example `AwaitingArchive`) cannot be completed by an idempotent retry. The record id is derived from the key, but the retry re-registers with the current authorization revision and a fresh header id, so it gets `IDEMPOTENCY_CONFLICT`, and the record may stay registered without content (revision 0). The SPA coordinator retries writes on 503 with the same key, so a user could see this. It fails closed. Not changed in M1; the owner should decide on a fix (for example, deterministic header id and the expected revision stored with the idempotency key).
+* **Performance defect (pre-existing):** fixed in b146907 (§8.1).
+* **G23 (new):** see §7.
+
+### 8.8 Browser checks to confirm M0 was unaffected (development environment)
+
+The development stack at `http://127.0.0.1:8091` was backed up first (`Documents\EnterpriseForms-dev-backups\enterpriseforms-dev\20261024-014923`) and then rebuilt with `devstack.py rebuild authority api web`. Only those three containers were recreated, and the additive Authority migrations were applied. Vault, the databases, SpiceDB, Azurite, keys and data are untouched.
+
+* Repeat §4 steps 1–8 (M0 layout, exact search, disabled Advanced Search with the explanation, gallery preview, keyboard, 320 px). Nothing in the UI changed in M1.
+* G22: everything you do in the browser (editing, submitting, sharing, uploads, publishing, signing out) must keep working. A rejection would show as a 403 "CSRF_TOKEN_INVALID" error.
+
+## 9. Outstanding decisions and blockers
+
+* **Owner review and acceptance of M1** (this section and architecture §6A); M0 visual acceptance.
+* **Before M3:** the performance trade-off of §8.6 (500 records ≈ 6 s versus the < 3 s PB-09 target).
+* **F-C7-01:** idempotent completion of partially failed record creation.
+* **G23:** server-side session revocation.
+* **AC-6 (M2):** depends on PB-08 step-up for production approvals (OD-7) and on OD-3 form-version registration in the Authority.
+* **G06, G19, G21:** open. M1 is a precondition, not a closure. G19 needs M4.
+* **Independent review:** the Authority changes (catalogue, verifier credential, batch verification, audit stream, checkpoint lookup) and the G22 fix need independent security review, like C-12, C-28, AC-1 and AC-2. There is no Azure staging evidence.
