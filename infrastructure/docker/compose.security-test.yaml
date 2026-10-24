@@ -49,6 +49,10 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      # Starts after the one-shot seed; as a completed dependency it also keeps `up --wait` from treating the seed's
+      # normal exit as a failure (the second instance's later health check would otherwise race the seed's exit).
+      dev-seed:
+        condition: service_completed_successfully
   worker:
     environment:
       DOTNET_ENVIRONMENT: Testing
