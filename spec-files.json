@@ -119,8 +119,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "678639951cd8eda27f4caeb2a20f442faa12d0d6b2d88e59d27e965db4102ec6",
-      "bytes": 7982
+      "sha256": "eab5801501439c7dc056d8ff1a7f3172baca9c51c189286940fc602a43f361d3",
+      "bytes": 8045
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -141,6 +141,11 @@
       "path": "docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md",
       "sha256": "a524a9aa45022289f8bb236219fb2709d4cb5c5c21b413f0ad74aabc157a82d8",
       "bytes": 65888
+    },
+    {
+      "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
+      "sha256": "7ccab72c1b69652d91673845efc4ce78369d99862f1560f5314b20b56e4d9936",
+      "bytes": 9908
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -229,8 +234,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "9228f1c0eb4c0b3ca39d5b8cc93f35ef1778ee974a01ab6ffe05b8628f2c5ce4",
-      "bytes": 79858
+      "sha256": "bf8fbe67d8f2be0e3f1d04e00e96c6f6dbcb80c31194eae6e2f3c8e58660271e",
+      "bytes": 82293
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

@@ -12,7 +12,7 @@ namespace EnterpriseForms.Application.Features.FormRecords.Staging;
 /// staged immutably under the operation id, re-read from the untrusted store and submitted as commit evidence. Local
 /// candidate state is a hint only.
 /// </summary>
-public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAuthorityClient authority, TimeProvider clock)
+public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAuthorityClient authority, TimeProvider clock, IWriteFaultInjector faults)
 {
     public sealed record CandidateInput(FormRecordRevision Header, IReadOnlyList<ISignedContentRow> Rows);
 
@@ -59,6 +59,8 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
             throw new BusinessException("CANDIDATE_MISMATCH", 409, "authority prepared a different operation than the staged candidate");
         }
 
+        faults.Checkpoint(WriteFaultCheckpoints.ContentPrepared);
+
         // 2. Stage immutably with the authority-issued signatures.
         var signatures = prepared.SignedItems.ToDictionary(s => ((byte)s.ItemKind, s.ItemId), s => Convert.FromBase64String(s.RowSignatureBase64));
         foreach (var row in allRows)
@@ -76,6 +78,8 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             }
         }
+
+        faults.Checkpoint(WriteFaultCheckpoints.ContentStaged);
 
         // 3. Read back from the untrusted store and submit as commit evidence.
         var staged = await ReadStagedAsync(candidate.Header.FormRecordId, operationId, cancellationToken).ConfigureAwait(false);

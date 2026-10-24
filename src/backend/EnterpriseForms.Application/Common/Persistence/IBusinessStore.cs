@@ -149,6 +149,12 @@ public interface IBusinessScope : IAsyncDisposable
 
     void AddFormRecord(FormRecord record);
 
+    /// <summary>F-C7-01: the creation fingerprint recorded for a derived record id, or null.</summary>
+    Task<FormRecordCreationAttempt?> FindCreationAttemptAsync(Guid tenantId, Guid formRecordId, CancellationToken cancellationToken);
+
+    /// <summary>Inserts the attempt unless one already exists for the record (immediately, inside the scope's transaction); false when one exists.</summary>
+    Task<bool> TryAddCreationAttemptAsync(FormRecordCreationAttempt attempt, CancellationToken cancellationToken);
+
     void StageCandidate(FormRecordRevision headerRevision, IEnumerable<ISignedContentRow> rows);
 
     Task<FormRecordRevision?> FindStagedHeaderAsync(Guid formRecordId, Guid contentChangeOperationId, CancellationToken cancellationToken);
