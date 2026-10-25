@@ -67,3 +67,25 @@ public sealed record FieldSearchAdministrationForm(Guid FormDefinitionId, string
 
 /// <summary>Only for <c>administer_security</c>; forms of the caller's organization whose form resource is Active.</summary>
 public sealed record FieldSearchAdministrationResponse(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<FieldSearchAdministrationForm> Forms, long AuthorizationRevision, Guid CorrelationId);
+
+// ---- Security Administrators (owner message 7). "Security Administrator" = organization relation system_administrator
+// (permission administer_security); appointed and removed by GrantSystemRole / RevokeSystemRole security commands. ----
+
+/// <summary>Payload of GrantSystemRole / RevokeSystemRole. <c>RoleName</c> must be <c>system_administrator</c>.</summary>
+public sealed record SecurityAdministratorPayload(Guid AuthorityUserId, string RoleName, string Reason, string? StepUpEvidence = null);
+
+public sealed record SecurityAdministratorRosterRequest(Guid OrganizationId);
+
+/// <summary>A current Security Administrator: verified identity binding and the command that appointed them.</summary>
+public sealed record SecurityAdministratorEntry(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, DateTimeOffset AppointedOn, Guid AppointedBySecurityCommandId);
+
+/// <summary>An enabled, verified identity of the organization that could be appointed.</summary>
+public sealed record SecurityAdministratorCandidate(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier);
+
+/// <summary>
+/// The organization's Security Administrators, for its own Security Administrators and organization owners only.
+/// <c>CanManage</c>: the caller holds administer_security; <c>Candidates</c> only then. <c>AppointmentOperational</c> false
+/// where the Authority cannot accept the step-up (production and staging until PB-08).
+/// </summary>
+public sealed record SecurityAdministratorRoster(bool CanManage, bool AppointmentOperational, string AppointmentUnavailableReason, IReadOnlyList<SecurityAdministratorEntry> Administrators,
+    IReadOnlyList<SecurityAdministratorCandidate>? Candidates, long AuthorizationRevision, Guid CorrelationId);

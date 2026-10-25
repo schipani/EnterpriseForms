@@ -78,6 +78,8 @@ public static partial class CommandPlanner
             SecurityCommandKind.ApproveFieldSearch => await ApproveFieldSearchAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.WithdrawFieldSearch => await WithdrawFieldSearchAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateFieldSearchers => await UpdateFieldSearchersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.GrantSystemRole => await SecurityAdministratorAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, appoint: true, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RevokeSystemRole => await SecurityAdministratorAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, appoint: false, cancellationToken).ConfigureAwait(false),
             _ => throw new AuthorityException(AuthorityErrorCodes.CommandKindNotImplemented, 422, false, $"command kind {request.CommandKind} is not implemented in Stage A"),
         };
     }
@@ -112,6 +114,12 @@ public static partial class CommandPlanner
         if (!IsOrganizationAdministrator(graph, organizationId, actor.AuthorityUserId))
         {
             throw AuthorityException.Forbidden("team membership changes require organization owner or system administrator");
+        }
+
+        if (add && payload.MemberUserId == actor.AuthorityUserId && !graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
+        {
+            // Security administration never becomes record access: a Security Administrator cannot join a team (which may own records) on their own authority.
+            throw AuthorityException.Forbidden("a Security Administrator cannot add themselves to a team");
         }
 
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, payload.TeamId, cancellationToken).ConfigureAwait(false);
@@ -271,9 +279,11 @@ public static partial class CommandPlanner
     {
         var payload = CanonicalJson.Deserialize<UpdateMandatoryPolicyPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.Organization, organizationId);
-        if (!IsOrganizationAdministrator(graph, organizationId, actor.AuthorityUserId))
+        if (!graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
         {
-            throw AuthorityException.Forbidden("the data-protection policy is set by the organization owner or a system administrator");
+            // Separation of duties (Phase C7): the owner sets the organization's encryption floors; a Security Administrator
+            // administers security within them and can never lower them.
+            throw AuthorityException.Forbidden("the data-protection policy is set by the organization owner");
         }
 
         _ = Rank(payload.MinimumFieldClassification);
@@ -619,6 +629,13 @@ public static partial class CommandPlanner
         if (!isOwner && !isAdministrator)
         {
             throw AuthorityException.Forbidden("ownership transfer requires the current owner or an audited system administrator override");
+        }
+
+        if (!isOwner && (payload.NewOwnerUserId == actor.AuthorityUserId
+                         || (payload.NewOwnerTeamId is { } teamId && graph.EdgesOf(ResourceTypeNames.Team, teamId, "member").Any(e => e.SubjectTypeName == ResourceTypeNames.User && e.SubjectEntityId == actor.AuthorityUserId))))
+        {
+            // The administrator override moves ownership between others; it never makes the administrator (or their team) the owner.
+            throw AuthorityException.Forbidden("an administrator override cannot transfer a record to the administrator or a team they belong to");
         }
 
         var plan = new CommandPlan { NormalizedPayloadJson = CanonicalJson.Serialize(payload) };

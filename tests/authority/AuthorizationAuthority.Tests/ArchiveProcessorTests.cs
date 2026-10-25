@@ -128,6 +128,8 @@ public sealed class ArchiveProcessorTests
 
         public Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid org, Guid userId, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<List<IdentityBinding>> GetIdentityBindingsAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
+
         public void AddIdentityBinding(IdentityBinding binding) => throw new NotSupportedException();
 
         public Task<AuthorityResource?> FindResourceAsync(Guid org, string type, Guid id, CancellationToken ct) => throw new NotSupportedException();

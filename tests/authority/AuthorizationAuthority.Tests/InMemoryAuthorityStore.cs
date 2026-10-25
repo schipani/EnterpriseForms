@@ -57,6 +57,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken) =>
             Task.FromResult(s.Bindings.FirstOrDefault(b => b.OrganizationId == organizationId && b.AuthorityUserId == authorityUserId));
 
+        public Task<List<IdentityBinding>> GetIdentityBindingsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Bindings.Where(b => b.OrganizationId == organizationId).ToList());
+
         public Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken cancellationToken) => Task.FromResult(s.Bindings.FirstOrDefault(b => b.IdentityBindingId == identityBindingId));
 
         public void AddIdentityBinding(IdentityBinding binding) => s.Bindings.Add(binding);

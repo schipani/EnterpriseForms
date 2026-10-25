@@ -2939,6 +2939,134 @@
         }
       }
     },
+    "/api/v1/organization/security-administrators": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "The organization's Security Administrators (Authority relation system_administrator) — for its organization owners (read-only) and Security Administrators (with candidates); 403 for everyone else.",
+        "operationId": "GetSecurityAdministrators",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAdministratorsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Appoints an existing verified member as Security Administrator: a GrantSystemRole security command that only a Security Administrator may submit, with step-up (unavailable in staging and production until PB-08). Reason required; audited by the Authority. 204 once Effective.",
+        "operationId": "AppointSecurityAdministrator",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointSecurityAdministratorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/security-administrators/{userId}/remove": {
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains.",
+        "operationId": "RemoveSecurityAdministrator",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveSecurityAdministratorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users": {
       "get": {
         "tags": [
@@ -3412,6 +3540,29 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "AppointSecurityAdministratorRequest": {
+        "required": [
+          "userId",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -7151,6 +7302,24 @@
           }
         }
       },
+      "RemoveSecurityAdministratorRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "RestoreFieldChangeResponse": {
         "required": [
           "fieldKey",
@@ -7419,6 +7588,96 @@
           },
           "layoutJson": {
             "type": "string"
+          }
+        }
+      },
+      "SecurityAdministratorCandidateResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "identityIssuer",
+          "identitySubject"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "identityIssuer": {
+            "type": "string"
+          },
+          "identitySubject": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityAdministratorResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "identityIssuer",
+          "identitySubject",
+          "appointedOn",
+          "isCurrentUser"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "identityIssuer": {
+            "type": "string"
+          },
+          "identitySubject": {
+            "type": "string"
+          },
+          "appointedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isCurrentUser": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SecurityAdministratorsResponse": {
+        "required": [
+          "canManage",
+          "appointmentOperational",
+          "appointmentUnavailableReason",
+          "administrators",
+          "candidates"
+        ],
+        "type": "object",
+        "properties": {
+          "canManage": {
+            "type": "boolean"
+          },
+          "appointmentOperational": {
+            "type": "boolean"
+          },
+          "appointmentUnavailableReason": {
+            "type": "string"
+          },
+          "administrators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAdministratorResponse"
+            }
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAdministratorCandidateResponse"
+            }
           }
         }
       },

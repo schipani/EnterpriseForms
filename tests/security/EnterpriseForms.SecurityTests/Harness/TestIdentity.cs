@@ -37,13 +37,22 @@ public static class TestIdentity
     public static string VerifierToken(string workloadName = "field-protection-verifier") =>
         Mint(VerifierKeyBase64, "enterpriseforms-field-protection-verifier", "authorization-authority-verifier", "c7-verifier-harness", new Dictionary<string, object> { ["workload_role"] = "field-protection-verifier", ["workload_name"] = workloadName }, TimeSpan.FromMinutes(5));
 
+    /// <summary>A correctly signed user token that expired ten minutes ago (beyond the 30-second clock skew).</summary>
+    public static string ExpiredUserToken(TestUser user, Guid organizationId) =>
+        Mint(UserKeyBase64, Issuer, Audience, user.Subject, new Dictionary<string, object>
+        {
+            ["org"] = organizationId.ToString("D"),
+            ["authority_user_id"] = user.AuthorityUserId.ToString("D"),
+            ["name"] = user.DisplayName,
+        }, TimeSpan.FromMinutes(5), DateTime.UtcNow.AddMinutes(-15));
+
     /// <summary>A token signed with a key the authority does not trust (forged issuer).</summary>
     public static string ForgedUserToken(TestUser user, Guid organizationId) =>
         Mint(Convert.ToBase64String(new byte[32]), Issuer, Audience, user.Subject, new Dictionary<string, object> { ["org"] = organizationId.ToString("D"), ["authority_user_id"] = user.AuthorityUserId.ToString("D") }, TimeSpan.FromMinutes(5));
 
-    private static string Mint(string keyBase64, string issuer, string audience, string subject, Dictionary<string, object> claims, TimeSpan lifetime)
+    private static string Mint(string keyBase64, string issuer, string audience, string subject, Dictionary<string, object> claims, TimeSpan lifetime, DateTime? issuedAt = null)
     {
-        var now = DateTime.UtcNow;
+        var now = issuedAt ?? DateTime.UtcNow;
         claims["sub"] = subject;
         return Handler.CreateToken(new SecurityTokenDescriptor
         {

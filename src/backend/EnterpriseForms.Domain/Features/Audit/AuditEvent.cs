@@ -45,6 +45,8 @@ public static class AuditActions
     public const string RecordOwnershipTransferred = "RECORD_OWNERSHIP_TRANSFERRED";
     public const string AccessDenied = "ACCESS_DENIED";
     public const string FieldSearchApproved = "FIELD_SEARCH_APPROVED";
+    public const string SecurityAdministratorAppointed = "SECURITY_ADMINISTRATOR_APPOINTED";
+    public const string SecurityAdministratorRemoved = "SECURITY_ADMINISTRATOR_REMOVED";
     public const string FieldSearchWithdrawn = "FIELD_SEARCH_WITHDRAWN";
     public const string FieldSearchersChanged = "FIELD_SEARCHERS_CHANGED";
     public const string FormVersionAuthorityRegistered = "FORM_VERSION_AUTHORITY_REGISTERED";

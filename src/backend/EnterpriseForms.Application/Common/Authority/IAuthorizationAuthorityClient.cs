@@ -257,3 +257,20 @@ public interface IFieldSearchPolicyAuthority
     /// <summary>Journals one execution over the caller's own catalogue snapshot on the Authority audit stream.</summary>
     Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken);
 }
+
+// ---- Owner message 7: Security Administrators (mirrors AuthorizationAuthority.Contracts.V1 SecurityAdministratorRoster) ----
+
+public sealed record SecurityAdministratorRosterQuery(Guid OrganizationId);
+
+public sealed record AuthoritySecurityAdministrator(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, DateTimeOffset AppointedOn, Guid AppointedBySecurityCommandId);
+
+public sealed record AuthoritySecurityAdministratorCandidate(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier);
+
+public sealed record AuthoritySecurityAdministratorRoster(bool CanManage, bool AppointmentOperational, string AppointmentUnavailableReason, IReadOnlyList<AuthoritySecurityAdministrator> Administrators,
+    IReadOnlyList<AuthoritySecurityAdministratorCandidate>? Candidates, long AuthorizationRevision, Guid CorrelationId);
+
+/// <summary>Owner message 7: the Authority's Security Administrator roster (narrow port; only the Organizations feature uses it).</summary>
+public interface ISecurityAdministratorAuthority
+{
+    Task<AuthoritySecurityAdministratorRoster> GetSecurityAdministratorsAsync(DelegatedUserContext user, SecurityAdministratorRosterQuery query, CancellationToken cancellationToken);
+}

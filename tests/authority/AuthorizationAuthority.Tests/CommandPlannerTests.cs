@@ -135,9 +135,14 @@ public sealed class CommandPlannerTests
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), massAssignment, graph, CancellationToken.None));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, ex.ErrorCode);
 
-        var unimplemented = Command(SecurityCommandKind.GrantSystemRole, ResourceKind.Organization, Org, new { });
+        var unimplemented = Command(SecurityCommandKind.UpdateShareScope, ResourceKind.FormRecord, Org, new { });
         var ex2 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), unimplemented, graph, CancellationToken.None));
         Assert.Equal(AuthorityErrorCodes.CommandKindNotImplemented, ex2.ErrorCode);
+
+        // Owner message 7: GrantSystemRole is implemented, and an organization owner cannot use it (no self-elevation).
+        var selfElevation = Command(SecurityCommandKind.GrantSystemRole, ResourceKind.Organization, Org, new { authority_user_id = OwnerUser, role_name = "system_administrator", reason = "none exists" });
+        var ex3 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), selfElevation, graph, CancellationToken.None));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, ex3.ErrorCode);
     }
 
     [Fact]
@@ -370,6 +375,8 @@ public sealed class CommandPlannerTests
         public Task<AuthorityResource?> FindResourceAsync(Guid org, string type, Guid id, CancellationToken ct) => Task.FromResult(org == organizationId ? Resources.FirstOrDefault(r => r.ResourceTypeName == type && r.ResourceEntityId == id) : null);
 
         public Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid org, Guid userId, CancellationToken ct) => Task.FromResult(org == organizationId ? Bindings.FirstOrDefault(b => b.AuthorityUserId == userId) : null);
+
+        public Task<List<IdentityBinding>> GetIdentityBindingsAsync(Guid org, CancellationToken ct) => Task.FromResult(org == organizationId ? Bindings.ToList() : []);
 
         public Task<RecordContentHead?> FindContentHeadAsync(Guid org, Guid recordId, bool lockForUpdate, CancellationToken ct) => Task.FromResult(org == organizationId && Heads.TryGetValue(recordId, out var head) ? head : null);
 

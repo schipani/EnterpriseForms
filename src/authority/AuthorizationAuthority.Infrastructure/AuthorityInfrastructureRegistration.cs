@@ -78,6 +78,7 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton(sessionOptions);
         services.AddSingleton<SessionService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.FieldSearch.FieldSearchCapabilityService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.FieldSearch.SecurityAdministratorRosterService>();
         return services;
     }
 

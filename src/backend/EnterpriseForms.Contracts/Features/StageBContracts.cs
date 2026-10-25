@@ -328,3 +328,24 @@ public sealed record DashboardCountResponse(string WidgetIdentifier, long Count,
 public sealed record RecordShareSummaryResponse(Guid RecordShareId, Guid FormRecordId, Guid SharedByUserId, string? SharedByDisplayName, Guid? RecipientUserId, string? RecipientDisplayName, Guid? RecipientTeamId, string RecipientRole, string ShareScope, string ShareStatus, long ShareRevision, DateTimeOffset ShareCreatedOn, DateTimeOffset? ShareRevokedOn, IReadOnlyList<string> FieldKeys);
 
 public sealed record RecordShareListResponse(IReadOnlyList<RecordShareSummaryResponse> Items, long AuthorizationRevision);
+
+// ---- Owner message 7: Security Administrators (Organization settings) ----
+
+/// <summary>A current Security Administrator: display name (directory label), verified identity and appointment time.</summary>
+public sealed record SecurityAdministratorResponse(Guid UserId, string DisplayName, string IdentityIssuer, string IdentitySubject, DateTimeOffset AppointedOn, bool IsCurrentUser);
+
+/// <summary>A verified member of the organization who can be appointed (shown to Security Administrators only).</summary>
+public sealed record SecurityAdministratorCandidateResponse(Guid UserId, string DisplayName, string IdentityIssuer, string IdentitySubject);
+
+/// <summary>
+/// <c>CanManage</c>: the caller is a Security Administrator (may appoint and remove). Organization owners see the roster
+/// read-only. <c>AppointmentOperational</c> is false where the Authority cannot accept the required step-up (production
+/// and staging until PB-08).
+/// </summary>
+public sealed record SecurityAdministratorsResponse(bool CanManage, bool AppointmentOperational, string AppointmentUnavailableReason, IReadOnlyList<SecurityAdministratorResponse> Administrators,
+    IReadOnlyList<SecurityAdministratorCandidateResponse> Candidates);
+
+/// <summary><c>UseDevelopmentStepUp</c> presents the development-only synthetic step-up (accepted only where that path is enabled).</summary>
+public sealed record AppointSecurityAdministratorRequest(Guid UserId, string? Reason, bool UseDevelopmentStepUp = false);
+
+public sealed record RemoveSecurityAdministratorRequest(string? Reason, bool UseDevelopmentStepUp = false);

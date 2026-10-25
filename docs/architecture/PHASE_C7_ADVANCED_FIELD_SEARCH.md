@@ -554,6 +554,20 @@ AC-5 guarantees are unchanged: new eligible records, grants and revocations (any
 * **G19 OPEN** (M4), **G21 OPEN** (record editing reads unsigned metadata), **PB-08 OPEN**, **AUD-C7-01 OPEN**.
 * Field-value sort, OR, repeating groups, related forms, documents, encrypted values, exports: out of V1.
 
+## 6D. Security Administrator management (owner message 7, C-70)
+
+Normative detail: `docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md`.
+
+| Layer | Implementation |
+|---|---|
+| Role | The existing Authority relation `system_administrator` (`administer_security`); no second role system. |
+| Authority commands | `GrantSystemRole` / `RevokeSystemRole` (previously not implemented): actor must be a Security Administrator of the same organization; role fixed to `system_administrator`; target an enabled identity binding; reason; step-up through the shared `FieldSearchApprovalGate` (unavailable in staging/production; synthetic marker only in Development/Testing with the TestIdentityProvider); last administrator protected (`409 LAST_SECURITY_ADMINISTRATOR`). Refusals append `SecurityAdministratorCommandRejected` to the audit stream. |
+| Authority read | `POST /internal/v1/security-administrators`: roster from desired state + identity bindings; candidates only for administrators; owners read-only; anyone else 404. |
+| Separation of duties (F-C7-02) | Administrator ownership override cannot target the administrator or a team containing them; a Security Administrator cannot add themself to a team; `UpdateMandatoryPolicy` is owner-only. |
+| Business | Organizations feature: `GET/POST /api/v1/organization/security-administrators`, `POST …/{userId}/remove` (204 once Effective). No business pre-check: every attempt reaches the Authority. Local audit `SECURITY_ADMINISTRATOR_APPOINTED/REMOVED`. |
+| Frontend | Organization settings → Security Administrators card (list, Add, Remove, confirmations, last-administrator rule, empty/denied/loading states, step-up notice). Organization navigation for owners or Security Administrators. |
+| First administrator | Only the operator bootstrap at organization creation. For existing organizations: decision **DR-C7-3** (operator-plane first appointment / recovery with dual control) — presented, not implemented. |
+
 ## 7. Proposed milestones
 
 | Milestone | Content | Status |

@@ -32,6 +32,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken);
 
+    /// <summary>Owner message 7: every identity binding of the organization (read-only).</summary>
+    Task<List<IdentityBinding>> GetIdentityBindingsAsync(Guid organizationId, CancellationToken cancellationToken);
+
     Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken cancellationToken);
 
     void AddIdentityBinding(IdentityBinding binding);

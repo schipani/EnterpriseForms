@@ -38,6 +38,7 @@ public static class AuthorityErrorCodes
     public const string ContributorWritesDisabled = "CONTRIBUTOR_WRITES_DISABLED";
     public const string StepUpRequired = "STEP_UP_REQUIRED";
     public const string FieldSearchNotEligible = "FIELD_SEARCH_NOT_ELIGIBLE";
+    public const string LastSecurityAdministrator = "LAST_SECURITY_ADMINISTRATOR";
     public const string FormVersionUntrusted = "FORM_VERSION_UNTRUSTED";
 
     /// <summary>

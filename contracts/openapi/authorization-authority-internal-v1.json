@@ -999,6 +999,37 @@
           }
         }
       }
+    },
+    "/internal/v1/security-administrators": {
+      "post": {
+        "tags": [
+          "FieldSearch"
+        ],
+        "summary": "The organization's Security Administrators (system_administrator) with their verified identities and appointing command; candidates (enabled identities) only for Security Administrators. Organization owners see the roster read-only; anyone else gets 404. Appointment and removal are GrantSystemRole / RevokeSystemRole security commands.",
+        "operationId": "GetSecurityAdministrators",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityAdministratorRosterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAdministratorRoster"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2770,6 +2801,118 @@
             "format": "uuid"
           },
           "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorCandidate": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityAdministratorEntry": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "appointed_on",
+          "appointed_by_security_command_id"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "appointed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "appointed_by_security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorRoster": {
+        "required": [
+          "can_manage",
+          "appointment_operational",
+          "appointment_unavailable_reason",
+          "administrators",
+          "candidates",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "can_manage": {
+            "type": "boolean"
+          },
+          "appointment_operational": {
+            "type": "boolean"
+          },
+          "appointment_unavailable_reason": {
+            "type": "string"
+          },
+          "administrators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAdministratorEntry"
+            }
+          },
+          "candidates": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SecurityAdministratorCandidate"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorRosterRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
             "type": "string",
             "format": "uuid"
           }

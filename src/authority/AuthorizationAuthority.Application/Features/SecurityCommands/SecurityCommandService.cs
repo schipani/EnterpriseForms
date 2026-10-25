@@ -82,6 +82,11 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
                 // OD-8: refused AC-6 decisions are also hash-chained, archived evidence on the audit stream (no values, no predicates).
                 AuditJournal.Append(scope, state, "FieldSearchCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), form_definition_id = request.Resource.ResourceId, actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, rejection_detail = ex.ErrorCode is AuthorityErrorCodes.FieldSearchNotEligible ? ex.Message : null, correlation_id = correlationId }, clock);
             }
+            else if (request.CommandKind is SecurityCommandKind.GrantSystemRole or SecurityCommandKind.RevokeSystemRole)
+            {
+                // Refused Security Administrator appointments and removals: independent, archived evidence on the audit stream.
+                AuditJournal.Append(scope, state, "SecurityAdministratorCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
+            }
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }

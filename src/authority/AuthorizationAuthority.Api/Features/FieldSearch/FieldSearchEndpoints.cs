@@ -28,6 +28,14 @@ public static class FieldSearchEndpoints
             .WithName("GetFieldSearchAdministration")
             .WithSummary("Phase C7 M3: forms of the caller's organization with an Authority-registered published version (title, version, field and approval counts) for search-approval administration. administer_security only; no Designer or record access needed or granted.");
 
+        group.MapPost("/security-administrators", static async Task<Ok<SecurityAdministratorRoster>> (SecurityAdministratorRosterRequest request, HttpContext context, SecurityAdministratorRosterService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+            {
+                var actor = InternalAuthentication.RequireActor(context, validator);
+                return TypedResults.Ok(await service.GetAsync(actor, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetSecurityAdministrators")
+            .WithSummary("The organization's Security Administrators (system_administrator) with their verified identities and appointing command; candidates (enabled identities) only for Security Administrators. Organization owners see the roster read-only; anyone else gets 404. Appointment and removal are GrantSystemRole / RevokeSystemRole security commands.");
+
         return endpoints;
     }
 }

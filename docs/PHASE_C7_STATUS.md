@@ -476,7 +476,7 @@ Untouched in this round: the development stack (`http://127.0.0.1:8091`), its Va
 * Approvals: production and staging stay disabled until PB-08 step-up evidence exists; the synthetic path refuses startup outside Development/Testing or with a real identity provider.
 * A running development search is not evidence that production use may be enabled. No Level 2 claim.
 
-## 18. Outstanding decisions and blockers
+## 18. Outstanding decisions and blockers (M3; superseded by §21)
 
 * **Owner functional acceptance of M3** (§16) and of the review corrections (§15.1). M0/M2 visual acceptance not yet confirmed by the owner.
 * **DR-C7-1 (decision):** terminal state for abandoned record creations (`AbandonRecordRegistration`, architecture §6C.2).
@@ -490,3 +490,80 @@ Untouched in this round: the development stack (`http://127.0.0.1:8091`), its Va
 * **G06** (adversarial evidence exists on the isolated stack; independent review and Azure staging evidence outstanding), **G19** (M4), **G21** (record editing reads unsigned metadata): OPEN.
 * **Residuals:** conditions refused before a snapshot exists (not allowed) are not Authority-journaled; failed-search evidence after issuance is best effort; display labels (form and creator names) come from the unsigned directory, as in My Records.
 * **Independent review** of all Authority changes in C7 and of the executor; no Azure staging evidence. M4 not started. C7 not merged.
+
+## 19. Security Administrator management (owner message 7, C-70)
+
+Normative description: `docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md`; architecture §6D.
+
+### 19.1 Inspection
+
+* "Security Administrator" is the Authority relation `system_administrator` (`administer_security`, capability `security.administer`). There is one role system; no second one was added.
+* The development organization has none because organization roles were granted only by the one-shot operator bootstrap at creation, and the organization predates the Sam Security persona. `GrantSystemRole` / `RevokeSystemRole` existed only as unimplemented command kinds. **No approved operation can appoint a first Security Administrator in an existing organization.**
+
+### 19.2 What was built
+
+* Authority: `GrantSystemRole` / `RevokeSystemRole` (Security Administrator only, same organization, `system_administrator` only, enabled verified binding only, reason, step-up via the shared gate, last-administrator protection, refusals on the audit stream); roster read `POST /internal/v1/security-administrators`.
+* Separation of duties (F-C7-02 → G25, corrected): no ownership override to the administrator or their team; no team self-join by a Security Administrator; mandatory policy owner-only.
+* Business (Organizations): `GET/POST /api/v1/organization/security-administrators`, `POST …/{userId}/remove` (204 once Effective). Every attempt goes to the Authority (no business pre-check), so refusals are independently audited.
+* UI: Organization settings → Security Administrators (list with verified identities, Add from verified members, Remove with confirmation, last-administrator rule, read-only for owners, empty-state and step-up notices). Organization navigation for owners or Security Administrators.
+
+### 19.3 Not built — decision DR-C7-3 (G26)
+
+The first or a recovery Security Administrator for an **existing** organization needs a new privileged operator contract. Proposal, security implications and recovery: `SECURITY_ADMINISTRATOR_MANAGEMENT.md` §6. Not implemented, by instruction; owner decision required.
+
+### 19.4 Defect found and fixed during verification
+
+* Self-removal (allowed while another administrator remains) committed, but the handler then re-read the roster the caller could no longer see and answered 403. Appoint and remove now return 204; the UI refetches.
+
+### 19.5 Tests (owner list §7)
+
+| # | Test | Where |
+|---|---|---|
+| 1, 5 | administrator appoints a verified member; appointee appoints/removes | integration `ASecurityAdministratorAppointsAMember…`, `RemovalTakesEffect…`; browser |
+| 2, 3 | owner self-elevation and owner/designer/member appointments refused, through the API and directly at the Authority; repeated bootstrap creates nobody | integration `OwnersDesignersAndMembersCannotAppoint…`; unit |
+| 4 | cross-organization appointment, removal and roster refused | integration `AnotherOrganizationsAdministrator…` |
+| 6, 7 | removal; last administrator `409` | integration, unit, browser |
+| 8 | appointee uses Search approvals at once | integration, browser |
+| 9, 10 | no record content; no Form Designer rights (no `forms.design`, designer create 403, draft refused) | integration |
+| 11, 12 | removal ends privileges on the same bearer token and on live browser sessions | integration `RemovalTakesEffect…`, `BrowserSessions…` |
+| 13 | committed commands, Authority refusal events (`SecurityAdministratorCommandRejected`), business audit events | integration |
+| 14 | missing, forged, expired credentials → 401; step-up missing or wrong → `STEP_UP_REQUIRED` | integration `StepUpAndAValidCredentialAreRequired` |
+| 15, 16 | G22 CSRF on the new endpoints; G23 signed-out cookie replay refused | integration `BrowserSessions…` |
+| 17 | synthetic step-up cannot start in staging/production or with a real IdP; Unavailable gate refuses | unit (shared gate) |
+| 18 | My Records and Advanced Search unchanged | integration search/workspace classes; full browser suite |
+
+### 19.6 Verification
+
+Local (laptop; disposable security-test stack rebuilt from this tree):
+
+* .NET unit/contract: Authority 171/171 (8 Security Administrator tests), API contract 297/297, architecture 67/67, integrity 34/34; solution build 0 warnings, 0 errors.
+* Frontend: typecheck, lint, 207/207 unit tests; OpenAPI and generated client regenerated; spec manifest regenerated, strict validation pass.
+* Real stack: `SecurityAdministratorTests` 6/6 and `RecordHistoryTests` 5/5 after the last fix; related classes (search approval and execution, CSRF, session revocation, record workspace, authorization/tamper, sharing, form access, branding, search catalogue) 59/60 — the single failure is the 480-record catalogue benchmark exceeding the 15 s time limit on the laptop (known ≈2× slower than hosted; it passes hosted), not a functional change.
+* Browser: full suite 105 passed, 4 skipped (contributor-writes specs; that switch is off by default), including `security-administrators.spec.ts` 2/2.
+
+Hosted: HOSTED_PLACEHOLDER
+
+### 19.7 Development environment
+
+Not changed: no membership, role, grant, key, form or record change in the development organization (`http://127.0.0.1:8091`); its Vault, databases, SpiceDB and Azurite untouched. All tests ran on the disposable security-test stack.
+
+## 20. Browser acceptance instructions (Security Administrators and Advanced Search)
+
+**Where:** the disposable security-test stack (its organization is bootstrapped with the Sam Security persona). The development organization cannot be used until DR-C7-3 is decided and implemented.
+
+1. Start: `infrastructure/docker`: `docker compose -p enterpriseforms-sectest -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait`; then `cd src/frontend; $env:API_TARGET="http://127.0.0.1:5180"; npm run dev -w apps/web -- --host 127.0.0.1`; open `http://127.0.0.1:5173`.
+2. **Avery Owner → Organization:** the Security Administrators section lists Sam Security, read-only (no Add, no Remove).
+3. **Sam Security → Organization:** Remove is disabled for the only administrator. *Add administrator* → choose Casey Clerk → reason → tick the development-only step-up → Appoint. Casey appears.
+4. **Casey Clerk:** navigation shows Search approvals and Organization; Casey sees no other records and cannot design forms.
+5. **Advanced Search:** as Avery, permit plaintext search in the security policy and publish a form with plaintext Internal fields (as §16 step 2); as Casey or Sam, Search approvals → the form → approve fields with conditions, reference and step-up → grant Riley Reader (or Casey) search access; as that person, My Records → choose the form → Advanced Search (§16 steps 5–9).
+6. **Sam Security:** Remove Casey (reason, step-up). Casey's next page load loses Search approvals and Organization.
+7. 320 px and keyboard: the section, its table and both dialogs.
+
+## 21. Outstanding decisions and blockers
+
+* **Owner functional acceptance** of M3 (§16), the review corrections (§15.1) and Security Administrator management (§20). M0/M2 visual acceptance not yet confirmed by the owner.
+* **DR-C7-3 (G26):** first and recovery Security Administrator for existing organizations — required before the development organization can approve fields.
+* **DR-C7-1**, **DR-C7-2 (PB-09)**: unchanged (§18).
+* **G25:** independent review of the separation-of-duties correction.
+* **PB-08:** no step-up, so Security Administrators and approvals cannot be changed in staging or production.
+* **G06, G19, G21, G24:** OPEN. Independent review of all C7 Authority changes; no Azure staging evidence; no Level 2 claim. M4 not started. C7 not merged.

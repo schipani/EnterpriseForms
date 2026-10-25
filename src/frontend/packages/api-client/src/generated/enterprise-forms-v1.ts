@@ -1156,6 +1156,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/security-administrators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The organization's Security Administrators (Authority relation system_administrator) — for its organization owners (read-only) and Security Administrators (with candidates); 403 for everyone else. */
+        get: operations["GetSecurityAdministrators"];
+        put?: never;
+        /** Appoints an existing verified member as Security Administrator: a GrantSystemRole security command that only a Security Administrator may submit, with step-up (unavailable in staging and production until PB-08). Reason required; audited by the Authority. 204 once Effective. */
+        post: operations["AppointSecurityAdministrator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/security-administrators/{userId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains. */
+        post: operations["RemoveSecurityAdministrator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -1326,6 +1361,13 @@ export interface components {
             optionListId?: null | string;
             /** Format: uuid */
             groupDefinitionId?: null | string;
+        };
+        AppointSecurityAdministratorRequest: {
+            /** Format: uuid */
+            userId: string;
+            reason: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
         };
         ApproveFieldSearchRequest: {
             operators: null | string[];
@@ -2301,6 +2343,11 @@ export interface components {
             expectedContentRevision: number | string;
             removalReason: string;
         };
+        RemoveSecurityAdministratorRequest: {
+            reason: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
         RestoreFieldChangeResponse: {
             fieldKey: string;
             label: string;
@@ -2363,6 +2410,30 @@ export interface components {
             /** Format: int64 */
             expectedDraftRevision: number | string;
             layoutJson: string;
+        };
+        SecurityAdministratorCandidateResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            identityIssuer: string;
+            identitySubject: string;
+        };
+        SecurityAdministratorResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            identityIssuer: string;
+            identitySubject: string;
+            /** Format: date-time */
+            appointedOn: string;
+            isCurrentUser: boolean;
+        };
+        SecurityAdministratorsResponse: {
+            canManage: boolean;
+            appointmentOperational: boolean;
+            appointmentUnavailableReason: string;
+            administrators: components["schemas"]["SecurityAdministratorResponse"][];
+            candidates: components["schemas"]["SecurityAdministratorCandidateResponse"][];
         };
         SessionResponse: {
             authenticated: boolean;
@@ -4448,6 +4519,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationSecurityPolicyResponse"];
+                };
+            };
+        };
+    };
+    GetSecurityAdministrators: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityAdministratorsResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppointSecurityAdministrator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppointSecurityAdministratorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RemoveSecurityAdministrator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveSecurityAdministratorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

@@ -56,6 +56,10 @@ export type WithdrawFieldSearchRequest = S["WithdrawFieldSearchRequest"];
 export type UpdateFieldSearchersRequest = S["UpdateFieldSearchersRequest"];
 export type FieldSearchAdministrationResponse = S["FieldSearchAdministrationResponse"];
 export type FieldSearchAdministrationFormResponse = S["FieldSearchAdministrationFormResponse"];
+export type SecurityAdministratorsResponse = S["SecurityAdministratorsResponse"];
+export type SecurityAdministratorResponse = S["SecurityAdministratorResponse"];
+export type AppointSecurityAdministratorRequest = S["AppointSecurityAdministratorRequest"];
+export type RemoveSecurityAdministratorRequest = S["RemoveSecurityAdministratorRequest"];
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
 export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
 export type FieldProtectionVerificationResponse = S["FieldProtectionVerificationResponse"];
@@ -253,6 +257,9 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       uploadLogo: (png: ArrayBuffer) => coordinator.execute<BrandingResponse>({ lane: "interactive-write", method: "POST", endpointKey: "organization.uploadLogo", binaryPayload: png, binaryContentType: "image/png", resourceKey: "branding" }),
       users: (signal?: AbortSignal) => read<DirectoryUserResponse[]>("users.list", undefined, undefined, "background-read", signal),
       searchApprovals: (signal?: AbortSignal) => read<FieldSearchAdministrationResponse>("organization.searchApprovals", undefined, undefined, "interactive-read", signal),
+      securityAdministrators: (signal?: AbortSignal) => read<SecurityAdministratorsResponse>("organization.securityAdministrators", undefined, undefined, "interactive-read", signal),
+      appointSecurityAdministrator: (request: AppointSecurityAdministratorRequest) => write<void>("POST", "organization.appointSecurityAdministrator", undefined, request, { lane: "security", resourceKey: "organization:security-administrators" }),
+      removeSecurityAdministrator: (userId: string, request: RemoveSecurityAdministratorRequest) => write<void>("POST", "organization.removeSecurityAdministrator", { userId }, request, { lane: "security", resourceKey: "organization:security-administrators" }),
       securityPolicy: (signal?: AbortSignal) => read<OrganizationSecurityPolicyResponse>("organization.securityPolicy", undefined, undefined, "interactive-read", signal),
       updateSecurityPolicy: (request: UpdateOrganizationSecurityPolicyRequest) => write<OrganizationSecurityPolicyResponse>("PUT", "organization.updateSecurityPolicy", undefined, request, { resourceKey: "security-policy" }),
     },
