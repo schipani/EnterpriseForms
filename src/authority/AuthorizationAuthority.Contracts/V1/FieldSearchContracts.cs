@@ -7,9 +7,11 @@ namespace AuthorizationAuthority.Contracts.V1;
 /// digest is SHA-256 of the canonical layout JSON (digest scheme <c>layout-digest/v1</c>); each field entry is what the
 /// designer published for it. Approvals bind to these records, never to later business rows.
 /// </summary>
-public sealed record RegisterPublishedFormVersionPayload(Guid FormDefinitionId, int FormVersionNumber, string LayoutDigestHex, IReadOnlyList<PublishedFieldEntry> Fields);
+/// <remarks>Phase C7 M3: <c>FormTitle</c> (the published layout title, shown to security administrators) is recorded with the version.</remarks>
+public sealed record RegisterPublishedFormVersionPayload(Guid FormDefinitionId, int FormVersionNumber, string LayoutDigestHex, IReadOnlyList<PublishedFieldEntry> Fields, string? FormTitle = null);
 
-public sealed record PublishedFieldEntry(Guid FieldDefinitionId, string FieldDataType, string FieldClassification, string ProtectionMode, string FieldLabel, IReadOnlyList<PublishedOptionEntry>? Options = null);
+/// <remarks>Phase C7 M3: <c>InRepeatingGroup</c> — the field is placed inside a repeating section; such fields are not searchable in V1.</remarks>
+public sealed record PublishedFieldEntry(Guid FieldDefinitionId, string FieldDataType, string FieldClassification, string ProtectionMode, string FieldLabel, IReadOnlyList<PublishedOptionEntry>? Options = null, bool InRepeatingGroup = false);
 
 public sealed record PublishedOptionEntry(Guid FieldOptionId, string OptionLabel);
 
@@ -52,3 +54,16 @@ public sealed record FieldSearchConfiguration(bool CanApprove, bool ApprovalOper
 /// </summary>
 public sealed record FieldSearchCapabilitiesResponse(Guid FormDefinitionId, bool PlaintextSearchPermitted, long SearchPolicyRevision, long AuthorizationRevision,
     IReadOnlyList<SearchableFieldCapability> Fields, FieldSearchConfiguration? Configuration, Guid CorrelationId);
+
+// ---- Phase C7 M3: search-approval administration for security administrators (no Designer or record access needed) ----
+
+public sealed record FieldSearchAdministrationRequest(Guid OrganizationId);
+
+/// <summary>
+/// One form with an Authority-registered published version, as a security administrator needs it to administer search:
+/// the title and field facts recorded at registration and approval counts. Never record contents.
+/// </summary>
+public sealed record FieldSearchAdministrationForm(Guid FormDefinitionId, string? FormTitle, int RegisteredFormVersionNumber, DateTimeOffset RegisteredOn, int FieldCount, int EligibleFieldCount, int ActiveApprovalCount, int InvalidatedApprovalCount);
+
+/// <summary>Only for <c>administer_security</c>; forms of the caller's organization whose form resource is Active.</summary>
+public sealed record FieldSearchAdministrationResponse(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<FieldSearchAdministrationForm> Forms, long AuthorizationRevision, Guid CorrelationId);

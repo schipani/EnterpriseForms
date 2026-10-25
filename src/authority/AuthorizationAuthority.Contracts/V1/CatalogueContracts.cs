@@ -12,12 +12,19 @@ public sealed record SearchCatalogueRequest(Guid OrganizationId, Guid FormDefini
 /// nothing; it is listed so its first content invalidates the snapshot). Quarantined heads/resources are listed with their
 /// flag: a trusted search over them must fail, never skip them.
 /// </summary>
+/// <remarks>
+/// Phase C7 M3: <c>RecordRegisteredOn</c> (when the Authority registered the record) and <c>ContentHeadModifiedOn</c> (when
+/// its accepted head last changed; null without content) are Authority-held times, used to sort and display verified search
+/// results instead of unsigned business timestamps.
+/// </remarks>
 public sealed record CatalogueEntry(
     Guid FormRecordId,
     long CommittedContentRevision,
     Guid? CommittedOperationId,
     bool ContentHeadQuarantined,
-    bool ResourceQuarantined);
+    bool ResourceQuarantined,
+    DateTimeOffset? RecordRegisteredOn = null,
+    DateTimeOffset? ContentHeadModifiedOn = null);
 
 public sealed record SearchCatalogueResponse(
     Guid SearchCatalogueSnapshotId,
@@ -29,6 +36,15 @@ public sealed record SearchCatalogueResponse(
     IReadOnlyList<CatalogueEntry> Entries,
     DateTimeOffset SnapshotExpiresOn,
     Guid CorrelationId);
+
+/// <summary>
+/// Phase C7 M3 (OD-8): evidence of one field-search execution over a catalogue snapshot the caller holds — which fields and
+/// operators were used, how many records were evaluated and matched, and the outcome code. Never predicate values,
+/// record ids or field values.
+/// </summary>
+public sealed record SearchExecutionEvidence(IReadOnlyList<Guid> FieldDefinitionIds, IReadOnlyList<string> Operators, int ConditionCount, string Outcome, int? EvaluatedRecordCount, int? MatchedRecordCount, long ElapsedMilliseconds);
+
+public sealed record SearchExecutionRecorded(Guid SearchCatalogueSnapshotId, Guid CorrelationId);
 
 /// <summary>Validation of a snapshot against current Authority state (never against the id alone).</summary>
 public sealed record CatalogueSnapshotValidation(

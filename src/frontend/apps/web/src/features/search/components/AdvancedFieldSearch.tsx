@@ -43,7 +43,7 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
   }, [formId]);
 
   const available = formSelected && capabilities?.fieldValueSearchAvailable === true;
-  const executable = available && onSearch !== undefined;
+  const executable = available && onSearch !== undefined && (capabilities?.fields.length ?? 0) > 0;
   const maximum = maximumConditions(capabilities);
   // Phase C7 M2: the fields are the Authority-approved ones this person may search. They can be chosen and conditions
   // composed even while execution is off (M3), so the controls reflect real permissions; Search records stays disabled.

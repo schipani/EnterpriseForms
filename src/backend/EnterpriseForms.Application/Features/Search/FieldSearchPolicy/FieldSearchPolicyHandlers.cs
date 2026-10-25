@@ -42,6 +42,28 @@ public sealed class FieldSearchPolicyHandlers(IBusinessStore store, IAuthorizati
             searchers);
     }
 
+    /// <summary>
+    /// Phase C7 M3: search-approval administration for security administrators. The form list, titles and counts are the
+    /// Authority's (registered published versions); no Designer permission and no record access are needed or granted.
+    /// </summary>
+    public async Task<FieldSearchAdministrationResponse> GetAdministrationAsync(RequestContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        AuthorityFieldSearchAdministration administration;
+        try
+        {
+            administration = await policy.GetFieldSearchAdministrationAsync(context.ToDelegatedUser(), new FieldSearchAdministrationQuery(context.OrganizationId), cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityClientException ex) when (ex.HttpStatusCode is 403 or 404)
+        {
+            throw new BusinessException("FORBIDDEN", 403, "search approvals are administered by security administrators");
+        }
+
+        return new FieldSearchAdministrationResponse(administration.PlaintextSearchPermitted, administration.ApprovalOperational, administration.ApprovalUnavailableReason,
+            administration.Forms.Select(f => new FieldSearchAdministrationFormResponse(f.FormDefinitionId, f.FormTitle ?? "Untitled form (publish again to register its title)", f.FormTitle is not null,
+                f.RegisteredFormVersionNumber, f.RegisteredOn, f.FieldCount, f.EligibleFieldCount, f.ActiveApprovalCount, f.InvalidatedApprovalCount)).ToList());
+    }
+
     public async Task<FieldSearchConfigurationResponse> ApproveAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, ApproveFieldSearchRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);

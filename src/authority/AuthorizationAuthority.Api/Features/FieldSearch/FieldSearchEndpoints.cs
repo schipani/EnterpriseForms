@@ -20,6 +20,14 @@ public static class FieldSearchEndpoints
             .WithName("GetFieldSearchCapabilities")
             .WithSummary("Searchable fields of a form for the delegated user (query_fields + active AC-6 approvals; labels and options from the approval snapshot) and, for designers and security administrators only, the search configuration of the latest registered published version. Identical empty answer for no access and unknown forms.");
 
+        group.MapPost("/field-search/administration", static async Task<Ok<FieldSearchAdministrationResponse>> (FieldSearchAdministrationRequest request, HttpContext context, FieldSearchCapabilityService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+            {
+                var actor = InternalAuthentication.RequireActor(context, validator);
+                return TypedResults.Ok(await service.AdministerAsync(actor, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetFieldSearchAdministration")
+            .WithSummary("Phase C7 M3: forms of the caller's organization with an Authority-registered published version (title, version, field and approval counts) for search-approval administration. administer_security only; no Designer or record access needed or granted.");
+
         return endpoints;
     }
 }

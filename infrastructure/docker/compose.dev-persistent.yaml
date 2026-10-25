@@ -79,6 +79,8 @@ services:
     image: enterpriseforms/api:dev
     environment:
       Encryption__LocalDevelopmentKekBase64: ${DEVSTACK_LOCAL_DEV_KEK_BASE64:?use scripts/devstack/devstack.py (the custody file supplies the KEK)}
+      # Phase C7 M3: verified field-value search (development only; the API refuses to start with it outside Development/Testing).
+      FieldSearch__ExecutionEnabled: "true"
     ports: ["127.0.0.1:${DEVSTACK_API_PORT:-5280}:8080"]
   worker:
     image: enterpriseforms/worker:dev

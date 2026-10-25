@@ -20,6 +20,13 @@ public sealed class CatalogueOptions
     /// <summary>Ceiling for a user-scoped catalogue (the business API passes its own, never larger, limit).</summary>
     public int MaximumUserEntries { get; set; } = 500;
 
+    /// <summary>
+    /// Phase C7 M3: ceiling for registered records without accepted content (pending creations) listed in a user catalogue.
+    /// They need no verification and can match nothing, so they do not count against <see cref="MaximumUserEntries"/>; this
+    /// separate bound keeps abandoned creations from making a form unsearchable while still listing every one of them.
+    /// </summary>
+    public int MaximumPendingUserEntries { get; set; } = 2000;
+
     /// <summary>Ceiling for the verifier's complete population of one form (paged).</summary>
     public int MaximumMigrationEntries { get; set; } = 50_000;
 
@@ -85,14 +92,18 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         var resources = (await scope.GetFormRecordResourcesAsync(state.OrganizationId, request.FormDefinitionId, UserScopeStates, cancellationToken).ConfigureAwait(false))
             .Where(r => discoverable.Contains(r.ResourceEntityId))
             .ToList();
-        if (resources.Count > request.MaximumEntries)
+        var heads = await ReadHeadsAsync(scope, state.OrganizationId, resources, cancellationToken).ConfigureAwait(false);
+        var contentful = resources.Count(r => heads.GetValueOrDefault(r.ResourceEntityId) is { CommittedContentRevision: > 0 });
+        if (contentful > request.MaximumEntries || resources.Count - contentful > settings.MaximumPendingUserEntries)
         {
-            // D3/D4: a scope that cannot be verified completely is refused before any work — no entries and no count.
-            await JournalRefusalAsync(state.OrganizationId, "SearchCatalogueRefused", s => new CatalogueAuditBody(null, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, bound.AuthorityUserId, null, null, 0, null, s.AuthorizationRevision, s.ContentIntegrityRevision, "VERIFICATION_LIMIT", correlationId), cancellationToken).ConfigureAwait(false);
+            // D3/D4: a scope that cannot be verified completely is refused before any work — no entries and no count. Records
+            // without accepted content (pending creations) need no verification and have their own ceiling (Phase C7 M3).
+            var reason = contentful > request.MaximumEntries ? "VERIFICATION_LIMIT" : "PENDING_CEILING";
+            await JournalRefusalAsync(state.OrganizationId, "SearchCatalogueRefused", s => new CatalogueAuditBody(null, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, bound.AuthorityUserId, null, null, 0, null, s.AuthorizationRevision, s.ContentIntegrityRevision, reason, correlationId), cancellationToken).ConfigureAwait(false);
             throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, "the form's eligible records exceed the verification limit");
         }
 
-        var entries = await BuildEntriesAsync(scope, state.OrganizationId, resources, cancellationToken).ConfigureAwait(false);
+        var entries = BuildEntries(state.OrganizationId, resources, heads);
         var locked = await LockUnchangedAsync(scope, state, cancellationToken).ConfigureAwait(false);
         var now = clock.GetUtcNow();
         var snapshot = NewSnapshot(locked, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, entries, now, settings.UserSnapshotLifetimeSeconds);
@@ -100,8 +111,14 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         Audit(scope, locked, "SearchCatalogueIssued", new CatalogueAuditBody(snapshot.SearchCatalogueSnapshotId, CatalogueScopeKinds.UserSearch, request.FormDefinitionId, bound.AuthorityUserId, null, null, entries.Count, Convert.ToHexStringLower(snapshot.CatalogueDigest), locked.AuthorizationRevision, locked.ContentIntegrityRevision, null, correlationId), now);
         scope.AddCatalogueSnapshot(snapshot, entries);
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        // Authority-held times (Phase C7 M3) are returned for sorting and display; the snapshot itself fixes heads, not times.
+        var registeredOn = resources.ToDictionary(r => r.ResourceEntityId, r => r.ResourceRegisteredOn);
         return new SearchCatalogueResponse(snapshot.SearchCatalogueSnapshotId, state.OrganizationId, request.FormDefinitionId, locked.AuthorizationRevision, locked.ProjectionAppliedRevision, locked.ContentIntegrityRevision,
-            entries.Select(ToContract).ToList(), snapshot.SnapshotExpiresOn, correlationId);
+            entries.Select(e => ToContract(e) with
+            {
+                RecordRegisteredOn = registeredOn[e.FormRecordId],
+                ContentHeadModifiedOn = heads.GetValueOrDefault(e.FormRecordId) is { CommittedContentRevision: > 0 } head ? head.ContentHeadModifiedOn : null,
+            }).ToList(), snapshot.SnapshotExpiresOn, correlationId);
     }
 
     /// <summary>A user's snapshot, validated for that same user only (anyone else gets the not-found answer).</summary>
@@ -291,10 +308,17 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         return new CatalogueSnapshotValidation(snapshot.SearchCatalogueSnapshotId, reason is null, reason, state.AuthorizationRevision, state.ContentIntegrityRevision, correlationId);
     }
 
-    private static async Task<List<SearchCatalogueSnapshotEntry>> BuildEntriesAsync(IAuthorityScope scope, Guid organizationId, List<AuthorityResource> resources, CancellationToken cancellationToken)
+    private static async Task<List<SearchCatalogueSnapshotEntry>> BuildEntriesAsync(IAuthorityScope scope, Guid organizationId, List<AuthorityResource> resources, CancellationToken cancellationToken) =>
+        BuildEntries(organizationId, resources, await ReadHeadsAsync(scope, organizationId, resources, cancellationToken).ConfigureAwait(false));
+
+    private static async Task<Dictionary<Guid, Domain.Features.Content.RecordContentHead>> ReadHeadsAsync(IAuthorityScope scope, Guid organizationId, List<AuthorityResource> resources, CancellationToken cancellationToken)
     {
         var ids = resources.Select(r => r.ResourceEntityId).ToList();
-        var heads = ids.Count == 0 ? [] : (await scope.GetContentHeadsAsync(organizationId, ids, cancellationToken).ConfigureAwait(false)).ToDictionary(h => h.FormRecordId);
+        return ids.Count == 0 ? [] : (await scope.GetContentHeadsAsync(organizationId, ids, cancellationToken).ConfigureAwait(false)).ToDictionary(h => h.FormRecordId);
+    }
+
+    private static List<SearchCatalogueSnapshotEntry> BuildEntries(Guid organizationId, List<AuthorityResource> resources, Dictionary<Guid, Domain.Features.Content.RecordContentHead> heads)
+    {
         return resources.OrderBy(r => r.ResourceEntityId).Select((r, index) =>
         {
             var head = heads.GetValueOrDefault(r.ResourceEntityId);
@@ -374,6 +398,54 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         AuditJournal.Append(scope, locked, eventKind, body, clock);
     }
 
+    /// <summary>
+    /// Phase C7 M3 (OD-8): records one field-search execution over the caller's own user snapshot on the audit stream — field
+    /// ids, operators, counts, outcome and duration only. Anyone else's snapshot: not found.
+    /// </summary>
+    public async Task<SearchExecutionRecorded> RecordExecutionAsync(VerifiedActor actor, Guid snapshotId, SearchExecutionEvidence evidence, Guid correlationId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(evidence);
+        if (evidence.FieldDefinitionIds is null || evidence.Operators is null || evidence.FieldDefinitionIds.Count > 5 || evidence.Operators.Count > 5 || evidence.ConditionCount is < 0 or > 5
+            || !ExecutionOutcomes.Contains(evidence.Outcome ?? string.Empty) || evidence.Operators.Any(o => o is null || o.Length > 40) || evidence.EvaluatedRecordCount < 0 || evidence.MatchedRecordCount < 0 || evidence.ElapsedMilliseconds < 0)
+        {
+            throw AuthorityException.Invalid("execution evidence: at most 5 field ids and operators, a known outcome and non-negative counts");
+        }
+
+        Guid organizationId;
+        Guid formDefinitionId;
+        Guid userId;
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var snapshot = await scope.FindCatalogueSnapshotAsync(snapshotId, cancellationToken).ConfigureAwait(false);
+            if (snapshot is null || snapshot.SnapshotScopeKind != CatalogueScopeKinds.UserSearch)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+            }
+
+            var bound = await ActorResolver.BindAsync(scope, snapshot.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
+            if (bound.AuthorityUserId != snapshot.RequestingAuthorityUserId)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+            }
+
+            (organizationId, formDefinitionId, userId) = (snapshot.OrganizationId, snapshot.FormDefinitionId, bound.AuthorityUserId);
+        }
+
+        await using var auditScope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var locked = await auditScope.LockOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
+                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        AuditJournal.Append(auditScope, locked, "FieldSearchExecuted", new SearchExecutionAuditBody(snapshotId, formDefinitionId, userId, evidence.FieldDefinitionIds, evidence.Operators, evidence.ConditionCount,
+            evidence.Outcome!, evidence.EvaluatedRecordCount, evidence.MatchedRecordCount, evidence.ElapsedMilliseconds, locked.AuthorizationRevision, correlationId), clock);
+        await auditScope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return new SearchExecutionRecorded(snapshotId, correlationId);
+    }
+
+    /// <summary>Outcome codes of an execution (success or the business search error code).</summary>
+    public static readonly IReadOnlySet<string> ExecutionOutcomes = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "COMPLETED", "SEARCH_SNAPSHOT_CHANGED", "SEARCH_VERIFICATION_LIMIT", "SEARCH_VERIFICATION_UNAVAILABLE", "SEARCH_FIELD_NOT_ALLOWED",
+    };
+
     private static CatalogueEntry ToContract(SearchCatalogueSnapshotEntry e) =>
         new(e.FormRecordId, e.CommittedContentRevision, e.CommittedOperationId, e.ContentHeadQuarantined, e.ResourceLifecycleState == ResourceLifecycleStates.Quarantined);
 
@@ -387,6 +459,10 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
 
     private sealed record CanonicalEntry(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, bool ContentHeadQuarantined, string ResourceLifecycleState);
 
+    /// <summary>Execution audit body (OD-8): field ids, operators, counts and outcome only — never predicate values or record ids.</summary>
+    private sealed record SearchExecutionAuditBody(Guid SearchCatalogueSnapshotId, Guid FormDefinitionId, Guid AuthorityUserId, IReadOnlyList<Guid> FieldDefinitionIds, IReadOnlyList<string> Operators, int ConditionCount,
+        string Outcome, int? EvaluatedRecordCount, int? MatchedRecordCount, long ElapsedMilliseconds, long AuthorizationRevision, Guid CorrelationId);
+
     /// <summary>Audit journal body: identifiers, counts and revisions only — never record contents, field values or predicates.</summary>
     private sealed record CatalogueAuditBody(Guid? SearchCatalogueSnapshotId, string ScopeKind, Guid FormDefinitionId, Guid? AuthorityUserId, string? WorkloadName, Guid? SecurityCommandId, int EntryCount, string? CatalogueDigestHex, long AuthorizationRevision, long ContentIntegrityRevision, string? DenialReason, Guid CorrelationId);
 }
@@ -397,7 +473,7 @@ public static class CatalogueOptionsValidation
     public static void Validate(CatalogueOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (options.MaximumUserEntries < 1 || options.MaximumMigrationEntries < 1 || options.MigrationPageSize is < 1 or > 5000
+        if (options.MaximumUserEntries < 1 || options.MaximumPendingUserEntries < 1 || options.MaximumMigrationEntries < 1 || options.MigrationPageSize is < 1 or > 5000
             || options.UserSnapshotLifetimeSeconds is < 1 or > 900 || options.MigrationSnapshotLifetimeSeconds is < 1 or > 900)
         {
             throw new InvalidOperationException("Catalogue limits must be positive; page size 1..5000; snapshot lifetimes 1..900 seconds");

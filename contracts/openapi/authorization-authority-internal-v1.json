@@ -553,6 +553,48 @@
         }
       }
     },
+    "/internal/v1/search-catalogue/{snapshotId}/executions": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M3 (OD-8): journals one field-search execution over the caller's own snapshot on the audit stream (field ids, operators, counts, outcome, duration — never predicate values or record ids).",
+        "operationId": "RecordSearchExecution",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchExecutionEvidence"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchExecutionRecorded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/verifier/migration-catalogue": {
       "post": {
         "tags": [
@@ -926,6 +968,37 @@
           }
         }
       }
+    },
+    "/internal/v1/field-search/administration": {
+      "post": {
+        "tags": [
+          "FieldSearch"
+        ],
+        "summary": "Phase C7 M3: forms of the caller's organization with an Authority-registered published version (title, version, field and approval counts) for search-approval administration. administer_security only; no Designer or record access needed or granted.",
+        "operationId": "GetFieldSearchAdministration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSearchAdministrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchAdministrationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1175,6 +1248,20 @@
           },
           "resource_quarantined": {
             "type": "boolean"
+          },
+          "record_registered_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "content_head_modified_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -1597,6 +1684,127 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "FieldSearchAdministrationForm": {
+        "required": [
+          "form_definition_id",
+          "form_title",
+          "registered_form_version_number",
+          "registered_on",
+          "field_count",
+          "eligible_field_count",
+          "active_approval_count",
+          "invalidated_approval_count"
+        ],
+        "type": "object",
+        "properties": {
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registered_form_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registered_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "field_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "eligible_field_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "active_approval_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "invalidated_approval_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "FieldSearchAdministrationRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FieldSearchAdministrationResponse": {
+        "required": [
+          "plaintext_search_permitted",
+          "approval_operational",
+          "approval_unavailable_reason",
+          "forms",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "plaintext_search_permitted": {
+            "type": "boolean"
+          },
+          "approval_operational": {
+            "type": "boolean"
+          },
+          "approval_unavailable_reason": {
+            "type": "string"
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchAdministrationForm"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -2479,6 +2687,87 @@
           "snapshot_expires_on": {
             "type": "string",
             "format": "date-time"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchExecutionEvidence": {
+        "required": [
+          "field_definition_ids",
+          "operators",
+          "condition_count",
+          "outcome",
+          "evaluated_record_count",
+          "matched_record_count",
+          "elapsed_milliseconds"
+        ],
+        "type": "object",
+        "properties": {
+          "field_definition_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "condition_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "evaluated_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "matched_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "elapsed_milliseconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "SearchExecutionRecorded": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
           },
           "correlation_id": {
             "type": "string",

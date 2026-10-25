@@ -190,6 +190,10 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddPublishedFormVersion(PublishedFormVersion version) => context.PublishedFormVersions.Add(version);
 
+        public async Task<List<PublishedFormVersion>> GetLatestPublishedFormVersionsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            (await context.PublishedFormVersions.AsNoTracking().Where(v => v.OrganizationId == organizationId).ToListAsync(cancellationToken).ConfigureAwait(false))
+                .GroupBy(v => v.FormDefinitionId).Select(g => g.MaxBy(v => v.FormVersionNumber)!).ToList();
+
         public Task<List<FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid organizationId, Guid? formDefinitionId, CancellationToken cancellationToken) =>
             context.FieldSearchApprovals.AsTracking().Where(a => a.OrganizationId == organizationId && (formDefinitionId == null || a.FormDefinitionId == formDefinitionId)).OrderBy(a => a.FieldSearchApprovalId).ToListAsync(cancellationToken);
 

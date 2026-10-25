@@ -263,6 +263,22 @@ public sealed class FieldSearchApprovalTests
         Assert.Equal((FieldSearchApprovalStates.Invalidated, FieldSearchInvalidationReasons.FormVersionChanged), (approval.ApprovalStateName, approval.InvalidationReasonCode));
     }
 
+    /// <summary>Phase C7 M3: fields inside repeating sections are not searchable in V1; moving an approved field into one invalidates it.</summary>
+    [Fact]
+    public async Task RepeatingGroupFieldsAreNeverEligibleAndMovingAnApprovedFieldIntoOneInvalidatesIt()
+    {
+        var approval = await ApprovedAsync(PublicText, "equals");
+        List<PublishedFieldEntry> Grouped(Guid field) => [.. Entries().Select(e => e.FieldDefinitionId == field ? e with { InRepeatingGroup = true } : e)];
+        var plan = await PlanAsync(Designer, SecurityCommandKind.RegisterPublishedFormVersion, ResourceKind.FormDefinition, Form, new RegisterPublishedFormVersionPayload(Form, 2, new string('d', 64), Grouped(PublicText), "Case intake"));
+        Assert.Equal((FieldSearchApprovalStates.Invalidated, FieldSearchInvalidationReasons.FormVersionChanged), (approval.ApprovalStateName, approval.InvalidationReasonCode));
+        Assert.Equal("Case intake", plan.PublishedVersion!.FormTitleSnapshot);
+
+        store.PublishedVersions.Clear();
+        store.PublishedVersions.Add(Version(1, Grouped(InternalNumber)));
+        Assert.Equal(FieldSearchEligibility.RepeatingGroupNotSearchable, FieldSearchRules.Eligibility(Grouped(InternalNumber).Single(e => e.FieldDefinitionId == InternalNumber), store.Policies.Single(), new FieldSearchRules.ProtectionFacts(false, false, false)));
+        await RejectedAsync(() => ApproveAsync(Administrator, InternalNumber, ["equals"]), AuthorityErrorCodes.FieldSearchNotEligible);
+    }
+
     // ---- 11–12: strengthening, policy changes, withdrawal and query permission ----
 
     [Fact]

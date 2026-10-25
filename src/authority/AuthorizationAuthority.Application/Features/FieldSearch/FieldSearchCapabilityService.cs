@@ -85,4 +85,59 @@ public sealed class FieldSearchCapabilityService(IAuthorityStore store, Permissi
 
         return new FieldSearchCapabilitiesResponse(request.FormDefinitionId, policy?.PlaintextSearchPermitted ?? false, policy?.SearchPolicyRevision ?? 0, revision, fields, configuration, correlationId);
     }
+
+    /// <summary>
+    /// Phase C7 M3: search-approval administration for security administrators. Lists the forms of the caller's organization
+    /// that have an Authority-registered published version (latest version, registered title, field and approval counts),
+    /// so approvals can be administered without Designer or record access. Only <c>administer_security</c>; nothing from
+    /// business rows; forms whose resource is not Active are omitted.
+    /// </summary>
+    public async Task<FieldSearchAdministrationResponse> AdministerAsync(VerifiedActor actor, FieldSearchAdministrationRequest request, Guid correlationId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var decisions = await permissions.CheckBatchAsync(actor,
+            [new PermissionCheckRequest(request.OrganizationId, new ResourceRef(ResourceKind.Organization, request.OrganizationId), RequestedAction.AdministerSecurity)], correlationId, cancellationToken).ConfigureAwait(false);
+        if (!decisions[0].Allowed)
+        {
+            throw AuthorityException.Forbidden("search-approval administration requires administer_security");
+        }
+
+        var revision = decisions[0].AuthorizationRevision;
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var policy = await scope.FindProtectionPolicyAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false);
+        var approvals = (await scope.GetFieldSearchApprovalsAsync(request.OrganizationId, null, cancellationToken).ConfigureAwait(false)).ToList();
+        var forms = new List<FieldSearchAdministrationForm>();
+        foreach (var version in await scope.GetLatestPublishedFormVersionsAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false))
+        {
+            var form = await scope.FindResourceAsync(request.OrganizationId, ResourceTypeNames.FormDefinition, version.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+            if (form is not { ResourceLifecycleState: ResourceLifecycleStates.Active })
+            {
+                continue;
+            }
+
+            var entries = FieldSearchRules.ReadManifest(version);
+            var eligible = 0;
+            foreach (var entry in entries)
+            {
+                var facts = await FieldSearchRules.ReadProtectionFactsAsync(scope, request.OrganizationId, entry.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+                if (FieldSearchRules.Eligibility(entry, policy, facts) == FieldSearchEligibility.Eligible)
+                {
+                    eligible++;
+                }
+            }
+
+            var formApprovals = approvals.Where(a => a.FormDefinitionId == version.FormDefinitionId).ToList();
+            forms.Add(new FieldSearchAdministrationForm(version.FormDefinitionId, version.FormTitleSnapshot, version.FormVersionNumber, version.RegisteredOn, entries.Count, eligible,
+                formApprovals.Count(a => a.ApprovalStateName == FieldSearchApprovalStates.Active), formApprovals.Count(a => a.ApprovalStateName == FieldSearchApprovalStates.Invalidated)));
+        }
+
+        var after = await scope.ReadOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false);
+        if (after is null || after.AuthorizationRevision != revision)
+        {
+            throw AuthorityException.NotReady("authorization state moved while reading search-approval administration");
+        }
+
+        return new FieldSearchAdministrationResponse(policy?.PlaintextSearchPermitted ?? false, gate.ApprovalsOperational, gate.UnavailableReason,
+            forms.OrderBy(f => f.FormTitle ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(f => f.FormDefinitionId).ToList(), revision, correlationId);
+    }
 }

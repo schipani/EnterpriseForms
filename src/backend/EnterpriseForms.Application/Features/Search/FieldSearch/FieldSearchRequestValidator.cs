@@ -69,7 +69,7 @@ public static class FieldSearchRequestValidator
 
     public static void ValidatePage(FieldSearchPageRequest? request)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Cursor) || request.Cursor.Length > 4096)
+        if (request is null || string.IsNullOrWhiteSpace(request.Cursor) || request.Cursor.Length > FieldSearchCursor.MaximumTokenLength)
         {
             throw SearchException.RequestInvalid("cursor required");
         }
@@ -141,8 +141,8 @@ public static class FieldSearchRequestValidator
         }
     }
 
-    /// <summary>Strict invariant parsing; the parsed value is only compared here (bounds order) and discarded.</summary>
-    private static IComparable Parse(string valueType, string text, int number, FieldSearchLimits limits)
+    /// <summary>Strict invariant parsing (also used by the evaluator, Phase C7 M3, so request validation and evaluation agree).</summary>
+    internal static IComparable Parse(string valueType, string text, int number, FieldSearchLimits limits)
     {
         var invalid = SearchException.RequestInvalid($"condition {number}: the value is not a valid {valueType.ToLowerInvariant()}");
         switch (valueType)

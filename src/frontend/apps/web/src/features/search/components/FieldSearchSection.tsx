@@ -1,10 +1,10 @@
-import type { FieldDefinitionResponse, FieldSearchConfigurationResponse, FieldSearchStatusResponse } from "@enterpriseforms/api-client";
+import type { FieldSearchConfigurationResponse, FieldSearchStatusResponse } from "@enterpriseforms/api-client";
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import { Badge, Button, Checkbox, LoadingBlock, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { operatorLabel } from "../../search";
 import { ErrorPanel } from "../../support";
+import { operatorLabel } from "./conditionModel";
 
 /**
  * Phase C7 M2 (AC-6): the "Search" section of Configure Field. Everything shown is the Authorization Authority's view of
@@ -47,7 +47,7 @@ export function fieldSearchKey(formDefinitionId: string) {
   return ["forms", formDefinitionId, "field-search"];
 }
 
-export function FieldSearchSection({ formDefinitionId, field }: { formDefinitionId: string; field: FieldDefinitionResponse }) {
+export function FieldSearchSection({ formDefinitionId, fieldDefinitionId }: { formDefinitionId: string; fieldDefinitionId: string }) {
   const api = useApi();
   const configuration = useQuery({ queryKey: fieldSearchKey(formDefinitionId), queryFn: ({ signal }) => api.forms.fieldSearch(formDefinitionId, signal).then((r) => r.result), retry: (count, error) => !isNotFound(error) && count < 2 });
 
@@ -65,7 +65,7 @@ export function FieldSearchSection({ formDefinitionId, field }: { formDefinition
   }
 
   const data = configuration.data;
-  const status = data.fields.find((candidate) => candidate.fieldDefinitionId === field.fieldDefinitionId);
+  const status = data.fields.find((candidate) => candidate.fieldDefinitionId === fieldDefinitionId);
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted">Which fields can be used in Advanced Search is decided by the Authorization Authority, field by field, for the latest published version of this form. Searching itself is not turned on yet.</p>
@@ -127,6 +127,7 @@ function ApprovalControls({ formDefinitionId, data, status }: { formDefinitionId
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: fieldSearchKey(formDefinitionId) });
     await queryClient.invalidateQueries({ queryKey: ["search", "capabilities", formDefinitionId] });
+    await queryClient.invalidateQueries({ queryKey: ["organization", "search-approvals"] });
   };
   const approve = useMutation({
     mutationFn: () => api.forms.approveFieldSearch(formDefinitionId, status.fieldDefinitionId, { operators, approvalReference: reference.trim(), useDevelopmentStepUp: stepUp }).then((r) => r.result),

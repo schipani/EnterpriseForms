@@ -114,6 +114,12 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<AuthorityFieldSearchCapabilities> GetFieldSearchCapabilitiesAsync(DelegatedUserContext user, FieldSearchCapabilitiesQuery query, CancellationToken cancellationToken) =>
         SendAsync<AuthorityFieldSearchCapabilities>(HttpMethod.Post, "internal/v1/field-search/capabilities", user, query, null, cancellationToken);
 
+    public Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityFieldSearchAdministration>(HttpMethod.Post, "internal/v1/field-search/administration", user, query, null, cancellationToken);
+
+    public Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken) =>
+        SendAsync<System.Text.Json.JsonElement>(HttpMethod.Post, $"internal/v1/search-catalogue/{searchCatalogueSnapshotId:D}/executions", user, evidence, null, cancellationToken);
+
     public Task<BrowserSessionState> CreateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, DateTimeOffset absoluteExpiresOn, string? replacedSessionDigestBase64, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(user);

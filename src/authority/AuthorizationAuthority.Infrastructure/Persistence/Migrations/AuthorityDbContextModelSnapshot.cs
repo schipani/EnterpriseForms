@@ -731,6 +731,11 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("form_definition_id");
 
+                    b.Property<string>("FormTitleSnapshot")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("form_title_snapshot");
+
                     b.Property<int>("FormVersionNumber")
                         .HasColumnType("integer")
                         .HasColumnName("form_version_number");

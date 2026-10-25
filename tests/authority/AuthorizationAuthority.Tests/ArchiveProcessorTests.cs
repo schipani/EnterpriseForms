@@ -218,6 +218,8 @@ public sealed class ArchiveProcessorTests
 
         public void AddPublishedFormVersion(AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion version) => throw new NotSupportedException();
 
+        public Task<List<AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion>> GetLatestPublishedFormVersionsAsync(Guid org, CancellationToken ct) => Task.FromResult(new List<AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion>());
+
         public Task<List<AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid org, Guid? form, CancellationToken ct) => Task.FromResult(new List<AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval>());
 
         public void AddFieldSearchApproval(AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval approval) => throw new NotSupportedException();

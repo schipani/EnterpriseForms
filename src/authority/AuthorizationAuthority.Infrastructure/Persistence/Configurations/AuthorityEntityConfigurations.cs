@@ -333,6 +333,7 @@ public sealed class PublishedFormVersionConfiguration : IEntityTypeConfiguration
         builder.HasKey(e => e.PublishedFormVersionId);
         builder.Property(e => e.LayoutDigestScheme).HasMaxLength(40);
         builder.Property(e => e.FieldManifestJson).HasColumnType("jsonb");
+        builder.Property(e => e.FormTitleSnapshot).HasMaxLength(300);
         builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId, e.FormVersionNumber }).IsUnique().HasDatabaseName("uq_published_form_version_number");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_published_form_version_org");
         builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.RegisteredBySecurityCommandId).HasConstraintName("fk_published_form_version_command");

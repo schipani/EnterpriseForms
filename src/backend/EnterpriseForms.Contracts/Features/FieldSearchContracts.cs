@@ -124,3 +124,12 @@ public sealed record ApproveFieldSearchRequest(IReadOnlyList<string>? Operators,
 public sealed record WithdrawFieldSearchRequest(string? Reason);
 
 public sealed record UpdateFieldSearchersRequest(IReadOnlyList<Guid>? GrantUserIds, IReadOnlyList<Guid>? GrantTeamIds, IReadOnlyList<Guid>? RevokeUserIds, IReadOnlyList<Guid>? RevokeTeamIds);
+
+// ---- Phase C7 M3: search-approval administration (security administrators; no Designer or record access) ----
+
+/// <summary>A form with an Authority-registered published version: registered title (null before M3 registrations), version and counts.</summary>
+public sealed record FieldSearchAdministrationFormResponse(Guid FormDefinitionId, string FormTitle, bool FormTitleRegistered, int RegisteredFormVersionNumber, DateTimeOffset RegisteredOn,
+    int FieldCount, int EligibleFieldCount, int ActiveApprovalCount, int InvalidatedApprovalCount);
+
+/// <summary><c>ApprovalOperational</c> false (with <c>ApprovalUnavailableReason</c>) where approvals cannot be accepted (production and staging until PB-08).</summary>
+public sealed record FieldSearchAdministrationResponse(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<FieldSearchAdministrationFormResponse> Forms);

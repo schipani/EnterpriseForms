@@ -31,6 +31,11 @@ public static partial class CommandPlanner
             throw AuthorityException.Invalid("form_version_number >= 1, a 64-hex layout digest and unique field entries (at most 1000) are required");
         }
 
+        if (payload.FormTitle is { Length: > 300 })
+        {
+            throw AuthorityException.Invalid("form_title is at most 300 characters");
+        }
+
         byte[] digest;
         try
         {
@@ -67,6 +72,7 @@ public static partial class CommandPlanner
             FormVersionNumber = payload.FormVersionNumber,
             LayoutDigest = digest,
             FieldManifestJson = manifest,
+            FormTitleSnapshot = string.IsNullOrWhiteSpace(payload.FormTitle) ? null : payload.FormTitle.Trim(),
         };
 
         var entries = payload.Fields.ToDictionary(f => f.FieldDefinitionId);
@@ -281,6 +287,7 @@ public static partial class CommandPlanner
         && approval.ApprovedFieldClassification == entry.FieldClassification
         && approval.ApprovedProtectionMode == entry.ProtectionMode
         && approval.ApprovedFieldLabelSnapshot == entry.FieldLabel
+        && !entry.InRepeatingGroup
         && FieldSearchRules.SameOptions(approval, entry.Options);
 
     private static async Task AdvanceSearchPolicyAsync(IAuthorityScope scope, Guid organizationId, CommandPlan plan, CancellationToken cancellationToken)

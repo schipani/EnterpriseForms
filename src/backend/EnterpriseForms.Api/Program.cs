@@ -67,7 +67,9 @@ public sealed class Program
         // Phase C7 D4: provisional field-search limits (configuration FieldSearch); a bad value fails at startup.
         var fieldSearchLimits = builder.Configuration.GetSection(EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits.SectionName).Get<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits>() ?? new EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits();
         fieldSearchLimits.Validate();
+        fieldSearchLimits.ValidateEnvironment(builder.Environment.EnvironmentName);
         builder.Services.AddSingleton(fieldSearchLimits);
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchAdmission>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.Verification.TrustedScopeVerifier>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));

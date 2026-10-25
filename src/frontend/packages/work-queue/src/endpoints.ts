@@ -26,6 +26,7 @@ export const ENDPOINTS = {
   "forms.retryProtectionMigration": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/retry" },
   "forms.reclassifyField": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reclassify" },
   "forms.fieldSearch": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/field-search" },
+  "organization.searchApprovals": { method: "GET", path: "/api/v1/organization/search-approvals" },
   "forms.approveFieldSearch": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/search-approval" },
   "forms.withdrawFieldSearch": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/search-approval/withdraw" },
   "forms.updateFieldSearchers": { method: "PUT", path: "/api/v1/form-definitions/{formDefinitionId}/field-searchers" },

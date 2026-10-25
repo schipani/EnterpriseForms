@@ -55,9 +55,48 @@ public sealed class PhaseC7FieldSearchTests
                 FieldSearchOperators.ForValueType(g.First().ValueType), g.Where(c => Guid.TryParse(c.Value, out _)).Select(c => new FieldSearchOptionSnapshot(Guid.Parse(c.Value!), "Option")).ToList(), 1)).ToList();
             return Task.FromResult(new AuthorityFieldSearchCapabilities(query.FormDefinitionId, true, 0, 1, fields, null, Guid.CreateVersion7()));
         }
+
+        public List<SearchExecutionEvidence> Evidence { get; } = [];
+
+        public Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken) =>
+            Task.FromResult(new AuthorityFieldSearchAdministration(true, false, "PB08_STEP_UP_NOT_AVAILABLE", [], 1, Guid.Empty));
+
+        public Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken)
+        {
+            Evidence.Add(evidence);
+            return Task.CompletedTask;
+        }
     }
 
-    private static FieldSearchHandler Handler(FieldSearchLimits? limits = null, FieldSearchRequest? request = null) => new(limits ?? Limits, new ApprovingPolicy { Request = request });
+    /// <summary>The gate tests never reach the Authority client, the records or the directory (the gate is off by default).</summary>
+    private static FieldSearchHandler Handler(FieldSearchLimits? limits = null, FieldSearchRequest? request = null)
+    {
+        var settings = limits ?? Limits;
+        var authority = System.Reflection.DispatchProxy.Create<IAuthorizationAuthorityClient, PhaseC7ScopeVerificationTests.Stub<IAuthorizationAuthorityClient>>();
+        return new FieldSearchHandler(settings, new ApprovingPolicy { Request = request }, new Application.Features.Search.Verification.TrustedScopeVerifier(authority, new NoRecords(), settings, TimeProvider.System),
+            new FieldSearchAdmission(settings), authority, new NoCursors(), new NoDirectory(), TimeProvider.System);
+    }
+
+    private sealed class NoRecords : Application.Features.FormRecords.Ports.IAcceptedRecordItemsReader
+    {
+        public Task<IReadOnlyList<StagedContentItem>> ReadObservedItemsAsync(Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) => throw new InvalidOperationException("gate");
+
+        public Task<Application.Features.FormRecords.Ports.AcceptedRecordContent> ReadAcceptedContentAsync(Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) => throw new InvalidOperationException("gate");
+    }
+
+    private sealed class NoCursors : IOpaqueCursorProtector
+    {
+        public string Protect(string payload, TimeSpan lifetime) => throw new InvalidOperationException("gate");
+
+        public string? Unprotect(string token) => null;
+    }
+
+    private sealed class NoDirectory : Application.Features.FormRecords.Ports.IRecordDisplayDirectory
+    {
+        public Task<Application.Features.FormRecords.Ports.RecordDisplayNames> GetNamesAsync(Guid organizationId, CancellationToken cancellationToken) => throw new InvalidOperationException("gate");
+
+        public string ReferenceFor(Guid formRecordId) => "REC";
+    }
 
     private static SearchException Refusal(FieldSearchRequest? request) =>
         Assert.ThrowsAsync<SearchException>(() => Handler(request: request).SearchAsync(Context, request, TestContext.Current.CancellationToken)).GetAwaiter().GetResult();
@@ -100,11 +139,11 @@ public sealed class PhaseC7FieldSearchTests
     }
 
     [Fact]
-    public void APageRequestIsRefusedTheSameWayBecauseNoVerifiedResultCanExist()
+    public async Task APageRequestIsRefusedTheSameWayWhileTheExecutionGateIsOff()
     {
-        var refusal = Assert.Throws<SearchException>(() => FieldSearchHandler.Page(Context, new FieldSearchPageRequest("opaque-cursor")));
+        var refusal = await Assert.ThrowsAsync<SearchException>(() => Handler().PageAsync(Context, new FieldSearchPageRequest("0.opaque-cursor"), TestContext.Current.CancellationToken));
         Assert.Equal(SearchErrorCodes.VerificationUnavailable, refusal.ErrorCode);
-        Assert.Equal(SearchErrorCodes.RequestInvalid, Assert.Throws<SearchException>(() => FieldSearchHandler.Page(Context, new FieldSearchPageRequest(" "))).ErrorCode);
+        Assert.Equal(SearchErrorCodes.RequestInvalid, (await Assert.ThrowsAsync<SearchException>(() => Handler().PageAsync(Context, new FieldSearchPageRequest(" "), TestContext.Current.CancellationToken))).ErrorCode);
     }
 
     [Fact]
@@ -132,8 +171,11 @@ public sealed class PhaseC7FieldSearchTests
     public void TheHandlerHasNoDependencyThatCouldReadBusinessRecords()
     {
         var parameters = typeof(FieldSearchHandler).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToList();
-        // Phase C7 M2: the Authority's capability port is the only addition; still nothing that reads business records.
-        Assert.Equal([typeof(FieldSearchLimits), typeof(IFieldSearchPolicyAuthority)], parameters);
+        // Phase C7 M3: business bytes reach the executor only through the verifier (FormRecords verified-items port, checked
+        // against the Authority catalogue); names come from the display port. Nothing that queries business records.
+        Assert.Equal([typeof(FieldSearchLimits), typeof(IFieldSearchPolicyAuthority), typeof(Application.Features.Search.Verification.TrustedScopeVerifier), typeof(FieldSearchAdmission),
+            typeof(IAuthorizationAuthorityClient), typeof(IOpaqueCursorProtector), typeof(Application.Features.FormRecords.Ports.IRecordDisplayDirectory), typeof(TimeProvider)], parameters);
+        Assert.DoesNotContain(parameters, p => p.Namespace == "EnterpriseForms.Application.Common.Persistence");
     }
 
     // ---- request validation (422, never echoing values) ----

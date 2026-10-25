@@ -276,7 +276,7 @@ public sealed class SearchCatalogueTests
         var h = new Harness();
         for (var i = 0; i < 3; i++)
         {
-            await h.RecordAsync(h.FormA, withContent: false);
+            await h.RecordAsync(h.FormA);
         }
 
         var refused = await Assert.ThrowsAsync<AuthorityException>(() => h.UserCatalogueAsync(h.Owner, h.FormA, maximum: 2));
@@ -285,6 +285,69 @@ public sealed class SearchCatalogueTests
         Assert.Empty(h.Store.Snapshots);
         Assert.Equal(3, (await h.UserCatalogueAsync(h.Owner, h.FormA, maximum: 3)).Entries.Count);
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, (await Assert.ThrowsAsync<AuthorityException>(() => h.UserCatalogueAsync(h.Owner, h.FormA, maximum: 501))).ErrorCode);
+    }
+
+    /// <summary>
+    /// Phase C7 M3: registered records without accepted content (pending, e.g. abandoned creations) are listed — the
+    /// inventory stays complete — but need no verification, so they do not consume the verification limit; a separate
+    /// ceiling bounds them. They never make an unrelated form unsearchable merely by existing.
+    /// </summary>
+    [Fact]
+    public async Task PendingCreationsAreListedWithoutConsumingTheVerificationLimitAndHaveTheirOwnCeiling()
+    {
+        var h = new Harness();
+        await h.RecordAsync(h.FormA);
+        for (var i = 0; i < 3; i++)
+        {
+            await h.RecordAsync(h.FormA, withContent: false);
+        }
+
+        var catalogue = await h.UserCatalogueAsync(h.Owner, h.FormA, maximum: 1);
+        Assert.Equal(4, catalogue.Entries.Count);
+        Assert.Equal(3, catalogue.Entries.Count(e => e.CommittedContentRevision == 0));
+
+        h.Options.MaximumPendingUserEntries = 2;
+        var refused = await Assert.ThrowsAsync<AuthorityException>(() => h.UserCatalogueAsync(h.Owner, h.FormA, maximum: 1));
+        Assert.Equal(AuthorityErrorCodes.LimitExceeded, refused.ErrorCode);
+        Assert.Contains("PENDING_CEILING", h.Store.Journal.Last(j => j.JournalStreamName == JournalStreamNames.Audit).JournalEventBodyJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EntriesCarryTheAuthorityHeldRegistrationAndHeadChangeTimes()
+    {
+        var h = new Harness();
+        var filled = await h.RecordAsync(h.FormA);
+        var pending = await h.RecordAsync(h.FormA, withContent: false);
+        var registered = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        foreach (var resource in h.Store.Resources.Where(r => r.ResourceEntityId == filled || r.ResourceEntityId == pending))
+        {
+            resource.ResourceRegisteredOn = registered;
+        }
+
+        var modified = h.Store.Heads.Single(x => x.FormRecordId == filled).ContentHeadModifiedOn;
+        var entries = (await h.UserCatalogueAsync(h.Owner, h.FormA)).Entries.ToDictionary(e => e.FormRecordId);
+        Assert.Equal((registered, modified), (entries[filled].RecordRegisteredOn!.Value, entries[filled].ContentHeadModifiedOn!.Value));
+        Assert.Equal(registered, entries[pending].RecordRegisteredOn);
+        Assert.Null(entries[pending].ContentHeadModifiedOn);
+    }
+
+    /// <summary>Phase C7 M3 (OD-8): execution evidence for the caller's own snapshot only, on the audit stream, never values.</summary>
+    [Fact]
+    public async Task ExecutionEvidenceIsJournaledForTheSnapshotOwnerOnlyAndCarriesNoValues()
+    {
+        var h = new Harness();
+        await h.RecordAsync(h.FormA, value: "SECRET-VALUE-123");
+        var catalogue = await h.UserCatalogueAsync(h.Owner, h.FormA);
+        var evidence = new SearchExecutionEvidence([h.Field], ["equals"], 1, "COMPLETED", 1, 0, 120);
+        await h.Catalogue.RecordExecutionAsync(Harness.Actor(h.Owner), catalogue.SearchCatalogueSnapshotId, evidence, Guid.CreateVersion7(), CancellationToken.None);
+        var executed = h.Store.Journal.Single(j => j.JournalEventKind == "FieldSearchExecuted");
+        Assert.Equal(JournalStreamNames.Audit, executed.JournalStreamName);
+        Assert.Contains(h.Field.ToString("D"), executed.JournalEventBodyJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("SECRET-VALUE-123", executed.JournalEventBodyJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(catalogue.Entries[0].FormRecordId.ToString("D"), executed.JournalEventBodyJson, StringComparison.Ordinal);
+
+        Assert.Equal(AuthorityErrorCodes.NotFound, (await Assert.ThrowsAsync<AuthorityException>(() => h.Catalogue.RecordExecutionAsync(Harness.Actor(h.Other), catalogue.SearchCatalogueSnapshotId, evidence, Guid.CreateVersion7(), CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, (await Assert.ThrowsAsync<AuthorityException>(() => h.Catalogue.RecordExecutionAsync(Harness.Actor(h.Owner), catalogue.SearchCatalogueSnapshotId, evidence with { Outcome = "SOMETHING" }, Guid.CreateVersion7(), CancellationToken.None))).ErrorCode);
     }
 
     [Fact]
@@ -440,7 +503,7 @@ public sealed class SearchCatalogueTests
         var h = new Harness();
         for (var i = 0; i < 3; i++)
         {
-            await h.RecordAsync(h.FormA, withContent: false);
+            await h.RecordAsync(h.FormA); // contentful: only those count against the verification limit (Phase C7 M3)
         }
 
         await Assert.ThrowsAsync<AuthorityException>(() => h.UserCatalogueAsync(h.Owner, h.FormA, maximum: 2));

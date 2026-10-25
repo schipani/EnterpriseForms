@@ -33,6 +33,14 @@ public static class CatalogueEndpoints
             .WithName("ValidateSearchCatalogue")
             .WithSummary("Validates the caller's own snapshot against current Authority state: expiry, gate, authorization and projection revision (any change invalidates, OD-5), and — when the organization's content revision moved — every entry's head, quarantine and registry state. The id alone proves nothing.");
 
+        user.MapPost("/{snapshotId:guid}/executions", static async Task<Ok<SearchExecutionRecorded>> (Guid snapshotId, SearchExecutionEvidence evidence, HttpContext context, SearchCatalogueService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+            {
+                var actor = InternalAuthentication.RequireActor(context, validator);
+                return TypedResults.Ok(await service.RecordExecutionAsync(actor, snapshotId, evidence, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("RecordSearchExecution")
+            .WithSummary("Phase C7 M3 (OD-8): journals one field-search execution over the caller's own snapshot on the audit stream (field ids, operators, counts, outcome, duration — never predicate values or record ids).");
+
         var verifier = endpoints.MapGroup(InternalApi.Prefix + "/verifier/migration-catalogue").WithTags("Catalogue").RequireAuthorization(InternalAuthentication.VerifierPolicy);
 
         verifier.MapPost("/", static async Task<Ok<MigrationCataloguePage>> (MigrationCatalogueRequest request, HttpContext context, SearchCatalogueService service, CancellationToken cancellationToken) =>

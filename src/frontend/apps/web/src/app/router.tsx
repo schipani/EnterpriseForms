@@ -41,6 +41,7 @@ const newChildRoute = createRoute({ getParentRoute: () => appRoute, path: "/reco
 const uploadsRoute = createRoute({ getParentRoute: () => appRoute, path: "/uploads", component: lazyRouteComponent(() => import("../features/jobs"), "UploadCenterPage") });
 const activityRoute = createRoute({ getParentRoute: () => appRoute, path: "/activity", component: lazyRouteComponent(() => import("../features/audit"), "MyActivityPage") });
 const brandingRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/branding", component: lazyRouteComponent(() => import("../features/organizations"), "BrandingPage") });
+const searchApprovalsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/search-approvals", component: lazyRouteComponent(() => import("../features/search"), "SearchApprovalsPage") });
 const preferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
 const galleryRoute = createRoute({ getParentRoute: () => appRoute, path: "/gallery", component: lazyRouteComponent(() => import("../features/support"), "GalleryPage") });
 const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/no-permission", component: lazyRouteComponent(() => import("../features/support"), "NoPermissionPage") });
@@ -48,7 +49,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, preferencesRoute, galleryRoute, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, searchApprovalsRoute, preferencesRoute, galleryRoute, noPermissionRoute]),
 ]);
 
 export function createAppRouter() {

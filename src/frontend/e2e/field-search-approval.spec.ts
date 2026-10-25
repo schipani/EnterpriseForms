@@ -116,7 +116,7 @@ test.describe("Phase C7 M2 search approval", () => {
     await expect(card.getByRole("rowheader", { name: /Casey Clerk/ })).toBeVisible();
   });
 
-  test("Advanced Search offers the searcher exactly the approved field and conditions, never runs, and offers nothing to others", async ({ page }) => {
+  test("Advanced Search offers the searcher exactly the approved field and conditions, runs verified, and offers nothing to others", async ({ page }) => {
     const sent: string[] = [];
     page.on("request", (request) => {
       if (/\/field-search(\/|$|\?)/.test(new URL(request.url()).pathname)) sent.push(request.url());
@@ -133,10 +133,12 @@ test.describe("Phase C7 M2 search approval", () => {
     await expect(page.getByRole("option")).toHaveText(["Is exactly", "Starts with"]);
     await page.getByRole("option", { name: "Starts with" }).click();
     await first.getByRole("textbox", { name: "Value" }).fill("CR-");
-    await expect(page.getByText(/nothing is searched until trusted search is turned on/)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Search records" })).toBeDisabled();
-    await page.getByRole("textbox", { name: "Value" }).press("Enter");
-    expect(sent).toHaveLength(0);
+    // Phase C7 M3 (gate on in this isolated environment): the search runs verified; the clerk has no records in this form,
+    // so the complete, verified answer is "no records match" — and the value never reaches the address bar.
+    await page.getByRole("button", { name: "Search records" }).click();
+    await expect(page.getByText("No records match these conditions")).toBeVisible();
+    expect(sent).toHaveLength(1);
+    expect(page.url()).not.toContain("CR-");
     await signOut(page);
 
     await signIn(page, "reader");

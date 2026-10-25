@@ -128,7 +128,9 @@ public sealed record RecordDiscoveryPage(IReadOnlyList<Guid> FormRecordIds, long
 
 public sealed record SearchCatalogueRequest(Guid OrganizationId, Guid FormDefinitionId, int MaximumEntries);
 
-public sealed record CatalogueEntry(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, bool ContentHeadQuarantined, bool ResourceQuarantined);
+/// <remarks>Phase C7 M3: Authority-held registration and head-change times (sorting and display of verified results).</remarks>
+public sealed record CatalogueEntry(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, bool ContentHeadQuarantined, bool ResourceQuarantined,
+    DateTimeOffset? RecordRegisteredOn = null, DateTimeOffset? ContentHeadModifiedOn = null);
 
 /// <summary>The Authority's expected population of one form for the caller, with accepted heads, at one snapshot.</summary>
 public sealed record SearchCatalogue(Guid SearchCatalogueSnapshotId, Guid OrganizationId, Guid FormDefinitionId, long AuthorizationRevision, long ProjectionRevision, long ContentIntegrityRevision,
@@ -235,8 +237,23 @@ public sealed record AuthorityFieldSearchConfiguration(bool CanApprove, bool App
 public sealed record AuthorityFieldSearchCapabilities(Guid FormDefinitionId, bool PlaintextSearchPermitted, long SearchPolicyRevision, long AuthorizationRevision,
     IReadOnlyList<AuthoritySearchableField> Fields, AuthorityFieldSearchConfiguration? Configuration, Guid CorrelationId);
 
-/// <summary>Phase C7 M2: the Authority's field search capabilities for the delegated user (narrow port; only the Search feature uses it).</summary>
+/// <summary>Phase C7 M3 (OD-8): evidence of one execution — field ids, operators, counts, outcome (never values or record ids).</summary>
+public sealed record SearchExecutionEvidence(IReadOnlyList<Guid> FieldDefinitionIds, IReadOnlyList<string> Operators, int ConditionCount, string Outcome, int? EvaluatedRecordCount, int? MatchedRecordCount, long ElapsedMilliseconds);
+
+public sealed record FieldSearchAdministrationQuery(Guid OrganizationId);
+
+public sealed record AuthorityFieldSearchAdministrationForm(Guid FormDefinitionId, string? FormTitle, int RegisteredFormVersionNumber, DateTimeOffset RegisteredOn, int FieldCount, int EligibleFieldCount, int ActiveApprovalCount, int InvalidatedApprovalCount);
+
+public sealed record AuthorityFieldSearchAdministration(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<AuthorityFieldSearchAdministrationForm> Forms, long AuthorizationRevision, Guid CorrelationId);
+
+/// <summary>Phase C7 M2/M3: the Authority's field search capabilities, administration listing and execution evidence (narrow port; only the Search feature uses it).</summary>
 public interface IFieldSearchPolicyAuthority
 {
     Task<AuthorityFieldSearchCapabilities> GetFieldSearchCapabilitiesAsync(DelegatedUserContext user, FieldSearchCapabilitiesQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Security administrators only (<c>administer_security</c>): forms with a registered published version and their search-approval counts.</summary>
+    Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Journals one execution over the caller's own catalogue snapshot on the Authority audit stream.</summary>
+    Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken);
 }

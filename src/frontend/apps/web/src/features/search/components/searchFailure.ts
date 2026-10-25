@@ -18,9 +18,16 @@ export function presentSearchFailure(error: unknown): SearchFailure {
   const reason = problem?.unavailable_reason;
   switch (presented.code) {
     case "SEARCH_VERIFICATION_UNAVAILABLE":
-      return reason === "TRUSTED_SEARCH_NOT_ENABLED"
-        ? { code: presented.code, title: "Advanced field search is not available yet", message: "Searching inside records stays off until results can be independently verified as complete. Nothing was searched, so this is not a list of matching records.", canRetry: false }
-        : { code: presented.code, title: "Search results could not be verified", message: "The records in this form could not all be checked right now, so no results are shown — this does not mean nothing matched. Try again in a few minutes.", canRetry: true };
+      if (reason === "TRUSTED_SEARCH_NOT_ENABLED") {
+        return { code: presented.code, title: "Advanced field search is not available yet", message: "Searching inside records stays off until results can be independently verified as complete. Nothing was searched, so this is not a list of matching records.", canRetry: false };
+      }
+      if (reason === "SEARCH_CAPACITY_EXCEEDED") {
+        return { code: presented.code, title: "Search is busy", message: "Too many verified searches are running right now, so this one was not started. Your conditions are kept — try again in a moment.", canRetry: true };
+      }
+      if (reason === "RECORD_QUARANTINED" || reason === "RECORD_VERIFICATION_FAILED" || reason === "RECORD_NOT_VERIFIED") {
+        return { code: presented.code, title: "A record could not be verified", message: "A record in this form failed its integrity check, so no results are shown — this does not mean nothing matched. The record is held for review; searching this form works again once an administrator has resolved it.", canRetry: false };
+      }
+      return { code: presented.code, title: "Search results could not be verified", message: "The records in this form could not all be checked right now, so no results are shown — this does not mean nothing matched. Try again in a few minutes.", canRetry: true };
     case "SEARCH_VERIFICATION_LIMIT":
       return { code: presented.code, title: "This search is too large to verify", message: "Too many records would need to be checked to give a complete answer, so no results are shown. Narrow the search: choose a status or add another condition.", canRetry: false };
     case "SEARCH_SNAPSHOT_CHANGED":

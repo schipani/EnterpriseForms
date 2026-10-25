@@ -3,8 +3,9 @@ import { expect, test, type Locator, type Page, type Request } from "@playwright
 import { signIn } from "./support";
 
 /**
- * Phase C7 M0 Advanced Field Search (C-56). Real API and BFF session; trusted execution (Authority AC-5/AC-6) does not
- * exist, so the server reports field-value search unavailable and refuses every search request.
+ * Phase C7 M0 Advanced Field Search (C-56): layout, contracts and typed errors, against the real API and BFF session. In the
+ * isolated environments these specs run in, the M3 execution gate is on (C-69); a form nobody approved fields for offers
+ * nothing, and executed searches are covered by field-search-execution.spec.ts.
  *  1. My Records keeps the reference/ID search on top, Form | Status and Sort by | Rows per page in two columns, then the
  *     Advanced Search section (collapsed) — one card, one results table.
  *  2. Advanced Search is disabled with an explanation; the page never sends a field-search request.
@@ -70,7 +71,7 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
     await expect(page.getByRole("table")).toHaveCount(await page.getByRole("table", { name: "My Records" }).count());
   });
 
-  test("without a form, Advanced Search asks for one; with a form it is unavailable, disabled and explained, and nothing is ever sent", async ({ page }) => {
+  test("without a form, Advanced Search asks for one; a form without approved fields offers nothing, disables it and says why; nothing is ever sent", async ({ page }) => {
     await signIn(page, "owner");
     const sent = watchFieldSearch(page);
     const capabilityUrls: string[] = [];
@@ -85,9 +86,8 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
 
     await page.goto(`/app/records?form=${someForm}`);
     await advancedToggle(page).click();
-    await expect(page.getByText("Not available yet", { exact: true })).toBeVisible();
-    await expect(page.getByText("Advanced field search is not available yet")).toBeVisible();
-    await expect(page.getByText(/turned off until the Authorization Authority can verify/)).toBeVisible();
+    // Phase C7 M3: execution is on in this isolated environment; a form the person may not search (here: unknown) offers no field.
+    await expect(page.getByText("No fields can be searched in this form")).toBeVisible();
     const first = condition(page, 1);
     await expect(first.getByRole("combobox", { name: "Field" })).toBeDisabled();
     await expect(first.getByRole("combobox", { name: "Field" })).toHaveText("No searchable fields");
@@ -136,17 +136,20 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
     expect(regex.status()).toBe(422);
     expect(((await regex.json()) as { title: string }).title).toBe("SEARCH_OPERATOR_NOT_SUPPORTED");
 
+    // A forged page cursor is refused typed (M3: malformed ⇒ 422; altered or foreign ⇒ 409 SEARCH_SNAPSHOT_CHANGED).
     const page2 = await page.request.post("/api/v1/form-records/field-search/page", { data: { cursor: "forged-cursor" }, headers });
-    expect(page2.status()).toBe(503);
+    expect([409, 422]).toContain(page2.status());
+    const page3 = await page.request.post("/api/v1/form-records/field-search/page", { data: { cursor: "0.forged-cursor" }, headers });
+    expect(page3.status()).toBe(409);
 
-    for (const response of [refused, tooMany, regex, page2]) {
+    for (const response of [refused, tooMany, regex, page2, page3]) {
       expect(await response.text()).not.toContain(sentinel);
       expect(response.url()).not.toContain(sentinel);
       expect(response.headers()["cache-control"] ?? "").toContain("no-store");
     }
 
     const capabilities = (await (await page.request.get(`/api/v1/form-records/search-capabilities?formDefinitionId=${someForm}`)).json()) as Record<string, unknown>;
-    expect(capabilities).toMatchObject({ fieldValueSearchAvailable: false, unavailableReasonCode: "TRUSTED_SEARCH_NOT_ENABLED", fields: [], notSearchableFields: [], maximumConditions: 5, conditionJoin: "And" });
+    expect(capabilities).toMatchObject({ fieldValueSearchAvailable: true, fields: [], notSearchableFields: [], maximumConditions: 5, conditionJoin: "And" }); // M3 gate on (isolated environment); nothing approved for an unknown form
   });
 
   test("gallery preview: Field and Condition side by side, Value beneath, typed controls, up to five AND conditions", async ({ page }) => {

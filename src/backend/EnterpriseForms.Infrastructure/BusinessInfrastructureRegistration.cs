@@ -50,6 +50,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<IAuthorizationAuthorityClient>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IBrowserSessionStateAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IFieldSearchPolicyAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IRecordDisplayDirectory, EnterpriseForms.Application.Features.FormRecords.Ports.RecordDisplayDirectory>();
         services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearchPolicy.FieldSearchPolicyHandlers>();
 
         services.AddSingleton(TimeProvider.System);

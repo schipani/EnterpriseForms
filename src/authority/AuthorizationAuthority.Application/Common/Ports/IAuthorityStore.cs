@@ -138,6 +138,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     void AddPublishedFormVersion(PublishedFormVersion version);
 
+    /// <summary>Phase C7 M3: the highest registered published version of every form of the organization (read-only).</summary>
+    Task<List<PublishedFormVersion>> GetLatestPublishedFormVersionsAsync(Guid organizationId, CancellationToken cancellationToken);
+
     /// <summary>Phase C7 M2 (AC-6): approvals of the organization (optionally one form), tracked so commands can change their state.</summary>
     Task<List<FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid organizationId, Guid? formDefinitionId, CancellationToken cancellationToken);
 

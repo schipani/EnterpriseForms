@@ -42,6 +42,8 @@ services:
       Testing__WriteFaultInjection: "true"
       # G23: both API instances decrypt the same session cookies (one key ring); session validity is decided by the Authority.
       DataProtection__KeyRingDirectory: /keyring
+      # Phase C7 M3: verified field-value search execution (fail-closed gate; refused at startup outside Development/Testing).
+      FieldSearch__ExecutionEnabled: "true"
     volumes:
       - api-keyring:/keyring
     ports: ["127.0.0.1:5180:8080"]
@@ -54,6 +56,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
       DataProtection__KeyRingDirectory: /keyring
+      FieldSearch__ExecutionEnabled: "true"
     volumes:
       - api-keyring:/keyring
     ports: ["127.0.0.1:5181:8080"]

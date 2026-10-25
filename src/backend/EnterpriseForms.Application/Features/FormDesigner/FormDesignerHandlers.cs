@@ -1221,6 +1221,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                     protection_mode = field.FieldProtectionMode,
                     field_label = element.Label.Length > 300 ? element.Label[..300] : element.Label,
                     options = field.FieldDataType == "Option" ? (element.Options ?? []).Select(o => new { field_option_id = o.FieldOptionId, option_label = o.Label.Length > 300 ? o.Label[..300] : o.Label }).ToList() : null,
+                    in_repeating_group = field.GroupDefinitionId is not null,
                 };
             })
             .ToList();
@@ -1230,6 +1231,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
             form_version_number = version.VersionNumber,
             layout_digest_hex = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonicalLayout))),
             fields,
+            form_title = string.IsNullOrWhiteSpace(layout.Title) ? null : (layout.Title.Length > 300 ? layout.Title[..300] : layout.Title),
         });
         string? failure = null;
         for (var attempt = 0; attempt < 3; attempt++)

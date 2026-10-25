@@ -1199,7 +1199,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Phase C7 M2: each condition is authorized against the Authority's capabilities first (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED), then every request is refused with 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED, retryable false) because execution (M3) is not enabled. */
+        /** Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Each condition is first authorized against the Authority's capabilities (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED). Phase C7 M3: executed only where the fail-closed execution gate is on (isolated Development/Testing); otherwise 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED). Overload: 503 SEARCH_VERIFICATION_UNAVAILABLE (SEARCH_CAPACITY_EXCEEDED, retryable). */
         post: operations["SearchFormRecordsByFieldValues"];
         delete?: never;
         options?: never;
@@ -1216,7 +1216,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Another page of a verified advanced-search result: the opaque cursor is bound to the caller, session, query digest and verified snapshot; a changed authorization or content snapshot returns 409 SEARCH_SNAPSHOT_CHANGED (restart from page one). Phase C7 M0: refused with 503 SEARCH_VERIFICATION_UNAVAILABLE / TRUSTED_SEARCH_NOT_ENABLED. */
+        /** Another page of a verified advanced-search result: the opaque cursor is bound to the caller, session, query digest and verified snapshot; a changed authorization or content snapshot returns 409 SEARCH_SNAPSHOT_CHANGED (restart from page one). Nothing is re-evaluated: the page comes from the verified result the cursor carries, after the Authority re-validates its snapshot. */
         post: operations["PageFieldSearchResults"];
         delete?: never;
         options?: never;
@@ -1285,6 +1285,23 @@ export interface paths {
         get?: never;
         /** Grants or revokes the form's field_searcher relation (query permission for its approved fields) for users or teams. Security administrators only. Form access, record ownership and design access never imply it. */
         put: operations["UpdateFieldSearchers"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/search-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase C7 M3: for security administrators (administer_security) only — the organization's forms with an Authority-registered published version, their registered title and version, field and approval counts. Search approval administration without Designer or record access; 403 for everyone else. */
+        get: operations["GetSearchApprovalAdministration"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1693,6 +1710,30 @@ export interface components {
             fieldKey: string;
             fieldDisplayName: string;
             fieldDataType: string;
+        };
+        FieldSearchAdministrationFormResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            formTitle: string;
+            formTitleRegistered: boolean;
+            /** Format: int32 */
+            registeredFormVersionNumber: number | string;
+            /** Format: date-time */
+            registeredOn: string;
+            /** Format: int32 */
+            fieldCount: number | string;
+            /** Format: int32 */
+            eligibleFieldCount: number | string;
+            /** Format: int32 */
+            activeApprovalCount: number | string;
+            /** Format: int32 */
+            invalidatedApprovalCount: number | string;
+        };
+        FieldSearchAdministrationResponse: {
+            plaintextSearchPermitted: boolean;
+            approvalOperational: boolean;
+            approvalUnavailableReason: string;
+            forms: components["schemas"]["FieldSearchAdministrationFormResponse"][];
         };
         FieldSearchCapabilitiesResponse: {
             /** Format: uuid */
@@ -4679,6 +4720,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    GetSearchApprovalAdministration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchAdministrationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
         };
     };

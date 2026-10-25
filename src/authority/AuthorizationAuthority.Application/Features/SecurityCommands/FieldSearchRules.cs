@@ -88,6 +88,11 @@ public static class FieldSearchRules
             return FieldSearchEligibility.TypeNotSearchable;
         }
 
+        if (field.InRepeatingGroup)
+        {
+            return FieldSearchEligibility.RepeatingGroupNotSearchable;
+        }
+
         if (policy is null)
         {
             return FieldSearchEligibility.OrganizationPolicyMissing;

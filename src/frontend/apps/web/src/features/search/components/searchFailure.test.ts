@@ -18,6 +18,18 @@ describe("advanced search failure messages", () => {
     expect(presentSearchFailure(failure(409, "SEARCH_SNAPSHOT_CHANGED")).canRetry).toBe(true);
   });
 
+  it("explains a busy refusal (conditions kept, retry offered) and an integrity failure (no retry, never 'no records')", () => {
+    const busy = presentSearchFailure(failure(503, "SEARCH_VERIFICATION_UNAVAILABLE", { unavailable_reason: "SEARCH_CAPACITY_EXCEEDED" }));
+    expect(busy.title).toBe("Search is busy");
+    expect(busy.canRetry).toBe(true);
+    for (const reason of ["RECORD_QUARANTINED", "RECORD_VERIFICATION_FAILED"]) {
+      const integrity = presentSearchFailure(failure(503, "SEARCH_VERIFICATION_UNAVAILABLE", { unavailable_reason: reason }));
+      expect(integrity.title).toBe("A record could not be verified");
+      expect(integrity.canRetry).toBe(false);
+      expect(integrity.message).toContain("does not mean nothing matched");
+    }
+  });
+
   it("asks to narrow the search when the verification limit is reached", () => {
     const presented = presentSearchFailure(failure(422, "SEARCH_VERIFICATION_LIMIT", { limit_kind: "records" }));
     expect(presented.message).toContain("Narrow the search");

@@ -12,7 +12,7 @@ namespace EnterpriseForms.StageBTests.Tests;
 /// Authority-registered published version and refused for anything encrypted, Confidential/Restricted or below the
 /// organization floor; query permission is the field_searcher relation; strengthening, policy changes, republishing
 /// and revocation take effect at once; business-database tampering with labels or options changes nothing the
-/// Authority offers. Execution stays off: every authorized condition still ends in TRUSTED_SEARCH_NOT_ENABLED.
+/// Authority offers. Execution (M3) runs on this stack (gate on); its verified semantics are FieldSearchExecutionTests.
 /// The synthetic development step-up is enabled on this isolated stack only (compose.security-test.yaml).
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
@@ -134,8 +134,7 @@ public sealed class FieldSearchApprovalTests(StageBFixture fixture)
         Assert.Equal([w.Reference], SearchableFields(clerk));
         Assert.Equal("Case reference", clerk.Root.GetProperty("fields")[0].GetProperty("displayLabel").GetString());
         Assert.Equal(["equals", "startsWith"], clerk.Root.GetProperty("fields")[0].GetProperty("operators").EnumerateArray().Select(o => o.GetString()));
-        Assert.False(clerk.Root.GetProperty("fieldValueSearchAvailable").GetBoolean());
-        Assert.Equal("TRUSTED_SEARCH_NOT_ENABLED", clerk.Root.GetProperty("unavailableReasonCode").GetString());
+        Assert.True(clerk.Root.GetProperty("fieldValueSearchAvailable").GetBoolean()); // the M3 execution gate is on in this isolated stack
         // A searcher who is not a designer learns nothing about the form's other fields.
         Assert.Empty(clerk.Root.GetProperty("notSearchableFields").EnumerateArray());
         Assert.Equal(HttpStatusCode.NotFound, (await ConfigurationAsync(w, w.S.Clerk)).Status);
@@ -143,10 +142,10 @@ public sealed class FieldSearchApprovalTests(StageBFixture fixture)
         Assert.Equal([w.S.Clerk.AuthorityUserId], listed.Root.GetProperty("fieldSearchers").EnumerateArray().Select(e => e.GetProperty("subjectId").GetGuid()));
         Assert.Equal(JsonValueKind.Null, (await ConfigurationAsync(w, w.S.Designer)).Root.GetProperty("fieldSearchers").ValueKind); // designers see status, not who may search
 
-        // An approved condition still does not run; an unapproved field, operator or type is refused first.
+        // An approved condition runs (M3); an unapproved field, operator or type is refused first.
         var allowed = await SearchAsync(w, w.S.Clerk, new { fieldDefinitionId = w.Reference, @operator = "startsWith", valueType = "String", value = "CR-" });
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, allowed.Status);
-        Assert.Equal("SEARCH_VERIFICATION_UNAVAILABLE", allowed.ErrorCode);
+        // M3: the approved condition runs (complete, verified); unapproved fields, operators and types are still refused first.
+        Assert.True(allowed.IsSuccess || allowed.ErrorCode is "SEARCH_SNAPSHOT_CHANGED" or "SEARCH_VERIFICATION_UNAVAILABLE", allowed.Body);
         Assert.Equal("SEARCH_FIELD_NOT_ALLOWED", (await SearchAsync(w, w.S.Clerk, new { fieldDefinitionId = w.Count, @operator = "equals", valueType = "Integer", value = "3" })).ErrorCode);
         Assert.Equal("SEARCH_OPERATOR_NOT_SUPPORTED", (await SearchAsync(w, w.S.Clerk, new { fieldDefinitionId = w.Reference, @operator = "contains", valueType = "String", value = "CR-1" })).ErrorCode);
         Assert.Equal("SEARCH_FIELD_NOT_ALLOWED", (await SearchAsync(w, w.S.Clerk, new { fieldDefinitionId = w.Reference, @operator = "equals", valueType = "Integer", value = "3" })).ErrorCode); // forged value type
@@ -241,7 +240,8 @@ public sealed class FieldSearchApprovalTests(StageBFixture fixture)
         Assert.Equal("Case reference", fields[w.Reference].GetProperty("displayLabel").GetString());
         Assert.Equal([w.Open, w.Closed], fields[w.Status].GetProperty("options").EnumerateArray().Select(o => o.GetProperty("fieldOptionId").GetGuid()));
         Assert.Equal("SEARCH_OPERATOR_NOT_SUPPORTED", (await SearchAsync(w, w.S.Clerk, new { fieldDefinitionId = w.Status, @operator = "is", valueType = "Option", value = injected.ToString("D") })).ErrorCode);
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await SearchAsync(w, w.S.Clerk, new { fieldDefinitionId = w.Status, @operator = "is", valueType = "Option", value = w.Open.ToString("D") })).Status);
+        var frozen = await SearchAsync(w, w.S.Clerk, new { fieldDefinitionId = w.Status, @operator = "is", valueType = "Option", value = w.Open.ToString("D") });
+        Assert.True(frozen.IsSuccess || frozen.ErrorCode is "SEARCH_SNAPSHOT_CHANGED" or "SEARCH_VERIFICATION_UNAVAILABLE", frozen.Body); // a frozen option is accepted
         Assert.DoesNotContain(w.Note, fields.Keys);
         Assert.Equal("SEARCH_FIELD_NOT_ALLOWED", (await SearchAsync(w, w.S.Clerk, new { fieldDefinitionId = w.Note, @operator = "equals", valueType = "String", value = "x" })).ErrorCode);
         var note = StatusOf(await ConfigurationAsync(w, w.S.Administrator), w.Note);

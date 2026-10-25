@@ -22,6 +22,9 @@ public sealed class PublishedFormVersion
 
     public string FieldManifestJson { get; set; } = "[]";
 
+    /// <summary>Phase C7 M3: the published layout title as registered (display for security administrators); null for versions registered before M3.</summary>
+    public string? FormTitleSnapshot { get; set; }
+
     public Guid RegisteredBySecurityCommandId { get; set; }
 
     public DateTimeOffset RegisteredOn { get; set; }
@@ -113,6 +116,9 @@ public static class FieldSearchEligibility
     public const string OrganizationPolicyMissing = "OrganizationPolicyMissing";
     public const string ProtectionPending = "ProtectionPending";
     public const string TypeNotSearchable = "TypeNotSearchable";
+
+    /// <summary>Phase C7 M3: fields inside repeating sections are not searchable in V1.</summary>
+    public const string RepeatingGroupNotSearchable = "RepeatingGroupNotSearchable";
 }
 
 public static class FieldSearchInvalidationReasons

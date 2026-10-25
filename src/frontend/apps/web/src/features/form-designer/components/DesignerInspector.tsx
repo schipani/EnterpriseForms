@@ -3,10 +3,10 @@ import { applyEditValues, elementKey, findElement, moveElementTo, placedIds, sam
 import { CONTROLS_BY_TYPE, REPEAT_CEILING, type DocumentElement, type FieldDataType, type FieldElement, type FormLayout, type LayoutElement, type LayoutRepeat, type RelatedElement } from "@enterpriseforms/form-renderer";
 import { ActionIcons, Badge, Button, Checkbox, Select, StatusMessage, Tabs, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useState, type ReactNode } from "react";
-import { FieldSearchSection } from "./FieldSearchSection";
 import { CurrentProtectionSection } from "./FieldSecuritySection";
 import { OptionsEditor } from "./OptionsEditor";
 import { DependentChoices, RulesTab } from "./RulesTab";
+import { FieldSearchSection } from "../../search";
 import { ErrorPanel } from "../../support";
 
 export interface PlacementTarget {
@@ -397,7 +397,7 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
       ? {
           value: "search",
           label: "Search",
-          content: <FieldSearchSection formDefinitionId={props.formDefinitionId} field={field} />,
+          content: <FieldSearchSection formDefinitionId={props.formDefinitionId} fieldDefinitionId={field.fieldDefinitionId} />,
         }
       : null,
     {

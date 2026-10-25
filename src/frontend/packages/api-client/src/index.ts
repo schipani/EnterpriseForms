@@ -54,6 +54,8 @@ export type FieldSearchStatusResponse = S["FieldSearchStatusResponse"];
 export type ApproveFieldSearchRequest = S["ApproveFieldSearchRequest"];
 export type WithdrawFieldSearchRequest = S["WithdrawFieldSearchRequest"];
 export type UpdateFieldSearchersRequest = S["UpdateFieldSearchersRequest"];
+export type FieldSearchAdministrationResponse = S["FieldSearchAdministrationResponse"];
+export type FieldSearchAdministrationFormResponse = S["FieldSearchAdministrationFormResponse"];
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
 export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
 export type FieldProtectionVerificationResponse = S["FieldProtectionVerificationResponse"];
@@ -250,6 +252,7 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       updateBranding: (request: UpdateBrandingRequest) => write<BrandingResponse>("PUT", "organization.updateBranding", undefined, request, { resourceKey: "branding" }),
       uploadLogo: (png: ArrayBuffer) => coordinator.execute<BrandingResponse>({ lane: "interactive-write", method: "POST", endpointKey: "organization.uploadLogo", binaryPayload: png, binaryContentType: "image/png", resourceKey: "branding" }),
       users: (signal?: AbortSignal) => read<DirectoryUserResponse[]>("users.list", undefined, undefined, "background-read", signal),
+      searchApprovals: (signal?: AbortSignal) => read<FieldSearchAdministrationResponse>("organization.searchApprovals", undefined, undefined, "interactive-read", signal),
       securityPolicy: (signal?: AbortSignal) => read<OrganizationSecurityPolicyResponse>("organization.securityPolicy", undefined, undefined, "interactive-read", signal),
       updateSecurityPolicy: (request: UpdateOrganizationSecurityPolicyRequest) => write<OrganizationSecurityPolicyResponse>("PUT", "organization.updateSecurityPolicy", undefined, request, { resourceKey: "security-policy" }),
     },

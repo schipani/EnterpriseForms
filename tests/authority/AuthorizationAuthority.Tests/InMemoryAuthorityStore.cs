@@ -178,6 +178,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public void AddPublishedFormVersion(PublishedFormVersion version) => s.PublishedVersions.Add(version);
 
+        public Task<List<PublishedFormVersion>> GetLatestPublishedFormVersionsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PublishedVersions.Where(v => v.OrganizationId == organizationId).GroupBy(v => v.FormDefinitionId).Select(g => g.MaxBy(v => v.FormVersionNumber)!).ToList());
+
         public Task<List<FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid organizationId, Guid? formDefinitionId, CancellationToken cancellationToken) =>
             Task.FromResult(s.Approvals.Where(a => a.OrganizationId == organizationId && (formDefinitionId == null || a.FormDefinitionId == formDefinitionId)).ToList());
 

@@ -81,6 +81,9 @@ public sealed class PhaseC7ScopeVerificationTests
             Reads.Add((formRecordId, committedOperationId));
             return Task.FromResult<IReadOnlyList<StagedContentItem>>([new StagedContentItem(ManifestItemKind.RecordHeader, formRecordId, Convert.ToBase64String(new byte[bytesPerRecord]), Convert.ToBase64String(new byte[32]))]);
         }
+
+        public async Task<AcceptedRecordContent> ReadAcceptedContentAsync(Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) =>
+            new(await ReadObservedItemsAsync(formRecordId, committedOperationId, cancellationToken), new AcceptedRecordHeaderFacts(Form, "Submitted", Guid.Empty, null), []);
     }
 
     private static CatalogueEntry Entry(long revision = 1, bool quarantined = false) => new(Guid.CreateVersion7(), revision, revision == 0 ? null : Guid.CreateVersion7(), quarantined, false);
