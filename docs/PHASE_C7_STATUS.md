@@ -422,6 +422,7 @@ ENC-SR status is in `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md`; no
 
 * **Local (developer laptop):** .NET Authority 163/163, contract 297/297, architecture 67/67, integrity 34/34; frontend lint, typecheck, 207/207, build, no generated-contract drift; real-stack search classes 29/31 on the first run (one wrong test expectation, corrected and re-run green; the M1 480-record benchmark exceeded the 15 s budget on this laptop — the typed refusal, see §15.5); browser specs M3 6/6, M2 5/5, M0 8/8, responsive 2/2.
 * **Hosted (dispatched on 574ddef):** `stage-b-integration` run 40150640937 — integration **160/160** (including the M3 adversarial suite and both benchmarks), browser **106 passed, 1 failed** (`responsive.spec.ts` still expected the M0 "not available yet" text; test corrected afterwards, see §15.6); `security-gate-a` run 40150642998 — SEC-P01..SEC-P12 **13/13**.
+* **Hosted final (dispatched on 95a3729; code identical to 574ddef plus the test-only spec fix and documentation):** `stage-b-integration` run 40153566849 — integration **160/160**, browser **107/107**.
 
 ### 15.5 Performance (PB-09; engineering measurement, not a capacity claim)
 
