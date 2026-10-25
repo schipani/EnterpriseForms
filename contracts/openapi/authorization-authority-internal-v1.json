@@ -764,6 +764,122 @@
         }
       }
     },
+    "/internal/v1/operator/organizations/{organizationId}/security-administrators": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Operator view: the organization's verified members and Security Administrators (identities only), and whether dual-controlled approval is available here.",
+        "operationId": "GetOperatorSecurityAdministrators",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSecurityAdministratorStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/security-administrators/first-appointment": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "DR-C7-3: first Security Administrator of an organization with none usable. dry_run previews the exact change and the statement to approve; execution needs two ES256 approvals from distinct registered approvers (OPERATOR_DUAL_CONTROL_UNAVAILABLE where approvals are not available, e.g. staging/production). Single-use operation id; journaled and alerted.",
+        "operationId": "AppointFirstSecurityAdministrator",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirstSecurityAdministratorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAdministratorProvisioningResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/security-administrators/recovery": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "DR-C7-3: recovery when the organization's Security Administrators are unavailable. Incident reference required; explicit scope (one appointee, named administrators removed); two independent approvals; critical security alert; journaled.",
+        "operationId": "RecoverSecurityAdministrator",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityAdministratorRecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAdministratorProvisioningResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/operator/fault-injection": {
       "post": {
         "tags": [
@@ -2031,6 +2147,53 @@
           }
         }
       },
+      "FirstSecurityAdministratorRequest": {
+        "required": [
+          "operation_id",
+          "confirm_organization_id",
+          "target_authority_user_id",
+          "target_issuer_uri",
+          "target_subject_identifier",
+          "justification",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirm_organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_issuer_uri": {
+            "type": "string"
+          },
+          "target_subject_identifier": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "approvals": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "FormAccessState": {
         "required": [
           "form_definition_id",
@@ -2244,6 +2407,118 @@
               "null",
               "string"
             ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OperatorOrganizationPrincipal": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "identity_enabled",
+          "is_security_administrator",
+          "appointed_on"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "identity_enabled": {
+            "type": "boolean"
+          },
+          "is_security_administrator": {
+            "type": "boolean"
+          },
+          "appointed_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "OperatorSecurityAdministratorStatus": {
+        "required": [
+          "organization_id",
+          "organization_display_name",
+          "authorization_revision",
+          "usable_administrator_count",
+          "approval_mode",
+          "approvals_operational",
+          "approval_assurance",
+          "required_approvals",
+          "max_approval_lifetime_seconds",
+          "members",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "usable_administrator_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approvals_operational": {
+            "type": "boolean"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "required_approvals": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "max_approval_lifetime_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorOrganizationPrincipal"
+            }
           },
           "correlation_id": {
             "type": "string",
@@ -2853,6 +3128,209 @@
           "appointed_by_security_command_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorProvisioningResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "operation_id",
+          "operation_kind",
+          "organization_id",
+          "organization_display_name",
+          "target",
+          "role_name",
+          "current_administrators",
+          "removed_administrator_ids",
+          "consequences",
+          "approval_statement_json",
+          "approval_statement_sha256",
+          "approval_mode",
+          "approval_assurance",
+          "required_approvals",
+          "max_approval_lifetime_seconds",
+          "security_command_id",
+          "command_status",
+          "replayed",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_kind": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/OperatorOrganizationPrincipal"
+          },
+          "role_name": {
+            "type": "string"
+          },
+          "current_administrators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorOrganizationPrincipal"
+            }
+          },
+          "removed_administrator_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval_statement_json": {
+            "type": "string"
+          },
+          "approval_statement_sha256": {
+            "type": "string"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "required_approvals": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "max_approval_lifetime_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "command_status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorRecoveryRequest": {
+        "required": [
+          "operation_id",
+          "confirm_organization_id",
+          "target_authority_user_id",
+          "target_issuer_uri",
+          "target_subject_identifier",
+          "justification",
+          "incident_reference",
+          "removed_administrator_ids",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirm_organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_issuer_uri": {
+            "type": "string"
+          },
+          "target_subject_identifier": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "incident_reference": {
+            "type": "string"
+          },
+          "removed_administrator_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "approvals": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

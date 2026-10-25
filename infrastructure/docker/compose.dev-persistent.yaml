@@ -72,6 +72,14 @@ services:
       # Phase C7 M2 (AC-6): development-only synthetic step-up so search approvals can be tried locally (Development +
       # TestIdentityProvider only; the Authority refuses to start with it anywhere else).
       FieldSearch__ApprovalStepUp: SyntheticDevelopment
+      # DR-C7-3: development-only synthetic operator approvers, enabled only by `devstack.py security-admin enable-approvals`
+      # (per-environment keys in the custody directory; only the public halves reach the Authority). Unset => Unavailable:
+      # operator appointments are refused. The Authority refuses the synthetic mode outside Development/Testing.
+      OperatorApprovals__Mode: ${DEVSTACK_OPERATOR_APPROVAL_MODE:-Unavailable}
+      OperatorApprovals__Approvers__0__ApproverId: ${DEVSTACK_OPERATOR_APPROVER_1_ID:-}
+      OperatorApprovals__Approvers__0__PublicKeyBase64: ${DEVSTACK_OPERATOR_APPROVER_1_PUBLIC_KEY:-}
+      OperatorApprovals__Approvers__1__ApproverId: ${DEVSTACK_OPERATOR_APPROVER_2_ID:-}
+      OperatorApprovals__Approvers__1__PublicKeyBase64: ${DEVSTACK_OPERATOR_APPROVER_2_PUBLIC_KEY:-}
 
   business-migrate:
     image: enterpriseforms/api:dev

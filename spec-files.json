@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "9ecc2988e73ee156e555d7d8d9261b5bcc4ae97dc023fa8f226cfc6cc8544571",
-      "bytes": 34347
+      "sha256": "419ca63180ce41b2a3b8a152e961310950da8b940c95ff70b08046d10270d74a",
+      "bytes": 34813
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/PHASE_C7_STATUS.md",
-      "sha256": "049af813ac67f6a9cca11bea3090d1e4417a25e6ebd0b383fd519ec95267045f",
-      "bytes": 59971
+      "sha256": "382cc35081c062e51b4fe2fd2e836b54dee2b85fcc854b21df8baae9b24bda0f",
+      "bytes": 68241
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -149,8 +149,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md",
-      "sha256": "d786359313ccf3c1330b4c93b0308adf0561fea073aa9e93665223fcb7cfbdc5",
-      "bytes": 72232
+      "sha256": "e33d7d4d520e1aaf8ae1193d684e0e936200b9043dc3eb6ce1ade2bdf4663e77",
+      "bytes": 73404
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -244,8 +244,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "104d7704d0c818287fc60e8e4a8a4b8801203689ec21160ea47a0b320418878f",
-      "bytes": 106561
+      "sha256": "b103ab84f49fa14854ce2879bed5a14cdbcd8940b3d8517f9fac92f46042d59f",
+      "bytes": 108139
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -309,8 +309,8 @@
     },
     {
       "path": "docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md",
-      "sha256": "351584a8f8f473da1c4f3436075798d02abde451ba2f88eb654faf889391c504",
-      "bytes": 12123
+      "sha256": "bf17f86a8a0ecbe1e09310873505df4daf3c60a7271af3abc2d74c5f0dd86542",
+      "bytes": 13147
     },
     {
       "path": "docs/infrastructure/PB05_DEPLOYMENT_BLUEPRINT.md",
@@ -364,8 +364,8 @@
     },
     {
       "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
-      "sha256": "aa67f6753fbec601c86e3a087aae19a17f5fdf8e42f8406c4c2be931a1e1a6cd",
-      "bytes": 13769
+      "sha256": "dc096d0018cd4a745b1e9c12f16870a2dc04aff7387dd91d60bbefdbf7122bcf",
+      "bytes": 21554
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",
@@ -534,8 +534,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "fb509954f29d355b4da43fc3fb6072f0b3ab13d6e87998e94df09be5bbe7cfa6",
-      "bytes": 51524
+      "sha256": "218ad4fce4d1af89f913c91195e1c1c60b5fd5f785dcfed84f849e7ec9aeda23",
+      "bytes": 61201
     },
     {
       "path": "scripts/generate-spec-manifest.py",

@@ -46,7 +46,8 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
 
     public static string TokenFor(TestUser user, Guid organizationId) => TestIdentity.UserToken(user, organizationId);
 
-    public async Task BootstrapAsync()
+    /// <summary><paramref name="withSecurityAdministrator"/> false: the Administrator persona is an ordinary member and the organization has no Security Administrator (DR-C7-3 tests).</summary>
+    public async Task BootstrapAsync(bool withSecurityAdministrator = true)
     {
         var bootstrap = await Fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/organizations", new
         {
@@ -57,7 +58,7 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
                 new { authority_user_id = Designer.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Designer.Subject, organization_roles = new[] { "organization_owner", "designer" } },
                 new { authority_user_id = Clerk.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Clerk.Subject, organization_roles = Array.Empty<string>() },
                 new { authority_user_id = Reader.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Reader.Subject, organization_roles = Array.Empty<string>() },
-                new { authority_user_id = Administrator.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Administrator.Subject, organization_roles = new[] { "system_administrator" } },
+                new { authority_user_id = Administrator.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Administrator.Subject, organization_roles = withSecurityAdministrator ? new[] { "system_administrator" } : Array.Empty<string>() },
                 new { authority_user_id = DesignerOnly.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = DesignerOnly.Subject, organization_roles = new[] { "designer" } },
             },
         }).ConfigureAwait(false);

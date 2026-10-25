@@ -39,6 +39,21 @@ public static class AuthorityErrorCodes
     public const string StepUpRequired = "STEP_UP_REQUIRED";
     public const string FieldSearchNotEligible = "FIELD_SEARCH_NOT_ELIGIBLE";
     public const string LastSecurityAdministrator = "LAST_SECURITY_ADMINISTRATOR";
+
+    /// <summary>DR-C7-3: dual-controlled operator approval is not available here (production: privileged identity model not implemented).</summary>
+    public const string OperatorDualControlUnavailable = "OPERATOR_DUAL_CONTROL_UNAVAILABLE";
+
+    /// <summary>DR-C7-3: an operator approval is missing, malformed, forged, expired or bound to a different operation.</summary>
+    public const string OperatorApprovalInvalid = "OPERATOR_APPROVAL_INVALID";
+
+    /// <summary>DR-C7-3: both approvals come from the same approver.</summary>
+    public const string OperatorApprovalsNotIndependent = "OPERATOR_APPROVALS_NOT_INDEPENDENT";
+
+    /// <summary>DR-C7-3: a first appointment was requested for an organization that already has a usable Security Administrator.</summary>
+    public const string SecurityAdministratorExists = "SECURITY_ADMINISTRATOR_EXISTS";
+
+    /// <summary>DR-C7-3: recovery was requested for an organization with no Security Administrator (use a first appointment).</summary>
+    public const string RecoveryNotApplicable = "RECOVERY_NOT_APPLICABLE";
     public const string FormVersionUntrusted = "FORM_VERSION_UNTRUSTED";
 
     /// <summary>

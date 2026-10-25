@@ -568,6 +568,16 @@ Normative detail: `docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md`.
 | Frontend | Organization settings → Security Administrators card (list, Add, Remove, confirmations, last-administrator rule, empty/denied/loading states, step-up notice). Organization navigation for owners or Security Administrators. |
 | First administrator | Only the operator bootstrap at organization creation. For existing organizations: decision **DR-C7-3** (operator-plane first appointment / recovery with dual control) — presented, not implemented. |
 
+## 6E. DR-C7-3 — first and recovery Security Administrator (C-71)
+
+| Layer | Implementation |
+|---|---|
+| Operator plane | `GET /internal/v1/operator/organizations/{id}/security-administrators`, `POST …/first-appointment`, `POST …/recovery` (operator credential; business workload and user tokens refused). |
+| Dual control | `OperatorApprovalVerifier`: two ES256 approvals (compact JWS) from different registered approver keys over the statement digest; public keys only in the Authority; `Unavailable` everywhere but Development/Testing; `SyntheticDevelopment` recorded as not two-human evidence. |
+| Service | `SecurityAdministratorProvisioningService`: dry-run preview; inside the organization lock: idempotency on the operation id, approval verification, preconditions (first: no usable administrator; recovery: administrators exist, incident, explicit removals), one journaled command, audit events, alert. |
+| Alerts | Port `ISecurityAlertSink`; `LoggingSecurityAlertSink` (event 9100); the alert is journaled on the audit stream first. |
+| Development | dev-seed modes `generate-approver-keys` and `operator-security-admin`; `devstack.py security-admin`. |
+
 ## 7. Proposed milestones
 
 | Milestone | Content | Status |

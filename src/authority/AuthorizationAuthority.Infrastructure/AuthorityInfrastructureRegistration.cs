@@ -6,6 +6,7 @@ using AuthorizationAuthority.Application.Features.OperatorPlane;
 using AuthorizationAuthority.Application.Features.Projection;
 using AuthorizationAuthority.Application.Features.SecurityCommands;
 using AuthorizationAuthority.Application.Features.Sessions;
+using AuthorizationAuthority.Infrastructure.Alerts;
 using AuthorizationAuthority.Infrastructure.Archive;
 using AuthorizationAuthority.Infrastructure.Faults;
 using AuthorizationAuthority.Infrastructure.Persistence;
@@ -73,6 +74,9 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton<ProjectionProcessor>();
         services.AddSingleton<ArchiveProcessor>();
         services.AddSingleton<OrganizationBootstrapService>();
+        services.TryAddSingleton(OperatorApprovalVerifier.Unavailable); // the API host registers the configured verifier (DR-C7-3)
+        services.AddSingleton<ISecurityAlertSink, LoggingSecurityAlertSink>();
+        services.AddSingleton<SecurityAdministratorProvisioningService>();
         var sessionOptions = configuration.GetSection(SessionOptions.SectionName).Get<SessionOptions>() ?? new SessionOptions();
         SessionOptions.Validate(sessionOptions);
         services.AddSingleton(sessionOptions);

@@ -31,6 +31,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<IntegrityKeyRegistration> Keys { get; } = [];
     public List<SearchCatalogueSnapshot> Snapshots { get; } = [];
     public List<SecurityCommand> Commands { get; } = [];
+
+    public List<ProjectionOutboxEvent> Outbox { get; } = [];
     public List<SearchCatalogueSnapshotEntry> SnapshotEntries { get; } = [];
 
     public List<AuthenticatedSession> Sessions { get; } = [];
@@ -81,13 +83,14 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public void AddEdge(AuthorityRelationshipEdge edge) => s.Edges.Add(edge);
 
-        public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) => Task.FromResult<SecurityCommand?>(null);
+        public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.FirstOrDefault(c => c.OrganizationId == organizationId && c.CommandIdempotencyKey == idempotencyKey));
 
         public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) => Task.FromResult(s.Commands.FirstOrDefault(c => c.SecurityCommandId == securityCommandId));
 
-        public void AddCommand(SecurityCommand command) => throw new NotSupportedException();
+        public void AddCommand(SecurityCommand command) => s.Commands.Add(command);
 
-        public void AddOutboxEvent(ProjectionOutboxEvent outboxEvent) => throw new NotSupportedException();
+        public void AddOutboxEvent(ProjectionOutboxEvent outboxEvent) => s.Outbox.Add(outboxEvent);
 
         public Task<ProjectionOutboxEvent?> FindOutboxEventAsync(Guid organizationId, long targetAuthorizationRevision, CancellationToken cancellationToken) => Task.FromResult<ProjectionOutboxEvent?>(null);
 

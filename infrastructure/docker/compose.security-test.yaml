@@ -30,6 +30,14 @@ services:
       # with this outside Development/Testing or without the synthetic TestIdentityProvider; every other stack leaves it
       # unset (Unavailable), so approvals are refused there until PB-08 step-up exists.
       FieldSearch__ApprovalStepUp: SyntheticDevelopment
+      # DR-C7-3: development-only synthetic operator approvers for first/recovery Security Administrators on this isolated
+      # stack (public keys only; TestIdentity holds the matching synthetic private keys). Startup refuses this mode outside
+      # Development/Testing; every other stack leaves it unset (Unavailable), so operator appointments are refused there.
+      OperatorApprovals__Mode: SyntheticDevelopment
+      OperatorApprovals__Approvers__0__ApproverId: test-synthetic-approver-1
+      OperatorApprovals__Approvers__0__PublicKeyBase64: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaBC2VnfuPFENfDfpRL5gG6ZhYCDxOJB/Mj8yXvw2PxusfBRgV1d1wjvy/HP67VIRCfW0h67+hMuHCFx7rV/qDQ==
+      OperatorApprovals__Approvers__1__ApproverId: test-synthetic-approver-2
+      OperatorApprovals__Approvers__1__PublicKeyBase64: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4VrwCbiOwMrK+U4F07V5aaLnSTrgfBh0p7h9aapL/IuZmvII/Yvy9nX/Iz6vjVDz465DRHe0dWZeILR4h/E/Ew==
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
   api:

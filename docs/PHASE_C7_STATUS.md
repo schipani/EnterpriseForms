@@ -559,11 +559,87 @@ Not changed: no membership, role, grant, key, form or record change in the devel
 6. **Sam Security:** Remove Casey (reason, step-up). Casey's next page load loses Search approvals and Organization.
 7. 320 px and keyboard: the section, its table and both dialogs.
 
-## 21. Outstanding decisions and blockers
+## 21. Outstanding decisions and blockers (superseded by §24)
 
 * **Owner functional acceptance** of M3 (§16), the review corrections (§15.1) and Security Administrator management (§20). M0/M2 visual acceptance not yet confirmed by the owner.
 * **DR-C7-3 (G26):** first and recovery Security Administrator for existing organizations — required before the development organization can approve fields.
 * **DR-C7-1**, **DR-C7-2 (PB-09)**: unchanged (§18).
 * **G25:** independent review of the separation-of-duties correction.
+* **PB-08:** no step-up, so Security Administrators and approvals cannot be changed in staging or production.
+* **G06, G19, G21, G24:** OPEN. Independent review of all C7 Authority changes; no Azure staging evidence; no Level 2 claim. M4 not started. C7 not merged.
+
+## 22. DR-C7-3 — first and recovery Security Administrator (C-71)
+
+Normative description: `docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md` §6–§7; architecture §6E.
+
+### 22.1 What was built
+
+* **Authority operator plane** (operator credential only): `GET …/organizations/{id}/security-administrators` (members and administrators, identities only), `POST …/first-appointment`, `POST …/recovery`. Dry run first; execution adds or removes only the `system_administrator` relation through one journaled security command (`ProvisionFirstSecurityAdministrator` / `RecoverSecurityAdministrator`), inside the organization lock, single-use operation id, idempotent replay.
+* **Dual control** (`OperatorApprovalVerifier`): exactly two ES256 approvals from different registered approver keys, bound to the statement digest (organization, member identity, role, kind, justification, incident, recovery scope, operation), unexpired, lifetime ≤ 15 minutes. The Authority holds public keys only. Mode `Unavailable` (default; the only mode outside Development/Testing) refuses execution `OPERATOR_DUAL_CONTROL_UNAVAILABLE`; `SyntheticDevelopment` is refused at startup outside Development/Testing and is recorded as not two-human evidence.
+* **Recovery**: separate endpoint, incident reference, explicit removals, refused where no administrator exists (`RECOVERY_NOT_APPLICABLE`), critical alert.
+* **Evidence**: authorization-stream command (approver ids and approval digests, never the approvals); audit-stream `SecurityAdministratorFirstAppointed` / `SecurityAdministratorRecovered`, `SecurityAlertRaised`, `SecurityAdministratorProvisioningRejected`; structured alert log event 9100.
+* **Development procedure**: `devstack.py security-admin status | enable-approvals | appoint | recover` driving new dev-seed modes inside the stack network; per-environment synthetic approver keys in the custody folder; typed confirmation of organization id and `APPOINT`.
+* No business API route, UI or session can reach these operations. No migration.
+
+### 22.2 Tests (owner list §7)
+
+| # | Test | Where |
+|---|---|---|
+| 1 | first appointment where none exists | integration `TwoIndependentApprovalsAppoint…`; unit |
+| 2 | refused when an administrator exists (and after the first one) | integration, unit |
+| 3, 4 | two distinct approvals; same approver twice refused | integration `ForgedExpiredMisbound…`; unit |
+| 5, 6 | forged (other key under a registered id, unregistered approver), expired, too long-lived | integration, unit |
+| 7, 8 | approval for the wrong organization / wrong member / tampered claim | integration, unit |
+| 9 | replayed operation returns the recorded outcome; same id for someone else is a conflict | integration, unit |
+| 10 | concurrent first appointments → exactly one administrator | integration `ConcurrentFirstAppointments…` |
+| 11, 12 | non-member, other organization's member, identity mismatch, mismatched confirmation, unknown organization | integration `NonMembersOtherOrganizations…`; unit |
+| 13 | owner self-elevation still refused in an organization without an administrator | integration |
+| 14 | business workload, business workload + user assertion, user token, no credential refused on both operations; no business API route | integration |
+| 15, 16 | recovery: incident required, first-appointment approvals rejected, named administrator removed, audit and critical alert (journal and authority log) | integration `RecoveryNeedsAnIncident…`; unit |
+| 17 | synthetic approvals refused at startup in Production/Staging/Preproduction; Unavailable mode refuses execution | unit |
+| 18 | development path works only with the synthetic mode on the isolated stack; devstack procedure end to end on the disposable stack | integration; devstack shim (§22.3) |
+| 19 | appointee's existing token gains the role at once; removed administrator's token loses it at once | integration |
+| 20 | appointee: no `forms.design`, no designer create, no record content | integration |
+| 21 | G25 regression | `SecurityAdministratorTests` (unit and integration) |
+| 22 | Search approvals and Advanced Field Search preserved | `FieldSearchApprovalTests`, `FieldSearchExecutionTests`, browser suite |
+
+### 22.3 Verification
+
+Local (laptop; disposable security-test stack rebuilt from this tree with the synthetic approvers of `compose.security-test.yaml`):
+
+* .NET: Authority unit 178/178 (7 new DR-C7-3 tests), API contract 297/297, architecture 67/67, integrity 34/34; solution build 0 warnings, 0 errors.
+* Real stack: `SecurityAdministratorProvisioningTests` 5/5; regression classes (Security Administrators/G25, search approval and execution, CSRF, session revocation, authorization/tamper, sharing, form access, record workspace, record history) 58/58; SEC-P01..SEC-P12 13/13.
+* Browser: full suite 103 passed, 4 skipped (contributor-writes switch off), 1 failed — `dropdowns-rules.spec.ts` clerk round-trip (Phase C2; no frontend change in C-71); rerun of that spec 5/5 passed.
+* Development procedure: `devstack.py security-admin` exercised end to end against the disposable stack with a test shim that only redirects the Compose project (status, appoint dry run and refusal, wrong organization id and missing `APPOINT` change nothing, confirmed recovery executes and is shown by status, approver-key generation) — 9/9.
+* Frontend unchanged in C-71 (C-70 results stand: 207/207, typecheck, lint).
+
+Hosted: HOSTED_PLACEHOLDER_C71
+
+### 22.4 Development organization
+
+Not changed. No dev image was rebuilt, no approver key generated, no appointment made. Procedure for the owner: §23.
+
+## 23. Instructions — appoint your existing account in the development organization
+
+From the repository root, with the development stack running (`python scripts/devstack/devstack.py up`):
+
+1. `python scripts/devstack/devstack.py backup` (recommended; stops and restarts the stack).
+2. `python scripts/devstack/devstack.py rebuild authority api web` (new images; data untouched; no migration).
+3. `python scripts/devstack/devstack.py security-admin status` — check that **owner / Avery Owner (Organization Owner + Designer)**, subject `dev-owner`, is listed as a member and that there is no Security Administrator.
+4. `python scripts/devstack/devstack.py security-admin enable-approvals` (once).
+5. `python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "First Security Administrator for the development organization"` — read the dry run (organization, member, identity, role, consequences).
+6. Repeat step 5 with `--execute`; type the organization id shown, then `APPOINT`.
+7. Browser `http://127.0.0.1:8091`: sign out and in as Avery Owner. **Organization** shows the Security Administrators section with you listed; **Search approvals** appears.
+8. Search: Organization → security policy → permit plaintext search for Public/Internal fields; publish a form with plaintext Internal fields; Search approvals → the form → Review fields → approve (conditions, reference, development step-up) → "Who can search field values" → grant Casey Clerk (or yourself); as that person, My Records → choose the form → Advanced Search.
+9. Optional: Organization → Security Administrators → Add administrator → choose Casey Clerk (reason, step-up); then remove (last-administrator rule shown when only one remains).
+
+If any step stops, nothing was changed; report the message.
+
+## 24. Outstanding decisions and blockers
+
+* **Owner acceptance** of M3 (§16), the review corrections (§15.1), Security Administrator management (§20) and DR-C7-3 in the development organization (§23). M0/M2 visual acceptance not yet confirmed.
+* **G26:** DR-C7-3 implemented; production needs PIM-backed approver identities (not implemented — production fails closed) and independent review.
+* **G25:** independent review of the separation-of-duties correction.
+* **DR-C7-1**, **DR-C7-2 (PB-09)**: unchanged (§18).
 * **PB-08:** no step-up, so Security Administrators and approvals cannot be changed in staging or production.
 * **G06, G19, G21, G24:** OPEN. Independent review of all C7 Authority changes; no Azure staging evidence; no Level 2 claim. M4 not started. C7 not merged.

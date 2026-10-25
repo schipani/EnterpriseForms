@@ -46,6 +46,48 @@ public static class TestIdentity
             ["name"] = user.DisplayName,
         }, TimeSpan.FromMinutes(5), DateTime.UtcNow.AddMinutes(-15));
 
+    /// <summary>DR-C7-3: synthetic operator approver keys of the security-test stack (compose.security-test.yaml holds the public halves).</summary>
+    public static readonly IReadOnlyList<(string ApproverId, string PrivateKeyBase64)> SyntheticApprovers =
+    [
+        ("test-synthetic-approver-1", "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgubV0XkbnW6lMPVhJU6JKK4FQRgKcwkxV3TgVshYi4UKhRANCAARoELZWd+48UQ18N+lEvmAbpmFgIPE4kH8yPzJe/DY/G6x8FGBXV3XCO/L8c/rtUhEJ9bSHrv6Ey4cIXHutX+oN"),
+        ("test-synthetic-approver-2", "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQguS+l+uQrwnftGAtgkLX9YrrSmPp5RJrSBIFbyAg8EBehRANCAAThWvAJuI7Aysr5TgXTtXlpoudJOuB8GHSnuH1pqkv8i5ma8gj9i/L2df8jPq+NUPPjrkNEd7R1Zl4gtHiH8T8T"),
+    ];
+
+    /// <summary>
+    /// DR-C7-3: an operator approval (compact JWS, ES256) over a dry-run preview's statement, as an approver's tooling produces
+    /// it. <paramref name="key"/> null uses the registered synthetic key of <paramref name="approverId"/>.
+    /// </summary>
+    public static string OperatorApproval(System.Text.Json.JsonElement preview, string approverId, System.Security.Cryptography.ECDsa? key = null, Action<Dictionary<string, object>>? tamper = null, DateTimeOffset? issuedAt = null, TimeSpan? lifetime = null)
+    {
+        using var registered = System.Security.Cryptography.ECDsa.Create();
+        if (key is null)
+        {
+            registered.ImportPkcs8PrivateKey(Convert.FromBase64String(SyntheticApprovers.Single(a => a.ApproverId == approverId).PrivateKeyBase64), out _);
+        }
+
+        var iat = issuedAt ?? DateTimeOffset.UtcNow;
+        var claims = new Dictionary<string, object>
+        {
+            ["iss"] = "enterpriseforms-operator-approval",
+            ["aud"] = "authorization-authority-operator-approval",
+            ["sub"] = approverId,
+            ["jti"] = Guid.NewGuid().ToString("N"),
+            ["iat"] = iat.ToUnixTimeSeconds(),
+            ["nbf"] = iat.AddSeconds(-5).ToUnixTimeSeconds(),
+            ["exp"] = iat.Add(lifetime ?? TimeSpan.FromMinutes(10)).ToUnixTimeSeconds(),
+            ["statement_sha256"] = preview.GetProperty("approval_statement_sha256").GetString()!,
+            ["operation_id"] = preview.GetProperty("operation_id").GetString()!,
+            ["operation_kind"] = preview.GetProperty("operation_kind").GetString()!,
+            ["organization_id"] = preview.GetProperty("organization_id").GetString()!,
+            ["target_authority_user_id"] = preview.GetProperty("target").GetProperty("authority_user_id").GetString()!,
+        };
+        tamper?.Invoke(claims);
+        var header = System.Buffers.Text.Base64Url.EncodeToString(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { alg = "ES256", typ = "JWT", kid = approverId }));
+        var payload = System.Buffers.Text.Base64Url.EncodeToString(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(claims));
+        var signature = (key ?? registered).SignData(System.Text.Encoding.ASCII.GetBytes(header + "." + payload), System.Security.Cryptography.HashAlgorithmName.SHA256);
+        return header + "." + payload + "." + System.Buffers.Text.Base64Url.EncodeToString(signature);
+    }
+
     /// <summary>A token signed with a key the authority does not trust (forged issuer).</summary>
     public static string ForgedUserToken(TestUser user, Guid organizationId) =>
         Mint(Convert.ToBase64String(new byte[32]), Issuer, Audience, user.Subject, new Dictionary<string, object> { ["org"] = organizationId.ToString("D"), ["authority_user_id"] = user.AuthorityUserId.ToString("D") }, TimeSpan.FromMinutes(5));

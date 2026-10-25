@@ -66,6 +66,11 @@ public sealed class Program
             builder.Configuration[AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.ConfigurationKey],
             builder.Environment.EnvironmentName,
             builder.Configuration["Identity:UserAssertion:ProviderKind"]));
+        // DR-C7-3: dual-controlled operator approvals for first/recovery Security Administrators. Unavailable unless configured;
+        // Create refuses the development-only synthetic approver keys outside Development/Testing (startup failure).
+        builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.OperatorPlane.OperatorApprovalVerifier.Create(
+            builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.OperatorPlane.OperatorApprovalOptions.SectionName).Get<AuthorizationAuthority.Application.Features.OperatorPlane.OperatorApprovalOptions>(),
+            builder.Environment.EnvironmentName));
         // Phase C7 M1 (AC-5): provisional catalogue limits (section Catalogue, C-56 D4); a bad value fails at startup.
         var catalogueOptions = builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions.SectionName).Get<AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions>() ?? new AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions();
         AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptionsValidation.Validate(catalogueOptions);

@@ -27,6 +27,28 @@ public static class OperatorEndpoints
                 TypedResults.Ok(await service.GetGateStatusAsync(organizationId, cancellationToken).ConfigureAwait(false)))
             .WithName("GetOrganizationGate");
 
+        // DR-C7-3: first and recovery Security Administrator (operator credential + two independent approvals; never the business API).
+        group.MapGet("/organizations/{organizationId:guid}/security-administrators", static async Task<Ok<OperatorSecurityAdministratorStatus>> (Guid organizationId, HttpContext context, SecurityAdministratorProvisioningService service, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await service.GetStatusAsync(organizationId, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+            .WithName("GetOperatorSecurityAdministrators")
+            .WithSummary("Operator view: the organization's verified members and Security Administrators (identities only), and whether dual-controlled approval is available here.");
+
+        group.MapPost("/organizations/{organizationId:guid}/security-administrators/first-appointment", static async Task<Ok<SecurityAdministratorProvisioningResponse>> (Guid organizationId, FirstSecurityAdministratorRequest request, HttpContext context, SecurityAdministratorProvisioningService service, CancellationToken cancellationToken) =>
+            {
+                var operatorName = context.User.FindFirst("workload_name")?.Value ?? "operator";
+                return TypedResults.Ok(await service.FirstAppointmentAsync(organizationId, request, operatorName, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("AppointFirstSecurityAdministrator")
+            .WithSummary("DR-C7-3: first Security Administrator of an organization with none usable. dry_run previews the exact change and the statement to approve; execution needs two ES256 approvals from distinct registered approvers (OPERATOR_DUAL_CONTROL_UNAVAILABLE where approvals are not available, e.g. staging/production). Single-use operation id; journaled and alerted.");
+
+        group.MapPost("/organizations/{organizationId:guid}/security-administrators/recovery", static async Task<Ok<SecurityAdministratorProvisioningResponse>> (Guid organizationId, SecurityAdministratorRecoveryRequest request, HttpContext context, SecurityAdministratorProvisioningService service, CancellationToken cancellationToken) =>
+            {
+                var operatorName = context.User.FindFirst("workload_name")?.Value ?? "operator";
+                return TypedResults.Ok(await service.RecoverAsync(organizationId, request, operatorName, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("RecoverSecurityAdministrator")
+            .WithSummary("DR-C7-3: recovery when the organization's Security Administrators are unavailable. Incident reference required; explicit scope (one appointee, named administrators removed); two independent approvals; critical security alert; journaled.");
+
         group.MapPost("/fault-injection", static Results<Ok<FaultInjectionRequest>, ProblemHttpResult> (FaultInjectionRequest request, IServiceProvider services, IHostEnvironment environment) =>
             {
                 var injector = services.GetService<ProcessCrashFaultInjector>();
