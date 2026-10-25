@@ -541,7 +541,7 @@ Local (laptop; disposable security-test stack rebuilt from this tree):
 * Real stack: `SecurityAdministratorTests` 6/6 and `RecordHistoryTests` 5/5 after the last fix; related classes (search approval and execution, CSRF, session revocation, record workspace, authorization/tamper, sharing, form access, branding, search catalogue) 59/60 — the single failure is the 480-record catalogue benchmark exceeding the 15 s time limit on the laptop (known ≈2× slower than hosted; it passes hosted), not a functional change.
 * Browser: full suite 105 passed, 4 skipped (contributor-writes specs; that switch is off by default), including `security-administrators.spec.ts` 2/2.
 
-Hosted: HOSTED_PLACEHOLDER
+Hosted on `4685637` (workflow_dispatch, branch has no PR): `stage-b-integration` run 40165973262 — integration tests (real stack) **166/166**, browser end-to-end (real stack) **109 passed**, aggregate gate job success; `security-gate-a` run 40165974987 — SEC-P01..SEC-P12 against the isolated Docker stack **13/13**.
 
 ### 19.7 Development environment
 
