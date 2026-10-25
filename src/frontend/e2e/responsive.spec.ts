@@ -34,7 +34,8 @@ test("My Records filters and Advanced Search stack at 320px without horizontal s
   await page.goto("/app/records?form=0199a2b3-c4d5-7e6f-8123-456789abcdf9");
   const toggle = page.getByRole("button", { name: /^Advanced Search/ });
   await toggle.click();
-  await expect(page.getByText("Advanced field search is not available yet")).toBeVisible();
+  // Phase C7 M3: execution is on in this isolated environment; an unknown form offers no searchable field.
+  await expect(page.getByText("No fields can be searched in this form")).toBeVisible();
   const form = await page.getByRole("combobox", { name: "Form" }).boundingBox();
   const status = await page.getByRole("combobox", { name: "Status" }).boundingBox();
   expect(status!.y).toBeGreaterThan(form!.y + form!.height - 1);
