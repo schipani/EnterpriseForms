@@ -1,0 +1,461 @@
+{
+  "measuredOn": "2026-10-25T02:05:09.5491369+00:00",
+  "query": "complete M3 query: capabilities, condition authorization, admission, Authority catalogue, batch verification of every record, snapshot validation, predicate evaluation, sort, execution evidence, first page; plus the second page",
+  "conditions": [
+    "String startsWith \u002B Integer between",
+    "Option is \u002B Boolean isTrue \u002B Date after"
+  ],
+  "users": "5 team members, alternating two API instances",
+  "backgroundWorkload": "edits of a record of another form every 400 ms; one individual field_searcher grant (concurrency 4) and revocation (concurrency 8) mid-level",
+  "note": "engineering measurement; small samples; p99 of small n is near the maximum; not a capacity claim",
+  "sizes": [
+    {
+      "records": 50,
+      "scope": {
+        "authorityCallsForScope": 3,
+        "verificationBatches": 1,
+        "verifiedBytes": 147900,
+        "scopeMilliseconds": 493.1339
+      },
+      "authorityCallsPerSearch": "capabilities 1 \u002B catalogue 1 \u002B batches ceil(50/50) \u002B validation 1 \u002B evidence 1 \u002B edit check 1 (\u002B the same again on the single automatic retry)",
+      "levels": [
+        {
+          "concurrency": 1,
+          "rounds": 8,
+          "attempts": 9,
+          "outcomes": {
+            "COMPLETED": 9
+          },
+          "searchMilliseconds": {
+            "p50": 481.8,
+            "p95": 567,
+            "p99": 567,
+            "max": 567,
+            "samples": 8
+          },
+          "secondPageMilliseconds": {
+            "p50": 12.5,
+            "p95": 16.8,
+            "p99": 16.8,
+            "max": 16.8,
+            "samples": 8
+          },
+          "businessDb": {
+            "transactions": 614,
+            "tuplesReturned": 31984
+          },
+          "authorityDb": {
+            "transactions": 321,
+            "tuplesReturned": 26420
+          },
+          "containerLoadAtConcurrency8": []
+        },
+        {
+          "concurrency": 4,
+          "rounds": 3,
+          "attempts": 16,
+          "outcomes": {
+            "COMPLETED": 16
+          },
+          "searchMilliseconds": {
+            "p50": 1749.5,
+            "p95": 1888.4,
+            "p99": 1888.4,
+            "max": 1888.4,
+            "samples": 12
+          },
+          "secondPageMilliseconds": {
+            "p50": 18.5,
+            "p95": 22,
+            "p99": 22,
+            "max": 22,
+            "samples": 6
+          },
+          "businessDb": {
+            "transactions": 902,
+            "tuplesReturned": 27594
+          },
+          "authorityDb": {
+            "transactions": 325,
+            "tuplesReturned": 35823
+          },
+          "containerLoadAtConcurrency8": []
+        },
+        {
+          "concurrency": 8,
+          "rounds": 2,
+          "attempts": 24,
+          "outcomes": {
+            "COMPLETED": 22,
+            "SEARCH_SNAPSHOT_CHANGED": 2
+          },
+          "searchMilliseconds": {
+            "p50": 2999.9,
+            "p95": 3034.3,
+            "p99": 3034.3,
+            "max": 3034.3,
+            "samples": 14
+          },
+          "secondPageMilliseconds": {
+            "p50": 37.6,
+            "p95": 48,
+            "p99": 48,
+            "max": 48,
+            "samples": 7
+          },
+          "businessDb": {
+            "transactions": 1181,
+            "tuplesReturned": 36208
+          },
+          "authorityDb": {
+            "transactions": 432,
+            "tuplesReturned": 53285
+          },
+          "containerLoadAtConcurrency8": [
+            "enterpriseforms-sectest-api-1|0.47%|226.1MiB / 15.61GiB",
+            "enterpriseforms-sectest-api-secondary-1|0.22%|167MiB / 15.61GiB",
+            "enterpriseforms-sectest-authority-1|92.27%|205.5MiB / 15.61GiB",
+            "enterpriseforms-sectest-spicedb-1|18.23%|67.68MiB / 15.61GiB",
+            "enterpriseforms-sectest-business-db-1|0.16%|166.9MiB / 15.61GiB",
+            "enterpriseforms-sectest-authority-db-1|15.65%|239.1MiB / 15.61GiB",
+            "enterpriseforms-sectest-vault-1|58.11%|70.87MiB / 15.61GiB"
+          ]
+        }
+      ]
+    },
+    {
+      "records": 150,
+      "scope": {
+        "authorityCallsForScope": 5,
+        "verificationBatches": 3,
+        "verifiedBytes": 443700,
+        "scopeMilliseconds": 1379.2681
+      },
+      "authorityCallsPerSearch": "capabilities 1 \u002B catalogue 1 \u002B batches ceil(150/50) \u002B validation 1 \u002B evidence 1 \u002B edit check 1 (\u002B the same again on the single automatic retry)",
+      "levels": [
+        {
+          "concurrency": 1,
+          "rounds": 8,
+          "attempts": 9,
+          "outcomes": {
+            "COMPLETED": 9
+          },
+          "searchMilliseconds": {
+            "p50": 1390.1,
+            "p95": 1500.2,
+            "p99": 1500.2,
+            "max": 1500.2,
+            "samples": 8
+          },
+          "secondPageMilliseconds": {
+            "p50": 22.6,
+            "p95": 34.9,
+            "p99": 34.9,
+            "max": 34.9,
+            "samples": 8
+          },
+          "businessDb": {
+            "transactions": 1670,
+            "tuplesReturned": 71259
+          },
+          "authorityDb": {
+            "transactions": 681,
+            "tuplesReturned": 110236
+          },
+          "containerLoadAtConcurrency8": []
+        },
+        {
+          "concurrency": 4,
+          "rounds": 3,
+          "attempts": 16,
+          "outcomes": {
+            "COMPLETED": 16
+          },
+          "searchMilliseconds": {
+            "p50": 4342,
+            "p95": 4521.2,
+            "p99": 4521.2,
+            "max": 4521.2,
+            "samples": 12
+          },
+          "secondPageMilliseconds": {
+            "p50": 39,
+            "p95": 62.5,
+            "p99": 62.5,
+            "max": 62.5,
+            "samples": 12
+          },
+          "businessDb": {
+            "transactions": 2571,
+            "tuplesReturned": 45864
+          },
+          "authorityDb": {
+            "transactions": 482,
+            "tuplesReturned": 106724
+          },
+          "containerLoadAtConcurrency8": []
+        },
+        {
+          "concurrency": 8,
+          "rounds": 2,
+          "attempts": 24,
+          "outcomes": {
+            "COMPLETED": 22,
+            "SEARCH_SNAPSHOT_CHANGED": 2
+          },
+          "searchMilliseconds": {
+            "p50": 8400.9,
+            "p95": 8495.4,
+            "p99": 8495.4,
+            "max": 8495.4,
+            "samples": 14
+          },
+          "secondPageMilliseconds": {
+            "p50": 65.8,
+            "p95": 84.6,
+            "p99": 84.6,
+            "max": 84.6,
+            "samples": 14
+          },
+          "businessDb": {
+            "transactions": 3475,
+            "tuplesReturned": 45823
+          },
+          "authorityDb": {
+            "transactions": 620,
+            "tuplesReturned": 145434
+          },
+          "containerLoadAtConcurrency8": [
+            "enterpriseforms-sectest-api-1|41.74%|246.7MiB / 15.61GiB",
+            "enterpriseforms-sectest-api-secondary-1|20.10%|189MiB / 15.61GiB",
+            "enterpriseforms-sectest-authority-1|80.95%|219.6MiB / 15.61GiB",
+            "enterpriseforms-sectest-spicedb-1|20.33%|76.91MiB / 15.61GiB",
+            "enterpriseforms-sectest-business-db-1|31.40%|170.4MiB / 15.61GiB",
+            "enterpriseforms-sectest-authority-db-1|14.04%|249.2MiB / 15.61GiB",
+            "enterpriseforms-sectest-vault-1|48.45%|70.88MiB / 15.61GiB"
+          ]
+        }
+      ]
+    },
+    {
+      "records": 200,
+      "scope": {
+        "authorityCallsForScope": 6,
+        "verificationBatches": 4,
+        "verifiedBytes": 591600,
+        "scopeMilliseconds": 1876.5521
+      },
+      "authorityCallsPerSearch": "capabilities 1 \u002B catalogue 1 \u002B batches ceil(200/50) \u002B validation 1 \u002B evidence 1 \u002B edit check 1 (\u002B the same again on the single automatic retry)",
+      "levels": [
+        {
+          "concurrency": 1,
+          "rounds": 8,
+          "attempts": 9,
+          "outcomes": {
+            "COMPLETED": 9
+          },
+          "searchMilliseconds": {
+            "p50": 1885.1,
+            "p95": 1951,
+            "p99": 1951,
+            "max": 1951,
+            "samples": 8
+          },
+          "secondPageMilliseconds": {
+            "p50": 24.6,
+            "p95": 32.1,
+            "p99": 32.1,
+            "max": 32.1,
+            "samples": 8
+          },
+          "businessDb": {
+            "transactions": 2163,
+            "tuplesReturned": 98620
+          },
+          "authorityDb": {
+            "transactions": 840,
+            "tuplesReturned": 189878
+          },
+          "containerLoadAtConcurrency8": []
+        },
+        {
+          "concurrency": 4,
+          "rounds": 3,
+          "attempts": 16,
+          "outcomes": {
+            "COMPLETED": 16
+          },
+          "searchMilliseconds": {
+            "p50": 6019,
+            "p95": 6048.3,
+            "p99": 6048.3,
+            "max": 6048.3,
+            "samples": 12
+          },
+          "secondPageMilliseconds": {
+            "p50": 44.7,
+            "p95": 56.3,
+            "p99": 56.3,
+            "max": 56.3,
+            "samples": 12
+          },
+          "businessDb": {
+            "transactions": 3413,
+            "tuplesReturned": 53827
+          },
+          "authorityDb": {
+            "transactions": 615,
+            "tuplesReturned": 217734
+          },
+          "containerLoadAtConcurrency8": []
+        },
+        {
+          "concurrency": 8,
+          "rounds": 2,
+          "attempts": 24,
+          "outcomes": {
+            "COMPLETED": 22,
+            "SEARCH_SNAPSHOT_CHANGED": 2
+          },
+          "searchMilliseconds": {
+            "p50": 11569.7,
+            "p95": 11680,
+            "p99": 11680,
+            "max": 11680,
+            "samples": 14
+          },
+          "secondPageMilliseconds": {
+            "p50": 46.5,
+            "p95": 69.8,
+            "p99": 69.8,
+            "max": 69.8,
+            "samples": 14
+          },
+          "businessDb": {
+            "transactions": 4627,
+            "tuplesReturned": 65426
+          },
+          "authorityDb": {
+            "transactions": 701,
+            "tuplesReturned": 263507
+          },
+          "containerLoadAtConcurrency8": [
+            "enterpriseforms-sectest-api-1|20.81%|262.4MiB / 15.61GiB",
+            "enterpriseforms-sectest-api-secondary-1|43.45%|181MiB / 15.61GiB",
+            "enterpriseforms-sectest-authority-1|88.48%|220MiB / 15.61GiB",
+            "enterpriseforms-sectest-spicedb-1|14.66%|103.1MiB / 15.61GiB",
+            "enterpriseforms-sectest-business-db-1|32.83%|171.3MiB / 15.61GiB",
+            "enterpriseforms-sectest-authority-db-1|12.80%|258.3MiB / 15.61GiB",
+            "enterpriseforms-sectest-vault-1|44.33%|70.89MiB / 15.61GiB"
+          ]
+        }
+      ]
+    },
+    {
+      "records": 480,
+      "scope": {
+        "authorityCallsForScope": 12,
+        "verificationBatches": 10,
+        "verifiedBytes": 1419840,
+        "scopeMilliseconds": 4549.6692
+      },
+      "authorityCallsPerSearch": "capabilities 1 \u002B catalogue 1 \u002B batches ceil(480/50) \u002B validation 1 \u002B evidence 1 \u002B edit check 1 (\u002B the same again on the single automatic retry)",
+      "levels": [
+        {
+          "concurrency": 1,
+          "rounds": 8,
+          "attempts": 9,
+          "outcomes": {
+            "COMPLETED": 9
+          },
+          "searchMilliseconds": {
+            "p50": 4682.7,
+            "p95": 4874.3,
+            "p99": 4874.3,
+            "max": 4874.3,
+            "samples": 8
+          },
+          "secondPageMilliseconds": {
+            "p50": 29.5,
+            "p95": 34.7,
+            "p99": 34.7,
+            "max": 34.7,
+            "samples": 8
+          },
+          "businessDb": {
+            "transactions": 5180,
+            "tuplesReturned": 232344
+          },
+          "authorityDb": {
+            "transactions": 1811,
+            "tuplesReturned": 681774
+          },
+          "containerLoadAtConcurrency8": []
+        },
+        {
+          "concurrency": 4,
+          "rounds": 3,
+          "attempts": 16,
+          "outcomes": {
+            "COMPLETED": 16
+          },
+          "searchMilliseconds": {
+            "p50": 13637.7,
+            "p95": 13785.4,
+            "p99": 13785.4,
+            "max": 13785.4,
+            "samples": 12
+          },
+          "secondPageMilliseconds": {
+            "p50": 39.4,
+            "p95": 48.4,
+            "p99": 48.4,
+            "max": 48.4,
+            "samples": 12
+          },
+          "businessDb": {
+            "transactions": 8015,
+            "tuplesReturned": 116798
+          },
+          "authorityDb": {
+            "transactions": 977,
+            "tuplesReturned": 497526
+          },
+          "containerLoadAtConcurrency8": []
+        },
+        {
+          "concurrency": 8,
+          "rounds": 2,
+          "attempts": 24,
+          "outcomes": {
+            "SEARCH_VERIFICATION_LIMIT:time": 18,
+            "SEARCH_SNAPSHOT_CHANGED": 6
+          },
+          "searchMilliseconds": {
+            "samples": 0
+          },
+          "secondPageMilliseconds": {
+            "samples": 0
+          },
+          "businessDb": {
+            "transactions": 7245,
+            "tuplesReturned": 90043
+          },
+          "authorityDb": {
+            "transactions": 710,
+            "tuplesReturned": 356778
+          },
+          "containerLoadAtConcurrency8": [
+            "enterpriseforms-sectest-api-1|51.79%|298.2MiB / 15.61GiB",
+            "enterpriseforms-sectest-api-secondary-1|53.25%|209.6MiB / 15.61GiB",
+            "enterpriseforms-sectest-authority-1|77.88%|224.4MiB / 15.61GiB",
+            "enterpriseforms-sectest-spicedb-1|13.64%|126MiB / 15.61GiB",
+            "enterpriseforms-sectest-business-db-1|38.03%|166MiB / 15.61GiB",
+            "enterpriseforms-sectest-authority-db-1|13.23%|274.4MiB / 15.61GiB",
+            "enterpriseforms-sectest-vault-1|49.13%|71.47MiB / 15.61GiB"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -506,6 +506,54 @@ Before the checkpoint-lookup fix: 50 → 0.84 s, 150 → 4.46 s, 480 → over th
 * **PB-08 not resolved:** production and staging approvals stay disabled; the synthetic path is development/test only.
 * No independent review of the Authority changes and no Azure staging evidence.
 
+## 6C. M1/M2 review corrections (C-68) and M3 — verified execution (C-69)
+
+### 6C.1 Search-approval administration without Designer or record access (review A)
+
+* **Authority:** `POST /internal/v1/field-search/administration` (`administer_security` only): the organization's forms that have a registered published version and whose form resource is Active — the latest registered version, the **registered title** (new: `form_title` in `RegisterPublishedFormVersion`, additive column `form_title_snapshot`), field count, eligible fields, active and invalidated approvals. Nothing from business rows. Per-form configuration (§6B) was already answered to `administer_security` holders; it is now answered **only for an Active form of the caller's organization** (another organization's administrator gets the unknown-form answer — found in M2 verification).
+* **Business:** `GET /api/v1/organization/search-approvals` (403 for everyone else), capability `security.administer` in the session.
+* **UI:** "Search approvals" (navigation for security administrators): published forms → Review fields → the same Search section per field (approve with conditions, reference and the development step-up; withdraw) and "Who can search field values". The reusable approval UI moved from the form designer to the Search feature; Configure Field → Search remains for designers' inspection. No request workflow (deferred).
+* **Repeating groups:** published field entries carry `in_repeating_group`; such fields are `RepeatingGroupNotSearchable` (V1 excludes repeating-group conditions) and moving an approved field into a repeating section invalidates it (`FORM_VERSION_CHANGED`).
+
+### 6C.2 Record-creation categories and pending reconciliation (review B)
+
+| Category | Authority state | Search behaviour |
+|---|---|---|
+| 1. Creation never accepted (pending; abandoned when the client never retries) | Record registered, accepted content revision 0 | Listed in the user and migration catalogues (inventory complete for G19), never verified, **cannot match**; reported in the scope statement ("N pending creation(s)"). Pending records **do not count against the 500-record verification limit**; they have their own ceiling (`Catalogue:MaximumPendingUserEntries`, 2000; refusal journaled `PENDING_CEILING`), so abandoned creations cannot make an unrelated form unsearchable. |
+| 2. Accepted, but business content missing or unverifiable | Accepted head (revision ≥ 1) | Batch verification fails → the Authority quarantines the head → **the whole search fails** (`SEARCH_VERIFICATION_UNAVAILABLE`, `RECORD_VERIFICATION_FAILED`, then `RECORD_QUARANTINED`), never skipped, until privileged reconciliation. |
+| 3. Accepted, no longer eligible | Accepted head; registry lifecycle and signed header | Decided only on verified facts: the catalogue contains Active/Quarantined registry entries only; the **signed header** status (Archived hidden unless asked) and parent (related records unless included). |
+
+* **Resumption (category 1):** the same request with the same key completes the creation (F-C7-01, idempotent, fingerprint-checked); a different request with that key is a conflict.
+* **Terminal state — decision required (DR-C7-1, not implemented):** marking an abandoned registration terminal is a new Authority state transition. Proposed: an operator/worker security command `AbandonRecordRegistration` allowed only for a record with accepted revision 0 older than a threshold (for example 24 h, well beyond the 10-minute prepared-operation expiry); it moves the resource to `Abandoned` (excluded from user catalogues, kept in the migration population and audit), is idempotent, journaled and archived; a later resumption of that key is refused with a typed error and the client creates anew. Until decided, pending records remain registered at revision 0; they are harmless to search (above) and carry no content.
+* **Retention of `form_record_creation_attempts`:** a row is needed while its record has no accepted head (resumption) and, after acceptance, to tell a replay from a conflicting reuse of the key. Rule: keep while the record is pending; after acceptance keep at least 30 days (beyond any client idempotency retry window); purge is a privileged maintenance task (the runtime role cannot delete), never for pending records, never automated in M3.
+* No registered record is deleted and no accepted content is repaired from business data.
+
+### 6C.3 Snapshot completeness and audit (review C)
+
+AC-5 guarantees are unchanged: new eligible records, grants and revocations (any authorization change, OD-5) and head changes invalidate snapshots; missing or corrupted accepted records fail; quarantined records fail. Unrelated changes may cause retryable snapshot refusals (measured, §PHASE_C7_STATUS §15). **AUD-C7-01** (asynchronous archive copy of mandatory search-audit events) and **G23 session-event auditing** remain open production blockers.
+
+### 6C.4 M3 executor (owner performance decision C-69)
+
+| Step | Implementation |
+|---|---|
+| Gate | `FieldSearch:ExecutionEnabled` (default off; the API refuses to start with it outside Development/Testing; on only in `compose.security-test.yaml` and `compose.dev-persistent.yaml`). Off ⇒ `TRUSTED_SEARCH_NOT_ENABLED`. Production approvals stay impossible until PB-08 regardless. |
+| Authorization | Capabilities from the Authority (AC-6): every condition's field, value type, operator and Option id must match the caller's approved, `field_searcher`-granted fields — the single denials `SEARCH_FIELD_NOT_ALLOWED` / `SEARCH_OPERATOR_NOT_SUPPORTED`. |
+| Admission | At most 4 verified searches per API instance and 1 per user (configurable down); a request that cannot get a slot within 1.5 s is refused `SEARCH_VERIFICATION_UNAVAILABLE` / `SEARCH_CAPACITY_EXCEEDED` (retryable) — never queued without bound. |
+| Scope | AC-5 catalogue of the caller's discoverable records of the form (500 contentful records max), every contentful record read from its accepted operation and verified in batches of 50 (HMAC, complete leaf set, root) within 64 MiB and 15 s, snapshot re-validated. One failure fails the search. |
+| Values | Evaluated on the decoded content of the very row objects whose canonical bytes the Authority verified (FormRecords port `ReadAcceptedContentAsync`), top-level values only; a record is evaluated only if the caller may read every value item of every predicate field on it (otherwise left out, independent of its values). |
+| Semantics | Missing value never matches. Text: NFC-normalized, trimmed, case-insensitive (`equals` whole value, `startsWith`, `contains`). Numbers/dates/instants by value, `between` inclusive, `before`/`after` strict. Option `is` = exactly that option, `includes` = contains it. Booleans `isTrue`/`isFalse`. AND only. |
+| Metadata | Status, archived and related filters on the signed header; sort by Authority-held times (registered = created, head change = modified) or verified status; record id as final key. No field-value sort. |
+| Retry | At most **one** automatic retry, only for `SEARCH_SNAPSHOT_CHANGED`, only with at least half of the 15 s budget left and a free slot. Limits, denials and integrity failures are never retried. |
+| Evidence | Each execution is journaled by the Authority (`FieldSearchExecuted`: field ids, operators, counts, outcome, duration — never values or record ids); a completed search whose evidence cannot be recorded returns no result (`EXECUTION_EVIDENCE_UNAVAILABLE`, retryable). Failures after the catalogue was issued are journaled best effort. Conditions refused before any snapshot (not allowed) are not Authority-journaled (residual). |
+| Pagination | The result (sorted matches with verified display facts) travels in an opaque Data Protection cursor bound to organization, user, form, Authority snapshot and authorization revision, expiring with the snapshot (≤ 5 min). Each page re-validates the snapshot with the Authority: any authorization change (revocation included) or change to a record in scope ⇒ `SEARCH_SNAPSHOT_CHANGED`; nothing is re-evaluated or re-read from business rows. |
+| Response | The My Records row shape with `projectionVerified = true`, `completeness = "Complete"` and a scope statement; display labels (form and creator names) come from the directory as in My Records. |
+
+### 6C.5 What M3 does not establish
+
+* **G06 OPEN:** adversarial evidence exists on the isolated stack, but no independent review, no Azure staging evidence, and the PB-09 objective is not met under concurrency (§PHASE_C7_STATUS §15).
+* **G19 OPEN** (M4), **G21 OPEN** (record editing reads unsigned metadata), **PB-08 OPEN**, **AUD-C7-01 OPEN**.
+* Field-value sort, OR, repeating groups, related forms, documents, encrypted values, exports: out of V1.
+
 ## 7. Proposed milestones
 
 | Milestone | Content | Status |
@@ -513,7 +561,7 @@ Before the checkpoint-lookup fix: 50 → 0.84 s, 150 → 4.46 s, 480 → over th
 | M0 | UI, contracts, validation, typed errors, server gate, tests | **Implemented (C-57); awaiting owner functional acceptance** |
 | M1 | AC-5 Authority catalogue (user scope + migration scope), snapshot validation, batch verification (OD-6), AC5-T01..T15 | **Implemented (C-62, §6A); awaiting owner review** |
 | M2 | AC-6 policy + approvals + `field_searcher` grants + Designer "Search" section + organization policy UI, AC6-T01..T12 | **Implemented (C-67, §6B); awaiting owner review** |
-| M3 | Trusted executor, paging cache, audit, ENC-SR-01..18, browser acceptance with real results, performance measurement | Not authorized |
+| M3 | Trusted executor, paging cursor, execution evidence, ENC-SR-01..18, browser acceptance with real results, performance measurement | **Implemented (C-69, §6C); awaiting owner functional acceptance** |
 | M4 | Worker G19 reconciliation against the migration catalogue | Not authorized |
 
 **Proposed next:** owner review of M1 and M2. M3 (execution) is not authorized; production approvals depend on PB-08 step-up; M4 (G19 reconciliation) can follow independently.

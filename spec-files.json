@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "f9db3afa9a943864218c6aaf6a37996fde115637d966551961a4f24621cfd637",
-      "bytes": 31565
+      "sha256": "29a1e91a203e6d2374fe6aefbfa2a75c778080d40b3fb5410f83ee18c55e1c2b",
+      "bytes": 32855
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/PHASE_C7_STATUS.md",
-      "sha256": "b3599d83892bc443f5bb024b509ebeee2f4071bd6afec9c8d5d59c884026a023",
-      "bytes": 36957
+      "sha256": "9e0792ef7e192b640d6bc330db16d74ed85092f1aa73355d84db190d5f93d02a",
+      "bytes": 51728
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -149,8 +149,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md",
-      "sha256": "ceb8c44fa30c7a51299b3f6eb89e66bca01de282c05e12372cbeaa383a1607af",
-      "bytes": 61371
+      "sha256": "36a1f8e499e0f8db4e6573fec5bb7c59410fe0fb4067069e7e7c4f1677f342cf",
+      "bytes": 70260
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -244,8 +244,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "3d0e42875616d2cc8e37ab084ac9532b0260f3e1380b7de39b68ab311fbbbd96",
-      "bytes": 101082
+      "sha256": "75177679e56cb00c8c0dfa643cd26b502e9a9abd4db5a28b36e8e1a6635e1ae8",
+      "bytes": 105008
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -589,8 +589,8 @@
     },
     {
       "path": "security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md",
-      "sha256": "e102795ba25bccd4b89ef81157b1539e1acb49aa04b6d905c4ce7439e91891b7",
-      "bytes": 7000
+      "sha256": "69f61a8099e89c1b78ed32809196589689621b8d2d0b9251f2c37be40926ec3a",
+      "bytes": 7788
     },
     {
       "path": "security_hardening/SECURITY_ACCEPTANCE_TESTS.md",

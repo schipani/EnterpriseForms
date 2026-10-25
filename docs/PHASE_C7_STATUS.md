@@ -13,14 +13,16 @@
   * C-62: M1 implemented;
   * C-63/C-64: G23 hotfix (merged to `main`, integrated here);
   * C-65/C-66: F-C7-01 correction (merged to `main`, integrated here); final AC-5 review;
-  * C-67: M2 (AC-6) implemented.
-- **G06, G19, G21:** OPEN. **G22, G23:** corrected (independent review pending). **PB-08:** not resolved (production/staging search approvals disabled).
+  * C-67: M2 (AC-6) implemented;
+  * C-68: M1/M2 review corrections; C-69: M3 implemented.
+- **G06, G19, G21:** OPEN. **G22, G23:** corrected (independent review pending). **PB-08:** not resolved (production/staging search approvals disabled). **PB-09:** objective not met under concurrency (§15.5). **AUD-C7-01 / G24:** open.
 - **State (2026-10-24):**
   * M0 implemented (owner visual acceptance **pending**).
   * G22, G23 and F-C7-01 merged to `main` and into this branch (§7, §10).
   * M1 — AC-5 — implemented; final review done (§11).
-  * **M2 — AC-6 — implemented and verified (§12); stopped for owner review and acceptance.**
-  * Field-value search is still disabled. M3 and M4 are not started. This branch is not merged to `main`.
+  * M2 — AC-6 — implemented and verified (§12).
+  * **M1/M2 review corrections and M3 — verified field-value search — implemented and verified (§15); stopped for owner functional acceptance.**
+  * Field-value search runs only where the fail-closed execution gate is on (isolated Development/Testing); never in staging or production. M4 is not started. This branch is not merged to `main`.
 
 ## 1. History
 
@@ -364,7 +366,7 @@ AC6-T01..T08, T10 and T12 are covered as above. **AC6-T09** (revocation mid-sear
 7. **Gallery** (`/app/gallery`): the synthetic preview is unchanged.
 8. Keyboard and 320 px: the Search tab and Advanced Search remain operable.
 
-## 14. Outstanding decisions and blockers
+## 14. Outstanding decisions and blockers (M2; superseded by §18)
 
 * **Owner review and acceptance of M2** (§12, architecture §6B) and of the AC-5 review (§11); M0 visual acceptance (§13).
 * **Performance before M3 (§11.3):** < 3 s is not met at 200 records under concurrency and is not achievable at 500; concurrency degrades sharply; retryable refusals during unrelated writes. Options: lower the limit, accept slower complete searches, or a V2 trusted index (separate ADR).
@@ -374,3 +376,116 @@ AC6-T01..T08, T10 and T12 are covered as above. **AC6-T09** (revocation mid-sear
 * **G06** (execution, M3), **G19** (M4), **G21** (search part addressed for versions published since M2; editing still reads unsigned metadata): OPEN.
 * **Independent review** of the Authority changes (catalogue, verifier credential, batch verification, audit stream, session store, AC-6 commands and capabilities) and of G22/G23. No Azure staging evidence; no Level 2 claim.
 * Not started: M3, M4. C7 is not merged to `main`.
+
+## 15. M1/M2 review corrections (C-68) and M3 — verified field-value search (C-69)
+
+Architecture §6C has the design. Implementation commit **574ddef** (on `phase-c7/advanced-field-search`); test-only correction of the phone-layout spec and documentation in the following commits.
+
+### 15.1 Review findings and corrections
+
+| # | Finding | Correction |
+|---|---|---|
+| R1 | A security administrator needed unrelated Designer or form-user access to reach a form's search configuration. | Authority administration listing (`administer_security` only; forms with a registered version, registered title, counts) → `GET /api/v1/organization/search-approvals` → "Search approvals" page; capability `security.administer`. No Designer or record access is granted. |
+| R2 | Abandoned creations (accepted revision 0) counted against the 500-record verification limit, so enough of them could make a form unsearchable. | Pending records stay listed (inventory complete) but have their own ceiling (2000, `PENDING_CEILING`); they never block an unrelated search. |
+| R3 | The record-creation categories were not defined. | Defined (architecture §6C.2): pending → cannot match, reported; accepted but missing/unverifiable → whole search fails, record quarantined; ineligible → verified header and registry state only. Retention of `form_record_creation_attempts` defined (pending: keep; accepted: at least 30 days; privileged purge only, not automated). |
+| R4 | A terminal state for abandoned creations needs a new Authority transition. | **Not implemented — decision DR-C7-1 requested** (architecture §6C.2). |
+| R5 | Repeating-section fields could be approved although V1 cannot search them correctly. | Registration records `in_repeating_group`; such fields are `RepeatingGroupNotSearchable`; moving an approved field into a repeating section invalidates it. |
+| R6 | Approved operators were returned in sorted storage order. | Business returns them in vocabulary order (UX). |
+| R7 | "Search records" was enabled for a form with no searchable fields. | Disabled when no field can be searched. |
+| — | AC-5 completeness, AUD-C7-01, G23 session-event auditing | AC-5 guarantees unchanged and re-tested; AUD-C7-01 and G23 session-event auditing remain **open production blockers**. |
+
+### 15.2 M3 summary
+
+Fail-closed execution gate (`FieldSearch:ExecutionEnabled`; startup refused outside Development/Testing); conditions authorized against the Authority's approvals; admission (4 per instance, 1 per user, busy refusal); the AC-5 catalogue and batch verification of every contentful record (500 records / 64 MiB / 15 s, approved ceilings that configuration can only lower); predicates evaluated on the decoded content of the verified rows, only on values the caller may read; verified status/parent filters; sort by Authority-held times; at most one automatic retry on a changed snapshot; mandatory Authority execution evidence; snapshot-bound result cursors re-validated on every page; results in the My Records table with `projectionVerified`. The Advanced Search UI keeps the approved M0 layout.
+
+### 15.3 Tests (owner list §6, ENC-SR, AC6-T09/T11)
+
+| Owner item | Where (real stack unless noted) |
+|---|---|
+| Approved equality; allowed/disallowed operators; multiple AND; date, numeric, dropdown, boolean | `FieldSearchExecutionTests.ApprovedPredicatesOfEveryType…`; unit `PhaseC7FieldSearchExecutionTests` |
+| Conditional capability visibility; unauthorized field and record discovery | `…UnauthorizedRecordsAndUnreadableFieldValues…`, `FieldSearchApprovalTests` (M2) |
+| Approval revocation; search-permission revocation mid-query (**AC6-T09**); pagination revocation | `…RevokingSearchPermissionOrWithdrawingApproval…` (open page refused after revocation) |
+| Missing accepted record; BusinessDb deletion; tampered values; rollback; field substitution and forged search rows (**AC6-T11**) | `…AHostileChangeToOneAcceptedRecordFailsTheWholeSearch…` × altered / deleted / field-substituted / forged-row / rolled-back |
+| BusinessDb injection | `…RowsInjectedForAnUnregisteredRecordNeverEnterTheResult` (+ M1 ENC-SR-10/11) |
+| Form/version/field substitution | `FieldSearchApprovalTests.VersionFieldAndMetadataSubstitution…` (M2) |
+| Snapshot change during execution | `…SearchesDuringConcurrentWritesAreCompleteOrTypedNeverPartial` |
+| Size and time limits; concurrency overload | benchmark (505 records ⇒ `records` limit; time-limit refusals at 480 × 8); `…ConcurrentSearchesOfOneUser…Busy` |
+| No partial results after verification failure | tampering tests, benchmark assertions, unit tests |
+| No protected values in URLs/logs | `…PredicateValuesNeverReachUrlsErrorsOrLogs` (API and Authority logs, journal); browser specs (URL) |
+| Exact-reference search regression | `RecordLookupTests`, `advanced-field-search.spec.ts` |
+| Pending vs accepted completeness; abandoned creation; resumption; concurrent retry | `…APendingCreationNeverBlocksSearchesAndIsFoundOnceResumed` |
+| Dev-only isolation; production/staging gating | unit: gate and step-up startup refusals (`TheExecutionGateIsADevelopmentCapability…`, M2 gate test) |
+
+ENC-SR status is in `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md`; no case is marked passed without independent review.
+
+### 15.4 Verification
+
+* **Local (developer laptop):** .NET Authority 163/163, contract 297/297, architecture 67/67, integrity 34/34; frontend lint, typecheck, 207/207, build, no generated-contract drift; real-stack search classes 29/31 on the first run (one wrong test expectation, corrected and re-run green; the M1 480-record benchmark exceeded the 15 s budget on this laptop — the typed refusal, see §15.5); browser specs M3 6/6, M2 5/5, M0 8/8, responsive 2/2.
+* **Hosted (dispatched on 574ddef):** `stage-b-integration` run 40150640937 — integration **160/160** (including the M3 adversarial suite and both benchmarks), browser **106 passed, 1 failed** (`responsive.spec.ts` still expected the M0 "not available yet" text; test corrected afterwards, see §15.6); `security-gate-a` run 40150642998 — SEC-P01..SEC-P12 **13/13**.
+
+### 15.5 Performance (PB-09; engineering measurement, not a capacity claim)
+
+Complete M3 query (capabilities, authorization, admission, catalogue, verification of every record, validation, evaluation, sort, evidence, first page; second page measured separately). Two- and three-condition queries over String, Integer, Option, Boolean and Date fields; five team members alternating two API instances; edits of another form every 400 ms; one grant (concurrency 4) and one revocation (concurrency 8) mid-level. Hosted run 40150640937; raw data `docs/evidence/phase-c7/c7-m3-benchmark-574ddef.json`.
+
+| Records | Verified bytes | Authority calls per search | 1 search p50 / p95 / p99 | 4 concurrent p50 / p99 | 8 concurrent p50 / p99 | Page 2 p50 | Refusals (8 concurrent) |
+|---|---|---|---|---|---|---|---|
+| 50 | 0.15 MB | 6 | 0.48 / 0.57 / 0.57 s | 1.75 / 1.89 s | 3.00 / 3.03 s | 13–38 ms | 2 snapshot changed |
+| 150 | 0.44 MB | 8 | 1.39 / 1.50 / 1.50 s | 4.34 / 4.52 s | 8.40 / 8.50 s | 23–66 ms | 2 snapshot changed |
+| 200 | 0.59 MB | 9 | 1.89 / 1.95 / 1.95 s | 6.02 / 6.05 s | 11.57 / 11.68 s | 25–47 ms | 2 snapshot changed |
+| 480 | 1.42 MB | 15 | 4.68 / 4.87 / 4.87 s | 13.64 / 13.79 s | — (all refused) | 29–39 ms | 18 time limit, 6 snapshot changed |
+| 505 | — | — | typed `SEARCH_VERIFICATION_LIMIT` (`records`) | | | | |
+
+* **Load at 8 concurrent:** Authority container 78–92 % CPU, Vault 44–58 %, SpiceDB 14–20 %, business PostgreSQL 0–38 %, Authority PostgreSQL 13–16 %; memory 70–300 MB per container. Database load per level is in the raw data (transactions and tuples returned).
+* **Throughput:** about 105–140 verified records per second in total, independent of concurrency — latency grows linearly with concurrent searches; the single Authority verification path is the bottleneck.
+* **Three-second objective:** met for a single search up to about 300 records on this runner (p99 1.95 s at 200, 4.87 s at 480). **Not met under concurrency** (200 records: 6.0 s at 4, 11.6 s at 8). **PB-09 remains an open performance blocker.** The recommended operational scope of about 200 records works for a few concurrent users; 480 records with eight concurrent searches is refused (time limit) every time.
+* **Developer laptop:** about twice as slow (≈ 26 ms per record); at 480 records every search reached the 15 s budget and was refused — typed, never partial.
+* **Scaling proposal (decision required, DR-C7-2):** see §18.
+
+### 15.6 Commits
+
+* `574ddef` — M1/M2 review corrections and M3 implementation and tests.
+* Following commits — phone-layout spec expectation (test only), documentation and evidence.
+
+### 15.7 Development environment
+
+Untouched in this round: the development stack (`http://127.0.0.1:8091`), its Vault, databases, SpiceDB, Azurite, keys, forms and records. All destructive and adversarial testing ran on the disposable security-test stack.
+
+## 16. Browser acceptance instructions (M3)
+
+**Where:** an isolated organization with synthetic identities. The persistent development organization predates the "Sam Security" persona and cannot approve fields (no operator path injects privileged identities into an existing organization, by design). Use the disposable security-test stack:
+
+1. `infrastructure/docker`: `docker compose -p enterpriseforms-sectest -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait`; then `cd src/frontend; $env:API_TARGET="http://127.0.0.1:5180"; npm run dev -w apps/web -- --host 127.0.0.1` and open `http://127.0.0.1:5173`.
+2. **Owner (Avery Owner):** Organization settings → tick "Permit search approvals for plaintext Public/Internal fields". Create a form with a plaintext Internal text field, a number, a date and a dropdown; publish; give Casey Clerk create permission.
+3. **Clerk:** create several records with different values.
+4. **Security administrator (Sam Security):** navigation **Search approvals** → the form → Review fields → for each field choose conditions, enter an approval reference, tick the development-only step-up, Approve; "Who can search field values" → grant Casey Clerk. Check that Sam has no record access (My Records shows none of the clerk's records).
+5. **Clerk, My Records:** reference/ID search on top; Form | Status; sorting and rows per page; Advanced Search collapsed.
+   * Choose the Form → expand Advanced Search: only approved fields are offered; each field offers its own conditions; the value control matches the type.
+   * Search text (Is exactly / Starts with / Contains), a number range, a date, a dropdown value; add a second condition (AND).
+   * Results appear in the same My Records table (Actions rightmost, statuses, paging); change Rows per page and use Next page; Clear advanced search returns to the list.
+   * The address bar never contains the values.
+6. **Unauthorized records:** sign in as Riley Reader (grant search access in step 4 if you like): no clerk record appears.
+7. **Failure states:** these occur only under database tampering or overload (proven by the integration tests); `field-search-execution.spec.ts` shows them with replaced responses: "A record could not be verified" (no retry), "Search is busy" (retry), "Records changed during the search" (Run search again) — never "No records match", and the conditions stay.
+8. **320 px and keyboard:** narrow the window; tab through the filters, conditions and buttons.
+9. **Regression:** open, edit and save a record; the record editor and My Records list behave as before.
+10. **Development stack (`http://127.0.0.1:8091`), optional:** `scripts/devstack/devstack.py rebuild authority api web` (back up first; additive migrations only). Search approvals cannot be granted there (no security persona), so Advanced Search shows no searchable fields; everything else must be unchanged.
+
+## 17. Production gating
+
+* Execution: `FieldSearch:ExecutionEnabled` refuses startup outside Development/Testing.
+* Approvals: production and staging stay disabled until PB-08 step-up evidence exists; the synthetic path refuses startup outside Development/Testing or with a real identity provider.
+* A running development search is not evidence that production use may be enabled. No Level 2 claim.
+
+## 18. Outstanding decisions and blockers
+
+* **Owner functional acceptance of M3** (§16) and of the review corrections (§15.1). M0/M2 visual acceptance not yet confirmed by the owner.
+* **DR-C7-1 (decision):** terminal state for abandoned record creations (`AbandonRecordRegistration`, architecture §6C.2).
+* **DR-C7-2 (decision, PB-09):** scaling the verified search. Measured throughput is about 130 verified records per second per Authority. Options for an independently reviewed design:
+  1. **Authority-side verified-head digest cache:** HMAC-verify each accepted head's leaves once, keep the verified leaf digests bound to (record, committed operation, manifest root, key version); later searches compare the business bytes' SHA-256 to those digests instead of re-running HMAC. Large reduction of Vault/HSM work; needs cache invalidation proof and review.
+  2. **Horizontal verification:** several Authority verification workers behind the same independently administered store and HSM, with admission sized to them.
+  3. **V2 independently maintained search projection** of approved fields, revision-fenced (ADR-PB-004 option; separate ADR).
+  Until decided: keep the 500/64 MiB/15 s limits, recommend about 200 records, and keep PB-09 open.
+* **AUD-C7-01 / G24:** asynchronous archive copy of mandatory search-audit events. **G23 session-event auditing:** open.
+* **PB-08:** production/staging approvals disabled.
+* **G06** (adversarial evidence exists on the isolated stack; independent review and Azure staging evidence outstanding), **G19** (M4), **G21** (record editing reads unsigned metadata): OPEN.
+* **Residuals:** conditions refused before a snapshot exists (not allowed) are not Authority-journaled; failed-search evidence after issuance is best effort; display labels (form and creator names) come from the unsigned directory, as in My Records.
+* **Independent review** of all Authority changes in C7 and of the executor; no Azure staging evidence. M4 not started. C7 not merged.
