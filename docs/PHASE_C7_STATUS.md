@@ -613,7 +613,7 @@ Local (laptop; disposable security-test stack rebuilt from this tree with the sy
 * Development procedure: `devstack.py security-admin` exercised end to end against the disposable stack with a test shim that only redirects the Compose project (status, appoint dry run and refusal, wrong organization id and missing `APPOINT` change nothing, confirmed recovery executes and is shown by status, approver-key generation) — 9/9.
 * Frontend unchanged in C-71 (C-70 results stand: 207/207, typecheck, lint).
 
-Hosted: HOSTED_PLACEHOLDER_C71
+Hosted on `f1e54b1` (workflow_dispatch; the branch has no PR): `stage-b-integration` run 40176067535 — integration tests (real stack) **171/171**, browser end-to-end (real stack) **109 passed**, aggregate gate job success; `security-gate-a` run 40176069794 — SEC-P01..SEC-P12 **13/13**.
 
 ### 22.4 Development organization
 
