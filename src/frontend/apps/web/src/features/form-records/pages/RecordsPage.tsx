@@ -157,7 +157,9 @@ export function RecordsPage() {
           </>
         }
       />
-      <Card title="Find and filter records" aria-label="Find and filter records">
+      <div className="records-search">
+        <div className="records-search__panels">
+      <Card title="Find and filter records" aria-label="Find and filter records" className="records-search__panel">
         <form role="search" aria-label="Search records by reference or ID" onSubmit={submitSearch} noValidate>
           <TextInput
             label="Search records"
@@ -170,7 +172,6 @@ export function RecordsPage() {
               setSearchError(null);
             }}
             error={searchError ?? undefined}
-            className="max-w-3xl"
             actions={
               <>
                 <Button type="submit" icon={ActionIcons.search} busy={records.isFetching && Boolean(search.q)}>
@@ -185,7 +186,7 @@ export function RecordsPage() {
             }
           />
         </form>
-        <div className="flex max-w-3xl flex-col gap-3" role="group" aria-label="Filter and sort records">
+        <div className="flex flex-col gap-3" role="group" aria-label="Filter and sort records">
           <div className="grid items-start gap-x-4 gap-y-3 sm:grid-cols-2">
             <Select
               label="Form"
@@ -214,20 +215,23 @@ export function RecordsPage() {
           </div>
           <p className="text-sm text-muted">Archived records are hidden unless you include them or choose the Archived status. An exact search also finds archived and related records; the Form and Status filters still narrow it.</p>
         </div>
-        <div className="max-w-3xl">
-          <AdvancedFieldSearch
-            formSelected={Boolean(search.form)}
-            capabilities={capabilities.data}
-            loading={capabilities.isPending && Boolean(search.form)}
-            loadFailed={capabilities.isError}
-            onRetryLoad={() => void capabilities.refetch()}
-            onSearch={fieldSearchAvailable ? startFieldSearch : undefined}
-            searching={runFieldSearch.isPending}
-          />
-        </div>
       </Card>
+      <Card as="div" className="records-search__panel">
+        <AdvancedFieldSearch
+          collapsible={false}
+          formSelected={Boolean(search.form)}
+          capabilities={capabilities.data}
+          loading={capabilities.isPending && Boolean(search.form)}
+          loadFailed={capabilities.isError}
+          onRetryLoad={() => void capabilities.refetch()}
+          onSearch={fieldSearchAvailable ? startFieldSearch : undefined}
+          searching={runFieldSearch.isPending}
+        />
+      </Card>
+        </div>
+      </div>
 
-      <Card className="mt-4">
+      <Card className="records-results">
         {fieldSearch ? (
           <FieldSearchResults
             state={fieldSearch}

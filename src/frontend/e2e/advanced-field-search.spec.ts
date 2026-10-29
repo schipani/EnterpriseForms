@@ -19,7 +19,7 @@ import { signIn } from "./support";
 const sentinel = "Zq7SentinelValueX";
 const someForm = "0199a2b3-c4d5-7e6f-8123-456789abcdf9";
 
-const advancedToggle = (page: Page) => page.getByRole("button", { name: /^Advanced Search/ });
+const advancedHeading = (page: Page) => page.getByRole("heading", { name: "Advanced Search" });
 const condition = (scope: Page | Locator, n: number) => scope.getByRole("group", { name: `Condition ${n}` });
 
 async function box(locator: Locator) {
@@ -42,7 +42,7 @@ function watchFieldSearch(page: Page): Request[] {
 }
 
 test.describe("Phase C7 M0 Advanced Field Search", () => {
-  test("My Records keeps reference search on top, Form | Status and Sort | Rows in two columns, then a collapsed Advanced Search", async ({ page }) => {
+  test("My Records keeps reference search on top, Form | Status and Sort | Rows in two columns, with Advanced Search beside them (60/40) and one results table below", async ({ page }) => {
     await signIn(page, "owner");
     await page.goto("/app/records");
     const card = page.getByRole("region", { name: "Find and filter records" });
@@ -52,12 +52,12 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
     const status = card.getByRole("combobox", { name: "Status" });
     const sort = card.getByRole("combobox", { name: "Sort by" });
     const rows = card.getByRole("combobox", { name: "Rows per page" });
-    const [s, b, f, st, so, r, adv] = await Promise.all([box(searchBox), box(searchButton), box(form), box(status), box(sort), box(rows), box(advancedToggle(page))]);
+    const [s, b, f, st, so, r] = await Promise.all([box(searchBox), box(searchButton), box(form), box(status), box(sort), box(rows)]);
     // The Search button is aligned with its input (same top and height, right of it).
     expect(Math.abs(b.y - s.y)).toBeLessThanOrEqual(1);
     expect(Math.abs(b.height - s.height)).toBeLessThanOrEqual(1);
     expect(b.x).toBeGreaterThan(s.x + s.width - 1);
-    // Form and Status share a row below the search; Sort and Rows share the next row; Advanced Search follows.
+    // Form and Status share a row below the search; Sort and Rows share the next row.
     expect(f.y).toBeGreaterThan(s.y + s.height);
     expect(Math.abs(f.y - st.y)).toBeLessThanOrEqual(1);
     expect(st.x).toBeGreaterThan(f.x + f.width - 1);
@@ -65,8 +65,18 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
     expect(so.y).toBeGreaterThan(f.y + f.height);
     expect(Math.abs(so.y - r.y)).toBeLessThanOrEqual(1);
     expect(Math.abs(so.x - f.x)).toBeLessThanOrEqual(1);
-    expect(adv.y).toBeGreaterThan(so.y + so.height);
-    await expect(advancedToggle(page)).toHaveAttribute("aria-expanded", "false");
+    // Owner reference: 40px controls, and Advanced Search is visible beside the filters (right of them, same top).
+    expect(Math.round(s.height)).toBe(40);
+    expect(Math.round(f.height)).toBe(40);
+    const leftPanel = await box(card);
+    const rightPanel = await box(page.locator(".records-search__panel").nth(1));
+    expect(Math.abs(leftPanel.y - rightPanel.y)).toBeLessThanOrEqual(1);
+    expect(rightPanel.x).toBeGreaterThan(leftPanel.x + leftPanel.width - 1);
+    expect(Math.abs(leftPanel.width / (leftPanel.width + rightPanel.width + 16) - 0.6)).toBeLessThan(0.02);
+    await expect(advancedHeading(page)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Advanced Search" })).toHaveCount(0);
+    const table = await box(page.getByRole("table", { name: "My Records" }).or(page.getByText(/^(You have no records yet|No records match these filters)$/)));
+    expect(table.y).toBeGreaterThan(Math.max(leftPanel.y + leftPanel.height, rightPanel.y + rightPanel.height) - 1);
     await expect(page.getByRole("table", { name: "My Records" }).or(page.getByText(/^(You have no records yet|No records match these filters)$/))).toHaveCount(1);
     await expect(page.getByRole("table")).toHaveCount(await page.getByRole("table", { name: "My Records" }).count());
   });
@@ -79,13 +89,10 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
       if (request.url().includes("/search-capabilities")) capabilityUrls.push(request.url());
     });
     await page.goto("/app/records");
-    await advancedToggle(page).click();
-    await expect(advancedToggle(page)).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByText("Choose a form first")).toBeVisible();
     await expect(page.getByRole("button", { name: "Search records" })).toBeDisabled();
 
     await page.goto(`/app/records?form=${someForm}`);
-    await advancedToggle(page).click();
     // Phase C7 M3: execution is on in this isolated environment; a form the person may not search (here: unknown) offers no field.
     await expect(page.getByText("No fields can be searched in this form")).toBeVisible();
     const first = condition(page, 1);
@@ -219,7 +226,6 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
       }
     });
     await page.goto(`/app/records?form=${someForm}`);
-    await advancedToggle(page).click();
     const first = condition(page, 1);
     await choose(page, first, "Field", "Surname");
     await first.getByRole("textbox", { name: "Value" }).fill(sentinel);
@@ -245,18 +251,10 @@ test.describe("Phase C7 M0 Advanced Field Search", () => {
     expect(page.url()).not.toContain(sentinel);
   });
 
-  test("keyboard: the disclosure and conditions are reachable and operable; axe WCAG 2.2 AA passes expanded", async ({ page }) => {
+  test("keyboard: the conditions are reachable and operable; axe WCAG 2.2 AA passes", async ({ page }) => {
     await signIn(page, "owner");
     await page.goto(`/app/records?form=${someForm}`);
-    const toggle = advancedToggle(page);
-    await toggle.focus();
-    await page.keyboard.press("Enter");
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await page.keyboard.press("Space");
-    await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await page.keyboard.press("Enter");
-    const outline = await toggle.evaluate((element) => getComputedStyle(element).outlineStyle);
-    expect(outline).not.toBe("none");
+    await expect(advancedHeading(page)).toBeVisible();
     const scan = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]).disableRules(["region"]).analyze();
     expect(scan.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join("; ")}`)).toEqual([]);
 

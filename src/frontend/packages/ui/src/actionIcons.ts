@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Download, History, Pencil, Plus, RotateCcw, Save, Search, Send, Settings, Trash2, Undo2, type LucideIcon } from "lucide-react";
+import { Archive, ArchiveRestore, Download, History, Pencil, Plus, RotateCcw, Save, Search, Send, Settings, SlidersHorizontal, Trash2, Undo2, type LucideIcon } from "lucide-react";
 
 export type ActionIconComponent = LucideIcon;
 
@@ -9,6 +9,8 @@ export type ActionIconComponent = LucideIcon;
 export const ActionIcons = {
   add: Plus,
   search: Search,
+  /** Advanced Search panel heading (Phase C7 visual styling). */
+  filters: SlidersHorizontal,
   reset: RotateCcw,
   edit: Pencil,
   save: Save,

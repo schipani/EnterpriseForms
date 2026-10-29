@@ -34,7 +34,6 @@ async function apiAs(page: Page) {
 }
 
 const field = (id: string, label: string) => ({ kind: "field", fieldDefinitionId: id, control: "text", label, required: false, layout: { columnSpan: 2, startOnNewRow: false }, validation: {} });
-const advancedToggle = (page: Page) => page.getByRole("button", { name: /^Advanced Search/ });
 const condition = (scope: Page | Locator, n: number) => scope.getByRole("group", { name: `Condition ${n}` });
 
 test.describe.configure({ mode: "serial" });
@@ -123,7 +122,6 @@ test.describe("Phase C7 M2 search approval", () => {
     });
     await signIn(page, "clerk");
     await page.goto(`/app/records?form=${formId}`);
-    await advancedToggle(page).click();
     const first = condition(page, 1);
     await expect(first.getByRole("combobox", { name: "Field" })).toBeEnabled();
     await first.getByRole("combobox", { name: "Field" }).click();
@@ -143,7 +141,6 @@ test.describe("Phase C7 M2 search approval", () => {
 
     await signIn(page, "reader");
     await page.goto(`/app/records?form=${formId}`);
-    await advancedToggle(page).click();
     await expect(condition(page, 1).getByRole("combobox", { name: "Field" })).toBeDisabled();
     await expect(condition(page, 1).getByRole("combobox", { name: "Field" })).toHaveText("No searchable fields");
   });
@@ -162,7 +159,6 @@ test.describe("Phase C7 M2 search approval", () => {
 
     await signIn(page, "clerk");
     await page.goto(`/app/records?form=${formId}`);
-    await advancedToggle(page).click();
     await expect(condition(page, 1).getByRole("combobox", { name: "Field" })).toBeDisabled();
   });
 });

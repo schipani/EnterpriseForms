@@ -35,7 +35,6 @@ async function apiAs(page: Page) {
 }
 
 const field = (id: string, label: string, control = "text") => ({ kind: "field", fieldDefinitionId: id, control, label, required: false, layout: { columnSpan: 2, startOnNewRow: false }, validation: {} });
-const advancedToggle = (page: Page) => page.getByRole("button", { name: /^Advanced Search/ });
 const condition = (scope: Page | Locator, n: number) => scope.getByRole("group", { name: `Condition ${n}` });
 
 async function choose(page: Page, scope: Locator, label: string, option: string | RegExp) {
@@ -47,7 +46,6 @@ async function openForm(page: Page, formName: string) {
   await page.goto("/app/records");
   await page.getByRole("combobox", { name: "Form" }).click();
   await page.getByRole("option", { name: formName }).click();
-  await advancedToggle(page).click();
 }
 
 test.describe.configure({ mode: "serial" });
@@ -131,7 +129,6 @@ test.describe("Phase C7 M3 verified field search", () => {
     await signIn(page, "clerk");
     // Without a form nothing is offered; selecting the form loads its approved fields from the server.
     await page.goto("/app/records");
-    await advancedToggle(page).click();
     await expect(page.getByText("Choose a form first")).toBeVisible();
     await openForm(page, formName);
     const first = condition(page, 1);
@@ -187,7 +184,6 @@ test.describe("Phase C7 M3 verified field search", () => {
     await page.getByRole("option", { name: formName }).click();
     await page.getByRole("combobox", { name: "Rows per page" }).click();
     await page.getByRole("option", { name: "10", exact: true }).click();
-    await advancedToggle(page).click();
     await choose(page, condition(page, 1), "Field", "Exhibit count");
     await choose(page, condition(page, 1), "Condition", "Greater than");
     await condition(page, 1).getByRole("textbox", { name: "Value" }).fill("-1");
