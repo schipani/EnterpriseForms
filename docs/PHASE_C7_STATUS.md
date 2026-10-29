@@ -692,6 +692,7 @@ The first verify-only implementation reused a census the Authority already held 
 | Stage B regression (FieldProtectionMigration, FieldProtectionDowngrade, Encryption, SearchCatalogue, FieldSearchApproval) | 36/36 |
 | .NET CI script (architecture, Authority, contracts, integrity) | 594/594 |
 | Frontend lint, typecheck, vitest | pass; 207/207 |
+| Browser (Playwright) | **not verified** — the local runs hit the development stack (§28.5); hosted run pending |
 
 Owner §11 list → tests: `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §10. **Pending (not implemented as integration tests):** policy change during an integration run (unit only), missing KEK during the decrypt check, the worker's `RECONCILIATION_LIMIT` path above 50,000 records, archival outage (AUD-C7-01).
 
@@ -714,7 +715,15 @@ See `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §7. In short: only curre
 
 ### 28.4 Hosted results
 
-Pending at the time of writing (stage-b-integration, security-gate-a dispatched on the M4 commit).
+**Not run.** The `gh` CLI is not installed in this session and dispatching through the GitHub API with the stored credential was refused by the session's permission policy. The owner needs to dispatch `stage-b-integration.yml` and `security-gate-a.yml` on `phase-c7/advanced-field-search` (commit `a373734` or later).
+
+### 28.5 Incident — browser tests ran against the persistent development stack (2026-10-29)
+
+* **What happened:** a Vite dev server already listening on `127.0.0.1:5173` (started 07:50 local, proxying to the persistent development API) was reused by Playwright (`reuseExistingServer: true`). Both local Playwright runs of this session — the two encryption specs and the full suite — therefore ran against the **owner's development organization**, not the isolated stack. The persistent stack runs the pre-M4 images (no verifier), so no M4 code ran there.
+* **Effect (read-only audit query, 13:49:37–14:09:06 UTC):** 428 audit events; 30 synthetic Playwright forms and 45 synthetic records created (with uploads, shares, lifecycle changes, two strengthenings and two encryption removals on those test forms only); **no event references any form or record that existed before** the runs; the organization data-protection policy was toggled eight times and ended with the same values as before (revision 10 → 18, review note now "Playwright … restored the development default"); **the organization logo was replaced** by the spec's one-pixel PNG (branding revision 7); one shared option list was created. Nothing was reset or deleted; Vault, keys, memberships and grants were not changed.
+* **Not repaired:** no corrective change was made to the development environment; restoring the logo or removing the synthetic forms needs the owner's decision.
+* **Consequence for evidence:** the browser results of this session are **invalid** (92 passed / 3 failed / 7 skipped were against the development stack; the three failures come from its missing Security Administrator persona). Browser verification of M4 on an isolated stack has **not** been done; it is part of the hosted Stage B run.
+* **Prevention:** before any Playwright run, check that nothing listens on 5173, or run a dedicated Vite server on another port against the isolated API and set `E2E_BASE_URL`.
 
 ## 29. Acceptance instructions — synthetic migration and reconciliation
 
@@ -740,6 +749,8 @@ Nothing here touches existing forms or records. Use only a **new synthetic form*
 ## 30. Outstanding decisions and blockers
 
 * **Owner functional acceptance of M4** (§29).
+* **Owner decision on the development-environment incident (§28.5):** whether to restore the logo and remove the 30 synthetic Playwright forms.
+* **Hosted verification:** dispatch `stage-b-integration.yml` and `security-gate-a.yml` (browser suite included); not run in this session.
 * **G19 OPEN:** independent review of the Authority census/attestation/coverage and the verifier boundary; Azure staging evidence; a production verifier identity (Entra workload identity + mTLS; today a Stage A HS256 credential like every workload credential).
 * **DR-C7-4:** retained plaintext history, WAL, replicas, backups — disposal policy and any new Authority transition (not implemented).
 * **DR-C7-5:** a read-only coverage view for Security Administrators (coverage is verifier-only today).
