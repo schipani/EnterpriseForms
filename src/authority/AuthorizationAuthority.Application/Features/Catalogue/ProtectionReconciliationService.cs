@@ -67,6 +67,7 @@ public sealed class ProtectionReconciliationService(IAuthorityStore store, Conte
         var held = (await scope.GetProtectionCensusResultsAsync(state.OrganizationId, decision.CommandId, ids, cancellationToken).ConfigureAwait(false))
             .ToDictionary(r => (r.FormRecordId, r.CommittedOperationId));
         var heads = (await scope.GetContentHeadsAsync(state.OrganizationId, ids, cancellationToken).ConfigureAwait(false)).ToDictionary(h => h.FormRecordId);
+        var reuseSince = await ReuseCutoffAsync(scope, workloadName, snapshot, request.ReuseSinceSnapshotId, cancellationToken).ConfigureAwait(false);
 
         var results = new List<ProtectionCensusRecordResult>(request.Records.Count);
         var changed = false;
@@ -81,17 +82,24 @@ public sealed class ProtectionReconciliationService(IAuthorityStore store, Conte
             }
 
             var head = heads.GetValueOrDefault(item.FormRecordId);
-            if (!request.Reverify && held.TryGetValue((item.FormRecordId, item.ExpectedCommittedOperationId), out var known) && head is { ContentHeadQuarantined: false } && head.CommittedOperationId == item.ExpectedCommittedOperationId && known.CensusOutcomeName == ProtectionCensusOutcomes.Verified)
+            if (reuseSince is { } cutoff && held.TryGetValue((item.FormRecordId, item.ExpectedCommittedOperationId), out var known) && known.CensusVerifiedOn >= cutoff
+                && head is { ContentHeadQuarantined: false } && head.CommittedOperationId == item.ExpectedCommittedOperationId && known.CensusOutcomeName == ProtectionCensusOutcomes.Verified)
             {
-                // Accepted content of an operation is immutable: within one reconciliation a census already verified for it stays
-                // true (no re-verification). Every reconciliation's first round re-verifies (Reverify), so a business copy tampered
-                // with after an earlier census is never vouched for by reuse.
+                // Accepted content of an operation is immutable: within one reconciliation (verified since its first snapshot) a
+                // census already taken for it stays true and is not repeated. A result from an earlier reconciliation is never reused.
                 results.Add(new ProtectionCensusRecordResult(item.FormRecordId, known.CensusOutcomeName, known.CommittedContentRevision, known.CommittedOperationId, known.FieldOccurrenceCount, known.OldFormOccurrenceCount, known.EnvelopeIssueCount, true));
                 continue;
             }
 
             var verified = await content.VerifyForProtectionCensusAsync(scope, state, decision.FormDefinitionId, item.FormRecordId, item.ExpectedCommittedOperationId, item.ObservedItems ?? [], decision.FieldDefinitionId, decision.Direction, workloadName, decision.CommandId, correlationId, cancellationToken).ConfigureAwait(false);
             changed |= verified.Quarantined;
+            if (verified.Verified && verified.CommittedOperationId is { } refreshed && held.ContainsKey((item.FormRecordId, refreshed))
+                && await scope.FindProtectionCensusResultAsync(decision.CommandId, item.FormRecordId, refreshed, cancellationToken).ConfigureAwait(false) is { CensusOutcomeName: ProtectionCensusOutcomes.Verified } tracked)
+            {
+                // Verified again now: later rounds of this reconciliation may reuse it.
+                tracked.CensusVerifiedOn = now;
+                changed = true;
+            }
             if (IsStoredOutcome(verified) && verified.CommittedOperationId is { } operation && !held.ContainsKey((item.FormRecordId, operation)))
             {
                 scope.AddProtectionCensusResult(new ProtectionCensusResult
@@ -292,6 +300,25 @@ public sealed class ProtectionReconciliationService(IAuthorityStore store, Conte
         return new ProtectionCoverageResponse(state.OrganizationId, forms.Count, rows.Count, complete, complete == rows.Count, rows, state.AuthorizationRevision, clock.GetUtcNow(),
             "Every current field protection decision the Authorization Authority holds for the organization, each with its latest Authority attestation (point in time). An attestation covers the current accepted revisions of the decision's form only; retained earlier revisions and retired records are reported, not migrated.",
             correlationId);
+    }
+
+    /// <summary>
+    /// When held census results may be reused: from the issue time of an earlier snapshot of the same verifier, decision and
+    /// form (the reconciliation's first round). Anything else — none given, unknown, another verifier, decision or form, or a
+    /// later snapshot — means no reuse at all.
+    /// </summary>
+    private static async Task<DateTimeOffset?> ReuseCutoffAsync(IAuthorityScope scope, string workloadName, SearchCatalogueSnapshot current, Guid? sinceSnapshotId, CancellationToken cancellationToken)
+    {
+        if (sinceSnapshotId is not { } id)
+        {
+            return null;
+        }
+
+        var since = await scope.FindCatalogueSnapshotAsync(id, cancellationToken).ConfigureAwait(false);
+        return since is not null && since.SnapshotScopeKind == CatalogueScopeKinds.MigrationVerification && since.RequestingWorkloadName == workloadName && since.OrganizationId == current.OrganizationId
+               && since.ScopingSecurityCommandId == current.ScopingSecurityCommandId && since.FormDefinitionId == current.FormDefinitionId && since.SnapshotIssuedOn <= current.SnapshotIssuedOn
+            ? since.SnapshotIssuedOn
+            : null;
     }
 
     private static async Task<SearchCatalogueSnapshot> RequireSnapshotAsync(IAuthorityScope scope, string workloadName, Guid snapshotId, CancellationToken cancellationToken)

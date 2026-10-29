@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, ITestStackIdentityAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -122,6 +122,9 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
     public Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken) =>
         SendAsync<System.Text.Json.JsonElement>(HttpMethod.Post, $"internal/v1/search-catalogue/{searchCatalogueSnapshotId:D}/executions", user, evidence, null, cancellationToken);
+
+    public Task<AuthorityStackIdentity> GetTestStackIdentityAsync(CancellationToken cancellationToken) =>
+        SendAsync<AuthorityStackIdentity>(HttpMethod.Get, "internal/v1/testing/stack-identity", null, null, null, cancellationToken);
 
     public Task<BrowserSessionState> CreateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, DateTimeOffset absoluteExpiresOn, string? replacedSessionDigestBase64, CancellationToken cancellationToken)
     {

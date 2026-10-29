@@ -59,8 +59,8 @@ public sealed class ProtectionReconciliationTests(StageBFixture fixture)
 
     private static string Marker(StageBScenario s, int i) => $"m4-plaintext-marker-{i}-{s.Name}";
 
-    private Task<HttpResult> StrengthenAsync(Workspace w, Guid? field = null) =>
-        fixture.Api.PostAsync($"/api/v1/form-definitions/{w.FormId:D}/fields/{(field ?? w.NoteId):D}/protection", w.S.Token(w.S.Designer), new { targetClassification = "Confidential", targetProtectionMode = "ApplicationEncrypted", changeReason = "M4 reconciliation proof", expectedProtectionRevision = 1 });
+    private Task<HttpResult> StrengthenAsync(Workspace w, Guid? field = null, string classification = "Confidential") =>
+        fixture.Api.PostAsync($"/api/v1/form-definitions/{w.FormId:D}/fields/{(field ?? w.NoteId):D}/protection", w.S.Token(w.S.Designer), new { targetClassification = classification, targetProtectionMode = "ApplicationEncrypted", changeReason = "M4 reconciliation proof", expectedProtectionRevision = 1 });
 
     private Task<HttpResult> StatusAsync(Workspace w, Guid? field = null) => fixture.Api.GetAsync($"/api/v1/form-definitions/{w.FormId:D}/fields/{(field ?? w.NoteId):D}/protection", w.S.Token(w.S.Designer));
 
@@ -467,6 +467,270 @@ INSERT INTO field_string_values SELECT (jsonb_populate_record(NULL::field_string
         Assert.Equal(2, full.GetProperty("attested_complete_decision_count").GetInt32());
     }
 
+    // ---- C7 M4 follow-up: the previously missing adversarial tests (owner instruction, 2026-10-29) ----
+
+    /// <summary>Recreates one service with test-only environment overrides (restored by calling again with null values).</summary>
+    private void Recreate(string service, params (string Variable, string? Value)[] overrides)
+    {
+        foreach (var (variable, value) in overrides)
+        {
+            Environment.SetEnvironmentVariable(variable, value);
+        }
+
+        fixture.Stack.Compose($"up -d --no-deps --force-recreate --wait {service}", 300);
+    }
+
+    private async Task<JsonElement> WaitReconciliationAsync(Workspace w, Guid reconciliationId, TimeSpan? timeout = null) =>
+        await WaitStatusAsync(w, s => Terminal(s) && Reconciliation(s).GetProperty("fieldProtectionReconciliationId").GetGuid() == reconciliationId, timeout);
+
+    private async Task<Guid> RequestIdAsync(Workspace w, string reason)
+    {
+        var requested = await RequestVerificationAsync(w, w.S.Designer, reason);
+        Assert.True(requested.IsSuccess, requested.Body);
+        return Reconciliation(requested.Root).GetProperty("fieldProtectionReconciliationId").GetGuid();
+    }
+
+    private string ReconciliationRow(Guid reconciliationId) =>
+        fixture.Stack.AttackerSql($"SELECT reconciliation_state || '|' || coalesce(last_error_code, '') || '|' || reconciliation_round_count FROM field_protection_reconciliations WHERE field_protection_reconciliation_id = '{reconciliationId:D}';").Trim();
+
+    private async Task SetPolicyAsync(StageBScenario s, bool permitDowngrade)
+    {
+        var current = await fixture.Api.GetAsync("/api/v1/organization/security-policy", s.Token(s.Designer));
+        Assert.True(current.IsSuccess, current.Body);
+        var updated = await fixture.Api.SendAsync(HttpMethod.Put, "/api/v1/organization/security-policy", s.Token(s.Designer), new { minimumFieldClassification = "Internal", plaintextInternalFieldsPermitted = true, plaintextDowngradePermitted = permitDowngrade, policyStatementText = permitDowngrade ? "M4 test: governance approved removing encryption from Internal fields." : "M4 test: removal of encryption no longer permitted.", expectedPolicyRevision = current.Root.GetProperty("securityPolicyRevision").GetInt64() }, null);
+        Assert.True(updated.IsSuccess, updated.Body);
+    }
+
+    /// <summary>
+    /// Owner: a policy change during an active reconciliation. An organization policy change (authorization revision moves) does
+    /// not falsify or block the result — the attestation re-derives everything; a change of the field's protection decision
+    /// supersedes the running reconciliation (nothing attested under the old decision), and the new decision's own migration
+    /// is reconciled in the new direction.
+    /// </summary>
+    [Fact]
+    public async Task ADecisionChangeDuringAReconciliationSupersedesItWhileAnOrganizationPolicyChangeDoesNot()
+    {
+        var w = await WorkspaceAsync("m4-policy", 3);
+        Assert.True((await StrengthenAsync(w, classification: "Internal")).IsSuccess);
+        await WaitStatusAsync(w, s => s.GetProperty("authorityReconciledComplete").GetBoolean());
+        try
+        {
+            fixture.Stack.Pause("worker");
+            Guid unaffected;
+            try
+            {
+                unaffected = await RequestIdAsync(w, "organization policy changes meanwhile");
+                await SetPolicyAsync(w.S, permitDowngrade: true);
+            }
+            finally
+            {
+                fixture.Stack.Unpause("worker");
+            }
+
+            Assert.Equal("Complete", ReconciliationState(await WaitReconciliationAsync(w, unaffected)));
+
+            fixture.Stack.Pause("worker");
+            Guid superseded;
+            try
+            {
+                superseded = await RequestIdAsync(w, "the decision changes meanwhile");
+                var field = (await StatusAsync(w)).Root;
+                var downgrade = await fixture.Api.PostAsync($"/api/v1/form-definitions/{w.FormId:D}/fields/{w.NoteId:D}/protection/downgrade", w.S.Token(w.S.Administrator), new { changeReason = "M4 test: decision changes during a reconciliation", expectedProtectionRevision = field.GetProperty("protectionPolicyRevision").GetInt64() });
+                Assert.True(downgrade.IsSuccess, downgrade.Body);
+            }
+            finally
+            {
+                fixture.Stack.Unpause("worker");
+            }
+
+            var deadline = DateTime.UtcNow.AddSeconds(180);
+            string row;
+            do
+            {
+                await Task.Delay(1000, Ct);
+                row = ReconciliationRow(superseded);
+            }
+            while ((row.StartsWith("Queued", StringComparison.Ordinal) || row.StartsWith("Running", StringComparison.Ordinal) || row.StartsWith("Blocked", StringComparison.Ordinal)) && DateTime.UtcNow < deadline);
+            Assert.StartsWith("Superseded|", row, StringComparison.Ordinal); // never Complete under a superseded decision
+            Assert.Equal(string.Empty, fixture.Stack.AttackerSql($"SELECT authority_attestation_id FROM field_protection_reconciliations WHERE field_protection_reconciliation_id = '{superseded:D}';").Trim()); // nothing attested under it
+
+            // The new decision (removal) is reconciled in its own direction before its migration completes.
+            var decrypted = await WaitStatusAsync(w, s => s.GetProperty("authorityReconciledComplete").GetBoolean() || MigrationState(s) == "Failed");
+            Assert.True(decrypted.GetProperty("authorityReconciledComplete").GetBoolean(), decrypted.GetRawText());
+            Assert.Equal("Decrypt", decrypted.GetProperty("migration").GetProperty("migrationDirection").GetString());
+            Assert.Equal(3, Int(Attestation(decrypted), "compliantRecordCount"));
+        }
+        finally
+        {
+            await SetPolicyAsync(w.S, permitDowngrade: false);
+        }
+    }
+
+    /// <summary>Owner: a missing or unavailable encryption key. The decrypt check cannot run, so the reconciliation blocks (retried) and is never Complete until the key returns.</summary>
+    [Fact]
+    public async Task AnUnavailableEncryptionKeyBlocksTheReconciliationAndNeverCompletesIt()
+    {
+        var w = await WorkspaceAsync("m4-key", 2);
+        Assert.True((await StrengthenAsync(w)).IsSuccess);
+        await WaitStatusAsync(w, s => s.GetProperty("authorityReconciledComplete").GetBoolean());
+        Guid id;
+        try
+        {
+            fixture.Stack.Pause("worker");
+            id = await RequestIdAsync(w, "key provider outage");
+            Recreate("worker", ("WORKER_TESTING_KEY_PROVIDER", "Unconfigured")); // replaces the paused worker: the queued run starts without a key
+            var deadline = DateTime.UtcNow.AddSeconds(120);
+            string row;
+            do
+            {
+                await Task.Delay(1000, Ct);
+                row = ReconciliationRow(id);
+            }
+            while (!row.StartsWith("Blocked", StringComparison.Ordinal) && !row.StartsWith("Complete", StringComparison.Ordinal) && !row.StartsWith("Incomplete", StringComparison.Ordinal) && DateTime.UtcNow < deadline);
+            Assert.StartsWith("Blocked|ENCRYPTION_UNAVAILABLE", row, StringComparison.Ordinal);
+            await Task.Delay(5000, Ct);
+            Assert.StartsWith("Blocked|", ReconciliationRow(id), StringComparison.Ordinal); // still waiting, never completed without the check
+        }
+        finally
+        {
+            Recreate("worker", ("WORKER_TESTING_KEY_PROVIDER", null));
+        }
+
+        Assert.Equal("Complete", ReconciliationState(await WaitReconciliationAsync(w, id)));
+    }
+
+    /// <summary>
+    /// Owner: the verification limit and snapshot expiry. Above the migration-catalogue ceiling the reconciliation ends Incomplete
+    /// (RECONCILIATION_LIMIT, no partial certificate) and the migration is not claimed complete; with a snapshot lifetime far
+    /// shorter than one round, the reconciliation renews the catalogue, reuses only what it verified itself and completes —
+    /// or ends Incomplete — but never claims completeness from an expired snapshot.
+    /// </summary>
+    [Fact]
+    public async Task TheCatalogueCeilingEndsIncompleteAndExpiredSnapshotsAreRenewedSafely()
+    {
+        var limited = await WorkspaceAsync("m4-limit", 4);
+        var large = await WorkspaceAsync("m4-expiry", 160, limited.S);
+        Assert.True((await StrengthenAsync(large)).IsSuccess);
+        await WaitStatusAsync(large, s => s.GetProperty("authorityReconciledComplete").GetBoolean(), TimeSpan.FromMinutes(10));
+        try
+        {
+            Recreate("authority", ("AUTHORITY_TESTING_MAX_MIGRATION_ENTRIES", "3"));
+            Assert.True((await StrengthenAsync(limited)).IsSuccess);
+            var done = await WaitStatusAsync(limited, s => MigrationState(s) is "Failed" or "Completed");
+            Assert.Equal("Failed", MigrationState(done));
+            Assert.Equal("RECONCILIATION_INCOMPLETE:RECONCILIATION_LIMIT", done.GetProperty("migration").GetProperty("lastErrorCode").GetString());
+            Assert.Equal("Incomplete", ReconciliationState(done));
+            Assert.False(done.GetProperty("authorityReconciledComplete").GetBoolean());
+            Assert.Equal(JsonValueKind.Null, Reconciliation(done).GetProperty("attestation").ValueKind); // nothing partial attested
+
+            Recreate("authority", ("AUTHORITY_TESTING_MAX_MIGRATION_ENTRIES", null), ("AUTHORITY_TESTING_MIGRATION_SNAPSHOT_SECONDS", "2"));
+            var id = await RequestIdAsync(large, "snapshots expire within one round");
+            var renewed = await WaitReconciliationAsync(large, id, TimeSpan.FromMinutes(10));
+            var row = ReconciliationRow(id);
+            // Each round verifies at least one batch before its snapshot expires and later rounds reuse only what this
+            // reconciliation verified, so the form completes across several renewals; the attestation is still re-derived.
+            Assert.Equal("Complete", ReconciliationState(renewed));
+            Assert.Equal(160, Int(Attestation(renewed), "compliantRecordCount"));
+            var firstRound = fixture.Stack.AttackerSql($"SELECT first_round_snapshot_id FROM field_protection_reconciliations WHERE field_protection_reconciliation_id = '{id:D}';").Trim();
+            Assert.Equal("160", Observer($"SELECT count(*) FROM protection_census_results WHERE scoping_security_command_id = '{CommandOf(large):D}' AND census_outcome_name = 'Verified' AND census_verified_on >= (SELECT snapshot_issued_on FROM search_catalogue_snapshots WHERE search_catalogue_snapshot_id = '{firstRound}');")); // every record verified within this reconciliation
+            Assert.True(Int(Reconciliation(renewed), "roundCount") >= 2, row); // at least one renewal happened
+            TestContext.Current.TestOutputHelper?.WriteLine("2-second snapshot lifetime, 160 records: " + row + " " + Reconciliation(renewed).GetRawText());
+        }
+        finally
+        {
+            Recreate("authority", ("AUTHORITY_TESTING_MAX_MIGRATION_ENTRIES", null), ("AUTHORITY_TESTING_MIGRATION_SNAPSHOT_SECONDS", null));
+        }
+    }
+
+    /// <summary>
+    /// Owner: a required audit archival outage. The attestation is journaled on the Authority audit stream in the same
+    /// transaction (non-gating); a completion is never reported without that journal entry, which is archived once the archive
+    /// returns. AUD-C7-01 (archival durability of mandatory evidence) stays open: delivery is asynchronous.
+    /// </summary>
+    [Fact]
+    public async Task AnArchiveOutageNeverYieldsACompletionWithoutAuthorityEvidence()
+    {
+        var w = await WorkspaceAsync("m4-archive", 2);
+        Assert.True((await StrengthenAsync(w)).IsSuccess);
+        await WaitStatusAsync(w, s => s.GetProperty("authorityReconciledComplete").GetBoolean());
+        fixture.Stack.Stop("archive-store");
+        Guid id;
+        string row;
+        try
+        {
+            id = await RequestIdAsync(w, "archive outage");
+            var deadline = DateTime.UtcNow.AddSeconds(180);
+            do
+            {
+                await Task.Delay(1000, Ct);
+                row = ReconciliationRow(id);
+            }
+            while ((row.StartsWith("Queued", StringComparison.Ordinal) || row.StartsWith("Running", StringComparison.Ordinal)) && DateTime.UtcNow < deadline);
+        }
+        finally
+        {
+            fixture.Stack.Start("archive-store");
+        }
+
+        TestContext.Current.TestOutputHelper?.WriteLine("during the archive outage: " + row);
+        var during = await WaitReconciliationAsync(w, id, TimeSpan.FromSeconds(240)); // Blocked (if any) resumes once the archive is back
+        var state = ReconciliationState(during);
+        if (state == "Complete")
+        {
+            var attestationId = Attestation(during).GetProperty("attestationId").GetGuid();
+            Assert.NotEqual(string.Empty, Observer($"SELECT archive_delivery_state FROM security_journal_entries WHERE journal_event_kind = 'ProtectionReconciliationAttested' AND journal_event_body_json LIKE '%{attestationId:D}%';"));
+            var deadline = DateTime.UtcNow.AddSeconds(180);
+            string delivery;
+            do
+            {
+                await Task.Delay(2000, Ct);
+                delivery = Observer($"SELECT archive_delivery_state FROM security_journal_entries WHERE journal_event_kind = 'ProtectionReconciliationAttested' AND journal_event_body_json LIKE '%{attestationId:D}%';");
+            }
+            while (delivery != "Anchored" && DateTime.UtcNow < deadline);
+            Assert.Equal("Anchored", delivery); // delivered once the archive is back
+        }
+        else
+        {
+            Assert.Contains(state, new[] { "Incomplete", "Blocked" });
+        }
+    }
+
+    /// <summary>Owner: accepted changes after an attestation. The protection barrier admits a new revision only in the required form; the next reconciliation verifies the new head and stays complete.</summary>
+    [Fact]
+    public async Task ARecordChangedAfterTheAttestationIsVerifiedByTheNextReconciliation()
+    {
+        var w = await WorkspaceAsync("m4-after", 3);
+        Assert.True((await StrengthenAsync(w)).IsSuccess);
+        await WaitStatusAsync(w, s => s.GetProperty("authorityReconciledComplete").GetBoolean());
+        var target = w.Records[0];
+        var before = AuthorityOracle.Head(fixture.Stack, target);
+        var view = (await w.S.WaitProjectionAsync(w.S.Clerk, target)).Root;
+        var edit = await fixture.Api.PatchAsync($"/api/v1/form-records/{target:D}", w.S.Token(w.S.Clerk), new { expectedContentRevision = view.GetProperty("record").GetProperty("contentRevision").GetInt64(), values = new Dictionary<string, string> { ["plain_note"] = "changed after the attestation" } });
+        Assert.True(edit.IsSuccess, edit.Body);
+        var after = AuthorityOracle.Head(fixture.Stack, target);
+        Assert.True(after.ContentRevision > before.ContentRevision);
+        Assert.Equal(0, AuthorityOracle.RowsInAcceptedHeads(fixture.Stack, "field_string_values", w.NoteId, [target]).Values); // the barrier: only ciphertext was accepted
+        var id = await RequestIdAsync(w, "after a change");
+        var done = await WaitReconciliationAsync(w, id);
+        Assert.Equal("Complete", ReconciliationState(done));
+        Assert.Equal(3, Int(Reconciliation(done), "censusVerifiedRecordCount"));
+        Assert.Equal("1", Observer($"SELECT count(*) FROM protection_census_results WHERE form_record_id = '{target:D}' AND committed_operation_id = '{after.OperationId:D}' AND census_outcome_name = 'Verified';"));
+    }
+
+    /// <summary>The isolated stack identifies itself to the browser-test guard (API and Authority, Testing only).</summary>
+    [Fact]
+    public async Task TheIsolatedStackIdentifiesItselfAndTheAuthorityConfirmsIt()
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(StageBFixture.ApiBaseAddress) };
+        var identity = await client.GetFromJsonAsync<JsonElement>("/api/v1/testing/stack-identity", Ct);
+        Assert.True(identity.GetProperty("isolated").GetBoolean(), identity.GetRawText());
+        Assert.Equal("Testing", identity.GetProperty("apiEnvironment").GetString());
+        Assert.Equal("Testing", identity.GetProperty("authorityEnvironment").GetString());
+        Assert.Equal("enterpriseforms-security-test", identity.GetProperty("authorityStackIdentity").GetString());
+        // The Authority route needs the business workload credential.
+        Assert.Contains((await fixture.Authority.SendAsync(HttpMethod.Get, "/internal/v1/testing/stack-identity", null, null)).Status, new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden });
+    }
+
     // ---- PB-09 measurement (engineering only; not a capacity claim) ----
 
     [Fact]
@@ -483,7 +747,7 @@ INSERT INTO field_string_values SELECT (jsonb_populate_record(NULL::field_string
             var completion = Reconciliation(migrated);
             var completionSeconds = (DateTimeOffset.Parse(completion.GetProperty("completedOn").GetString()!, CultureInfo.InvariantCulture) - DateTimeOffset.Parse(completion.GetProperty("requestedOn").GetString()!, CultureInfo.InvariantCulture)).TotalSeconds;
 
-            // Verify-only runs: the first round of each re-verifies every record (reverify), so each run is a full verification.
+            // Verify-only runs: no census of an earlier reconciliation is reused, so each run is a full verification.
             var runs = new List<double>();
             for (var run = 0; run < 3; run++)
             {

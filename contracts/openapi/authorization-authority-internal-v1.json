@@ -707,7 +707,7 @@
         "tags": [
           "Catalogue"
         ],
-        "summary": "Phase C7 M4 (G19, verifier only): verifies 1..50 entries of the verifier's own snapshot against their accepted manifests (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the head) and counts the decision's field rows in the old and the target form from the verified bytes. Counts only — never contents. A census already held for the same accepted operation is returned without re-verification unless reverify is set (the first round of every reconciliation sets it).",
+        "summary": "Phase C7 M4 (G19, verifier only): verifies 1..50 entries of the verifier's own snapshot against their accepted manifests (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the head) and counts the decision's field rows in the old and the target form from the verified bytes. Counts only — never contents. A census held for the same accepted operation is reused only when it was verified since reuseSinceSnapshotId (this reconciliation's first snapshot) was issued; anything else is re-verified.",
         "operationId": "TakeProtectionCensus",
         "parameters": [
           {
@@ -3277,9 +3277,12 @@
               "$ref": "#/components/schemas/ProtectionCensusItem"
             }
           },
-          "reverify": {
-            "type": "boolean",
-            "default": false
+          "reuse_since_snapshot_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },

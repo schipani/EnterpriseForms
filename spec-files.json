@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "ba968845b4b62631f46b3e661c0a09681dbe4c0a4cde45988330527f02dba22c",
-      "bytes": 36099
+      "sha256": "996d693f4e5e7b5e17a153cf6f70911148acac42dabd4d4c57bf97405f685162",
+      "bytes": 36334
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/PHASE_C7_STATUS.md",
-      "sha256": "2f8603642f7d55d238c48b891e80f10e393bbb9377b2e843e9463100fd3ba9b1",
-      "bytes": 84765
+      "sha256": "9999ec1a58eb19e066a4612858176d8eaaa443d875c8c0a829ded1535b502d5d",
+      "bytes": 92520
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -244,8 +244,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "f7d12f5607856ee7c1f29ab616008ccef8e0ca9595c7546ef25634f9bd49e0da",
-      "bytes": 112953
+      "sha256": "d570604eada7b31cec951797fc00d8e2106ca7fa1211830f144f44dad8e1e2ad",
+      "bytes": 115600
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -338,14 +338,19 @@
       "bytes": 3348
     },
     {
+      "path": "docs/security/C7_M4_DEVELOPMENT_INCIDENT_2026-10-29.md",
+      "sha256": "02b847a3363e0e92311a7c78597b79c7a4351d911860bdd0021e262c43b5643e",
+      "bytes": 9385
+    },
+    {
       "path": "docs/security/DOCUMENT_ENCRYPTION_AUDIT.md",
       "sha256": "0cef9d3ddb8d8689f1df57777a34de5bb7af28c8358d60b796a9067e5cf6fc71",
       "bytes": 13412
     },
     {
       "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
-      "sha256": "6518ae80234b289e57c72f233394596486b445c50bbafd4c28fe2feb61239536",
-      "bytes": 21360
+      "sha256": "8dbffa3e2e496e12014a0810f74d8c83e7fadc33d7c3d80eab12286da0af71ab",
+      "bytes": 29646
     },
     {
       "path": "docs/security/G22_SESSION_CSRF_HOTFIX.md",

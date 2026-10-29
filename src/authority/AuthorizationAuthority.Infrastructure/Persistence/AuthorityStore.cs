@@ -227,6 +227,9 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddProtectionCensusResult(ProtectionCensusResult result) => context.ProtectionCensusResults.Add(result);
 
+        public Task<ProtectionCensusResult?> FindProtectionCensusResultAsync(Guid scopingSecurityCommandId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) =>
+            context.ProtectionCensusResults.AsTracking().FirstOrDefaultAsync(r => r.ScopingSecurityCommandId == scopingSecurityCommandId && r.FormRecordId == formRecordId && r.CommittedOperationId == committedOperationId, cancellationToken);
+
         public void AddProtectionAttestation(ProtectionReconciliationAttestation attestation) => context.ProtectionAttestations.Add(attestation);
 
         public async Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken) =>

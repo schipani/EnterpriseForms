@@ -35,6 +35,7 @@ public sealed class Program
         }
 
         var builder = WebApplication.CreateBuilder(args);
+        EnterpriseForms.Api.Features.Platform.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
 
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<BusinessProblemHandler>();
@@ -109,6 +110,8 @@ public sealed class Program
         {
             // Phase C7 M1: real-stack proof of the AC-5 verification path. Never mapped outside the isolated Testing stack.
             app.MapSearchTestingEndpoints();
+            // C7 M4 incident correction: isolated-stack identity for the browser-test guard.
+            app.MapTestStackIdentityEndpoints();
         }
 
         app.Run();

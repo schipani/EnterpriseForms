@@ -19,6 +19,13 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
       FaultInjection__Enabled: "true"
+      # C7 M4 adversarial tests only: a test may recreate the authority with a lower migration-catalogue ceiling or a shorter
+      # migration snapshot lifetime (defaults are the production values) and restores them afterwards.
+      Catalogue__MaximumMigrationEntries: ${AUTHORITY_TESTING_MAX_MIGRATION_ENTRIES:-50000}
+      Catalogue__MigrationSnapshotLifetimeSeconds: ${AUTHORITY_TESTING_MIGRATION_SNAPSHOT_SECONDS:-900}
+      # C7 M4 incident correction: identity of this isolated stack (Testing only; the browser-test guard requires it from both
+      # the API and the Authority). The persistent development stack never sets it and runs Development.
+      Testing__StackIdentity: enterpriseforms-security-test
       # C-28: a small lookup page makes every multi-record discovery test cross SpiceDB cursor pages (production keeps 1000).
       SpiceDb__LookupPageSize: "20"
       # Phase C7 OD-1: synthetic field-protection verifier credential for this isolated stack only (TestIdentity.VerifierToken
@@ -52,6 +59,7 @@ services:
       DataProtection__KeyRingDirectory: /keyring
       # Phase C7 M3: verified field-value search execution (fail-closed gate; refused at startup outside Development/Testing).
       FieldSearch__ExecutionEnabled: "true"
+      Testing__StackIdentity: enterpriseforms-security-test
     volumes:
       - api-keyring:/keyring
     ports: ["127.0.0.1:5180:8080"]
@@ -65,6 +73,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Testing
       DataProtection__KeyRingDirectory: /keyring
       FieldSearch__ExecutionEnabled: "true"
+      Testing__StackIdentity: enterpriseforms-security-test
     volumes:
       - api-keyring:/keyring
     ports: ["127.0.0.1:5181:8080"]
@@ -78,6 +87,8 @@ services:
   worker:
     environment:
       DOTNET_ENVIRONMENT: Testing
+      # C7 M4 key-outage test only: recreated with "Unconfigured" (fail-closed key provider) and restored afterwards.
+      Encryption__KeyProvider: ${WORKER_TESTING_KEY_PROVIDER:-LocalDevelopment}
       # Phase C7 M4 (OD-1): the same synthetic field-protection verifier credential as the authority above, for the Worker
       # only (the API never gets it). TestIdentity.VerifierToken mirrors it.
       ProtectionVerifier__Issuer: enterpriseforms-field-protection-verifier

@@ -57,6 +57,18 @@ public sealed class FieldProtectionReconciliation
     /// <summary>Durable checkpoint: catalogue entries of the current round already processed.</summary>
     public int CensusNextOffset { get; set; }
 
+    /// <summary>The first round's snapshot: catch-up rounds may reuse only census results the Authority verified since it was issued.</summary>
+    public Guid? FirstRoundSnapshotId { get; set; }
+
+    /// <summary>Records newly verified before the current round started: a round that adds none ends the reconciliation (no progress).</summary>
+    public int RoundStartVerifiedRecordCount { get; set; }
+
+    /// <summary>
+    /// Durable resume position after a snapshot expiry: the next round skips catalogue entries up to this record id (verified
+    /// earlier in this reconciliation; catalogue order is record id order). Cleared for a full round when heads changed.
+    /// </summary>
+    public Guid? ResumeAfterFormRecordId { get; set; }
+
     /// <summary>Records the Authority newly verified in census calls (all rounds).</summary>
     public int CensusVerifiedRecordCount { get; set; }
 

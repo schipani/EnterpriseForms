@@ -1124,6 +1124,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("field_protection_migration_id");
 
+                    b.Property<Guid?>("FirstRoundSnapshotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("first_round_snapshot_id");
+
                     b.Property<Guid>("FormDefinitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("form_definition_id");
@@ -1193,9 +1197,17 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("requested_by_user_id");
 
+                    b.Property<Guid?>("ResumeAfterFormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resume_after_form_record_id");
+
                     b.Property<int?>("RetainedOldFormRowCount")
                         .HasColumnType("integer")
                         .HasColumnName("retained_old_form_row_count");
+
+                    b.Property<int>("RoundStartVerifiedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_start_verified_record_count");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -1223,7 +1235,7 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_field_protection_reconciliations_complete", "reconciliation_state <> 'Complete' OR (attestation_complete = true AND authority_attestation_id IS NOT NULL AND decrypt_failed_value_count = 0 AND logical_type_mismatch_count = 0)");
 
-                            t.HasCheckConstraint("ck_field_protection_reconciliations_counts", "census_next_offset >= 0 AND census_verified_record_count >= 0 AND census_reused_record_count >= 0 AND census_failed_record_count >= 0 AND decrypt_checked_value_count >= 0 AND decrypt_failed_value_count >= 0 AND logical_type_mismatch_count >= 0 AND reconciliation_round_count >= 0 AND transient_failure_count >= 0");
+                            t.HasCheckConstraint("ck_field_protection_reconciliations_counts", "census_next_offset >= 0 AND round_start_verified_record_count >= 0 AND census_verified_record_count >= 0 AND census_reused_record_count >= 0 AND census_failed_record_count >= 0 AND decrypt_checked_value_count >= 0 AND decrypt_failed_value_count >= 0 AND logical_type_mismatch_count >= 0 AND reconciliation_round_count >= 0 AND transient_failure_count >= 0");
 
                             t.HasCheckConstraint("ck_field_protection_reconciliations_direction", "migration_direction IN ('Encrypt','Decrypt')");
 

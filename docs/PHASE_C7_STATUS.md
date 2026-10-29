@@ -15,7 +15,7 @@
   * C-65/C-66: F-C7-01 correction (merged to `main`, integrated here); final AC-5 review;
   * C-67: M2 (AC-6) implemented;
   * C-68: M1/M2 review corrections; C-69: M3 implemented;
-  * C-70/C-71: Security Administrators, DR-C7-3; C-72: owner functional acceptance of Advanced Field Search and the two-column layout; C-73: M4 implemented.
+  * C-70/C-71: Security Administrators, DR-C7-3; C-72: owner functional acceptance of Advanced Field Search and the two-column layout; C-73: M4 implemented; C-74: development incident investigated (no cleanup executed), Playwright isolation guard, missing M4 tests, resumable rounds.
 - **G06, G19, G21:** OPEN (G19: M4 reconciliation implemented, review pending — §27). **G22, G23:** corrected (independent review pending). **PB-08:** not resolved (production/staging search approvals disabled). **PB-09:** objective not met under concurrency (§15.5). **AUD-C7-01 / G24:** open.
 - **State (2026-10-24):**
   * M0 implemented (owner visual acceptance **pending**).
@@ -23,6 +23,7 @@
   * M1 — AC-5 — implemented; final review done (§11).
   * M2 — AC-6 — implemented and verified (§12).
   * **M1/M2 review corrections and M3 — verified field-value search — implemented and verified (§15); stopped for owner functional acceptance.**
+  * **2026-10-29 (later): development incident inventory and remediation plan (no remediation executed), Playwright isolation, missing adversarial tests, DR-C7-4/5/6 designs (C-74, §31–§35); stopped for the owner's approval.**
   * Field-value search runs only where the fail-closed execution gate is on (isolated Development/Testing); never in staging or production. This branch is not merged to `main`.
   * **2026-10-29: owner functional acceptance of M3 and the layout (C-72, §26); M4 — encryption migration reconciliation — implemented (§27–§29); stopped for owner functional acceptance.**
 
@@ -688,13 +689,13 @@ The first verify-only implementation reused a census the Authority already held 
 |---|---|
 | Authority unit `ProtectionReconciliationTests` (new, 12) | pass — census counts from verified bytes (repeating occurrences), registry population (undiscoverable, pending, quarantined, retired), tampered/missing/rolled-back rows quarantined, earlier-head census never counts, reuse vs `reverify`, snapshot ownership, superseded decision, envelope shape and nonce reuse, retired key, active approval, Decrypt direction, audit journal without record ids, coverage across forms, cross-organization |
 | Contract `ProtectionVerifierBoundaryTests` (new, 6) | pass — API never registers the verifier; partial/reused credentials refused; unconfigured fails closed |
-| Stage B `ProtectionReconciliationTests` (new, 8, real stack) | pass — complete population with archived, older-layout and pending records, decrypt checks, kept history, journal and log scans; concealed record (moved + relabelled) blocks a false completion while the business-side post-check alone passed; forged business row ignored; post-completion rollback detected by verify-only, quarantined, never repaired; Authority outage → Blocked → resumes; worker restart mid-run; concurrent edits caught up; permissions and verifier-only routes; organization coverage across forms; benchmark |
+| Stage B `ProtectionReconciliationTests` (8 at C-73; 14 since C-74, §32) | pass — complete population with archived, older-layout and pending records, decrypt checks, kept history, journal and log scans; concealed record (moved + relabelled) blocks a false completion while the business-side post-check alone passed; forged business row ignored; post-completion rollback detected by verify-only, quarantined, never repaired; Authority outage → Blocked → resumes; worker restart mid-run; concurrent edits caught up; permissions and verifier-only routes; organization coverage across forms; benchmark |
 | Stage B regression (FieldProtectionMigration, FieldProtectionDowngrade, Encryption, SearchCatalogue, FieldSearchApproval) | 36/36 |
 | .NET CI script (architecture, Authority, contracts, integrity) | 594/594 |
 | Frontend lint, typecheck, vitest | pass; 207/207 |
 | Browser (Playwright) | **not verified** — the local runs hit the development stack (§28.5); hosted run pending |
 
-Owner §11 list → tests: `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §10. **Pending (not implemented as integration tests):** policy change during an integration run (unit only), missing KEK during the decrypt check, the worker's `RECONCILIATION_LIMIT` path above 50,000 records, archival outage (AUD-C7-01).
+Owner §11 list → tests: `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §10. The four tests pending at C-73 (policy change, missing key, 50,000 limit, archive outage) were added in C-74 (§32).
 
 ### 28.2 Performance (PB-09 engineering measurement on the developer laptop; not a capacity claim)
 
@@ -706,7 +707,7 @@ Owner §11 list → tests: `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §
 | 250 | 49.3 s | 8.9 s | 28.2 | 7.4 / 8.5 / 8.5 s | 14.2 s | 9 |
 
 * Linear in records; ≈ 30 verified records/s end to end (the worker reads each record's staged rows, decrypt-checks, and the Authority verifies every HMAC through Vault Transit). The search path verifies ≈ 130 records/s because it does not decrypt; reconciliation is a background job, not an interactive operation, and completeness is never traded for speed.
-* At this rate the 50,000-record migration catalogue ceiling would take ≈ 28 minutes per round, beyond the 15-minute migration snapshot lifetime: such a form ends `Incomplete` (snapshot expiry → new rounds → `RECONCILIATION_DID_NOT_CONVERGE`) rather than claiming anything. Larger forms need a longer-lived catalogue or parallel census workers (a DR-C7-2-style scaling decision); not done.
+* At this rate the 50,000-record migration catalogue ceiling would take ≈ 28 minutes per round, beyond the 15-minute migration snapshot lifetime. Superseded by C-74 (§33): rounds now resume after a snapshot expiry, so such a form completes over several rounds instead of ending `Incomplete`.
 * CPU/memory: not instrumented separately; the Authority (HMAC verification) and the worker (decryption) are the expected costs. Hosted measurements in §28.4.
 
 ### 28.3 Residual plaintext and historical exposure
@@ -715,15 +716,15 @@ See `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §7. In short: only curre
 
 ### 28.4 Hosted results
 
-**Not run.** The `gh` CLI is not installed in this session and dispatching through the GitHub API with the stored credential was refused by the session's permission policy. The owner needs to dispatch `stage-b-integration.yml` and `security-gate-a.yml` on `phase-c7/advanced-field-search` (commit `a373734` or later).
+**Not run.** The `gh` CLI is not installed in this session, and dispatching through the GitHub API with the stored credential was refused by the session's permission policy (not bypassed). Manual dispatch steps: §34.
 
 ### 28.5 Incident — browser tests ran against the persistent development stack (2026-10-29)
 
 * **What happened:** a Vite dev server already listening on `127.0.0.1:5173` (started 07:50 local, proxying to the persistent development API) was reused by Playwright (`reuseExistingServer: true`). Both local Playwright runs of this session — the two encryption specs and the full suite — therefore ran against the **owner's development organization**, not the isolated stack. The persistent stack runs the pre-M4 images (no verifier), so no M4 code ran there.
-* **Effect (read-only audit query, 13:49:37–14:09:06 UTC):** 428 audit events; 30 synthetic Playwright forms and 45 synthetic records created (with uploads, shares, lifecycle changes, two strengthenings and two encryption removals on those test forms only); **no event references any form or record that existed before** the runs; the organization data-protection policy was toggled eight times and ended with the same values as before (revision 10 → 18, review note now "Playwright … restored the development default"); **the organization logo was replaced** by the spec's one-pixel PNG (branding revision 7); one shared option list was created. Nothing was reset or deleted; Vault, keys, memberships and grants were not changed.
+* **Effect (read-only audit query, 13:49:37–14:09:06 UTC):** 428 audit events; 30 synthetic Playwright forms and 45 synthetic records created (**corrected in C-74: 28 forms and 41 records**; the other two forms predate the runs — exact inventory in `docs/security/C7_M4_DEVELOPMENT_INCIDENT_2026-10-29.md`) (with uploads, shares, lifecycle changes, two strengthenings and two encryption removals on those test forms only); **no event references any form or record that existed before** the runs; the organization data-protection policy was toggled eight times and ended with the same values as before (revision 10 → 18, review note now "Playwright … restored the development default"); **the organization logo was replaced** by the spec's one-pixel PNG (branding revision 7); one shared option list was created. Nothing was reset or deleted; Vault, keys, memberships and grants were not changed.
 * **Not repaired:** no corrective change was made to the development environment; restoring the logo or removing the synthetic forms needs the owner's decision.
 * **Consequence for evidence:** the browser results of this session are **invalid** (92 passed / 3 failed / 7 skipped were against the development stack; the three failures come from its missing Security Administrator persona). Browser verification of M4 on an isolated stack has **not** been done; it is part of the hosted Stage B run.
-* **Prevention:** before any Playwright run, check that nothing listens on 5173, or run a dedicated Vite server on another port against the isolated API and set `E2E_BASE_URL`.
+* **Prevention:** permanent guard implemented in C-74 (§31).
 
 ## 29. Acceptance instructions — synthetic migration and reconciliation
 
@@ -746,7 +747,7 @@ Nothing here touches existing forms or records. Use only a **new synthetic form*
 2. Without the verifier, a new synthetic strengthening ends *Independent reconciliation unavailable* and keeps the pre-M4 "All listed records encrypted" badge and caveat — that is the expected fail-closed behaviour.
 3. To try the real reconciliation: `py scripts/devstack/devstack.py protection-verifier enable` (development credential in the custody directory; recreates the Authority and Worker; no data change, no migration started). Then repeat Option A steps 2–6 on a **new** form. Do not strengthen fields of existing forms unless you intend that migration; if you do, request **Verify completeness** first only after its migration finished and review the report.
 
-## 30. Outstanding decisions and blockers
+## 30. Outstanding decisions and blockers (superseded by §35)
 
 * **Owner functional acceptance of M4** (§29).
 * **Owner decision on the development-environment incident (§28.5):** whether to restore the logo and remove the 30 synthetic Playwright forms.
@@ -757,3 +758,60 @@ Nothing here touches existing forms or records. Use only a **new synthetic form*
 * **Scale:** forms above ≈ 25,000 records cannot finish a round within the 15-minute snapshot lifetime at the measured rate (§28.2).
 * **AUD-C7-01 / G24:** archival durability of mandatory evidence (the attestation journal entry included) unverified.
 * Unchanged: G06, G21, PB-08, PB-09, DR-C7-1, DR-C7-2, G25/G26 reviews. No Level 2 claim. C7 not merged; no further milestone started.
+
+## 31. Development incident — inventory, remediation plan and permanent fix (C-74)
+
+**Inventory** (read-only; Authority and business databases compared; backup 20261025-083213 read in a throwaway, network-less container): `docs/security/C7_M4_DEVELOPMENT_INCIDENT_2026-10-29.md`, identity lists in `docs/evidence/phase-c7/dev-incident-2026-10-29/`. In the window 13:49:37–14:09:06 UTC: 28 forms, 41 records, 7 shares (2 revoked), 59 protection decisions on those forms, 4 attachments, 1 option list, 8 policy updates (revision 10 → 18, values unchanged), the organization logo replaced (branding revision 7), 428 audit events. The Authority confirms that **no pre-existing record** received a manifest commit or a head change in the window. Earlier occurrences: 97 Playwright forms on 2026-10-23; the logo was already the spec's one-pixel PNG in the 2026-10-25 backup (byte-identical); the policy note was already Playwright text before today. Whether a genuine logo ever existed (branding revision 5, unaudited — F-C7-03) cannot be determined.
+
+**Remediation:** R1–R8 in the incident document, each an existing audited operation (archive records, deactivate the option list, revoke shares, a new policy revision with the owner's statement, upload of the owner's logo). **Nothing was executed.** There is no supported archive/delete for forms and no logo removal; those need decisions.
+
+**Permanent fix — Playwright can no longer reach a persistent stack:**
+
+| Layer | Guard |
+|---|---|
+| Configuration | Dedicated port 5199 (`--strictPort`), `reuseExistingServer: false`; base URL or API target on 8091, 5280 or 5080 refused when the configuration loads |
+| Global setup (before any test) | GET-only proof through the browser's own base URL: `/api/v1/testing/stack-identity` (mapped only in the `Testing` environment; refuses to start elsewhere) must report API **and** Authority identity `enterpriseforms-security-test` (the Authority answers its own Testing-only endpoint under workload authentication); the served organizations must not include any persistent organization id from the backup manifests |
+| Every sign-in | `signIn` refuses an origin that global setup did not verify |
+| CI | regression step + `E2E_EXPECTED_STACK_IDENTITY` in `stage-b-integration.yml` |
+
+**Evidence:** `e2e/isolation.unit.test.ts` 12/12; `scripts/e2e-isolation-regression.mjs` reproduces (A) a base URL pointing at a fake persistent-looking server, (B) an occupied test port, (C) an API target on 5280 — each run stops before its first test; the fake server recorded **0 non-GET requests**. Contract test `TestStackIdentityBoundaryTests` (endpoint absent outside Testing). Stage B `TheIsolatedStackIdentifiesItselfAndTheAuthorityConfirmsIt`.
+
+## 32. Missing M4 adversarial tests (C-74)
+
+Isolated security-test stack; `ProtectionReconciliationTests` 14/14 (the 8 from C-73 plus):
+
+| Test | Shows |
+|---|---|
+| `ADecisionChangeDuringAReconciliationSupersedesItWhileAnOrganizationPolicyChangeDoesNot` | a new protection decision mid-run supersedes the reconciliation (no attestation of the old decision); an organization policy change does not invalidate a running one |
+| `AnUnavailableEncryptionKeyBlocksTheReconciliationAndNeverCompletesIt` | worker without its key provider → decrypt check fails → `Blocked`, never Complete; recovers after the key returns |
+| `TheCatalogueCeilingEndsIncompleteAndExpiredSnapshotsAreRenewedSafely` | above the ceiling → `Incomplete` (`RECONCILIATION_LIMIT`), nothing partial; with a 2 s snapshot lifetime: Complete after 3 rounds, each of 160 records verified exactly once, 160 decrypt checks, 8 s |
+| `AnArchiveOutageNeverYieldsACompletionWithoutAuthorityEvidence` | archive outage: completion only with a journaled attestation; AUD-C7-01 stays open |
+| `ARecordChangedAfterTheAttestationIsVerifiedByTheNextReconciliation` | a change after attestation is re-verified by the next verify-only run |
+| `TheIsolatedStackIdentifiesItselfAndTheAuthorityConfirmsIt` | §31 |
+
+Authority unit: `TheMigrationCatalogueAcceptsExactly50000RecordsAndRefuses50001WithNothingPartial`, reuse test renamed `…ReusedOnlyWithinTheSameReconciliation` (13/13).
+
+**Defect found and fixed:** catch-up rounds could reuse a census held from an **earlier** reconciliation for records not yet reached in the current one. The census request now names `reuseSinceSnapshotId` (this reconciliation's first snapshot); the Authority reuses a held result only if it was verified at or after that snapshot was issued (same verifier, decision and form; a re-verification refreshes the time). Replaces the C-73 `reverify` flag (Authority internal OpenAPI regenerated; business contract unchanged).
+
+Regression: .NET CI script 598/598 (Authority 191, contracts 306, architecture 67, integrity 34); frontend lint, typecheck, vitest 219/219. Benchmark refreshed (`docs/evidence/phase-c7/c7-m4-benchmark-local.json`): 100 records completion 2.8 s (36 rec/s), 250 records 6.6 s (38 rec/s); verify-only p50 3.2 / 6.2 s; restart recovery 8.8 / 12.9 s. Browser suite on the isolated stack: not run locally in this session; part of the hosted Stage B run.
+
+## 33. Catalogue lifetime and DR-C7-4 / DR-C7-5 / DR-C7-6 (C-74)
+
+* **15-minute lifetime:** no Authority protocol extension was needed. Worker rounds resume after an expiry (resume position, checkpoints at every page end and on a mid-page expiry, per-50 batches), a round without new verified records ends `Incomplete`, at most 20 rounds. Not done on purpose: longer lifetime, higher ceiling, weaker completeness. Additive business migrations `PhaseC7ReconciliationReuseCutoff`, `PhaseC7ReconciliationResumableRounds`. **DR-C7-6:** approval requested before production use (`FIELD_PROTECTION_RECONCILIATION.md` §11).
+* **DR-C7-4 (unresolved):** options A–E in §12 of that document. Recommendation: keep and disclose now (A), restrict history reads of strengthened fields once PB-08 step-up exists (B); re-seal and retention purge (C, D) only with an approved retention policy and an independently reviewed new Authority transition. No immediate restriction is needed: retained plaintext is not reachable through search, and history is open only to full readers who can already read the current value.
+* **DR-C7-5 (designed, not built):** §13 of that document — read-only, count-only coverage view for Security Administrators through a new user-plane Authority read; never record ids or values.
+
+## 34. Hosted verification — manual dispatch
+
+1. GitHub → `schipani/EnterpriseForms` → **Actions** → **Stage B integration** → **Run workflow** → branch `phase-c7/advanced-field-search` → **Run workflow**.
+2. Same for **Security gate A** (`security-gate-a.yml`).
+3. Expected: the new isolation regression step passes before the browser suite; integration includes the 14 reconciliation tests; browser suite against the isolated CI stack.
+
+## 35. Outstanding decisions and blockers
+
+* **Owner approval of the incident remediation** (R1–R8, exact identities) — nothing executed; logo source (or confirmation there was none); decision on forms (no archive operation exists).
+* **Owner functional acceptance of M4** (§29) — not given; M4 not owner-accepted.
+* **Hosted verification** (§34).
+* **DR-C7-4** unresolved; **DR-C7-5** not built; **DR-C7-6** approval for production.
+* **F-C7-03:** organization logo uploads are not audited.
+* **G19 OPEN** (independent review, Azure staging, production verifier identity, AUD-C7-01/G24). Unchanged: G06, G21, PB-08, PB-09, DR-C7-1, DR-C7-2, G25/G26. No Level 2 claim. C7 not merged; no further milestone started.

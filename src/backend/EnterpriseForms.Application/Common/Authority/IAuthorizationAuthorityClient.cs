@@ -274,3 +274,13 @@ public interface ISecurityAdministratorAuthority
 {
     Task<AuthoritySecurityAdministratorRoster> GetSecurityAdministratorsAsync(DelegatedUserContext user, SecurityAdministratorRosterQuery query, CancellationToken cancellationToken);
 }
+
+// ---- C7 M4 incident correction: isolated test-stack identity (Testing environment only) ----
+
+public sealed record AuthorityStackIdentity(string EnvironmentName, string StackIdentity);
+
+/// <summary>The Authority's configured test-stack identity (Testing only; anything else fails). Used solely by the Testing-only identity endpoint.</summary>
+public interface ITestStackIdentityAuthority
+{
+    Task<AuthorityStackIdentity> GetTestStackIdentityAsync(CancellationToken cancellationToken);
+}

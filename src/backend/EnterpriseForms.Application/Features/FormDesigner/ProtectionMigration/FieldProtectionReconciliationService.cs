@@ -40,13 +40,16 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
     /// <summary>Census calls carry at most this many records (the Authority's batch bound, OD-6).</summary>
     public const int CensusBatchSize = 50;
 
-    /// <summary>Catalogue rounds per reconciliation before it ends incomplete (heads or population kept moving).</summary>
-    public const int MaximumRounds = 5;
+    /// <summary>
+    /// Absolute bound on catalogue rounds. A round ends with a snapshot expiry (a large form) or with records changed or added
+    /// since the snapshot; each further round reuses what this reconciliation already verified and verifies the rest. A round
+    /// that verifies nothing new also ends the reconciliation (no progress). Either way it ends Incomplete, never complete.
+    /// </summary>
+    public const int MaximumRounds = 20;
 
     /// <summary>Reconciliations per migration before the migration fails instead of looping (records keep reverting to the old form).</summary>
     public const int MaximumReconciliationsPerMigration = 10;
 
-    private const string Verified = "Verified";
     private const string HeadChanged = "HEAD_CHANGED";
 
     /// <summary>Processes one step of one due reconciliation; returns false when none was due.</summary>
@@ -138,7 +141,7 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
     /// <summary>Round start: the complete Authority population, compared with the business rows in both directions (reported, never trusted).</summary>
     private async Task StartRoundAsync(FieldProtectionReconciliation reconciliation, CancellationToken cancellationToken)
     {
-        if (reconciliation.ReconciliationRoundCount >= MaximumRounds)
+        if (reconciliation.ReconciliationRoundCount >= MaximumRounds || (reconciliation.ReconciliationRoundCount >= 2 && reconciliation.CensusVerifiedRecordCount == reconciliation.RoundStartVerifiedRecordCount))
         {
             await FinishAsync(reconciliation.FieldProtectionReconciliationId, FieldProtectionReconciliationStates.Incomplete, "RECONCILIATION_DID_NOT_CONVERGE", null, cancellationToken).ConfigureAwait(false);
             return;
@@ -166,12 +169,19 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
         await UpdateAsync(reconciliation.FieldProtectionReconciliationId, r =>
         {
             r.CatalogueSnapshotId = first.SearchCatalogueSnapshotId;
+            r.FirstRoundSnapshotId ??= first.SearchCatalogueSnapshotId;
+            r.RoundStartVerifiedRecordCount = r.CensusVerifiedRecordCount;
             r.CatalogueEntryCount = first.TotalEntryCount;
             r.CensusNextOffset = 0;
-            r.CensusFailedRecordCount = 0;
-            r.DecryptCheckedValueCount = 0;
-            r.DecryptFailedValueCount = 0;
-            r.LogicalTypeMismatchCount = 0;
+            if (r.ResumeAfterFormRecordId is null)
+            {
+                // A full round: every accepted record is censused and decrypt-checked again (a resumed round keeps the earlier part's counts).
+                r.CensusFailedRecordCount = 0;
+                r.DecryptCheckedValueCount = 0;
+                r.DecryptFailedValueCount = 0;
+                r.LogicalTypeMismatchCount = 0;
+            }
+
             r.ReconciliationRoundCount++;
             r.BusinessOnlyRecordCount = business.Count(id => !catalogue.Contains(id));
             // Registered records the business database does not list under this form (row deleted, or moved to another form).
@@ -198,50 +208,88 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
         var snapshotId = reconciliation.CatalogueSnapshotId!.Value;
         var page = await verifier.ReadMigrationCatalogueAsync(snapshotId, reconciliation.CensusNextOffset, cancellationToken).ConfigureAwait(false);
         var encrypting = reconciliation.MigrationDirection == FieldProtectionMigrationDirections.Encrypt;
-        // The first round of every reconciliation verifies every record again; later rounds (catch-up) reuse what this one verified.
-        var reverify = reconciliation.ReconciliationRoundCount <= 1;
-        var census = new List<ProtectionCensusItem>();
-        int decryptChecked = 0, decryptFailed = 0, typeMismatch = 0;
-        foreach (var entry in page.Entries)
+        // The first round verifies every record again; catch-up rounds may reuse what this reconciliation verified since its first snapshot.
+        var reuseSince = reconciliation.ReconciliationRoundCount > 1 ? reconciliation.FirstRoundSnapshotId : null;
+        // After a snapshot expiry the next round resumes after the last record this reconciliation verified (catalogue order is
+        // record id order); the attestation still re-derives every current head, so a record changed meanwhile is caught.
+        var resumeAfter = reconciliation.ResumeAfterFormRecordId;
+        var progress = new CensusProgress();
+        // Pending creations and quarantined records are classified by the Authority's attestation, not here.
+        var accepted = page.Entries.Where(e => e.CommittedOperationId is not null && e.CommittedContentRevision > 0 && !e.ContentHeadQuarantined && !e.ResourceQuarantined
+                                               && (resumeAfter is not { } after || e.FormRecordId.CompareTo(after) > 0)).ToList();
+        // Rows are read and sent one census batch at a time, so progress starts at once even when the snapshot lifetime is short.
+        foreach (var chunk in accepted.Chunk(CensusBatchSize))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (entry.CommittedOperationId is not { } operation || entry.CommittedContentRevision == 0 || entry.ContentHeadQuarantined || entry.ResourceQuarantined)
+            var batch = new List<ProtectionCensusItem>(chunk.Length);
+            int decryptChecked = 0, decryptFailed = 0, typeMismatch = 0;
+            foreach (var entry in chunk)
             {
-                continue; // pending creations and quarantined records are classified by the Authority's attestation, not here
-            }
-
-            var staged = await stager.ReadStagedAsync(entry.FormRecordId, operation, cancellationToken).ConfigureAwait(false);
-            // In a catch-up round a census the Authority already holds for this operation needs no rows (returned without re-verification).
-            census.Add(new ProtectionCensusItem(entry.FormRecordId, operation, !reverify && entry.ProtectionCensusOutcome == Verified ? [] : staged.Items));
-            if (!encrypting)
-            {
-                continue;
-            }
-
-            foreach (var sealedRow in staged.Rows.OfType<FieldEncryptedValue>().Where(v => v.FieldDefinitionId == field.FieldDefinitionId))
-            {
-                decryptChecked++;
-                if (!DecryptsToTheFieldType(sealedRow, field, options, optionsById, out var authenticated))
+                cancellationToken.ThrowIfCancellationRequested();
+                var operation = entry.CommittedOperationId!.Value;
+                var staged = await stager.ReadStagedAsync(entry.FormRecordId, operation, cancellationToken).ConfigureAwait(false);
+                batch.Add(new ProtectionCensusItem(entry.FormRecordId, operation, staged.Items)); // rows always sent; the Authority decides whether a held result may stand
+                if (!encrypting)
                 {
-                    if (authenticated)
+                    continue;
+                }
+
+                foreach (var sealedRow in staged.Rows.OfType<FieldEncryptedValue>().Where(v => v.FieldDefinitionId == field.FieldDefinitionId))
+                {
+                    decryptChecked++;
+                    if (!DecryptsToTheFieldType(sealedRow, field, options, optionsById, out var authenticated))
                     {
-                        typeMismatch++;
-                    }
-                    else
-                    {
-                        decryptFailed++;
+                        if (authenticated)
+                        {
+                            typeMismatch++;
+                        }
+                        else
+                        {
+                            decryptFailed++;
+                        }
                     }
                 }
             }
+
+            try
+            {
+                var response = await verifier.TakeCensusAsync(snapshotId, batch, reuseSince, cancellationToken).ConfigureAwait(false);
+                progress.Results.AddRange(response.Results);
+                progress.DecryptChecked += decryptChecked;
+                progress.DecryptFailed += decryptFailed;
+                progress.TypeMismatch += typeMismatch;
+                progress.LastRecordId = chunk[^1].FormRecordId;
+            }
+            catch (AuthorityClientException ex) when (ex.ErrorCode == "CONTINUATION_INVALIDATED" && progress.LastRecordId is not null)
+            {
+                // The snapshot expired mid-page: the Authority holds the census of the batches already done. Record that progress
+                // (counts, hand-back, resume position) so the next round continues after it, then renew the round.
+                await RecordProgressAsync(reconciliation, snapshotId, progress, advanceOffsetBy: null, cancellationToken).ConfigureAwait(false);
+                throw;
+            }
         }
 
-        var results = new List<ProtectionCensusRecordResult>(census.Count);
-        foreach (var batch in census.Chunk(CensusBatchSize))
-        {
-            var response = await verifier.TakeCensusAsync(snapshotId, batch, reverify, cancellationToken).ConfigureAwait(false);
-            results.AddRange(response.Results);
-        }
+        // The whole page is done (verified, or skipped as verified earlier in this reconciliation): resume after its last entry.
+        progress.LastRecordId = page.Entries.Count > 0 ? page.Entries[^1].FormRecordId : progress.LastRecordId;
+        await RecordProgressAsync(reconciliation, snapshotId, progress, advanceOffsetBy: page.Entries.Count, cancellationToken).ConfigureAwait(false);
+    }
 
+    private sealed class CensusProgress
+    {
+        public List<ProtectionCensusRecordResult> Results { get; } = [];
+
+        public int DecryptChecked { get; set; }
+
+        public int DecryptFailed { get; set; }
+
+        public int TypeMismatch { get; set; }
+
+        public Guid? LastRecordId { get; set; }
+    }
+
+    /// <summary>Durable checkpoint of census progress: counters, hand-back of old-form records, resume position and (at a page end) the offset.</summary>
+    private async Task RecordProgressAsync(FieldProtectionReconciliation reconciliation, Guid snapshotId, CensusProgress progress, int? advanceOffsetBy, CancellationToken cancellationToken)
+    {
+        var results = progress.Results;
         var stillOldForm = results.Where(r => r.Verified && r.OldFormOccurrenceCount > 0).ToList();
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var current = await scope.FindProtectionReconciliationAsync(reconciliation.FieldProtectionReconciliationId, cancellationToken).ConfigureAwait(false);
@@ -259,10 +307,11 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
         current.CensusVerifiedRecordCount += results.Count(r => r.Verified && !r.Reused);
         current.CensusReusedRecordCount += results.Count(r => r.Verified && r.Reused);
         current.CensusFailedRecordCount += results.Count(r => !r.Verified && r.Outcome != HeadChanged);
-        current.DecryptCheckedValueCount += decryptChecked;
-        current.DecryptFailedValueCount += decryptFailed;
-        current.LogicalTypeMismatchCount += typeMismatch;
-        current.CensusNextOffset += page.Entries.Count;
+        current.DecryptCheckedValueCount += progress.DecryptChecked;
+        current.DecryptFailedValueCount += progress.DecryptFailed;
+        current.LogicalTypeMismatchCount += progress.TypeMismatch;
+        current.CensusNextOffset += advanceOffsetBy ?? 0;
+        current.ResumeAfterFormRecordId = progress.LastRecordId ?? current.ResumeAfterFormRecordId;
         current.LeaseOwnerName = null;
         current.LeaseExpiresOn = null;
         current.NextAttemptOn = now;
@@ -321,7 +370,7 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
         {
             // Heads changed or records were registered since the snapshot: a new round censuses only what is new (held census results carry over).
             await RecordAttestationAsync(reconciliation.FieldProtectionReconciliationId, attestation, retainedOldFormRows, cancellationToken).ConfigureAwait(false);
-            await RestartRoundAsync(reconciliation.FieldProtectionReconciliationId, "SCOPE_MOVED", cancellationToken).ConfigureAwait(false);
+            await RestartRoundAsync(reconciliation.FieldProtectionReconciliationId, "SCOPE_MOVED", cancellationToken, fullRound: true).ConfigureAwait(false);
             return;
         }
 
@@ -352,12 +401,18 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
             r.RetainedOldFormRowCount = retainedOldFormRows;
         }, cancellationToken).ConfigureAwait(false);
 
-    private async Task RestartRoundAsync(Guid reconciliationId, string reason, CancellationToken cancellationToken) =>
+    /// <summary>A new round. <paramref name="fullRound"/>: heads changed or records were added, so nothing is skipped (resume position cleared); otherwise (snapshot expiry) the round resumes after the last record already verified.</summary>
+    private async Task RestartRoundAsync(Guid reconciliationId, string reason, CancellationToken cancellationToken, bool fullRound = false) =>
         await UpdateAsync(reconciliationId, r =>
         {
             r.CatalogueSnapshotId = null;
             r.CatalogueEntryCount = null;
             r.CensusNextOffset = 0;
+            if (fullRound)
+            {
+                r.ResumeAfterFormRecordId = null;
+            }
+
             r.LastErrorCode = reason;
             r.NextAttemptOn = clock.GetUtcNow();
         }, cancellationToken).ConfigureAwait(false);

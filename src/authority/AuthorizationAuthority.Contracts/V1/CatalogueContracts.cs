@@ -113,11 +113,13 @@ public sealed record VerifyRecordProjectionsResponse(IReadOnlyList<BatchVerifica
 public sealed record ProtectionCensusItem(Guid FormRecordId, Guid ExpectedCommittedOperationId, IReadOnlyList<StagedContentItem> ObservedItems);
 
 /// <summary>
-/// 1..50 records of the snapshot, each verified fully and independently. <c>Reverify</c>: verify the observed rows even when
-/// a census of the same accepted operation is already held (the first round of every reconciliation sets it, so business
-/// rows tampered with after an earlier census are caught); without it a held census is returned as <c>Reused</c>.
+/// 1..50 records of the snapshot, each verified fully and independently. A census the Authority already holds for the same
+/// (decision, record, accepted operation) is returned as <c>Reused</c> only when <c>ReuseSinceSnapshotId</c> names an earlier
+/// migration snapshot of the same verifier, decision and form and the held census was verified at or after that snapshot
+/// was issued (Authority clock) — i.e. within the same reconciliation. Without it every record is verified again, so a held
+/// result from an earlier reconciliation never stands in for a fresh one. Rows must always be sent.
 /// </summary>
-public sealed record ProtectionCensusRequest(IReadOnlyList<ProtectionCensusItem> Records, bool Reverify = false);
+public sealed record ProtectionCensusRequest(IReadOnlyList<ProtectionCensusItem> Records, Guid? ReuseSinceSnapshotId = null);
 
 /// <summary>
 /// Per-record census. <c>Outcome</c> is <c>Verified</c> or a typed failure: <c>HEAD_CHANGED</c> (nothing verified),

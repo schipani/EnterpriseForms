@@ -167,8 +167,9 @@ public sealed class ProtectionReconciliationTests
         public Task<ProtectionCensusResponse> CensusAsync(params ProtectionCensusItem[] records) =>
             Reconciliation.CensusAsync(Verifier, LastSnapshot, new ProtectionCensusRequest(records), Guid.CreateVersion7(), CancellationToken.None);
 
-        public Task<ProtectionCensusResponse> ReverifyAsync(params ProtectionCensusItem[] records) =>
-            Reconciliation.CensusAsync(Verifier, LastSnapshot, new ProtectionCensusRequest(records, Reverify: true), Guid.CreateVersion7(), CancellationToken.None);
+        /// <summary>A catch-up census of the same reconciliation: results verified since <paramref name="since"/> may be reused.</summary>
+        public Task<ProtectionCensusResponse> CatchUpAsync(Guid since, params ProtectionCensusItem[] records) =>
+            Reconciliation.CensusAsync(Verifier, LastSnapshot, new ProtectionCensusRequest(records, since), Guid.CreateVersion7(), CancellationToken.None);
 
         /// <summary>Catalogue, census of every contentful entry with its accepted rows, attestation.</summary>
         public async Task<ProtectionAttestation> ReconcileAsync(Guid form, Guid command)
@@ -281,24 +282,42 @@ public sealed class ProtectionReconciliationTests
     }
 
     [Fact]
-    public async Task ACensusOfAnEarlierHeadNeverCountsForANewerOneAndAHeldCensusIsReusedWithoutReverification()
+    public async Task ACensusOfAnEarlierHeadNeverCountsForANewerOneAndHeldResultsAreReusedOnlyWithinTheSameReconciliation()
     {
         var h = new Harness();
         var record = await h.RecordAsync(h.FormA);
         var command = h.Decision(h.FormA);
         await h.WriteSealedAsync(record);
         Assert.True((await h.ReconcileAsync(h.FormA, command)).AttestationComplete);
+        var firstRound = h.LastSnapshot;
 
-        // The census is held for (decision, record, accepted operation): a new catalogue reports it and a repeat is reused.
+        // A new reconciliation (snapshot issued after the held census) never reuses the earlier result: the rows are verified again.
+        await Task.Delay(5, TestContext.Current.CancellationToken);
         var entries = await h.CatalogueAsync(h.FormA, command);
-        Assert.Equal(ProtectionCensusOutcomes.Verified, Assert.Single(entries).ProtectionCensusOutcome);
-        var repeat = Assert.Single((await h.CensusAsync(h.Item(record, []))).Results); // no rows sent: a reused census never re-verifies
-        Assert.True(repeat.Reused);
+        var laterRound = h.LastSnapshot;
+        Assert.Equal(ProtectionCensusOutcomes.Verified, Assert.Single(entries).ProtectionCensusOutcome); // a hint only
+        var fresh = Assert.Single((await h.CatchUpAsync(laterRound, h.Item(record))).Results);
+        Assert.False(fresh.Reused);
+        Assert.Equal(ProtectionCensusOutcomes.Verified, fresh.Outcome);
+        // Verified again within this reconciliation: a catch-up round may now reuse it (the earlier round's cutoff also covers it).
+        Assert.True(Assert.Single((await h.CatchUpAsync(laterRound, h.Item(record))).Results).Reused);
+        Assert.True(Assert.Single((await h.CatchUpAsync(firstRound, h.Item(record))).Results).Reused);
+        Assert.False(Assert.Single((await h.CensusAsync(h.Item(record))).Results).Reused); // no cutoff: never reused
         Assert.Single(h.Store.CensusResults);
-        // With reverify (the first round of every reconciliation) the rows are verified again: a business copy tampered with
-        // after the earlier census is caught on the unchanged head instead of being vouched for by the held result.
+        // A cutoff from another decision or form is ignored (no reuse).
+        var otherForm = await h.RecordAsync(h.FormB);
+        var otherCommand = h.Decision(h.FormB);
+        await h.CatalogueAsync(h.FormB, otherCommand);
+        var foreignCutoff = h.LastSnapshot;
+        h.Store.Resources.Single(r => r.ResourceTypeName == ResourceTypeNames.FieldProtectionRequirement).RegisteredBySecurityCommandId = command;
+        h.Store.Resources.Single(r => r.ResourceTypeName == ResourceTypeNames.FieldProtectionRequirement).ParentResourceEntityId = h.FormA;
+        await h.CatalogueAsync(h.FormA, command);
+        Assert.False(Assert.Single((await h.CatchUpAsync(foreignCutoff, h.Item(record))).Results).Reused);
+        _ = otherForm;
+
+        // Without reuse the rows are verified: a business copy tampered with after the earlier census is caught on the unchanged head.
         var rewritten = h.Accepted[record].Select(i => i.ItemKind == ManifestItemKind.FieldValue ? i with { CanonicalBytesBase64 = Encode(Text(h.Org, record, h.Field, i.ItemId, "plaintext again"), h.Org, h.AcceptedOperation[record], 2).Base64 } : i).ToList();
-        var caught = Assert.Single((await h.ReverifyAsync(h.Item(record, rewritten))).Results);
+        var caught = Assert.Single((await h.CensusAsync(h.Item(record, rewritten))).Results);
         Assert.False(caught.Reused);
         Assert.Equal("ITEM_DIGEST_MISMATCH", caught.Outcome);
         Assert.True(h.Head(record).ContentHeadQuarantined);
@@ -311,6 +330,26 @@ public sealed class ProtectionReconciliationTests
         Assert.False(stale.AttestationComplete);
         Assert.Equal(ProtectionAttestationReasons.NotYetCensused, stale.AttestationIncompleteReason);
         Assert.Null(Assert.Single(await h.CatalogueAsync(h.FormA, command)).ProtectionCensusOutcome);
+    }
+
+    /// <summary>The production default ceiling, with synthetic registry rows: exactly 50,000 records are catalogued; one more is refused with nothing partial.</summary>
+    [Fact]
+    public async Task TheMigrationCatalogueAcceptsExactly50000RecordsAndRefuses50001WithNothingPartial()
+    {
+        var h = new Harness();
+        var command = h.Decision(h.FormA);
+        Assert.Equal(50_000, new CatalogueOptions().MaximumMigrationEntries);
+        h.Store.Resources.AddRange(Enumerable.Range(0, 50_000).Select(_ => new AuthorityResource { AuthorityResourceId = Guid.CreateVersion7(), OrganizationId = h.Org, ResourceTypeName = ResourceTypeNames.FormRecord, ResourceEntityId = Guid.CreateVersion7(), ParentResourceEntityId = h.FormA, ResourceLifecycleState = ResourceLifecycleStates.Registered }));
+        var page = await h.Catalogue.IssueMigrationCatalogueAsync(Verifier, new MigrationCatalogueRequest(h.Org, h.FormA, command), Guid.CreateVersion7(), CancellationToken.None);
+        Assert.Equal(50_000, page.TotalEntryCount);
+        Assert.Equal(1000, page.Entries.Count);
+        var snapshots = h.Store.Snapshots.Count;
+
+        h.Store.Resources.Add(new AuthorityResource { AuthorityResourceId = Guid.CreateVersion7(), OrganizationId = h.Org, ResourceTypeName = ResourceTypeNames.FormRecord, ResourceEntityId = Guid.CreateVersion7(), ParentResourceEntityId = h.FormA, ResourceLifecycleState = ResourceLifecycleStates.Registered });
+        var refused = await Assert.ThrowsAsync<AuthorityException>(() => h.Catalogue.IssueMigrationCatalogueAsync(Verifier, new MigrationCatalogueRequest(h.Org, h.FormA, command), Guid.CreateVersion7(), CancellationToken.None));
+        Assert.Equal(AuthorityErrorCodes.LimitExceeded, refused.ErrorCode);
+        Assert.Equal(snapshots, h.Store.Snapshots.Count); // no snapshot, no entries
+        Assert.Contains(h.Store.Journal, j => j.JournalEventKind == "MigrationCatalogueRefused");
     }
 
     [Fact]

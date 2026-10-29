@@ -69,8 +69,8 @@ public interface IProtectionVerifierAuthority
 
     Task<MigrationCataloguePage> ReadMigrationCatalogueAsync(Guid searchCatalogueSnapshotId, int offset, CancellationToken cancellationToken);
 
-    /// <summary><paramref name="reverify"/>: verify the rows even when the Authority already holds a census of the same accepted operation (first round of every reconciliation).</summary>
-    Task<ProtectionCensusResponse> TakeCensusAsync(Guid searchCatalogueSnapshotId, IReadOnlyList<ProtectionCensusItem> records, bool reverify, CancellationToken cancellationToken);
+    /// <summary><paramref name="reuseSinceSnapshotId"/>: this reconciliation's first snapshot (catch-up rounds) — the Authority reuses only results verified since then; null verifies every record.</summary>
+    Task<ProtectionCensusResponse> TakeCensusAsync(Guid searchCatalogueSnapshotId, IReadOnlyList<ProtectionCensusItem> records, Guid? reuseSinceSnapshotId, CancellationToken cancellationToken);
 
     Task<ProtectionAttestation> AttestAsync(Guid searchCatalogueSnapshotId, CancellationToken cancellationToken);
 

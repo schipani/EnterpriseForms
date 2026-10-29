@@ -76,8 +76,8 @@ public sealed class ProtectionVerifierHttpClient(IHttpClientFactory httpClientFa
     public Task<MigrationCataloguePage> ReadMigrationCatalogueAsync(Guid searchCatalogueSnapshotId, int offset, CancellationToken cancellationToken) =>
         SendAsync<MigrationCataloguePage>(HttpMethod.Get, $"internal/v1/verifier/migration-catalogue/{searchCatalogueSnapshotId:D}/entries?offset={offset.ToString(System.Globalization.CultureInfo.InvariantCulture)}", null, cancellationToken);
 
-    public Task<ProtectionCensusResponse> TakeCensusAsync(Guid searchCatalogueSnapshotId, IReadOnlyList<ProtectionCensusItem> records, bool reverify, CancellationToken cancellationToken) =>
-        SendAsync<ProtectionCensusResponse>(HttpMethod.Post, $"internal/v1/verifier/migration-catalogue/{searchCatalogueSnapshotId:D}/census", new { records, reverify }, cancellationToken);
+    public Task<ProtectionCensusResponse> TakeCensusAsync(Guid searchCatalogueSnapshotId, IReadOnlyList<ProtectionCensusItem> records, Guid? reuseSinceSnapshotId, CancellationToken cancellationToken) =>
+        SendAsync<ProtectionCensusResponse>(HttpMethod.Post, $"internal/v1/verifier/migration-catalogue/{searchCatalogueSnapshotId:D}/census", new { records, reuseSinceSnapshotId }, cancellationToken);
 
     public Task<ProtectionAttestation> AttestAsync(Guid searchCatalogueSnapshotId, CancellationToken cancellationToken) =>
         SendAsync<ProtectionAttestation>(HttpMethod.Post, $"internal/v1/verifier/migration-catalogue/{searchCatalogueSnapshotId:D}/attestation", null, cancellationToken);

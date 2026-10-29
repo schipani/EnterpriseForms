@@ -35,7 +35,7 @@ Protocol check before implementing (owner §2): the census and attestation are r
 | Route | Behaviour |
 |---|---|
 | `POST migration-catalogue` (AC-5, unchanged) | Complete population of the form scoped by the decision; pages now carry `protection_census_outcome` (the census the Authority already holds for exactly that record, operation and decision; a work-list hint) |
-| `POST migration-catalogue/{snapshot}/census` | 1..50 entries (`reverify` flag, see below) of the verifier's own, unexpired snapshot, each at the head the snapshot fixed. Per record: registry (form parent, not Revoked), quarantine, current head equals the entry (`HEAD_CHANGED` otherwise; nothing verified), archive receipt (`AWAITING_ARCHIVE`), verification key version (`KEY_UNAVAILABLE` for a retired key), then the shared verification (`VerifyStagedAgainstLeavesAsync`: count, keys, digests, signatures, root). On failure: head quarantined, incident journaled naming the workload and decision. On success the decision's field rows are counted from the verified bytes: occurrences (top level and repeating sections), rows still in the old form, target-form ciphertext rows with an unapproved envelope (algorithm, 96-bit nonce, 128-bit tag, non-empty ciphertext / wrapped key / key reference) or a repeated (wrapped key, nonce) pair; the signed header status (Archived records counted). Without `reverify`, a census already held for that (decision, record, operation) is returned as `Reused` without re-verification. Counts only. |
+| `POST migration-catalogue/{snapshot}/census` | 1..50 entries (with an optional `reuse_since_snapshot_id`, see below) of the verifier's own, unexpired snapshot, each at the head the snapshot fixed. Per record: registry (form parent, not Revoked), quarantine, current head equals the entry (`HEAD_CHANGED` otherwise; nothing verified), archive receipt (`AWAITING_ARCHIVE`), verification key version (`KEY_UNAVAILABLE` for a retired key), then the shared verification (`VerifyStagedAgainstLeavesAsync`: count, keys, digests, signatures, root). On failure: head quarantined, incident journaled naming the workload and decision. On success the decision's field rows are counted from the verified bytes: occurrences (top level and repeating sections), rows still in the old form, target-form ciphertext rows with an unapproved envelope (algorithm, 96-bit nonce, 128-bit tag, non-empty ciphertext / wrapped key / key reference) or a repeated (wrapped key, nonce) pair; the signed header status (Archived records counted). A census already held for that (decision, record, operation) is returned as `Reused` only when it was verified since the reconciliation's first snapshot (below). Counts only. |
 | `POST migration-catalogue/{snapshot}/attestation` | Under the organization lock: the decision must still be current (else 409); population re-read from the registry (Active, Quarantined, Registered of the form; Revoked counted as retired); heads re-read; census results joined on (record, **current** head operation). Report counts (§4) and `attestation_complete`; `protection_reconciliation_attestations` row (immutable to the runtime; CHECK constraint forbids a complete row with anything remaining) and audit journal entry in the same transaction. |
 | `POST protection-coverage` | Every active `FieldProtectionRequirement`/`FieldProtectionRelease` of the organization (Authority resources, never the business form list) with its latest attestation; `organization_complete` only when each current decision has a complete attestation taken under that decision. |
 
@@ -43,7 +43,7 @@ Persistence (Authority migration `20261029122643_ProtectionReconciliation`, addi
 
 **Why the attestation does not depend on the snapshot's revisions.** The migration population depends only on registry rows and heads, not on SpiceDB. Instead of trusting that "nothing moved since the snapshot", the attestation re-derives the population and every head under the lock and requires a verified census for each **current** head. A census of an earlier head never counts for a newer one; a record registered after the snapshot shows up as not censused. The snapshot only identifies the decision and the verifier and supplies the work-list. User-scope snapshot rules (OD-5) are unchanged.
 
-**When a held census is reused.** Accepted content of an operation is immutable and the census is keyed by (decision, record, operation), so within **one** reconciliation a record whose head did not change is not verified twice: catch-up rounds send no rows for it and get the held result as `Reused`. Every reconciliation's **first round** sets `reverify`: all rows are sent and verified again, so a business copy tampered with after an earlier census (found in verification by the rollback test, C-73) is caught on an unchanged head instead of being vouched for by the earlier result.
+**When a held census is reused (C-74).** Accepted content of an operation is immutable and the census is keyed by (decision, record, operation). A held result is reused only when the request names an earlier snapshot of the **same** verifier, decision and form (`reuse_since_snapshot_id`: the reconciliation's first round) and the result was verified at or after that snapshot was issued (Authority clock); a re-verification refreshes that time. The first round names none, so every record is verified in every reconciliation, and a result from an earlier reconciliation never stands in for a fresh one (the first M4 version reused across reconciliations — caught by the rollback test, then again by review for records a catch-up round had not reached; both fixed). Rows are always sent.
 
 ## 4. Report categories (owner §5)
 
@@ -71,9 +71,9 @@ Worker-side additions, held in the business database and labelled untrusted: bus
 
 States: `Queued → Running ⇄ Blocked → Complete | Incomplete | Unavailable | Superseded`. Modes: `MigrationCompletion` (created when a migration's business-side post-check passes; the migration is `Verifying` meanwhile) and `VerifyOnly` (authorized request; never converts).
 
-1. **Round start:** read every catalogue page; compare with business `form_records` both ways (reported only); reset per-round counters; round count bounded (5).
-2. **Census pages:** one page per lease (≤ 1000 entries): rows of each accepted, non-quarantined entry are read from the immutable staged copy and sent in batches of 50 (first round: all rows, `reverify`; catch-up rounds: entries with a census held for the same operation are sent without rows); the worker decrypt-checks target-form ciphertext; records whose verified head still holds the old form are handed back to the migration as pending items (MigrationCompletion; an item wrongly marked completed is reopened); offset, counters and hand-back commit together (durable checkpoint).
-3. **Attestation:** stored with its digest and journal revision. Not-yet-censused records → a new round (held census carries over). Otherwise Complete/Incomplete with the first reason.
+1. **Round start:** read every catalogue page; compare with business `form_records` both ways (reported only); a full round resets the per-round counters (a resumed round keeps them); rounds are bounded (20) and a round that verifies nothing new ends the reconciliation (`RECONCILIATION_DID_NOT_CONVERGE`).
+2. **Census pages:** one page per lease (≤ 1000 entries), processed 50 records at a time — rows read from the immutable staged copy, decrypt-checked (target-form ciphertext) and sent to the census — so progress starts immediately; records whose verified head still holds the old form are handed back to the migration as pending items (MigrationCompletion; an item wrongly marked completed is reopened). Counters, hand-back, the resume position and the offset commit together at each page end and when a snapshot expires mid-page (durable checkpoint). After an expiry the next round resumes after the last record this reconciliation verified.
+3. **Attestation:** stored with its digest and journal revision. Not-yet-censused records (heads changed or records added) → a full new round (resume position cleared; this reconciliation's census results are reused). Otherwise Complete/Incomplete with the first reason.
 4. **Migration outcome (MigrationCompletion only, migration still `Verifying`):** Complete → `Completed` (+ audit with the attestation id); old form remaining with pending items → `Running` again (bounded: 10 reconciliations per migration); anything else → `Failed` (`RECONCILIATION_INCOMPLETE:<reason>`). Verifier not configured → `Unavailable` and the migration completes with the pre-M4 caveat ("listed records", G19 not addressed).
 
 Failure behaviour: Authority/verifier unreachable, gate closed or key provider down → `Blocked`, retried after 30 s, nothing claimed; snapshot expired → new round; decision superseded → `Superseded`; catalogue above `MaximumMigrationEntries` → `Incomplete` (`RECONCILIATION_LIMIT`), no partial certificate; worker crash or shutdown → lease expires or is released, the next step resumes from the stored offset; a lost census response → the Authority already holds the result, the retry gets it as `Reused`; reprotection lost acknowledgements remain handled by B-28 (S2/S4). No cross-database transaction is used: the Authority is the only writer of census and attestation, the business database only holds job state.
@@ -117,8 +117,9 @@ Production/staging: not enabled. Requires the verifier's production identity (§
 
 ## 9. Not implemented — decisions needed
 
-* **DR-C7-4 — retained-history disposal.** Earlier accepted revisions are immutable by design (C6 history, restore). Removing their plaintext would need a new Authority transition (re-sealing or purging history under retention/legal hold, with new manifests for historic revisions) and a retention policy. Not implemented; reported only.
-* **DR-C7-5 — Security Administrator coverage view.** Coverage is available to the verifier workload only. A read-only view for `administer_security` holders (counts and decisions, no record ids) would need a user-plane Authority read; proposed, not built.
+* **DR-C7-4 — retained historical plaintext:** design in §12; unresolved pending an architectural decision.
+* **DR-C7-5 — Security Administrator coverage view:** design in §13; not built.
+* **DR-C7-6 — resumable rounds and limits for production:** §11; implemented for development, approval needed before production use.
 * **DR-C7-1** (abandoned creations) is unchanged; pending creations are counted, never treated as content.
 * **AUD-C7-01 / G24:** the attestation journal entry is archived by the existing asynchronous archive processor; mandatory-evidence archival durability is not verified.
 
@@ -139,13 +140,71 @@ Production/staging: not enabled. Requires the verifier's production identity (§
 | 14, 15 | ineligible downgrade, organization floor | existing `FieldProtectionDowngradeTests`, `EncryptionTests` (re-run with M4) |
 | 18 | historical revisions preserved | Stage B complete-population test (plaintext rows kept, history counted) |
 | 19 | searchable plaintext not falsely compliant | unit `ARetiredVerificationKeyAndAnActiveSearchApproval…`; residual rows reported |
-| 20–22 | worker interruption, lost response, duplicates | Stage B `OutagesAndRestartsResumeTheReconciliationAndHeldCensusResultsAreReused`; existing B-28 lost-acknowledgement test |
-| 23 | policy change during migration | unit `ASupersededDecisionCanNeitherBeCensusedNorAttested` (integration: pending) |
+| 20–22 | worker interruption, lost response, duplicates | Stage B `OutagesAndRestartsResumeTheReconciliationAndHeldCensusResultsAreReused`, `ARecordChangedAfterTheAttestationIsVerifiedByTheNextReconciliation`; existing B-28 lost-acknowledgement test |
+| 23 | policy change during migration | Stage B `ADecisionChangeDuringAReconciliationSupersedesItWhileAnOrganizationPolicyChangeDoesNot`; unit `ASupersededDecisionCanNeitherBeCensusedNorAttested` |
 | 24 | record edits during reconciliation | Stage B `EditsDuringAReconciliationAreCaughtUpInANewRoundNotMixed`; unit `ACensusOfAnEarlierHead…` |
-| 25 | retired keys | unit (retired verification key); missing KEK: pending integration |
-| 26 | quota and limits | Authority catalogue ceiling (M1 unit); worker `RECONCILIATION_LIMIT` path: pending integration |
+| 25 | retired or unavailable keys | unit (retired verification key); Stage B `AnUnavailableEncryptionKeyBlocksTheReconciliationAndNeverCompletesIt` |
+| 26 | quota and limits; snapshot expiry | unit `TheMigrationCatalogueAcceptsExactly50000RecordsAndRefuses50001WithNothingPartial`; Stage B `TheCatalogueCeilingEndsIncompleteAndExpiredSnapshotsAreRenewedSafely` |
 | 27 | no partial or misleading certificate | DB CHECK constraints on both sides; all failure tests |
 | 28–30 | permissions, cross-organization, unauthorized execution | Stage B `OnlyAuthorizedPeopleRequestAVerification…`; contract `ProtectionVerifierBoundaryTests`; unit cross-organization |
-| 31 | audit evidence; archival outage | Stage B complete-population test (journal entry); archival outage: pending (AUD-C7-01) |
+| 31 | audit evidence; archival outage | Stage B complete-population test (journal entry); `AnArchiveOutageNeverYieldsACompletionWithoutAuthorityEvidence` (AUD-C7-01 stays open) |
 | 32 | no plaintext in logs or reports | Stage B complete-population test (logs, audit metadata) |
 | 33 | no regression | full Stage B, browser and SEC-P suites |
+
+## 11. Catalogue lifetime and large forms (owner §5; DR-C7-6)
+
+**Problem.** A migration snapshot lives at most 15 minutes. At the measured ≈ 30 verified records/s a single pass covers ≈ 27,000 records, below the 50,000-record catalogue ceiling.
+
+**What the existing protocol already provides (no Authority protocol change needed):**
+
+| Requirement | How it is met |
+|---|---|
+| Durable, bounded checkpoints | The Authority's census results, keyed by the immutable (decision, record, accepted operation); the worker's page offset, counters and resume position, committed at every page end and at a mid-page expiry |
+| Independently verified resumable progress | Progress is the Authority's own census rows; the worker's numbers are only a work-list |
+| Snapshot-safe catch-up | Each round takes a new snapshot; nothing is carried between snapshots except Authority census results of unchanged operations |
+| Revalidation across renewal | Reuse only of results verified since this reconciliation's first snapshot (Authority clock, same verifier/decision/form); a re-verification refreshes the time |
+| Trustworthy final attestation | Unchanged: computed under the organization lock from the registry, current heads and census of exactly those heads — a record changed after it was censused shows as uncensused and forces a full round |
+
+**Implemented (C-74; worker policy plus one tightening of the Authority reuse rule):** after an expiry the next round resumes after the last record verified in this reconciliation; a round that verifies nothing new ends `Incomplete` (`RECONCILIATION_DID_NOT_CONVERGE`); at most 20 rounds; census batches start immediately (rows read per batch). Not done, on purpose: no longer snapshot lifetime, no higher ceiling, no weaker completeness rule.
+
+**Limits that remain:** the 50,000-record ceiling (a larger form ends `Incomplete`, `RECONCILIATION_LIMIT`); 20 rounds × 15 minutes bounds a reconciliation to ≈ 5 hours of verification; a form whose heads change faster than they can be censused never completes (it stays Incomplete, by design). Measured on the isolated stack with a 2-second snapshot lifetime: `docs/PHASE_C7_STATUS.md` §32.
+
+**Decision requested (DR-C7-6):** approve resumable rounds, the 20-round bound and the reuse rule for production use; or choose a different scaling path (parallel verifiers, a longer-lived catalogue with periodic revalidation — the latter is a protocol change and needs its own review).
+
+## 12. DR-C7-4 — retained historical plaintext (design; unresolved)
+
+**Exposure today.** After a strengthening, every earlier accepted revision of a record still holds the field in plaintext: the business database keeps those staged rows (and their value-table indexes), the Authority keeps their manifest commits and HMACs (digests only, no values), and backups, WAL, replicas and exports keep copies. Authorized full readers can open earlier revisions (C6 history; not a search surface). A business DBA can read the plaintext directly.
+
+**Constraints.** Accepted revisions are immutable and Authority-committed (manifest root, leaf digests, row signatures, archived journal entries); history is used for authorized viewing and restore; legal holds and retention may require keeping it; DR must not roll back.
+
+| Option | What it does | Security effect | Cost / risk |
+|---|---|---|---|
+| A. Keep and disclose (current) | Report retained revisions and rows; never claim them migrated | No change in exposure | None; honest |
+| B. Restrict historical reads of strengthened fields | History views mask the field in revisions older than the strengthening unless the reader passes an extra step-up (PB-08) | Lowers application-level exposure; DBA exposure unchanged | Small; needs PB-08 for the step-up |
+| C. Re-seal history (new "historic re-protection" transition) | For each earlier revision, write an encrypted copy and have the Authority accept a **superseding historic manifest** that references it, marking the plaintext revision "superseded for content, retained as evidence" | Removes plaintext from what the application serves; the old rows still exist until purged | New Authority transition, new manifest version, new archive events, restore semantics; independent review |
+| D. Crypto-shred-style purge under retention | After C, delete the superseded plaintext staged rows through a privileged, dual-approved retention job that records digests and receipts; keep Authority digests | Removes plaintext from the live database; backups/WAL age out on their schedule | Deletes evidence bytes (the digests stay); legal-hold checks; irreversible |
+| E. Per-record data keys from the start | Future fields encrypt every revision under per-record keys | Prevents the problem for new data only | Design change of the encryption model |
+
+**Recommendation.** Now: A, plus B as soon as PB-08 step-up exists. Later, only with an approved retention policy: C then D for organizations that require it. Never: rewrite or delete accepted revisions in place, re-sign old rows, or report history as migrated.
+
+**Immediately necessary restrictions — assessment.** Field-value search uses only current heads and refuses encrypted leaves, and approvals are invalidated at strengthening, so retained plaintext is **not reachable through search**. History is readable only by full readers (owners), who can already read the current decrypted value; share recipients, partial readers and Security Administrators cannot open history. No endpoint therefore exposes retained plaintext to anyone who could not already read the value; no immediate restriction is required. B remains recommended defence in depth. DR-C7-4 stays **unresolved**.
+
+## 13. DR-C7-5 — Security Administrator coverage view (design; not built)
+
+**Purpose.** A read-only organization page for `administer_security` holders showing whether each current protection decision is attested — without record discovery, read or decryption.
+
+**Contract.** A new user-plane Authority read `POST /internal/v1/field-protection/coverage` (business workload + delegated user; `administer_security` of the organization, else 404), answered from the same Authority state as the verifier coverage — but it never calls the verifier routes and never enumerates records:
+
+| Shown | Source |
+|---|---|
+| Form (registered title, OD-3) and field identity; decision direction and command time | protection resources, registered form versions |
+| Migration status | business job state (labelled business-held) |
+| Expected / accepted / compliant / pending / quarantined / unverified / not-censused counts | latest Authority attestation of the current decision |
+| Retained-history and retired counts; coverage statement | attestation |
+| Attestation id, journal revision, time; **Stale** when the attestation predates the decision's latest content-integrity change, **Missing** when the decision has none | attestation + organization state |
+
+**Never shown:** record ids, field values, ciphertext, record titles or any per-record row. Counts are exact: they describe only the administrator's own organization, and a count reveals no identity.
+
+**UI.** Organization → Security → "Encryption coverage": one row per decision, status badge, counts in a disclosure, "Request verification" only for users who already hold the field's design/administration permission (it queues the existing verify-only job; the administrator role alone does not grant it).
+
+**Tests to add with it.** No record ids in any response; 404 for non-administrators and other organizations; stale/missing states; no SpiceDB record lookup is performed by the endpoint.

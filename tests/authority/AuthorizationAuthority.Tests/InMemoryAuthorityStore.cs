@@ -208,6 +208,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public void AddProtectionCensusResult(ProtectionCensusResult result) => s.CensusResults.Add(result);
 
+        public Task<ProtectionCensusResult?> FindProtectionCensusResultAsync(Guid scopingSecurityCommandId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.CensusResults.FirstOrDefault(r => r.ScopingSecurityCommandId == scopingSecurityCommandId && r.FormRecordId == formRecordId && r.CommittedOperationId == committedOperationId));
+
         public void AddProtectionAttestation(ProtectionReconciliationAttestation attestation) => s.Attestations.Add(attestation);
 
         public Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken) =>

@@ -1,0 +1,9 @@
+command_kind_name,count
+PublishFormSecurityRevision,59
+RegisterRecord,41
+RegisterFormDefinition,28
+RegisterPublishedFormVersion,26
+UpdateMandatoryPolicy,8
+CreateShare,7
+RevokeShare,2
+UpdateFormUsers,2

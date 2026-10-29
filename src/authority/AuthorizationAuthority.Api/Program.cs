@@ -59,6 +59,7 @@ public sealed class Program
             builder.Configuration[AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.ConfigurationKey],
             builder.Environment.IsProduction(),
             builder.Environment.IsEnvironment("Testing")));
+        AuthorizationAuthority.Api.Features.Health.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
         builder.Services.AddInternalAuthentication(builder.Configuration);
         // Phase C7 M2 (OD-7): AC-6 approvals are unavailable unless the development-only synthetic step-up path is configured;
         // Create refuses that path outside Development/Testing or without the synthetic TestIdentityProvider (startup failure).
@@ -94,6 +95,11 @@ public sealed class Program
         }
 
         app.MapHealthEndpoints();
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            app.MapTestStackIdentityEndpoints();
+        }
+
         app.MapAuthorizationEndpoints();
         app.MapFormAccessEndpoints();
         app.MapSecurityCommandEndpoints();

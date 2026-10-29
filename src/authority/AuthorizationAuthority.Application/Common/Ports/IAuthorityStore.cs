@@ -163,6 +163,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     void AddProtectionCensusResult(ProtectionCensusResult result);
 
+    /// <summary>Phase C7 M4: one held census (tracked, so its verification time can be refreshed), or null.</summary>
+    Task<ProtectionCensusResult?> FindProtectionCensusResultAsync(Guid scopingSecurityCommandId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken);
+
     void AddProtectionAttestation(ProtectionReconciliationAttestation attestation);
 
     /// <summary>Phase C7 M4: the most recent attestation of each of the given protection decisions (read-only).</summary>

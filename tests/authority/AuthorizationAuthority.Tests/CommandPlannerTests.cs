@@ -497,6 +497,8 @@ public sealed class CommandPlannerTests
 
         public void AddProtectionCensusResult(AuthorizationAuthority.Domain.Features.Catalogue.ProtectionCensusResult result) => throw new NotSupportedException();
 
+        public Task<AuthorizationAuthority.Domain.Features.Catalogue.ProtectionCensusResult?> FindProtectionCensusResultAsync(Guid command, Guid record, Guid operation, CancellationToken ct) => throw new NotSupportedException();
+
         public void AddProtectionAttestation(AuthorizationAuthority.Domain.Features.Catalogue.ProtectionReconciliationAttestation attestation) => throw new NotSupportedException();
 
         public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid org, IReadOnlyCollection<Guid> commands, CancellationToken ct) => throw new NotSupportedException();
