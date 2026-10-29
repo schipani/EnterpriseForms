@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "996d693f4e5e7b5e17a153cf6f70911148acac42dabd4d4c57bf97405f685162",
-      "bytes": 36334
+      "sha256": "27f6914b1029c94f2bcafb89615a6ef7c423cab9db5192c0a0aa30f5e8c37f6f",
+      "bytes": 36596
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/PHASE_C7_STATUS.md",
-      "sha256": "9999ec1a58eb19e066a4612858176d8eaaa443d875c8c0a829ded1535b502d5d",
-      "bytes": 92520
+      "sha256": "ce13394585a5fa9b21686f7266d68f7aff803a2877c322429bcedeb69680759c",
+      "bytes": 103995
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -244,8 +244,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "d570604eada7b31cec951797fc00d8e2106ca7fa1211830f144f44dad8e1e2ad",
-      "bytes": 115600
+      "sha256": "a533ecb51a56c5d172b22204e0e02574ed62abf85a14ca8b240cace5ae940b15",
+      "bytes": 117695
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -349,8 +349,8 @@
     },
     {
       "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
-      "sha256": "8dbffa3e2e496e12014a0810f74d8c83e7fadc33d7c3d80eab12286da0af71ab",
-      "bytes": 29646
+      "sha256": "f1249e4c9c0c43056345a250188bea7d18be0547978afe47187ee59ee15c67e7",
+      "bytes": 29934
     },
     {
       "path": "docs/security/G22_SESSION_CSRF_HOTFIX.md",

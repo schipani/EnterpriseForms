@@ -122,7 +122,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     const security = dialog.getByRole("group", { name: "Security & Encryption" });
     await expect(security.getByText("Off — plaintext")).toBeVisible();
     await security.getByRole("button", { name: /Strengthen protection/ }).click();
-    await expect(security.getByText(/rewritten as ciphertext when each is next saved/)).toBeVisible();
+    await expect(security.getByText(/re-seals the current version of every existing record.*Earlier versions kept as record history are not migrated/)).toBeVisible();
     await security.getByRole("combobox", { name: /New classification/ }).click();
     await page.getByRole("option", { name: "Confidential" }).click();
     await expect(security.getByRole("button", { name: "Apply strengthening" })).toBeDisabled(); // reason required
@@ -141,6 +141,8 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     // The background migration re-encrypts the clerk's existing record through the Authority; only then is the field reported as fully encrypted.
     const authorityBadge = "Authority-verified: every record's current version encrypted";
     await expect(reopened.getByText(new RegExp(`All listed records encrypted|${authorityBadge}`))).toBeVisible({ timeout: 120_000 });
+    // Either way the claim is scoped to current versions: retained history is not migrated (DR-C7-4).
+    await expect(reopened.getByText(/^Current versions only\. .*not migrated and may still hold the field in plaintext/)).toBeVisible();
     if (await reopened.getByText(authorityBadge).isVisible()) {
       // Phase C7 M4 (verifier configured): the Authority attestation, shown with what it does not cover (current versions only).
       await expect(reopened.getByText(/It covers current versions only/)).toBeVisible();

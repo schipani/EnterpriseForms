@@ -8,7 +8,7 @@ import { ErrorPanel } from "../../support";
 export const CLASSIFICATIONS = ["Public", "Internal", "Confidential", "Restricted"] as const;
 const RANK: Record<string, number> = { Public: 0, Internal: 1, Confidential: 2, Restricted: 3 };
 
-export const SEARCH_IMPACT_ENCRYPTED = "Encrypted for privacy — not searchable. The value is stored as authenticated ciphertext; only authorized users see it on the record, and no plaintext copy exists in the business database. Confidential and Restricted values cannot be searched in V1 (ADR-PB-004).";
+export const SEARCH_IMPACT_ENCRYPTED = "Encrypted for privacy — not searchable. The value is stored as authenticated ciphertext; only authorized users see it on the record, and a value saved while encryption is on has no plaintext copy in the business database. Confidential and Restricted values cannot be searched in V1 (ADR-PB-004).";
 export const SEARCH_IMPACT_PLAINTEXT = "Plaintext: searchable within authorization, and readable by a database administrator. Only appropriate for Public or Internal data that the organization has approved for plaintext storage.";
 
 /** Mirrors the server defaults (FieldProtectionPolicy): free text and documents are Confidential, structured values Internal. */
@@ -90,6 +90,23 @@ const COMPLETENESS_NOTE =
   "Checked by the migration worker against the Authorization Authority's accepted version of every record the business database lists for this form. This is not an independently verified completeness guarantee: a record hidden from the business database would not be covered (security finding G19).";
 
 /**
+ * A protection migration converts each record's current accepted version only (DR-C7-4 open): earlier versions kept as
+ * history, write-ahead logs, replicas and backups keep the form they were saved in. Shown with every "migrated" claim.
+ */
+const HISTORY_NOT_MIGRATED =
+  "Earlier versions kept as record history are not migrated: they keep the form they were saved in.";
+
+/** The current-versions-only scope of a completed migration, with the Authority's count of retained earlier revisions when it has attested one. */
+function HistoryScopeNote({ encrypted, retainedRevisions }: { encrypted: boolean; retainedRevisions: number | null }) {
+  const counted = retainedRevisions === null ? "Earlier versions kept as record history" : `${retainedRevisions} earlier version(s) kept as record history`;
+  return (
+    <p className="text-xs text-muted">
+      {`Current versions only. ${counted} are not migrated and ${encrypted ? "may still hold the field in plaintext" : "may still hold the field encrypted"}; so may write-ahead logs, replicas and backups. They are kept, not deleted (decision DR-C7-4 is open).`}
+    </p>
+  );
+}
+
+/**
  * Phase C6 M0: the migration worker's last check against the Authorization Authority is shown apart from the local estimate,
  * with what it does not establish. Records the business database cannot match to their accepted version are reported as
  * not known locally, never counted either way.
@@ -107,8 +124,8 @@ function VerificationSummary({ verification, unresolvedRecords }: { verification
         <p>
           {`Last check by the migration worker (${new Date(verification.checkedOn).toLocaleString()}): `}
           {remaining === 0 && unverified === 0
-            ? "no checked record still holds the old form."
-            : `${remaining} record(s) still hold the old form${unverified > 0 ? `, ${unverified} record(s) could not be checked` : ""}.`}
+            ? "no checked record's current version still holds the old form."
+            : `${remaining} record(s) still hold the old form in their current version${unverified > 0 ? `, ${unverified} record(s) could not be checked` : ""}.`}
           {` ${verification.basis}`}
         </p>
       ) : null}
@@ -211,7 +228,7 @@ function ReconciliationSummary({ reconciliation, decrypting, canRequest, onReque
             <Count label="Authority records missing locally" value={reconciliation.businessMissingRecordCount} />
             {!decrypting ? <Count label="Encrypted values decrypt-checked" value={reconciliation.decryptCheckedValueCount} /> : null}
             {!decrypting ? <Count label="Decrypt failures / type mismatches" value={`${reconciliation.decryptFailedValueCount} / ${reconciliation.logicalTypeMismatchCount}`} /> : null}
-            <Count label="Old-form rows kept outside current versions" value={reconciliation.retainedOldFormRowCount} />
+            <Count label="Old-form rows in retained earlier versions (not migrated)" value={reconciliation.retainedOldFormRowCount} />
           </dl>
         </details>
       ) : null}
@@ -264,8 +281,8 @@ function MigrationProgress({ migration, legacyRecords, canRetry, onRetry, retryi
       </div>
       <p className="text-xs text-muted">
         {decrypting
-          ? `Existing ciphertext is rewritten as typed plaintext one record at a time through the Authorization Authority; every step is audited. Until this finishes and the worker's check passes, ${legacyRecords} record(s) still hold an encrypted copy.`
-          : `Existing values are re-sealed one record at a time through the Authorization Authority; every step is audited. Until this finishes and the worker's check passes, ${legacyRecords} record(s) still hold a plaintext copy.`}
+          ? `Existing ciphertext is rewritten as typed plaintext one record at a time through the Authorization Authority; every step is audited. Until this finishes and the worker's check passes, ${legacyRecords} record(s) still hold an encrypted copy in their current version. ${HISTORY_NOT_MIGRATED}`
+          : `Existing values are re-sealed one record at a time through the Authorization Authority; every step is audited. Until this finishes and the worker's check passes, ${legacyRecords} record(s) still hold a plaintext copy in their current version. ${HISTORY_NOT_MIGRATED}`}
         {migration.lastErrorCode ? ` Last error: ${migration.lastErrorCode}.` : ""}
       </p>
       {migration.migrationState === "Failed" || migration.migrationState === "Blocked" ? (
@@ -374,6 +391,9 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         {status.data?.migrationState === "DecryptionPendingRewrite" ? <Badge tone="warning">{status.data.legacyEncryptedRecordCount} record(s) still hold an encrypted copy</Badge> : null}
       </div>
       {!reconciled && (status.data?.fullyEncrypted || status.data?.fullyPlaintext) ? <p className="text-xs text-muted">{COMPLETENESS_NOTE}</p> : null}
+      {reconciled || status.data?.fullyEncrypted || status.data?.fullyPlaintext ? (
+        <HistoryScopeNote encrypted={encrypted} retainedRevisions={reconciled && reconciliation?.attestation ? Number(reconciliation.attestation.retainedHistoryRevisionCount) : null} />
+      ) : null}
       {status.data ? <VerificationSummary verification={status.data.verification ?? null} unresolvedRecords={Number(status.data.estimateUnresolvedRecordCount ?? 0)} /> : null}
       {status.data && (reconciliation || canReconcile) ? (
         <ReconciliationSummary reconciliation={reconciliation} decrypting={migration?.migrationDirection === "Decrypt"} canRequest={canReconcile} onRequest={(reason) => reconcile.mutate(reason)} requesting={reconcile.isPending} requestError={reconcile.error} />
@@ -412,7 +432,7 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         <div className="flex flex-col gap-3 rounded border border-line bg-page p-3">
           <Select label="New classification" value={target} options={higher.map((value) => ({ value, label: value }))} onValueChange={setTarget} />
           {!encrypted && !mandatory ? <Checkbox label="Switch to application-level encryption" checked={encrypt} onCheckedChange={(checked) => setEncrypt(checked === true)} /> : null}
-          {!encrypted ? <p className="text-xs text-muted">Future saves are encrypted immediately. Records that already hold a plaintext copy are rewritten as ciphertext when each is next saved; until then the Edit field dialog reports how many remain. This is recorded as an audited migration.</p> : null}
+          {!encrypted ? <p className="text-xs text-muted">Future saves are encrypted immediately. An audited background migration then re-seals the current version of every existing record; until it finishes the Edit field dialog reports how many remain. {HISTORY_NOT_MIGRATED}</p> : null}
           <TextInput label="Reason" value={reason} required maxLength={500} helpText="Recorded with the audit event (3 to 500 characters)." onChange={(event) => setReason(event.target.value)} />
           <div className="flex gap-2">
             <Button size="sm" busy={pending} disabled={!changes || reason.trim().length < 3} onClick={() => onStrengthen({ targetClassification: target, targetProtectionMode: mandatory || encrypt || encrypted ? "ApplicationEncrypted" : "Standard", changeReason: reason.trim(), expectedProtectionRevision: Number(field.protectionPolicyRevision) })}>

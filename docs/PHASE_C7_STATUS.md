@@ -716,7 +716,7 @@ See `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §7. In short: only curre
 
 ### 28.4 Hosted results
 
-**Not run.** The `gh` CLI is not installed in this session, and dispatching through the GitHub API with the stored credential was refused by the session's permission policy (not bypassed). Manual dispatch steps: §34.
+**Superseded by §37** (hosted runs on e41b1d0, all successful). At C-73: **not run.** The `gh` CLI is not installed in this session, and dispatching through the GitHub API with the stored credential was refused by the session's permission policy (not bypassed). Manual dispatch steps: §34.
 
 ### 28.5 Incident — browser tests ran against the persistent development stack (2026-10-29)
 
@@ -807,7 +807,7 @@ Regression: .NET CI script 598/598 (Authority 191, contracts 306, architecture 6
 2. Same for **Security gate A** (`security-gate-a.yml`).
 3. Expected: the new isolation regression step passes before the browser suite; integration includes the 14 reconciliation tests; browser suite against the isolated CI stack.
 
-## 35. Outstanding decisions and blockers
+## 35. Outstanding decisions and blockers (superseded by §39)
 
 * **Owner approval of the incident remediation** (R1–R8, exact identities) — nothing executed; logo source (or confirmation there was none); decision on forms (no archive operation exists).
 * **Owner functional acceptance of M4** (§29) — not given; M4 not owner-accepted.
@@ -815,3 +815,79 @@ Regression: .NET CI script 598/598 (Authority 191, contracts 306, architecture 6
 * **DR-C7-4** unresolved; **DR-C7-5** not built; **DR-C7-6** approval for production.
 * **F-C7-03:** organization logo uploads are not audited.
 * **G19 OPEN** (independent review, Azure staging, production verifier identity, AUD-C7-01/G24). Unchanged: G06, G21, PB-08, PB-09, DR-C7-1, DR-C7-2, G25/G26. No Level 2 claim. C7 not merged; no further milestone started.
+
+## 36. Owner functional acceptance of M4 current-version reconciliation (C-75)
+
+The owner ran the synthetic acceptance of §29 (Option A, isolated security-test stack) and reported: 3 Authority-registered records, 3 with accepted content, 3 verified encrypted, 1 archived record included, 0 still in the old form, 0 quarantined, 0 unverified, 0 envelope issues; worker: 3 decrypt-checked, 0 decrypt or type failures; 4 retained historical revisions outside the migration scope. Attestation `01a188ea-4bcf-76c0-80e9-85f10553c792`.
+
+**Recorded as functional acceptance, for continued development only, of the reconciliation of each record's _current accepted version_** (C-75). It is not acceptance that historical plaintext was removed (it was not: DR-C7-4), not an independent security review, and not production evidence. G19 stays OPEN.
+
+**Read-back from Authority state** (read-only, `BEGIN READ ONLY … ROLLBACK`, security-test Authority database): the attestation row exists with exactly the reported values — direction Encrypt, expected 3, accepted 3, pending 0, quarantined 0, compliant 3, not applicable 0, old form 0, unverified 0, not yet censused 0, envelope issues 0, archived 1, retired 0, retained history revisions 4, active search approvals 0, `attestation_complete = true`, requesting workload `field-protection-verifier`, attested 2026-10-29 18:26:58.639 UTC (matching the UUIDv7 timestamp), digest `20e797b8e7b5ee4de2d15c374e48014d0d671703af7827249926c98f56280ef4`, Authority audit-journal revision 4. Organization `01a188e2-c62a-79ee-ba61-cbc557d56414` is a freshly bootstrapped security-test organization, not the development organization. A second complete attestation exists for the same field (the step-6 verify-only run). The development Authority database has no attestation table (it still runs pre-M4 images), so no acceptance step touched the development stack.
+
+**Consistency with the trusted completion protocol** (`ProtectionReconciliationService.AttestAsync`):
+
+| Identity | Values | Holds |
+|---|---|---|
+| expected = accepted + pending + quarantined | 3 = 3 + 0 + 0 | yes |
+| accepted = compliant + not applicable + old form + envelope + unverified + not censused | 3 = 3 + 0 + 0 + 0 + 0 + 0 | yes |
+| complete ⇔ quarantined = unverified = not censused = old form = envelope = active approvals = 0 | all 0 | yes |
+| retained history = Σ (manifest commits − 1) over accepted records | 3 records × (creation + migration) = 3, plus the archive commit of the archived record = 4 | yes |
+| worker decrypt checks cover the Authority's target-form occurrences, no failures | 3 checked, 0 / 0 | yes |
+
+The archived record is in the population (its accepted content carries the Archived status) and counts as compliant. Retained history counts revisions, not values; every one of the four retained revisions still holds the field in plaintext.
+
+## 37. Hosted verification on e41b1d0 (PR #29)
+
+Commit `e41b1d0ac4bf0a433445140bdc22ff84d859db50` (C-74). Run metadata read from the public GitHub API (GET only, no credential).
+
+| Workflow | Trigger | Run | Result | Jobs |
+|---|---|---|---|---|
+| `ci` | pull_request | [40915568668](https://github.com/schipani/EnterpriseForms/actions/runs/40915568668) | success | .NET build + architecture/contract/Authority/integrity tests; frontend lint/typecheck/test/build/client drift; compose profiles; specification manifest + vectors |
+| `stage-b-integration` | pull_request | [40915568448](https://github.com/schipani/EnterpriseForms/actions/runs/40915568448) | success | integration (real stack); browser e2e (real stack) — the isolation regression step ran and passed before the browser suite; gate job |
+| `security-gate-a` | workflow_dispatch | [40927150366](https://github.com/schipani/EnterpriseForms/actions/runs/40927150366) | success | SEC-P01..SEC-P12 + harness guard; evidence manifest shape/digests |
+| `level3-script` | pull_request | [40915568279](https://github.com/schipani/EnterpriseForms/actions/runs/40915568279) | success | Level 3 developer script on an isolated runner |
+| CodeQL | pull_request | — | success | no new alerts in the changed code |
+
+Per-test totals are in the run logs and the `stage-b-evidence`, `stage-b-browser-evidence` and `gate-a-evidence` artifacts, which need an authenticated GitHub session; they were not read in this session and no count is claimed here. The workflows fail on zero discovered tests, missing or extra TRX files, and skipped or cancelled gate jobs. The only annotations are the Node.js 20 deprecation warning for `actions/upload-artifact`.
+
+The C-75 wording commit (§38) changes UI/server text and browser assertions; `ci`, `stage-b-integration` and `level3-script` re-run on it automatically through the PR, `security-gate-a` needs a manual dispatch (§34).
+
+## 38. Final C7 review (C-75)
+
+**Scope:** the complete branch against main (M0 → M4, C-55 … C-74; 251 files, mostly EF migration designers). The recorded milestone reviews, decisions and evidence were reconciled with the code, and the changes after the owner-accepted M3 state (`e0d0791` → `e41b1d0`) were re-read in full; this was not a second line-by-line audit of M0–M3. `main` has not moved since its last merge into the branch (0 commits behind; GitHub reports the PR mergeable).
+
+* **Wording (corrected):** (1) the encrypted search-impact text (server and client) said "no plaintext copy exists in the business database"; it now says a value saved while encryption is on has no plaintext copy, and that a field strengthened from plaintext keeps the old plaintext in its retained earlier versions. (2) The strengthening help said existing records are "rewritten as ciphertext when each is next saved" — stale since B-28 — and was silent on history; it now describes the background migration of current versions and states that earlier versions are not migrated. (3) Every "Authority-verified …" and "All listed records …" badge is now accompanied by "Current versions only. N earlier version(s) kept as record history are not migrated and may still hold the field in plaintext; so may write-ahead logs, replicas and backups. They are kept, not deleted (decision DR-C7-4 is open)." (N from the Authority attestation when there is one.) (4) Migration progress and the worker's last check say "in their current version"; the worker count is labelled "Old-form rows in retained earlier versions (not migrated)". (5) The pre-attestation completion audit description says "in those current versions (retained history not migrated)". No count, state, contract or behaviour changed. The browser spec asserts the new history note and help text.
+* **Trusted completion protocol:** consistent (§36). Migration completion is reachable only through a journaled Authority attestation computed under the organization lock from the Authority registry, current heads and census results; the business copy is display only.
+* **Field-search permissions and historical-record access:** no regression. After M3 (`e0d0791`) no user-plane search, history, restore or projection code changed: the user search catalogue is unchanged, the migration catalogue (verifier workload only) gained a census hint that the attestation never trusts, and the `ContentService` changes are additive (no line removed). The hosted Stage B run on e41b1d0 includes the FieldSearch approval/execution and RecordRestore/history suites.
+* **Playwright isolation:** confirmed — port 5199 with `--strictPort`, `reuseExistingServer: false`, persistent ports refused, Testing-only stack-identity proof of API **and** Authority before any test, verified origin at every sign-in; the hosted regression step passed on e41b1d0. A Vite server is listening on 5173 again; the guard ignores it, and a base URL pointed at it would fail the identity proof. **Development organization unchanged since the incident:** read-only query of the development business database — no audit event after 14:09:06.4 UTC (the last event of the incident window), no form and no record created since. Remediation R1–R8 still not executed.
+* **Migrations:** Authority `20261029122643_ProtectionReconciliation`; business `PhaseC7ProtectionReconciliation`, `PhaseC7ReconciliationReuseCutoff`, `PhaseC7ReconciliationResumableRounds`, plus the M0–M3 migrations already recorded. All additive and exercised by the hosted from-empty stacks. New tables are in the runtime grant lists; the Authority runtime may INSERT and UPDATE census rows (no DELETE), the established pattern — only `census_verified_on` is ever updated (§32 reuse cutoff).
+* **Architecture:** verifier credential registered only in the Worker (`ProtectionVerifierBoundaryTests`); Testing-only endpoints absent outside `Testing` (`TestStackIdentityBoundaryTests`); no new business authority over grants, keys or signing.
+* **Security findings:** none new; open findings unchanged and classified in §39.
+* **Checks for the wording commit (local):** frontend lint, typecheck, vitest 219/219; API and Worker Release builds, 0 warnings. The browser spec was not run locally (the only isolated stack holds the owner's acceptance data); the hosted run on the PR covers it.
+
+## 39. Outstanding items and merge readiness
+
+**Engineering merge into main — blockers:**
+
+1. Hosted green on the **final** commit (the C-75 wording commit): `ci`, `stage-b-integration` (browser suite with the changed assertions) and `level3-script` run on the PR automatically; `security-gate-a` needs the owner's manual dispatch.
+2. The owner's explicit merge approval: PR #29 is a draft titled "do not merge" and stays so until the owner decides.
+
+No code, test, migration or architecture blocker.
+
+**Not merge blockers (owner decisions on the development environment):** incident remediation R1–R8 (logo source; synthetic forms — no form archive operation exists). After a merge the persistent development stack needs `devstack.py backup`, then `rebuild` to pick up M4 (additive migrations); its verifier stays off until `protection-verifier enable`.
+
+**Production Level 2 release — blockers (all OPEN; none closed by C7):**
+
+| Item | Classification |
+|---|---|
+| G19 — independent review of census/attestation/coverage and the verifier boundary; Azure staging evidence; production verifier identity (Entra workload identity + mTLS) | P1 security finding, open |
+| DR-C7-4 — retained plaintext in earlier versions, WAL, replicas, backups | decision required, unresolved |
+| DR-C7-5 — Security Administrator coverage view | designed, not built |
+| DR-C7-6 — resumable reconciliation rounds | approval required before production use |
+| AUD-C7-01 / G24 — archival durability of mandatory evidence (attestation journal entry included) | open |
+| G06 search completeness; G21; G25/G26 independent reviews (PIM-backed approver identities for DR-C7-3) | open |
+| PB-08 step-up (Security Administrator changes and approvals cannot run in staging/production) | open |
+| PB-09 / DR-C7-2 — verified search ≈ 130 records/s hosted, reconciliation ≈ 30–38 records/s laptop; forms above ≈ 25,000 records need several rounds | open |
+| DR-C7-1 — terminal state for abandoned creations | decision required |
+| F-C7-03 — organization logo uploads not audited | audit gap, open |
+| No Azure staging evidence for any C7 Authority change; no Level 2 claim | release gate |

@@ -986,7 +986,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         var reconciledComplete = reconciliation is { ReconciliationState: FieldProtectionReconciliationStates.Complete } && migration is not null && reconciliation.AuthorityCommandId == migration.AuthorityCommandId
                                  && reconciliation.MigrationDirection == (encrypted ? FieldProtectionMigrationDirections.Encrypt : FieldProtectionMigrationDirections.Decrypt);
         return new FieldProtectionResponse(field.FieldDefinitionId, field.FieldKey, field.FieldClassification, field.FieldProtectionMode, field.ProtectionPolicyRevision, field.ProtectionChangedOn, status.State, legacyPlaintext,
-            encrypted ? "Encrypted for privacy — not searchable in V1 (ADR-PB-004). Authorized users see the value on the record; no plaintext copy exists in the business database." : "Plaintext: searchable within authorization, and readable by a database administrator.",
+            encrypted ? "Encrypted for privacy — not searchable in V1 (ADR-PB-004). Authorized users see the value on the record; a value saved while encryption is on has no plaintext copy in the business database. If the field was strengthened from plaintext, earlier versions kept as record history still hold the plaintext they were saved with (not migrated)." : "Plaintext: searchable within authorization, and readable by a database administrator.",
             policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, status.FullyEncrypted, progress, status.FullyPlaintext, legacyEncrypted,
             isFile ? 0 : estimate.UnresolvedRecordIds.Count, verification, reconciliation is null ? null : ToReconciliationResponse(reconciliation), reconciledComplete);
     }
