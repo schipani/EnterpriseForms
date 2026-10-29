@@ -374,3 +374,46 @@ public sealed class FieldSearchApprovalConfiguration : IEntityTypeConfiguration<
         });
     }
 }
+
+/// <summary>Phase C7 M4 (G19): one census per (protection decision, record, accepted operation); immutable to the runtime (no DELETE).</summary>
+public sealed class ProtectionCensusResultConfiguration : IEntityTypeConfiguration<ProtectionCensusResult>
+{
+    public void Configure(EntityTypeBuilder<ProtectionCensusResult> builder)
+    {
+        builder.MapSnakeCase("protection_census_results");
+        builder.HasKey(e => e.ProtectionCensusResultId);
+        builder.Property(e => e.CensusOutcomeName).HasMaxLength(40);
+        builder.Property(e => e.VerifiedRecordStatus).HasMaxLength(20);
+        builder.Property(e => e.RequestingWorkloadName).HasMaxLength(100);
+        builder.HasIndex(e => new { e.ScopingSecurityCommandId, e.FormRecordId, e.CommittedOperationId }).IsUnique().HasDatabaseName("uq_protection_census_operation");
+        builder.HasIndex(e => new { e.OrganizationId, e.ScopingSecurityCommandId }).HasDatabaseName("ix_protection_census_command");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_protection_census_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ScopingSecurityCommandId).HasConstraintName("fk_protection_census_command");
+        builder.ToTable(t => t.HasCheckConstraint("ck_protection_census_counts",
+            "committed_content_revision > 0 AND field_occurrence_count >= 0 AND old_form_occurrence_count >= 0 AND old_form_occurrence_count <= field_occurrence_count AND envelope_issue_count >= 0"));
+    }
+}
+
+/// <summary>Phase C7 M4 (G19): Authority-computed reconciliation reports; immutable to the runtime (no DELETE), also journaled on the audit stream.</summary>
+public sealed class ProtectionReconciliationAttestationConfiguration : IEntityTypeConfiguration<ProtectionReconciliationAttestation>
+{
+    public void Configure(EntityTypeBuilder<ProtectionReconciliationAttestation> builder)
+    {
+        builder.MapSnakeCase("protection_reconciliation_attestations");
+        builder.HasKey(e => e.ProtectionReconciliationAttestationId);
+        builder.Property(e => e.ProtectionDirectionName).HasMaxLength(10);
+        builder.Property(e => e.AttestationIncompleteReason).HasMaxLength(60);
+        builder.Property(e => e.RequestingWorkloadName).HasMaxLength(100);
+        builder.HasIndex(e => new { e.OrganizationId, e.ScopingSecurityCommandId, e.AttestedAuditJournalRevision }).HasDatabaseName("ix_protection_attestation_command");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_protection_attestation_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ScopingSecurityCommandId).HasConstraintName("fk_protection_attestation_command");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_protection_attestation_direction", "protection_direction_name IN ('Encrypt','Decrypt')");
+            t.HasCheckConstraint("ck_protection_attestation_digest", "octet_length(attestation_digest) = 32");
+            // A complete attestation can never carry a remaining, quarantined, unverified or uncensused record (defence in depth for the service rule).
+            t.HasCheckConstraint("ck_protection_attestation_complete",
+                "NOT attestation_complete OR (attestation_incomplete_reason IS NULL AND old_form_remaining_record_count = 0 AND quarantined_record_count = 0 AND unverified_record_count = 0 AND not_yet_censused_record_count = 0 AND envelope_issue_record_count = 0 AND active_search_approval_count = 0)");
+        });
+    }
+}

@@ -702,6 +702,111 @@
         }
       }
     },
+    "/internal/v1/verifier/migration-catalogue/{snapshotId}/census": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M4 (G19, verifier only): verifies 1..50 entries of the verifier's own snapshot against their accepted manifests (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the head) and counts the decision's field rows in the old and the target form from the verified bytes. Counts only — never contents. A census already held for the same accepted operation is returned without re-verification unless reverify is set (the first round of every reconciliation sets it).",
+        "operationId": "TakeProtectionCensus",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProtectionCensusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionCensusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue/{snapshotId}/attestation": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M4 (G19, verifier only): the Authority's reconciliation report for the snapshot's protection decision, computed now under the organization lock from the registry population, current heads and census results (nothing from the business database), journaled on the audit stream before it is returned. 409 when the decision was superseded.",
+        "operationId": "AttestProtectionReconciliation",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionAttestation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/protection-coverage": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M4 (verifier only): every current field protection decision of the organization (Authority protection resources, never the business form list) with its latest attestation; organization-complete only when each decision has a complete attestation under that decision.",
+        "operationId": "GetProtectionCoverage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProtectionCoverageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionCoverageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/operator/organizations": {
       "post": {
         "tags": [
@@ -1409,6 +1514,12 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "protection_census_outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -2821,6 +2932,515 @@
           "AwaitingArchive",
           "Quarantined"
         ]
+      },
+      "ProtectionAttestation": {
+        "required": [
+          "protection_reconciliation_attestation_id",
+          "organization_id",
+          "security_command_id",
+          "form_definition_id",
+          "field_definition_id",
+          "protection_direction",
+          "search_catalogue_snapshot_id",
+          "expected_record_count",
+          "accepted_record_count",
+          "pending_creation_record_count",
+          "quarantined_record_count",
+          "compliant_record_count",
+          "not_applicable_record_count",
+          "old_form_remaining_record_count",
+          "old_form_remaining_occurrence_count",
+          "target_form_occurrence_count",
+          "unverified_record_count",
+          "not_yet_censused_record_count",
+          "envelope_issue_record_count",
+          "archived_record_count",
+          "retired_record_count",
+          "retained_history_revision_count",
+          "active_search_approval_count",
+          "attestation_complete",
+          "attestation_incomplete_reason",
+          "attestation_digest_hex",
+          "authorization_revision",
+          "content_integrity_revision",
+          "audit_journal_revision",
+          "attested_on",
+          "coverage_statement",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "protection_reconciliation_attestation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "protection_direction": {
+            "type": "string"
+          },
+          "search_catalogue_snapshot_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expected_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "accepted_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pending_creation_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantined_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "compliant_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "not_applicable_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "old_form_remaining_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "old_form_remaining_occurrence_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "target_form_occurrence_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unverified_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "not_yet_censused_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "envelope_issue_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "archived_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retired_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retained_history_revision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "active_search_approval_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "attestation_complete": {
+            "type": "boolean"
+          },
+          "attestation_incomplete_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "attestation_digest_hex": {
+            "type": "string"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "audit_journal_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "attested_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverage_statement": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProtectionCensusItem": {
+        "required": [
+          "form_record_id",
+          "expected_committed_operation_id",
+          "observed_items"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_committed_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observed_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
+            }
+          }
+        }
+      },
+      "ProtectionCensusRecordResult": {
+        "required": [
+          "form_record_id",
+          "outcome",
+          "committed_content_revision",
+          "committed_operation_id",
+          "field_occurrence_count",
+          "old_form_occurrence_count",
+          "envelope_issue_count",
+          "reused"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "field_occurrence_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "old_form_occurrence_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "envelope_issue_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reused": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProtectionCensusRequest": {
+        "required": [
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProtectionCensusItem"
+            }
+          },
+          "reverify": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ProtectionCensusResponse": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "field_definition_id",
+          "protection_direction",
+          "results",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "protection_direction": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProtectionCensusRecordResult"
+            }
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProtectionCoverageDecision": {
+        "required": [
+          "security_command_id",
+          "form_definition_id",
+          "field_definition_id",
+          "protection_direction",
+          "form_registered_active",
+          "latest_attestation"
+        ],
+        "type": "object",
+        "properties": {
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "protection_direction": {
+            "type": "string"
+          },
+          "form_registered_active": {
+            "type": "boolean"
+          },
+          "latest_attestation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProtectionAttestation"
+              }
+            ]
+          }
+        }
+      },
+      "ProtectionCoverageRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProtectionCoverageResponse": {
+        "required": [
+          "organization_id",
+          "registered_form_count",
+          "decision_count",
+          "attested_complete_decision_count",
+          "organization_complete",
+          "decisions",
+          "authorization_revision",
+          "computed_on",
+          "coverage_statement",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "registered_form_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "decision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "attested_complete_decision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "organization_complete": {
+            "type": "boolean"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProtectionCoverageDecision"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "computed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverage_statement": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       },
       "RequestedAction": {
         "enum": [

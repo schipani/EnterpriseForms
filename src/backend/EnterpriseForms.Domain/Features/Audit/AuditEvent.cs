@@ -15,6 +15,8 @@ public static class AuditActions
     public const string FieldProtectionMigrationCompleted = "FIELD_PROTECTION_MIGRATION_COMPLETED";
     public const string FieldProtectionMigrationFailed = "FIELD_PROTECTION_MIGRATION_FAILED";
     public const string FieldProtectionMigrationRetried = "FIELD_PROTECTION_MIGRATION_RETRIED";
+    public const string FieldProtectionReconciliationRequested = "FIELD_PROTECTION_RECONCILIATION_REQUESTED";
+    public const string FieldProtectionReconciliationAttested = "FIELD_PROTECTION_RECONCILIATION_ATTESTED";
     public const string FieldDeclassified = "FIELD_DECLASSIFIED";
     public const string FieldProtectionDowngraded = "FIELD_PROTECTION_DOWNGRADED";
     public const string FieldValuesDeprotected = "FIELD_VALUES_DEPROTECTED";

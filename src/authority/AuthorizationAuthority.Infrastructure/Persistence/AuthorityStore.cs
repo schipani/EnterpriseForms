@@ -202,6 +202,43 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddFieldSearchApproval(FieldSearchApproval approval) => context.FieldSearchApprovals.Add(approval);
 
+        public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            context.CatalogueSnapshotEntries.AsNoTracking().Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId && formRecordIds.Contains(e.FormRecordId)).ToListAsync(cancellationToken);
+
+        public Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid organizationId, IReadOnlyCollection<string> resourceTypeNames, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken) =>
+            context.Resources.AsNoTracking()
+                .Where(r => r.OrganizationId == organizationId && resourceTypeNames.Contains(r.ResourceTypeName) && lifecycleStates.Contains(r.ResourceLifecycleState))
+                .OrderBy(r => r.ResourceEntityId)
+                .ToListAsync(cancellationToken);
+
+        public async Task<Dictionary<Guid, int>> CountManifestCommitsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            formRecordIds.Count == 0
+                ? []
+                : await context.ManifestCommits.AsNoTracking()
+                    .Where(c => c.OrganizationId == organizationId && formRecordIds.Contains(c.FormRecordId))
+                    .GroupBy(c => c.FormRecordId)
+                    .Select(g => new { FormRecordId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(g => g.FormRecordId, g => g.Count, cancellationToken).ConfigureAwait(false);
+
+        public Task<List<ProtectionCensusResult>> GetProtectionCensusResultsAsync(Guid organizationId, Guid scopingSecurityCommandId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            context.ProtectionCensusResults.AsNoTracking()
+                .Where(r => r.OrganizationId == organizationId && r.ScopingSecurityCommandId == scopingSecurityCommandId && formRecordIds.Contains(r.FormRecordId))
+                .ToListAsync(cancellationToken);
+
+        public void AddProtectionCensusResult(ProtectionCensusResult result) => context.ProtectionCensusResults.Add(result);
+
+        public void AddProtectionAttestation(ProtectionReconciliationAttestation attestation) => context.ProtectionAttestations.Add(attestation);
+
+        public async Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken) =>
+            scopingSecurityCommandIds.Count == 0
+                ? []
+                : (await context.ProtectionAttestations.AsNoTracking()
+                    .Where(a => a.OrganizationId == organizationId && scopingSecurityCommandIds.Contains(a.ScopingSecurityCommandId))
+                    .ToListAsync(cancellationToken).ConfigureAwait(false))
+                    .GroupBy(a => a.ScopingSecurityCommandId)
+                    .Select(g => g.MaxBy(a => a.AttestedAuditJournalRevision)!)
+                    .ToList();
+
         public async Task CommitAsync(CancellationToken cancellationToken)
         {
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

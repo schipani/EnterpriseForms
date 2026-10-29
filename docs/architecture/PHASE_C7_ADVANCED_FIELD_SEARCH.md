@@ -578,22 +578,36 @@ Normative detail: `docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md`.
 | Alerts | Port `ISecurityAlertSink`; `LoggingSecurityAlertSink` (event 9100); the alert is journaled on the audit stream first. |
 | Development | dev-seed modes `generate-approver-keys` and `operator-security-admin`; `devstack.py security-admin`. |
 
+## 6F. M4 — G19 encryption migration reconciliation (C-73)
+
+Normative detail, residual-exposure inventory, runbook and test map: `docs/security/FIELD_PROTECTION_RECONCILIATION.md`.
+
+| Layer | Implementation |
+|---|---|
+| Execution | **Unchanged** B-28/A1 reprotection operations; no second migration engine, no bulk SQL, no new write path. A migration whose business-side post-check passes becomes `Verifying` and completes only through the reconciliation. |
+| Authority (verifier scheme only) | `POST …/verifier/migration-catalogue/{id}/census` (1..50 entries of the verifier's own snapshot; the shared verification core; counts of the decision's field rows in the old/target form, envelope shape and nonce reuse from the verified bytes; tampering quarantines; first round of every reconciliation re-verifies); `…/{id}/attestation` (computed under the organization lock from the registry population, current heads and census results of those heads; journaled `ProtectionReconciliationAttested`; complete only with nothing quarantined, unverified, uncensused, in the old form or approved for search); `POST …/verifier/protection-coverage` (every current protection decision with its latest attestation). Tables `protection_census_results`, `protection_reconciliation_attestations` (additive migration, no DELETE). Catalogue pages carry the held census outcome (work-list hint only). |
+| Business | Worker-only `IProtectionVerifierAuthority` (separate credential, never registered by the API); leased, checkpointed job `field_protection_reconciliations` (MigrationCompletion / VerifyOnly; rounds with catch-up; hand-back of old-form records to the migration; AEAD decrypt check of every target-form ciphertext row; bidirectional business/registry comparison reported as untrusted). Status: `reconciliation`, `authorityReconciledComplete`. Request: `POST …/fields/{field}/protection/reconciliations` (verify-only; same permission as retry; 409 while migrating). |
+| Frontend | Edit field → Security & Encryption: Authority-verified badge only on a complete attestation under the current decision; attestation counts, worker observations, basis; **Verify completeness…** with a reason. |
+
+**What M4 does not establish:** G19 stays **OPEN** (independent review, Azure staging, production verifier identity); retained history, retired records, WAL, replicas and backups are not migrated (DR-C7-4); the organization coverage view is verifier-only (DR-C7-5); AUD-C7-01 archival durability unverified.
+
 ## 7. Proposed milestones
 
 | Milestone | Content | Status |
 |---|---|---|
-| M0 | UI, contracts, validation, typed errors, server gate, tests | **Implemented (C-57); awaiting owner functional acceptance** |
+| M0 | UI, contracts, validation, typed errors, server gate, tests | **Implemented (C-57); owner functional acceptance with M3 (C-72)** |
 | M1 | AC-5 Authority catalogue (user scope + migration scope), snapshot validation, batch verification (OD-6), AC5-T01..T15 | **Implemented (C-62, §6A); awaiting owner review** |
 | M2 | AC-6 policy + approvals + `field_searcher` grants + Designer "Search" section + organization policy UI, AC6-T01..T12 | **Implemented (C-67, §6B); awaiting owner review** |
-| M3 | Trusted executor, paging cursor, execution evidence, ENC-SR-01..18, browser acceptance with real results, performance measurement | **Implemented (C-69, §6C); awaiting owner functional acceptance** |
-| M4 | Worker G19 reconciliation against the migration catalogue | Not authorized |
+| M3 | Trusted executor, paging cursor, execution evidence, ENC-SR-01..18, browser acceptance with real results, performance measurement | **Implemented (C-69, §6C); owner functional acceptance (C-72)** |
+| M4 | Worker G19 reconciliation against the migration catalogue (census, attestation, coverage; §6F) | **Implemented (C-73); awaiting owner functional acceptance** |
 
-**Proposed next:** owner review of M1 and M2. M3 (execution) is not authorized; production approvals depend on PB-08 step-up; M4 (G19 reconciliation) can follow independently.
+**Next:** owner functional acceptance of M4. Production approvals still depend on PB-08 step-up; no further milestone is started.
 
 ## 8. Open risks
 
 * G06, G19 and G21 remain **OPEN**.
-* AC-5 and AC-6 are Authority changes and need independent production review (like C-12, C-28, AC-1, AC-2).
+* AC-5, AC-6 and the M4 census/attestation/coverage are Authority changes and need independent production review (like C-12, C-28, AC-1, AC-2).
+* Retained plaintext history, retired records, WAL, replicas and backups are outside the M4 scope (DR-C7-4); the verifier credential is a Stage A HS256 credential (production needs a workload identity).
 * The D4 limits have not been measured.
 * **G22** (C-58): corrected by the hotfix (C-59/C-61); independent review of the authentication pipeline is still required for production assurance.
 * **G23** (new): logout is client-side only; stateless session tickets stay valid until they expire. Needs an owner decision.

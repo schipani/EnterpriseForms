@@ -574,6 +574,57 @@
         }
       }
     },
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reconciliations": {
+      "post": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Phase C7 M4 (G19): queues a verify-only reconciliation of the field's current protection decision against the Authorization Authority's complete record population (Worker verifier; never converts anything; same permission as retrying the migration; audited). 409 while the migration or another reconciliation is still running.",
+        "operationId": "RequestFieldProtectionReconciliation",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fieldDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestFieldProtectionReconciliationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldProtectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reclassify": {
       "post": {
         "tags": [
@@ -4711,6 +4762,195 @@
           }
         }
       },
+      "FieldProtectionAttestationResponse": {
+        "required": [
+          "attestationId",
+          "digestHex",
+          "auditJournalRevision",
+          "attestedOn",
+          "complete",
+          "incompleteReason",
+          "expectedRecordCount",
+          "acceptedRecordCount",
+          "pendingCreationRecordCount",
+          "quarantinedRecordCount",
+          "compliantRecordCount",
+          "notApplicableRecordCount",
+          "oldFormRemainingRecordCount",
+          "oldFormRemainingOccurrenceCount",
+          "targetFormOccurrenceCount",
+          "unverifiedRecordCount",
+          "notYetCensusedRecordCount",
+          "envelopeIssueRecordCount",
+          "archivedRecordCount",
+          "retiredRecordCount",
+          "retainedHistoryRevisionCount",
+          "activeSearchApprovalCount",
+          "coverageStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "attestationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digestHex": {
+            "type": "string"
+          },
+          "auditJournalRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "attestedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "incompleteReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expectedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "acceptedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pendingCreationRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantinedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "compliantRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "notApplicableRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "oldFormRemainingRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "oldFormRemainingOccurrenceCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "targetFormOccurrenceCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unverifiedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "notYetCensusedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "envelopeIssueRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "archivedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retiredRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retainedHistoryRevisionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "activeSearchApprovalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "coverageStatement": {
+            "type": "string"
+          }
+        }
+      },
       "FieldProtectionMigrationResponse": {
         "required": [
           "fieldProtectionMigrationId",
@@ -4823,6 +5063,173 @@
           }
         }
       },
+      "FieldProtectionReconciliationResponse": {
+        "required": [
+          "fieldProtectionReconciliationId",
+          "mode",
+          "state",
+          "lastErrorCode",
+          "requestedOn",
+          "completedOn",
+          "roundCount",
+          "catalogueEntryCount",
+          "censusProcessedCount",
+          "censusVerifiedRecordCount",
+          "censusReusedRecordCount",
+          "censusFailedRecordCount",
+          "businessOnlyRecordCount",
+          "businessMissingRecordCount",
+          "decryptCheckedValueCount",
+          "decryptFailedValueCount",
+          "logicalTypeMismatchCount",
+          "retainedOldFormRowCount",
+          "attestation",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "fieldProtectionReconciliationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "lastErrorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "roundCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "catalogueEntryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "censusProcessedCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "censusVerifiedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "censusReusedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "censusFailedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "businessOnlyRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "businessMissingRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "decryptCheckedValueCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "decryptFailedValueCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "logicalTypeMismatchCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retainedOldFormRowCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "attestation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FieldProtectionAttestationResponse"
+              }
+            ]
+          },
+          "basis": {
+            "type": "string"
+          }
+        }
+      },
       "FieldProtectionResponse": {
         "required": [
           "fieldDefinitionId",
@@ -4932,6 +5339,20 @@
                 "$ref": "#/components/schemas/FieldProtectionVerificationResponse"
               }
             ]
+          },
+          "reconciliation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FieldProtectionReconciliationResponse"
+              }
+            ]
+          },
+          "authorityReconciledComplete": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -7317,6 +7738,17 @@
           "useDevelopmentStepUp": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "RequestFieldProtectionReconciliationRequest": {
+        "required": [
+          "requestReason"
+        ],
+        "type": "object",
+        "properties": {
+          "requestReason": {
+            "type": "string"
           }
         }
       },

@@ -59,6 +59,10 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<FieldSearchApproval> FieldSearchApprovals => Set<FieldSearchApproval>();
 
+    public DbSet<ProtectionCensusResult> ProtectionCensusResults => Set<ProtectionCensusResult>();
+
+    public DbSet<ProtectionReconciliationAttestation> ProtectionAttestations => Set<ProtectionReconciliationAttestation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

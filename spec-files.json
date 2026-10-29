@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "419ca63180ce41b2a3b8a152e961310950da8b940c95ff70b08046d10270d74a",
-      "bytes": 34813
+      "sha256": "ba968845b4b62631f46b3e661c0a09681dbe4c0a4cde45988330527f02dba22c",
+      "bytes": 36099
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/PHASE_C7_STATUS.md",
-      "sha256": "9798289197a6f89315347c2f6b9e1f6ab3247b9689e0552813e69c8582af206a",
-      "bytes": 68501
+      "sha256": "77503168df66d083e6df43b2590b037cfe3ee9a22473d74d839141bca004c78d",
+      "bytes": 82170
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -149,8 +149,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md",
-      "sha256": "e33d7d4d520e1aaf8ae1193d684e0e936200b9043dc3eb6ce1ade2bdf4663e77",
-      "bytes": 73404
+      "sha256": "8888acc0f7fe8b96031b30edb58a1ab864e9e122c02c868d7136f3ba5d624723",
+      "bytes": 76194
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -244,8 +244,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "b103ab84f49fa14854ce2879bed5a14cdbcd8940b3d8517f9fac92f46042d59f",
-      "bytes": 108139
+      "sha256": "f7d12f5607856ee7c1f29ab616008ccef8e0ca9595c7546ef25634f9bd49e0da",
+      "bytes": 112953
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -341,6 +341,11 @@
       "path": "docs/security/DOCUMENT_ENCRYPTION_AUDIT.md",
       "sha256": "0cef9d3ddb8d8689f1df57777a34de5bb7af28c8358d60b796a9067e5cf6fc71",
       "bytes": 13412
+    },
+    {
+      "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
+      "sha256": "6518ae80234b289e57c72f233394596486b445c50bbafd4c28fe2feb61239536",
+      "bytes": 21360
     },
     {
       "path": "docs/security/G22_SESSION_CSRF_HOTFIX.md",
@@ -478,6 +483,16 @@
       "bytes": 470486
     },
     {
+      "path": "docs/ui/my-records-search-1440.png",
+      "sha256": "40463ed234d7da60faefc3509ab595fa8278b78a6801c4f14dadc2e03d5e4ac6",
+      "bytes": 293432
+    },
+    {
+      "path": "docs/ui/my-records-search-320.png",
+      "sha256": "52280b9d1eee319fe08b23515ede7807355cc2273ac1d071d4a22ecb28762481",
+      "bytes": 207592
+    },
+    {
       "path": "form_model/RELATED_FORM_COLLECTIONS.md",
       "sha256": "7feaf4ce52316fa6a164f72cd79b29d65b23dc566162384a023feeb3d5cacb32",
       "bytes": 21222
@@ -534,8 +549,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "218ad4fce4d1af89f913c91195e1c1c60b5fd5f785dcfed84f849e7ec9aeda23",
-      "bytes": 61201
+      "sha256": "22091be81d65359474a893af32712653c0d9c17ba6308af758ec5b4e68ba7b62",
+      "bytes": 64202
     },
     {
       "path": "scripts/generate-spec-manifest.py",

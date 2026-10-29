@@ -627,6 +627,154 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         return new VerifyRecordProjectionsResponse(results, state.AuthorizationRevision, correlationId);
     }
 
+    /// <summary>Phase C7 M4: the result of one record's protection census (counts only; never contents).</summary>
+    public sealed record ProtectionCensusVerification(string Outcome, long CommittedContentRevision, Guid? CommittedOperationId, int FieldOccurrenceCount, int OldFormOccurrenceCount, int EnvelopeIssueCount, string? RecordStatus, bool Quarantined)
+    {
+        public bool Verified => Outcome == Domain.Features.Catalogue.ProtectionCensusOutcomes.Verified;
+    }
+
+    /// <summary>Not a registered record of the scoped form (or its registration was revoked).</summary>
+    public const string NotInScope = "NOT_IN_SCOPE";
+
+    /// <summary>The only AEAD envelope the business encrypts with (B-28); anything else in a target-form row is an envelope issue.</summary>
+    private const string ApprovedEncryptionAlgorithm = "AES-256-GCM";
+
+    /// <summary>
+    /// Phase C7 M4 (G19, verifier workload only — no user, no SpiceDB): verifies one record of the scoped form exactly as
+    /// <see cref="VerifyRecordCoreAsync"/> does — registry, quarantine, archive receipt, verification key, complete leaf set,
+    /// every HMAC, root — against the head the verifier expects, then counts the rows of <paramref name="fieldDefinitionId"/>
+    /// in the verified canonical bytes: all occurrences (top level and repeating sections), those still in the form the
+    /// decision removes, and target-form encrypted rows whose envelope is not the approved shape or reuses a nonce under the
+    /// same wrapped key. Integrity failures quarantine the head and journal a minimal incident naming the workload, exactly
+    /// like a user verification; nothing is repaired or re-signed. Provider outages throw (the caller's whole call fails).
+    /// The caller holds the organization lock and commits the scope when <c>Quarantined</c> is true.
+    /// </summary>
+    public async Task<ProtectionCensusVerification> VerifyForProtectionCensusAsync(
+        IAuthorityScope scope,
+        OrganizationAuthorizationState state,
+        Guid formDefinitionId,
+        Guid formRecordId,
+        Guid expectedCommittedOperationId,
+        IReadOnlyList<StagedContentItem> observedItems,
+        Guid fieldDefinitionId,
+        ProtectionDirection direction,
+        string workloadName,
+        Guid scopingSecurityCommandId,
+        Guid correlationId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(observedItems);
+        ProtectionCensusVerification Failed(string code, long revision = 0, Guid? operation = null, bool quarantined = false) => new(code, revision, operation, 0, 0, 0, null, quarantined);
+
+        var resource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, formRecordId, cancellationToken).ConfigureAwait(false);
+        if (resource is null || resource.ParentResourceEntityId != formDefinitionId || resource.ResourceLifecycleState == ResourceLifecycleStates.Revoked)
+        {
+            return Failed(NotInScope);
+        }
+
+        var head = await scope.FindContentHeadAsync(state.OrganizationId, formRecordId, lockForUpdate: true, cancellationToken).ConfigureAwait(false);
+        if (resource.ResourceLifecycleState == ResourceLifecycleStates.Quarantined || head?.ContentHeadQuarantined == true)
+        {
+            return Failed("QUARANTINED", head?.CommittedContentRevision ?? 0, head?.CommittedOperationId);
+        }
+
+        if (resource.ResourceLifecycleState != ResourceLifecycleStates.Active || head is null || head.CommittedContentRevision == 0 || head.CurrentRecordManifestCommitId is null)
+        {
+            return Failed("NO_COMMITTED_CONTENT");
+        }
+
+        if (head.CommittedOperationId != expectedCommittedOperationId)
+        {
+            return Failed(HeadChanged, head.CommittedContentRevision, head.CommittedOperationId);
+        }
+
+        var checkpointJournal = await FindContentJournalForHeadAsync(scope, state.OrganizationId, head, cancellationToken).ConfigureAwait(false);
+        if (checkpointJournal is null || checkpointJournal.ArchiveDeliveryState != ArchiveDeliveryStates.Anchored)
+        {
+            return Failed("AWAITING_ARCHIVE", head.CommittedContentRevision, head.CommittedOperationId);
+        }
+
+        var key = await scope.FindKeyRegistrationAsync(state.OrganizationId, IntegrityKeyPurposes.RowIntegrityV1, cancellationToken).ConfigureAwait(false)
+                  ?? throw new AuthorityException(AuthorityErrorCodes.KeyUnavailable, 503, true, "organization integrity key unavailable");
+        if (head.SignatureKeyVersion < key.MinimumVerificationKeyVersion)
+        {
+            // A retired verification key: the revision can no longer be verified, so it is reported, never assumed compliant.
+            return Failed(AuthorityErrorCodes.KeyUnavailable, head.CommittedContentRevision, head.CommittedOperationId);
+        }
+
+        var keyReference = new IntegrityKeyReference(state.OrganizationId, key.KeyPurposeName, key.ProviderKeyName, head.SignatureKeyVersion);
+        var expected = await scope.GetManifestLeavesAsync(head.CurrentRecordManifestCommitId.Value, cancellationToken).ConfigureAwait(false);
+        var failure = await VerifyStagedAgainstLeavesAsync(observedItems, expected.Select(l => (l.ManifestItemKey, l.ManifestItemKindCode, l.ManifestItemId, l.CanonicalPayloadDigest, l.RowSignature)).ToList(), state.OrganizationId, keyReference, head.CommittedContentRevision, head.CommittedOperationId!.Value, head.CommittedManifestRoot, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            // Tamper evidence (same rule as every verified read): quarantine the head, journal a minimal incident, never repair.
+            head.ContentHeadQuarantined = true;
+            head.QuarantineReasonCode = failure;
+            head.ContentHeadModifiedOn = clock.GetUtcNow();
+            state.ContentIntegrityRevision++;
+            var incident = new VerifierIntegrityIncidentBody(formRecordId, head.CommittedContentRevision, head.CommittedOperationId, failure, workloadName, scopingSecurityCommandId, correlationId);
+            scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
+            return Failed(failure, head.CommittedContentRevision, head.CommittedOperationId, quarantined: true);
+        }
+
+        // The bytes are now exactly the accepted, signed rows of this revision: count from them alone.
+        int occurrences = 0, oldForm = 0, envelopeIssues = 0;
+        string? status = null;
+        var nonces = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in observedItems)
+        {
+            var document = RowCanonicalDecoder.Decode(Convert.FromBase64String(item.CanonicalBytesBase64));
+            if (item.ItemKind == ManifestItemKind.RecordHeader)
+            {
+                status = document.Column("record_status")?.AsText();
+                continue;
+            }
+
+            if (item.ItemKind is not (ManifestItemKind.FieldValue or ManifestItemKind.FieldSelection) || document.Column("field_definition_id")?.AsUuid() != fieldDefinitionId)
+            {
+                continue;
+            }
+
+            occurrences++;
+            var encrypted = document.Header.EntityKind == ReprotectionRules.EncryptedEntityKind;
+            if (direction == ProtectionDirection.Encrypt ? !encrypted : encrypted)
+            {
+                oldForm++;
+                continue;
+            }
+
+            if (encrypted && !EnvelopeLooksApproved(document, nonces))
+            {
+                envelopeIssues++;
+            }
+        }
+
+        return new ProtectionCensusVerification(Domain.Features.Catalogue.ProtectionCensusOutcomes.Verified, head.CommittedContentRevision, head.CommittedOperationId, occurrences, oldForm, envelopeIssues, status, false);
+    }
+
+    /// <summary>
+    /// Shape of a target-form AEAD envelope as far as the Authority can judge without keys: the approved algorithm, a 96-bit
+    /// nonce, a 128-bit tag, non-empty ciphertext, wrapped data key and key reference, and no (wrapped key, nonce) pair seen
+    /// before in this revision. The tag itself can only be checked by the key holder (the worker's decrypt check).
+    /// </summary>
+    private static bool EnvelopeLooksApproved(RowCanonicalDocument document, HashSet<string> nonces)
+    {
+        var algorithm = document.Column("encryption_algorithm_name")?.AsText();
+        var nonce = document.Column("encryption_nonce_bytes")?.AsBytes();
+        var tag = document.Column("encryption_auth_tag_bytes")?.AsBytes();
+        var ciphertext = document.Column("encrypted_value_bytes")?.AsBytes();
+        var wrapped = document.Column("wrapped_data_key_bytes")?.AsBytes();
+        var keyReference = document.Column("encryption_key_reference")?.AsText();
+        if (algorithm != ApprovedEncryptionAlgorithm || nonce is not { Length: 12 } || tag is not { Length: 16 } || ciphertext is not { Length: > 0 } || wrapped is not { Length: > 0 } || string.IsNullOrEmpty(keyReference))
+        {
+            return false;
+        }
+
+        return nonces.Add(Convert.ToHexStringLower(wrapped.Value.Span) + ":" + Convert.ToHexStringLower(nonce.Value.Span));
+    }
+
     /// <summary>
     /// One record's verification (shared by the single and the batch operation). Throws the single operation's typed
     /// failures (not found, quarantined, awaiting archive, key unavailable); returns a failure result for missing content,
@@ -1241,6 +1389,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     private sealed record ContentCheckpointBody(Guid FormRecordId, long CommittedContentRevision, Guid CommittedOperationId, string ManifestRootHex, string LeafIndexDigestHex, long LeafCount, int KeyVersion, Guid ActorUserId, long AuthorizationRevision, Guid CorrelationId);
 
     private sealed record IntegrityIncidentBody(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, string FailureReasonCode, Guid ObservedByUserId, Guid CorrelationId);
+
+    /// <summary>Phase C7 M4: the same minimal incident, observed by the verifier workload during a protection census.</summary>
+    private sealed record VerifierIntegrityIncidentBody(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, string FailureReasonCode, string ObservedByWorkloadName, Guid ScopingSecurityCommandId, Guid CorrelationId);
 
     private sealed class UnsignedByteComparer : IComparer<byte[]>
     {

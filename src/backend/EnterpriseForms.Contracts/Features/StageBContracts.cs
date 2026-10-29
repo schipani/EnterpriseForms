@@ -89,9 +89,37 @@ public sealed record StrengthenFieldProtectionRequest(string? TargetClassificati
 /// estimate agrees"; they are not an independently verified completeness guarantee (security finding G19) and not
 /// protected against a hostile business-database administrator.
 /// </summary>
+/// <remarks>
+/// Phase C7 M4 (G19): <c>Reconciliation</c> is the latest reconciliation of the field against the Authorization Authority's
+/// complete record population; <c>AuthorityReconciledComplete</c> is true only when it is Complete under the field's current
+/// protection decision (the Authority attested every accepted record's current revision and every decrypt check passed). It
+/// covers current versions only — never retained history — and the copy shown is held by the business database; the
+/// Authority audit journal holds the original attestation.
+/// </remarks>
 public sealed record FieldProtectionResponse(Guid FieldDefinitionId, string FieldKey, string FieldClassification, string FieldProtectionMode, long ProtectionPolicyRevision, DateTimeOffset? ProtectionChangedOn, string MigrationState, int LegacyPlaintextRecordCount, string SearchImpact, string OrganizationMinimumClassification, bool OrganizationPermitsPlaintext,
     bool FullyEncrypted = false, FieldProtectionMigrationResponse? Migration = null, bool FullyPlaintext = false, int LegacyEncryptedRecordCount = 0,
-    int EstimateUnresolvedRecordCount = 0, FieldProtectionVerificationResponse? Verification = null);
+    int EstimateUnresolvedRecordCount = 0, FieldProtectionVerificationResponse? Verification = null, FieldProtectionReconciliationResponse? Reconciliation = null, bool AuthorityReconciledComplete = false);
+
+/// <summary>
+/// Phase C7 M4: progress and result of one reconciliation (Mode MigrationCompletion or VerifyOnly; State Queued, Running,
+/// Blocked, Complete, Incomplete, Unavailable, Superseded). Counts from <c>Attestation</c> are the Authority's; the
+/// <c>BusinessOnly…</c>, <c>BusinessMissing…</c>, <c>Decrypt…</c> and <c>RetainedOldFormRowCount</c> counts are the worker's
+/// (untrusted business-side observations reported next to the Authority's, never used to narrow it). <c>Basis</c> states
+/// what the result does and does not establish.
+/// </summary>
+public sealed record FieldProtectionReconciliationResponse(Guid FieldProtectionReconciliationId, string Mode, string State, string? LastErrorCode, DateTimeOffset RequestedOn, DateTimeOffset? CompletedOn,
+    int RoundCount, int? CatalogueEntryCount, int CensusProcessedCount, int CensusVerifiedRecordCount, int CensusReusedRecordCount, int CensusFailedRecordCount,
+    int? BusinessOnlyRecordCount, int? BusinessMissingRecordCount, int DecryptCheckedValueCount, int DecryptFailedValueCount, int LogicalTypeMismatchCount, int? RetainedOldFormRowCount,
+    FieldProtectionAttestationResponse? Attestation, string Basis);
+
+/// <summary>Phase C7 M4: the Authority's attestation (copy). Complete only when nothing is quarantined, unverified, uncensused or still in the old form and no search approval is active.</summary>
+public sealed record FieldProtectionAttestationResponse(Guid AttestationId, string DigestHex, long AuditJournalRevision, DateTimeOffset AttestedOn, bool Complete, string? IncompleteReason,
+    int ExpectedRecordCount, int AcceptedRecordCount, int PendingCreationRecordCount, int QuarantinedRecordCount, int CompliantRecordCount, int NotApplicableRecordCount,
+    int OldFormRemainingRecordCount, int OldFormRemainingOccurrenceCount, int TargetFormOccurrenceCount, int UnverifiedRecordCount, int NotYetCensusedRecordCount, int EnvelopeIssueRecordCount,
+    int ArchivedRecordCount, int RetiredRecordCount, long RetainedHistoryRevisionCount, int ActiveSearchApprovalCount, string CoverageStatement);
+
+/// <summary>Phase C7 M4: an authorized request to verify a field's protection against the Authority's complete record population (never converts anything).</summary>
+public sealed record RequestFieldProtectionReconciliationRequest(string RequestReason);
 
 /// <summary>
 /// The migration worker's last post-check (Phase C6 M0): it read the Authority-accepted version of each record the business

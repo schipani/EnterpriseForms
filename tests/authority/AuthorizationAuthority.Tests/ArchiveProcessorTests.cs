@@ -225,5 +225,19 @@ public sealed class ArchiveProcessorTests
         public Task<List<AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid org, Guid? form, CancellationToken ct) => Task.FromResult(new List<AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval>());
 
         public void AddFieldSearchApproval(AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval approval) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid snapshot, IReadOnlyCollection<Guid> records, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid org, IReadOnlyCollection<string> types, IReadOnlyCollection<string> states, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<Dictionary<Guid, int>> CountManifestCommitsAsync(Guid org, IReadOnlyCollection<Guid> records, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.ProtectionCensusResult>> GetProtectionCensusResultsAsync(Guid org, Guid command, IReadOnlyCollection<Guid> records, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddProtectionCensusResult(AuthorizationAuthority.Domain.Features.Catalogue.ProtectionCensusResult result) => throw new NotSupportedException();
+
+        public void AddProtectionAttestation(AuthorizationAuthority.Domain.Features.Catalogue.ProtectionReconciliationAttestation attestation) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid org, IReadOnlyCollection<Guid> commands, CancellationToken ct) => throw new NotSupportedException();
     }
 }

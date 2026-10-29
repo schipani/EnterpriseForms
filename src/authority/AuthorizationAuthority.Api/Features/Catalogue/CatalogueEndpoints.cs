@@ -58,6 +58,23 @@ public static class CatalogueEndpoints
             .WithName("ValidateMigrationCatalogue")
             .WithSummary("Validates the verifier's snapshot like the user snapshot, plus that the scoping command is still the field's current protection decision.");
 
+        verifier.MapPost("/{snapshotId:guid}/census", static async Task<Ok<ProtectionCensusResponse>> (Guid snapshotId, ProtectionCensusRequest request, HttpContext context, ProtectionReconciliationService service, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await service.CensusAsync(WorkloadName(context), snapshotId, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+            .WithName("TakeProtectionCensus")
+            .WithSummary("Phase C7 M4 (G19, verifier only): verifies 1..50 entries of the verifier's own snapshot against their accepted manifests (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the head) and counts the decision's field rows in the old and the target form from the verified bytes. Counts only — never contents. A census already held for the same accepted operation is returned without re-verification unless reverify is set (the first round of every reconciliation sets it).");
+
+        verifier.MapPost("/{snapshotId:guid}/attestation", static async Task<Ok<ProtectionAttestation>> (Guid snapshotId, HttpContext context, ProtectionReconciliationService service, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await service.AttestAsync(WorkloadName(context), snapshotId, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+            .WithName("AttestProtectionReconciliation")
+            .WithSummary("Phase C7 M4 (G19, verifier only): the Authority's reconciliation report for the snapshot's protection decision, computed now under the organization lock from the registry population, current heads and census results (nothing from the business database), journaled on the audit stream before it is returned. 409 when the decision was superseded.");
+
+        endpoints.MapPost(InternalApi.Prefix + "/verifier/protection-coverage", static async Task<Ok<ProtectionCoverageResponse>> (ProtectionCoverageRequest request, HttpContext context, ProtectionReconciliationService service, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await service.CoverageAsync(request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+            .WithTags("Catalogue")
+            .RequireAuthorization(InternalAuthentication.VerifierPolicy)
+            .WithName("GetProtectionCoverage")
+            .WithSummary("Phase C7 M4 (verifier only): every current field protection decision of the organization (Authority protection resources, never the business form list) with its latest attestation; organization-complete only when each decision has a complete attestation under that decision.");
+
         return endpoints;
     }
 

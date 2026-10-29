@@ -130,7 +130,7 @@ public sealed record SearchCatalogueRequest(Guid OrganizationId, Guid FormDefini
 
 /// <remarks>Phase C7 M3: Authority-held registration and head-change times (sorting and display of verified results).</remarks>
 public sealed record CatalogueEntry(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, bool ContentHeadQuarantined, bool ResourceQuarantined,
-    DateTimeOffset? RecordRegisteredOn = null, DateTimeOffset? ContentHeadModifiedOn = null);
+    DateTimeOffset? RecordRegisteredOn = null, DateTimeOffset? ContentHeadModifiedOn = null, string? ProtectionCensusOutcome = null);
 
 /// <summary>The Authority's expected population of one form for the caller, with accepted heads, at one snapshot.</summary>
 public sealed record SearchCatalogue(Guid SearchCatalogueSnapshotId, Guid OrganizationId, Guid FormDefinitionId, long AuthorizationRevision, long ProjectionRevision, long ContentIntegrityRevision,

@@ -273,6 +273,30 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<int> CountPendingProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
 
+    /// <summary>Phase C7 M4: the migration's item for one record (tracked), or null.</summary>
+    Task<FieldProtectionMigrationItem?> FindProtectionMigrationItemForRecordAsync(Guid fieldProtectionMigrationId, Guid formRecordId, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M4: business form_records rows that exist among the given ids (untrusted; for the bidirectional comparison and item FKs only).</summary>
+    Task<HashSet<Guid>> GetExistingFormRecordIdsAsync(IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M4 (residual exposure, untrusted): rows of the field in the old form across every staged operation the business database holds.</summary>
+    Task<int> CountOldFormRowsOfFieldAsync(Guid fieldDefinitionId, bool encryptedForm, CancellationToken cancellationToken);
+
+    void AddProtectionReconciliation(FieldProtectionReconciliation reconciliation);
+
+    Task<FieldProtectionReconciliation?> FindProtectionReconciliationAsync(Guid fieldProtectionReconciliationId, CancellationToken cancellationToken);
+
+    /// <summary>The field's most recently requested reconciliation (tracked), or null.</summary>
+    Task<FieldProtectionReconciliation?> FindLatestProtectionReconciliationAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+
+    /// <summary>The field's Queued, Running or Blocked reconciliation (tracked), or null.</summary>
+    Task<FieldProtectionReconciliation?> FindActiveProtectionReconciliationAsync(Guid fieldDefinitionId, CancellationToken cancellationToken);
+
+    Task<int> CountProtectionReconciliationsOfMigrationAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken);
+
+    /// <summary>Leases the next due reconciliation (FOR UPDATE SKIP LOCKED), or null.</summary>
+    Task<FieldProtectionReconciliation?> LeaseNextProtectionReconciliationAsync(string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken);
+
     Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken);
 
     void AddUiPreference(UserUiPreference preference);

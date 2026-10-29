@@ -185,9 +185,29 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         snapshot.RequestingWorkloadName = workloadName;
         snapshot.ScopingSecurityCommandId = decision.CommandId;
         Audit(scope, locked, "MigrationCatalogueIssued", new CatalogueAuditBody(snapshot.SearchCatalogueSnapshotId, CatalogueScopeKinds.MigrationVerification, request.FormDefinitionId, null, workloadName, decision.CommandId, entries.Count, Convert.ToHexStringLower(snapshot.CatalogueDigest), locked.AuthorizationRevision, locked.ContentIntegrityRevision, null, correlationId), now);
+        var first = entries.Take(settings.MigrationPageSize).ToList();
+        var census = await CensusOutcomesAsync(scope, snapshot, first, cancellationToken).ConfigureAwait(false);
         scope.AddCatalogueSnapshot(snapshot, entries);
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-        return ToPage(snapshot, entries, 0, settings.MigrationPageSize, correlationId);
+        return ToPage(snapshot, first, 0, census, correlationId);
+    }
+
+    /// <summary>
+    /// Phase C7 M4: the census outcome the Authority already holds for each page entry's exact accepted operation under the
+    /// snapshot's decision (absent: none yet). A hint for the verifier's work-list only; the attestation re-derives everything.
+    /// </summary>
+    private static async Task<Dictionary<Guid, string>> CensusOutcomesAsync(IAuthorityScope scope, SearchCatalogueSnapshot snapshot, List<SearchCatalogueSnapshotEntry> page, CancellationToken cancellationToken)
+    {
+        var contentful = page.Where(e => e.CommittedOperationId is not null).Select(e => e.FormRecordId).ToList();
+        if (contentful.Count == 0 || snapshot.ScopingSecurityCommandId is not { } command)
+        {
+            return [];
+        }
+
+        var operations = page.Where(e => e.CommittedOperationId is not null).ToDictionary(e => e.FormRecordId, e => e.CommittedOperationId!.Value);
+        return (await scope.GetProtectionCensusResultsAsync(snapshot.OrganizationId, command, contentful, cancellationToken).ConfigureAwait(false))
+            .Where(r => operations.GetValueOrDefault(r.FormRecordId) == r.CommittedOperationId)
+            .ToDictionary(r => r.FormRecordId, r => r.CensusOutcomeName);
     }
 
     public async Task<MigrationCataloguePage> ReadMigrationCatalogueAsync(string workloadName, Guid snapshotId, int offset, Guid correlationId, CancellationToken cancellationToken)
@@ -205,9 +225,7 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
         }
 
         var entries = await scope.GetCatalogueSnapshotEntriesAsync(snapshotId, offset, options.MigrationPageSize, cancellationToken).ConfigureAwait(false);
-        return new MigrationCataloguePage(snapshot.SearchCatalogueSnapshotId, snapshot.OrganizationId, snapshot.FormDefinitionId, snapshot.ScopingSecurityCommandId ?? Guid.Empty,
-            snapshot.SnapshotAuthorizationRevision, snapshot.SnapshotContentIntegrityRevision, snapshot.CatalogueEntryCount, entries.Select(ToContract).ToList(),
-            offset + entries.Count < snapshot.CatalogueEntryCount ? offset + entries.Count : null, correlationId);
+        return ToPage(snapshot, entries, offset, await CensusOutcomesAsync(scope, snapshot, entries, cancellationToken).ConfigureAwait(false), correlationId);
     }
 
     public async Task<CatalogueSnapshotValidation> ValidateMigrationSnapshotAsync(string workloadName, Guid snapshotId, Guid correlationId, CancellationToken cancellationToken)
@@ -449,13 +467,11 @@ public sealed class SearchCatalogueService(IAuthorityStore store, ISpiceDbProjec
     private static CatalogueEntry ToContract(SearchCatalogueSnapshotEntry e) =>
         new(e.FormRecordId, e.CommittedContentRevision, e.CommittedOperationId, e.ContentHeadQuarantined, e.ResourceLifecycleState == ResourceLifecycleStates.Quarantined);
 
-    private static MigrationCataloguePage ToPage(SearchCatalogueSnapshot snapshot, List<SearchCatalogueSnapshotEntry> all, int offset, int pageSize, Guid correlationId)
-    {
-        var page = all.Skip(offset).Take(pageSize).ToList();
-        return new MigrationCataloguePage(snapshot.SearchCatalogueSnapshotId, snapshot.OrganizationId, snapshot.FormDefinitionId, snapshot.ScopingSecurityCommandId ?? Guid.Empty,
-            snapshot.SnapshotAuthorizationRevision, snapshot.SnapshotContentIntegrityRevision, snapshot.CatalogueEntryCount, page.Select(ToContract).ToList(),
+    private static MigrationCataloguePage ToPage(SearchCatalogueSnapshot snapshot, List<SearchCatalogueSnapshotEntry> page, int offset, Dictionary<Guid, string> census, Guid correlationId) =>
+        new(snapshot.SearchCatalogueSnapshotId, snapshot.OrganizationId, snapshot.FormDefinitionId, snapshot.ScopingSecurityCommandId ?? Guid.Empty,
+            snapshot.SnapshotAuthorizationRevision, snapshot.SnapshotContentIntegrityRevision, snapshot.CatalogueEntryCount,
+            page.Select(e => ToContract(e) with { ProtectionCensusOutcome = census.GetValueOrDefault(e.FormRecordId) }).ToList(),
             offset + page.Count < snapshot.CatalogueEntryCount ? offset + page.Count : null, correlationId);
-    }
 
     private sealed record CanonicalEntry(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, bool ContentHeadQuarantined, string ResourceLifecycleState);
 

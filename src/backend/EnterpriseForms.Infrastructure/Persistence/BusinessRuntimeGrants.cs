@@ -24,7 +24,7 @@ public static class BusinessRuntimeGrants
         "form_drafts", "field_options", "option_lists", "option_list_items", "form_relationship_definitions", "form_record_relationships",
         "upload_sessions", "file_attachments", "document_processing_jobs",
         "organization_brandings", "user_ui_preferences", "organization_security_policies",
-        "field_protection_migrations", "field_protection_migration_items",
+        "field_protection_migrations", "field_protection_migration_items", "field_protection_reconciliations",
     ];
 
     /// <summary>

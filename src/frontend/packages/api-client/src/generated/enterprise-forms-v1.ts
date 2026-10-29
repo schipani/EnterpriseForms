@@ -277,6 +277,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phase C7 M4 (G19): queues a verify-only reconciliation of the field's current protection decision against the Authorization Authority's complete record population (Worker verifier; never converts anything; same permission as retrying the migration; audited). 409 while the migration or another reconciliation is still running. */
+        post: operations["RequestFieldProtectionReconciliation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reclassify": {
         parameters: {
             query?: never;
@@ -1670,6 +1687,50 @@ export interface components {
             /** Format: uuid */
             optionListItemId?: null | string;
         };
+        FieldProtectionAttestationResponse: {
+            /** Format: uuid */
+            attestationId: string;
+            digestHex: string;
+            /** Format: int64 */
+            auditJournalRevision: number | string;
+            /** Format: date-time */
+            attestedOn: string;
+            complete: boolean;
+            incompleteReason: null | string;
+            /** Format: int32 */
+            expectedRecordCount: number | string;
+            /** Format: int32 */
+            acceptedRecordCount: number | string;
+            /** Format: int32 */
+            pendingCreationRecordCount: number | string;
+            /** Format: int32 */
+            quarantinedRecordCount: number | string;
+            /** Format: int32 */
+            compliantRecordCount: number | string;
+            /** Format: int32 */
+            notApplicableRecordCount: number | string;
+            /** Format: int32 */
+            oldFormRemainingRecordCount: number | string;
+            /** Format: int32 */
+            oldFormRemainingOccurrenceCount: number | string;
+            /** Format: int32 */
+            targetFormOccurrenceCount: number | string;
+            /** Format: int32 */
+            unverifiedRecordCount: number | string;
+            /** Format: int32 */
+            notYetCensusedRecordCount: number | string;
+            /** Format: int32 */
+            envelopeIssueRecordCount: number | string;
+            /** Format: int32 */
+            archivedRecordCount: number | string;
+            /** Format: int32 */
+            retiredRecordCount: number | string;
+            /** Format: int64 */
+            retainedHistoryRevisionCount: number | string;
+            /** Format: int32 */
+            activeSearchApprovalCount: number | string;
+            coverageStatement: string;
+        };
         FieldProtectionMigrationResponse: {
             /** Format: uuid */
             fieldProtectionMigrationId: string;
@@ -1699,6 +1760,43 @@ export interface components {
             cancelledOn?: null | string;
             /** Format: uuid */
             rollbackOfMigrationId?: null | string;
+        };
+        FieldProtectionReconciliationResponse: {
+            /** Format: uuid */
+            fieldProtectionReconciliationId: string;
+            mode: string;
+            state: string;
+            lastErrorCode: null | string;
+            /** Format: date-time */
+            requestedOn: string;
+            /** Format: date-time */
+            completedOn: null | string;
+            /** Format: int32 */
+            roundCount: number | string;
+            /** Format: int32 */
+            catalogueEntryCount: null | number | string;
+            /** Format: int32 */
+            censusProcessedCount: number | string;
+            /** Format: int32 */
+            censusVerifiedRecordCount: number | string;
+            /** Format: int32 */
+            censusReusedRecordCount: number | string;
+            /** Format: int32 */
+            censusFailedRecordCount: number | string;
+            /** Format: int32 */
+            businessOnlyRecordCount: null | number | string;
+            /** Format: int32 */
+            businessMissingRecordCount: null | number | string;
+            /** Format: int32 */
+            decryptCheckedValueCount: number | string;
+            /** Format: int32 */
+            decryptFailedValueCount: number | string;
+            /** Format: int32 */
+            logicalTypeMismatchCount: number | string;
+            /** Format: int32 */
+            retainedOldFormRowCount: null | number | string;
+            attestation: null | components["schemas"]["FieldProtectionAttestationResponse"];
+            basis: string;
         };
         FieldProtectionResponse: {
             /** Format: uuid */
@@ -1732,6 +1830,9 @@ export interface components {
              */
             estimateUnresolvedRecordCount: number | string;
             verification?: null | components["schemas"]["FieldProtectionVerificationResponse"];
+            reconciliation?: null | components["schemas"]["FieldProtectionReconciliationResponse"];
+            /** @default false */
+            authorityReconciledComplete: boolean;
         };
         FieldProtectionVerificationResponse: {
             /** Format: date-time */
@@ -2347,6 +2448,9 @@ export interface components {
             reason: null | string;
             /** @default false */
             useDevelopmentStepUp: boolean;
+        };
+        RequestFieldProtectionReconciliationRequest: {
+            requestReason: string;
         };
         RestoreFieldChangeResponse: {
             fieldKey: string;
@@ -3022,6 +3126,33 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RetryFieldProtectionMigrationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldProtectionResponse"];
+                };
+            };
+        };
+    };
+    RequestFieldProtectionReconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestFieldProtectionReconciliationRequest"];
             };
         };
         responses: {

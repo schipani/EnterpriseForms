@@ -21,6 +21,7 @@ passed on a command line or written into the working tree.
     python scripts/devstack/devstack.py security-admin enable-approvals  # DR-C7-3: synthetic approver keys (once)
     python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "..."            # dry run
     python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "..." --execute  # confirm
+    python scripts/devstack/devstack.py protection-verifier status|enable  # Phase C7 M4: verifier credential (no data changes)
 
 See docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md. Production signing uses Azure Managed HSM; nothing here is a
 production control or Level 2 evidence.
@@ -115,6 +116,14 @@ def load_approvers(project: str) -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8"))["approvers"] if path.exists() else []
 
 
+VERIFIER_FILE = "protection-verifier.json"  # Phase C7 M4 (OD-1); separate custody file, never part of custody.json
+
+
+def load_verifier(project: str) -> dict | None:
+    path = custody_dir(project) / VERIFIER_FILE
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
 def load_state(project: str) -> dict:
     path = custody_dir(project) / "state.json"
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
@@ -163,6 +172,12 @@ class Stack:
         for index, approver in enumerate(approvers[:2], start=1):
             env[f"DEVSTACK_OPERATOR_APPROVER_{index}_ID"] = approver["approver_id"]
             env[f"DEVSTACK_OPERATOR_APPROVER_{index}_PUBLIC_KEY"] = approver["public_key_spki_base64"]
+        # Phase C7 M4: the field-protection verifier credential (Authority + Worker only), once `protection-verifier enable` created it.
+        verifier = load_verifier(self.project)
+        if verifier:
+            env["DEVSTACK_PROTECTION_VERIFIER_ISSUER"] = verifier["issuer"]
+            env["DEVSTACK_PROTECTION_VERIFIER_AUDIENCE"] = verifier["audience"]
+            env["DEVSTACK_PROTECTION_VERIFIER_KEY"] = verifier["shared_key_base64"]
         env.update(self.overrides)
         return env
 
@@ -958,6 +973,32 @@ def print_preview(preview: dict) -> None:
         print(f"NOT ELIGIBLE : {preview['refusal_code']} - {preview.get('refusal_detail') or ''}")
 
 
+def cmd_protection_verifier(args) -> None:
+    """Phase C7 M4: enable the DEVELOPMENT-ONLY field-protection verifier credential (Authority + Worker). No data changes."""
+    stack = Stack(args.project, load_custody(args.project))
+    path = custody_dir(args.project) / VERIFIER_FILE
+    if args.action == "status":
+        verifier = load_verifier(args.project)
+        print(f"[protection-verifier] {'enabled (issuer ' + verifier['issuer'] + ')' if verifier else 'not enabled: reconciliations report themselves unavailable'}")
+        return
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    if path.exists():
+        print("[protection-verifier] credential already exists in the custody directory")
+    else:
+        # Own issuer, audience and 256-bit key, distinct from the workload and operator credentials (both hosts refuse reuse).
+        write_private_json(path, {
+            "purpose": "DEVELOPMENT ONLY field-protection verifier credential (Phase C7 M4, OD-1). Never commit.",
+            "issuer": "enterpriseforms-field-protection-verifier-dev",
+            "audience": "authorization-authority-verifier",
+            "shared_key_base64": base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
+        })
+        print(f"[protection-verifier] generated a DEVELOPMENT-ONLY verifier credential in {path} (owner-only ACL; never printed)")
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "authority", "worker", timeout=900)
+    print("[protection-verifier] authority and worker recreated with the verifier credential (no data changed; no migration started).")
+    print("[protection-verifier] reconciliations run only when a protection migration finishes or when you request one in the Edit field dialog.")
+
+
 def cmd_security_admin(args) -> None:
     stack = Stack(args.project, load_custody(args.project))
     if stack.vault_status() != "unsealed":
@@ -1044,6 +1085,9 @@ def main() -> int:
     security.add_argument("--remove-user-id", action="append", help="administrator to remove (recover only; repeatable)")
     security.add_argument("--execute", action="store_true", help="after the dry run and your typed confirmation, perform the change")
     security.set_defaults(handler=cmd_security_admin)
+    verifier = commands.add_parser("protection-verifier", help="Phase C7 M4: development-only field-protection verifier credential (Authority + Worker)")
+    verifier.add_argument("action", choices=["status", "enable"])
+    verifier.set_defaults(handler=cmd_protection_verifier)
     restore = commands.add_parser("restore-test")
     restore.add_argument("backup_dir")
     restore.add_argument("--keep", action="store_true", help="leave the disposable restore project running for inspection")

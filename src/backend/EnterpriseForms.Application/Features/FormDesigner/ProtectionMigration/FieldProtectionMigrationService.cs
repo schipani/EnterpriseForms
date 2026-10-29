@@ -485,12 +485,25 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
         }
         else
         {
-            migration.MigrationState = FieldProtectionMigrationStates.Completed;
-            migration.MigrationCompletedOn = now;
-            migration.MigrationVerifiedOn = now;
+            // Phase C7 M4 (G19): the business-side post-check passed, but it only covers the records the business database
+            // lists. Completion is decided by a reconciliation against the Authority's complete record population (Worker,
+            // field-protection verifier); until it attests, the migration is Verifying and makes no claim.
+            migration.MigrationState = FieldProtectionMigrationStates.Verifying;
             migration.LastErrorCode = null;
             migration.NextAttemptOn = DateTimeOffset.MaxValue;
-            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionMigrationCompleted, "Success", decrypting ? "every listed record decrypted through the authority; post-check against the authority-accepted heads of the records the business database lists found no encrypted row of the field (Amendment A1; not an independent completeness proof, G19)" : "every listed record re-protected through the authority; post-check against the authority-accepted heads of the records the business database lists found no plaintext copy of the field (not an independent completeness proof, G19)", null, new { migration.TotalRecordCount, migration.TotalValueCount, migration.CompletedRecordCount, verifiedRecords = checkedHeads.Count, direction = migration.MigrationDirection }));
+            var active = await scope.FindActiveProtectionReconciliationAsync(migration.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            if (active is not null)
+            {
+                active.ReconciliationState = FieldProtectionReconciliationStates.Superseded;
+                active.LastErrorCode = "MIGRATION_COMPLETION_REQUESTED";
+                active.ReconciliationCompletedOn = now;
+                active.ReconciliationModifiedOn = now;
+                active.NextAttemptOn = DateTimeOffset.MaxValue;
+            }
+
+            var reconciliation = FieldProtectionReconciliationRequests.New(migration.TenantId, migration.FormDefinitionId, migration.FieldDefinitionId, migration.FieldProtectionMigrationId, migration.AuthorityCommandId, migration.MigrationDirection, FieldProtectionReconciliationModes.MigrationCompletion, null, null, now);
+            scope.AddProtectionReconciliation(reconciliation);
+            scope.AddAuditEvent(ServiceEvent(migration, AuditActions.FieldProtectionReconciliationRequested, "Success", "every listed record converted; completion now depends on the Authorization Authority's reconciliation of the complete record population (G19)", null, new { reconciliationId = reconciliation.FieldProtectionReconciliationId, migration.TotalRecordCount, migration.CompletedRecordCount, verifiedRecords = checkedHeads.Count, direction = migration.MigrationDirection }));
         }
 
         migration.LeaseOwnerName = null;

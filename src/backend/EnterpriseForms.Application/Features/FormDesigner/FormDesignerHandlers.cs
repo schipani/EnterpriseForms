@@ -807,6 +807,64 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         return await ProtectionResponseAsync(scope, field, policy, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Phase C7 M4 (G19): queues a verify-only reconciliation of the field's current protection decision against the
+    /// Authorization Authority's complete record population. Same permission as retrying the field's migration (design for an
+    /// encryption decision; organization administration for a removal). Never converts anything and never runs while the
+    /// migration itself is still working; the Worker's verifier does the reconciliation, the business API cannot.
+    /// </summary>
+    public async Task<FieldProtectionResponse> RequestProtectionReconciliationAsync(RequestContext context, Guid formDefinitionId, Guid fieldDefinitionId, RequestFieldProtectionReconciliationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(request);
+        var reason = RequireReason(request.RequestReason);
+        string direction;
+        await using (var peek = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            _ = await peek.FindFormDefinitionAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)
+                ?? throw new BusinessException("NOT_FOUND", 404, "form definition not found");
+            direction = (await peek.FindLatestProtectionMigrationAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false))?.MigrationDirection ?? FieldProtectionMigrationDirections.Encrypt;
+        }
+
+        if (direction == FieldProtectionMigrationDirections.Decrypt)
+        {
+            await RequireOrganizationAdministratorAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        }
+
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var field = await scope.FindFieldDefinitionAsync(formDefinitionId, fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new BusinessException("NOT_FOUND", 404, "field not found");
+        var migration = await scope.FindLatestProtectionMigrationAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false)
+                        ?? throw new BusinessException("NO_PROTECTION_DECISION", 409, "the field has no protection change to reconcile");
+        if (migration.MigrationState is not (FieldProtectionMigrationStates.Completed or FieldProtectionMigrationStates.Failed))
+        {
+            throw new BusinessException("MIGRATION_IN_PROGRESS", 409, "the field's protection migration is still working; it reconciles itself when it finishes");
+        }
+
+        var expectedMode = migration.MigrationDirection == FieldProtectionMigrationDirections.Decrypt ? FieldProtectionModes.Standard : FieldProtectionModes.ApplicationEncrypted;
+        if (field.FieldProtectionMode != expectedMode)
+        {
+            throw new BusinessException("NO_PROTECTION_DECISION", 409, "the field's protection no longer matches its latest protection change");
+        }
+
+        if (await scope.FindActiveProtectionReconciliationAsync(fieldDefinitionId, cancellationToken).ConfigureAwait(false) is not null)
+        {
+            throw new BusinessException("RECONCILIATION_IN_PROGRESS", 409, "a reconciliation of this field is already queued or running");
+        }
+
+        var now = clock.GetUtcNow();
+        var reconciliation = ProtectionMigration.FieldProtectionReconciliationRequests.New(context.OrganizationId, formDefinitionId, fieldDefinitionId, migration.FieldProtectionMigrationId, migration.AuthorityCommandId, migration.MigrationDirection, FieldProtectionReconciliationModes.VerifyOnly, context.LocalUserId, reason, now);
+        scope.AddProtectionReconciliation(reconciliation);
+        var policy = await Organizations.SecurityPolicyHandlers.EnsureAsync(scope, context.OrganizationId, cancellationToken).ConfigureAwait(false);
+        AuditRecorder.Record(scope, context, clock, AuditCategories.Security, AuditActions.FieldProtectionReconciliationRequested, "verify-only reconciliation of the field against the Authorization Authority's complete record population queued (no conversion)", formDefinitionId: formDefinitionId, fieldDefinitionId: fieldDefinitionId, targetEntityType: "field_protection_reconciliation", targetEntityId: reconciliation.FieldProtectionReconciliationId, metadata: new { requestReason = reason, direction = migration.MigrationDirection, authorityCommandId = migration.AuthorityCommandId });
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return await ProtectionResponseAsync(scope, field, policy, cancellationToken).ConfigureAwait(false);
+    }
+
     private static string RequireReason(string? text)
     {
         var reason = text?.Trim() ?? string.Empty;
@@ -923,10 +981,36 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         var status = ProtectionMigration.FieldProtectionStatusEvaluator.Evaluate(encrypted, isFile, estimate, migration);
         var legacyPlaintext = encrypted && !isFile ? estimate.HolderValueCount : 0;
         var legacyEncrypted = !encrypted && !isFile ? estimate.HolderRecordCount : 0;
+        var reconciliation = isFile ? null : await scope.FindLatestProtectionReconciliationAsync(field.FieldDefinitionId, cancellationToken).ConfigureAwait(false);
+        // Complete only under the decision the latest migration carries and in the field's current direction (a stale report never speaks for a newer decision).
+        var reconciledComplete = reconciliation is { ReconciliationState: FieldProtectionReconciliationStates.Complete } && migration is not null && reconciliation.AuthorityCommandId == migration.AuthorityCommandId
+                                 && reconciliation.MigrationDirection == (encrypted ? FieldProtectionMigrationDirections.Encrypt : FieldProtectionMigrationDirections.Decrypt);
         return new FieldProtectionResponse(field.FieldDefinitionId, field.FieldKey, field.FieldClassification, field.FieldProtectionMode, field.ProtectionPolicyRevision, field.ProtectionChangedOn, status.State, legacyPlaintext,
             encrypted ? "Encrypted for privacy — not searchable in V1 (ADR-PB-004). Authorized users see the value on the record; no plaintext copy exists in the business database." : "Plaintext: searchable within authorization, and readable by a database administrator.",
             policy.MinimumFieldClassification, policy.PlaintextInternalFieldsPermitted, status.FullyEncrypted, progress, status.FullyPlaintext, legacyEncrypted,
-            isFile ? 0 : estimate.UnresolvedRecordIds.Count, verification);
+            isFile ? 0 : estimate.UnresolvedRecordIds.Count, verification, reconciliation is null ? null : ToReconciliationResponse(reconciliation), reconciledComplete);
+    }
+
+    /// <summary>What a reconciliation result does and does not establish (shown with it).</summary>
+    public const string ReconciliationBasis = "Reconciled by the Worker's separate field-protection verifier against the Authorization Authority's complete record population for this form, including records no user can open. The Authority verified each accepted record's current version (every row and signature) and counted the field's rows itself; its attestation is journaled in the Authority audit trail. It covers current versions only: earlier versions kept as history, retired records, write-ahead logs, replicas and backups are not migrated and may still hold the old form. The copy shown here is stored in the business database.";
+
+    private static FieldProtectionReconciliationResponse ToReconciliationResponse(FieldProtectionReconciliation r)
+    {
+        FieldProtectionAttestationResponse? attestation = null;
+        if (r.AuthorityAttestationId is { } attestationId && r.AttestationReportJson is { } json)
+        {
+            var a = System.Text.Json.JsonSerializer.Deserialize<Common.Authority.ProtectionAttestation>(json);
+            if (a is not null)
+            {
+                attestation = new FieldProtectionAttestationResponse(attestationId, r.AttestationDigestHex ?? string.Empty, r.AttestationAuditJournalRevision ?? 0, r.AttestedOn ?? a.AttestedOn, a.AttestationComplete, a.AttestationIncompleteReason,
+                    a.ExpectedRecordCount, a.AcceptedRecordCount, a.PendingCreationRecordCount, a.QuarantinedRecordCount, a.CompliantRecordCount, a.NotApplicableRecordCount, a.OldFormRemainingRecordCount, a.OldFormRemainingOccurrenceCount,
+                    a.TargetFormOccurrenceCount, a.UnverifiedRecordCount, a.NotYetCensusedRecordCount, a.EnvelopeIssueRecordCount, a.ArchivedRecordCount, a.RetiredRecordCount, a.RetainedHistoryRevisionCount, a.ActiveSearchApprovalCount, a.CoverageStatement);
+            }
+        }
+
+        return new FieldProtectionReconciliationResponse(r.FieldProtectionReconciliationId, r.ReconciliationMode, r.ReconciliationState, r.LastErrorCode, r.ReconciliationRequestedOn, r.ReconciliationCompletedOn,
+            r.ReconciliationRoundCount, r.CatalogueEntryCount, r.CensusNextOffset, r.CensusVerifiedRecordCount, r.CensusReusedRecordCount, r.CensusFailedRecordCount,
+            r.BusinessOnlyRecordCount, r.BusinessMissingRecordCount, r.DecryptCheckedValueCount, r.DecryptFailedValueCount, r.LogicalTypeMismatchCount, r.RetainedOldFormRowCount, attestation, ReconciliationBasis);
     }
 
     /// <summary>What the stored post-check result does and does not establish (shown with it).</summary>

@@ -63,6 +63,9 @@ export type RemoveSecurityAdministratorRequest = S["RemoveSecurityAdministratorR
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
 export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
 export type FieldProtectionVerificationResponse = S["FieldProtectionVerificationResponse"];
+export type FieldProtectionReconciliationResponse = S["FieldProtectionReconciliationResponse"];
+export type FieldProtectionAttestationResponse = S["FieldProtectionAttestationResponse"];
+export type RequestFieldProtectionReconciliationRequest = S["RequestFieldProtectionReconciliationRequest"];
 export type RecordLifecycleRequest = S["RecordLifecycleRequest"];
 export type RecordLifecycleResponse = S["RecordLifecycleResponse"];
 export type RecordLifecycleStateResponse = S["RecordLifecycleStateResponse"];
@@ -181,6 +184,7 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       protection: (formDefinitionId: string, fieldDefinitionId: string, signal?: AbortSignal) => read<FieldProtectionResponse>("forms.protection", { formDefinitionId, fieldDefinitionId }, undefined, "interactive-read", signal),
       strengthenProtection: (formDefinitionId: string, fieldDefinitionId: string, request: StrengthenFieldProtectionRequest) => write<FieldProtectionResponse>("POST", "forms.strengthenProtection", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       retryProtectionMigration: (formDefinitionId: string, fieldDefinitionId: string, request: RetryFieldProtectionMigrationRequest) => write<FieldProtectionResponse>("POST", "forms.retryProtectionMigration", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      requestProtectionReconciliation: (formDefinitionId: string, fieldDefinitionId: string, request: RequestFieldProtectionReconciliationRequest) => write<FieldProtectionResponse>("POST", "forms.requestProtectionReconciliation", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       reclassifyField: (formDefinitionId: string, fieldDefinitionId: string, request: ReclassifyFieldRequest) => write<FieldProtectionResponse>("POST", "forms.reclassifyField", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       fieldSearch: (formDefinitionId: string, signal?: AbortSignal) => read<FieldSearchConfigurationResponse>("forms.fieldSearch", { formDefinitionId }, undefined, "interactive-read", signal),
       approveFieldSearch: (formDefinitionId: string, fieldDefinitionId: string, request: ApproveFieldSearchRequest) => write<FieldSearchConfigurationResponse>("POST", "forms.approveFieldSearch", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),

@@ -48,6 +48,8 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
 
     public DbSet<FieldProtectionMigrationItem> FieldProtectionMigrationItems => Set<FieldProtectionMigrationItem>();
 
+    public DbSet<FieldProtectionReconciliation> FieldProtectionReconciliations => Set<FieldProtectionReconciliation>();
+
     public DbSet<FormDraft> FormDrafts => Set<FormDraft>();
 
     public DbSet<FormRecord> FormRecords => Set<FormRecord>();

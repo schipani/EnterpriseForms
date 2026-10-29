@@ -1,0 +1,35 @@
+{
+  "measuredOn": "2026-10-29T13:42:32.7823109+00:00",
+  "scenario": "strengthen a plaintext Internal String field; worker migration then MigrationCompletion reconciliation (catalogue, census of every record, decrypt check, attestation); then three verify-only runs (first round re-verifies every record); then a worker restart mid-run",
+  "note": "engineering measurement on the isolated security-test stack; status polling at 1 s adds up to 1 s per measurement; small samples; not a capacity claim",
+  "results": [
+    {
+      "records": 100,
+      "migrationAndReconciliationSeconds": 22.29,
+      "completionReconciliationSeconds": 3.26,
+      "completionCensusVerified": 100,
+      "verifiedRecordsPerSecond": 30.6,
+      "verifyOnlyFullReverificationRunSeconds": {
+        "p50": 4.26,
+        "max": 4.33,
+        "min": 4.24
+      },
+      "restartRecoverySeconds": 9.12,
+      "authorityCallsPerFullRound": 6
+    },
+    {
+      "records": 250,
+      "migrationAndReconciliationSeconds": 49.33,
+      "completionReconciliationSeconds": 8.87,
+      "completionCensusVerified": 250,
+      "verifiedRecordsPerSecond": 28.2,
+      "verifyOnlyFullReverificationRunSeconds": {
+        "p50": 8.47,
+        "max": 8.48,
+        "min": 7.37
+      },
+      "restartRecoverySeconds": 14.21,
+      "authorityCallsPerFullRound": 9
+    }
+  ]
+}

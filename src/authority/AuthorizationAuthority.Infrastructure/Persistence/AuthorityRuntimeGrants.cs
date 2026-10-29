@@ -13,7 +13,7 @@ public static class AuthorityRuntimeGrants
     [
         "security_commands", "security_journal_entries", "authority_relationship_edges", "projection_outbox_events",
         "record_manifest_commits", "record_manifest_leaves", "content_integrity_checkpoints", "content_candidate_leaves",
-        "search_catalogue_snapshot_entries", "published_form_versions",
+        "search_catalogue_snapshot_entries", "published_form_versions", "protection_census_results", "protection_reconciliation_attestations",
     ];
 
     private static readonly string[] MutableTables =

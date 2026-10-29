@@ -76,6 +76,7 @@ public sealed class Program
         AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptionsValidation.Validate(catalogueOptions);
         builder.Services.AddSingleton(catalogueOptions);
         builder.Services.AddSingleton<AuthorizationAuthority.Application.Features.Catalogue.SearchCatalogueService>();
+        builder.Services.AddSingleton<AuthorizationAuthority.Application.Features.Catalogue.ProtectionReconciliationService>();
         builder.Services.AddSingleton<SpiceDbSchemaInitializer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SpiceDbSchemaInitializer>());
         builder.Services.AddHostedService<AuthorityWorkLoop>();

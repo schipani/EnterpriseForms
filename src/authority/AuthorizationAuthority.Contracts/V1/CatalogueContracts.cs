@@ -17,6 +17,11 @@ public sealed record SearchCatalogueRequest(Guid OrganizationId, Guid FormDefini
 /// its accepted head last changed; null without content) are Authority-held times, used to sort and display verified search
 /// results instead of unsigned business timestamps.
 /// </remarks>
+/// <remarks>
+/// Phase C7 M4: in a migration catalogue page, <c>ProtectionCensusOutcome</c> is the outcome of a census the Authority already
+/// holds for exactly this record, accepted operation and scoping command (null: none yet), so the verifier only sends the
+/// rows of records that still need one. Always null in a user catalogue.
+/// </remarks>
 public sealed record CatalogueEntry(
     Guid FormRecordId,
     long CommittedContentRevision,
@@ -24,7 +29,8 @@ public sealed record CatalogueEntry(
     bool ContentHeadQuarantined,
     bool ResourceQuarantined,
     DateTimeOffset? RecordRegisteredOn = null,
-    DateTimeOffset? ContentHeadModifiedOn = null);
+    DateTimeOffset? ContentHeadModifiedOn = null,
+    string? ProtectionCensusOutcome = null);
 
 public sealed record SearchCatalogueResponse(
     Guid SearchCatalogueSnapshotId,
@@ -97,3 +103,99 @@ public sealed record BatchVerificationResult(
     IReadOnlyList<VerifiedProjectionItem> ReadableItems);
 
 public sealed record VerifyRecordProjectionsResponse(IReadOnlyList<BatchVerificationResult> Results, long AuthorizationRevision, Guid CorrelationId);
+
+// Phase C7 M4 — G19 protection reconciliation (verifier workload only, OD-1; docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md §6F).
+// The Authority verifies each record's accepted revision itself and counts the field's rows in the old and the target form
+// from the verified canonical bytes; the attestation is computed from Authority state only. Nothing here carries record
+// contents, field values or ciphertext.
+
+/// <summary>One record of a census: the head the verifier expects (from its migration snapshot) and the observed staged items of that operation.</summary>
+public sealed record ProtectionCensusItem(Guid FormRecordId, Guid ExpectedCommittedOperationId, IReadOnlyList<StagedContentItem> ObservedItems);
+
+/// <summary>
+/// 1..50 records of the snapshot, each verified fully and independently. <c>Reverify</c>: verify the observed rows even when
+/// a census of the same accepted operation is already held (the first round of every reconciliation sets it, so business
+/// rows tampered with after an earlier census are caught); without it a held census is returned as <c>Reused</c>.
+/// </summary>
+public sealed record ProtectionCensusRequest(IReadOnlyList<ProtectionCensusItem> Records, bool Reverify = false);
+
+/// <summary>
+/// Per-record census. <c>Outcome</c> is <c>Verified</c> or a typed failure: <c>HEAD_CHANGED</c> (nothing verified),
+/// <c>NOT_IN_SCOPE</c> (not an entry of the snapshot / not a registered record of the form), <c>QUARANTINED</c>,
+/// <c>AWAITING_ARCHIVE</c>, <c>NO_COMMITTED_CONTENT</c>, <c>KEY_UNAVAILABLE</c>, or an integrity code
+/// (<c>MISSING_ITEM</c>, <c>EXTRA_ITEM</c>, <c>ITEM_DIGEST_MISMATCH</c>, …; the record head is then quarantined).
+/// <c>Reused</c>: the Authority already held a census for this exact accepted operation and returned it without re-verifying.
+/// </summary>
+public sealed record ProtectionCensusRecordResult(
+    Guid FormRecordId,
+    string Outcome,
+    long CommittedContentRevision,
+    Guid? CommittedOperationId,
+    int FieldOccurrenceCount,
+    int OldFormOccurrenceCount,
+    int EnvelopeIssueCount,
+    bool Reused);
+
+public sealed record ProtectionCensusResponse(Guid SearchCatalogueSnapshotId, Guid FieldDefinitionId, string ProtectionDirection, IReadOnlyList<ProtectionCensusRecordResult> Results, Guid CorrelationId);
+
+/// <summary>
+/// The Authority's reconciliation report for one protection decision, computed under the organization lock from its registry,
+/// accepted heads and census results. Complete only when every accepted record's <b>current</b> revision was verified with no
+/// row of the field left in the old form and nothing quarantined, unverified or uncensused, and no search approval of the
+/// field is active. Pending creations hold no accepted content (the protection barrier admits their first revision only in
+/// the required form). Retained earlier revisions and retired records are outside the executable scope and never claimed.
+/// </summary>
+public sealed record ProtectionAttestation(
+    Guid ProtectionReconciliationAttestationId,
+    Guid OrganizationId,
+    Guid SecurityCommandId,
+    Guid FormDefinitionId,
+    Guid FieldDefinitionId,
+    string ProtectionDirection,
+    Guid? SearchCatalogueSnapshotId,
+    int ExpectedRecordCount,
+    int AcceptedRecordCount,
+    int PendingCreationRecordCount,
+    int QuarantinedRecordCount,
+    int CompliantRecordCount,
+    int NotApplicableRecordCount,
+    int OldFormRemainingRecordCount,
+    int OldFormRemainingOccurrenceCount,
+    int TargetFormOccurrenceCount,
+    int UnverifiedRecordCount,
+    int NotYetCensusedRecordCount,
+    int EnvelopeIssueRecordCount,
+    int ArchivedRecordCount,
+    int RetiredRecordCount,
+    long RetainedHistoryRevisionCount,
+    int ActiveSearchApprovalCount,
+    bool AttestationComplete,
+    string? AttestationIncompleteReason,
+    string AttestationDigestHex,
+    long AuthorizationRevision,
+    long ContentIntegrityRevision,
+    long AuditJournalRevision,
+    DateTimeOffset AttestedOn,
+    string CoverageStatement,
+    Guid CorrelationId);
+
+/// <summary>Organization-wide coverage: every current protection decision of the organization and its latest attestation.</summary>
+public sealed record ProtectionCoverageRequest(Guid OrganizationId);
+
+public sealed record ProtectionCoverageDecision(Guid SecurityCommandId, Guid FormDefinitionId, Guid FieldDefinitionId, string ProtectionDirection, bool FormRegisteredActive, ProtectionAttestation? LatestAttestation);
+
+/// <summary>
+/// <c>OrganizationComplete</c> only when every current decision has a complete attestation taken under that same decision.
+/// The decision list comes from the Authority's protection resources, never from the business database's form list.
+/// </summary>
+public sealed record ProtectionCoverageResponse(
+    Guid OrganizationId,
+    int RegisteredFormCount,
+    int DecisionCount,
+    int AttestedCompleteDecisionCount,
+    bool OrganizationComplete,
+    IReadOnlyList<ProtectionCoverageDecision> Decisions,
+    long AuthorizationRevision,
+    DateTimeOffset ComputedOn,
+    string CoverageStatement,
+    Guid CorrelationId);

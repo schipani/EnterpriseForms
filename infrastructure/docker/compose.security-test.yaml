@@ -78,6 +78,11 @@ services:
   worker:
     environment:
       DOTNET_ENVIRONMENT: Testing
+      # Phase C7 M4 (OD-1): the same synthetic field-protection verifier credential as the authority above, for the Worker
+      # only (the API never gets it). TestIdentity.VerifierToken mirrors it.
+      ProtectionVerifier__Issuer: enterpriseforms-field-protection-verifier
+      ProtectionVerifier__Audience: authorization-authority-verifier
+      ProtectionVerifier__SharedKeyBase64: dmVyaWZpZXItdGVzdC1vbmx5LXNoYXJlZC1rZXktMDAwMDAwMDAw
   web:
     profiles: [never]
   attacker-sql:

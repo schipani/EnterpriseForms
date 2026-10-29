@@ -109,7 +109,8 @@ test.describe.serial("Field encryption removal: policy switch, administrator-onl
     await panel.getByLabel("Reason").fill("Badge numbers are an Internal lookup key; governance approved plaintext");
     await panel.getByRole("button", { name: "Remove encryption", exact: true }).click();
     await expect(security.getByText("Off — plaintext")).toBeVisible();
-    await expect(security.getByText("All listed records migrated to plaintext")).toBeVisible({ timeout: 120_000 });
+    // With the field-protection verifier (security-test stack) the Authority attestation replaces the "listed records" badge (Phase C7 M4).
+    await expect(security.getByText(/All listed records migrated to plaintext|Authority-verified: every record's current version in plaintext/)).toBeVisible({ timeout: 120_000 });
     await expect(security.getByRole("group", { name: "Decryption migration progress" })).toHaveCount(0);
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();

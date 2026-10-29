@@ -1,4 +1,4 @@
-import type { FieldDefinitionResponse, FieldProtectionMigrationResponse, FieldProtectionVerificationResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
+import type { FieldDefinitionResponse, FieldProtectionMigrationResponse, FieldProtectionReconciliationResponse, FieldProtectionVerificationResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
 import { Badge, Button, Checkbox, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -73,6 +73,7 @@ export function FieldSecuritySection({ dataType, classification, encryptChoice, 
 const MIGRATION_LABELS: Record<string, { tone: "info" | "warning" | "danger" | "success"; label: string }> = {
   Queued: { tone: "info", label: "migration queued" },
   Running: { tone: "info", label: "migration running" },
+  Verifying: { tone: "info", label: "migration verifying with the Authorization Authority" },
   Blocked: { tone: "warning", label: "migration waiting for a dependency" },
   Failed: { tone: "danger", label: "migration failed" },
   Completed: { tone: "success", label: "migration completed" },
@@ -112,6 +113,131 @@ function VerificationSummary({ verification, unresolvedRecords }: { verification
         </p>
       ) : null}
       {unresolvedRecords > 0 ? <p>{`${unresolvedRecords} record(s) could not be matched to their accepted version locally; the migration worker checks them against the Authorization Authority.`}</p> : null}
+    </div>
+  );
+}
+
+const RECONCILIATION_LABELS: Record<string, { tone: "info" | "warning" | "danger" | "success"; label: string }> = {
+  Queued: { tone: "info", label: "Reconciliation queued" },
+  Running: { tone: "info", label: "Reconciliation running" },
+  Blocked: { tone: "warning", label: "Reconciliation waiting for a dependency" },
+  Complete: { tone: "success", label: "Authority reconciliation complete" },
+  Incomplete: { tone: "danger", label: "Authority reconciliation incomplete" },
+  Unavailable: { tone: "warning", label: "Independent reconciliation unavailable" },
+  Superseded: { tone: "warning", label: "Reconciliation superseded" },
+};
+
+const ACTIVE_RECONCILIATION = ["Queued", "Running", "Blocked"];
+
+/** Why a reconciliation did not attest completion, in words (codes from the Authority attestation or the worker's decrypt check). */
+const INCOMPLETE_REASONS: Record<string, string> = {
+  OLD_FORM_REMAINING: "some records' current version still holds the field in the old form",
+  RECORDS_QUARANTINED: "some records are quarantined (their accepted content is missing or failed verification)",
+  RECORDS_UNVERIFIED: "some records' current version could not be verified (for example a retired verification key)",
+  RECORDS_NOT_CENSUSED: "records changed or were added while it ran and were not all checked",
+  ENVELOPE_ISSUES: "some encrypted values do not have the approved envelope shape",
+  SEARCH_APPROVAL_ACTIVE: "a plaintext search approval of the field is still active",
+  DECRYPT_CHECK_FAILED: "some encrypted values failed authenticated decryption",
+  LOGICAL_TYPE_MISMATCH: "some encrypted values do not decrypt to the field's type",
+  DECRYPT_CHECK_INCOMPLETE: "the worker could not decrypt-check every encrypted value the Authority counted",
+  RECONCILIATION_LIMIT: "the form has more records than one reconciliation may cover",
+  RECONCILIATION_DID_NOT_CONVERGE: "records kept changing while it ran",
+  VERIFIER_NOT_CONFIGURED: "this environment has no field-protection verifier",
+  DECISION_SUPERSEDED: "the field's protection changed while it ran",
+  MIGRATION_COMPLETION_REQUESTED: "replaced by the reconciliation of a newer migration",
+};
+
+function Count({ label, value }: { label: string; value: number | string | null | undefined }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt>{label}</dt>
+      <dd className="font-medium text-body">{value === null || value === undefined ? "—" : value}</dd>
+    </div>
+  );
+}
+
+/**
+ * Phase C7 M4 (G19): the latest reconciliation of the field against the Authorization Authority's complete record population.
+ * The Authority's counts and the worker's own observations are shown apart; nothing here is a claim about retained history.
+ */
+function ReconciliationSummary({ reconciliation, decrypting, canRequest, onRequest, requesting, requestError }: { reconciliation: FieldProtectionReconciliationResponse | null; decrypting: boolean; canRequest: boolean; onRequest: (reason: string) => void; requesting: boolean; requestError: unknown }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const label = reconciliation ? (RECONCILIATION_LABELS[reconciliation.state] ?? { tone: "warning" as const, label: reconciliation.state }) : null;
+  const attestation = reconciliation?.attestation ?? null;
+  const active = reconciliation !== null && ACTIVE_RECONCILIATION.includes(reconciliation.state);
+  const reasonCode = attestation?.incompleteReason ?? reconciliation?.lastErrorCode ?? null;
+  return (
+    <div className="flex flex-col gap-2 rounded border border-line bg-page p-3" role="group" aria-label="Completeness reconciliation">
+      <div className="flex flex-wrap items-center gap-2">
+        {label ? <Badge tone={label.tone}>{label.label}</Badge> : <span className="text-sm">No reconciliation yet</span>}
+        {reconciliation ? <span className="text-xs text-muted">{reconciliation.mode === "VerifyOnly" ? "verify only" : "migration completion"} · requested {new Date(reconciliation.requestedOn).toLocaleString()}</span> : null}
+      </div>
+      {active && reconciliation ? (
+        <p className="text-xs text-muted" aria-live="polite">
+          {reconciliation.catalogueEntryCount === null || reconciliation.catalogueEntryCount === undefined
+            ? "Reading the Authorization Authority's record population for this form…"
+            : `Checked ${reconciliation.censusProcessedCount} of ${reconciliation.catalogueEntryCount} registered record(s) (round ${reconciliation.roundCount}).`}
+          {reconciliation.state === "Blocked" && reconciliation.lastErrorCode ? ` Waiting: ${reconciliation.lastErrorCode}.` : ""}
+        </p>
+      ) : null}
+      {reconciliation && !active && reconciliation.state !== "Complete" && reasonCode ? <p className="text-xs">{`Not attested: ${INCOMPLETE_REASONS[reasonCode] ?? reasonCode}.`}</p> : null}
+      {attestation ? (
+        <details className="text-xs text-muted">
+          <summary className="cursor-pointer text-body">{`Authority attestation (${new Date(attestation.attestedOn).toLocaleString()})`}</summary>
+          <dl className="mt-2 grid gap-1 sm:grid-cols-2 sm:gap-x-6">
+            <Count label="Registered records (expected)" value={attestation.expectedRecordCount} />
+            <Count label="With accepted content" value={attestation.acceptedRecordCount} />
+            <Count label={decrypting ? "Verified plaintext" : "Verified encrypted"} value={attestation.compliantRecordCount} />
+            <Count label="No value in the field" value={attestation.notApplicableRecordCount} />
+            <Count label="Still in the old form" value={attestation.oldFormRemainingRecordCount} />
+            <Count label="Quarantined" value={attestation.quarantinedRecordCount} />
+            <Count label="Could not be verified" value={attestation.unverifiedRecordCount} />
+            <Count label="Not yet checked" value={attestation.notYetCensusedRecordCount} />
+            <Count label="Pending creations (no content)" value={attestation.pendingCreationRecordCount} />
+            <Count label="Archived (included)" value={attestation.archivedRecordCount} />
+            <Count label="Envelope issues" value={attestation.envelopeIssueRecordCount} />
+            <Count label="Active search approvals" value={attestation.activeSearchApprovalCount} />
+          </dl>
+          <p className="mt-2">{attestation.coverageStatement}</p>
+          <p className="mt-1 break-all">{`Attestation ${attestation.attestationId} · digest ${attestation.digestHex} · Authority audit journal revision ${attestation.auditJournalRevision}`}</p>
+        </details>
+      ) : null}
+      {reconciliation && (attestation || reconciliation.businessOnlyRecordCount !== null) ? (
+        <details className="text-xs text-muted">
+          <summary className="cursor-pointer text-body">Worker observations (business database, untrusted)</summary>
+          <dl className="mt-2 grid gap-1 sm:grid-cols-2 sm:gap-x-6">
+            <Count label="Business rows unknown to the Authority (ignored)" value={reconciliation.businessOnlyRecordCount} />
+            <Count label="Authority records missing locally" value={reconciliation.businessMissingRecordCount} />
+            {!decrypting ? <Count label="Encrypted values decrypt-checked" value={reconciliation.decryptCheckedValueCount} /> : null}
+            {!decrypting ? <Count label="Decrypt failures / type mismatches" value={`${reconciliation.decryptFailedValueCount} / ${reconciliation.logicalTypeMismatchCount}`} /> : null}
+            <Count label="Old-form rows kept outside current versions" value={reconciliation.retainedOldFormRowCount} />
+          </dl>
+        </details>
+      ) : null}
+      {reconciliation ? <p className="text-xs text-muted">{reconciliation.basis}</p> : null}
+      {canRequest && !active && !open ? (
+        <div>
+          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+            Verify completeness…
+          </Button>
+          <p className="mt-1 text-xs text-muted">Checks every record the Authorization Authority registers for this form. It never changes a value.</p>
+        </div>
+      ) : null}
+      {open ? (
+        <div className="flex flex-col gap-2">
+          <TextInput label="Reason" value={reason} required maxLength={500} helpText="Recorded with the audit event (3 to 500 characters)." onChange={(event) => setReason(event.target.value)} />
+          <div className="flex gap-2">
+            <Button size="sm" busy={requesting} disabled={reason.trim().length < 3} onClick={() => { onRequest(reason.trim()); setOpen(false); setReason(""); }}>
+              Start verification
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={requesting}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {requestError ? <ErrorPanel error={requestError} /> : null}
     </div>
   );
 }
@@ -173,7 +299,8 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
     queryKey: statusKey,
     queryFn: () => api.forms.protection(formDefinitionId, field.fieldDefinitionId).then((r) => r.result),
     // A running migration is polled; the "all listed records" claims only ever come from the server status (worker check against the Authority heads of the records the business database lists — not an independent completeness proof, G19).
-    refetchInterval: (query) => (query.state.data?.migration && ["Queued", "Running", "Blocked"].includes(query.state.data.migration.migrationState) ? 2000 : false),
+    refetchInterval: (query) =>
+      (query.state.data?.migration && ["Queued", "Running", "Blocked", "Verifying"].includes(query.state.data.migration.migrationState)) || (query.state.data?.reconciliation && ACTIVE_RECONCILIATION.includes(query.state.data.reconciliation.state)) ? 2000 : false,
   });
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: statusKey });
@@ -181,6 +308,10 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
   };
   const retry = useMutation({
     mutationFn: () => api.forms.retryProtectionMigration(formDefinitionId, field.fieldDefinitionId, { retryReason: "Retried from the Edit field dialog after reviewing the failed records" }).then((r) => r.result),
+    onSuccess: refresh,
+  });
+  const reconcile = useMutation({
+    mutationFn: (requestReason: string) => api.forms.requestProtectionReconciliation(formDefinitionId, field.fieldDefinitionId, { requestReason }).then((r) => r.result),
     onSuccess: refresh,
   });
   const reclassify = useMutation({
@@ -218,9 +349,12 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
   const changes = target !== field.fieldClassification || (!encrypted && encrypt);
   const mandatory = requiresEncryption(target);
   const migration = status.data?.migration ?? null;
-  const migrationActive = migration !== null && ["Queued", "Running", "Blocked", "Failed"].includes(migration.migrationState);
+  const migrationActive = migration !== null && ["Queued", "Running", "Blocked", "Verifying", "Failed"].includes(migration.migrationState);
+  const reconciled = status.data?.authorityReconciledComplete === true;
+  const reconciliation = status.data?.reconciliation ?? null;
   const decryptInProgress = migration !== null && migration.migrationDirection === "Decrypt" && !status.data?.fullyPlaintext && migration.migrationState !== "Cancelled";
   const administrator = session.hasCapability("organization.manage");
+  const canReconcile = migration !== null && ["Completed", "Failed"].includes(migration.migrationState) && (migration.migrationDirection === "Decrypt" ? administrator : canEdit);
   const policyPermitsPlaintext = status.data?.organizationPermitsPlaintext === true;
   const sensitive = requiresEncryption(field.fieldClassification);
   const governanceAvailable = administrator && encrypted && !isDocuments && !migrationActive;
@@ -232,13 +366,18 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         <Badge tone="neutral">{field.fieldClassification}</Badge>
         <span>Application-level encryption</span>
         <Badge tone={encrypted ? "success" : "warning"}>{encrypted ? "Enabled" : "Off — plaintext"}</Badge>
-        {status.data?.fullyEncrypted ? <Badge tone="success">All listed records encrypted</Badge> : null}
-        {status.data?.fullyPlaintext ? <Badge tone="warning">All listed records migrated to plaintext</Badge> : null}
+        {reconciled && encrypted ? <Badge tone="success">Authority-verified: every record's current version encrypted</Badge> : null}
+        {reconciled && !encrypted ? <Badge tone="warning">Authority-verified: every record's current version in plaintext</Badge> : null}
+        {!reconciled && status.data?.fullyEncrypted ? <Badge tone="success">All listed records encrypted</Badge> : null}
+        {!reconciled && status.data?.fullyPlaintext ? <Badge tone="warning">All listed records migrated to plaintext</Badge> : null}
         {status.data?.migrationState === "EncryptionPendingRewrite" ? <Badge tone="warning">{status.data.legacyPlaintextRecordCount} record(s) still hold a plaintext copy until their next save</Badge> : null}
         {status.data?.migrationState === "DecryptionPendingRewrite" ? <Badge tone="warning">{status.data.legacyEncryptedRecordCount} record(s) still hold an encrypted copy</Badge> : null}
       </div>
-      {status.data?.fullyEncrypted || status.data?.fullyPlaintext ? <p className="text-xs text-muted">{COMPLETENESS_NOTE}</p> : null}
+      {!reconciled && (status.data?.fullyEncrypted || status.data?.fullyPlaintext) ? <p className="text-xs text-muted">{COMPLETENESS_NOTE}</p> : null}
       {status.data ? <VerificationSummary verification={status.data.verification ?? null} unresolvedRecords={Number(status.data.estimateUnresolvedRecordCount ?? 0)} /> : null}
+      {status.data && (reconciliation || canReconcile) ? (
+        <ReconciliationSummary reconciliation={reconciliation} decrypting={migration?.migrationDirection === "Decrypt"} canRequest={canReconcile} onRequest={(reason) => reconcile.mutate(reason)} requesting={reconcile.isPending} requestError={reconcile.error} />
+      ) : null}
       {migration && !status.data?.fullyEncrypted && !status.data?.fullyPlaintext && migration.migrationState !== "Cancelled" ? (
         <MigrationProgress migration={migration} legacyRecords={Number(migration.migrationDirection === "Decrypt" ? status.data?.legacyEncryptedRecordCount : status.data?.legacyPlaintextRecordCount)} canRetry={migration.migrationDirection === "Decrypt" ? administrator : canEdit} onRetry={() => retry.mutate()} retrying={retry.isPending} retryError={retry.error} />
       ) : null}

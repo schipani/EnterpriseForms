@@ -149,5 +149,24 @@ public interface IAuthorityScope : IAsyncDisposable
 
     void AddFieldSearchApproval(FieldSearchApproval approval);
 
+    /// <summary>Phase C7 M4: the entries of one snapshot for the given records only (read-only; uses the snapshot/record unique index).</summary>
+    Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M4: registry rows of the given types and lifecycle states across the organization (read-only).</summary>
+    Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid organizationId, IReadOnlyCollection<string> resourceTypeNames, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M4: number of accepted manifest commits (accepted revisions) per record, for the given records (read-only; records without any are absent).</summary>
+    Task<Dictionary<Guid, int>> CountManifestCommitsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M4: census results held for one protection decision and the given records (any operation; read-only).</summary>
+    Task<List<ProtectionCensusResult>> GetProtectionCensusResultsAsync(Guid organizationId, Guid scopingSecurityCommandId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    void AddProtectionCensusResult(ProtectionCensusResult result);
+
+    void AddProtectionAttestation(ProtectionReconciliationAttestation attestation);
+
+    /// <summary>Phase C7 M4: the most recent attestation of each of the given protection decisions (read-only).</summary>
+    Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken);
+
     Task CommitAsync(CancellationToken cancellationToken);
 }

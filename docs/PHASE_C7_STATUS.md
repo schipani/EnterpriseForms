@@ -14,15 +14,17 @@
   * C-63/C-64: G23 hotfix (merged to `main`, integrated here);
   * C-65/C-66: F-C7-01 correction (merged to `main`, integrated here); final AC-5 review;
   * C-67: M2 (AC-6) implemented;
-  * C-68: M1/M2 review corrections; C-69: M3 implemented.
-- **G06, G19, G21:** OPEN. **G22, G23:** corrected (independent review pending). **PB-08:** not resolved (production/staging search approvals disabled). **PB-09:** objective not met under concurrency (§15.5). **AUD-C7-01 / G24:** open.
+  * C-68: M1/M2 review corrections; C-69: M3 implemented;
+  * C-70/C-71: Security Administrators, DR-C7-3; C-72: owner functional acceptance of Advanced Field Search and the two-column layout; C-73: M4 implemented.
+- **G06, G19, G21:** OPEN (G19: M4 reconciliation implemented, review pending — §27). **G22, G23:** corrected (independent review pending). **PB-08:** not resolved (production/staging search approvals disabled). **PB-09:** objective not met under concurrency (§15.5). **AUD-C7-01 / G24:** open.
 - **State (2026-10-24):**
   * M0 implemented (owner visual acceptance **pending**).
   * G22, G23 and F-C7-01 merged to `main` and into this branch (§7, §10).
   * M1 — AC-5 — implemented; final review done (§11).
   * M2 — AC-6 — implemented and verified (§12).
   * **M1/M2 review corrections and M3 — verified field-value search — implemented and verified (§15); stopped for owner functional acceptance.**
-  * Field-value search runs only where the fail-closed execution gate is on (isolated Development/Testing); never in staging or production. M4 is not started. This branch is not merged to `main`.
+  * Field-value search runs only where the fail-closed execution gate is on (isolated Development/Testing); never in staging or production. This branch is not merged to `main`.
+  * **2026-10-29: owner functional acceptance of M3 and the layout (C-72, §26); M4 — encryption migration reconciliation — implemented (§27–§29); stopped for owner functional acceptance.**
 
 ## 1. History
 
@@ -650,3 +652,97 @@ If any step stops, nothing was changed; report the message.
 * **Styling:** scoped under `.records-search` / `.records-results` in `apps/web/src/app/styles.css` (no other screen changes): Inter-first stack, 16px panel headings, 13px labels, 14px control text, 12px help, 40px controls and buttons, 8px control radius, 12px card radius, 20px card padding, 13px/600 table headings. Colours still come from the theme tokens.
 * **Deliberate differences from the reference:** the input border stays the validated `--ui-input-border` (#64748b), not #D1D5DB (1.5:1, fails WCAG 1.4.11); secondary/placeholder text stays #334155 (token) rather than #6B7280/#9CA3AF; Inter is listed first but not bundled (falls back to the existing stack); the left field keeps its label "Search records" and its help text (existing tests and the label/help standard); a "related records" checkbox and an archive explanation remain; the table keeps its Record/Status/Created/Last changed columns.
 * **Evidence:** `docs/ui/my-records-search-1440.png` and `docs/ui/my-records-search-320.png` (real browser, development stack). 320 px: no horizontal overflow. Frontend: lint, typecheck, vitest 207/207. Browser (dev stack): advanced-field-search 6/6, record-lookup and responsive specs pass; the field-search-approval/execution specs (updated to drop the disclosure click) were not re-run here. No Authority, search, API or contract change. C7 not merged; M4 not started.
+
+## 26. Owner functional acceptance of Advanced Field Search (C-72)
+
+The owner personally tested Advanced Field Search and confirmed it works correctly, and accepted the two-column My Records search layout (§25). Recorded as functional acceptance for continued development only (C-72). M4 preserves that design and every M3 behaviour; no My Records or search code was changed.
+
+## 27. M4 — encryption migration reconciliation (C-73)
+
+Normative document: `docs/security/FIELD_PROTECTION_RECONCILIATION.md` (design, categories, residual exposure, runbook, test map). Architecture §6F.
+
+### 27.1 Checkpoint result
+
+* Execution of approved strengthening (B-28) and governed removal (A1) already existed and is unchanged: reprotection operations through the Authority's content protocol under the decision's command. No second migration engine.
+* Missing and now built: an independent expected population (AC-5 migration catalogue, verifier workload), an Authority **census** that verifies each accepted record and counts the field's rows from the verified bytes, an Authority **attestation** that decides completeness from Authority state only, organization **coverage**, the Worker job, status, request and UI.
+* Not built (needs decisions): retained-history disposal (DR-C7-4), Security Administrator coverage view (DR-C7-5). The census/attestation/coverage are verify-and-count operations within D1(7)/OD-1/OD-8; the only state change they make is the existing quarantine-on-tamper rule.
+
+### 27.2 What was built
+
+| Layer | Change |
+|---|---|
+| Authority | `ContentService.VerifyForProtectionCensusAsync` (shared verification core + counts), `ProtectionReconciliationService` (census, attestation, coverage), verifier routes `…/census`, `…/attestation`, `/verifier/protection-coverage`; catalogue pages carry the held census outcome; migration `20261029122643_ProtectionReconciliation`; `RowCanonicalColumn.AsBytes()` (shared, additive) |
+| Business | `IProtectionVerifierAuthority` + `ProtectionVerifierHttpClient` (Worker only); `FieldProtectionReconciliationService` + `FieldProtectionReconciliationWorker`; migration state `Verifying`; `field_protection_reconciliations` (migration `PhaseC7ProtectionReconciliation`); status `reconciliation` / `authorityReconciledComplete`; `POST …/protection/reconciliations` |
+| Frontend | Security & Encryption panel: Authority-verified badge, attestation counts, worker observations, basis, Verify completeness… |
+| Infrastructure | security-test Worker verifier credential; dev-persistent opt-in (`devstack.py protection-verifier enable`) |
+
+### 27.3 Defect found and fixed during verification
+
+The first verify-only implementation reused a census the Authority already held for an unchanged head, so business rows tampered with after an earlier census were vouched for. Every reconciliation's first round now re-verifies (`reverify`); reuse is limited to catch-up rounds of the same reconciliation. Covered by the rollback integration test and an Authority unit test.
+
+## 28. Verification, performance and residual exposure
+
+### 28.1 Tests (local, isolated security-test stack; hosted results in §28.4)
+
+| Suite | Result |
+|---|---|
+| Authority unit `ProtectionReconciliationTests` (new, 12) | pass — census counts from verified bytes (repeating occurrences), registry population (undiscoverable, pending, quarantined, retired), tampered/missing/rolled-back rows quarantined, earlier-head census never counts, reuse vs `reverify`, snapshot ownership, superseded decision, envelope shape and nonce reuse, retired key, active approval, Decrypt direction, audit journal without record ids, coverage across forms, cross-organization |
+| Contract `ProtectionVerifierBoundaryTests` (new, 6) | pass — API never registers the verifier; partial/reused credentials refused; unconfigured fails closed |
+| Stage B `ProtectionReconciliationTests` (new, 8, real stack) | pass — complete population with archived, older-layout and pending records, decrypt checks, kept history, journal and log scans; concealed record (moved + relabelled) blocks a false completion while the business-side post-check alone passed; forged business row ignored; post-completion rollback detected by verify-only, quarantined, never repaired; Authority outage → Blocked → resumes; worker restart mid-run; concurrent edits caught up; permissions and verifier-only routes; organization coverage across forms; benchmark |
+| Stage B regression (FieldProtectionMigration, FieldProtectionDowngrade, Encryption, SearchCatalogue, FieldSearchApproval) | 36/36 |
+| .NET CI script (architecture, Authority, contracts, integrity) | 594/594 |
+| Frontend lint, typecheck, vitest | pass; 207/207 |
+
+Owner §11 list → tests: `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §10. **Pending (not implemented as integration tests):** policy change during an integration run (unit only), missing KEK during the decrypt check, the worker's `RECONCILIATION_LIMIT` path above 50,000 records, archival outage (AUD-C7-01).
+
+### 28.2 Performance (PB-09 engineering measurement on the developer laptop; not a capacity claim)
+
+`docs/evidence/phase-c7/c7-m4-benchmark-local.json`:
+
+| Records | Migration + completion reconciliation | Completion reconciliation | Verified records/s | Verify-only full re-verification (min / p50 / max) | Worker restart mid-run → complete | Authority calls per round |
+|---|---|---|---|---|---|---|
+| 100 | 22.3 s | 3.3 s | 30.6 | 4.2 / 4.3 / 4.3 s | 9.1 s | 6 |
+| 250 | 49.3 s | 8.9 s | 28.2 | 7.4 / 8.5 / 8.5 s | 14.2 s | 9 |
+
+* Linear in records; ≈ 30 verified records/s end to end (the worker reads each record's staged rows, decrypt-checks, and the Authority verifies every HMAC through Vault Transit). The search path verifies ≈ 130 records/s because it does not decrypt; reconciliation is a background job, not an interactive operation, and completeness is never traded for speed.
+* At this rate the 50,000-record migration catalogue ceiling would take ≈ 28 minutes per round, beyond the 15-minute migration snapshot lifetime: such a form ends `Incomplete` (snapshot expiry → new rounds → `RECONCILIATION_DID_NOT_CONVERGE`) rather than claiming anything. Larger forms need a longer-lived catalogue or parallel census workers (a DR-C7-2-style scaling decision); not done.
+* CPU/memory: not instrumented separately; the Authority (HMAC verification) and the worker (decryption) are the expected costs. Hosted measurements in §28.4.
+
+### 28.3 Residual plaintext and historical exposure
+
+See `docs/security/FIELD_PROTECTION_RECONCILIATION.md` §7. In short: only current accepted versions are migrated and attested. Earlier revisions (and their indexed plaintext rows), abandoned candidates, retired records, WAL, replicas, backups and exports keep the old form; they are counted and reported, never deleted, never claimed (DR-C7-4).
+
+### 28.4 Hosted results
+
+Pending at the time of writing (stage-b-integration, security-gate-a dispatched on the M4 commit).
+
+## 29. Acceptance instructions — synthetic migration and reconciliation
+
+Nothing here touches existing forms or records. Use only a **new synthetic form**.
+
+**Option A — isolated security-test stack (verifier configured):**
+
+1. `infrastructure/docker`: `docker compose -p enterpriseforms-sectest -f compose.yaml -f compose.security-test.yaml --env-file .env up -d --build --wait`; `cd src/frontend; $env:API_TARGET="http://127.0.0.1:5180"; npm run dev -w apps/web -- --host 127.0.0.1`; open `http://127.0.0.1:5173`.
+2. **Owner (Avery Owner, designer):** create a form "M4 acceptance" with a plaintext Internal text field "Note" and a number; publish; give Casey Clerk create permission.
+3. **Clerk:** create three records with distinct notes. Archive one of them (record page → Archive).
+4. **Owner:** Fields → Edit "Note" → Security & Encryption → Strengthen protection → Confidential, reason → Apply. Watch: *migration running* → *migration verifying with the Authorization Authority* → **Authority-verified: every record's current version encrypted** and **Authority reconciliation complete**.
+5. Open **Authority attestation**: 3 registered, 3 verified encrypted, 1 archived (included), 0 still in the old form, 0 quarantined, retained earlier revisions ≥ 3 (history is kept and not migrated — read the coverage statement). **Worker observations**: 3 decrypt-checked, 0 failures, 0 unknown/missing rows, old-form rows kept outside current versions ≥ 3.
+6. **Verify completeness…** → reason → Start verification: a new *verify only* reconciliation runs and completes; record values and history are unchanged (open a record as the clerk: the note is still readable; History lists the earlier revisions).
+7. Optional tamper check (needs the attacker container; see `ProtectionReconciliationTests`): after a DBA rewrite of one record's encrypted row, Verify completeness ends **Authority reconciliation incomplete** — "some records are quarantined"; nothing is repaired.
+8. As Riley Reader: no Verify completeness button and no record access. 320 px: the panel stacks; the details are keyboard reachable.
+
+**Option B — persistent development stack (`http://127.0.0.1:8091`):**
+
+1. `py scripts/devstack/devstack.py backup` (recommended), then `py scripts/devstack/devstack.py rebuild authority api worker web` (additive migrations only; data untouched).
+2. Without the verifier, a new synthetic strengthening ends *Independent reconciliation unavailable* and keeps the pre-M4 "All listed records encrypted" badge and caveat — that is the expected fail-closed behaviour.
+3. To try the real reconciliation: `py scripts/devstack/devstack.py protection-verifier enable` (development credential in the custody directory; recreates the Authority and Worker; no data change, no migration started). Then repeat Option A steps 2–6 on a **new** form. Do not strengthen fields of existing forms unless you intend that migration; if you do, request **Verify completeness** first only after its migration finished and review the report.
+
+## 30. Outstanding decisions and blockers
+
+* **Owner functional acceptance of M4** (§29).
+* **G19 OPEN:** independent review of the Authority census/attestation/coverage and the verifier boundary; Azure staging evidence; a production verifier identity (Entra workload identity + mTLS; today a Stage A HS256 credential like every workload credential).
+* **DR-C7-4:** retained plaintext history, WAL, replicas, backups — disposal policy and any new Authority transition (not implemented).
+* **DR-C7-5:** a read-only coverage view for Security Administrators (coverage is verifier-only today).
+* **Scale:** forms above ≈ 25,000 records cannot finish a round within the 15-minute snapshot lifetime at the measured rate (§28.2).
+* **AUD-C7-01 / G24:** archival durability of mandatory evidence (the attestation journal entry included) unverified.
+* Unchanged: G06, G21, PB-08, PB-09, DR-C7-1, DR-C7-2, G25/G26 reviews. No Level 2 claim. C7 not merged; no further milestone started.

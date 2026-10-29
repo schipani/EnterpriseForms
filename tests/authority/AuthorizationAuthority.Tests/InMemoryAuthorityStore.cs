@@ -39,6 +39,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<PublishedFormVersion> PublishedVersions { get; } = [];
     public List<FieldSearchApproval> Approvals { get; } = [];
     public List<OrganizationProtectionPolicy> Policies { get; } = [];
+    public List<ProtectionCensusResult> CensusResults { get; } = [];
+    public List<ProtectionReconciliationAttestation> Attestations { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -191,6 +193,25 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             Task.FromResult(s.Approvals.Where(a => a.OrganizationId == organizationId && (formDefinitionId == null || a.FormDefinitionId == formDefinitionId)).ToList());
 
         public void AddFieldSearchApproval(FieldSearchApproval approval) => s.Approvals.Add(approval);
+
+        public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.SnapshotEntries.Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId && formRecordIds.Contains(e.FormRecordId)).ToList());
+
+        public Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid organizationId, IReadOnlyCollection<string> resourceTypeNames, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && resourceTypeNames.Contains(r.ResourceTypeName) && lifecycleStates.Contains(r.ResourceLifecycleState)).OrderBy(r => r.ResourceEntityId).ToList());
+
+        public Task<Dictionary<Guid, int>> CountManifestCommitsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commits.Where(c => c.OrganizationId == organizationId && formRecordIds.Contains(c.FormRecordId)).GroupBy(c => c.FormRecordId).ToDictionary(g => g.Key, g => g.Count()));
+
+        public Task<List<ProtectionCensusResult>> GetProtectionCensusResultsAsync(Guid organizationId, Guid scopingSecurityCommandId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.CensusResults.Where(r => r.OrganizationId == organizationId && r.ScopingSecurityCommandId == scopingSecurityCommandId && formRecordIds.Contains(r.FormRecordId)).ToList());
+
+        public void AddProtectionCensusResult(ProtectionCensusResult result) => s.CensusResults.Add(result);
+
+        public void AddProtectionAttestation(ProtectionReconciliationAttestation attestation) => s.Attestations.Add(attestation);
+
+        public Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Attestations.Where(a => a.OrganizationId == organizationId && scopingSecurityCommandIds.Contains(a.ScopingSecurityCommandId)).GroupBy(a => a.ScopingSecurityCommandId).Select(g => g.MaxBy(a => a.AttestedAuditJournalRevision)!).ToList());
 
         public Task CommitAsync(CancellationToken cancellationToken)
         {

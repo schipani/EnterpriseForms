@@ -480,6 +480,62 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public Task<int> CountPendingProtectionMigrationItemsAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
             context.FieldProtectionMigrationItems.CountAsync(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId && i.ItemState == FieldProtectionMigrationItemStates.Pending, cancellationToken);
 
+        public Task<FieldProtectionMigrationItem?> FindProtectionMigrationItemForRecordAsync(Guid fieldProtectionMigrationId, Guid formRecordId, CancellationToken cancellationToken) =>
+            context.FieldProtectionMigrationItems.FirstOrDefaultAsync(i => i.FieldProtectionMigrationId == fieldProtectionMigrationId && i.FormRecordId == formRecordId, cancellationToken);
+
+        public async Task<HashSet<Guid>> GetExistingFormRecordIdsAsync(IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            formRecordIds.Count == 0 ? [] : (await context.FormRecords.AsNoTracking().Where(r => formRecordIds.Contains(r.FormRecordId)).Select(r => r.FormRecordId).ToListAsync(cancellationToken).ConfigureAwait(false)).ToHashSet();
+
+        public async Task<int> CountOldFormRowsOfFieldAsync(Guid fieldDefinitionId, bool encryptedForm, CancellationToken cancellationToken)
+        {
+            if (encryptedForm)
+            {
+                return await context.FieldEncryptedValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            }
+
+            var count = 0;
+            count += await context.FieldStringValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldIntegerValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldDecimalValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldDateValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldDateTimeValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldGuidValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldBooleanValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            count += await context.FieldOptionValues.CountAsync(v => v.FieldDefinitionId == fieldDefinitionId, cancellationToken).ConfigureAwait(false);
+            return count;
+        }
+
+        public void AddProtectionReconciliation(FieldProtectionReconciliation reconciliation) => context.FieldProtectionReconciliations.Add(reconciliation);
+
+        public Task<FieldProtectionReconciliation?> FindProtectionReconciliationAsync(Guid fieldProtectionReconciliationId, CancellationToken cancellationToken) =>
+            context.FieldProtectionReconciliations.FirstOrDefaultAsync(r => r.FieldProtectionReconciliationId == fieldProtectionReconciliationId, cancellationToken);
+
+        public Task<FieldProtectionReconciliation?> FindLatestProtectionReconciliationAsync(Guid fieldDefinitionId, CancellationToken cancellationToken) =>
+            context.FieldProtectionReconciliations.Where(r => r.FieldDefinitionId == fieldDefinitionId).OrderByDescending(r => r.ReconciliationRequestedOn).ThenByDescending(r => r.FieldProtectionReconciliationId).FirstOrDefaultAsync(cancellationToken);
+
+        public Task<FieldProtectionReconciliation?> FindActiveProtectionReconciliationAsync(Guid fieldDefinitionId, CancellationToken cancellationToken) =>
+            context.FieldProtectionReconciliations.FirstOrDefaultAsync(r => r.FieldDefinitionId == fieldDefinitionId && (r.ReconciliationState == FieldProtectionReconciliationStates.Queued || r.ReconciliationState == FieldProtectionReconciliationStates.Running || r.ReconciliationState == FieldProtectionReconciliationStates.Blocked), cancellationToken);
+
+        public Task<int> CountProtectionReconciliationsOfMigrationAsync(Guid fieldProtectionMigrationId, CancellationToken cancellationToken) =>
+            context.FieldProtectionReconciliations.CountAsync(r => r.FieldProtectionMigrationId == fieldProtectionMigrationId, cancellationToken);
+
+        public async Task<FieldProtectionReconciliation?> LeaseNextProtectionReconciliationAsync(string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken)
+        {
+            var now = clock.GetUtcNow();
+            var reconciliation = await context.FieldProtectionReconciliations
+                .FromSqlInterpolated($"SELECT * FROM field_protection_reconciliations WHERE reconciliation_state IN ('Queued','Running','Blocked') AND next_attempt_on <= {now} AND (lease_expires_on IS NULL OR lease_expires_on < {now}) ORDER BY next_attempt_on LIMIT 1 FOR UPDATE SKIP LOCKED")
+                .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            if (reconciliation is null)
+            {
+                return null;
+            }
+
+            reconciliation.LeaseOwnerName = leaseOwner;
+            reconciliation.LeaseExpiresOn = now.Add(leaseDuration);
+            reconciliation.ReconciliationModifiedOn = now;
+            return reconciliation;
+        }
+
         public Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken) =>
             context.UserUiPreferences.FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
 
