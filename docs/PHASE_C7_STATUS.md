@@ -891,3 +891,27 @@ No code, test, migration or architecture blocker.
 | DR-C7-1 — terminal state for abandoned creations | decision required |
 | F-C7-03 — organization logo uploads not audited | audit gap, open |
 | No Azure staging evidence for any C7 Authority change; no Level 2 claim | release gate |
+
+## 40. Level 3 failure on 383291a: catalogue issuance race in a test (C-76)
+
+**Symptom.** `level3-script` run 40933654368 (383291a) failed; `ci` 40933654404 and `stage-b-integration` 40933654361 on the same commit were green. The failing test was `SearchCatalogueTests.OnlyTheVerifierWithAnEffectiveCommandOfTheFormGetsTheCompletePopulation`, with a `KeyNotFoundException` from `JsonElement.GetProperty` inside `Ids(..., "entries")`.
+
+**Captured response.** A temporary probe (not committed) ran on the isolated security-test stack. After the same strengthening, it requested the reader's catalogue repeatedly while the Worker re-sealed the records. Two requests got `HTTP 503 {"error_code":"AUTHORITY_NOT_READY","retryable":true,"detail":"authorization or content state moved while the catalogue was read"}` and had no `entries` property. In the Authority journal of a normal run, the reader's `SearchCatalogueIssued` (29.945 s) is followed about 450 ms later by the Worker's two re-seal `ContentHeadCommitted` entries (30.394 s and 30.589 s).
+
+**Root cause: a test defect, not a contract change.** Catalogue issuance reads the registry and heads, then re-checks the authorization, projection and content-integrity revisions under the organization lock (`LockUnchangedAsync`, unchanged since M1, 906af67). A content commit between the read and the lock is refused with the retryable 503 `AUTHORITY_NOT_READY`, and no partial catalogue is returned. That is the documented fail-closed snapshot rule (§3.4, OD-5). The business API already maps it to `SNAPSHOT_CHANGED` (`TrustedScopeVerifier`). After the strengthening, the Worker re-seals the form's records immediately (B-28). The test then called the reader's catalogue (line 244) without checking the status and read `entries`. When a re-seal commit landed inside that window, the call threw. Line 241, the verifier issuance, had the same exposure but asserts success, so it would have failed with the body instead. M4 did not change the response contract.
+
+**Fix (test only; no product change).**
+
+- `CatalogueAsync` and the verifier issuance in this test retry **only** a 503 `AUTHORITY_NOT_READY`, for at most 30 s every 250 ms. Any other response, including 401/403/404/422, is returned unchanged.
+- `Ids` now asserts that the call succeeded and that the property is an array. On failure it reports the HTTP status, the error code and a bounded, single-line excerpt of the body.
+
+Verifier authorization, catalogue completeness, tenant isolation and Authority verification are unchanged. The denial assertions (business workload, user, operator, verifier without a command) still use the non-retrying call.
+
+**Local evidence (isolated security-test stack; development stack not touched).**
+
+- The failing test passes in isolation (8.4 s).
+- The relevant classes (`SearchCatalogueTests`, `ProtectionReconciliationTests`, `FieldProtectionMigrationTests`, `FieldProtectionDowngradeTests`, `EncryptionTests`, `FieldSearchExecutionTests`, `FieldSearchApprovalTests`) ran in one pass: 64 tests, 51 passed, 13 failed, 46 min.
+
+**That regression pass is inconclusive, not green.** At 20:52:01 UTC the security-test Authority container was stopped gracefully from outside the run. Its restart policy is `unless-stopped`; the earlier three restarts were the tests' own deliberate crash injections, from which it recovered. The container was also detached from `authority-net`. No test stops the Authority or changes networks, and no other Claude session was running. Later tests failed with connection refused. The per-test failure list was not kept: the output was truncated to the summary.
+
+I started the container once to rerun. It could not reach SpiceDB because it was no longer on `authority-net`, so I returned it to the stopped state and made no further change to the stack. The hosted `stage-b-integration` and `level3-script` runs on the fix commit are the verification of record.

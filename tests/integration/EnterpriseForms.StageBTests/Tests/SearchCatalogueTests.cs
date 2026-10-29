@@ -43,12 +43,46 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
     private Task<HttpResult> VerifyAsync(StageBScenario s, TestUser user) => fixture.Api.PostAsync(Verify, s.Token(user), new { formDefinitionId = s.AccusedFormId });
 
     private Task<HttpResult> CatalogueAsync(StageBScenario s, TestUser user, Guid? form = null, int maximum = 500) =>
-        fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/search-catalogue", TestIdentity.WorkloadToken(), new { organizationId = s.OrganizationId, formDefinitionId = form ?? s.AccusedFormId, maximumEntries = maximum }, s.Token(user));
+        IssueAsync(() => fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/search-catalogue", TestIdentity.WorkloadToken(), new { organizationId = s.OrganizationId, formDefinitionId = form ?? s.AccusedFormId, maximumEntries = maximum }, s.Token(user)));
+
+    /// <summary>
+    /// A catalogue is fixed at one authorization, projection and content-integrity revision and re-checked under the
+    /// organization lock: a commit landing between the read and the lock (e.g. the Worker re-sealing records after a
+    /// protection change) is refused with the retryable 503 AUTHORITY_NOT_READY and no entries — the caller asks again
+    /// (the business API maps it to SNAPSHOT_CHANGED). Only that refusal is retried, within a bound; anything else is returned.
+    /// </summary>
+    private static async Task<HttpResult> IssueAsync(Func<Task<HttpResult>> issue)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (true)
+        {
+            var result = await issue();
+            if (result.Status != HttpStatusCode.ServiceUnavailable || result.ErrorCode != "AUTHORITY_NOT_READY" || DateTime.UtcNow > deadline)
+            {
+                return result;
+            }
+
+            await Task.Delay(250);
+        }
+    }
 
     private Task<HttpResult> ValidateAsync(StageBScenario s, TestUser user, Guid snapshot) =>
         fixture.Authority.SendAsync(HttpMethod.Post, $"/internal/v1/search-catalogue/{snapshot:D}/validate", TestIdentity.WorkloadToken(), null, s.Token(user));
 
-    private static List<Guid> Ids(HttpResult result, string property) => result.Root.GetProperty(property).EnumerateArray().Select(e => e.ValueKind == JsonValueKind.String ? e.GetGuid() : e.GetProperty("form_record_id").GetGuid()).ToList();
+    private static List<Guid> Ids(HttpResult result, string property)
+    {
+        var root = result.Json?.RootElement;
+        Assert.True(result.IsSuccess && root is { ValueKind: JsonValueKind.Object } && root.Value.TryGetProperty(property, out var found) && found.ValueKind == JsonValueKind.Array,
+            $"expected a '{property}' array; got HTTP {(int)result.Status} {result.ErrorCode ?? "(no error code)"}: {Excerpt(result.Body)}");
+        return root!.Value.GetProperty(property).EnumerateArray().Select(e => e.ValueKind == JsonValueKind.String ? e.GetGuid() : e.GetProperty("form_record_id").GetGuid()).ToList();
+    }
+
+    /// <summary>Synthetic-stack responses carry no secrets; the excerpt is bounded and single-line for the test report.</summary>
+    private static string Excerpt(string body)
+    {
+        var line = string.Join(' ', body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return line.Length <= 1500 ? line : line[..1500] + " …";
+    }
 
     [Fact]
     public async Task TheVerifiedScopeIsExactlyTheCallersDiscoverableRecordsOfTheFormAndEveryOneVerifies()
@@ -238,7 +272,8 @@ public sealed class SearchCatalogueTests(StageBFixture fixture)
         Assert.True(strengthen.IsSuccess, strengthen.Body);
         await s.WaitGateReadyAsync();
         var command = Guid.Parse(fixture.Stack.AuthorityObserverSql($"SELECT security_command_id FROM security_commands WHERE organization_id = '{s.OrganizationId:D}' AND command_kind_name = 'PublishFormSecurityRevision' AND command_state_name = 'Effective' ORDER BY command_created_on DESC LIMIT 1;").Trim());
-        var issued = await fixture.Authority.SendAsync(HttpMethod.Post, route, TestIdentity.VerifierToken(), new { organizationId = s.OrganizationId, formDefinitionId = s.AccusedFormId, securityCommandId = command });
+        // The Worker starts re-sealing these records right away; a re-seal commit during issuance is a retryable refusal.
+        var issued = await IssueAsync(() => fixture.Authority.SendAsync(HttpMethod.Post, route, TestIdentity.VerifierToken(), new { organizationId = s.OrganizationId, formDefinitionId = s.AccusedFormId, securityCommandId = command }));
         Assert.True(issued.IsSuccess, issued.Body);
         Assert.Equal(records.Order(), Ids(issued, "entries").Order());
         Assert.Empty(Ids(await CatalogueAsync(s, s.Reader), "entries")); // the reader can discover none of them
