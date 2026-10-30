@@ -624,16 +624,52 @@ INSERT INTO field_string_values SELECT (jsonb_populate_record(NULL::field_string
             Assert.Equal(JsonValueKind.Null, Reconciliation(done).GetProperty("attestation").ValueKind); // nothing partial attested
 
             Recreate("authority", ("AUTHORITY_TESTING_MAX_MIGRATION_ENTRIES", null), ("AUTHORITY_TESTING_MIGRATION_SNAPSHOT_SECONDS", "2"));
-            var id = await RequestIdAsync(large, "snapshots expire within one round");
+            // Expiry is forced by state, not by runner speed: the Worker starts without an encryption key, so round 1 issues its
+            // catalogue snapshot and then cannot pass its first census batch (Blocked, ENCRYPTION_UNAVAILABLE). The test waits until
+            // the Authority's own clock reports that snapshot expired, and only then restores the key. The retry therefore must
+            // hit an expired snapshot, however fast the machine is.
+            Guid id;
+            fixture.Stack.Pause("worker");
+            try
+            {
+                id = await RequestIdAsync(large, "snapshots expire within one round");
+                Recreate("worker", ("WORKER_TESTING_KEY_PROVIDER", "Unconfigured")); // replaces the paused worker: the queued run starts without a key
+                var blockedBy = DateTime.UtcNow.AddSeconds(120);
+                string blocked;
+                do
+                {
+                    await Task.Delay(500, Ct);
+                    blocked = ReconciliationRow(id);
+                }
+                while (!blocked.StartsWith("Blocked", StringComparison.Ordinal) && !blocked.StartsWith("Complete", StringComparison.Ordinal) && DateTime.UtcNow < blockedBy);
+                Assert.Equal("Blocked|ENCRYPTION_UNAVAILABLE|1", blocked); // round 1 only, nothing censused yet
+                var expiredSnapshot = fixture.Stack.AttackerSql($"SELECT catalogue_snapshot_id FROM field_protection_reconciliations WHERE field_protection_reconciliation_id = '{id:D}';").Trim();
+                Assert.NotEqual(string.Empty, expiredSnapshot);
+                var expiryBy = DateTime.UtcNow.AddSeconds(60);
+                while (Observer($"SELECT (snapshot_expires_on <= now())::text FROM search_catalogue_snapshots WHERE search_catalogue_snapshot_id = '{expiredSnapshot}';") != "true" && DateTime.UtcNow < expiryBy)
+                {
+                    await Task.Delay(250, Ct);
+                }
+
+                Assert.Equal("true", Observer($"SELECT (snapshot_expires_on <= now())::text FROM search_catalogue_snapshots WHERE search_catalogue_snapshot_id = '{expiredSnapshot}';")); // the Authority itself says it expired
+                Recreate("worker", ("WORKER_TESTING_KEY_PROVIDER", null)); // key restored: the retry meets the expired snapshot
+            }
+            catch
+            {
+                Recreate("worker", ("WORKER_TESTING_KEY_PROVIDER", null));
+                throw;
+            }
+
             var renewed = await WaitReconciliationAsync(large, id, TimeSpan.FromMinutes(10));
             var row = ReconciliationRow(id);
-            // Each round verifies at least one batch before its snapshot expires and later rounds reuse only what this
-            // reconciliation verified, so the form completes across several renewals; the attestation is still re-derived.
+            // The expired snapshot is never accepted: the reconciliation renewed the catalogue (round 2 or later) and finished on a
+            // different, live snapshot. Later rounds reuse only what this reconciliation verified; the attestation is still re-derived.
             Assert.Equal("Complete", ReconciliationState(renewed));
             Assert.Equal(160, Int(Attestation(renewed), "compliantRecordCount"));
             var firstRound = fixture.Stack.AttackerSql($"SELECT first_round_snapshot_id FROM field_protection_reconciliations WHERE field_protection_reconciliation_id = '{id:D}';").Trim();
             Assert.Equal("160", Observer($"SELECT count(*) FROM protection_census_results WHERE scoping_security_command_id = '{CommandOf(large):D}' AND census_outcome_name = 'Verified' AND census_verified_on >= (SELECT snapshot_issued_on FROM search_catalogue_snapshots WHERE search_catalogue_snapshot_id = '{firstRound}');")); // every record verified within this reconciliation
-            Assert.True(Int(Reconciliation(renewed), "roundCount") >= 2, row); // at least one renewal happened
+            Assert.True(Int(Reconciliation(renewed), "roundCount") >= 2, row); // the forced renewal happened
+            Assert.NotEqual(firstRound, fixture.Stack.AttackerSql($"SELECT catalogue_snapshot_id FROM field_protection_reconciliations WHERE field_protection_reconciliation_id = '{id:D}';").Trim()); // completed on a renewed snapshot, not the expired one
             TestContext.Current.TestOutputHelper?.WriteLine("2-second snapshot lifetime, 160 records: " + row + " " + Reconciliation(renewed).GetRawText());
         }
         finally

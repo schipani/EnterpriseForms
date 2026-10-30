@@ -100,6 +100,17 @@ public static class OrganizationEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        // Phase C8 M1 (PG-041): aggregate of independently failing parts; owners and Security Administrators only (the Authority decides).
+        var overview = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/overview").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        overview.MapGet("/", static async Task<Ok<OrganizationOverviewResponse>> (HttpContext http, OrganizationOverviewHandler handler, CancellationToken cancellationToken) =>
+            {
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handler.GetAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetOrganizationOverview")
+            .WithSummary("Organization overview (PG-041): organization identity, member and Security Administrator counts, teams, data-protection floor and authentication status as independently computed parts (an unavailable part never fails the page). Organization owners and Security Administrators only; 403 for everyone else, without counts.")
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         var users = endpoints.MapGroup(ApiVersions.V1Prefix + "/users").WithTags("Identity").WithFeatureOwner("Identity").RequireAuthorization(BusinessAuthentication.Policy);
         users.MapGet("/", static async Task<Ok<IReadOnlyList<DirectoryUserResponse>>> (HttpContext http, IBusinessStore store, CancellationToken cancellationToken) =>
             {

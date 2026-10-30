@@ -33,6 +33,35 @@ public static class TeamEndpoints
             .WithName("ListOrganizationTeams")
             .WithSummary("Display-name directory of the organization's teams (projection; confers nothing).");
 
+        // Phase C8 M1 (PG-048/049): administrative directory and detail over the projection; owners and Security Administrators read, owners rename (D8-8).
+        var administration = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/teams").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        administration.MapGet("/", static async Task<Ok<TeamDirectoryResponse>> (HttpContext http, TeamDirectoryHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handlers.GetDirectoryAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetTeamDirectory")
+            .WithSummary("Team directory with member counts (PG-048). Organization owners and Security Administrators only; 403 otherwise, without counts.")
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapGet("/{teamId:guid}", static async Task<Ok<TeamDetailResponse>> (Guid teamId, HttpContext http, TeamDirectoryHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handlers.GetDetailAsync(BusinessAuthentication.RequireContext(http), teamId, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetTeam")
+            .WithSummary("Team detail and roster (PG-049) from the projection, each membership carrying the Authority command that made it effective. Owners and Security Administrators only; another organization's team is the same generic 404 as an unknown id.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPatch("/{teamId:guid}", static async Task<Ok<TeamDetailResponse>> (Guid teamId, RenameTeamRequest request, HttpContext http, TeamDirectoryHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.RenameAsync(BusinessAuthentication.RequireContext(http), teamId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("RenameTeam")
+            .WithSummary("Display-only rename of the team projection (D8-8; the Authority names no team). Organization owners and Security Administrators (the Authority's team-command rule); audited (TEAM_RENAMED); 409 TEAM_MODIFIED_CONCURRENTLY when expectedModifiedOn is stale.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapPost("/{teamId:guid}/members", static async Task<Ok<CommandStatusResponse>> (Guid teamId, TeamMemberRequest request, HttpContext http, ChangeTeamMembershipHandler handler, CancellationToken cancellationToken) =>
             {
                 var context = BusinessAuthentication.RequireContext(http);

@@ -168,7 +168,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
 
   test("organization owner tightens the data-protection policy; the designer is then refused plaintext", async ({ page }) => {
     await signIn(page, "owner");
-    await page.goto("/app/organization/branding");
+    await page.goto("/app/organization/data-protection");
     const card = policyCard(page);
     await expect(card.getByText(/Development default — not yet reviewed|^Reviewed /)).toBeVisible();
     await card.getByRole("checkbox", { name: /Permit plaintext storage/ }).uncheck();
@@ -198,7 +198,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     } finally {
       // Restore the shared development organization's policy for the other specs.
       await signIn(page, "owner");
-      await page.goto("/app/organization/branding");
+      await page.goto("/app/organization/data-protection");
       const restore = policyCard(page);
       await restore.getByRole("checkbox", { name: /Permit plaintext storage/ }).check();
       await restore.getByLabel("Policy statement").fill(`Playwright ${run}: restored the development default after the encryption spec.`);

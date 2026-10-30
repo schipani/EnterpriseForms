@@ -3,7 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { signIn, signOut } from "./support";
 
 /**
- * Owner message 7 — Security Administrator management in Organization settings, in the real application (business API,
+ * Owner message 7 — Security Administrator management on the Organization › Security Administrators page (Phase C8 M1 moved it
+ * out of the branding page), in the real application (business API,
  * Authorization Authority, SpiceDB; no mocks).
  *  1. An organization owner sees the Security Administrators read-only: no Add, no Remove, and the reason why.
  *  2. A Security Administrator appoints an existing verified member (picked from a list, never typed), with a reason and
@@ -26,7 +27,7 @@ async function axe(page: Page) {
 test.describe("Security Administrators", () => {
   test("an organization owner sees the administrators read-only and cannot appoint anyone", async ({ page }) => {
     await signIn(page, "owner");
-    await page.goto("/app/organization/branding");
+    await page.goto("/app/organization/security-administrators");
     await expect(table(page)).toBeVisible();
     test.skip((await table(page).getByRole("row", { name: /Sam Security/ }).count()) === 0, "this organization predates the dev-seed security persona (recreate the stack to run this spec)");
     await expect(table(page).getByRole("row", { name: /Sam Security/ })).toContainText("Active");
@@ -41,7 +42,9 @@ test.describe("Security Administrators", () => {
     await signIn(page, "security");
     await expect(nav(page, "Organization")).toBeVisible();
     await nav(page, "Organization").click();
-    await expect(page.getByRole("heading", { name: "Organization settings" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Organization overview" })).toBeVisible();
+    await page.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Security Administrators", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Security Administrators" })).toBeVisible();
     await expect(table(page).getByRole("row", { name: /Sam Security.*\(you\)/ })).toBeVisible();
 
     // The last administrator cannot be removed.
@@ -71,12 +74,13 @@ test.describe("Security Administrators", () => {
     await nav(page, "Search approvals").click();
     await expect(page.getByRole("heading", { name: /Search approvals/ }).first()).toBeVisible();
     await nav(page, "Organization").click();
+    await page.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Security Administrators", exact: true }).click();
     await expect(table(page).getByRole("row", { name: /Casey Clerk.*\(you\)/ })).toBeVisible();
     await signOut(page);
 
     // Removal: confirm with a reason and the step-up; the role is gone.
     await signIn(page, "security");
-    await page.goto("/app/organization/branding");
+    await page.goto("/app/organization/security-administrators");
     await page.getByRole("button", { name: /Remove Casey Clerk.* as Security Administrator/ }).click();
     const remove = page.getByRole("dialog", { name: /Remove Casey Clerk/ });
     await remove.getByRole("textbox", { name: /Reason/ }).fill("Governance ticket SA-E2E: rotation");
@@ -91,7 +95,8 @@ test.describe("Security Administrators", () => {
     await signIn(page, "clerk");
     await expect(nav(page, "Search approvals")).toHaveCount(0);
     await expect(nav(page, "Organization")).toHaveCount(0);
-    await page.goto("/app/organization/branding");
-    await expect(page.getByText("Only an organization owner can change branding.")).toBeVisible();
+    await page.goto("/app/organization/security-administrators");
+    await expect(page.getByText("Organization administration is for organization owners and Security Administrators.")).toBeVisible();
+    await expect(table(page)).toHaveCount(0);
   });
 });

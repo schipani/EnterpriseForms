@@ -41,6 +41,13 @@ const newChildRoute = createRoute({ getParentRoute: () => appRoute, path: "/reco
 const uploadsRoute = createRoute({ getParentRoute: () => appRoute, path: "/uploads", component: lazyRouteComponent(() => import("../features/jobs"), "UploadCenterPage") });
 const activityRoute = createRoute({ getParentRoute: () => appRoute, path: "/activity", component: lazyRouteComponent(() => import("../features/audit"), "MyActivityPage") });
 const brandingRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/branding", component: lazyRouteComponent(() => import("../features/organizations"), "BrandingPage") });
+// Phase C8 M1: administration shell (PG-041 overview, PG-050 people, PG-048/049 teams, PG-046 data protection, Security Administrators).
+const organizationOverviewRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization", component: lazyRouteComponent(() => import("../features/organizations"), "OverviewPage") });
+const organizationDataProtectionRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/data-protection", component: lazyRouteComponent(() => import("../features/organizations"), "DataProtectionPage") });
+const organizationSecurityAdministratorsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/security-administrators", component: lazyRouteComponent(() => import("../features/organizations"), "SecurityAdministratorsPage") });
+const organizationPeopleRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/users", component: lazyRouteComponent(() => import("../features/identity"), "PeopleDirectoryPage") });
+const organizationTeamsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/teams", component: lazyRouteComponent(() => import("../features/teams"), "TeamsPage") });
+const organizationTeamRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/teams/$teamId", component: lazyRouteComponent(() => import("../features/teams"), "TeamDetailPage") });
 const searchApprovalsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/search-approvals", component: lazyRouteComponent(() => import("../features/search"), "SearchApprovalsPage") });
 const preferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
 const galleryRoute = createRoute({ getParentRoute: () => appRoute, path: "/gallery", component: lazyRouteComponent(() => import("../features/support"), "GalleryPage") });
@@ -49,7 +56,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, searchApprovalsRoute, preferencesRoute, galleryRoute, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, preferencesRoute, galleryRoute, noPermissionRoute]),
 ]);
 
 export function createAppRouter() {
