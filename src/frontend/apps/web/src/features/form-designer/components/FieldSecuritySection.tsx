@@ -1,6 +1,6 @@
 import type { FieldDefinitionResponse, FieldProtectionMigrationResponse, FieldProtectionReconciliationResponse, FieldProtectionVerificationResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Checkbox, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Checkbox, legendClass, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -49,7 +49,7 @@ export function FieldSecuritySection({ dataType, classification, encryptChoice, 
   const encrypted = security.protectionMode === "ApplicationEncrypted";
   return (
     <fieldset className="flex flex-col gap-3 rounded border border-line p-3">
-      <legend className="px-1 text-sm font-medium">Security &amp; Encryption</legend>
+      <legend className={`px-1 ${legendClass}`}>Security &amp; Encryption</legend>
       <Select label="Classification" value={classification} required options={CLASSIFICATIONS.map((value) => ({ value, label: value }))} onValueChange={onClassificationChange} helpText={dataType === "File" ? "Documents are always application-encrypted." : "Confidential and Restricted require application-level encryption. New free text defaults to Confidential."} />
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">Application-level encryption</span>
@@ -377,7 +377,7 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
   const governanceAvailable = administrator && encrypted && !isDocuments && !migrationActive;
   return (
     <fieldset className="flex flex-col gap-3 rounded border border-line p-3">
-      <legend className="px-1 text-sm font-medium">Security &amp; Encryption</legend>
+      <legend className={`px-1 ${legendClass}`}>Security &amp; Encryption</legend>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span>Classification</span>
         <Badge tone="neutral">{field.fieldClassification}</Badge>

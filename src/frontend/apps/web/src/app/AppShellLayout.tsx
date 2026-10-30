@@ -1,5 +1,5 @@
 import { LOGO_PATH, useRuntime, useSession } from "@enterpriseforms/app-runtime";
-import { Button, LoadingBlock, StatusMessage } from "@enterpriseforms/ui";
+import { Button, LoadingBlock, menuContentClass, menuItemClass, StatusMessage } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Link, Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type PropsWithChildren } from "react";
@@ -57,7 +57,6 @@ function PrimaryNav({ wide }: { wide: boolean }) {
     { to: "/app/activity", label: "My activity", show: true },
     { to: "/app/organization/branding", label: "Organization", show: session.hasCapability("organization.manage") || session.hasCapability("security.administer") },
     { to: "/app/organization/search-approvals", label: "Search approvals", show: session.hasCapability("security.administer") },
-    { to: "/app/gallery", label: "Component gallery", show: true },
   ];
   return (
     <nav aria-label="Primary" className={`mx-auto w-full ${wide ? "max-w-[100rem]" : "max-w-7xl"} px-4`}>
@@ -88,16 +87,16 @@ function UserMenu() {
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-56 rounded border border-input bg-surface p-1 shadow-lg">
+        <DropdownMenu.Content align="end" sideOffset={6} className={`${menuContentClass} min-w-56`}>
           <DropdownMenu.Label className="px-3 py-2 text-xs text-muted">
             {session.session?.organizationDisplayName} · {session.identityProviderKind === "TestIdentityProvider" ? "development identity" : session.identityProviderKind}
           </DropdownMenu.Label>
-          <DropdownMenu.Item className="flex min-h-10 cursor-default items-center rounded px-3 text-base outline-none data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground" onSelect={() => void navigate({ to: "/app/me/preferences" })}>
+          <DropdownMenu.Item className={menuItemClass} onSelect={() => void navigate({ to: "/app/me/preferences" })}>
             Text size preferences
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
           <DropdownMenu.Item
-            className="flex min-h-10 cursor-default items-center rounded px-3 text-base outline-none data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground"
+            className={menuItemClass}
             onSelect={() => {
               void session.logout().then(
                 () => navigate({ to: "/login" }),
@@ -157,7 +156,7 @@ function SessionExpiredNotice() {
   }
   return (
     <div role="alertdialog" aria-modal="true" aria-labelledby="expired-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-lg border border-input bg-surface p-5">
+      <div className="w-full max-w-md rounded-panel border border-input bg-surface p-5">
         <h2 id="expired-title" className="text-xl font-semibold">
           Your session has ended
         </h2>

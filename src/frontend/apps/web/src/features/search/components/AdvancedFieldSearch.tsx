@@ -1,5 +1,5 @@
 import type { FieldSearchCapabilitiesResponse, FieldSearchCapabilityField } from "@enterpriseforms/api-client";
-import { ActionIcons, Badge, Button, LoadingBlock, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, helpTextClass, LoadingBlock, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { addCondition, arity, fieldFor, maximumConditions, newCondition, operatorLabel, removeCondition, setField, setOperator, setValue, validateConditions, type ConditionDraft, type ConditionErrors } from "./conditionModel";
 
@@ -81,7 +81,7 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
     <section aria-labelledby={headingId} className={stacked ? "flex flex-col gap-4" : "flex flex-col gap-3 border-t border-input pt-4"}>
       <h3 id={headingId} className="m-0 text-base font-semibold">
         {collapsible ? (
-          <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded((open) => !open)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded px-1 text-left">
+          <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpanded((open) => !open)} className="flex min-h-control w-full items-center justify-between gap-3 rounded-control px-1 text-left">
             <span>Advanced Search</span>
             <span className="flex items-center gap-2">
               {unavailableReason ? <Badge tone="neutral">Not available yet</Badge> : null}
@@ -99,7 +99,7 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
         )}
       </h3>
       <div id={panelId} hidden={!expanded} className="flex flex-col gap-4">
-        <p className="text-sm text-muted">Find records of the selected form by the values of approved fields. Every condition must match.</p>
+        <p className={helpTextClass}>Find records of the selected form by the values of approved fields. Every condition must match.</p>
         {notice}
         {!formSelected ? (
           <StatusMessage tone="info" title="Choose a form first">
@@ -122,7 +122,7 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
           </div>
         ) : null}
         {composable && !available ? (
-          <p className="text-sm text-muted">You can choose approved fields and conditions to see what can be searched, but nothing is searched until trusted search is turned on.</p>
+          <p className={helpTextClass}>You can choose approved fields and conditions to see what can be searched, but nothing is searched until trusted search is turned on.</p>
         ) : null}
         {available && fields.length === 0 ? (
           <StatusMessage tone="info" title="No fields can be searched in this form">
@@ -130,7 +130,7 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
           </StatusMessage>
         ) : null}
         {notSearchable.length > 0 ? (
-          <p className="text-sm text-muted">
+          <p className={helpTextClass}>
             {notSearchable.some((field) => field.reasonCode === "ENCRYPTED") ? <>Encrypted for privacy — not searchable: {notSearchable.filter((field) => field.reasonCode === "ENCRYPTED").map((field) => field.displayLabel).join(", ")}. </> : null}
             {notSearchable.some((field) => field.reasonCode !== "ENCRYPTED") ? <>Not approved for searching: {notSearchable.filter((field) => field.reasonCode !== "ENCRYPTED").map((field) => field.displayLabel).join(", ")}.</> : null}
           </p>
@@ -162,7 +162,7 @@ export function AdvancedFieldSearch({ formSelected, capabilities, loading, loadF
                 Search records
               </Button>
             </div>
-            {composable ? <p className="text-sm text-muted">{conditions.length >= maximum ? `You can use up to ${maximum} conditions.` : `Up to ${maximum} conditions; all of them must match.`}</p> : null}
+            {composable ? <p className={helpTextClass}>{conditions.length >= maximum ? `You can use up to ${maximum} conditions.` : `Up to ${maximum} conditions; all of them must match.`}</p> : null}
           </div>
         </form>
       </div>
@@ -224,7 +224,7 @@ function ConditionRow({ number, condition, field, fields, enabled, errors, remov
           <ValueControl label="To" field={field} text={condition.upperBound} error={errors.upperBound} enabled={enabled} onChange={(text) => onValueChange("upperBound", text)} />
         </div>
       ) : kind === "none" && field ? (
-        <p className="text-sm text-muted">No value is needed for this condition.</p>
+        <p className={helpTextClass}>No value is needed for this condition.</p>
       ) : (
         <ValueControl label="Value" field={field} text={condition.value} error={errors.value} enabled={enabled && Boolean(field)} onChange={(text) => onValueChange("value", text)} />
       )}

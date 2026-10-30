@@ -1,7 +1,7 @@
 import type { FieldDefinitionResponse, GroupDefinitionResponse, RelationshipDefinitionResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { applyEditValues, elementKey, findElement, moveElementTo, placedIds, sameScope, setSectionRepeat, toEditValues, updateElementByKey, updateSection, validateEditValues, type DesignerSelection, type FieldEditValues } from "@enterpriseforms/form-designer";
 import { CONTROLS_BY_TYPE, REPEAT_CEILING, type DocumentElement, type FieldDataType, type FieldElement, type FormLayout, type LayoutElement, type LayoutRepeat, type RelatedElement } from "@enterpriseforms/form-renderer";
-import { ActionIcons, Badge, Button, Checkbox, Select, StatusMessage, Tabs, TextArea, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Checkbox, errorTextClass, IconButton, Select, StatusMessage, Tabs, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useState, type ReactNode } from "react";
 import { CurrentProtectionSection } from "./FieldSecuritySection";
 import { OptionsEditor } from "./OptionsEditor";
@@ -97,17 +97,17 @@ export function DesignerInspector(props: DesignerInspectorProps) {
     }
   }
   return (
-    <aside aria-labelledby="designer-inspector-heading" className="flex min-w-0 flex-col rounded-lg border border-line bg-surface">
+    <aside aria-labelledby="designer-inspector-heading" className="flex min-w-0 flex-col rounded-panel border border-line bg-surface">
       <div className="flex min-h-12 items-center gap-2 border-b border-line px-4 py-2">
         <h2 id="designer-inspector-heading" tabIndex={-1} className="min-w-0 flex-1 text-lg font-semibold focus-visible:outline-none">
           {title}
         </h2>
         {selection ? (
-          <button type="button" aria-label="Close properties" title="Close properties" onClick={() => props.onSelect(null)} className="flex h-9 w-9 items-center justify-center rounded text-body hover:bg-page">
+          <IconButton label="Close properties" onClick={() => props.onSelect(null)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
-          </button>
+          </IconButton>
         ) : null}
       </div>
       <div className="flex min-w-0 flex-col gap-3 p-4">{body}</div>
@@ -562,7 +562,7 @@ function RepeatSettings(props: DesignerInspectorProps & { sectionIndex: number }
             <TextInput label="Maximum entries" inputMode="numeric" value={maxText} disabled={!canDesign} onChange={(event) => commitBounds(minText, event.target.value.trim())} />
           </div>
           {boundsError ? (
-            <p role="alert" className="text-sm font-medium text-[#991b1b]">
+            <p role="alert" className={errorTextClass}>
               {boundsError}
             </p>
           ) : (

@@ -59,7 +59,7 @@ export function UploadCenterPage() {
               </div>
               <ProgressBar label={`${item.fileName} transfer`} value={item.transferredBytes} max={item.sizeBytes} />
               {item.errorCode ? (
-                <p className="mt-1 text-sm text-[#991b1b]">
+                <p className="mt-1 text-sm text-danger">
                   {item.errorCode}
                   {item.errorDetail ? `: ${item.errorDetail}` : ""}
                 </p>

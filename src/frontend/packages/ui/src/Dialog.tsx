@@ -1,5 +1,6 @@
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, type ReactNode } from "react";
+import { IconButton } from "./Button";
 
 export interface DialogProps {
   open: boolean;
@@ -42,8 +43,8 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
         <RadixDialog.Content
           className={
             large
-              ? "fixed inset-0 z-50 flex flex-col overflow-hidden bg-surface text-body shadow-xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-[85vh] sm:max-h-[85vh] sm:w-[90vw] sm:max-w-[1200px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg sm:border sm:border-input"
-              : "fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[min(95vw,40rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-auto rounded-lg border border-input bg-surface p-5 text-body shadow-xl"
+              ? "fixed inset-0 z-50 flex flex-col overflow-hidden bg-surface text-body shadow-xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-[85vh] sm:max-h-[85vh] sm:w-[90vw] sm:max-w-[1200px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-panel sm:border sm:border-input"
+              : "fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[min(95vw,40rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-auto rounded-panel border border-input bg-surface p-5 text-body shadow-xl"
           }
           onEscapeKeyDown={(event) => (locked ? event.preventDefault() : undefined)}
           onInteractOutside={(event) => (locked ? event.preventDefault() : undefined)}
@@ -63,11 +64,11 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
                   {description ? <RadixDialog.Description className="mt-1 text-sm text-muted">{description}</RadixDialog.Description> : <RadixDialog.Description className="sr-only">{title}</RadixDialog.Description>}
                 </div>
                 <RadixDialog.Close asChild>
-                  <button type="button" aria-label="Close" title="Close" disabled={locked} className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-body hover:bg-page disabled:opacity-50">
+                  <IconButton label="Close" disabled={locked}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                       <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
-                  </button>
+                  </IconButton>
                 </RadixDialog.Close>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>

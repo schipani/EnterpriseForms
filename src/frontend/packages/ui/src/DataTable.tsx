@@ -32,13 +32,13 @@ export function DataTable<T>({ caption, columns, rows, rowKey, emptyMessage = "N
   const cellClass = (column: DataTableColumn<T>) => `${column.isActions ? `text-right${stickyActions ? " sticky right-0 bg-surface" : ""}` : ""} ${column.className ?? ""}`;
   return (
     // A horizontally scrollable region must be reachable by keyboard (WCAG 2.1.1 / axe scrollable-region-focusable).
-    <div role="region" aria-label={caption} tabIndex={0} className="w-full overflow-x-auto rounded border border-line focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+    <div role="region" aria-label={caption} tabIndex={0} className="w-full overflow-x-auto rounded-control border border-line focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
       <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-page">
           <tr>
             {ordered.map((column) => (
-              <th key={column.key} scope="col" className={`border-b border-line px-3 py-2 font-semibold ${column.isActions ? `text-right${stickyActions ? " sticky right-0 bg-page" : ""}` : ""} ${column.className ?? ""}`}>
+              <th key={column.key} scope="col" className={`border-b border-line px-3 py-2 text-label font-semibold ${column.isActions ? `text-right${stickyActions ? " sticky right-0 bg-page" : ""}` : ""} ${column.className ?? ""}`}>
                 {column.header}
               </th>
             ))}

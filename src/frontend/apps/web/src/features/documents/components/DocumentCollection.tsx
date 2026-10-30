@@ -1,7 +1,7 @@
 import type { DocumentSummaryResponse } from "@enterpriseforms/api-client";
 import { DOWNLOAD_PATH, resolvePath, useApi, useRuntime } from "@enterpriseforms/app-runtime";
 import type { LayoutUploadPolicy } from "@enterpriseforms/form-renderer";
-import { ActionIcons, Badge, Button, Card, DataTable, Dialog, LoadingBlock, ProgressBar, RowActions, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, buttonClass, Card, DataTable, Dialog, LoadingBlock, ProgressBar, RowActions, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { phaseTone, useUploadItems } from "../../jobs";
@@ -142,7 +142,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
                 <Badge tone={phaseTone(item.phase)}>{item.phase === "Processing" ? `Scanning/encrypting (${item.processingStage ?? "queued"})` : item.phase}</Badge>
               </div>
               {item.phase !== "Ready" ? <ProgressBar label={`${item.fileName} transfer`} value={item.transferredBytes} max={item.sizeBytes} /> : null}
-              {item.errorCode ? <p className="text-sm text-[#991b1b]">{item.errorCode}{item.errorDetail ? `: ${item.errorDetail}` : ""}</p> : null}
+              {item.errorCode ? <p className="text-sm text-danger">{item.errorCode}{item.errorDetail ? `: ${item.errorDetail}` : ""}</p> : null}
               <div className="mt-1 flex gap-2">
                 {item.phase === "Failed" && item.hasBytes ? <Button size="sm" variant="secondary" onClick={() => uploads.retry(item.clientUploadId)}>Retry</Button> : null}
                 {item.phase === "Paused" && item.hasBytes ? <Button size="sm" variant="secondary" onClick={() => uploads.retry(item.clientUploadId)}>Resume</Button> : null}
@@ -202,7 +202,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
                   overflowLabel={`More actions for ${row.originalFileName}`}
                   primary={
                     ready ? (
-                      <a href={resolvePath(DOWNLOAD_PATH, { formRecordId, fileAttachmentId: row.fileAttachmentId })} download={row.originalFileName} className="inline-flex min-h-9 items-center rounded border border-secondary-border bg-secondary px-3 text-sm font-medium text-secondary-foreground">
+                      <a href={resolvePath(DOWNLOAD_PATH, { formRecordId, fileAttachmentId: row.fileAttachmentId })} download={row.originalFileName} className={buttonClass("secondary", "sm")}>
                         Download
                       </a>
                     ) : (

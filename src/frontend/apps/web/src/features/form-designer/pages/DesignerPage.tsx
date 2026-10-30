@@ -2,7 +2,7 @@ import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "
 import { useApi } from "@enterpriseforms/app-runtime";
 import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findOptionFilterCycle, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, setSectionRepeat, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
 import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
-import { ActionIcons, Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, menuContentClass, menuItemClass, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useParams } from "@tanstack/react-router";
@@ -504,7 +504,7 @@ export function DesignerPage() {
   const sectionTargetIndex = sectionOfSelection();
 
   const toolbar = (
-    <div role="group" aria-label="Designer actions" className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2">
+    <div role="group" aria-label="Designer actions" className="flex flex-wrap items-center gap-2 rounded-panel border border-line bg-surface p-2">
       {canDesign ? (
         <>
           <DropdownMenu.Root>
@@ -514,13 +514,13 @@ export function DesignerPage() {
               </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content align="start" sideOffset={6} className="z-50 min-w-56 rounded border border-input bg-surface p-1 shadow-lg">
+              <DropdownMenu.Content align="start" sideOffset={6} className={`${menuContentClass} min-w-56`}>
                 {[
                   { key: "new", label: "New field…", run: () => setCreateAt({ kind: "field", target: layout ? columnSlotFor(layout, selection) : null }) },
                   { key: "documents", label: "New document collection…", run: () => setCreateAt({ kind: "documents", target: layout ? columnSlotFor(layout, selection) : null }) },
                   { key: "existing", label: "Place an existing field…", run: placeExisting },
                 ].map((item) => (
-                  <DropdownMenu.Item key={item.key} onSelect={item.run} className="flex min-h-10 cursor-default items-center rounded px-3 text-base outline-none data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground">
+                  <DropdownMenu.Item key={item.key} onSelect={item.run} className={menuItemClass}>
                     {item.label}
                   </DropdownMenu.Item>
                 ))}
@@ -565,11 +565,11 @@ export function DesignerPage() {
 
   const designView = layout ? (
     <div className="flex flex-col gap-3">
-      <div role="group" aria-label="Designer panes" className="flex gap-1 rounded-lg border border-line bg-surface p-1 lg:hidden">
+      <div role="group" aria-label="Designer panes" className="flex gap-2 lg:hidden">
         {(["canvas", "properties"] as const).map((option) => (
-          <button key={option} type="button" aria-pressed={pane === option} onClick={() => setPane(option)} className={`min-h-11 flex-1 rounded px-3 text-base font-medium ${pane === option ? "bg-primary text-primary-foreground" : "text-body hover:bg-page"}`}>
+          <Button key={option} variant={pane === option ? "primary" : "secondary"} aria-pressed={pane === option} onClick={() => setPane(option)} className="flex-1">
             {option === "canvas" ? "Canvas" : "Properties"}
-          </button>
+          </Button>
         ))}
       </div>
       {/* lg:items-start: without it, CSS Grid's default align-items:stretch makes the inspector column match the

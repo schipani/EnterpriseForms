@@ -1,5 +1,5 @@
 import { packElements, visibleColumns, type Breakpoint, type FormLayout, type LayoutElement, type LayoutSection, type RendererField } from "@enterpriseforms/form-renderer";
-import { OverflowMenu } from "@enterpriseforms/ui";
+import { IconButton as SharedIconButton, OverflowMenu } from "@enterpriseforms/ui";
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { duplicateSection, elementKey, findElement, moveElementTo, moveSection, newSectionKey, removeElement, sameScope, updateElement, updateSection } from "./layoutEdits";
 
@@ -202,21 +202,19 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
   return (
     <section
       aria-labelledby={headingId}
-      className={`min-w-0 rounded-lg border bg-surface ${selected ? "border-focus ring-2 ring-focus" : containsSelection ? "border-focus" : "border-line"} ${dropTarget === `section:${section.sectionKey}` ? "outline-2 outline-dashed outline-focus" : ""}`}
+      className={`min-w-0 rounded-panel border bg-surface ${selected ? "border-focus ring-2 ring-focus" : containsSelection ? "border-focus" : "border-line"} ${dropTarget === `section:${section.sectionKey}` ? "outline-2 outline-dashed outline-focus" : ""}`}
       onDragOver={readOnly ? undefined : drag.over(`section:${section.sectionKey}`)}
       onDrop={readOnly ? undefined : drag.drop(sectionIndex, section.elements.length)}
     >
       <div className="flex min-h-12 items-center gap-1 border-b border-line px-2 py-1">
-        <button
-          type="button"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-body hover:bg-page"
+        <SharedIconButton
+          label={`${collapsed ? "Expand" : "Collapse"} ${title}`}
           aria-expanded={!collapsed}
           aria-controls={bodyId}
-          aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`}
           onClick={() => props.onToggleCollapse(section.sectionKey)}
         >
           <Chevron open={!collapsed} />
-        </button>
+        </SharedIconButton>
         <h2 id={headingId} className="min-w-0 flex-1 text-lg font-semibold">
           {renaming ? (
             <InlineText
@@ -291,7 +289,7 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
                       event.stopPropagation();
                       props.onSelect({ kind: "slot", sectionKey: section.sectionKey, insertIndex: slot.insertIndex, slotId: slot.slotId, startOnNewRow: slot.startOnNewRow });
                     }}
-                    className={`flex h-full min-h-20 w-full flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-sm font-medium text-body hover:bg-page ${isSelected || dropTarget === target ? "border-focus bg-page" : "border-input"}`}
+                    className={`flex h-full min-h-20 w-full flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed text-sm font-medium text-body hover:bg-page ${isSelected || dropTarget === target ? "border-focus bg-page" : "border-input"}`}
                   >
                     <span aria-hidden="true" className="text-xl leading-none">
                       +
@@ -414,7 +412,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
       onDrop={readOnly ? undefined : drag.drop(sectionIndex, index)}
     >
       <div
-        className={`relative flex h-full min-h-20 flex-col gap-2 rounded-md border bg-surface p-3 ${selected ? "border-focus ring-2 ring-focus" : "border-line hover:border-input"} ${dropActive ? "outline-2 outline-dashed outline-focus" : ""} ${readOnly ? "" : "cursor-grab"}`}
+        className={`relative flex h-full min-h-20 flex-col gap-2 rounded-control border bg-surface p-3 ${selected ? "border-focus ring-2 ring-focus" : "border-line hover:border-input"} ${dropActive ? "outline-2 outline-dashed outline-focus" : ""} ${readOnly ? "" : "cursor-grab"}`}
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button,input,[role=menu]")) {
             select();
@@ -452,7 +450,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
             >
               {label}
               {element.kind !== "relatedFormList" && element.required ? (
-                <span aria-hidden="true" className="text-[#991b1b]">
+                <span aria-hidden="true" className="text-danger">
                   {" "}
                   *
                 </span>
@@ -460,7 +458,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
             </button>
           )}
           {selected && !readOnly && !renaming ? (
-            <div role="group" aria-label={`Actions for ${label}`} className="absolute -top-4 right-2 z-10 flex items-center gap-0.5 rounded-md border border-line bg-surface px-0.5 shadow-sm">
+            <div role="group" aria-label={`Actions for ${label}`} className="absolute -top-4 right-2 z-10 flex items-center gap-0.5 rounded-control border border-line bg-surface px-0.5 shadow-sm">
               {props.onOpenConfig ? (
                 <IconButton label={`Configure ${label}`} onClick={() => props.onOpenConfig!(key)}>
                   <GearIcon />
@@ -634,7 +632,7 @@ function InlineText({ label, initial, maxLength, selectAll, onCommit, onCancel }
       aria-label={label}
       value={value}
       maxLength={maxLength}
-      className="min-h-9 w-full min-w-0 rounded border border-input bg-surface px-2 text-base font-semibold text-body"
+      className="min-h-control-compact w-full min-w-0 rounded-control border border-input bg-surface px-2 text-base font-semibold text-body"
       onChange={(event) => setValue(event.target.value.replace(/[<>]/g, ""))}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
@@ -669,11 +667,12 @@ function MenuButton({ label, items, compact = false }: { label: string; items: A
   );
 }
 
+/** The shared compact icon button (packages/ui); kept as a local adapter for the tile toolbar's call sites. */
 function IconButton({ label, onClick, children, danger = false }: { label: string; onClick: () => void; children: ReactNode; danger?: boolean }) {
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className={`flex h-8 w-8 items-center justify-center rounded hover:bg-page ${danger ? "text-[#991b1b]" : "text-body"}`}>
+    <SharedIconButton label={label} size="sm" tone={danger ? "danger" : "default"} onClick={onClick}>
       {children}
-    </button>
+    </SharedIconButton>
   );
 }
 

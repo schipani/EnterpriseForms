@@ -1,6 +1,6 @@
 import { removeSection, sameScope, type SectionRemoval } from "@enterpriseforms/form-designer";
 import type { FormLayout } from "@enterpriseforms/form-renderer";
-import { Button, Dialog, Select } from "@enterpriseforms/ui";
+import { Button, Dialog, RadioGroup, Select } from "@enterpriseforms/ui";
 import { useId, useState } from "react";
 
 /**
@@ -25,7 +25,6 @@ export function RemoveSectionDialog({ layout, sectionIndex, onConfirm, onClose }
   const items = count === 1 ? "1 item" : `${count} items`;
   const targetIndex = layout.sections.findIndex((candidate) => candidate.sectionKey === target);
   const disposition: SectionRemoval | null = empty ? { kind: "empty" } : choice === "move" && targetIndex >= 0 ? { kind: "moveTo", targetSectionIndex: targetIndex } : choice === "unplace" ? { kind: "unplace" } : null;
-  const radio = "h-5 w-5 shrink-0 accent-[var(--ui-primary-bg)]";
   return (
     <Dialog
       open
@@ -54,22 +53,21 @@ export function RemoveSectionDialog({ layout, sectionIndex, onConfirm, onClose }
       }
     >
       {empty ? null : (
-        <fieldset className="flex flex-col gap-3">
-          <legend className="mb-1 font-medium">What should happen to the {items}?</legend>
-          <label className="flex items-start gap-3">
-            <input type="radio" name={groupName} className={radio} checked={choice === "move"} disabled={others.length === 0} onChange={() => setChoice("move")} />
-            <span>Move the {items} to another section{others.length === 0 ? " (no compatible section: fields of a section that allows multiple entries can only be un-placed)" : ""}</span>
-          </label>
-          {choice === "move" ? (
-            <div className="pl-8">
-              <Select label="Move to section" value={target} onValueChange={setTarget} options={others.map(({ candidate }) => ({ value: candidate.sectionKey, label: candidate.title?.trim() || candidate.sectionKey }))} />
-            </div>
-          ) : null}
-          <label className="flex items-start gap-3">
-            <input type="radio" name={groupName} className={radio} checked={choice === "unplace"} onChange={() => setChoice("unplace")} />
-            <span>Remove the {items} from the layout only — they stay in the field catalog with their values and documents, ready to place again</span>
-          </label>
-        </fieldset>
+        <RadioGroup
+          legend={`What should happen to the ${items}?`}
+          name={groupName}
+          value={choice ?? undefined}
+          onValueChange={(value) => setChoice(value as typeof choice)}
+          options={[
+            {
+              value: "move",
+              disabled: others.length === 0,
+              label: `Move the ${items} to another section${others.length === 0 ? " (no compatible section: fields of a section that allows multiple entries can only be un-placed)" : ""}`,
+              details: <Select label="Move to section" value={target} onValueChange={setTarget} options={others.map(({ candidate }) => ({ value: candidate.sectionKey, label: candidate.title?.trim() || candidate.sectionKey }))} />,
+            },
+            { value: "unplace", label: `Remove the ${items} from the layout only — they stay in the field catalog with their values and documents, ready to place again` },
+          ]}
+        />
       )}
     </Dialog>
   );

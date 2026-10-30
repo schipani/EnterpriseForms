@@ -2,10 +2,10 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 export function Card({ title, actions, children, className = "", as: Tag = "section", ...rest }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; as?: "section" | "article" | "div" } & Omit<HTMLAttributes<HTMLElement>, "title">) {
   return (
-    <Tag className={`flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-surface p-4 ${className}`} {...rest}>
+    <Tag className={`flex min-w-0 flex-col gap-4 rounded-panel border border-line bg-surface p-5 ${className}`} {...rest}>
       {title || actions ? (
         <header className="flex flex-wrap items-start justify-between gap-2">
-          {title ? <h2 className="text-lg font-semibold">{title}</h2> : <span />}
+          {title ? <h2 className="text-base font-semibold leading-snug">{title}</h2> : <span />}
           {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
         </header>
       ) : null}
@@ -38,7 +38,7 @@ const toneLabel: Record<StatusTone, string> = { info: "Information", success: "S
 /** Status messages are announced and never rely on color alone: a text prefix identifies the tone. */
 export function StatusMessage({ tone = "info", title, children, actions }: { tone?: StatusTone; title?: string; children?: ReactNode; actions?: ReactNode }) {
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={`flex flex-col gap-2 rounded border-l-4 px-4 py-3 ${tones[tone]}`}>
+    <div role={tone === "danger" ? "alert" : "status"} className={`flex flex-col gap-2 rounded-control border-l-4 px-4 py-3 ${tones[tone]}`}>
       <p className="font-semibold">
         {title ?? toneLabel[tone]}
         {title ? <span className="sr-only"> ({toneLabel[tone]})</span> : null}
@@ -56,7 +56,7 @@ export function Badge({ children, tone = "info" }: { children: ReactNode; tone?:
 
 export function EmptyState({ title, children, actions }: { title: string; children?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded border border-dashed border-input bg-page p-6">
+    <div className="flex flex-col items-start gap-2 rounded-control border border-dashed border-input bg-page p-6">
       <p className="font-semibold">{title}</p>
       {children ? <p className="text-sm text-muted">{children}</p> : null}
       {actions ? <div className="mt-2 flex flex-wrap gap-2">{actions}</div> : null}
