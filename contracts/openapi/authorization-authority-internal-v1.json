@@ -242,6 +242,108 @@
         }
       }
     },
+    "/internal/v1/security-command-outcomes/lookup": {
+      "post": {
+        "tags": [
+          "SecurityCommands"
+        ],
+        "summary": "AC-9 (reconciler credential only): read-only outcome of one AddTeamMember/RemoveTeamMember command bound by (organization, idempotency key, allowlisted kind), with the organization's revisions and the effective membership of the command's own (team, member) pair at the projection-applied revision. Uniform found=false for unknown organization, key or kind mismatch; membership null when rejected or quarantined. No lock, revision, journal or SpiceDB access.",
+        "operationId": "LookupSecurityCommandOutcome",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityCommandOutcomeLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityCommandOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/protection-coverage": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M4 (verifier only): every current field protection decision of the organization (Authority protection resources, never the business form list) with its latest attestation; organization-complete only when each decision has a complete attestation under that decision.",
+        "operationId": "GetProtectionCoverage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProtectionCoverageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionCoverageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/content-changes/prepare": {
       "post": {
         "tags": [
@@ -769,37 +871,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProtectionAttestation"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/v1/verifier/protection-coverage": {
-      "post": {
-        "tags": [
-          "Catalogue"
-        ],
-        "summary": "Phase C7 M4 (verifier only): every current field protection decision of the organization (Authority protection resources, never the business form list) with its latest attestation; organization-complete only when each decision has a complete attestation under that decision.",
-        "operationId": "GetProtectionCoverage",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProtectionCoverageRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProtectionCoverageResponse"
                 }
               }
             }
@@ -1907,6 +1978,32 @@
             "format": "int64"
           },
           "continuation_token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ErrorResponse": {
+        "required": [
+          "error_code",
+          "correlation_id",
+          "retryable"
+        ],
+        "type": "object",
+        "properties": {
+          "error_code": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "detail": {
             "type": [
               "null",
               "string"
@@ -4043,6 +4140,198 @@
           "UpdateFieldSearchers"
         ]
       },
+      "SecurityCommandOutcome": {
+        "required": [
+          "found",
+          "correlation_id",
+          "organization_id",
+          "security_command_id",
+          "command_kind",
+          "command_state",
+          "committed_authorization_revision",
+          "rejection_reason_code",
+          "team_id",
+          "member_user_id",
+          "organization_state",
+          "membership"
+        ],
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "boolean"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "command_kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityCommandKind"
+              }
+            ]
+          },
+          "command_state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommandStatus"
+              }
+            ]
+          },
+          "committed_authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "rejection_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "team_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "member_user_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "organization_state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityCommandOutcomeOrganizationState"
+              }
+            ]
+          },
+          "membership": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecurityCommandOutcomeMembership"
+              }
+            ]
+          }
+        }
+      },
+      "SecurityCommandOutcomeLookupRequest": {
+        "required": [
+          "organization_id",
+          "idempotency_key",
+          "expected_command_kind"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "expected_command_kind": {
+            "$ref": "#/components/schemas/SecurityCommandKind"
+          }
+        }
+      },
+      "SecurityCommandOutcomeMembership": {
+        "required": [
+          "evaluated_at_revision",
+          "effective_member",
+          "effective_membership_revision",
+          "later_change_pending"
+        ],
+        "type": "object",
+        "properties": {
+          "evaluated_at_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "effective_member": {
+            "type": "boolean"
+          },
+          "effective_membership_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "later_change_pending": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SecurityCommandOutcomeOrganizationState": {
+        "required": [
+          "authorization_revision",
+          "projection_applied_revision",
+          "projection_gate_state",
+          "integrity_quarantined"
+        ],
+        "type": "object",
+        "properties": {
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_applied_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_gate_state": {
+            "$ref": "#/components/schemas/ProjectionGateState"
+          },
+          "integrity_quarantined": {
+            "type": "boolean"
+          }
+        }
+      },
       "SecurityCommandRequest": {
         "required": [
           "organization_id",
@@ -4381,10 +4670,10 @@
       "name": "SecurityCommands"
     },
     {
-      "name": "Content"
+      "name": "Catalogue"
     },
     {
-      "name": "Catalogue"
+      "name": "Content"
     },
     {
       "name": "Operator"

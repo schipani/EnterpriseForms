@@ -110,6 +110,8 @@ public sealed class ArchiveProcessorTests
 
         public Task<IAuthorityScope> BeginScopeAsync(CancellationToken ct) => Task.FromResult<IAuthorityScope>(this);
 
+        public Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken ct) => throw new NotSupportedException();
+
         public Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([organizationId]);
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationAuthorizationState?>(org == organizationId ? State : null);
@@ -143,6 +145,10 @@ public sealed class ArchiveProcessorTests
         public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => throw new NotSupportedException();
 
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityRelationshipEdge>> GetRelationshipEdgeHistoryAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, string relationshipName, string subjectTypeName, Guid subjectEntityId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<Dictionary<Guid, long?>> GetCommittedRevisionsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public void AddEdge(AuthorityRelationshipEdge edge) => throw new NotSupportedException();
 

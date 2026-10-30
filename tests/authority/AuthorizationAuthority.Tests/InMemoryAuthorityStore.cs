@@ -45,9 +45,18 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
 
+    /// <summary>Phase C8 AC-9: number of read-only snapshot scopes opened; such a scope refuses to commit.</summary>
+    public int ReadOnlyScopeCount { get; private set; }
+
+    public Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken cancellationToken)
+    {
+        ReadOnlyScopeCount++;
+        return Task.FromResult<IAuthorityScope>(new Scope(this, readOnly: true));
+    }
+
     public Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>([]);
 
-    private sealed class Scope(InMemoryAuthorityStore s) : IAuthorityScope
+    private sealed class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
     {
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
 
@@ -84,6 +93,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null).ToList());
 
         public void AddEdge(AuthorityRelationshipEdge edge) => s.Edges.Add(edge);
+
+        public Task<List<AuthorityRelationshipEdge>> GetRelationshipEdgeHistoryAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, string relationshipName, string subjectTypeName, Guid subjectEntityId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.ResourceTypeName == resourceTypeName && e.ResourceEntityId == resourceEntityId && e.RelationshipName == relationshipName && e.SubjectTypeName == subjectTypeName && e.SubjectEntityId == subjectEntityId).ToList());
+
+        public Task<Dictionary<Guid, long?>> GetCommittedRevisionsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && securityCommandIds.Contains(c.SecurityCommandId)).ToDictionary(c => c.SecurityCommandId, c => c.CommittedAuthorizationRevision));
 
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) =>
             Task.FromResult(s.Commands.FirstOrDefault(c => c.OrganizationId == organizationId && c.CommandIdempotencyKey == idempotencyKey));
@@ -218,6 +233,11 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public Task CommitAsync(CancellationToken cancellationToken)
         {
+            if (readOnly)
+            {
+                throw new InvalidOperationException("read-only snapshot scope cannot commit");
+            }
+
             s.ScopeCommitCount++;
             return Task.CompletedTask;
         }

@@ -28,6 +28,10 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
 
     public DbSet<TeamMembership> TeamMemberships => Set<TeamMembership>();
 
+    public DbSet<AuthorityCommandOperation> AuthorityCommandOperations => Set<AuthorityCommandOperation>();
+
+    public DbSet<TeamMembershipProjectionState> TeamMembershipProjectionStates => Set<TeamMembershipProjectionState>();
+
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
 
     public DbSet<FormVersion> FormVersions => Set<FormVersion>();

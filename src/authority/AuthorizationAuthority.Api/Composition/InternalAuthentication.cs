@@ -30,6 +30,15 @@ public static class InternalAuthentication
     public const string VerifierScheme = "Verifier";
     public const string VerifierPolicy = "VerifierCaller";
     public const string VerifierRole = "field-protection-verifier";
+
+    /// <summary>
+    /// Phase C8 AC-9 (D8-12): the business Worker's team-membership reconciler. Its own credential, scheme and role; it satisfies
+    /// only the read-only outcome lookup, and no other credential satisfies that endpoint. Unconfigured ⇒ no scheme is
+    /// registered and the policy denies everything (fail closed), as for the verifier.
+    /// </summary>
+    public const string ReconcilerScheme = "Reconciler";
+    public const string ReconcilerPolicy = "ReconcilerCaller";
+    public const string ReconcilerRole = "business-projection-reconciler";
     public const string UserAssertionHeader = "X-Delegated-User-Assertion";
     public const string CorrelationHeader = "X-Correlation-Id";
 
@@ -49,6 +58,12 @@ public static class InternalAuthentication
             authentication.AddJwtBearer(VerifierScheme, options => Configure(options, identity.Verifier));
         }
 
+        var reconcilerConfigured = identity.Reconciler.IsConfigured;
+        if (reconcilerConfigured)
+        {
+            authentication.AddJwtBearer(ReconcilerScheme, options => Configure(options, identity.Reconciler));
+        }
+
         services.AddAuthorizationBuilder()
             .AddPolicy(WorkloadPolicy, policy => policy.AddAuthenticationSchemes(WorkloadScheme).RequireAuthenticatedUser().RequireClaim("workload_role", "business-api"))
             .AddPolicy(OperatorPolicy, policy => policy.AddAuthenticationSchemes(OperatorScheme).RequireAuthenticatedUser().RequireClaim("workload_role", "authority-operator"))
@@ -61,6 +76,18 @@ public static class InternalAuthentication
                 else
                 {
                     // No verifier credential in this deployment: nothing can ever satisfy the policy.
+                    policy.AddAuthenticationSchemes(WorkloadScheme).RequireAssertion(_ => false);
+                }
+            })
+            .AddPolicy(ReconcilerPolicy, policy =>
+            {
+                if (reconcilerConfigured)
+                {
+                    policy.AddAuthenticationSchemes(ReconcilerScheme).RequireAuthenticatedUser().RequireClaim("workload_role", ReconcilerRole);
+                }
+                else
+                {
+                    // No reconciler credential in this deployment: nothing can ever satisfy the policy.
                     policy.AddAuthenticationSchemes(WorkloadScheme).RequireAssertion(_ => false);
                 }
             });
@@ -143,6 +170,9 @@ public sealed class IdentityOptions
     /// <summary>Optional (Phase C7 OD-1): the field-protection verifier workload credential; absent ⇒ the migration catalogue is unreachable.</summary>
     public CredentialOptions Verifier { get; set; } = new();
 
+    /// <summary>Optional (Phase C8 AC-9): the team-membership reconciler credential; absent ⇒ the outcome lookup is unreachable.</summary>
+    public CredentialOptions Reconciler { get; set; } = new();
+
     public UserAssertionOptions UserAssertion { get; set; } = new();
 }
 
@@ -187,7 +217,7 @@ public sealed class DelegatedUserAssertionValidator(IOptions<IdentityOptions> op
 }
 
 /// <summary>Fail closed: all three credentials configured; TestIdentityProvider only in Development/Testing; Production needs EntraId (unimplemented ⇒ refuse).</summary>
-public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options, IHostEnvironment environment) : IHostedService
+public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options, IHostEnvironment environment, IConfiguration configuration) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -220,6 +250,8 @@ public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options
             throw new InvalidOperationException("The verifier credential must have its own key and issuer, distinct from the workload, operator and user-assertion credentials (OD-1).");
         }
 
+        ValidateReconciler(identity, environment, configuration);
+
         var provider = identity.UserAssertion.ProviderKind;
         var testProviderAllowed = environment.IsDevelopment() || environment.IsEnvironment("Testing");
         if (string.Equals(provider, "TestIdentityProvider", StringComparison.Ordinal) && !testProviderAllowed)
@@ -236,4 +268,40 @@ public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// Phase C8 AC-9. C-2: the reconciler credential is complete or absent, and has its own key and issuer, distinct from the
+    /// workload, operator, user-assertion and verifier credentials (with HS256 the key, not the role claim, separates callers).
+    /// C-1: outside Development/Testing a configured reconciler requires the server to demand client certificates.
+    /// </summary>
+    public static void ValidateReconciler(IdentityOptions identity, IHostEnvironment environment, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(configuration);
+        var reconciler = identity.Reconciler;
+        var partlyConfigured = !string.IsNullOrWhiteSpace(reconciler.Issuer) || !string.IsNullOrWhiteSpace(reconciler.Audience) || !string.IsNullOrWhiteSpace(reconciler.SharedKeyBase64);
+        if (partlyConfigured && !reconciler.IsConfigured)
+        {
+            throw new InvalidOperationException("Identity:Reconciler must be configured completely (issuer, audience, ≥256-bit key) or not at all (C-2).");
+        }
+
+        if (!reconciler.IsConfigured)
+        {
+            return;
+        }
+
+        var others = new[] { identity.Workload, identity.Operator, identity.UserAssertion, identity.Verifier };
+        if (others.Any(o => !string.IsNullOrWhiteSpace(o.SharedKeyBase64) && o.SharedKeyBase64 == reconciler.SharedKeyBase64)
+            || others.Any(o => !string.IsNullOrWhiteSpace(o.Issuer) && o.Issuer == reconciler.Issuer))
+        {
+            throw new InvalidOperationException("The reconciler credential must have its own key and issuer, distinct from the workload, operator, user-assertion and verifier credentials (C-2).");
+        }
+
+        var syntheticEnvironment = environment.IsDevelopment() || environment.IsEnvironment("Testing");
+        if (!syntheticEnvironment && !string.Equals(configuration["Kestrel:EndpointDefaults:ClientCertificateMode"], "RequireCertificate", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Outside Development/Testing the reconciler policy requires the server to demand client certificates (Kestrel:EndpointDefaults:ClientCertificateMode = RequireCertificate, C-1).");
+        }
+    }
 }

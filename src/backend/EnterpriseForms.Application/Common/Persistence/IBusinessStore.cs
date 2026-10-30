@@ -300,6 +300,28 @@ public interface IBusinessScope : IAsyncDisposable
     /// <summary>Leases the next due reconciliation (FOR UPDATE SKIP LOCKED), or null.</summary>
     Task<FieldProtectionReconciliation?> LeaseNextProtectionReconciliationAsync(string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken);
 
+    // ---- Phase C8 (C8-M1-01/02): durable team-membership operations and the per-pair roster watermark ----
+
+    void AddAuthorityCommandOperation(AuthorityCommandOperation operation);
+
+    /// <summary>The tenant's operation with this exact Authority idempotency key (tracked), or null.</summary>
+    Task<AuthorityCommandOperation?> FindAuthorityCommandOperationByKeyAsync(Guid tenantId, string authorityIdempotencyKey, CancellationToken cancellationToken);
+
+    /// <summary>The operation (tracked); <paramref name="lockForUpdate"/> takes <c>SELECT … FOR UPDATE</c>.</summary>
+    Task<AuthorityCommandOperation?> FindAuthorityCommandOperationAsync(Guid authorityCommandOperationId, bool lockForUpdate, CancellationToken cancellationToken);
+
+    /// <summary>Leases the next due operation (FOR UPDATE SKIP LOCKED): a due state and a passed <c>next_attempt_on</c>, or a terminal NotCommitted row whose late-commit sweep is due.</summary>
+    Task<AuthorityCommandOperation?> LeaseNextAuthorityCommandOperationAsync(string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken);
+
+    /// <summary>The team's operations that are not terminal, plus unreviewed failures (read-only).</summary>
+    Task<List<AuthorityCommandOperation>> GetOpenAuthorityCommandOperationsAsync(Guid tenantId, Guid teamId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// R-2: the pair's watermark row under <c>SELECT … FOR UPDATE</c>, created first (W = 0, absent) when missing. Concurrent
+    /// writers of the same pair serialize on this lock for the rest of the transaction.
+    /// </summary>
+    Task<TeamMembershipProjectionState> LockTeamMembershipProjectionStateAsync(Guid tenantId, Guid teamId, Guid memberUserId, CancellationToken cancellationToken);
+
     Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken);
 
     void AddUiPreference(UserUiPreference preference);
