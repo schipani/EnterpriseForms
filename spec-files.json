@@ -84,8 +84,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "db711b7897b3bbdd7f52533fd3a73fafcab787573fc6f45e88b40b96bc92dc99",
-      "bytes": 24412
+      "sha256": "fe53dccadef438e93cc66b2fbcee608cba7aec7c122d6837d4cc5fb5a3c7e564",
+      "bytes": 27308
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -159,8 +159,13 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
-      "sha256": "4d4993526e296b7bb59a4f6cb19c5c2f75936bcb9d9cbd594481491e175392b8",
-      "bytes": 36766
+      "sha256": "ecb6c721effba795105725563552da5d220d8bdb5a78363e70cf003a8378f19a",
+      "bytes": 41146
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md",
+      "sha256": "13c22d26ff842566c3f8d9298fe87e089c3a76d76d426cabf7e5c9a005d0056f",
+      "bytes": 45336
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -254,8 +259,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "11eff732a6c932a10c7750574313832bab85f557ad73d0c1615a1e32ab2881e6",
-      "bytes": 127312
+      "sha256": "66af35c8e2acece5bc3048e0ecedb78208b39874bf818df60f060980045c1767",
+      "bytes": 128919
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

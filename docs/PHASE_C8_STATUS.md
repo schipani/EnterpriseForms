@@ -148,3 +148,31 @@ Owner decisions applied to the verification report of §7. Evidence: `docs/evide
 - Playwright pauses the archive container by name (`E2E_ARCHIVE_CONTAINER`, default `enterpriseforms-sectest-archive-store-1`).
 
 Status: remediation implemented and verified locally; C8-M1-01 is **proposed for closure on the owner's acceptance**. Hosted workflows still not run (see section 8 and the evidence file).
+
+## 10. C8-M1-01 durable server-side reconciler: architecture proposal (2026-10-30, C-83)
+
+The owner approved **architecture planning only** for a server-side durable reconciler on candidate `160efdb`. The proposal is in `docs/architecture/PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md`, summarized in the architecture document §10.
+
+- **Decisive constraint (verified in code):** `SecurityCommandService.GetStatusAsync` answers only the originating actor (any other binding gets a generic 404). No workload-only status read or Authority team-roster read exists. A background worker therefore cannot confirm Effective without impersonation, so "independent of browser and actor" and "no Authority change" cannot both be met.
+- **Recommended design R:**
+  * a durable `authority_command_operations` row written before the submit;
+  * a leased Worker reconciler over a proposed **AC-9** read-only outcome lookup, keyed by organization and idempotency key, under a separate Worker-only credential;
+  * one shared projector that writes the roster only on Authority-confirmed Effective, is idempotent, serializes per team and is revision-guarded;
+  * no submit capability in the reconciler, and no re-submission after not-found.
+- **Fallback F:** no Authority change; reconciliation runs only in the initiating administrator's own later requests. It stays Pending if they never return or are disabled.
+- **New observations:**
+  * **C8-M1-02 (proposed):** a stale Effective add observed after a later remove resurrects the member in the display roster at `160efdb`. Reachable through a duplicated tab or a direct same-key retry; display-only.
+  * **RO-2 (proposed):** the same observe-and-project pattern exists in 11 other handlers.
+- **Deliverables in the proposal:**
+  * architecture and sequence diagrams;
+  * table and indexes (proposal SQL);
+  * state machine;
+  * transaction boundaries and failure catalogue;
+  * threats T1–T16 with residual risks;
+  * real-stack tests RC-01…RC-20, including browser closure, API, Worker and Authority restarts, crash windows, revision guard, tampering and cross-organization cases;
+  * rollout and rollback;
+  * decisions D8-11…D8-19.
+- **Not done (by instruction):** no reconciler code; no migration or database change; no Authority, SpiceDB or OpenAPI change; no UI change; no deployment; no merge; M2 not started.
+- **Findings:** C8-M1-01 stays **open, mitigated by C-82** (browser-driven) until D8-11…D8-19 are decided and the chosen design passes its tests. F-C7-03, C-74 remediation (unexecuted), G08, G19–G21, G24–G26, PB-08, PB-09, DR-C7-1…6, AUD-C7-01 and production Level 2 are unchanged. Hosted workflows have still not run.
+
+**Next step:** the owner decides D8-11…D8-19, in particular R versus F and whether AC-9 may enter the independent Authority review package. Implementation starts only after those decisions are recorded.

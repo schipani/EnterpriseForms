@@ -1,6 +1,6 @@
 # Phase C8 — Administration and Governance: architecture and milestone plan
 
-- **Status:** M0 approved with conditions (C-78, 2026-10-29: D8-1…D8-10 approved as proposed; owner-role grants need two distinct owners, designer grants one owner, member additions stay on the operator two-approval process in Development/Testing, no disabling while directly owning records, disabling keeps roles and shares, the auditor role is separate from Security Administrator, C-74 cleanup verified before any C8 image reaches the development stack, and AC-7/AC-8 need separate architecture/security approval). **M1 implemented (C-79) and awaiting owner acceptance; M2–M4 not started.** AC-7 and AC-8 remain proposals: no Authority command, relation or schema was changed. The C7 merge does not authorize them.
+- **Status:** M0 approved with conditions (C-78, 2026-10-29: D8-1…D8-10 approved as proposed; owner-role grants need two distinct owners, designer grants one owner, member additions stay on the operator two-approval process in Development/Testing, no disabling while directly owning records, disabling keeps roles and shares, the auditor role is separate from Security Administrator, C-74 cleanup verified before any C8 image reaches the development stack, and AC-7/AC-8 need separate architecture/security approval). **M1 implemented (C-79) and awaiting owner acceptance; M2–M4 not started.** AC-7 and AC-8 remain proposals: no Authority command, relation or schema was changed. The C7 merge does not authorize them. **C8-M1-01 durable reconciliation: architecture proposal only (C-83, §10), stopped at its approval checkpoint; it proposes AC-9, a read-only Authority query, which is not implemented.**
 - **Branch:** `phase-c8/administration-governance`, from `main` `b1e1b30` (the Phase C7 squash merge, PR #29).
 - **Status log:** `docs/PHASE_C8_STATUS.md`. **Decisions:** C-77 (M0 plan), C-78 (approvals), C-79 (M1 implementation) in `docs/decisions/PHASE_C_DECISION_LOG.md`.
 - **Normative inputs:**
@@ -353,9 +353,13 @@ Deleting a disabled user's shares, team memberships and roles would make re-enab
   | T06 | Revoked auditor's next read | Denied |
   | T07 | Business DBA forges an auditor row | No effect |
 
+### 5.5a AC-9 (proposed with the C8-M1-01 reconciler, §10)
+
+AC-9 is a **read-only** internal lookup, `POST /internal/v1/security-command-outcomes/lookup`. It takes an organization, an idempotency key and an expected command kind; only `AddTeamMember` and `RemoveTeamMember` are allowed. It returns the recorded state, revision, team and member of that command, with no actor data. It is served under a separate Worker-only `business-projection-reconciler` credential that fails closed when unconfigured (the OD-1 pattern). It adds no command, no write, no revision and no gate bypass. Full specification and tests: `PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md` §10. Approval: D8-11/D8-12.
+
 ### 5.6 Review requirement
 
-AC-7 and AC-8 join AC-5 and AC-6 in the **independent Authority review package**. None of them may be described as independently reviewed or production-ready until that review and Azure staging evidence exist.
+AC-7, AC-8 and, if approved, AC-9 join AC-5 and AC-6 in the **independent Authority review package**. None of them may be described as independently reviewed or production-ready until that review and Azure staging evidence exist.
 
 ## 6. Tenant isolation
 
@@ -410,3 +414,32 @@ C8 **does not close, downgrade or reinterpret** any finding.
 | D8-10 | C-74 development incident remediation: execute before C8 images reach the development stack, or keep deferred (C8 tests never use it) | Owner's choice; it does not block M1 on the security-test stack | — |
 
 Each approval will be recorded as a decision-log entry (C-78 onward) before work on the milestone it unblocks begins.
+
+## 10. C8-M1-01 durable Authority command reconciliation (proposal; approval required)
+
+**Status:** architecture proposal only (C-83, 2026-10-30). Nothing is implemented. No database, Authority, SpiceDB, OpenAPI or UI change was made, nothing was deployed or merged, and M2 has not started. The full design is in `docs/architecture/PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md`: diagrams, table and indexes, state machine, transactions, threats, the RC-01…RC-20 tests, rollout and decisions.
+
+**Why a server-side design needs a decision.** The Authority's only command-status read (`GetSecurityCommandStatus`) answers the **originating actor** alone. No workload status read or team-roster read exists. A background worker therefore cannot confirm Effective through existing interfaces without impersonating the actor, which is forbidden. "Independent of the browser and the actor" and "no Authority change" cannot both hold. Two designs:
+
+- **R (recommended):** a durable `authority_command_operations` record written **before** the Authority submit. The Worker reconciler (leased, `SKIP LOCKED`, backoff) resolves every non-Effective outcome through **AC-9**, a read-only outcome lookup (§5.5a). A shared projector writes the roster **only on Authority-confirmed Effective**. It is idempotent, serialized per team and revision-guarded. The reconciler cannot submit commands. Closes C8-M1-01 fully.
+- **F (fallback, no Authority change):** the same record and projector. Reconciliation happens only within the initiating administrator's own later requests, through the existing actor-bound status read. It survives browser closure and restarts, but stays Pending if that administrator never returns or is disabled.
+
+**Found during the review (owner triage):**
+- **C8-M1-02 (proposed):** at `160efdb`, an Effective add observed *after* a later remove re-inserts the removed member into the display roster. This is reachable through a duplicated tab or a direct same-key retry. It is display-only and confers nothing. It is fixed by the revision guard in both designs.
+- **RO-2 (proposed):** 11 other handlers project only in the request that observes Effective. They are out of this proposal's scope.
+
+**Decisions D8-11…D8-19** (details and recommendations in the companion §13):
+
+| ID | Decision | Recommendation |
+|---|---|---|
+| D8-11 | Design R (AC-9) or F | R |
+| D8-12 | AC-9 credential: separate Worker-only credential or reuse business-API credential | Separate |
+| D8-13 | Scope: team add/remove only; `RegisterTeam` and the other handlers via a new RO-2 finding | Approve |
+| D8-14 | Register C8-M1-02; fix it through the revision guard | Approve |
+| D8-15 | Project Effective commands while the gate is not Ready, but never during integrity quarantine | Approve |
+| D8-16 | Timing and retention parameters (5 min window, 5 s→5 min backoff, 30 min attention, 7-day late sweep, 400-day retention) | Approve |
+| D8-17 | Business audit only for failures and operator actions (service actor; initiator in metadata) | Approve |
+| D8-18 | Operation table classified as an untrusted projection table and added to the §4L coverage inventory | Approve |
+| D8-19 | Closure criterion: implementation plus RC tests on the security-test stack plus hosted workflows; C-82 stays in place until then | Approve |
+
+Until these are approved and implemented, C8-M1-01 stays **open, mitigated by the C-82 browser-driven reconciliation**. All findings in §7 are unchanged.
