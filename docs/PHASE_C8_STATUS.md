@@ -128,4 +128,4 @@ Owner decisions applied to the verification report of §7. Evidence: `docs/evide
 - **Comment correction (done):** `AdministrationAccess` XML comment now states the owner-or-Security-Administrator rule; no implementation change.
 - **Manual accessibility:** checklist prepared in `docs/testing/PHASE_C8_M1_MANUAL_ACCESSIBILITY_CHECKLIST.md`; automated and manual results are recorded separately; **no manual NVDA/VoiceOver result exists**.
 - **Findings:** F-C7-03 stays open until formal M1 acceptance; C-74 remediation unexecuted; G19–G21, G24–G26, PB-08, PB-09, DR-C7-1…6, AUD-C7-01 and production Level 2 unchanged. No development deployment.
-- **Hosted workflows:** see the evidence file (PR number, SHA, run results) — only what GitHub reports is recorded.
+- **Hosted workflows: NOT RUN.** No `gh`/API credential here, so no draft PR was created and nothing was dispatched (PR number: none). Candidate code commit `9f7b31c`; the exact manual actions (draft PR link, `security-gate-a` dispatch, same-SHA check) are in the evidence file. No result is claimed.

@@ -27,3 +27,15 @@
 Finding C8-M1-01 (open, owner decision): see `docs/PHASE_C8_STATUS.md` §8; the Pending wording promises a roster update on refresh, but the projection is only written by a retry with the same idempotency key.
 
 Hosted workflow results follow below (filled only from what GitHub reports).
+
+### Hosted workflows — NOT RUN; manual actions required (recorded 2026-10-30)
+
+The environment has no `gh` CLI and no GitHub API credential, and a token was deliberately not extracted from the Git credential manager. A pull request therefore could not be created, and no workflow was dispatched. **No hosted result exists; nothing is claimed to have passed. PR number: none.**
+
+- Code-bearing candidate commit pushed to `origin/phase-c8/administration-governance`: `9f7b31c9fba68c8975d36297c8095dad5558445f`. The next commit on the branch is documentation-only (this section); the branch head at dispatch time is the final candidate.
+- Manual actions for the owner (existing permissions, no protection bypass):
+  1. Open a **draft** PR `phase-c8/administration-governance` → `main`: https://github.com/schipani/EnterpriseForms/pull/new/phase-c8/administration-governance . This triggers `ci` (`ci.yml`), `stage-b-integration` (`stage-b-integration.yml`) and `level3-script` (`level3-script.yml`; path-filtered, it only runs if the PR touches its watched paths — if it does not start, dispatch it manually).
+  2. Actions → `security-gate-a` → Run workflow on branch `phase-c8/administration-governance` (`workflow_dispatch` only; it does not run on PRs).
+  3. If `level3-script` or `stage-b-integration` do not start from the PR, Actions → choose the workflow → Run workflow on the same branch.
+  4. Confirm every run shows the same head SHA, then record workflow name, run id, SHA and conclusion here.
+- Do not merge the PR; M1 is not accepted until those runs are green and the owner accepts.
