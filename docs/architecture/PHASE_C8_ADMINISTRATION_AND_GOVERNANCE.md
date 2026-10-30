@@ -428,7 +428,29 @@ Each approval will be recorded as a decision-log entry (C-78 onward) before work
 - **C8-M1-02 (proposed):** at `160efdb`, an Effective add observed *after* a later remove re-inserts the removed member into the display roster. This is reachable through a duplicated tab or a direct same-key retry. It is display-only and confers nothing. It is fixed by the revision guard in both designs.
 - **RO-2 (proposed):** 11 other handlers project only in the request that observes Effective. They are out of this proposal's scope.
 
-**Decisions D8-11…D8-19** (details and recommendations in the companion §13):
+**C-84 (2026-10-30): the owner approved Design R subject to independent security review of AC-9 and recorded D8-11…D8-19 as below.** The review package is `docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md`. It contains:
+- the exact AC-9 contract;
+- the authentication model and threats;
+- the ordering resolution of C8-M1-02: the Authority's per-organization committed revision, read for the command's own pair; never local time;
+- database integrity and failure handling;
+- the RC-01…RC-28 mapping;
+- findings F-1…F-8 and reviewer questions Q-1…Q-9.
+
+Owner follow-ups are Q-O1…Q-O4. Nothing is implemented; C8-M1-01 stays open.
+
+| ID | Owner decision (C-84) |
+|---|---|
+| D8-11 | Design R approved, subject to independent AC-9 review |
+| D8-12 | Dedicated Worker-only credential approved |
+| D8-13 | Scope: team add/remove only; RO-2 registered for the other handlers (12, corrected) |
+| D8-14 | C8-M1-02 registered; stale ordering to be resolved in this implementation |
+| D8-15 | Conditional: project while the gate is closed only with previously authenticated Effective evidence and no integrity quarantine |
+| D8-16 | Timing defaults approved; configurable (bounded) and tested |
+| D8-17 | Auditable security-relevant failures and operator actions, plus durable diagnostic evidence of successful reconciliation |
+| D8-18 | Operations table non-authoritative; security-relevant fields protected; table in the integrity coverage inventory |
+| D8-19 | C8-M1-01 open until implementation, RC-01…RC-20 and required hosted verification pass |
+
+**Original proposal (C-83), with recommendations:**
 
 | ID | Decision | Recommendation |
 |---|---|---|

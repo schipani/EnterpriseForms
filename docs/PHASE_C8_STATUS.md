@@ -176,3 +176,38 @@ The owner approved **architecture planning only** for a server-side durable reco
 - **Findings:** C8-M1-01 stays **open, mitigated by C-82** (browser-driven) until D8-11…D8-19 are decided and the chosen design passes its tests. F-C7-03, C-74 remediation (unexecuted), G08, G19–G21, G24–G26, PB-08, PB-09, DR-C7-1…6, AUD-C7-01 and production Level 2 are unchanged. Hosted workflows have still not run.
 
 **Next step:** the owner decides D8-11…D8-19, in particular R versus F and whether AC-9 may enter the independent Authority review package. Implementation starts only after those decisions are recorded.
+
+## 11. AC-9 architecture approval and independent review package (2026-10-30, C-84)
+
+The owner approved **Design R** as the direction for C8-M1-01, **subject to independent security review of AC-9**, and recorded D8-11…D8-19 (architecture §10). The review package is `docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md`.
+
+- **Ordering (C8-M1-02) resolved from existing Authority facts (verified in code):**
+  * every command's `CommittedAuthorizationRevision` is assigned at commit under the organization lock and is unique and strictly increasing per organization;
+  * `ProjectionProcessor` makes commands Effective strictly in revision order;
+  * desired-state edges record their creating and removing commands.
+
+  AC-9 therefore returns the **effective membership of the command's own (team, member) pair at the applied revision P**. The reconciler projects that value under a monotonic per-pair watermark. Arrival time, Worker time and local timestamps are never used. Add and Remove processed in either order converge on the Authority's state. No new ordering guarantee is required.
+- **Refinements for owner approval (Q-O2):**
+  * R-1: project the Authority pair state, not the operation's own effect;
+  * R-2: new watermark table `team_membership_projection_states`;
+  * R-3: the Worker is the single projection writer;
+  * R-4: the browser polls, never re-POSTs.
+
+  Correction R-5: RO-2 covers **12** handlers (`CreateTeam` plus 11 other handler files), not 11.
+- **AC-9 contract:**
+  * read-only `POST /internal/v1/security-command-outcomes/lookup`, scoped to (organization, idempotency key, allowlisted kind);
+  * its own Worker-only workload identity and policy;
+  * delegated user assertions refused;
+  * uniform `found:false`;
+  * `membership` null when rejected or quarantined;
+  * new framework rate limiter;
+  * structured audit;
+  * reconciler-side invariant validation that fails closed.
+- **Findings:**
+  * F-1: Stage A/local Authority responses are authenticated only by the channel (HTTP inside Docker), as for every Authority call; production mTLS is required;
+  * F-2 (C8-M1-02) and F-3 (RO-2) are registered;
+  * F-4…F-8 are residual risks.
+- **Tests:** RC-01…RC-19 mapped; RC-20 (Design F only) proposed for retirement; RC-21…RC-28 proposed additions (Q-O3).
+- **Not done (by instruction):** no AC-9, Worker, migration or projection implementation; no deployment; no merge; M2 not started. **C8-M1-01 remains OPEN.** All other findings unchanged; hosted workflows still not run.
+
+**Next step:** independent security review of the package (Q-1…Q-9). Owner answers to Q-O1…Q-O4. Implementation only after both are recorded.

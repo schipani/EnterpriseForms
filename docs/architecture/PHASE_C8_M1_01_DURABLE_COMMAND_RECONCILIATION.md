@@ -1,6 +1,14 @@
 # Phase C8 — C8-M1-01 durable Authority command reconciliation: architecture proposal
 
-- **Status:** **Proposal only; stopped at the C8-M1-01 architecture approval checkpoint (C-83, 2026-10-30).** Nothing here is implemented. No database, Authority, SpiceDB, OpenAPI or UI change has been made, nothing was deployed or merged, and M2 has not started.
+- **Status update (C-84, 2026-10-30):** the owner approved **Design R** as the direction, **subject to independent security review of AC-9**, and recorded D8-11…D8-19. The review package is `docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md`. Its refinements **R-1…R-5 supersede this document where they differ**:
+  * R-1: the projected value is the Authority's effective membership of the command's own (team, member) pair at revision P, replacing the operations-ledger guard of §6.3;
+  * R-2: a new per-pair watermark table, `team_membership_projection_states`;
+  * R-3: the Worker is the only projection writer; the API no longer writes the roster;
+  * R-4: the browser polls and never re-POSTs;
+  * R-5: RO-2 covers 12 handlers, not 11.
+
+  Still not implemented; C8-M1-01 stays open.
+- **Original status:** **Proposal only; stopped at the C8-M1-01 architecture approval checkpoint (C-83, 2026-10-30).** Nothing here is implemented. No database, Authority, SpiceDB, OpenAPI or UI change has been made, nothing was deployed or merged, and M2 has not started.
 - **Candidate commit reviewed:** `160efdbdacd8b70977bc914dcaf741eaeba79326` on `phase-c8/administration-governance`.
 - **Parent documents:** `docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md` §10 (summary and decisions); `docs/PHASE_C8_STATUS.md` §8–§10; decision log C-81…C-83.
 - **Normative inputs:** `CLAUDE.md` §4B, §4D, §4L, §4M–§4N, §4Q (G08), §4T, §4U; `trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md`; ADR-PB-006 (API), ADR-PB-007 (durable jobs); C-82 (the client-side remediation this replaces).
