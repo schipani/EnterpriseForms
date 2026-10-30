@@ -102,3 +102,30 @@ Two selector corrections were needed in the new spec before it passed (an unname
 ## 6. Next step
 
 Owner acceptance testing of M1 on the isolated stack (architecture §4 M1 acceptance). Afterwards, M2 (AC-7) still needs its separate architecture/security approval before any Authority change starts. Not merged to `main`.
+
+## 7. M1 acceptance verification (2026-10-30, commit `b66d357`)
+
+Evidence: `docs/evidence/phase-c8/m1-acceptance-verification.md`. Decision: C-80.
+
+- **Passed (re-run by the verifier):** build with warnings as errors; contract tests 306/306; architecture tests 67/67; real-stack `AdministrationTests` 5/5; frontend lint, typecheck and Vitest 227/227.
+- **Authorization / isolation (code and test review):** every administrative read calls the Authority (`manage_configuration` / `administer_security`) before any lookup; members, readers and designer-only users get 403 without counts; another organization's team id is the same 404 as an unknown id; the organization is taken from the session only. Covered by `AdministrationTests`.
+- **Pending commands:** the Teams pages treat HTTP 202 or a non-effective command as "Pending" and re-read the roster; no optimistic update. Limit: no automated test forces a genuinely pending Authority command (component tests only), so the fail-closed pending path is verified by code review, not by fault injection.
+- **Logo audit:** `ORGANIZATION_LOGO_UPLOADED` / `…_REPLACED` are written in the same transaction as the projection write; refused uploads write nothing (`LogoUploadAndReplacementAreAudited`).
+- **Authority:** no Authority, SpiceDB schema or migration change since `b1e1b30`.
+- **Not run / not verified:** hosted workflows (no runs exist for this SHA; not dispatched, see §4 note); Playwright and the 11-test real-stack regression were not re-run in this checkpoint (earlier results in §4.1 stand as reported).
+- **Manual accessibility outstanding:** NVDA and VoiceOver on Overview, People, Teams, Team detail, Data Protection, Security Administrators, Branding (axe WCAG 2.2 AA is automated only), plus 320/768/1440 px and 200%/400% zoom review per PB-14.
+- **Doc defect found:** the `AdministrationAccess` XML comment says team commands and renames "keep requiring `manage_configuration` alone", contradicting the implemented and documented owner-or-Security-Administrator rule. Comment-only; not changed here (code frozen at the verified SHA).
+- **Findings status unchanged:** C-74 remediation remains unexecuted and is not marked resolved; G19–G21, G24–G26, PB-08, PB-09, DR-C7-1…6, AUD-C7-01 and production Level 2 remain open. F-C7-03 stays "proposed for closure on owner acceptance".
+- **Owner decisions needed:** (1) dispatch the four hosted workflows (open a PR to `main`, or `workflow_dispatch` for `security-gate-a`) and accept or reject M1 on their outcome; (2) accept the pending-path evidence level or require a forced-pending integration test; (3) approve the comment-only fix; (4) close F-C7-03; (5) separately, schedule C-74 remediation before any C8 image reaches the development stack.
+
+## 8. M1 acceptance remediation (2026-10-30, C-81)
+
+Owner decisions applied to the verification report of §7. Evidence: `docs/evidence/phase-c8/m1-acceptance-verification.md` (§Remediation).
+
+- **Pending Authority integration test (added):** `PendingAuthorityCommandTests` (real stack, deterministic: the mandatory audit archive is paused, the SEC-P12 mechanism, and always unpaused in `finally`). It proves the API never reports the membership command complete (no 201, `effective` false or HTTP 202 `COMMAND_PENDING`), the Authority gate is not Ready, the roster is not updated optimistically (read fails closed or lacks the member), the business projection stays empty even after the Authority recovers, and a retry with the same idempotency key resolves to the one committed command, now Effective, adding the member exactly once. A second test proves rejected commands (G25 self-add, unknown principal) never succeed and leave the roster unchanged.
+- **UI Pending (added):** `organization-administration.spec.ts` pauses the archive on the isolated stack, adds a member through the UI and asserts the **Pending** status ("has not made it effective yet"), no roster row and no Effective state.
+- **Observed behaviour to decide on (finding C8-M1-01, not fixed):** the pending membership command is not written to the business projection by the Authority recovering; the projection gains the member only when the same request is retried with its idempotency key (the UI sends a new key per click). The Pending text "The roster shows it once the Authority reports it effective; refresh to check" is therefore **not accurate**: refreshing alone never shows it. The projection stays safe (confers nothing), but the wording and a retry/reconcile path need an owner decision (reword now; reconcile-from-Authority is a feature). Left unchanged pending approval.
+- **Comment correction (done):** `AdministrationAccess` XML comment now states the owner-or-Security-Administrator rule; no implementation change.
+- **Manual accessibility:** checklist prepared in `docs/testing/PHASE_C8_M1_MANUAL_ACCESSIBILITY_CHECKLIST.md`; automated and manual results are recorded separately; **no manual NVDA/VoiceOver result exists**.
+- **Findings:** F-C7-03 stays open until formal M1 acceptance; C-74 remediation unexecuted; G19–G21, G24–G26, PB-08, PB-09, DR-C7-1…6, AUD-C7-01 and production Level 2 unchanged. No development deployment.
+- **Hosted workflows:** see the evidence file (PR number, SHA, run results) — only what GitHub reports is recorded.

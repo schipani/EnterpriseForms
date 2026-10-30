@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { signIn, signOut } from "./support";
@@ -87,7 +88,7 @@ test.describe("Organization administration (C8 M1)", () => {
     await expect(add).toBeHidden({ timeout: 60_000 });
     const roster = page.getByRole("table", { name: "Team members" });
     await expect(roster.getByRole("row", { name: /Casey Clerk/ })).toContainText("Effective", { timeout: 60_000 });
-    await expect(page.getByText("Pending", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("status").filter({ hasText: "Pending" })).toHaveCount(0);
 
     await page.getByRole("button", { name: "Rename" }).click();
     const rename = page.getByRole("dialog", { name: "Rename team" });
@@ -104,6 +105,50 @@ test.describe("Organization administration (C8 M1)", () => {
 
     await page.getByRole("link", { name: "All teams" }).click();
     await expect(page.getByRole("table", { name: "Teams" }).getByRole("row", { name: new RegExp(`${teamName} renamed`) })).toContainText("0");
+    await signOut(page);
+  });
+
+  test("a committed but non-effective membership command is shown as Pending, never as done, and the roster is not updated optimistically", async ({ page }) => {
+    // Deterministic fault (the SEC-P12 mechanism): pausing the mandatory audit archive keeps the Authority from making the command Effective.
+    test.setTimeout(180_000);
+    const archive = process.env["E2E_ARCHIVE_CONTAINER"] ?? "enterpriseforms-sectest-archive-store-1";
+    const docker = (verb: "pause" | "unpause") => execFileSync("docker", [verb, archive], { stdio: "pipe" });
+    const pendingTeam = `Pending E2E ${Date.now().toString(36)}`;
+    await signIn(page, "owner");
+    await page.goto("/app/organization/teams");
+    await page.getByRole("button", { name: "Create team" }).click();
+    const create = page.getByRole("dialog", { name: "Create team" });
+    await create.getByLabel("Team name").fill(pendingTeam);
+    await create.getByRole("button", { name: "Create team" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: pendingTeam })).toBeVisible({ timeout: 60_000 });
+
+    docker("pause");
+    let paused = true;
+    try {
+      await page.getByRole("button", { name: "Add member" }).click();
+      const add = page.getByRole("dialog", { name: "Add a member" });
+      await add.getByRole("combobox", { name: /Person/ }).click();
+      await page.getByRole("option", { name: /Casey Clerk/ }).click();
+      await add.getByRole("button", { name: "Add member" }).click();
+      // The command is committed but not effective: the page says Pending and never shows the member or an Effective state.
+      const pendingStatus = page.getByRole("status").filter({ hasText: "Pending" });
+      await expect(pendingStatus).toBeVisible({ timeout: 90_000 });
+      await expect(pendingStatus).toContainText("has not made it effective yet");
+      await expect(page.getByRole("table", { name: "Team members" }).getByRole("row", { name: /Casey Clerk/ })).toHaveCount(0);
+      await expect(page.getByText("Effective", { exact: true })).toHaveCount(0);
+    } finally {
+      if (paused) {
+        docker("unpause");
+        paused = false;
+      }
+    }
+
+    // After the archive returns, the roster still lists only what an effective, observed command wrote: re-read, never assumed.
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByRole("heading", { level: 1, name: pendingTeam })).toBeVisible();
+      await expect(page.getByRole("table", { name: "Team members" }).getByRole("row", { name: /Casey Clerk/ })).toHaveCount(0);
+    }).toPass({ timeout: 60_000 });
     await signOut(page);
   });
 

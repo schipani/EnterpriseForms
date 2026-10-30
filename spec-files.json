@@ -84,8 +84,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "0743455ba7aa938fee56275d8d7e831be19570cbe38ba9a2fb6f8e8a6e61c0df",
-      "bytes": 14840
+      "sha256": "bf8135c72c54ae96a720ddd9b8ea8893f2a9917b51f8da096193c74e4bafa3fa",
+      "bytes": 20156
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -254,8 +254,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "63ac5cae3afdf3ddfa16832815ae067aa49d17998b3c79f62a8e1c39e6db06bb",
-      "bytes": 124710
+      "sha256": "d0a26272ec271e70b0732938317babf05e06c591372e9276035eb53191f7efb9",
+      "bytes": 126363
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -426,6 +426,11 @@
       "path": "docs/testing/PB14_UI_DESIGN_ACCEPTANCE_TESTS.csv",
       "sha256": "5bd048435810e8f6ff8b974b670d3ee2d70ea3a31d3d9087e74f07af993ce3ea",
       "bytes": 5177
+    },
+    {
+      "path": "docs/testing/PHASE_C8_M1_MANUAL_ACCESSIBILITY_CHECKLIST.md",
+      "sha256": "b7709854337d2ca39ecbdfca7bacec32b85ea88981bb4f10c36871dd541e6163",
+      "bytes": 3888
     },
     {
       "path": "docs/ui/C1_DESIGNER_UX_IMPLEMENTATION_BRIEF.md",
