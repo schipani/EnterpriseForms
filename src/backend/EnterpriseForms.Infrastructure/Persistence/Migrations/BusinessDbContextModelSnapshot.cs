@@ -3223,6 +3223,248 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.SecurityOperations.SecurityIncident", b =>
+                {
+                    b.Property<Guid>("SecurityIncidentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("security_incident_id");
+
+                    b.Property<Guid?>("AssignedToUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_to_user_id");
+
+                    b.Property<string>("DetectionSourceName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("detection_source_name");
+
+                    b.Property<Guid>("FirstCorrelationIdentifier")
+                        .HasColumnType("uuid")
+                        .HasColumnName("first_correlation_identifier");
+
+                    b.Property<DateTimeOffset>("FirstDetectedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_detected_on");
+
+                    b.Property<Guid?>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<string>("IncidentDeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("incident_deduplication_key");
+
+                    b.Property<Guid?>("IncidentModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_modified_by_user_id");
+
+                    b.Property<DateTimeOffset>("IncidentModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("incident_modified_on");
+
+                    b.Property<long>("IncidentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("incident_revision");
+
+                    b.Property<string>("IncidentSeverityName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("incident_severity_name");
+
+                    b.Property<string>("IncidentStatusName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("incident_status_name");
+
+                    b.Property<string>("IncidentTypeName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("incident_type_name");
+
+                    b.Property<DateTimeOffset>("LastDetectedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_detected_on");
+
+                    b.Property<int>("OccurrenceCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("occurrence_count");
+
+                    b.Property<string>("ResolutionExplanationText")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("resolution_explanation_text");
+
+                    b.Property<Guid?>("ResolvedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ResolvedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_on");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("VerificationErrorCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("verification_error_code");
+
+                    b.HasKey("SecurityIncidentId");
+
+                    b.HasIndex("AssignedToUserId");
+
+                    b.HasIndex("IncidentModifiedByUserId");
+
+                    b.HasIndex("ResolvedByUserId");
+
+                    b.HasIndex("TenantId", "FormRecordId")
+                        .HasDatabaseName("ix_security_incidents_record");
+
+                    b.HasIndex("TenantId", "IncidentDeduplicationKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_security_incidents_active_key")
+                        .HasFilter("incident_status_name IN ('Open','Investigating')");
+
+                    b.HasIndex("TenantId", "IncidentDeduplicationKey", "FirstDetectedOn")
+                        .HasDatabaseName("ix_security_incidents_deduplication");
+
+                    b.HasIndex("TenantId", "LastDetectedOn", "SecurityIncidentId")
+                        .HasDatabaseName("ix_security_incidents_recent");
+
+                    b.ToTable("security_incidents", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_security_incidents_counts", "occurrence_count >= 1 AND incident_revision >= 1 AND last_detected_on >= first_detected_on");
+
+                            t.HasCheckConstraint("ck_security_incidents_error_code", "verification_error_code ~ '^[A-Za-z0-9_.:-]{0,80}$'");
+
+                            t.HasCheckConstraint("ck_security_incidents_resolution", "(incident_status_name IN ('Resolved','FalsePositive')) = (resolved_on IS NOT NULL AND resolved_by_user_id IS NOT NULL AND resolution_explanation_text IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_security_incidents_severity", "incident_severity_name IN ('Critical','High','Medium','Low')");
+
+                            t.HasCheckConstraint("ck_security_incidents_status", "incident_status_name IN ('Open','Investigating','Resolved','FalsePositive')");
+
+                            t.HasCheckConstraint("ck_security_incidents_type", "incident_type_name IN ('ConfirmedIntegrityMismatch','IntegrityQuarantine','VerificationServiceUnavailable','OperationalVerificationFailure')");
+                        });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.SecurityOperations.SecurityIncidentNote", b =>
+                {
+                    b.Property<Guid>("SecurityIncidentNoteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("security_incident_note_id");
+
+                    b.Property<string>("InvestigationNoteText")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("investigation_note_text");
+
+                    b.Property<Guid>("NoteAuthorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("note_author_user_id");
+
+                    b.Property<DateTimeOffset>("NoteCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("note_created_on");
+
+                    b.Property<Guid>("SecurityIncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("security_incident_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("SecurityIncidentNoteId");
+
+                    b.HasIndex("NoteAuthorUserId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("SecurityIncidentId", "NoteCreatedOn")
+                        .HasDatabaseName("ix_security_incident_notes_incident");
+
+                    b.ToTable("security_incident_notes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_security_incident_notes_text", "char_length(investigation_note_text) BETWEEN 1 AND 2000");
+                        });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.SecurityOperations.SecurityIncidentOccurrence", b =>
+                {
+                    b.Property<Guid>("SecurityIncidentOccurrenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("security_incident_occurrence_id");
+
+                    b.Property<long?>("CommittedContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("committed_content_revision");
+
+                    b.Property<string>("DetectionSourceName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("detection_source_name");
+
+                    b.Property<Guid?>("ObservedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("observed_by_user_id");
+
+                    b.Property<string>("ObservedIncidentTypeName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("observed_incident_type_name");
+
+                    b.Property<DateTimeOffset>("OccurrenceDetectedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurrence_detected_on");
+
+                    b.Property<Guid>("RequestCorrelationIdentifier")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_correlation_identifier");
+
+                    b.Property<Guid>("SecurityIncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("security_incident_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("VerificationErrorCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("verification_error_code");
+
+                    b.HasKey("SecurityIncidentOccurrenceId");
+
+                    b.HasIndex("ObservedByUserId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("SecurityIncidentId", "OccurrenceDetectedOn")
+                        .HasDatabaseName("ix_security_incident_occurrences_incident");
+
+                    b.ToTable("security_incident_occurrences", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_security_incident_occurrences_type", "observed_incident_type_name IN ('ConfirmedIntegrityMismatch','IntegrityQuarantine','VerificationServiceUnavailable','OperationalVerificationFailure')");
+                        });
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.Sharing.RecordShare", b =>
                 {
                     b.Property<Guid>("RecordShareId")
@@ -4392,6 +4634,77 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_form_relationship_definitions_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.SecurityOperations.SecurityIncident", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .HasConstraintName("fk_security_incidents_assignee");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("IncidentModifiedByUserId")
+                        .HasConstraintName("fk_security_incidents_modifier");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ResolvedByUserId")
+                        .HasConstraintName("fk_security_incidents_resolver");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_security_incidents_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.SecurityOperations.SecurityIncidentNote", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("NoteAuthorUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_security_incident_notes_author");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.SecurityOperations.SecurityIncident", null)
+                        .WithMany()
+                        .HasForeignKey("SecurityIncidentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_security_incident_notes_incident");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_security_incident_notes_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.SecurityOperations.SecurityIncidentOccurrence", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ObservedByUserId")
+                        .HasConstraintName("fk_security_incident_occurrences_observer");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.SecurityOperations.SecurityIncident", null)
+                        .WithMany()
+                        .HasForeignKey("SecurityIncidentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_security_incident_occurrences_incident");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_security_incident_occurrences_tenant");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.Sharing.RecordShare", b =>

@@ -9,6 +9,7 @@ using EnterpriseForms.Api.Features.Organizations;
 using EnterpriseForms.Api.Features.Platform;
 using EnterpriseForms.Api.Features.RelatedForms;
 using EnterpriseForms.Api.Features.Search;
+using EnterpriseForms.Api.Features.SecurityOperations;
 using EnterpriseForms.Api.Features.Sharing;
 using EnterpriseForms.Api.Features.Teams;
 using EnterpriseForms.Infrastructure;
@@ -114,6 +115,7 @@ public sealed class Program
         app.MapDashboardEndpoints();
         app.MapOrganizationEndpoints();
         app.MapSearchEndpoints();
+        app.MapSecurityIncidentEndpoints();
         if (app.Environment.IsEnvironment("Testing"))
         {
             // Phase C7 M1: real-stack proof of the AC-5 verification path. Never mapped outside the isolated Testing stack.

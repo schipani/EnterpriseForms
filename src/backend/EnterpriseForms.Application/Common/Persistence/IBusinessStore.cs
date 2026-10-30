@@ -5,6 +5,7 @@ using EnterpriseForms.Domain.Features.FormRecords;
 using EnterpriseForms.Domain.Features.Identity;
 using EnterpriseForms.Domain.Features.Organizations;
 using EnterpriseForms.Domain.Features.RelatedForms;
+using EnterpriseForms.Domain.Features.SecurityOperations;
 using EnterpriseForms.Domain.Features.Sharing;
 using EnterpriseForms.Domain.Features.Teams;
 using EnterpriseForms.Domain.Features.UserPreferences;
@@ -37,6 +38,24 @@ public sealed record LegacyRecordEstimate(IReadOnlyList<LegacyPlaintextRecord> H
 
 /// <summary>One protection-migration item of a record: the migration and the item's attempt counter (operation-identity attribution, Phase C6 M0 S4).</summary>
 public sealed record ProtectionMigrationAttempt(Guid FieldProtectionMigrationId, int AttemptCount);
+
+/// <summary>Dashboard upload filter (the caller's own sessions only). <c>FileNameContains</c> is matched case-insensitively as literal text.</summary>
+public sealed record UploadSessionFilter(IReadOnlyCollection<string> States, string? FileNameContains, DateTimeOffset? CreatedFrom, DateTimeOffset? CreatedBefore);
+
+/// <summary>Dashboard activity filter (the caller's own audit events only).</summary>
+public sealed record ActorAuditEventFilter(string? EventCategory, string? EventOutcome, DateTimeOffset? OccurredFrom, DateTimeOffset? OccurredBefore);
+
+/// <summary>Security incident filter (tenant-scoped). <c>FormRecordIds</c>, when set, restricts to incidents of those records.</summary>
+public sealed record SecurityIncidentFilter(string? IncidentTypeName, string? IncidentSeverityName, string? IncidentStatusName, DateTimeOffset? DetectedFrom, DateTimeOffset? DetectedBefore, string? IncidentIdSuffix, IReadOnlyCollection<Guid>? FormRecordIds);
+
+/// <summary>A page of rows plus the total matching the filter (computed in the same transaction).</summary>
+public sealed record StorePage<T>(List<T> Items, int TotalCount);
+
+/// <summary>Upload session state and creation time (statistics only; never the file name).</summary>
+public sealed record UploadSessionStatistic(string SessionState, DateTimeOffset SessionCreatedOn);
+
+/// <summary>Incident status, severity, type and detection times (statistics only; no identifiers).</summary>
+public sealed record SecurityIncidentStatistic(string IncidentStatusName, string IncidentSeverityName, string IncidentTypeName, DateTimeOffset FirstDetectedOn, DateTimeOffset LastDetectedOn);
 
 public interface IBusinessStore
 {
@@ -169,6 +188,12 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<List<UploadSession>> GetUploadSessionsForUserAsync(Guid tenantId, Guid ownerUserId, IReadOnlyCollection<string> states, CancellationToken cancellationToken);
 
+    /// <summary>Dashboard: a page of the caller's own sessions, newest first (created time, then id), with the filtered total.</summary>
+    Task<StorePage<UploadSession>> QueryUploadSessionsForUserAsync(Guid tenantId, Guid ownerUserId, UploadSessionFilter filter, int offset, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Dashboard: state and creation time of the caller's own sessions created at or after <paramref name="createdFrom"/>.</summary>
+    Task<List<UploadSessionStatistic>> GetUploadSessionStatisticsAsync(Guid tenantId, Guid ownerUserId, DateTimeOffset createdFrom, CancellationToken cancellationToken);
+
     /// <summary>
     /// Sessions whose plaintext staging object must be purged (tracked for update): unpurged and either still open/received past
     /// their expiry, or terminal (processed, committed, rejected, cancelled, failed, expired) for longer than the grace period.
@@ -224,6 +249,15 @@ public interface IBusinessScope : IAsyncDisposable
     Task<List<AuditEvent>> GetRecordAuditEventsAsync(Guid tenantId, Guid formRecordId, int limit, CancellationToken cancellationToken);
 
     Task<List<AuditEvent>> GetActorAuditEventsAsync(Guid tenantId, Guid actorUserId, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Dashboard: a page of the caller's own events, newest first (event time, then sequence), with the filtered total.</summary>
+    Task<StorePage<AuditEvent>> QueryActorAuditEventsAsync(Guid tenantId, Guid actorUserId, ActorAuditEventFilter filter, int offset, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Dashboard: the distinct categories of the caller's own events (filter choices).</summary>
+    Task<List<string>> GetActorAuditCategoriesAsync(Guid tenantId, Guid actorUserId, CancellationToken cancellationToken);
+
+    /// <summary>Events whose target is the given entity, oldest first (incident audit trail).</summary>
+    Task<List<AuditEvent>> GetTargetAuditEventsAsync(Guid tenantId, string targetEntityType, Guid targetEntityId, int limit, CancellationToken cancellationToken);
 
     // Organizations / preferences
     Task<OrganizationBranding?> FindBrandingAsync(Guid tenantId, CancellationToken cancellationToken);
@@ -324,6 +358,41 @@ public interface IBusinessScope : IAsyncDisposable
     /// writers of the same pair serialize on this lock for the rest of the transaction.
     /// </summary>
     Task<TeamMembershipProjectionState> LockTeamMembershipProjectionStateAsync(Guid tenantId, Guid teamId, Guid memberUserId, CancellationToken cancellationToken);
+
+    // ---- Security monitoring (PG-056): incident triage store (untrusted projection class) ----
+
+    /// <summary>
+    /// Serializes detections of one problem: takes a transaction-scoped advisory lock on (tenant, key), then returns the
+    /// most recent incident with that key (tracked, <c>FOR UPDATE</c>) or null. Concurrent detections wait for each other.
+    /// </summary>
+    Task<SecurityIncident?> LockLatestSecurityIncidentAsync(Guid tenantId, string deduplicationKey, CancellationToken cancellationToken);
+
+    /// <summary>The tenant's incident (tracked); <paramref name="lockForUpdate"/> takes <c>SELECT … FOR UPDATE</c>.</summary>
+    Task<SecurityIncident?> FindSecurityIncidentAsync(Guid tenantId, Guid securityIncidentId, bool lockForUpdate, CancellationToken cancellationToken);
+
+    void AddSecurityIncident(SecurityIncident incident);
+
+    void AddSecurityIncidentOccurrence(SecurityIncidentOccurrence occurrence);
+
+    void AddSecurityIncidentNote(SecurityIncidentNote note);
+
+    /// <summary>Time of the incident's most recent history row, or null.</summary>
+    Task<DateTimeOffset?> GetLatestSecurityIncidentOccurrenceOnAsync(Guid securityIncidentId, CancellationToken cancellationToken);
+
+    /// <summary>A page of the tenant's incidents, most recently detected first (last detection, then id), with the filtered total.</summary>
+    Task<StorePage<SecurityIncident>> QuerySecurityIncidentsAsync(Guid tenantId, SecurityIncidentFilter filter, int offset, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Incidents of the tenant whose record id ends with <paramref name="recordIdSuffix"/> (lowercase hex), most recent first (bounded).</summary>
+    Task<List<SecurityIncident>> FindSecurityIncidentsByRecordSuffixAsync(Guid tenantId, string recordIdSuffix, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Statistics of all the tenant's incidents (no identifiers).</summary>
+    Task<List<SecurityIncidentStatistic>> GetSecurityIncidentStatisticsAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>The incident's detection history, newest first (bounded).</summary>
+    Task<List<SecurityIncidentOccurrence>> GetSecurityIncidentOccurrencesAsync(Guid securityIncidentId, int limit, CancellationToken cancellationToken);
+
+    /// <summary>The incident's notes, oldest first.</summary>
+    Task<List<SecurityIncidentNote>> GetSecurityIncidentNotesAsync(Guid securityIncidentId, CancellationToken cancellationToken);
 
     Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken);
 

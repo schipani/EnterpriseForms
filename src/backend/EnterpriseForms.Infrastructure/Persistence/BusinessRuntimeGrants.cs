@@ -19,6 +19,9 @@ public static class BusinessRuntimeGrants
         // Phase C8 (C8-M1-01/02): durable team-membership operations and the per-pair roster watermark. Insert plus the
         // column-level UPDATE below only: identity columns are never updatable by the runtime role, and nothing is deletable.
         "authority_command_operations", "team_membership_projection_states",
+        // Security monitoring (PG-056): incident triage. Occurrence history and notes are insert-only; an incident allows only the
+        // column-level UPDATE below (identity, key and first detection are never updatable; a schema-owned trigger keeps counts monotonic).
+        "security_incidents", "security_incident_occurrences", "security_incident_notes",
     ];
 
     private static readonly string[] ProjectionTables =
@@ -49,6 +52,11 @@ public static class BusinessRuntimeGrants
         ],
         // Phase C8 (R-2): the three state columns and the modification time; a schema-owned trigger refuses lowering the revision (I-3).
         ["team_membership_projection_states"] = ["projected_membership_present", "projected_membership_revision", "last_authority_command_operation_id", "projection_state_modified_on"],
+        ["security_incidents"] =
+        [
+            "incident_status_name", "last_detected_on", "occurrence_count", "assigned_to_user_id", "resolution_explanation_text", "resolved_on", "resolved_by_user_id",
+            "incident_revision", "incident_modified_on", "incident_modified_by_user_id",
+        ],
         ["field_definitions"] = ["field_display_name", "field_description", "field_definition_revision", "modified_on", "modified_by_user_id", "field_classification", "field_protection_mode", "protection_policy_revision", "protection_changed_on", "protection_changed_by_user_id", "protection_authority_command_id"],
     };
 

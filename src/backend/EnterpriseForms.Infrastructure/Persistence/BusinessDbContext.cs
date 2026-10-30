@@ -5,6 +5,7 @@ using EnterpriseForms.Domain.Features.FormRecords;
 using EnterpriseForms.Domain.Features.Identity;
 using EnterpriseForms.Domain.Features.Organizations;
 using EnterpriseForms.Domain.Features.RelatedForms;
+using EnterpriseForms.Domain.Features.SecurityOperations;
 using EnterpriseForms.Domain.Features.Sharing;
 using EnterpriseForms.Domain.Features.Teams;
 using EnterpriseForms.Domain.Features.UserPreferences;
@@ -31,6 +32,12 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
     public DbSet<AuthorityCommandOperation> AuthorityCommandOperations => Set<AuthorityCommandOperation>();
 
     public DbSet<TeamMembershipProjectionState> TeamMembershipProjectionStates => Set<TeamMembershipProjectionState>();
+
+    public DbSet<SecurityIncident> SecurityIncidents => Set<SecurityIncident>();
+
+    public DbSet<SecurityIncidentOccurrence> SecurityIncidentOccurrences => Set<SecurityIncidentOccurrence>();
+
+    public DbSet<SecurityIncidentNote> SecurityIncidentNotes => Set<SecurityIncidentNote>();
 
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
 

@@ -33,6 +33,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using EnterpriseForms.Application.Features.SecurityOperations.Incidents;
+using EnterpriseForms.Infrastructure.Features.SecurityOperations;
 namespace EnterpriseForms.Infrastructure;
 
 public static class BusinessInfrastructureRegistration
@@ -91,6 +93,9 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<EnterpriseForms.Application.Features.Identity.MemberDirectory.GetMemberDirectoryHandler>();
         services.AddSingleton<TeamDirectoryHandlers>();
         services.AddSingleton<DashboardHandler>();
+        services.AddSingleton<DashboardSectionHandlers>();
+        services.AddSingleton<SecurityIncidentHandlers>();
+        services.AddSingleton<ISecurityIncidentRecorder, SecurityIncidentRecorder>();
         services.AddSingleton<UploadSessionHandlers>();
         services.AddSingleton<DocumentHandlers>();
         services.AddSingleton<DocumentProcessingService>();
