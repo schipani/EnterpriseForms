@@ -868,6 +868,9 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
         Directory.CreateDirectory(scripts);
         const string Previous = "20261029154322_PhaseC7ReconciliationResumableRounds";
         const string Target = "20261030130521_PhaseC8TeamMembershipReconciliation";
+        // dotnet-ef comes from the repository tool manifest (.config/dotnet-tools.json, pinned); hosted runners have not restored
+        // it, so restore it here (idempotent; a no-op where it is already restored). A failed restore fails the test.
+        ComposeStack.Run("dotnet", "tool restore", 300);
         string Script(string name, string from, string to)
         {
             var file = Path.Combine(scripts, name);
