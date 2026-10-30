@@ -1,6 +1,6 @@
 # Phase C8 — AC-9, C8-M1-01 and C8-M1-02: implementation plan (C-87)
 
-- **Status:** implementation in progress on `phase-c8/ac9-durable-reconciliation` (from `phase-c8/administration-governance` at `69a6717`, the PR #31 head). Not merged, not deployed.
+- **Status:** **implemented and locally verified** (C-87; evidence `docs/evidence/phase-c8/ac9-reconciliation-verification.md`) on `phase-c8/ac9-durable-reconciliation` (from `phase-c8/administration-governance` at `69a6717`, the PR #31 head). Not merged, not deployed.
 - **Authority for this work:** the owner's instruction of 2026-10-30 (recorded as C-87) reverses the earlier "accepted limitation" closure, authorizes implementation of Design R with D8-11…D8-23, and keeps independent security review and owner approval as **closure and merge gates**. It does not authorize anything outside the approved design.
 - **Independence:** this plan and every implementation decision below were made by the implementation agent (Claude). None of it is an independent review. AC-9 remains **not independently reviewed** (package §11).
 - **Base design:** `PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md` (C-85). Where this plan says "as package", the package text governs.
