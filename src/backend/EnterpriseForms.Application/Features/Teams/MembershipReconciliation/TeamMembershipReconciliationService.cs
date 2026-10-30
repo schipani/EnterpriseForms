@@ -444,7 +444,7 @@ public sealed class TeamMembershipReconciliationService(IBusinessStore store, IT
     }
 
     private AuditEvent FailureAudit(AuthorityCommandOperation operation, string code, string reason, Guid? securityCommandId) =>
-        ServiceAudit(operation, AuditActions.TeamMembershipReconciliationFailed, "Failure", "team membership reconciliation: " + reason, new
+        ServiceAudit(operation, AuditActions.TeamMembershipReconciliationFailed, "Failed", "team membership reconciliation: " + reason, new
         {
             authorityCommandOperationId = operation.AuthorityCommandOperationId,
             failureCode = code,

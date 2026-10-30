@@ -6,8 +6,9 @@ using Xunit;
 namespace EnterpriseForms.StageBTests.Tests;
 
 /// <summary>
-/// Phase C8 M1 acceptance (C-80/C-81): a team command the Authority has committed but cannot yet make Effective must never be
-/// reported as completed. The non-effective state is forced deterministically by pausing the mandatory audit archive
+/// Phase C8 M1 acceptance (C-80/C-81), updated for C8-M1-01 Design R (C-87): a team command the Authority has committed but
+/// cannot yet make Effective must never be reported as completed, and the roster is never written while it is pending. Once the
+/// Authority makes it effective, the Worker projects it without any further request. The non-effective state is forced deterministically by pausing the mandatory audit archive
 /// (the SEC-P12 mechanism): the Authority journals the command but keeps the organization's projection gate closed until the
 /// archive receipt exists. Real stack, nothing mocked; the archive is always unpaused in <c>finally</c>.
 /// </summary>
@@ -66,22 +67,34 @@ public sealed class PendingAuthorityCommandTests(StageBFixture fixture)
 
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(90));
 
-        // 4. The business projection was not written by the pending request (no optimistic or phantom membership), even though the Authority
-        //    has now made the command effective: the roster reads only what an effective, observed command wrote.
-        var afterRecovery = await fixture.Api.GetAsync($"/api/v1/teams/{teamId:D}", s.Token(s.Designer));
-        Assert.True(afterRecovery.IsSuccess, afterRecovery.Body);
-        Assert.Empty(afterRecovery.Root.GetProperty("members").EnumerateArray());
-
-        // 5. Re-reading the effective Authority state: the same idempotency key resolves to the one committed command, now Effective, and only then
-        //    does the projection gain the member, exactly once.
-        var retried = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Designer), new { userId = s.Clerk.AuthorityUserId }, key);
-        Assert.True(retried.IsSuccess, retried.Body);
-        Assert.True(retried.Root.GetProperty("command").GetProperty("effective").GetBoolean(), retried.Body);
+        // 4. C8-M1-01 (Design R): with no further request from this client, the Worker projects the membership once the Authority
+        //    has made the command effective — the roster gains exactly the member of the one committed command.
+        Assert.Equal(1, await WaitActiveProjectionRowsAsync(s, teamId, 1));
         var final = await fixture.Api.GetAsync($"/api/v1/teams/{teamId:D}", s.Token(s.Designer));
         Assert.True(final.IsSuccess, final.Body);
         var member = Assert.Single(final.Root.GetProperty("members").EnumerateArray());
         Assert.Equal(s.Clerk.AuthorityUserId, member.GetProperty("userId").GetGuid());
+
+        // 5. Re-sending the same idempotency key resolves to the one committed command (now projected) and duplicates nothing.
+        var retried = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Designer), new { userId = s.Clerk.AuthorityUserId }, key);
+        Assert.True(retried.IsSuccess, retried.Body);
+        Assert.True(retried.Root.GetProperty("command").GetProperty("effective").GetBoolean(), retried.Body);
+        Assert.Equal("Projected", retried.Root.GetProperty("operation").GetProperty("operationState").GetString());
         Assert.Equal(retried.Root.GetProperty("command").GetProperty("commandId").GetGuid(), member.GetProperty("authorityCommandId").GetGuid());
+        Assert.Equal(1, ActiveProjectionRows(s, teamId));
+    }
+
+    /// <summary>Polls the business roster (hostile-DBA SQL, works while the Authority gate is closed) until it holds <paramref name="expected"/> active rows.</summary>
+    private async Task<int> WaitActiveProjectionRowsAsync(StageBScenario s, Guid teamId, int expected, int seconds = 90)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        int rows;
+        while ((rows = ActiveProjectionRows(s, teamId)) != expected && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+        }
+
+        return rows;
     }
 
     private async Task<(StageBScenario S, Guid TeamId, string Key)> PendingAddAsync(string name, bool leaveArchivePaused = false)
@@ -98,6 +111,7 @@ public sealed class PendingAuthorityCommandTests(StageBFixture fixture)
         {
             var during = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Designer), new { userId = s.Clerk.AuthorityUserId }, key);
             Assert.False(during.IsSuccess && during.Root.GetProperty("command").GetProperty("effective").GetBoolean(), during.Body);
+            Assert.Equal(0, ActiveProjectionRows(s, teamId)); // nothing written on the strength of a pending response
         }
         finally
         {
@@ -130,7 +144,6 @@ public sealed class PendingAuthorityCommandTests(StageBFixture fixture)
     public async Task RepeatedAndConcurrentSameKeyChecksNeverDuplicateTheMembership()
     {
         var (s, teamId, key) = await PendingAddAsync("c8-reconcile-idem");
-        Assert.Equal(0, ActiveProjectionRows(s, teamId));
 
         var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Designer), new { userId = s.Clerk.AuthorityUserId }, key)));
         // Every outcome is either a confirmed Effective command or an explicit non-success; never a second membership.
@@ -163,6 +176,7 @@ public sealed class PendingAuthorityCommandTests(StageBFixture fixture)
         {
             var during = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members/{s.Clerk.AuthorityUserId:D}/remove", s.Token(s.Designer), new { }, key);
             Assert.False(during.IsSuccess && during.Root.GetProperty("command").GetProperty("effective").GetBoolean(), during.Body);
+            Assert.Equal(1, ActiveProjectionRows(s, teamId)); // not removed on the strength of a pending response
         }
         finally
         {
@@ -170,7 +184,8 @@ public sealed class PendingAuthorityCommandTests(StageBFixture fixture)
         }
 
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(90));
-        Assert.Equal(1, await MemberCountAsync(s, teamId)); // not removed on the strength of a pending response
+        // The Worker removes the member once the Authority confirms it, with no further request from this client.
+        Assert.Equal(0, await WaitActiveProjectionRowsAsync(s, teamId, 0));
         var confirmed = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members/{s.Clerk.AuthorityUserId:D}/remove", s.Token(s.Designer), new { }, key);
         Assert.True(confirmed.IsSuccess && confirmed.Root.GetProperty("command").GetProperty("effective").GetBoolean(), confirmed.Body);
         Assert.Equal(0, await MemberCountAsync(s, teamId));
@@ -196,8 +211,9 @@ public sealed class PendingAuthorityCommandTests(StageBFixture fixture)
         var otherRequest = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Designer), new { userId = s.Reader.AuthorityUserId }, key);
         Assert.False(otherRequest.IsSuccess, otherRequest.Body);
 
-        Assert.Equal(0, await MemberCountAsync(s, teamId));
-        Assert.Equal(0, ActiveProjectionRows(s, teamId));
+        // Only the legitimate pending command is projected (by the Worker): the replayed member never appears; the other organization gets nothing.
+        Assert.Equal(1, await WaitActiveProjectionRowsAsync(s, teamId, 1));
+        Assert.Equal("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM team_memberships WHERE team_id = '{teamId:D}' AND user_id = '{s.Reader.AuthorityUserId:D}'").Trim());
         Assert.Equal(0, ActiveProjectionRows(other, teamId));
 
         var owner = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Designer), new { userId = s.Clerk.AuthorityUserId }, key);
@@ -239,7 +255,8 @@ public sealed class PendingAuthorityCommandTests(StageBFixture fixture)
         }
 
         await s.WaitGateReadyAsync(TimeSpan.FromSeconds(120));
-        Assert.Equal(0, ActiveProjectionRows(s, teamId)); // nothing was written on the strength of the lost Pending response
+        // Nothing was lost with the Pending response: the Worker completes the operation recorded before submit.
+        Assert.Equal(1, await WaitActiveProjectionRowsAsync(s, teamId, 1, 120));
         HttpResult confirmed;
         var attempts = 0;
         do
