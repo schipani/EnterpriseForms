@@ -108,7 +108,7 @@ test.describe("Organization administration (C8 M1)", () => {
     await signOut(page);
   });
 
-  test("a committed but non-effective membership command is shown as Pending, never as done, and the roster is not updated optimistically", async ({ page }) => {
+  test("a committed but non-effective membership command is shown as Pending, never as done, then reconciles itself to Effective", async ({ page }) => {
     // Deterministic fault (the SEC-P12 mechanism): pausing the mandatory audit archive keeps the Authority from making the command Effective.
     test.setTimeout(180_000);
     const archive = process.env["E2E_ARCHIVE_CONTAINER"] ?? "enterpriseforms-sectest-archive-store-1";
@@ -133,9 +133,14 @@ test.describe("Organization administration (C8 M1)", () => {
       // The command is committed but not effective: the page says Pending and never shows the member or an Effective state.
       const pendingStatus = page.getByRole("status").filter({ hasText: "Pending" });
       await expect(pendingStatus).toBeVisible({ timeout: 90_000 });
-      await expect(pendingStatus).toContainText("has not made it effective yet");
+      await expect(pendingStatus).toContainText("has not yet confirmed");
       await expect(page.getByRole("table", { name: "Team members" }).getByRole("row", { name: /Casey Clerk/ })).toHaveCount(0);
       await expect(page.getByText("Effective", { exact: true })).toHaveCount(0);
+      // The pending operation (team, person, direction and the ORIGINAL idempotency key; nothing secret) is kept in session storage.
+      // (A reload while the Authority gate is closed fails the whole application closed at bootstrap, so reload survival is covered by unit tests.)
+      const stored = await page.evaluate(() => Object.entries(window.sessionStorage).filter(([k]) => k.startsWith("ef.pendingMembership.")).map(([, v]) => v));
+      expect(stored).toHaveLength(1);
+      expect(stored[0]).toContain("idempotencyKey");
     } finally {
       if (paused) {
         docker("unpause");
@@ -143,12 +148,16 @@ test.describe("Organization administration (C8 M1)", () => {
       }
     }
 
-    // After the archive returns, the roster still lists only what an effective, observed command wrote: re-read, never assumed.
-    await expect(async () => {
-      await page.reload();
-      await expect(page.getByRole("heading", { level: 1, name: pendingTeam })).toBeVisible();
-      await expect(page.getByRole("table", { name: "Team members" }).getByRole("row", { name: /Casey Clerk/ })).toHaveCount(0);
-    }).toPass({ timeout: 60_000 });
+    // After the archive returns, the page re-checks the SAME command by itself (no new click, no new key): Pending turns into
+    // Effective only when the Authority confirms it, and the roster then shows the member exactly once.
+    const roster = page.getByRole("table", { name: "Team members" });
+    await expect(page.getByRole("status").filter({ hasText: "Effective" })).toBeVisible({ timeout: 150_000 });
+    await expect(roster.getByRole("row", { name: /Casey Clerk/ })).toHaveCount(1, { timeout: 60_000 });
+    await expect(page.getByRole("status").filter({ hasText: "Pending" })).toHaveCount(0);
+    expect(await page.evaluate(() => Object.keys(window.sessionStorage).filter((k) => k.startsWith("ef.pendingMembership.")))).toEqual([]);
+    await page.reload();
+    await expect(roster.getByRole("row", { name: /Casey Clerk/ })).toHaveCount(1);
+    await expect(page.getByRole("status").filter({ hasText: "Pending" })).toHaveCount(0);
     await signOut(page);
   });
 

@@ -156,14 +156,14 @@ function idempotencyKey(): string {
 export function createApiClient(coordinator: IRequestCoordinator) {
   const read = <T>(endpointKey: string, pathParams?: Record<string, string>, query?: Record<string, string | number | boolean | undefined>, lane: OperationLane = "interactive-read", signal?: AbortSignal) =>
     coordinator.execute<T>({ lane, method: "GET", endpointKey, ...(pathParams ? { pathParams } : {}), ...(query ? { query } : {}) }, signal);
-  const write = <T>(method: "POST" | "PUT" | "PATCH" | "DELETE", endpointKey: string, pathParams: Record<string, string> | undefined, payload: unknown, options: { idempotent?: boolean; resourceKey?: string; expectedRevision?: string; lane?: OperationLane; responseKind?: "json" | "none" } = {}) =>
+  const write = <T>(method: "POST" | "PUT" | "PATCH" | "DELETE", endpointKey: string, pathParams: Record<string, string> | undefined, payload: unknown, options: { idempotent?: boolean; idempotencyKey?: string; resourceKey?: string; expectedRevision?: string; lane?: OperationLane; responseKind?: "json" | "none" } = {}) =>
     coordinator.execute<T>({
       lane: options.lane ?? "interactive-write",
       method,
       endpointKey,
       ...(pathParams ? { pathParams } : {}),
       ...(payload !== undefined ? { payload } : {}),
-      ...(options.idempotent ? { idempotencyKey: idempotencyKey() } : {}),
+      ...(options.idempotent ? { idempotencyKey: options.idempotencyKey ?? idempotencyKey() } : {}),
       ...(options.resourceKey ? { resourceKey: options.resourceKey } : {}),
       ...(options.expectedRevision ? { expectedRevision: options.expectedRevision } : {}),
       ...(options.responseKind ? { responseKind: options.responseKind } : {}),
@@ -290,8 +290,9 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       create: (request: CreateTeamRequest) => write<TeamResponse>("POST", "teams.create", undefined, request, { idempotent: true, resourceKey: "teams" }),
       /** Display-only rename of the projection label (D8-8); owner only, audited, concurrency on expectedModifiedOn. */
       rename: (teamId: string, request: RenameTeamRequest) => write<TeamDetailResponse>("PATCH", "teams.rename", { teamId }, request, { resourceKey: `team:${teamId}` }),
-      addMember: (teamId: string, request: TeamMemberRequest) => write<CommandStatusResponse>("POST", "teams.addMember", { teamId }, request, { idempotent: true, resourceKey: `team:${teamId}` }),
-      removeMember: (teamId: string, userId: string) => write<CommandStatusResponse>("POST", "teams.removeMember", { teamId, userId }, {}, { idempotent: true, resourceKey: `team:${teamId}` }),
+      /** C8-M1-01: pass the original idempotencyKey to re-check the same Authority command (never a new one) after a Pending outcome. */
+      addMember: (teamId: string, request: TeamMemberRequest, idempotencyKey?: string) => write<CommandStatusResponse>("POST", "teams.addMember", { teamId }, request, { idempotent: true, ...(idempotencyKey ? { idempotencyKey } : {}), resourceKey: `team:${teamId}` }),
+      removeMember: (teamId: string, userId: string, idempotencyKey?: string) => write<CommandStatusResponse>("POST", "teams.removeMember", { teamId, userId }, {}, { idempotent: true, ...(idempotencyKey ? { idempotencyKey } : {}), resourceKey: `team:${teamId}` }),
     },
     preferences: {
       get: (signal?: AbortSignal) => read<UiPreferenceResponse>("preferences.get", undefined, undefined, "interactive-read", signal),

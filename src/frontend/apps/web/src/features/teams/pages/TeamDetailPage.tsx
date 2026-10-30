@@ -3,17 +3,21 @@ import { useApi, useSession } from "@enterpriseforms/app-runtime";
 import { ActionIcons, Badge, Button, Card, DescriptionList, Dialog, LoadingBlock, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OrganizationLayout } from "../../organizations";
 import { ErrorPanel } from "../../support";
+import { classifyError, classifyResponse, loadPending, MAXIMUM_AUTOMATIC_ATTEMPTS, nextDelayMs, savePending, type MembershipOutcome, type PendingMembershipOperation } from "../components/membershipOutcome";
 import { TeamRoster } from "../components/TeamRoster";
 import { teamDirectoryKey } from "./TeamsPage";
 
 /**
  * PG-049 team detail (Phase C8 M1): roster from the projection, add/remove through the existing AddTeamMember and
  * RemoveTeamMember Authority commands (organization owner or Security Administrator, who is never offered themself: G25),
- * and the display-only rename of D8-8. A committed-but-not-
- * effective command is shown as pending; the roster is re-read from the server rather than updated optimistically.
+ * and the display-only rename of D8-8. A committed-but-not-effective command is shown as Pending and is re-checked
+ * automatically with its ORIGINAL idempotency key (C8-M1-01): that addresses the one committed Authority command, never a
+ * new one, and the business projection (the roster) is written only once the Authority reports it effective. Pending
+ * operations survive a reload of this tab (session storage: team, person, direction and key; nothing secret). The roster
+ * is always re-read from the server; it is never updated optimistically.
  */
 export function TeamDetailPage() {
   const { teamId } = useParams({ strict: false }) as { teamId: string };
@@ -28,7 +32,12 @@ export function TeamDetailPage() {
   const [removing, setRemoving] = useState<TeamMemberResponse | null>(null);
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [name, setName] = useState("");
-  const [pending, setPending] = useState<string | null>(null);
+  const [operations, setOperations] = useState<PendingMembershipOperation[]>(() => loadPending(teamId));
+  const [notices, setNotices] = useState<{ id: string; outcome: MembershipOutcome; text: string }[]>([]);
+  const [exhausted, setExhausted] = useState(false);
+  const checking = useRef(false);
+  const operationsRef = useRef(operations);
+  operationsRef.current = operations;
   const close = () => {
     setAdding(false);
     setRenaming(false);
@@ -40,25 +49,92 @@ export function TeamDetailPage() {
     await queryClient.invalidateQueries({ queryKey: teamDirectoryKey });
     await queryClient.invalidateQueries({ queryKey: ["organization", "members"] });
   };
-  const settle = (status: number, effective: boolean | undefined, what: string) => {
-    setPending(status === 202 || !effective ? `The Authorization Authority committed the ${what} but has not made it effective yet. The roster shows it once the Authority reports it effective; refresh to check.` : null);
+  const describe = (op: PendingMembershipOperation) => `${op.operation === "add" ? "adding" : "removing"} ${op.displayName} ${op.operation === "add" ? "to" : "from"} the team`;
+  const finish = async (op: PendingMembershipOperation, outcome: MembershipOutcome) => {
+    if (outcome.kind === "pending") {
+      return;
+    }
+    setOperations((current) => {
+      const next = current.filter((o) => o.idempotencyKey !== op.idempotencyKey);
+      savePending(teamId, next);
+      return next;
+    });
+    const text =
+      outcome.kind === "effective"
+        ? `The Authorization Authority confirmed ${describe(op)}; the roster below is read from the server.`
+        : `${outcome.detail} (${describe(op)}). Nothing was changed.`;
+    setNotices((current) => [{ id: op.idempotencyKey, outcome, text }, ...current.filter((n) => n.id !== op.idempotencyKey)].slice(0, 3));
+    await refresh();
+  };
+  /** Sends (or re-sends) the command with the operation's own idempotency key: the Authority returns the one committed command. */
+  const send = async (op: PendingMembershipOperation): Promise<MembershipOutcome> => {
+    try {
+      const response = op.operation === "add" ? await api.teams.addMember(teamId, { userId: op.userId }, op.idempotencyKey) : await api.teams.removeMember(teamId, op.userId, op.idempotencyKey);
+      return classifyResponse(response);
+    } catch (error) {
+      return classifyError(error);
+    }
+  };
+  const recheck = async (op: PendingMembershipOperation) => {
+    if (checking.current) {
+      return;
+    }
+    checking.current = true;
+    try {
+      await finish(op, await send(op));
+    } finally {
+      checking.current = false;
+    }
+  };
+  const start = async (operation: "add" | "remove", userIdentifier: string, displayName: string) => {
+    const op: PendingMembershipOperation = { teamId, userId: userIdentifier, displayName, operation, idempotencyKey: crypto.randomUUID(), startedOn: Date.now() };
+    // Recorded before the request so a lost response or a reload still re-checks the same command (never a second one).
+    const next = [...operations, op];
+    setOperations(next);
+    savePending(teamId, next);
+    setExhausted(false);
+    close();
+    await finish(op, await send(op));
   };
   const add = useMutation({
-    mutationFn: () => api.teams.addMember(teamId, { userId: userId! }),
-    onSuccess: async (response) => {
-      close();
-      settle(response.status, response.result?.command?.effective, "membership");
-      await refresh();
-    },
+    mutationFn: () => start("add", userId!, team.data?.availableMembers.find((u) => u.userId === userId)?.displayName ?? "the member"),
   });
   const remove = useMutation({
-    mutationFn: (member: TeamMemberResponse) => api.teams.removeMember(teamId, member.userId),
-    onSuccess: async (response) => {
-      close();
-      settle(response.status, response.result?.command?.effective, "removal");
-      await refresh();
-    },
+    mutationFn: (member: TeamMemberResponse) => start("remove", member.userId, member.displayName),
   });
+  const waiting = operations.length;
+  useEffect(() => {
+    if (waiting === 0) {
+      return undefined;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+    const tick = async () => {
+      for (const op of [...operationsRef.current]) {
+        if (cancelled) {
+          return;
+        }
+        await recheck(op);
+      }
+      attempt += 1;
+      if (cancelled) {
+        return;
+      }
+      if (attempt >= MAXIMUM_AUTOMATIC_ATTEMPTS) {
+        setExhausted(true);
+        return;
+      }
+      timer = setTimeout(() => void tick(), nextDelayMs(attempt));
+    };
+    timer = setTimeout(() => void tick(), nextDelayMs(0));
+    return () => {
+      cancelled = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [waiting, teamId]);
   const rename = useMutation({
     mutationFn: () => api.teams.rename(teamId, { teamName: name.trim(), expectedModifiedOn: team.data!.modifiedOn }).then((r) => r.result),
     onSuccess: async () => {
@@ -104,11 +180,32 @@ export function TeamDetailPage() {
     >
       {team.isPending ? <LoadingBlock label="Loading the team" /> : null}
       {team.isError ? <ErrorPanel error={team.error} onRetry={() => void team.refetch()} /> : null}
-      {pending ? (
-        <StatusMessage tone="warning" title="Pending">
-          {pending}
+      {operations.length > 0 ? (
+        <StatusMessage
+          tone="warning"
+          title="Pending"
+          actions={
+            exhausted ? (
+              <Button size="sm" variant="secondary" onClick={() => operations.forEach((op) => void recheck(op))}>
+                Check now
+              </Button>
+            ) : undefined
+          }
+        >
+          <ul className="m-0 list-none p-0">
+            {operations.map((op) => (
+              <li key={op.idempotencyKey}>
+                The Authorization Authority has not yet confirmed {describe(op)}. {exhausted ? "Automatic checking stopped; use Check now." : "This page checks again automatically."} The roster changes only after the Authority reports it effective.
+              </li>
+            ))}
+          </ul>
         </StatusMessage>
       ) : null}
+      {notices.map((n) => (
+        <StatusMessage key={n.id} tone={n.outcome.kind === "effective" ? "success" : "danger"} title={n.outcome.kind === "effective" ? "Effective" : n.outcome.kind === "rejected" ? "Rejected" : "Failed"}>
+          {n.text}
+        </StatusMessage>
+      ))}
       {team.data ? (
         <div className="flex flex-col gap-4">
           <Card title="Team">
@@ -147,8 +244,7 @@ export function TeamDetailPage() {
         }
       >
         <Select label="Person" value={userId} placeholder="Choose a person" options={(team.data?.availableMembers ?? []).map((u) => ({ value: u.userId, label: u.displayName }))} onValueChange={setUserId} />
-        {add.isError ? <ErrorPanel error={add.error} /> : null}
-      </Dialog>
+              </Dialog>
 
       <Dialog
         open={removing !== null}
@@ -167,7 +263,7 @@ export function TeamDetailPage() {
           </>
         }
       >
-        {remove.isError ? <ErrorPanel error={remove.error} /> : null}
+                <></>
       </Dialog>
 
       <Dialog

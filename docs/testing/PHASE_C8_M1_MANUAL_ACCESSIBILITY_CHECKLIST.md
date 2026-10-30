@@ -23,7 +23,7 @@ Overview `/app/organization`; People `/app/organization/users`; Teams `/app/orga
 | 3 | Overview: each card is a named region; its Refresh button name includes the card; refresh result/“Unavailable” part announced | ☐ | ☐ |
 | 4 | People/Teams tables: caption/name, row headers, column headers announced; filter field labelled; no action column in People | ☐ | ☐ |
 | 5 | Team detail: roster table reads member, verified command state; Add/Remove/Rename dialogs trap and restore focus, titles announced, Esc closes | ☐ | ☐ |
-| 6 | **Pending**: the status message is announced politely when it appears (not only visually); wording does not claim completion; the “Access is being updated” error is announced | ☐ | ☐ |
+| 6 | **Pending / Effective / Rejected / Failed** (C8-M1-01): each status message is announced when it appears (Pending and Effective politely, Rejected and Failed as alerts); Pending wording never claims completion and is replaced by Effective by itself without any action; “Check now” is operable | ☐ | ☐ |
 | 7 | Combobox “Person” in Add member: options, selected value, empty state announced | ☐ | ☐ |
 | 8 | Data protection and Security Administrators: form controls, validation and read-only explanations announced | ☐ | ☐ |
 | 9 | Branding: logo upload control, success/refusal messages announced | ☐ | ☐ |

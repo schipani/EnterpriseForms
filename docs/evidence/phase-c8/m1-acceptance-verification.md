@@ -39,3 +39,16 @@ The environment has no `gh` CLI and no GitHub API credential, and a token was de
   3. If `level3-script` or `stage-b-integration` do not start from the PR, Actions → choose the workflow → Run workflow on the same branch.
   4. Confirm every run shows the same head SHA, then record workflow name, run id, SHA and conclusion here.
 - Do not merge the PR; M1 is not accepted until those runs are green and the owner accepts.
+
+## C8-M1-01 remediation (C-82, 2026-10-30)
+
+| Check | Result |
+|---|---|
+| `PendingAuthorityCommandTests` (real stack: pending to Effective with the same key, rejected, idempotent/concurrent checks, pending removal, cross-organization/actor/request isolation, API + Authority restart) | 6 / 6 |
+| `AdministrationTests` regression | 5 / 5 |
+| `organization-administration.spec.ts` (UI Pending, self-reconciled Effective, member shown once, stored operation cleared; axe on all pages) | 5 / 5 |
+| Vitest | 231 / 231 (30 files) |
+| Build `-warnaserror`; contract 306/306; architecture 67/67; lint; typecheck | clean / passed |
+| Backend, Authority, SpiceDB schema, OpenAPI | unchanged |
+
+Limitation recorded in `docs/PHASE_C8_STATUS.md` section 9: reconciliation is driven by the open tab; a server-side durable reconciler requires separate approval. Hosted workflow status is unchanged (not run; manual actions above).
