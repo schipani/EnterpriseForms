@@ -2,7 +2,7 @@ import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "
 import { useApi } from "@enterpriseforms/app-runtime";
 import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findOptionFilterCycle, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, setSectionRepeat, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
 import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
-import { ActionIcons, Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, menuContentClass, menuItemClass, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useParams } from "@tanstack/react-router";
@@ -504,7 +504,7 @@ export function DesignerPage() {
   const sectionTargetIndex = sectionOfSelection();
 
   const toolbar = (
-    <div role="group" aria-label="Designer actions" className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2">
+    <div role="group" aria-label="Designer actions" className="flex flex-wrap items-center gap-2 rounded-panel border border-line bg-surface p-2">
       {canDesign ? (
         <>
           <DropdownMenu.Root>
@@ -514,13 +514,13 @@ export function DesignerPage() {
               </Button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content align="start" sideOffset={6} className="z-50 min-w-56 rounded border border-input bg-surface p-1 shadow-lg">
+              <DropdownMenu.Content align="start" sideOffset={6} className={`${menuContentClass} min-w-56`}>
                 {[
                   { key: "new", label: "New field…", run: () => setCreateAt({ kind: "field", target: layout ? columnSlotFor(layout, selection) : null }) },
                   { key: "documents", label: "New document collection…", run: () => setCreateAt({ kind: "documents", target: layout ? columnSlotFor(layout, selection) : null }) },
                   { key: "existing", label: "Place an existing field…", run: placeExisting },
                 ].map((item) => (
-                  <DropdownMenu.Item key={item.key} onSelect={item.run} className="flex min-h-10 cursor-default items-center rounded px-3 text-base outline-none data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground">
+                  <DropdownMenu.Item key={item.key} onSelect={item.run} className={menuItemClass}>
                     {item.label}
                   </DropdownMenu.Item>
                 ))}
@@ -565,11 +565,11 @@ export function DesignerPage() {
 
   const designView = layout ? (
     <div className="flex flex-col gap-3">
-      <div role="group" aria-label="Designer panes" className="flex gap-1 rounded-lg border border-line bg-surface p-1 lg:hidden">
+      <div role="group" aria-label="Designer panes" className="flex gap-2 lg:hidden">
         {(["canvas", "properties"] as const).map((option) => (
-          <button key={option} type="button" aria-pressed={pane === option} onClick={() => setPane(option)} className={`min-h-11 flex-1 rounded px-3 text-base font-medium ${pane === option ? "bg-primary text-primary-foreground" : "text-body hover:bg-page"}`}>
+          <Button key={option} variant={pane === option ? "primary" : "secondary"} aria-pressed={pane === option} onClick={() => setPane(option)} className="flex-1">
             {option === "canvas" ? "Canvas" : "Properties"}
-          </button>
+          </Button>
         ))}
       </div>
       {/* lg:items-start: without it, CSS Grid's default align-items:stretch makes the inspector column match the
@@ -821,7 +821,7 @@ export function DesignerPage() {
 
   const header = (
     <div className="flex flex-col gap-2">
-      <Link to="/app/forms" className="inline-flex min-h-9 items-center gap-1 self-start rounded text-sm font-medium text-muted underline-offset-4 hover:text-body hover:underline">
+      <Link to="/app/forms" className="inline-flex min-h-9 items-center gap-1 self-start rounded-control text-sm font-medium text-muted underline-offset-4 hover:text-body hover:underline">
         <span aria-hidden="true">←</span> All forms
       </Link>
       <p className="text-xl font-bold leading-tight">Form Designer</p>
@@ -1027,7 +1027,7 @@ function PreviewView({ layout, fields }: { layout: FormLayout; fields: RendererF
       }
     >
       <p className="text-sm text-muted">The draft as people will see it in the data-entry form, with the same renderer the record page uses. Fields marked Not in form are left out. Type synthetic values to try the visibility and required-if rules; nothing typed here is saved.</p>
-      <div className={`w-full ${width} rounded border border-dashed border-input bg-page p-3`}>
+      <div className={`w-full ${width} rounded-control border border-dashed border-input bg-page p-3`}>
         <FormRenderer
           layout={layout}
           fields={fields}
@@ -1044,7 +1044,7 @@ function PreviewView({ layout, fields }: { layout: FormLayout; fields: RendererF
 
 function PreviewSlot({ label, detail }: { label: string; detail: string }) {
   return (
-    <div className="rounded border border-dashed border-input bg-surface p-3">
+    <div className="rounded-control border border-dashed border-input bg-surface p-3">
       <p className="font-medium">{label}</p>
       <p className="text-sm text-muted">{detail}</p>
     </div>

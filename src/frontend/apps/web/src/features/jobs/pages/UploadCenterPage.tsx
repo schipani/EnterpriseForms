@@ -48,7 +48,7 @@ export function UploadCenterPage() {
         {items.length === 0 ? <p className="text-muted">No uploads started in this tab.</p> : null}
         <ul className="flex flex-col gap-3">
           {items.map((item) => (
-            <li key={item.clientUploadId} className="rounded border border-line p-3">
+            <li key={item.clientUploadId} className="rounded-control border border-line p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">
                   <Link to="/app/records/$formRecordId" params={{ formRecordId: item.formRecordId }} search={{ tab: "documents" }} className="underline-offset-4 hover:underline">
@@ -59,7 +59,7 @@ export function UploadCenterPage() {
               </div>
               <ProgressBar label={`${item.fileName} transfer`} value={item.transferredBytes} max={item.sizeBytes} />
               {item.errorCode ? (
-                <p className="mt-1 text-sm text-[#991b1b]">
+                <p className="mt-1 text-sm text-danger">
                   {item.errorCode}
                   {item.errorDetail ? `: ${item.errorDetail}` : ""}
                 </p>

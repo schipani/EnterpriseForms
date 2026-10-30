@@ -23,7 +23,7 @@ export interface SideNavItem {
 export function SideNavTabs({ label, items, value, onValueChange, stickyTop = 16 }: { label: string; items: SideNavItem[]; value: string; onValueChange: (value: string) => void; stickyTop?: number }) {
   return (
     <RadixTabs.Root value={value} onValueChange={onValueChange} orientation="vertical" className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start">
-      <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-line bg-surface p-3 lg:sticky" style={{ top: stickyTop }}>
+      <div className="flex min-w-0 flex-col gap-3 rounded-panel border border-line bg-surface p-3 lg:sticky" style={{ top: stickyTop }}>
         <RadixTabs.List aria-label={label} aria-orientation="vertical" className="-mx-1 flex min-w-0 flex-row gap-1 overflow-x-auto px-1 pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
           {items.map((item) => (
             <RadixTabs.Trigger

@@ -15,7 +15,7 @@ import {
   type RuleCondition,
   type RuleField,
 } from "@enterpriseforms/form-renderer";
-import { Badge, Button, Checkbox, Select, StatusMessage, TextArea, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Checkbox, errorTextClass, legendClass, Select, StatusMessage, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useState } from "react";
 
 type Source = RuleField & { fieldDisplayName: string };
@@ -62,7 +62,7 @@ export function RulesTab({ layout, element, field, fields, canDesign, onElementC
           helpText="Presentation only. Turning it off removes the field from the data-entry form; it does not delete the value or change who may read it — access is decided by authorization."
           onCheckedChange={(checked) => (checked ? set({}, ["showInForm"]) : set({ showInForm: false }))}
         />
-        {element.showInForm === false && (required || element.requiredWhen) ? <p className="text-sm font-medium text-[#991b1b]">A field that is not shown cannot be required. Clear “Required” and any required-if rule before saving.</p> : null}
+        {element.showInForm === false && (required || element.requiredWhen) ? <p className={errorTextClass}>A field that is not shown cannot be required. Clear “Required” and any required-if rule before saving.</p> : null}
         <Checkbox
           label="Read-only"
           checked={element.readOnly === true}
@@ -177,8 +177,8 @@ export function DependentChoices({ layout, element, field, fields, canDesign, on
           {childOptions.map((option) => {
             const mapped = filter.parentOptionKeysByOption[option.optionKey] ?? [];
             return (
-              <fieldset key={option.optionKey} className="flex flex-col gap-1 rounded border border-line p-2" data-dependent-choice={option.optionKey}>
-                <legend className="px-1 text-sm font-medium">
+              <fieldset key={option.optionKey} className="flex flex-col gap-1 rounded-control border border-line p-2" data-dependent-choice={option.optionKey}>
+                <legend className={`px-1 ${legendClass}`}>
                   {option.optionDisplayText} — {mapped.length === 0 ? "always available" : `available when ${parent.fieldDisplayName} is ${mapped.map((key) => parent.options.find((candidate) => candidate.optionKey === key)?.optionDisplayText ?? key).join(" or ")}`}
                 </legend>
                 {parentOptions.map((parentOption) => (
@@ -218,7 +218,7 @@ function ConditionEditor({ label, root, candidates, fields, canDesign, onChange 
       const canAdd = canDesign && nodes < RULE_MAX_NODES && candidates.length > 0;
       const first = candidates[0];
       return (
-        <fieldset key={path.join(".")} className="flex flex-col gap-2 rounded border border-line bg-page p-2" aria-label={`${label} ${node.op === "not" ? "negated" : "condition"} group ${position}`}>
+        <fieldset key={path.join(".")} className="flex flex-col gap-2 rounded-control border border-line bg-page p-2" aria-label={`${label} ${node.op === "not" ? "negated" : "condition"} group ${position}`}>
           <div className="flex flex-wrap items-center gap-2">
             {node.op === "not" ? (
               <Badge tone="neutral">Not</Badge>
@@ -259,7 +259,7 @@ function ConditionEditor({ label, root, candidates, fields, canDesign, onChange 
     const operators = source ? allowedOperators(source) : [];
     const rowProblem = conditionProblem(node, fieldsById);
     return (
-      <div key={path.join(".")} className="flex flex-col gap-2 rounded border border-line bg-surface p-2" data-condition-row={position}>
+      <div key={path.join(".")} className="flex flex-col gap-2 rounded-control border border-line bg-surface p-2" data-condition-row={position}>
         <Select
           label={`${label} condition ${position} field`}
           value={node.fieldDefinitionId}
@@ -281,7 +281,7 @@ function ConditionEditor({ label, root, candidates, fields, canDesign, onChange 
         />
         {source ? <OperandEditor label={`${label} condition ${position}`} field={fields.find((candidate) => candidate.fieldDefinitionId === node.fieldDefinitionId)!} condition={node} disabled={!canDesign} onChange={(next) => commit(replaceNode(group, path, next))} /> : null}
         {rowProblem ? (
-          <p role="alert" className="text-sm font-medium text-[#991b1b]">
+          <p role="alert" className={errorTextClass}>
             {rowProblem}
           </p>
         ) : null}
@@ -330,7 +330,7 @@ function OperandEditor({ label, field, condition, disabled, onChange }: { label:
     if (isOption) {
       return (
         <fieldset className="flex flex-col gap-1 border-0 p-0">
-          <legend className="text-sm font-medium">{label} values</legend>
+          <legend className={legendClass}>{label} values</legend>
           {activeOptions.map((option) => (
             <Checkbox key={option.optionKey} label={option.optionDisplayText} checked={values.includes(option.optionKey)} disabled={disabled} onCheckedChange={(checked) => onChange({ ...condition, values: checked ? [...values, option.optionKey] : values.filter((value) => value !== option.optionKey) })} />
           ))}
@@ -346,7 +346,7 @@ function OperandEditor({ label, field, condition, disabled, onChange }: { label:
       const selected = splitSelection(value);
       return (
         <fieldset className="flex flex-col gap-1 border-0 p-0">
-          <legend className="text-sm font-medium">{label} selection</legend>
+          <legend className={legendClass}>{label} selection</legend>
           {activeOptions.map((option) => (
             <Checkbox key={option.optionKey} label={option.optionDisplayText} checked={selected.includes(option.optionKey)} disabled={disabled} onCheckedChange={(checked) => onChange({ ...condition, value: activeOptions.map((candidate) => candidate.optionKey).filter((key) => (key === option.optionKey ? checked : selected.includes(key))).join(",") })} />
           ))}
@@ -388,7 +388,7 @@ function TryIt({ layout, element, sources, fields }: { layout: FormLayout; eleme
   const states = evaluateRuleStates(elements, new Map(sources.map((source) => [source.fieldDefinitionId, source])), new Map(Object.entries(samples)));
   const state = states.get(element.fieldDefinitionId);
   return (
-    <section aria-label="Try the rules" className="flex flex-col gap-2 rounded border border-dashed border-input p-3">
+    <section aria-label="Try the rules" className="flex flex-col gap-2 rounded-control border border-dashed border-input p-3">
       <h3 className="text-sm font-semibold">Try it with sample values</h3>
       <p className="text-xs text-muted">Synthetic values only — nothing typed here is saved or sent.</p>
       {referenced.map((id) => {
@@ -403,7 +403,7 @@ function TryIt({ layout, element, sources, fields }: { layout: FormLayout; eleme
           const selected = splitSelection(value);
           return (
             <fieldset key={id} className="flex flex-col gap-1 border-0 p-0">
-              <legend className="text-sm font-medium">Sample {field.fieldDisplayName}</legend>
+              <legend className={legendClass}>Sample {field.fieldDisplayName}</legend>
               {options.map((option) => (
                 <Checkbox key={option.optionKey} label={option.optionDisplayText} checked={selected.includes(option.optionKey)} onCheckedChange={(checked) => set(options.map((candidate) => candidate.optionKey).filter((key) => (key === option.optionKey ? checked : selected.includes(key))).join(","))} />
               ))}

@@ -15,6 +15,20 @@
   --color-line: var(--ui-border);
   --color-input: var(--ui-input-border);
   --color-focus: var(--ui-focus);
+  --color-danger: var(--ui-danger-text);
+
+  /* UI consistency standard: shared control geometry and type scale (docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md §3). */
+  --font-sans: var(--ui-font-family);
+  --spacing-control: var(--ui-control-height);
+  --spacing-control-compact: var(--ui-control-height-compact);
+  --radius-control: var(--ui-control-radius);
+  --radius-panel: var(--ui-panel-radius);
+  --text-control: var(--ui-text-control);
+  --text-control--line-height: 1.25rem;
+  --text-label: var(--ui-text-label);
+  --text-label--line-height: 1.25rem;
+  --text-help: var(--ui-text-help);
+  --text-help--line-height: 1.125rem;
 }
 
 /* Packages ship no CSS of their own; their class names resolve through this single Tailwind source. */
@@ -30,7 +44,7 @@ body {
   margin: 0;
   background: var(--ui-page);
   color: var(--ui-body-text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--ui-font-family);
   overflow-x: hidden;
 }
 
@@ -53,16 +67,13 @@ body {
   }
 }
 
-/* ---- My Records search area (Phase C7 visual styling; owner reference) ------------------------------------------------
-   Scoped to .records-search / .records-results so no other screen changes. Colours come only from the approved theme
-   tokens (tenant themes still apply). The reference's lighter #D1D5DB input border is NOT used: it fails WCAG 1.4.11 (3:1),
-   so the validated --ui-input-border stays. The panels go side by side on the width of the area itself (container query),
-   not on the device width. */
+/* ---- My Records search area: page layout only ---------------------------------------------------------------------
+   The search and Advanced Search panels sit side by side on the width of the area itself (container query), not on the
+   device width. Their control, label, help-text and panel styling is the application-wide standard and comes from the
+   shared components and tokens (docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md §3), not from rules scoped here. */
 .records-search {
   container: records-search / inline-size;
   margin-bottom: 16px;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  line-height: 1.45;
 }
 .records-search__panels {
   display: grid;
@@ -74,44 +85,4 @@ body {
   .records-search__panels {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
-}
-.records-search__panel {
-  gap: 16px;
-  border-radius: 12px;
-  padding: 20px;
-}
-.records-search h2,
-.records-search h3 {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-.records-search label {
-  font-size: 13px;
-  font-weight: 500;
-}
-.records-search input,
-.records-search [role="combobox"] {
-  min-height: 40px;
-  padding-block: 0;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 400;
-}
-.records-search button:not([role]) {
-  min-height: 40px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-}
-.records-search p.text-sm {
-  font-size: 12px;
-}
-.records-results {
-  border-radius: 12px;
-  padding: 20px;
-}
-.records-results th {
-  font-size: 13px;
-  font-weight: 600;
 }

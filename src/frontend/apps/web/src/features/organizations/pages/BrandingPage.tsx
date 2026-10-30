@@ -97,10 +97,10 @@ export function BrandingPage() {
             <StatusMessage tone="success" title="Contrast floor met" />
           )}
           <div className="flex flex-wrap gap-2" aria-label="Preview">
-            <span className="inline-flex min-h-11 items-center rounded border px-4 font-medium" style={{ background: draft.primary, color: draft.primaryText, borderColor: draft.primary }}>
+            <span className="inline-flex min-h-control items-center rounded-control border px-4 text-control font-medium" style={{ background: draft.primary, color: draft.primaryText, borderColor: draft.primary }}>
               Primary preview
             </span>
-            <span className="inline-flex min-h-11 items-center rounded border px-4 font-medium" style={{ background: draft.secondary, color: draft.secondaryText, borderColor: draft.secondaryBorder }}>
+            <span className="inline-flex min-h-control items-center rounded-control border px-4 text-control font-medium" style={{ background: draft.secondary, color: draft.secondaryText, borderColor: draft.secondaryBorder }}>
               Secondary preview
             </span>
           </div>

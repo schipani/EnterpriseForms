@@ -120,7 +120,7 @@ function RestoreDialog({ formRecordId, revision, projection, onClose, onRestored
       {preview.isError ? <PreviewError error={preview.error} onRetry={() => void preview.refetch()} /> : null}
       {data ? (
         <div className="flex flex-col gap-4">
-          <section aria-labelledby="restore-version-heading" className="rounded border border-line bg-page px-4 py-3">
+          <section aria-labelledby="restore-version-heading" className="rounded-control border border-line bg-page px-4 py-3">
             <h3 id="restore-version-heading" className="font-semibold">
               Version {revision}
             </h3>
@@ -165,7 +165,7 @@ function RestoreDialog({ formRecordId, revision, projection, onClose, onRestored
             />
           ) : null}
 
-          <section aria-labelledby="restore-excluded-heading" className="rounded border border-line px-4 py-3">
+          <section aria-labelledby="restore-excluded-heading" className="rounded-control border border-line px-4 py-3">
             <h3 id="restore-excluded-heading" className="font-semibold">
               Not restored
             </h3>

@@ -118,7 +118,7 @@ export function OptionListsDialog({ open, onOpenChange, canDesign }: { open: boo
           </div>
 
           {creating ? (
-            <section aria-label="New option list" className="flex flex-col gap-2 rounded border border-line bg-page p-3">
+            <section aria-label="New option list" className="flex flex-col gap-2 rounded-control border border-line bg-page p-3">
               <TextInput label="List name" value={createName} required maxLength={200} onChange={(event) => setCreateName(event.target.value.replace(/[<>]/g, ""))} />
               <TextArea label="Options (one per line)" value={createItems} rows={5} helpText="Keys are derived from the labels and then never change." onChange={(event) => setCreateItems(event.target.value.replace(/[<>]/g, ""))} />
               <div className="flex gap-2">
@@ -134,7 +134,7 @@ export function OptionListsDialog({ open, onOpenChange, canDesign }: { open: boo
           ) : null}
 
           {selected ? (
-            <section aria-label={`Edit ${selected.optionListName}`} className="flex flex-col gap-3 rounded border border-line bg-page p-3">
+            <section aria-label={`Edit ${selected.optionListName}`} className="flex flex-col gap-3 rounded-control border border-line bg-page p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="neutral">Revision {String(selected.optionListRevision)}</Badge>
                 <span className="text-xs text-muted">Fields that were created from this list keep their own copy until you sync them.</span>
@@ -143,7 +143,7 @@ export function OptionListsDialog({ open, onOpenChange, canDesign }: { open: boo
               <TextArea label="Description" value={description} rows={2} maxLength={1000} disabled={!canDesign} onChange={(event) => setDescription(event.target.value.replace(/[<>]/g, ""))} />
               <ol className="flex flex-col gap-2" aria-label="List items">
                 {rows.map((row, index) => (
-                  <li key={row.optionKey} className="flex flex-col gap-1 rounded border border-line bg-surface p-2">
+                  <li key={row.optionKey} className="flex flex-col gap-1 rounded-control border border-line bg-surface p-2">
                     <TextInput label={`Label of item ${index + 1}`} value={row.label} maxLength={200} disabled={!canDesign} onChange={(event) => setRows((current) => current.map((candidate, at) => (at === index ? { ...candidate, label: event.target.value.replace(/[<>]/g, "") } : candidate)))} />
                     <p className="text-xs text-muted">
                       Key <code>{row.optionKey}</code>

@@ -137,14 +137,14 @@ export function RecordVersionPage() {
             readOnly
             applyRules={false}
             renderRelatedList={(element) => (
-              <p key={element.formRelationshipDefinitionId} className="rounded border border-line bg-page px-3 py-2 text-sm text-muted">
+              <p key={element.formRelationshipDefinitionId} className="rounded-control border border-line bg-page px-3 py-2 text-sm text-muted">
                 {element.label || "Related records"}: related records are not part of this version.
               </p>
             )}
             renderDocumentCollection={(element, field) => {
               const documents = documentsOf(element.fieldDefinitionId);
               return (
-                <div key={element.fieldDefinitionId} className="rounded border border-line bg-page px-3 py-2">
+                <div key={element.fieldDefinitionId} className="rounded-control border border-line bg-page px-3 py-2">
                   <p className="font-medium">{element.label || field?.fieldDisplayName || "Documents"}</p>
                   {documents.length === 0 ? (
                     <p className="text-sm text-muted">No documents in this version.</p>

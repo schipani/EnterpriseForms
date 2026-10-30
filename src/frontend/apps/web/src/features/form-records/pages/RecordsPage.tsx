@@ -1,6 +1,6 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import type { FieldSearchRequest, FieldSearchResponse, RecordListItemResponse, RecordListQuery, RecordListResponse } from "@enterpriseforms/api-client";
-import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage, TextInput, type DataTableColumn } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, helpTextClass, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage, TextInput, type DataTableColumn } from "@enterpriseforms/ui";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
@@ -213,7 +213,7 @@ export function RecordsPage() {
               </Button>
             ) : null}
           </div>
-          <p className="text-sm text-muted">Archived records are hidden unless you include them or choose the Archived status. An exact search also finds archived and related records; the Form and Status filters still narrow it.</p>
+          <p className={helpTextClass}>Archived records are hidden unless you include them or choose the Archived status. An exact search also finds archived and related records; the Form and Status filters still narrow it.</p>
         </div>
       </Card>
       <Card as="div" className="records-search__panel">

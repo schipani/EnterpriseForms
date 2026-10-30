@@ -50,13 +50,19 @@ const organizationTeamsRoute = createRoute({ getParentRoute: () => appRoute, pat
 const organizationTeamRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/teams/$teamId", component: lazyRouteComponent(() => import("../features/teams"), "TeamDetailPage") });
 const searchApprovalsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/search-approvals", component: lazyRouteComponent(() => import("../features/search"), "SearchApprovalsPage") });
 const preferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
-const galleryRoute = createRoute({ getParentRoute: () => appRoute, path: "/gallery", component: lazyRouteComponent(() => import("../features/support"), "GalleryPage") });
+/**
+ * PG-069 component gallery (ADR-PB-014: internal, never a production route). It exists only in development builds (the Vite
+ * dev server, which the Playwright suites use) or when a build sets VITE_ENABLE_COMPONENT_GALLERY=true; it is not in any
+ * navigation. Both conditions are replaced at build time, so a production bundle contains neither the route nor its chunk.
+ */
+const componentGalleryEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_COMPONENT_GALLERY === "true";
+const developmentRoutes = componentGalleryEnabled ? [createRoute({ getParentRoute: () => appRoute, path: "/gallery", component: lazyRouteComponent(() => import("../features/support/developmentGallery"), "GalleryPage") })] : [];
 const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/no-permission", component: lazyRouteComponent(() => import("../features/support"), "NoPermissionPage") });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, preferencesRoute, galleryRoute, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, preferencesRoute, ...developmentRoutes, noPermissionRoute]),
 ]);
 
 export function createAppRouter() {

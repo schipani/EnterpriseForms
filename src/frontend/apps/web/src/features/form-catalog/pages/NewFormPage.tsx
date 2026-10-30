@@ -1,5 +1,5 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Button, Card, Checkbox, LoadingBlock, PageHeader, TextArea, TextInput } from "@enterpriseforms/ui";
+import { Button, Card, Checkbox, helpTextClass, legendClass, LoadingBlock, PageHeader, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -24,8 +24,8 @@ export function NewFormPage() {
         <TextInput label="Form name" value={name} required maxLength={200} onChange={(event) => setName(event.target.value)} />
         <TextArea label="Description" value={description} maxLength={1000} onChange={(event) => setDescription(event.target.value)} />
         <fieldset className="flex flex-col gap-1">
-          <legend className="text-sm font-medium">Who may create records with this form</legend>
-          <p className="text-sm text-muted">Designing a form never grants access to its records; record access follows ownership and explicit shares.</p>
+          <legend className={legendClass}>Who may create records with this form</legend>
+          <p className={helpTextClass}>Designing a form never grants access to its records; record access follows ownership and explicit shares.</p>
           {directory.isPending ? <LoadingBlock label="Loading users" /> : null}
           {directory.isError ? <ErrorPanel error={directory.error} onRetry={() => void directory.refetch()} /> : null}
           {(directory.data ?? []).map((user) => (

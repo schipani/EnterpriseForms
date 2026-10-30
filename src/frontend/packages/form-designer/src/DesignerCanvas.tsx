@@ -1,5 +1,5 @@
 import { packElements, visibleColumns, type Breakpoint, type FormLayout, type LayoutElement, type LayoutSection, type RendererField } from "@enterpriseforms/form-renderer";
-import { OverflowMenu } from "@enterpriseforms/ui";
+import { IconButton as SharedIconButton, OverflowMenu } from "@enterpriseforms/ui";
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { duplicateSection, elementKey, findElement, moveElementTo, moveSection, newSectionKey, removeElement, sameScope, updateElement, updateSection } from "./layoutEdits";
 
@@ -202,21 +202,19 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
   return (
     <section
       aria-labelledby={headingId}
-      className={`min-w-0 rounded-lg border bg-surface ${selected ? "border-focus ring-2 ring-focus" : containsSelection ? "border-focus" : "border-line"} ${dropTarget === `section:${section.sectionKey}` ? "outline-2 outline-dashed outline-focus" : ""}`}
+      className={`min-w-0 rounded-panel border bg-surface ${selected ? "border-focus ring-2 ring-focus" : containsSelection ? "border-focus" : "border-line"} ${dropTarget === `section:${section.sectionKey}` ? "outline-2 outline-dashed outline-focus" : ""}`}
       onDragOver={readOnly ? undefined : drag.over(`section:${section.sectionKey}`)}
       onDrop={readOnly ? undefined : drag.drop(sectionIndex, section.elements.length)}
     >
       <div className="flex min-h-12 items-center gap-1 border-b border-line px-2 py-1">
-        <button
-          type="button"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-body hover:bg-page"
+        <SharedIconButton
+          label={`${collapsed ? "Expand" : "Collapse"} ${title}`}
           aria-expanded={!collapsed}
           aria-controls={bodyId}
-          aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`}
           onClick={() => props.onToggleCollapse(section.sectionKey)}
         >
           <Chevron open={!collapsed} />
-        </button>
+        </SharedIconButton>
         <h2 id={headingId} className="min-w-0 flex-1 text-lg font-semibold">
           {renaming ? (
             <InlineText
@@ -236,7 +234,7 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
           ) : (
             <button
               type="button"
-              className="max-w-full truncate rounded px-1 text-left hover:bg-page"
+              className="max-w-full truncate rounded-control px-1 text-left hover:bg-page"
               aria-pressed={selected}
               onClick={(event) => {
                 event.stopPropagation();
@@ -250,7 +248,7 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
           )}
         </h2>
         {section.repeat ? (
-          <span className="shrink-0 rounded border border-line px-1.5 py-0.5 text-xs" data-repeat-badge title="People can add several entries to this section; each entry has its own values.">
+          <span className="shrink-0 rounded-control border border-line px-1.5 py-0.5 text-xs" data-repeat-badge title="People can add several entries to this section; each entry has its own values.">
             Multiple entries · {section.repeat.minOccurrences}–{section.repeat.maxOccurrences}
           </span>
         ) : null}
@@ -291,7 +289,7 @@ function SectionCard({ section, sectionIndex, props, focusKey, fieldById, relati
                       event.stopPropagation();
                       props.onSelect({ kind: "slot", sectionKey: section.sectionKey, insertIndex: slot.insertIndex, slotId: slot.slotId, startOnNewRow: slot.startOnNewRow });
                     }}
-                    className={`flex h-full min-h-20 w-full flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-sm font-medium text-body hover:bg-page ${isSelected || dropTarget === target ? "border-focus bg-page" : "border-input"}`}
+                    className={`flex h-full min-h-20 w-full flex-col items-center justify-center gap-1 rounded-control border-2 border-dashed text-sm font-medium text-body hover:bg-page ${isSelected || dropTarget === target ? "border-focus bg-page" : "border-input"}`}
                   >
                     <span aria-hidden="true" className="text-xl leading-none">
                       +
@@ -414,7 +412,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
       onDrop={readOnly ? undefined : drag.drop(sectionIndex, index)}
     >
       <div
-        className={`relative flex h-full min-h-20 flex-col gap-2 rounded-md border bg-surface p-3 ${selected ? "border-focus ring-2 ring-focus" : "border-line hover:border-input"} ${dropActive ? "outline-2 outline-dashed outline-focus" : ""} ${readOnly ? "" : "cursor-grab"}`}
+        className={`relative flex h-full min-h-20 flex-col gap-2 rounded-control border bg-surface p-3 ${selected ? "border-focus ring-2 ring-focus" : "border-line hover:border-input"} ${dropActive ? "outline-2 outline-dashed outline-focus" : ""} ${readOnly ? "" : "cursor-grab"}`}
         onClick={(event) => {
           if (!(event.target as HTMLElement).closest("button,input,[role=menu]")) {
             select();
@@ -444,7 +442,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
               aria-pressed={selected}
               aria-describedby={`${key}-desc`}
               aria-keyshortcuts={readOnly ? undefined : "Alt+ArrowUp Alt+ArrowDown"}
-              className="min-w-0 flex-1 truncate rounded text-left text-sm font-semibold text-body"
+              className="min-w-0 flex-1 truncate rounded-control text-left text-sm font-semibold text-body"
               onClick={select}
               onDoubleClick={() => !readOnly && setRenaming(true)}
               onKeyDown={onKeyDown}
@@ -452,7 +450,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
             >
               {label}
               {element.kind !== "relatedFormList" && element.required ? (
-                <span aria-hidden="true" className="text-[#991b1b]">
+                <span aria-hidden="true" className="text-danger">
                   {" "}
                   *
                 </span>
@@ -460,7 +458,7 @@ function FieldTile({ style, element, index, section, sectionIndex, field, relati
             </button>
           )}
           {selected && !readOnly && !renaming ? (
-            <div role="group" aria-label={`Actions for ${label}`} className="absolute -top-4 right-2 z-10 flex items-center gap-0.5 rounded-md border border-line bg-surface px-0.5 shadow-sm">
+            <div role="group" aria-label={`Actions for ${label}`} className="absolute -top-4 right-2 z-10 flex items-center gap-0.5 rounded-control border border-line bg-surface px-0.5 shadow-sm">
               {props.onOpenConfig ? (
                 <IconButton label={`Configure ${label}`} onClick={() => props.onOpenConfig!(key)}>
                   <GearIcon />
@@ -540,7 +538,7 @@ function TileBadges({ element, field }: { element: LayoutElement; field: Rendere
           key={flag.key}
           data-flag={flag.key}
           title={flag.description}
-          className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs ${flag.tone === "success" ? "border-[#166534] bg-[#f0fdf4] text-[#14532d] font-medium" : "border-line bg-page text-body"}`}
+          className={`flex items-center gap-1 rounded-control border px-1.5 py-0.5 text-xs ${flag.tone === "success" ? "border-[#166534] bg-[#f0fdf4] text-[#14532d] font-medium" : "border-line bg-page text-body"}`}
         >
           {flag.key === "encrypted" ? <LockIcon /> : null}
           {flag.label}
@@ -557,19 +555,19 @@ function displayLabel(element: LayoutElement, field: RendererField | undefined, 
 
 /** Inert, decorative picture of the control (aria-hidden): never a real input, so Design mode cannot capture record data. */
 function TilePreview({ element, field, relationship }: { element: LayoutElement; field: RendererField | undefined; relationship: DesignerRelationship | undefined }) {
-  const box = "flex min-h-9 w-full items-center justify-between gap-2 rounded border border-input bg-surface px-2.5 text-sm text-muted";
+  const box = "flex min-h-9 w-full items-center justify-between gap-2 rounded-control border border-input bg-surface px-2.5 text-sm text-muted";
   let body: ReactNode;
   if (element.kind === "relatedFormList") {
     body = (
-      <div className="flex flex-col gap-1 rounded border border-dashed border-input p-2 text-xs text-muted">
+      <div className="flex flex-col gap-1 rounded-control border border-dashed border-input p-2 text-xs text-muted">
         <span>Child records: {relationship?.childFormDefinitionName ?? "child form"}</span>
-        <span className="h-1.5 w-3/4 rounded bg-page" />
-        <span className="h-1.5 w-1/2 rounded bg-page" />
+        <span className="h-1.5 w-3/4 rounded-control bg-page" />
+        <span className="h-1.5 w-1/2 rounded-control bg-page" />
       </div>
     );
   } else if (element.kind === "documentCollection") {
     body = (
-      <div className="flex min-h-9 items-center gap-2 rounded border border-dashed border-input px-2.5 text-sm text-muted">
+      <div className="flex min-h-9 items-center gap-2 rounded-control border border-dashed border-input px-2.5 text-sm text-muted">
         <UploadIcon />
         <span className="truncate">Up to {element.upload?.maxFiles ?? 20} documents</span>
       </div>
@@ -634,7 +632,7 @@ function InlineText({ label, initial, maxLength, selectAll, onCommit, onCancel }
       aria-label={label}
       value={value}
       maxLength={maxLength}
-      className="min-h-9 w-full min-w-0 rounded border border-input bg-surface px-2 text-base font-semibold text-body"
+      className="min-h-control-compact w-full min-w-0 rounded-control border border-input bg-surface px-2 text-base font-semibold text-body"
       onChange={(event) => setValue(event.target.value.replace(/[<>]/g, ""))}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
@@ -669,11 +667,12 @@ function MenuButton({ label, items, compact = false }: { label: string; items: A
   );
 }
 
+/** The shared compact icon button (packages/ui); kept as a local adapter for the tile toolbar's call sites. */
 function IconButton({ label, onClick, children, danger = false }: { label: string; onClick: () => void; children: ReactNode; danger?: boolean }) {
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className={`flex h-8 w-8 items-center justify-center rounded hover:bg-page ${danger ? "text-[#991b1b]" : "text-body"}`}>
+    <SharedIconButton label={label} size="sm" tone={danger ? "danger" : "default"} onClick={onClick}>
       {children}
-    </button>
+    </SharedIconButton>
   );
 }
 

@@ -1,6 +1,6 @@
 import type { RecordProjectionResponse, RecordShareSummaryResponse } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, Checkbox, DataTable, DescriptionList, Dialog, LoadingBlock, Select, StatusMessage } from "@enterpriseforms/ui";
+import { Badge, Button, Card, Checkbox, DataTable, DescriptionList, Dialog, legendClass, LoadingBlock, Select, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ActivityTimeline } from "../../audit";
@@ -219,8 +219,8 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
         {users.isError ? <ErrorPanel error={users.error} onRetry={() => void users.refetch()} /> : null}
         {users.data ? <Select label="Person" required value={recipientUserId} placeholder="Choose a person" options={users.data.map((user) => ({ value: user.userId, label: user.displayName }))} onValueChange={setRecipientUserId} /> : null}
         <Select label="Role" required value={role} options={rolesFor(contributorWritesEnabled)} onValueChange={setRole} />
-        <fieldset className="flex flex-col gap-2 rounded border border-line p-3">
-          <legend className="px-1 text-sm font-medium">Fields to share</legend>
+        <fieldset className="flex flex-col gap-2 rounded-control border border-line p-3">
+          <legend className={`px-1 ${legendClass}`}>Fields to share</legend>
           <div className="flex gap-2">
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set(shareable))}>
               Select all current fields

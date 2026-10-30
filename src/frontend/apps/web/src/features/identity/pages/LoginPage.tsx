@@ -39,7 +39,7 @@ export function LoginPage() {
           {error ? <ErrorPanel error={error} /> : null}
           <ul className="flex flex-col gap-2">
             {(personas.data ?? []).map((persona) => (
-              <li key={persona.personaKey} className="flex flex-wrap items-center justify-between gap-2 rounded border border-line p-3">
+              <li key={persona.personaKey} className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line p-3">
                 <div>
                   <p className="font-medium">{persona.displayName}</p>
                   <p className="text-sm text-muted">

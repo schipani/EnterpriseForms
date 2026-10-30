@@ -1,12 +1,13 @@
-export { Button, type ButtonProps, type ButtonVariant } from "./Button";
+export { Button, IconButton, buttonClass, type ButtonProps, type ButtonSize, type ButtonVariant, type IconButtonProps } from "./Button";
 export { ActionIcons, type ActionIconComponent } from "./actionIcons";
-export { FieldLayoutProvider, FieldShell, TextArea, TextInput, inputClass, type TextAreaProps, type TextInputProps } from "./Field";
+export { FieldLayoutProvider, FieldShell, RequiredMarker, TextArea, TextInput, errorTextClass, fieldLabelClass, helpTextClass, inputClass, legendClass, type TextAreaProps, type TextInputProps } from "./Field";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
+export { RadioGroup, type RadioGroupOption, type RadioGroupProps } from "./RadioGroup";
 export { Select, type SelectOption, type SelectProps } from "./Select";
 export { Dialog, type DialogProps } from "./Dialog";
 export { Tabs, type TabItem } from "./Tabs";
 export { SideNavTabs, type SideNavItem } from "./SideNavTabs";
 export { Badge, Card, DescriptionList, EmptyState, LoadingBlock, PageHeader, ProgressBar, StatusMessage, type StatusTone } from "./Surfaces";
 export { DataTable, type DataTableColumn } from "./DataTable";
-export { OverflowMenu, RowActions, type OverflowMenuItem } from "./Menu";
+export { OverflowMenu, RowActions, menuContentClass, menuItemClass, type OverflowMenuItem } from "./Menu";
 export { VisuallyHidden } from "@radix-ui/react-visually-hidden";
