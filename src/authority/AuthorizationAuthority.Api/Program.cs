@@ -61,6 +61,8 @@ public sealed class Program
             builder.Environment.IsEnvironment("Testing")));
         AuthorizationAuthority.Api.Features.Health.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
         builder.Services.AddInternalAuthentication(builder.Configuration);
+        // Phase C8 AC-9: read-only outcome lookup for the business reconciler (own credential, rate limit; bad limits fail at startup).
+        builder.Services.AddReconcilerLookup(builder.Configuration);
         // Phase C7 M2 (OD-7): AC-6 approvals are unavailable unless the development-only synthetic step-up path is configured;
         // Create refuses that path outside Development/Testing or without the synthetic TestIdentityProvider (startup failure).
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.SecurityCommands.FieldSearchApprovalGate.Create(
@@ -84,10 +86,12 @@ public sealed class Program
 
         var app = builder.Build();
 
+        app.UseMiddleware<ReconcilerLookupRefusalMiddleware>(); // outermost: observes the final status of AC-9 refusals
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseRateLimiter();
 
         if (app.Environment.IsDevelopment())
         {
@@ -103,6 +107,7 @@ public sealed class Program
         app.MapAuthorizationEndpoints();
         app.MapFormAccessEndpoints();
         app.MapSecurityCommandEndpoints();
+        app.MapSecurityCommandOutcomeEndpoints();
         app.MapContentEndpoints();
         app.MapCatalogueEndpoints();
         app.MapOperatorEndpoints();

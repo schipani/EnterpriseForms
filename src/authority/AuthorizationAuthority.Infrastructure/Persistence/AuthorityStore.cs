@@ -22,6 +22,14 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         return new AuthorityScope(context, transaction);
     }
 
+    public async Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken cancellationToken)
+    {
+        var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken).ConfigureAwait(false);
+        await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", cancellationToken).ConfigureAwait(false);
+        return new AuthorityScope(context, transaction);
+    }
+
     public async Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -74,6 +82,16 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             context.RelationshipEdges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId == null).ToListAsync(cancellationToken);
 
         public void AddEdge(AuthorityRelationshipEdge edge) => context.RelationshipEdges.Add(edge);
+
+        public Task<List<AuthorityRelationshipEdge>> GetRelationshipEdgeHistoryAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, string relationshipName, string subjectTypeName, Guid subjectEntityId, CancellationToken cancellationToken) =>
+            context.RelationshipEdges.AsNoTracking()
+                .Where(e => e.OrganizationId == organizationId && e.ResourceTypeName == resourceTypeName && e.ResourceEntityId == resourceEntityId && e.RelationshipName == relationshipName && e.SubjectTypeName == subjectTypeName && e.SubjectEntityId == subjectEntityId)
+                .ToListAsync(cancellationToken);
+
+        public async Task<Dictionary<Guid, long?>> GetCommittedRevisionsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken) =>
+            await context.SecurityCommands.AsNoTracking()
+                .Where(c => c.OrganizationId == organizationId && securityCommandIds.Contains(c.SecurityCommandId))
+                .ToDictionaryAsync(c => c.SecurityCommandId, c => c.CommittedAuthorizationRevision, cancellationToken).ConfigureAwait(false);
 
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) =>
             context.SecurityCommands.FirstOrDefaultAsync(c => c.OrganizationId == organizationId && c.CommandIdempotencyKey == idempotencyKey, cancellationToken);

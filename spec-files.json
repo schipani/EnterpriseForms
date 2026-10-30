@@ -158,6 +158,11 @@
       "bytes": 76194
     },
     {
+      "path": "docs/architecture/PHASE_C8_AC9_IMPLEMENTATION_PLAN.md",
+      "sha256": "e6b22c14960cac113f9adb5a0f19ad82d04d9df9f9ffcfe156e3a4b02a39cd15",
+      "bytes": 9396
+    },
+    {
       "path": "docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md",
       "sha256": "a99ccf3a0028f99868846814b85c2a22493e70a66abb77874e02e055a2207cfb",
       "bytes": 52031

@@ -16,6 +16,9 @@ public static class BusinessRuntimeGrants
         "form_record_revisions", "field_string_values", "field_integer_values", "field_decimal_values", "field_date_values", "field_date_time_values", "field_guid_values", "field_boolean_values", "field_option_values", "field_encrypted_values",
         "form_versions", "field_definitions", "audit_events", "file_attachment_versions", "group_definitions", "form_record_group_revisions",
         "form_record_creation_attempts",
+        // Phase C8 (C8-M1-01/02): durable team-membership operations and the per-pair roster watermark. Insert plus the
+        // column-level UPDATE below only: identity columns are never updatable by the runtime role, and nothing is deletable.
+        "authority_command_operations", "team_membership_projection_states",
     ];
 
     private static readonly string[] ProjectionTables =
@@ -34,6 +37,18 @@ public static class BusinessRuntimeGrants
     /// </summary>
     private static readonly Dictionary<string, string[]> ColumnUpdateGrants = new(StringComparer.Ordinal)
     {
+        // Phase C8: mutable state of an operation; schema-owned triggers additionally freeze completion fields once terminal and
+        // allow authority_command_id / committed_authorization_revision to change only from NULL to a value.
+        ["authority_command_operations"] =
+        [
+            "authority_command_id", "committed_authorization_revision", "operation_state_name", "operation_outcome_code", "rejection_reason_code",
+            "evaluated_projection_revision", "projected_membership_revision", "projected_membership_present", "superseded_by_later_revision",
+            "next_attempt_on", "attempt_count", "consecutive_error_count", "lease_owner_name", "lease_expires_on", "first_not_found_on",
+            "needs_attention_flagged_on", "last_reconciliation_error_code", "late_commit_sweep_until", "late_commit_detected_on",
+            "operation_reviewed_on", "operation_reviewed_by_user_id", "operation_completed_on", "operation_modified_on",
+        ],
+        // Phase C8 (R-2): the three state columns and the modification time; a schema-owned trigger refuses lowering the revision (I-3).
+        ["team_membership_projection_states"] = ["projected_membership_present", "projected_membership_revision", "last_authority_command_operation_id", "projection_state_modified_on"],
         ["field_definitions"] = ["field_display_name", "field_description", "field_definition_revision", "modified_on", "modified_by_user_id", "field_classification", "field_protection_mode", "protection_policy_revision", "protection_changed_on", "protection_changed_by_user_id", "protection_authority_command_id"],
     };
 

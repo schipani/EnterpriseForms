@@ -539,6 +539,52 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             return reconciliation;
         }
 
+        public void AddAuthorityCommandOperation(AuthorityCommandOperation operation) => context.AuthorityCommandOperations.Add(operation);
+
+        public Task<AuthorityCommandOperation?> FindAuthorityCommandOperationByKeyAsync(Guid tenantId, string authorityIdempotencyKey, CancellationToken cancellationToken) =>
+            context.AuthorityCommandOperations.FirstOrDefaultAsync(o => o.TenantId == tenantId && o.AuthorityIdempotencyKey == authorityIdempotencyKey, cancellationToken);
+
+        public Task<AuthorityCommandOperation?> FindAuthorityCommandOperationAsync(Guid authorityCommandOperationId, bool lockForUpdate, CancellationToken cancellationToken) =>
+            lockForUpdate
+                ? context.AuthorityCommandOperations.FromSqlInterpolated($"SELECT * FROM authority_command_operations WHERE authority_command_operation_id = {authorityCommandOperationId} FOR UPDATE").AsTracking().FirstOrDefaultAsync(cancellationToken)
+                : context.AuthorityCommandOperations.FirstOrDefaultAsync(o => o.AuthorityCommandOperationId == authorityCommandOperationId, cancellationToken);
+
+        public async Task<AuthorityCommandOperation?> LeaseNextAuthorityCommandOperationAsync(string leaseOwner, TimeSpan leaseDuration, CancellationToken cancellationToken)
+        {
+            var now = clock.GetUtcNow();
+            var operation = await context.AuthorityCommandOperations
+                .FromSqlInterpolated($"SELECT * FROM authority_command_operations WHERE ((operation_state_name IN ('AwaitingCommit','AwaitingEffective','AwaitingQuarantineClearance')) OR (operation_state_name = 'NotCommitted' AND late_commit_detected_on IS NULL AND late_commit_sweep_until > {now})) AND next_attempt_on <= {now} AND (lease_expires_on IS NULL OR lease_expires_on < {now}) ORDER BY next_attempt_on LIMIT 1 FOR UPDATE SKIP LOCKED")
+                .AsTracking().FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            if (operation is null)
+            {
+                return null;
+            }
+
+            operation.LeaseOwnerName = leaseOwner;
+            operation.LeaseExpiresOn = now.Add(leaseDuration);
+            operation.OperationModifiedOn = now;
+            return operation;
+        }
+
+        public Task<List<AuthorityCommandOperation>> GetOpenAuthorityCommandOperationsAsync(Guid tenantId, Guid teamId, CancellationToken cancellationToken) =>
+            context.AuthorityCommandOperations.AsNoTracking()
+                .Where(o => o.TenantId == tenantId && o.TeamId == teamId
+                            && (o.OperationStateName == AuthorityCommandOperationStates.AwaitingCommit || o.OperationStateName == AuthorityCommandOperationStates.AwaitingEffective
+                                || o.OperationStateName == AuthorityCommandOperationStates.AwaitingQuarantineClearance || o.OperationStateName == AuthorityCommandOperationStates.ReconciliationError
+                                || ((o.OperationStateName == AuthorityCommandOperationStates.AuthorityFailed || o.OperationStateName == AuthorityCommandOperationStates.NotCommitted) && o.OperationReviewedOn == null)))
+                .OrderBy(o => o.OperationCreatedOn).Take(100).ToListAsync(cancellationToken);
+
+        public async Task<TeamMembershipProjectionState> LockTeamMembershipProjectionStateAsync(Guid tenantId, Guid teamId, Guid memberUserId, CancellationToken cancellationToken)
+        {
+            var now = clock.GetUtcNow();
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO team_membership_projection_states (team_membership_projection_state_id, tenant_id, team_id, member_user_id, projected_membership_present, projected_membership_revision, projection_state_modified_on) VALUES ({Guid.CreateVersion7()}, {tenantId}, {teamId}, {memberUserId}, false, 0, {now}) ON CONFLICT (tenant_id, team_id, member_user_id) DO NOTHING",
+                cancellationToken).ConfigureAwait(false);
+            return await context.TeamMembershipProjectionStates
+                .FromSqlInterpolated($"SELECT * FROM team_membership_projection_states WHERE tenant_id = {tenantId} AND team_id = {teamId} AND member_user_id = {memberUserId} FOR UPDATE")
+                .AsTracking().FirstAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         public Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken) =>
             context.UserUiPreferences.FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
 
