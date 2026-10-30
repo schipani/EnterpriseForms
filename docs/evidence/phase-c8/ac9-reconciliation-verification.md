@@ -60,10 +60,26 @@
 
 Run history: run 1 stopped after V-1 was diagnosed; run 2 24/31 (all 7 failures test-side, V-2); run 3 31/31.
 
+## 2a. Hosted results (GitHub Actions, PR #32)
+
+Read from the public Actions API. Job logs need authentication, so exact test counts were not readable. Counts below come from the job outcome and the script's gates.
+
+| Commit | Workflow (run id) | Result | What it shows |
+|---|---|---|---|
+| `354ac79` | `ci` (41077269628, pull_request) | success | |
+| `354ac79` | `security-gate-a` (41077898194, dispatch) | success | |
+| `354ac79` | `stage-b-integration` (41077795582, dispatch) | **failure** | 226/227; only RC-19 failed (`dotnet-ef` not restored on the runner) |
+| `354ac79` | `level3-script` (41077860311, dispatch) | **failure** | Same RC-19 cause |
+| `79978a3` | `ci` (41093559259, pull_request) | **success** | |
+| `79978a3` | `security-gate-a` (41094107514, dispatch) | **success** | SEC-P01…SEC-P12 on a clean runner |
+| `79978a3` | `level3-script` (41093996351, dispatch) | **success** | Runs the same Stage B command (`--minimum-expected-tests 10`) and stops on any failure, after SEC-P01…P12 and before all Playwright projects. The full Stage B suite therefore passed on a hosted runner. The exact count is only in the `level3-script-evidence` artifact (needs a signed-in download) |
+| `79978a3` | `stage-b-integration` (41093944068, dispatch) | **cancelled — NOT passed** | The integration job hit its `timeout-minutes: 60` ("The job has exceeded the maximum execution time of 1h0m0s"). Its tests ran 16:56:41–17:54:21 UTC with no failure reported before the cut. The browser job passed (11 min). The aggregate status check therefore failed |
+
+**Cause of the cancellation:** the job's time budget, not a concurrency cancellation (manual dispatches are never cancelled by this workflow's concurrency rule) and not a manual cancel. At `354ac79` the job already took 59 m 56 s; RC-19 now runs its migration scripts instead of failing at once, which pushed it past 60 minutes. The integration job's budget is raised to 90 minutes. No test, filter or assertion changed. `stage-b-integration` must still pass on the final commit; the `level3-script` pass does not replace it (that workflow's own header says so).
+
 ## 3. Not run / not proven
 
-- **The rest of the Stage B suite** (document, encryption, search, lifecycle and other classes not touching team membership) — not re-run in this session; the full suite takes over an hour on this workstation. Required with the hosted run (D8-19).
-- **Hosted CI** (`ci`, `stage-b-integration`, `security-gate-a`, `level3-script`) — not run: no `gh` credential here and no PR for this branch. Required by D8-19 before closure.
+- **`stage-b-integration` on the final commit**: not yet passed (see §2a). Required by D8-19 before closure.
 - **Playwright** `organization-administration.spec.ts` (UI Pending → Effective) — not run in this session (browser runs need the isolated web origin; the owner's dev Vite and dev stack were left untouched). The component logic is covered by Vitest; the spec's assertions still match the new page (Pending text, session key, Effective notice).
 - **Manual NVDA/VoiceOver** of the changed team page — not performed.
 - **Transport and identity** (mTLS, managed identities, Managed HSM, Azure) — not provable on this stack (package §10); C-1 only makes them a start condition.
