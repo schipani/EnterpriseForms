@@ -104,10 +104,16 @@ public sealed class BrandingHandlers(IBusinessStore store, IAuthorizationAuthori
             scope.AddBranding(branding);
         }
 
+        var replaced = branding.OrganizationLogoPng is not null;
         branding.OrganizationLogoPng = png;
         branding.BrandingRevision++;
         branding.BrandingModifiedOn = clock.GetUtcNow();
         branding.BrandingModifiedByUserId = context.LocalUserId;
+        // F-C7-03 (Phase C8 M1): the upload is audited in the same transaction as the projection write. The digest is of
+        // the public logo bytes (not a secret) so a later replacement can be told apart from a re-upload of the same file.
+        Audit.AuditRecorder.Record(scope, context, clock, Audit.AuditCategories.Security, replaced ? Domain.Features.Audit.AuditActions.OrganizationLogoReplaced : Domain.Features.Audit.AuditActions.OrganizationLogoUploaded,
+            replaced ? "organization logo replaced" : "organization logo uploaded", targetEntityType: "organization_branding", targetEntityId: branding.OrganizationBrandingId,
+            metadata: new { revision = branding.BrandingRevision, logoSizeBytes = png.Length, logoSha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(png)) });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToResponse(branding);
     }

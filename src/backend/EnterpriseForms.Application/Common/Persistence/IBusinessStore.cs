@@ -215,6 +215,9 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task<TeamMembership?> FindActiveTeamMembershipProjectionAsync(Guid tenantId, Guid teamId, Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>Phase C8 M1: active membership projection rows of the organization (all teams, or one when <paramref name="teamId"/> is given). Labels only; confers nothing.</summary>
+    Task<List<TeamMembership>> GetActiveTeamMembershipsAsync(Guid tenantId, Guid? teamId, CancellationToken cancellationToken);
+
     // Audit projection
     void AddAuditEvent(AuditEvent auditEvent);
 

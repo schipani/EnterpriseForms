@@ -53,6 +53,11 @@ public static class AuditActions
     public const string FieldSearchersChanged = "FIELD_SEARCHERS_CHANGED";
     public const string FormVersionAuthorityRegistered = "FORM_VERSION_AUTHORITY_REGISTERED";
     public const string FormVersionAuthorityRegistrationFailed = "FORM_VERSION_AUTHORITY_REGISTRATION_FAILED";
+
+    // Phase C8 M1 (F-C7-03 and D8-8): organization logo and display-only team rename.
+    public const string OrganizationLogoUploaded = "ORGANIZATION_LOGO_UPLOADED";
+    public const string OrganizationLogoReplaced = "ORGANIZATION_LOGO_REPLACED";
+    public const string TeamRenamed = "TEAM_RENAMED";
 }
 
 /// <summary>

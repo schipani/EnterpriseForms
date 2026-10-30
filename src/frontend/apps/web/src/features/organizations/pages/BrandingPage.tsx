@@ -1,11 +1,10 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
 import { validateThemePairs, defaultTheme, type OpaqueHex } from "@enterpriseforms/design-tokens";
-import { Button, Card, LoadingBlock, PageHeader, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Button, Card, LoadingBlock, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { ErrorPanel } from "../../support";
-import { SecurityAdministratorsCard } from "../components/SecurityAdministratorsCard";
-import { SecurityPolicyCard } from "../components/SecurityPolicyCard";
+import { OrganizationLayout } from "../components/OrganizationLayout";
 
 type Draft = { organizationDisplayName: string; logoAlternativeText: string; primary: string; primaryText: string; secondary: string; secondaryText: string; secondaryBorder: string; textScale: string; colorMode: string };
 
@@ -41,28 +40,27 @@ export function BrandingPage() {
   });
 
   if (!session.hasCapability("organization.manage")) {
-    // A Security Administrator who is not an owner sees only the Security Administrators section of Organization settings.
-    return session.hasCapability("security.administer") ? (
-      <>
-        <PageHeader title="Organization settings" lead="Security administration for this organization." />
-        <SecurityAdministratorsCard />
-      </>
-    ) : (
-      <StatusMessage tone="danger" title="No permission">Only an organization owner can change branding.</StatusMessage>
+    // Phase C8 M1: a Security Administrator who is not an owner has the overview, people, teams, data protection and
+    // Security Administrators pages; branding itself is owner-only.
+    return (
+      <OrganizationLayout title="Organization branding">
+        <StatusMessage tone="info" title="Organization owners only">
+          Only an organization owner can change branding.
+        </StatusMessage>
+      </OrganizationLayout>
     );
   }
   const current = branding.data;
   if (!current || !draft) {
-    return branding.isError ? <ErrorPanel error={branding.error} onRetry={() => void branding.refetch()} /> : <LoadingBlock label="Loading branding" />;
+    return <OrganizationLayout title="Organization branding">{branding.isError ? <ErrorPanel error={branding.error} onRetry={() => void branding.refetch()} /> : <LoadingBlock label="Loading branding" />}</OrganizationLayout>;
   }
   const hex = (value: string): OpaqueHex => (/^#[0-9a-fA-F]{6}$/.test(value) ? (value.toLowerCase() as OpaqueHex) : "#000000");
   const failures = validateThemePairs({ ...defaultTheme, primaryBackground: hex(draft.primary), primaryForeground: hex(draft.primaryText), secondaryBackground: hex(draft.secondary), secondaryForeground: hex(draft.secondaryText), secondaryBorder: hex(draft.secondaryBorder) });
   const colorField = (label: string, key: keyof Draft) => <TextInput label={label} value={draft[key]} pattern="#[0-9a-fA-F]{6}" helpText="Opaque #RRGGBB" onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />;
 
   return (
-    <>
-      <PageHeader title="Organization branding" lead="Branding can only override validated colour pairs; anything below the accessibility floor is refused by the server and never applied." />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <OrganizationLayout title="Organization branding" lead="Branding can only override validated colour pairs; anything below the accessibility floor is refused by the server and never applied.">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card title="Identity">
           <TextInput label="Organization display name" value={draft.organizationDisplayName} maxLength={200} onChange={(event) => setDraft({ ...draft, organizationDisplayName: event.target.value })} />
           <TextInput label="Logo alternative text" value={draft.logoAlternativeText} maxLength={200} onChange={(event) => setDraft({ ...draft, logoAlternativeText: event.target.value })} />
@@ -108,12 +106,6 @@ export function BrandingPage() {
           </div>
         </Card>
       </div>
-      <div className="mt-6">
-        <SecurityPolicyCard />
-      </div>
-      <div className="mt-6">
-        <SecurityAdministratorsCard />
-      </div>
       {save.isError ? <div className="mt-4"><ErrorPanel error={save.error} /></div> : null}
       {save.isSuccess ? <div className="mt-4"><StatusMessage tone="success" title="Branding saved" /></div> : null}
       <div className="mt-4 flex flex-wrap gap-2">
@@ -124,6 +116,6 @@ export function BrandingPage() {
           Discard changes
         </Button>
       </div>
-    </>
+    </OrganizationLayout>
   );
 }

@@ -332,6 +332,9 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public Task<TeamMembership?> FindActiveTeamMembershipProjectionAsync(Guid tenantId, Guid teamId, Guid userId, CancellationToken cancellationToken) =>
             context.TeamMemberships.FirstOrDefaultAsync(m => m.TenantId == tenantId && m.TeamId == teamId && m.UserId == userId && m.RemovedOn == null, cancellationToken);
 
+        public Task<List<TeamMembership>> GetActiveTeamMembershipsAsync(Guid tenantId, Guid? teamId, CancellationToken cancellationToken) =>
+            context.TeamMemberships.AsNoTracking().Where(m => m.TenantId == tenantId && m.RemovedOn == null && (teamId == null || m.TeamId == teamId)).OrderBy(m => m.CreatedOn).ToListAsync(cancellationToken);
+
         public void AddAuditEvent(AuditEvent auditEvent) => context.AuditEvents.Add(auditEvent);
 
         public Task<List<AuditEvent>> GetRecordAuditEventsAsync(Guid tenantId, Guid formRecordId, int limit, CancellationToken cancellationToken) =>

@@ -84,6 +84,9 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<ChangeTeamMembershipHandler>();
         services.AddSingleton<GetRecordActivityHandler>();
         services.AddSingleton<BrandingHandlers>();
+        services.AddSingleton<OrganizationOverviewHandler>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Identity.MemberDirectory.GetMemberDirectoryHandler>();
+        services.AddSingleton<TeamDirectoryHandlers>();
         services.AddSingleton<DashboardHandler>();
         services.AddSingleton<UploadSessionHandlers>();
         services.AddSingleton<DocumentHandlers>();
