@@ -428,6 +428,25 @@ Each approval will be recorded as a decision-log entry (C-78 onward) before work
 - **C8-M1-02 (proposed):** at `160efdb`, an Effective add observed *after* a later remove re-inserts the removed member into the display roster. This is reachable through a duplicated tab or a direct same-key retry. It is display-only and confers nothing. It is fixed by the revision guard in both designs.
 - **RO-2 (proposed):** 11 other handlers project only in the request that observes Effective. They are out of this proposal's scope.
 
+**C-85 (2026-10-30): owner answers to Q-O1…Q-O4, and the final independent-review submission.**
+
+| ID | Owner decision (C-85) |
+|---|---|
+| D8-20 | Q-O1: only a validated AC-9 response from the current reconciliation attempt qualifies as Effective evidence |
+| D8-21 | Q-O2: Authority pair-state projection, `team_membership_projection_states` and a single logical Worker writer approved; the roster projection and the high-water mark are updated atomically |
+| D8-22 | Q-O3: RC-01…RC-19 and RC-21…RC-28 are the D8-19 closure set; RC-20 retired with justification |
+| D8-23 | Q-O4: RO-2 corrected to 12 affected handlers |
+
+The package (`docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md`) now adds:
+- the self-found correction R-6 (a stale answer behind the watermark is re-looked-up, not alerted);
+- contract guards C-1…C-3 (HTTPS and client-certificate start condition outside Development/Testing; distinct reconciler key and issuer; key never logged);
+- new findings F-9 (the Worker already holds the business-API and verifier credentials), F-10 (API and Worker share one BusinessDb role, so single-writer is not database-enforced), F-11 (R-6) and F-12 (security-test stack exposure);
+- reviewer questions Q-10 and Q-11;
+- per-environment security guarantees (§10);
+- independence requirements (§11).
+
+It was written by the implementation agent and is **not** an independent review. Nothing is implemented; C8-M1-01 stays open.
+
 **C-84 (2026-10-30): the owner approved Design R subject to independent security review of AC-9 and recorded D8-11…D8-19 as below.** The review package is `docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md`. It contains:
 - the exact AC-9 contract;
 - the authentication model and threats;

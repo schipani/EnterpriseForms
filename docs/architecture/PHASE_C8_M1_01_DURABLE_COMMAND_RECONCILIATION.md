@@ -1,5 +1,6 @@
 # Phase C8 — C8-M1-01 durable Authority command reconciliation: architecture proposal
 
+- **Status update (C-85, 2026-10-30):** the owner answered Q-O1…Q-O4 (D8-20…D8-23). The package is now the final independent-review submission. It adds correction **R-6** (a stale answer behind the watermark is retried once, not alerted). **Not reviewed; not implemented;** C8-M1-01 stays open.
 - **Status update (C-84, 2026-10-30):** the owner approved **Design R** as the direction, **subject to independent security review of AC-9**, and recorded D8-11…D8-19. The review package is `docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md`. Its refinements **R-1…R-5 supersede this document where they differ**:
   * R-1: the projected value is the Authority's effective membership of the command's own (team, member) pair at revision P, replacing the operations-ledger guard of §6.3;
   * R-2: a new per-pair watermark table, `team_membership_projection_states`;

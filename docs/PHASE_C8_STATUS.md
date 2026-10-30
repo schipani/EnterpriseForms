@@ -211,3 +211,37 @@ The owner approved **Design R** as the direction for C8-M1-01, **subject to inde
 - **Not done (by instruction):** no AC-9, Worker, migration or projection implementation; no deployment; no merge; M2 not started. **C8-M1-01 remains OPEN.** All other findings unchanged; hosted workflows still not run.
 
 **Next step:** independent security review of the package (Q-1…Q-9). Owner answers to Q-O1…Q-O4. Implementation only after both are recorded.
+
+## 12. Owner answers Q-O1…Q-O4 and final independent-review submission (2026-10-30, C-85)
+
+**Owner decisions (approved with conditions):**
+- D8-20: only a validated AC-9 response from the current attempt is Effective evidence;
+- D8-21: Authority pair-state projection, `team_membership_projection_states` and a single logical Worker writer, with the roster and the high-water mark updated atomically;
+- D8-22: closure set RC-01…RC-19 and RC-21…RC-28; RC-20 retired;
+- D8-23: RO-2 = 12 handlers.
+
+**Submission:** `docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md`, rewritten as the final submission.
+- **Self-found correction R-6:** C-84's rule treated every answer older than the watermark as tampering, which would have raised false alarms when two Workers race. A stale answer is now discarded and looked up once more; only a fresh answer below the watermark is an anomaly. RC-11 and RC-23 cover both branches.
+- **Guards C-1…C-3:**
+  * C-1: outside Development/Testing the reconciler refuses to start without HTTPS and a client certificate;
+  * C-2: the reconciler credential must have its own key and issuer;
+  * C-3: the idempotency key is never logged.
+- **Verified facts that the reviewer needs:**
+  * Stage A workload credentials are HS256 shared secrets, so separation comes from per-scheme keys, not claims;
+  * mTLS is not implemented anywhere, and every runnable environment uses plain HTTP to the Authority;
+  * the Authority as built refuses to start outside Development/Testing, because Entra is not implemented. Azure staging and production therefore do not exist yet.
+- **New findings:**
+  * F-9: the Worker already holds the business-API and verifier credentials, so AC-9's isolation is at the Authority policy level, not the process level;
+  * F-10: API and Worker share one BusinessDb role, so single-writer is enforced by code and test, not by the database;
+  * F-11: R-6;
+  * F-12: the security-test stack exposes the Authority on host loopback and commits test-only keys.
+- **Reviewer questions:** Q-1…Q-9, plus new Q-10 (own container for the reconciler?) and Q-11 (separate BusinessDb reconciler role?). Each has its evidence and a proposed answer, explicitly marked as not independent.
+- **Per-environment guarantees (§10):** C8-M1-01 closure evidence from the security-test stack and hosted CI can prove AC-9's logic, not its transport or identity guarantees. Those stay with the Azure-staging gate.
+- **Independence:** this submission was prepared by the implementation agent on the owner's instruction. **No independent review has taken place.** §11 states who qualifies and what must be recorded.
+
+**Not done (by instruction):** no AC-9, Authority, Worker, migration or projection change; no deployment; no merge; M2 not started. **C8-M1-01 remains OPEN.**
+
+**Remaining before implementation authorization:**
+1. the independent review recorded per §11, with decisions on Q-1…Q-11;
+2. owner decisions on reviewer conditions (notably Q-10, Q-11, and any signed-outcome request under Q-1);
+3. owner authorization naming the implementation scope (package §12).
