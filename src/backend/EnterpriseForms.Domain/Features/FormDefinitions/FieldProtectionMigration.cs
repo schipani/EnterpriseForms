@@ -89,6 +89,12 @@ public static class FieldProtectionMigrationStates
     public const string Queued = "Queued";
     public const string Running = "Running";
 
+    /// <summary>
+    /// Phase C7 M4: every item completed and the business-side post-check passed; the worker is reconciling the field against
+    /// the Authorization Authority's complete record population (G19). Completed is reached only from here.
+    /// </summary>
+    public const string Verifying = "Verifying";
+
     /// <summary>Every item completed and the post-check found no plaintext copy; "fully encrypted" may be claimed.</summary>
     public const string Completed = "Completed";
 

@@ -8,6 +8,7 @@ using EnterpriseForms.Api.Features.Identity;
 using EnterpriseForms.Api.Features.Organizations;
 using EnterpriseForms.Api.Features.Platform;
 using EnterpriseForms.Api.Features.RelatedForms;
+using EnterpriseForms.Api.Features.Search;
 using EnterpriseForms.Api.Features.Sharing;
 using EnterpriseForms.Api.Features.Teams;
 using EnterpriseForms.Infrastructure;
@@ -34,6 +35,7 @@ public sealed class Program
         }
 
         var builder = WebApplication.CreateBuilder(args);
+        EnterpriseForms.Api.Features.Platform.TestStackIdentityEndpoints.RefuseOutsideTesting(builder.Configuration, builder.Environment);
 
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<BusinessProblemHandler>();
@@ -63,6 +65,14 @@ public sealed class Program
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.ListRecordsHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordHistoryHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordRestoreHandler>();
+        // Phase C7 D4: provisional field-search limits (configuration FieldSearch); a bad value fails at startup.
+        var fieldSearchLimits = builder.Configuration.GetSection(EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits.SectionName).Get<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits>() ?? new EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits();
+        fieldSearchLimits.Validate();
+        fieldSearchLimits.ValidateEnvironment(builder.Environment.EnvironmentName);
+        builder.Services.AddSingleton(fieldSearchLimits);
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchAdmission>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchHandler>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.Verification.TrustedScopeVerifier>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));
         builder.Services.AddHostedService<DocumentProviderStartupGuard>();
         builder.Services.AddHostedService<DocumentProcessingHostedService>();
@@ -95,6 +105,14 @@ public sealed class Program
         app.MapTeamEndpoints();
         app.MapDashboardEndpoints();
         app.MapOrganizationEndpoints();
+        app.MapSearchEndpoints();
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            // Phase C7 M1: real-stack proof of the AC-5 verification path. Never mapped outside the isolated Testing stack.
+            app.MapSearchTestingEndpoints();
+            // C7 M4 incident correction: isolated-stack identity for the browser-test guard.
+            app.MapTestStackIdentityEndpoints();
+        }
 
         app.Run();
         return 0;

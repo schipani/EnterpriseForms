@@ -932,7 +932,7 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_field_protection_migrations_direction", "migration_direction IN ('Encrypt','Decrypt')");
 
-                            t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Completed','Failed','Blocked','Cancelled')");
+                            t.HasCheckConstraint("ck_field_protection_migrations_state", "migration_state IN ('Queued','Running','Verifying','Completed','Failed','Blocked','Cancelled')");
 
                             t.HasCheckConstraint("ck_field_protection_migrations_verified_counts", "(verified_record_count IS NULL OR verified_record_count >= 0) AND (verified_remaining_record_count IS NULL OR verified_remaining_record_count >= 0) AND (verified_remaining_value_count IS NULL OR verified_remaining_value_count >= 0) AND (unverified_record_count IS NULL OR unverified_record_count >= 0)");
                         });
@@ -1032,6 +1032,216 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_field_protection_migration_items_state", "item_state IN ('Pending','Completed','Failed')");
 
                             t.HasCheckConstraint("ck_field_protection_migration_items_verified_counts", "(verified_old_form_value_count IS NULL OR verified_old_form_value_count >= 0) AND (verified_head_content_revision IS NULL OR verified_head_content_revision >= 0)");
+                        });
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionReconciliation", b =>
+                {
+                    b.Property<Guid>("FieldProtectionReconciliationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_protection_reconciliation_id");
+
+                    b.Property<long?>("AttestationAuditJournalRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attestation_audit_journal_revision");
+
+                    b.Property<bool?>("AttestationComplete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("attestation_complete");
+
+                    b.Property<string>("AttestationDigestHex")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("attestation_digest_hex");
+
+                    b.Property<string>("AttestationIncompleteReason")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("attestation_incomplete_reason");
+
+                    b.Property<string>("AttestationReportJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("attestation_report_json");
+
+                    b.Property<DateTimeOffset?>("AttestedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attested_on");
+
+                    b.Property<Guid?>("AuthorityAttestationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authority_attestation_id");
+
+                    b.Property<Guid>("AuthorityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authority_command_id");
+
+                    b.Property<int?>("BusinessMissingRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("business_missing_record_count");
+
+                    b.Property<int?>("BusinessOnlyRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("business_only_record_count");
+
+                    b.Property<int?>("CatalogueEntryCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("catalogue_entry_count");
+
+                    b.Property<Guid?>("CatalogueSnapshotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("catalogue_snapshot_id");
+
+                    b.Property<int>("CensusFailedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("census_failed_record_count");
+
+                    b.Property<int>("CensusNextOffset")
+                        .HasColumnType("integer")
+                        .HasColumnName("census_next_offset");
+
+                    b.Property<int>("CensusReusedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("census_reused_record_count");
+
+                    b.Property<int>("CensusVerifiedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("census_verified_record_count");
+
+                    b.Property<int>("DecryptCheckedValueCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("decrypt_checked_value_count");
+
+                    b.Property<int>("DecryptFailedValueCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("decrypt_failed_value_count");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid?>("FieldProtectionMigrationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_protection_migration_id");
+
+                    b.Property<Guid?>("FirstRoundSnapshotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("first_round_snapshot_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("last_error_code");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_on");
+
+                    b.Property<string>("LeaseOwnerName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("lease_owner_name");
+
+                    b.Property<int>("LogicalTypeMismatchCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("logical_type_mismatch_count");
+
+                    b.Property<string>("MigrationDirection")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("migration_direction");
+
+                    b.Property<DateTimeOffset>("NextAttemptOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_on");
+
+                    b.Property<DateTimeOffset?>("ReconciliationCompletedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reconciliation_completed_on");
+
+                    b.Property<string>("ReconciliationMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reconciliation_mode");
+
+                    b.Property<DateTimeOffset>("ReconciliationModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reconciliation_modified_on");
+
+                    b.Property<DateTimeOffset>("ReconciliationRequestedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reconciliation_requested_on");
+
+                    b.Property<int>("ReconciliationRoundCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("reconciliation_round_count");
+
+                    b.Property<string>("ReconciliationState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("reconciliation_state");
+
+                    b.Property<string>("RequestReasonText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("request_reason_text");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<Guid?>("ResumeAfterFormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resume_after_form_record_id");
+
+                    b.Property<int?>("RetainedOldFormRowCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("retained_old_form_row_count");
+
+                    b.Property<int>("RoundStartVerifiedRecordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_start_verified_record_count");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TransientFailureCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("transient_failure_count");
+
+                    b.HasKey("FieldProtectionReconciliationId");
+
+                    b.HasIndex("FieldProtectionMigrationId");
+
+                    b.HasIndex("FormDefinitionId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("FieldDefinitionId", "ReconciliationRequestedOn")
+                        .HasDatabaseName("ix_field_protection_reconciliations_field");
+
+                    b.HasIndex("ReconciliationState", "NextAttemptOn")
+                        .HasDatabaseName("ix_field_protection_reconciliations_due");
+
+                    b.ToTable("field_protection_reconciliations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_field_protection_reconciliations_complete", "reconciliation_state <> 'Complete' OR (attestation_complete = true AND authority_attestation_id IS NOT NULL AND decrypt_failed_value_count = 0 AND logical_type_mismatch_count = 0)");
+
+                            t.HasCheckConstraint("ck_field_protection_reconciliations_counts", "census_next_offset >= 0 AND round_start_verified_record_count >= 0 AND census_verified_record_count >= 0 AND census_reused_record_count >= 0 AND census_failed_record_count >= 0 AND decrypt_checked_value_count >= 0 AND decrypt_failed_value_count >= 0 AND logical_type_mismatch_count >= 0 AND reconciliation_round_count >= 0 AND transient_failure_count >= 0");
+
+                            t.HasCheckConstraint("ck_field_protection_reconciliations_direction", "migration_direction IN ('Encrypt','Decrypt')");
+
+                            t.HasCheckConstraint("ck_field_protection_reconciliations_mode", "reconciliation_mode IN ('MigrationCompletion','VerifyOnly')");
+
+                            t.HasCheckConstraint("ck_field_protection_reconciliations_state", "reconciliation_state IN ('Queued','Running','Blocked','Complete','Incomplete','Unavailable','Superseded')");
                         });
                 });
 
@@ -2805,6 +3015,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("plaintext_internal_fields_permitted");
 
+                    b.Property<bool>("PlaintextSearchPermitted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("plaintext_search_permitted");
+
                     b.Property<Guid?>("PolicyModifiedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("policy_modified_by_user_id");
@@ -3460,6 +3674,35 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_field_protection_migration_items_record");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionReconciliation", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FieldDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_protection_reconciliations_field");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FieldProtectionMigration", null)
+                        .WithMany()
+                        .HasForeignKey("FieldProtectionMigrationId")
+                        .HasConstraintName("fk_field_protection_reconciliations_migration");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.FormDefinitions.FormDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FormDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_protection_reconciliations_form");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_field_protection_reconciliations_tenant");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.FormDefinitions.FormDefinition", b =>

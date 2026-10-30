@@ -33,6 +33,15 @@ public sealed class OrganizationAuthorizationState
 
     public byte[]? LatestContentJournalDigest { get; set; }
 
+    /// <summary>
+    /// Phase C7 M1 (OD-8): revision of the separate audit stream (search catalogue issuance and denials). It is archived and
+    /// anchored like the other streams but never gates access and never advances the content-integrity revision, so audit
+    /// writes cannot invalidate other snapshots or delay reads.
+    /// </summary>
+    public long AuditJournalRevision { get; set; }
+
+    public byte[]? LatestAuditJournalDigest { get; set; }
+
     public DateTimeOffset StateModifiedOn { get; set; }
 }
 

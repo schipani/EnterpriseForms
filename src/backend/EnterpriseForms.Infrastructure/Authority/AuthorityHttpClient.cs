@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, ITestStackIdentityAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -82,6 +82,15 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     public Task<VerifyRecordProjectionResult> VerifyRecordProjectionAsync(DelegatedUserContext user, VerifyRecordProjectionRequest request, CancellationToken cancellationToken) =>
         SendAsync<VerifyRecordProjectionResult>(HttpMethod.Post, "internal/v1/integrity/verify-record-projection", user, request, null, cancellationToken);
 
+    public Task<SearchCatalogue> IssueSearchCatalogueAsync(DelegatedUserContext user, SearchCatalogueRequest request, CancellationToken cancellationToken) =>
+        SendAsync<SearchCatalogue>(HttpMethod.Post, "internal/v1/search-catalogue", user, request, null, cancellationToken);
+
+    public Task<CatalogueSnapshotValidation> ValidateSearchCatalogueAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, CancellationToken cancellationToken) =>
+        SendAsync<CatalogueSnapshotValidation>(HttpMethod.Post, $"internal/v1/search-catalogue/{searchCatalogueSnapshotId:D}/validate", user, null, null, cancellationToken);
+
+    public Task<VerifyRecordProjectionsResponse> VerifyRecordProjectionsAsync(DelegatedUserContext user, VerifyRecordProjectionsRequest request, CancellationToken cancellationToken) =>
+        SendAsync<VerifyRecordProjectionsResponse>(HttpMethod.Post, "internal/v1/integrity/verify-record-projections", user, request, null, cancellationToken);
+
     public Task<ContentHistoryPage> GetContentHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, long? afterRevision, int limit, CancellationToken cancellationToken) =>
         SendAsync<ContentHistoryPage>(HttpMethod.Get, $"internal/v1/content-revisions/{organizationId:D}/{formRecordId:D}/history?limit={limit.ToString(System.Globalization.CultureInfo.InvariantCulture)}" + (afterRevision is { } after ? "&after=" + after.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty), user, null, null, cancellationToken);
 
@@ -101,6 +110,21 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
     public Task<AcceptedContentRevision> CommitReprotectionAsync(Guid operationId, CommitContentChangeRequest request, CancellationToken cancellationToken) =>
         SendAsync<AcceptedContentRevision>(HttpMethod.Post, $"internal/v1/content-changes/{operationId:D}/commit", null, request, null, cancellationToken);
+
+    public Task<AuthorityFieldSearchCapabilities> GetFieldSearchCapabilitiesAsync(DelegatedUserContext user, FieldSearchCapabilitiesQuery query, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityFieldSearchCapabilities>(HttpMethod.Post, "internal/v1/field-search/capabilities", user, query, null, cancellationToken);
+
+    public Task<AuthoritySecurityAdministratorRoster> GetSecurityAdministratorsAsync(DelegatedUserContext user, SecurityAdministratorRosterQuery query, CancellationToken cancellationToken) =>
+        SendAsync<AuthoritySecurityAdministratorRoster>(HttpMethod.Post, "internal/v1/security-administrators", user, query, null, cancellationToken);
+
+    public Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityFieldSearchAdministration>(HttpMethod.Post, "internal/v1/field-search/administration", user, query, null, cancellationToken);
+
+    public Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken) =>
+        SendAsync<System.Text.Json.JsonElement>(HttpMethod.Post, $"internal/v1/search-catalogue/{searchCatalogueSnapshotId:D}/executions", user, evidence, null, cancellationToken);
+
+    public Task<AuthorityStackIdentity> GetTestStackIdentityAsync(CancellationToken cancellationToken) =>
+        SendAsync<AuthorityStackIdentity>(HttpMethod.Get, "internal/v1/testing/stack-identity", null, null, null, cancellationToken);
 
     public Task<BrowserSessionState> CreateSessionAsync(DelegatedUserContext user, string sessionDigestBase64, DateTimeOffset absoluteExpiresOn, string? replacedSessionDigestBase64, CancellationToken cancellationToken)
     {

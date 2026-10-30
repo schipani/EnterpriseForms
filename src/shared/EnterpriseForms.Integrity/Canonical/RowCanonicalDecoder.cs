@@ -14,6 +14,9 @@ public sealed record RowCanonicalColumn(string Name, RowColumnType? Type, ReadOn
     /// <summary>The text value, or null when the column is NULL or not text.</summary>
     public string? AsText() => Type == RowColumnType.Text ? Encoding.UTF8.GetString(FramedValue.Span[5..]) : null;
 
+    /// <summary>The byte-string value (without its length prefix), or null when the column is NULL or not bytes.</summary>
+    public ReadOnlyMemory<byte>? AsBytes() => Type == RowColumnType.Bytes ? FramedValue[5..] : null;
+
     public bool FramedValueEquals(RowCanonicalColumn other) => other is not null && FramedValue.Span.SequenceEqual(other.FramedValue.Span);
 }
 

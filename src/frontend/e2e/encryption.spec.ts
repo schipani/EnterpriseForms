@@ -122,7 +122,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     const security = dialog.getByRole("group", { name: "Security & Encryption" });
     await expect(security.getByText("Off — plaintext")).toBeVisible();
     await security.getByRole("button", { name: /Strengthen protection/ }).click();
-    await expect(security.getByText(/rewritten as ciphertext when each is next saved/)).toBeVisible();
+    await expect(security.getByText(/re-seals the current version of every existing record.*Earlier versions kept as record history are not migrated/)).toBeVisible();
     await security.getByRole("combobox", { name: /New classification/ }).click();
     await page.getByRole("option", { name: "Confidential" }).click();
     await expect(security.getByRole("button", { name: "Apply strengthening" })).toBeDisabled(); // reason required
@@ -130,7 +130,7 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     await security.getByRole("button", { name: "Apply strengthening" }).click();
     await expect(security.getByText("Enabled", { exact: true })).toBeVisible();
     // The background migration may already have re-encrypted the single record by now: either the pending count or the verified badge is correct.
-    await expect(security.getByText(/1 record\(s\) still hold a plaintext copy|All listed records encrypted/).first()).toBeVisible();
+    await expect(security.getByText(/1 record\(s\) still hold a plaintext copy|All listed records encrypted|Authority-verified: every record's current version encrypted/).first()).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("row", { name: /Exhibit count/ })).toContainText("Confidential · Encrypted");
@@ -139,9 +139,17 @@ test.describe.serial("Field encryption: designer configuration, record display, 
     const reopened = page.getByRole("dialog", { name: "Edit field" }).getByRole("group", { name: "Security & Encryption" });
     await expect(reopened.getByText("Enabled", { exact: true })).toBeVisible();
     // The background migration re-encrypts the clerk's existing record through the Authority; only then is the field reported as fully encrypted.
-    await expect(reopened.getByText("All listed records encrypted")).toBeVisible({ timeout: 120_000 });
-    // The badge must not be read as an independent completeness proof (security finding G19): the caveat is shown with it.
-    await expect(reopened.getByText(/not an independently verified completeness guarantee/)).toBeVisible();
+    const authorityBadge = "Authority-verified: every record's current version encrypted";
+    await expect(reopened.getByText(new RegExp(`All listed records encrypted|${authorityBadge}`))).toBeVisible({ timeout: 120_000 });
+    // Either way the claim is scoped to current versions: retained history is not migrated (DR-C7-4).
+    await expect(reopened.getByText(/^Current versions only\. .*not migrated and may still hold the field in plaintext/)).toBeVisible();
+    if (await reopened.getByText(authorityBadge).isVisible()) {
+      // Phase C7 M4 (verifier configured): the Authority attestation, shown with what it does not cover (current versions only).
+      await expect(reopened.getByText(/It covers current versions only/)).toBeVisible();
+    } else {
+      // Without the verifier the badge must not be read as an independent completeness proof (security finding G19): the caveat is shown with it.
+      await expect(reopened.getByText(/not an independently verified completeness guarantee/)).toBeVisible();
+    }
     await expect(reopened.getByRole("group", { name: "Encryption migration progress" })).toHaveCount(0);
     await reopened.getByRole("button", { name: /Strengthen protection/ }).click();
     await expect(reopened.getByRole("checkbox", { name: /Switch to application-level encryption/ })).toHaveCount(0);

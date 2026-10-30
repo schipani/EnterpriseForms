@@ -76,6 +76,27 @@
 
 **Pass:** Audit codes but no protected query plaintext; consistent UI and API error handling.
 
+## Phase C7 implementation status (2026-10-24; not a pass of any ENC-SR case)
+
+M0 (C-57), M1 (C-62), M2 (C-67) and M3 (C-69) implement the gate, the contracts, the Authority catalogue, the Authority-held search approvals and the verified executor (development/test only). Executed searches exist on the isolated stack (M3). **No ENC-SR case is marked passed**: each still needs independent review and Azure staging evidence. Coverage:
+
+| Case | Covered now | Test | Still pending |
+|---|---|---|---|
+| ENC-SR-05/06/07 | Request validation and the disabled gate (no predicate is evaluated; nothing leaks); M2: every condition authorized against the Authority's approvals (unapproved, encrypted, wrong type or operator, injected option → `SEARCH_FIELD_NOT_ALLOWED` / `SEARCH_OPERATOR_NOT_SUPPORTED`) before the closed gate | `PhaseC7FieldSearchTests`, `FieldSearchApprovalTests` (real stack), `advanced-field-search.spec.ts` | Execution semantics (M3) |
+| ENC-SR-08 | Deleted value rows fail the whole verified scope and the executed search (never fewer records) | `SearchCatalogueTests.DeletedValueRowsFailTheWholeScope…`, `FieldSearchExecutionTests.AHostileChange…(deleted)` | Independent review |
+| ENC-SR-09 | Altered or rolled-back values fail the scope and the executed search | `…AlteredAndRolledBackValuesFailTheScope`, `FieldSearchExecutionTests.AHostileChange…(altered, rolled-back, field-substituted, forged-row)` | Independent review |
+| ENC-SR-10 | Moving or hiding a record in business columns does not remove it from the scope | `…BusinessMetadataManipulation…` | Independent review |
+| ENC-SR-11 | Injected business records are never in scope; an injected extra row fails its record | `…BusinessMetadataManipulation…`, `FieldSearchExecutionTests.RowsInjected…`, `…AHostileChange…(forged-row)` | Independent review |
+| ENC-SR-12 | Records, byte and time limits refused with no entries or counts, on executed searches too | `…LimitsRefuseWithoutTruncation…`, `PhaseC7ScopeVerificationTests`, M3 benchmark (505 ⇒ records; 480 × 8 ⇒ time) | Independent review |
+| ENC-SR-13 | Authority/gate unavailable → typed failure, no SQL fallback (business unit level; architecture test) | `PhaseC7ScopeVerificationTests`, `FieldSearchHasNoDirectBusinessDatabaseAccess` | Real-stack Authority outage during a search (M3; SEC-P fail-closed suite covers reads) |
+| ENC-SR-14 | Revocation invalidates the snapshot and open result pages; forged or foreign cursors refused | `…SnapshotsDieOnRevocation…`, `FieldSearchExecutionTests.RevokingSearchPermission…`, unit cursor tests | Independent review |
+| ENC-SR-15 | Content and authorization changes invalidate; changes elsewhere do not | `…SnapshotsDieOnRevocation…`, AC5 unit tests | M3 |
+| ENC-SR-16 | Cross-organization snapshots and catalogues refused | `…LimitsRefuseWithoutTruncation…` | Child-record predicates (out of V1, D6) |
+| ENC-SR-04 | Approval only by `administer_security`, bound to the Authority-registered version, Public/Internal plaintext only, operators per type, step-up gate, `field_searcher` query permission | `FieldSearchApprovalTests` (Authority unit + real stack), `field-search-approval.spec.ts` | Production step-up (PB-08); search with real results (M3) |
+| ENC-SR-17 | Strengthening invalidates the approval in the same Authority command; the field leaves the capabilities at once; encrypted values are never decoded for search | `FieldSearchApprovalTests` (unit + real stack), executor port (encrypted rows not decoded) | Historical revisions are not a search surface; independent review |
+| ENC-SR-18 | Failures typed and never shown as no results; values never in URLs, logs, journal or errors | `FieldSearchExecutionTests.PredicateValuesNeverReach…`, `searchFailure.test.ts`, browser specs | Telemetry review in staging |
+| ENC-SR-01..03 | — (classification defaults and floors are pre-C7 controls) | Stage B encryption suites | — |
+
 ## Evidence and release rules
 
 For each case provide executable test path, test run/commit/image digest, isolated environment, inputs and expected result, observed result, authority revision/snapshot evidence, checked absence of protected information, logs redacted of sensitive data, and independently reviewable pass/fail status. CI must gate on applicable tests; real Azure staging proof still applies to all Level 2 controls. A missing, skipped, mocked or inconclusive check is not a pass. **G06 search completeness remains OPEN until real results establish it.**

@@ -1,4 +1,6 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
@@ -29,6 +31,9 @@ public interface IAuthorityScope : IAsyncDisposable
     Task<IdentityBinding?> FindIdentityBindingAsync(Guid organizationId, string issuerUri, string subjectIdentifier, CancellationToken cancellationToken);
 
     Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken);
+
+    /// <summary>Owner message 7: every identity binding of the organization (read-only).</summary>
+    Task<List<IdentityBinding>> GetIdentityBindingsAsync(Guid organizationId, CancellationToken cancellationToken);
 
     Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken cancellationToken);
 
@@ -63,6 +68,9 @@ public interface IAuthorityScope : IAsyncDisposable
     void AddJournalEntry(SecurityJournalEntry entry);
 
     Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken);
+
+    /// <summary>The content-stream ContentHeadCommitted entry of an accepted operation (latest if ever repeated), by index — not by scanning revisions.</summary>
+    Task<SecurityJournalEntry?> FindContentCommitJournalEntryAsync(Guid organizationId, Guid contentChangeOperationId, CancellationToken cancellationToken);
 
     Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken);
 
@@ -106,10 +114,62 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>Record IDs registered and active for the organization (authority-sourced discovery candidates).</summary>
     Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken);
 
+    /// <summary>Phase C7 AC-5: registered form_record resources of one form (registry parent = form) in the given lifecycle states, in id order.</summary>
+    Task<List<AuthorityResource>> GetFormRecordResourcesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken);
+
+    /// <summary>Registry rows of the given resources (any lifecycle state), for snapshot validation.</summary>
+    Task<List<AuthorityResource>> GetResourcesAsync(Guid organizationId, string resourceTypeName, IReadOnlyCollection<Guid> resourceEntityIds, CancellationToken cancellationToken);
+
+    /// <summary>Accepted content heads of the given records (read-only).</summary>
+    Task<List<RecordContentHead>> GetContentHeadsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    void AddCatalogueSnapshot(SearchCatalogueSnapshot snapshot, IEnumerable<SearchCatalogueSnapshotEntry> entries);
+
+    /// <summary>Tracked, so an invalidation can be recorded on it.</summary>
+    Task<SearchCatalogueSnapshot?> FindCatalogueSnapshotAsync(Guid searchCatalogueSnapshotId, CancellationToken cancellationToken);
+
+    /// <summary>Entries in catalogue order; <paramref name="limit"/> null = all.</summary>
+    Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesAsync(Guid searchCatalogueSnapshotId, int offset, int? limit, CancellationToken cancellationToken);
+
     /// <summary>G23: the session with this secret digest (tracked, so revocation/last-seen updates commit with the scope), or null.</summary>
     Task<AuthenticatedSession?> FindSessionByDigestAsync(byte[] sessionSecretDigest, CancellationToken cancellationToken);
 
     void AddSession(AuthenticatedSession session);
+
+    /// <summary>Phase C7 M2 (OD-3): the highest registered published version of a form, or null (read-only).</summary>
+    Task<PublishedFormVersion?> FindLatestPublishedFormVersionAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
+
+    void AddPublishedFormVersion(PublishedFormVersion version);
+
+    /// <summary>Phase C7 M3: the highest registered published version of every form of the organization (read-only).</summary>
+    Task<List<PublishedFormVersion>> GetLatestPublishedFormVersionsAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M2 (AC-6): approvals of the organization (optionally one form), tracked so commands can change their state.</summary>
+    Task<List<FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid organizationId, Guid? formDefinitionId, CancellationToken cancellationToken);
+
+    void AddFieldSearchApproval(FieldSearchApproval approval);
+
+    /// <summary>Phase C7 M4: the entries of one snapshot for the given records only (read-only; uses the snapshot/record unique index).</summary>
+    Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M4: registry rows of the given types and lifecycle states across the organization (read-only).</summary>
+    Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid organizationId, IReadOnlyCollection<string> resourceTypeNames, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M4: number of accepted manifest commits (accepted revisions) per record, for the given records (read-only; records without any are absent).</summary>
+    Task<Dictionary<Guid, int>> CountManifestCommitsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 M4: census results held for one protection decision and the given records (any operation; read-only).</summary>
+    Task<List<ProtectionCensusResult>> GetProtectionCensusResultsAsync(Guid organizationId, Guid scopingSecurityCommandId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    void AddProtectionCensusResult(ProtectionCensusResult result);
+
+    /// <summary>Phase C7 M4: one held census (tracked, so its verification time can be refreshed), or null.</summary>
+    Task<ProtectionCensusResult?> FindProtectionCensusResultAsync(Guid scopingSecurityCommandId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken);
+
+    void AddProtectionAttestation(ProtectionReconciliationAttestation attestation);
+
+    /// <summary>Phase C7 M4: the most recent attestation of each of the given protection decisions (read-only).</summary>
+    Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken);
 
     Task CommitAsync(CancellationToken cancellationToken);
 }

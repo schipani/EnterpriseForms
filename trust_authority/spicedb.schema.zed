@@ -22,8 +22,11 @@ definition form_definition {
     relation organization: organization
     relation designer: user | team#participant
     relation form_user: user | team#participant
+    // Phase C7 M2 (OD-4): explicit query permission for the form's AC-6-approved fields; no other relation implies it.
+    relation field_searcher: user | team#participant
     permission design = designer
     permission create_record = form_user
+    permission query_fields = field_searcher
 }
 
 // A share represents recipients only; scope attaches this share to specific

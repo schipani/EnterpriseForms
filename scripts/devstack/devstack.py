@@ -17,6 +17,11 @@ passed on a command line or written into the working tree.
     python scripts/devstack/devstack.py verify-persistence   # restart/kill/stop-start proofs against the live stack
     python scripts/devstack/devstack.py verify-workflow      # M1 lifecycle and restriction checks through the API
     python scripts/devstack/devstack.py prepare-acceptance   # synthetic Draft records for the owner's browser review
+    python scripts/devstack/devstack.py security-admin status            # DR-C7-3: members and Security Administrators
+    python scripts/devstack/devstack.py security-admin enable-approvals  # DR-C7-3: synthetic approver keys (once)
+    python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "..."            # dry run
+    python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "..." --execute  # confirm
+    python scripts/devstack/devstack.py protection-verifier status|enable  # Phase C7 M4: verifier credential (no data changes)
 
 See docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md. Production signing uses Azure Managed HSM; nothing here is a
 production control or Level 2 evidence.
@@ -103,6 +108,22 @@ def load_custody(project: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+APPROVERS_FILE = "operator-approvers.json"  # DR-C7-3; separate from custody.json so that file is never rewritten for this
+
+
+def load_approvers(project: str) -> list[dict]:
+    path = custody_dir(project) / APPROVERS_FILE
+    return json.loads(path.read_text(encoding="utf-8"))["approvers"] if path.exists() else []
+
+
+VERIFIER_FILE = "protection-verifier.json"  # Phase C7 M4 (OD-1); separate custody file, never part of custody.json
+
+
+def load_verifier(project: str) -> dict | None:
+    path = custody_dir(project) / VERIFIER_FILE
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
 def load_state(project: str) -> dict:
     path = custody_dir(project) / "state.json"
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
@@ -145,6 +166,18 @@ class Stack:
         env["DEVSTACK_PROJECT"] = self.project
         env["DEVSTACK_VAULT_AUTHORITY_TOKEN"] = self.custody.get("authority_vault_token") or "pending-initialization"
         env["DEVSTACK_LOCAL_DEV_KEK_BASE64"] = self.custody.get("local_dev_kek_base64") or "pending-initialization"
+        # DR-C7-3: only the public halves of the synthetic approver keys, and only once enable-approvals created them.
+        approvers = load_approvers(self.project)
+        env["DEVSTACK_OPERATOR_APPROVAL_MODE"] = "SyntheticDevelopment" if approvers else "Unavailable"
+        for index, approver in enumerate(approvers[:2], start=1):
+            env[f"DEVSTACK_OPERATOR_APPROVER_{index}_ID"] = approver["approver_id"]
+            env[f"DEVSTACK_OPERATOR_APPROVER_{index}_PUBLIC_KEY"] = approver["public_key_spki_base64"]
+        # Phase C7 M4: the field-protection verifier credential (Authority + Worker only), once `protection-verifier enable` created it.
+        verifier = load_verifier(self.project)
+        if verifier:
+            env["DEVSTACK_PROTECTION_VERIFIER_ISSUER"] = verifier["issuer"]
+            env["DEVSTACK_PROTECTION_VERIFIER_AUDIENCE"] = verifier["audience"]
+            env["DEVSTACK_PROTECTION_VERIFIER_KEY"] = verifier["shared_key_base64"]
         env.update(self.overrides)
         return env
 
@@ -893,6 +926,145 @@ def cmd_prepare_acceptance(args) -> None:
     print("[acceptance] Casey Clerk has a Reader share of 'Case title' on the first record")
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# DR-C7-3: first and recovery Security Administrator through the Authority operator plane (development procedure)
+# --------------------------------------------------------------------------------------------------------------------
+
+def operator_tool(stack: Stack, request: dict) -> tuple[int, dict]:
+    """Runs the dev-seed image's operator mode inside the stack's network. The request (with approver private keys when
+    executing) travels on stdin only; the tool's output never contains keys or approvals."""
+    result = stack.compose("run", "--rm", "--no-deps", "-T", "-e", "DEVSEED_MODE=operator-security-admin", "dev-seed",
+                           input_text=json.dumps(request), check=False, timeout=300)
+    text = result.stdout.strip()
+    start = text.find("{")
+    if start < 0:
+        raise DevStackError(f"operator tool failed ({result.returncode}): {result.stderr.strip()[-1200:]}")
+    return result.returncode, json.loads(text[start:])
+
+
+def print_members(status: dict) -> None:
+    print(f"Organization : {status['organization_display_name']}  ({status['organization_id']})")
+    print(f"Revision     : {status['authorization_revision']}    usable Security Administrators: {status['usable_administrator_count']}")
+    print(f"Approvals    : {status['approval_mode']} - {status['approval_assurance']}")
+    for member in status["members"]:
+        role = "SECURITY ADMINISTRATOR" if member["is_security_administrator"] else "member"
+        enabled = "" if member["identity_enabled"] else "  (identity disabled)"
+        label = member.get("display_name") or "(no dev persona)"
+        print(f"  {role:22} {member.get('persona_key') or '-':9} {label:45} {member['subject_identifier']}  {member['authority_user_id']}{enabled}")
+
+
+def print_preview(preview: dict) -> None:
+    target = preview["target"]
+    print(f"Operation    : {preview['operation_kind']}  (single-use id {preview['operation_id']}){'  [DRY RUN - nothing changed]' if preview['dry_run'] else ''}")
+    print(f"Organization : {preview['organization_display_name']}  ({preview['organization_id']})")
+    print(f"Member       : {preview.get('target_display_name') or '-'}  user {target['authority_user_id']}")
+    print(f"Identity     : {target['subject_identifier']}  issuer {target['issuer_uri']}")
+    print(f"Role         : {preview['role_name']} (Security Administrator)")
+    current = ", ".join(a["subject_identifier"] for a in preview["current_administrators"]) or "none"
+    print(f"Current Security Administrators: {current}")
+    if preview.get("removed_administrator_ids"):
+        print(f"Removed by this recovery: {', '.join(preview['removed_administrator_ids'])}")
+    print("Consequences :")
+    for line in preview["consequences"]:
+        print(f"  - {line}")
+    print(f"Approvals    : {preview['required_approvals']} x {preview['approval_assurance']}")
+    print(f"Statement    : sha256 {preview['approval_statement_sha256']}")
+    if not preview["eligible"]:
+        print(f"NOT ELIGIBLE : {preview['refusal_code']} - {preview.get('refusal_detail') or ''}")
+
+
+def cmd_protection_verifier(args) -> None:
+    """Phase C7 M4: enable the DEVELOPMENT-ONLY field-protection verifier credential (Authority + Worker). No data changes."""
+    stack = Stack(args.project, load_custody(args.project))
+    path = custody_dir(args.project) / VERIFIER_FILE
+    if args.action == "status":
+        verifier = load_verifier(args.project)
+        print(f"[protection-verifier] {'enabled (issuer ' + verifier['issuer'] + ')' if verifier else 'not enabled: reconciliations report themselves unavailable'}")
+        return
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    if path.exists():
+        print("[protection-verifier] credential already exists in the custody directory")
+    else:
+        # Own issuer, audience and 256-bit key, distinct from the workload and operator credentials (both hosts refuse reuse).
+        write_private_json(path, {
+            "purpose": "DEVELOPMENT ONLY field-protection verifier credential (Phase C7 M4, OD-1). Never commit.",
+            "issuer": "enterpriseforms-field-protection-verifier-dev",
+            "audience": "authorization-authority-verifier",
+            "shared_key_base64": base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
+        })
+        print(f"[protection-verifier] generated a DEVELOPMENT-ONLY verifier credential in {path} (owner-only ACL; never printed)")
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "authority", "worker", timeout=900)
+    print("[protection-verifier] authority and worker recreated with the verifier credential (no data changed; no migration started).")
+    print("[protection-verifier] reconciliations run only when a protection migration finishes or when you request one in the Edit field dialog.")
+
+
+def cmd_security_admin(args) -> None:
+    stack = Stack(args.project, load_custody(args.project))
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    stack.compose("build", "dev-seed", timeout=1800)
+    if args.action == "status":
+        code, status = operator_tool(stack, {"action": "status"})
+        if code != 0 or "error_code" in status:
+            raise DevStackError(f"status refused: {status.get('error_code')} {status.get('detail') or ''}")
+        print_members(status)
+        return
+
+    if args.action == "enable-approvals":
+        path = custody_dir(args.project) / APPROVERS_FILE
+        if path.exists():
+            print(f"[security-admin] synthetic approver keys already exist ({', '.join(a['approver_id'] for a in load_approvers(args.project))})")
+        else:
+            out = stack.compose("run", "--rm", "--no-deps", "-T", "-e", "DEVSEED_MODE=generate-approver-keys", "dev-seed", timeout=300).stdout
+            keys = json.loads(out[out.find("{"):])
+            write_private_json(path, keys)  # private keys stay in the custody directory (owner-only ACL), never printed
+            print(f"[security-admin] generated {len(keys['approvers'])} DEVELOPMENT-ONLY synthetic approver keys in {path}")
+        stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "authority", timeout=900)
+        print("[security-admin] authority recreated with the synthetic approver public keys (no data changed)")
+        return
+
+    if not args.justification:
+        raise DevStackError("--justification is required (10 to 500 characters)")
+    if not (args.persona or args.user_id):
+        raise DevStackError("name the member with --persona (owner, designer, clerk, reader) or --user-id")
+    request = {"action": "first-appointment" if args.action == "appoint" else "recovery", "operation_id": str(uuid.uuid4()),
+               "justification": args.justification, "persona": args.persona, "target_authority_user_id": args.user_id}
+    if args.action == "recover":
+        if not args.incident:
+            raise DevStackError("--incident is required for recovery")
+        request["incident_reference"] = args.incident
+        request["removed_administrator_ids"] = args.remove_user_id or []
+    request = {k: v for k, v in request.items() if v is not None}
+
+    code, preview = operator_tool(stack, request)
+    if "error_code" in preview:
+        raise DevStackError(f"refused: {preview['error_code']} {preview.get('detail') or ''}")
+    print_preview(preview)
+    if not args.execute:
+        print("\n[security-admin] dry run only. Re-run with --execute to appoint after confirming.")
+        return
+    if not preview["eligible"]:
+        raise DevStackError("not eligible; nothing changed")
+    approvers = load_approvers(args.project)
+    if len(approvers) < 2:
+        raise DevStackError("no synthetic approver keys; run `devstack.py security-admin enable-approvals` first")
+    print("\nThis changes the organization's Security Administrators. Confirm with the exact values above.")
+    if input("Type the organization id: ").strip() != preview["organization_id"]:
+        raise DevStackError("organization id did not match; nothing changed")
+    if input(f"Type APPOINT to give {preview['target']['subject_identifier']} the Security Administrator role: ").strip() != "APPOINT":
+        raise DevStackError("not confirmed; nothing changed")
+    request["execute"] = True
+    request["operation_id"] = preview["operation_id"]
+    request["confirm_organization_id"] = preview["organization_id"]
+    request["approvers"] = [{"approver_id": a["approver_id"], "private_key_pkcs8_base64": a["private_key_pkcs8_base64"]} for a in approvers[:2]]
+    code, outcome = operator_tool(stack, request)
+    if "error_code" in outcome:
+        raise DevStackError(f"refused: {outcome['error_code']} {outcome.get('detail') or ''}; nothing changed")
+    print(f"\n[security-admin] {outcome['operation_kind']} executed: command {outcome['security_command_id']} ({outcome['command_status']}), revision {outcome['authorization_revision']}")
+    print("[security-admin] recorded with synthetic development approvals (not two-human evidence). Reload the browser to see the role.")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", default=os.environ.get("DEVSTACK_PROJECT", DEFAULT_PROJECT))
@@ -904,6 +1076,18 @@ def main() -> int:
     rebuild = commands.add_parser("rebuild", help="rebuild and recreate stateless application services only (authority, api, worker, web)")
     rebuild.add_argument("services", nargs="*")
     rebuild.set_defaults(handler=cmd_rebuild)
+    security = commands.add_parser("security-admin", help="DR-C7-3: first/recovery Security Administrator via the Authority operator plane (dry run by default)")
+    security.add_argument("action", choices=["status", "enable-approvals", "appoint", "recover"])
+    security.add_argument("--persona", choices=list(PERSONAS))
+    security.add_argument("--user-id", help="Authority user id of the member (instead of --persona)")
+    security.add_argument("--justification")
+    security.add_argument("--incident", help="incident reference (recover only)")
+    security.add_argument("--remove-user-id", action="append", help="administrator to remove (recover only; repeatable)")
+    security.add_argument("--execute", action="store_true", help="after the dry run and your typed confirmation, perform the change")
+    security.set_defaults(handler=cmd_security_admin)
+    verifier = commands.add_parser("protection-verifier", help="Phase C7 M4: development-only field-protection verifier credential (Authority + Worker)")
+    verifier.add_argument("action", choices=["status", "enable"])
+    verifier.set_defaults(handler=cmd_protection_verifier)
     restore = commands.add_parser("restore-test")
     restore.add_argument("backup_dir")
     restore.add_argument("--keep", action="store_true", help="leave the disposable restore project running for inspection")

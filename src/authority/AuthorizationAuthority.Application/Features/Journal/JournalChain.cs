@@ -11,7 +11,12 @@ public static class JournalChain
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(clock);
-        var previous = streamName == JournalStreamNames.Authorization ? state.LatestSecurityJournalDigest : state.LatestContentJournalDigest;
+        var previous = streamName switch
+        {
+            JournalStreamNames.Authorization => state.LatestSecurityJournalDigest,
+            JournalStreamNames.Audit => state.LatestAuditJournalDigest,
+            _ => state.LatestContentJournalDigest,
+        };
         var envelope = new JournalEnvelope<TBody>(
             "DynamicForms/SecurityJournal/v1",
             state.OrganizationId,
@@ -42,6 +47,10 @@ public static class JournalChain
         if (streamName == JournalStreamNames.Authorization)
         {
             state.LatestSecurityJournalDigest = digest;
+        }
+        else if (streamName == JournalStreamNames.Audit)
+        {
+            state.LatestAuditJournalDigest = digest;
         }
         else
         {

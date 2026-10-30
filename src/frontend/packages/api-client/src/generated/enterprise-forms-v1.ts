@@ -277,6 +277,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phase C7 M4 (G19): queues a verify-only reconciliation of the field's current protection decision against the Authorization Authority's complete record population (Worker verifier; never converts anything; same permission as retrying the migration; audited). 409 while the migration or another reconciliation is still running. */
+        post: operations["RequestFieldProtectionReconciliation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/protection/reclassify": {
         parameters: {
             query?: never;
@@ -1156,6 +1173,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/security-administrators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The organization's Security Administrators (Authority relation system_administrator) — for its organization owners (read-only) and Security Administrators (with candidates); 403 for everyone else. */
+        get: operations["GetSecurityAdministrators"];
+        put?: never;
+        /** Appoints an existing verified member as Security Administrator: a GrantSystemRole security command that only a Security Administrator may submit, with step-up (unavailable in staging and production until PB-08). Reason required; audited by the Authority. 204 once Effective. */
+        post: operations["AppointSecurityAdministrator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/security-administrators/{userId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains. */
+        post: operations["RemoveSecurityAdministrator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -1165,6 +1217,142 @@ export interface paths {
         };
         /** Display-name directory of users seen in this organization (projection; confers nothing). */
         get: operations["ListOrganizationUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/search-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Server-authoritative Advanced Search capabilities for one form and the caller: the fields that may be used as predicates, their value types and allowed operators, and fields the caller may know about that cannot be searched (Encrypted for privacy — not searchable). A field the caller may not know about is in neither list. Phase C7 M2: fields come from the Authority (AC-6 approvals and the caller's field_searcher permission, with the approval's frozen labels and options); fieldValueSearchAvailable stays false (TRUSTED_SEARCH_NOT_ENABLED) because execution (M3) is not enabled. */
+        get: operations["GetFieldSearchCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/field-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Each condition is first authorized against the Authority's capabilities (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED). Phase C7 M3: executed only where the fail-closed execution gate is on (isolated Development/Testing); otherwise 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED). Overload: 503 SEARCH_VERIFICATION_UNAVAILABLE (SEARCH_CAPACITY_EXCEEDED, retryable). */
+        post: operations["SearchFormRecordsByFieldValues"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-records/field-search/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Another page of a verified advanced-search result: the opaque cursor is bound to the caller, session, query digest and verified snapshot; a changed authorization or content snapshot returns 409 SEARCH_SNAPSHOT_CHANGED (restart from page one). Nothing is re-evaluated: the page comes from the verified result the cursor carries, after the Authority re-validates its snapshot. */
+        post: operations["PageFieldSearchResults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/field-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search configuration of the form's latest Authority-registered published version: per field its classification, protection, eligibility, approval state and operators. Designers of the form and security administrators only (others: 404). Encrypted fields are reported as Encrypted (Encrypted for privacy — not searchable). */
+        get: operations["GetFieldSearchConfiguration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/search-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asks the Authority to approve plaintext value search of a field for the given operators (security administrators only; governance reference required). The Authority refuses encrypted, Confidential/Restricted and below-floor fields, unregistered versions and unsupported operators, and refuses every approval while step-up assurance (PB-08) is unavailable — in production and staging always. */
+        post: operations["ApproveFieldSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/search-approval/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraws a field's search approval (security administrators only, reason required). */
+        post: operations["WithdrawFieldSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-definitions/{formDefinitionId}/field-searchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Grants or revokes the form's field_searcher relation (query permission for its approved fields) for users or teams. Security administrators only. Form access, record ownership and design access never imply it. */
+        put: operations["UpdateFieldSearchers"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/search-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phase C7 M3: for security administrators (administer_security) only — the organization's forms with an Authority-registered published version, their registered title and version, field and approval counts. Search approval administration without Designer or record access; 403 for everyone else. */
+        get: operations["GetSearchApprovalAdministration"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1190,6 +1378,19 @@ export interface components {
             optionListId?: null | string;
             /** Format: uuid */
             groupDefinitionId?: null | string;
+        };
+        AppointSecurityAdministratorRequest: {
+            /** Format: uuid */
+            userId: string;
+            reason: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        ApproveFieldSearchRequest: {
+            operators: null | string[];
+            approvalReference: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
         };
         AuditEventResponse: {
             /** Format: uuid */
@@ -1486,6 +1687,50 @@ export interface components {
             /** Format: uuid */
             optionListItemId?: null | string;
         };
+        FieldProtectionAttestationResponse: {
+            /** Format: uuid */
+            attestationId: string;
+            digestHex: string;
+            /** Format: int64 */
+            auditJournalRevision: number | string;
+            /** Format: date-time */
+            attestedOn: string;
+            complete: boolean;
+            incompleteReason: null | string;
+            /** Format: int32 */
+            expectedRecordCount: number | string;
+            /** Format: int32 */
+            acceptedRecordCount: number | string;
+            /** Format: int32 */
+            pendingCreationRecordCount: number | string;
+            /** Format: int32 */
+            quarantinedRecordCount: number | string;
+            /** Format: int32 */
+            compliantRecordCount: number | string;
+            /** Format: int32 */
+            notApplicableRecordCount: number | string;
+            /** Format: int32 */
+            oldFormRemainingRecordCount: number | string;
+            /** Format: int32 */
+            oldFormRemainingOccurrenceCount: number | string;
+            /** Format: int32 */
+            targetFormOccurrenceCount: number | string;
+            /** Format: int32 */
+            unverifiedRecordCount: number | string;
+            /** Format: int32 */
+            notYetCensusedRecordCount: number | string;
+            /** Format: int32 */
+            envelopeIssueRecordCount: number | string;
+            /** Format: int32 */
+            archivedRecordCount: number | string;
+            /** Format: int32 */
+            retiredRecordCount: number | string;
+            /** Format: int64 */
+            retainedHistoryRevisionCount: number | string;
+            /** Format: int32 */
+            activeSearchApprovalCount: number | string;
+            coverageStatement: string;
+        };
         FieldProtectionMigrationResponse: {
             /** Format: uuid */
             fieldProtectionMigrationId: string;
@@ -1515,6 +1760,43 @@ export interface components {
             cancelledOn?: null | string;
             /** Format: uuid */
             rollbackOfMigrationId?: null | string;
+        };
+        FieldProtectionReconciliationResponse: {
+            /** Format: uuid */
+            fieldProtectionReconciliationId: string;
+            mode: string;
+            state: string;
+            lastErrorCode: null | string;
+            /** Format: date-time */
+            requestedOn: string;
+            /** Format: date-time */
+            completedOn: null | string;
+            /** Format: int32 */
+            roundCount: number | string;
+            /** Format: int32 */
+            catalogueEntryCount: null | number | string;
+            /** Format: int32 */
+            censusProcessedCount: number | string;
+            /** Format: int32 */
+            censusVerifiedRecordCount: number | string;
+            /** Format: int32 */
+            censusReusedRecordCount: number | string;
+            /** Format: int32 */
+            censusFailedRecordCount: number | string;
+            /** Format: int32 */
+            businessOnlyRecordCount: null | number | string;
+            /** Format: int32 */
+            businessMissingRecordCount: null | number | string;
+            /** Format: int32 */
+            decryptCheckedValueCount: number | string;
+            /** Format: int32 */
+            decryptFailedValueCount: number | string;
+            /** Format: int32 */
+            logicalTypeMismatchCount: number | string;
+            /** Format: int32 */
+            retainedOldFormRowCount: null | number | string;
+            attestation: null | components["schemas"]["FieldProtectionAttestationResponse"];
+            basis: string;
         };
         FieldProtectionResponse: {
             /** Format: uuid */
@@ -1548,6 +1830,9 @@ export interface components {
              */
             estimateUnresolvedRecordCount: number | string;
             verification?: null | components["schemas"]["FieldProtectionVerificationResponse"];
+            reconciliation?: null | components["schemas"]["FieldProtectionReconciliationResponse"];
+            /** @default false */
+            authorityReconciledComplete: boolean;
         };
         FieldProtectionVerificationResponse: {
             /** Format: date-time */
@@ -1568,6 +1853,138 @@ export interface components {
             fieldKey: string;
             fieldDisplayName: string;
             fieldDataType: string;
+        };
+        FieldSearchAdministrationFormResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            formTitle: string;
+            formTitleRegistered: boolean;
+            /** Format: int32 */
+            registeredFormVersionNumber: number | string;
+            /** Format: date-time */
+            registeredOn: string;
+            /** Format: int32 */
+            fieldCount: number | string;
+            /** Format: int32 */
+            eligibleFieldCount: number | string;
+            /** Format: int32 */
+            activeApprovalCount: number | string;
+            /** Format: int32 */
+            invalidatedApprovalCount: number | string;
+        };
+        FieldSearchAdministrationResponse: {
+            plaintextSearchPermitted: boolean;
+            approvalOperational: boolean;
+            approvalUnavailableReason: string;
+            forms: components["schemas"]["FieldSearchAdministrationFormResponse"][];
+        };
+        FieldSearchCapabilitiesResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            fieldValueSearchAvailable: boolean;
+            unavailableReasonCode: null | string;
+            /** Format: int32 */
+            maximumConditions: number | string;
+            conditionJoin: string;
+            fields: components["schemas"]["FieldSearchCapabilityField"][];
+            notSearchableFields: components["schemas"]["FieldSearchNotSearchableField"][];
+            /** Format: int64 */
+            policyRevision: null | number | string;
+        };
+        FieldSearchCapabilityField: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            displayLabel: string;
+            valueType: string;
+            operators: string[];
+            options: components["schemas"]["FieldSearchOptionChoice"][];
+            /** Format: int32 */
+            minimumTextLength: null | number | string;
+            /** Format: int32 */
+            maximumTextLength: null | number | string;
+        };
+        FieldSearchCondition: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            operator: string;
+            valueType: string;
+            value?: null | string;
+            lowerBound?: null | string;
+            upperBound?: null | string;
+        };
+        FieldSearchConfigurationResponse: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            plaintextSearchPermitted: boolean;
+            /** Format: int64 */
+            searchPolicyRevision: number | string;
+            canApprove: boolean;
+            approvalOperational: boolean;
+            approvalUnavailableReason: string;
+            /** Format: int32 */
+            registeredFormVersionNumber: null | number | string;
+            fields: components["schemas"]["FieldSearchStatusResponse"][];
+            fieldSearchers?: null | components["schemas"]["FormAccessSubjectResponse"][];
+        };
+        FieldSearchNotSearchableField: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            displayLabel: string;
+            reasonCode: string;
+        };
+        FieldSearchOptionChoice: {
+            /** Format: uuid */
+            fieldOptionId: string;
+            displayText: string;
+        };
+        FieldSearchPageRequest: {
+            cursor: null | string;
+        };
+        FieldSearchRequest: {
+            /** Format: uuid */
+            formDefinitionId: string;
+            conditions: null | components["schemas"]["FieldSearchCondition"][];
+            recordStatus?: null | string;
+            /** @default false */
+            includeArchived: boolean;
+            /** @default false */
+            includeChildren: boolean;
+            sortBy?: null | string;
+            sortDirection?: null | string;
+            /**
+             * Format: int32
+             * @default 25
+             */
+            pageSize: number | string;
+        };
+        FieldSearchResponse: {
+            items: components["schemas"]["RecordListItemResponse"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            /** Format: int32 */
+            pageStart: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            snapshotReference: string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            completeness: string;
+            scopeStatement: string;
+            continuationToken?: null | string;
+            previousToken?: null | string;
+        };
+        FieldSearchStatusResponse: {
+            /** Format: uuid */
+            fieldDefinitionId: string;
+            fieldLabel: string;
+            fieldDataType: string;
+            fieldClassification: string;
+            protectionMode: string;
+            eligibility: string;
+            approvalState: string;
+            invalidationReason: null | string;
+            approvedOperators: string[];
+            permittedOperators: string[];
         };
         FieldValueResponse: {
             /** Format: uuid */
@@ -1685,6 +2102,8 @@ export interface components {
             publishedOn: string;
             /** Format: uuid */
             publishedByUserId: string;
+            /** @default false */
+            authorityRegistered: boolean;
         };
         GroupDefinitionResponse: {
             /** Format: uuid */
@@ -1741,10 +2160,20 @@ export interface components {
             plaintextDowngradePermitted: boolean;
             /** Format: uuid */
             authorityCommandId?: null | string;
+            /** @default false */
+            plaintextSearchPermitted: boolean;
         };
         ProbeResponse: {
             probeStatus: string;
             serviceName: string;
+        };
+        ProblemDetails: {
+            type?: null | string;
+            title?: null | string;
+            /** Format: int32 */
+            status?: null | number | string;
+            detail?: null | string;
+            instance?: null | string;
         };
         PublishFormRequest: {
             /** Format: int64 */
@@ -2015,6 +2444,14 @@ export interface components {
             expectedContentRevision: number | string;
             removalReason: string;
         };
+        RemoveSecurityAdministratorRequest: {
+            reason: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        RequestFieldProtectionReconciliationRequest: {
+            requestReason: string;
+        };
         RestoreFieldChangeResponse: {
             fieldKey: string;
             label: string;
@@ -2077,6 +2514,30 @@ export interface components {
             /** Format: int64 */
             expectedDraftRevision: number | string;
             layoutJson: string;
+        };
+        SecurityAdministratorCandidateResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            identityIssuer: string;
+            identitySubject: string;
+        };
+        SecurityAdministratorResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            identityIssuer: string;
+            identitySubject: string;
+            /** Format: date-time */
+            appointedOn: string;
+            isCurrentUser: boolean;
+        };
+        SecurityAdministratorsResponse: {
+            canManage: boolean;
+            appointmentOperational: boolean;
+            appointmentUnavailableReason: string;
+            administrators: components["schemas"]["SecurityAdministratorResponse"][];
+            candidates: components["schemas"]["SecurityAdministratorCandidateResponse"][];
         };
         SessionResponse: {
             authenticated: boolean;
@@ -2170,6 +2631,12 @@ export interface components {
         UpdateFieldOptionsRequest: {
             changes: components["schemas"]["FieldOptionChange"][];
         };
+        UpdateFieldSearchersRequest: {
+            grantUserIds: null | string[];
+            grantTeamIds: null | string[];
+            revokeUserIds: null | string[];
+            revokeTeamIds: null | string[];
+        };
         UpdateFormAccessRequest: {
             grantUserIds: string[];
             grantTeamIds: string[];
@@ -2200,6 +2667,8 @@ export interface components {
             expectedPolicyRevision: number | string;
             /** @default false */
             plaintextDowngradePermitted: boolean;
+            /** @default false */
+            plaintextSearchPermitted: boolean;
         };
         UpdateUiPreferenceRequest: {
             textScalePreferenceMode: string;
@@ -2243,6 +2712,9 @@ export interface components {
             /** Format: int32 */
             versionNumber: null | number | string;
             scanVerdict: null | string;
+        };
+        WithdrawFieldSearchRequest: {
+            reason: null | string;
         };
     };
     responses: never;
@@ -2654,6 +3126,33 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RetryFieldProtectionMigrationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldProtectionResponse"];
+                };
+            };
+        };
+    };
+    RequestFieldProtectionReconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestFieldProtectionReconciliationRequest"];
             };
         };
         responses: {
@@ -4155,6 +4654,117 @@ export interface operations {
             };
         };
     };
+    GetSecurityAdministrators: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityAdministratorsResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AppointSecurityAdministrator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppointSecurityAdministratorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RemoveSecurityAdministrator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveSecurityAdministratorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListOrganizationUsers: {
         parameters: {
             query?: never;
@@ -4171,6 +4781,286 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DirectoryUserResponse"][];
+                };
+            };
+        };
+    };
+    GetFieldSearchCapabilities: {
+        parameters: {
+            query: {
+                formDefinitionId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchCapabilitiesResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SearchFormRecordsByFieldValues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PageFieldSearchResults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldSearchPageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetFieldSearchConfiguration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchConfigurationResponse"];
+                };
+            };
+        };
+    };
+    ApproveFieldSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveFieldSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchConfigurationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    WithdrawFieldSearch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+                fieldDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithdrawFieldSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchConfigurationResponse"];
+                };
+            };
+        };
+    };
+    UpdateFieldSearchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFieldSearchersRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GetSearchApprovalAdministration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSearchAdministrationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

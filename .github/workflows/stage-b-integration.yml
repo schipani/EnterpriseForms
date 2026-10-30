@@ -119,10 +119,17 @@ jobs:
           else
             npx playwright install --with-deps chromium
           fi
-      - name: Browser end-to-end Accused workflow (Vite dev server → security-test API on 5180)
+      - name: Browser-test isolation regression (misrouted base URL, occupied port, persistent endpoint → refused before any write)
         working-directory: src/frontend
         env:
           API_TARGET: http://127.0.0.1:5180
+          E2E_EXPECTED_STACK_IDENTITY: enterpriseforms-security-test
+        run: node scripts/e2e-isolation-regression.mjs
+      - name: Browser end-to-end Accused workflow (dedicated Vite server → security-test API on 5180; identity verified first)
+        working-directory: src/frontend
+        env:
+          API_TARGET: http://127.0.0.1:5180
+          E2E_EXPECTED_STACK_IDENTITY: enterpriseforms-security-test
         run: npx playwright test
       - name: Collect service logs (sanitized by the services; no secrets are logged)
         if: always()

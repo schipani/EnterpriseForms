@@ -15,6 +15,8 @@ public static class AuditActions
     public const string FieldProtectionMigrationCompleted = "FIELD_PROTECTION_MIGRATION_COMPLETED";
     public const string FieldProtectionMigrationFailed = "FIELD_PROTECTION_MIGRATION_FAILED";
     public const string FieldProtectionMigrationRetried = "FIELD_PROTECTION_MIGRATION_RETRIED";
+    public const string FieldProtectionReconciliationRequested = "FIELD_PROTECTION_RECONCILIATION_REQUESTED";
+    public const string FieldProtectionReconciliationAttested = "FIELD_PROTECTION_RECONCILIATION_ATTESTED";
     public const string FieldDeclassified = "FIELD_DECLASSIFIED";
     public const string FieldProtectionDowngraded = "FIELD_PROTECTION_DOWNGRADED";
     public const string FieldValuesDeprotected = "FIELD_VALUES_DEPROTECTED";
@@ -44,6 +46,13 @@ public static class AuditActions
     public const string RecordAccessRevoked = "RECORD_ACCESS_REVOKED";
     public const string RecordOwnershipTransferred = "RECORD_OWNERSHIP_TRANSFERRED";
     public const string AccessDenied = "ACCESS_DENIED";
+    public const string FieldSearchApproved = "FIELD_SEARCH_APPROVED";
+    public const string SecurityAdministratorAppointed = "SECURITY_ADMINISTRATOR_APPOINTED";
+    public const string SecurityAdministratorRemoved = "SECURITY_ADMINISTRATOR_REMOVED";
+    public const string FieldSearchWithdrawn = "FIELD_SEARCH_WITHDRAWN";
+    public const string FieldSearchersChanged = "FIELD_SEARCHERS_CHANGED";
+    public const string FormVersionAuthorityRegistered = "FORM_VERSION_AUTHORITY_REGISTERED";
+    public const string FormVersionAuthorityRegistrationFailed = "FORM_VERSION_AUTHORITY_REGISTRATION_FAILED";
 }
 
 /// <summary>

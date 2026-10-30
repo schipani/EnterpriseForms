@@ -70,6 +70,11 @@ public static class FormDesignerEndpoints
             .WithName("RetryFieldProtectionMigration")
             .WithSummary("Re-queues the failed records of a field's encryption migration (design permission; audited).");
 
+        group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection/reconciliations", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, RequestFieldProtectionReconciliationRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.RequestProtectionReconciliationAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("RequestFieldProtectionReconciliation")
+            .WithSummary("Phase C7 M4 (G19): queues a verify-only reconciliation of the field's current protection decision against the Authorization Authority's complete record population (Worker verifier; never converts anything; same permission as retrying the migration; audited). 409 while the migration or another reconciliation is still running.");
+
         group.MapPost("/{formDefinitionId:guid}/fields/{fieldDefinitionId:guid}/protection/reclassify", static async Task<Ok<FieldProtectionResponse>> (Guid formDefinitionId, Guid fieldDefinitionId, ReclassifyFieldRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.ReclassifyFieldAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, fieldDefinitionId, request, cancellationToken).ConfigureAwait(false)))
             .WithName("ReclassifyField")

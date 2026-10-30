@@ -459,6 +459,354 @@
         }
       }
     },
+    "/internal/v1/integrity/verify-record-projections": {
+      "post": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Phase C7 OD-6: batch of 1..50 records, each verified exactly like VerifyRecordProjection (registry, discover/read, quarantine, archive receipt, complete leaf set, every signature, root, readable field scope) against the head the caller expects. Per-record typed results; mismatches quarantine the record; read action only. Not a signature oracle: every record needs the caller's own read or discover permission.",
+        "operationId": "VerifyRecordProjections",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRecordProjectionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyRecordProjectionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-catalogue": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "AC-5: the registered records of one form (registry parent) that the delegated user may discover, each with its accepted head, fixed as an Authority-held snapshot at one authorization, projection and content revision. More eligible records than maximum_entries ⇒ 422 LIMIT_EXCEEDED with no entries. Quarantined heads and resources are listed with their flag (a trusted search over them must fail).",
+        "operationId": "IssueSearchCatalogue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchCatalogueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchCatalogueResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-catalogue/{snapshotId}/validate": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Validates the caller's own snapshot against current Authority state: expiry, gate, authorization and projection revision (any change invalidates, OD-5), and — when the organization's content revision moved — every entry's head, quarantine and registry state. The id alone proves nothing.",
+        "operationId": "ValidateSearchCatalogue",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueSnapshotValidation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-catalogue/{snapshotId}/executions": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M3 (OD-8): journals one field-search execution over the caller's own snapshot on the audit stream (field ids, operators, counts, outcome, duration — never predicate values or record ids).",
+        "operationId": "RecordSearchExecution",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchExecutionEvidence"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchExecutionRecorded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "OD-1 (verifier workload only): the complete registered population of the form scoped by an effective PublishFormSecurityRevision command — records no user can discover included — with heads, quarantine and registry state, as a paged Authority-held snapshot. Issuance and denials are journaled on the audit stream. Never routed through the business API.",
+        "operationId": "IssueMigrationCatalogue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MigrationCatalogueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MigrationCataloguePage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue/{snapshotId}/entries": {
+      "get": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "A further page of the verifier's own migration catalogue snapshot (409 after expiry).",
+        "operationId": "ReadMigrationCatalogue",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MigrationCataloguePage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue/{snapshotId}/validate": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Validates the verifier's snapshot like the user snapshot, plus that the scoping command is still the field's current protection decision.",
+        "operationId": "ValidateMigrationCatalogue",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueSnapshotValidation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue/{snapshotId}/census": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M4 (G19, verifier only): verifies 1..50 entries of the verifier's own snapshot against their accepted manifests (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the head) and counts the decision's field rows in the old and the target form from the verified bytes. Counts only — never contents. A census held for the same accepted operation is reused only when it was verified since reuseSinceSnapshotId (this reconciliation's first snapshot) was issued; anything else is re-verified.",
+        "operationId": "TakeProtectionCensus",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProtectionCensusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionCensusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/migration-catalogue/{snapshotId}/attestation": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M4 (G19, verifier only): the Authority's reconciliation report for the snapshot's protection decision, computed now under the organization lock from the registry population, current heads and census results (nothing from the business database), journaled on the audit stream before it is returned. 409 when the decision was superseded.",
+        "operationId": "AttestProtectionReconciliation",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionAttestation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/verifier/protection-coverage": {
+      "post": {
+        "tags": [
+          "Catalogue"
+        ],
+        "summary": "Phase C7 M4 (verifier only): every current field protection decision of the organization (Authority protection resources, never the business form list) with its latest attestation; organization-complete only when each decision has a complete attestation under that decision.",
+        "operationId": "GetProtectionCoverage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProtectionCoverageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionCoverageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/operator/organizations": {
       "post": {
         "tags": [
@@ -514,6 +862,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrganizationGateStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/security-administrators": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Operator view: the organization's verified members and Security Administrators (identities only), and whether dual-controlled approval is available here.",
+        "operationId": "GetOperatorSecurityAdministrators",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSecurityAdministratorStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/security-administrators/first-appointment": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "DR-C7-3: first Security Administrator of an organization with none usable. dry_run previews the exact change and the statement to approve; execution needs two ES256 approvals from distinct registered approvers (OPERATOR_DUAL_CONTROL_UNAVAILABLE where approvals are not available, e.g. staging/production). Single-use operation id; journaled and alerted.",
+        "operationId": "AppointFirstSecurityAdministrator",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirstSecurityAdministratorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAdministratorProvisioningResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/security-administrators/recovery": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "DR-C7-3: recovery when the organization's Security Administrators are unavailable. Incident reference required; explicit scope (one appointee, named administrators removed); two independent approvals; critical security alert; journaled.",
+        "operationId": "RecoverSecurityAdministrator",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityAdministratorRecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAdministratorProvisioningResponse"
                 }
               }
             }
@@ -694,6 +1158,99 @@
           }
         }
       }
+    },
+    "/internal/v1/field-search/capabilities": {
+      "post": {
+        "tags": [
+          "FieldSearch"
+        ],
+        "summary": "Searchable fields of a form for the delegated user (query_fields + active AC-6 approvals; labels and options from the approval snapshot) and, for designers and security administrators only, the search configuration of the latest registered published version. Identical empty answer for no access and unknown forms.",
+        "operationId": "GetFieldSearchCapabilities",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSearchCapabilitiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchCapabilitiesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/field-search/administration": {
+      "post": {
+        "tags": [
+          "FieldSearch"
+        ],
+        "summary": "Phase C7 M3: forms of the caller's organization with an Authority-registered published version (title, version, field and approval counts) for search-approval administration. administer_security only; no Designer or record access needed or granted.",
+        "operationId": "GetFieldSearchAdministration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSearchAdministrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldSearchAdministrationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/security-administrators": {
+      "post": {
+        "tags": [
+          "FieldSearch"
+        ],
+        "summary": "The organization's Security Administrators (system_administrator) with their verified identities and appointing command; candidates (enabled identities) only for Security Administrators. Organization owners see the roster read-only; anyone else gets 404. Appointment and removal are GrantSystemRole / RevokeSystemRole security commands.",
+        "operationId": "GetSecurityAdministrators",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityAdministratorRosterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAdministratorRoster"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -717,6 +1274,81 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "BatchVerificationItem": {
+        "required": [
+          "form_record_id",
+          "expected_committed_operation_id",
+          "observed_items"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_committed_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observed_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
+            }
+          }
+        }
+      },
+      "BatchVerificationResult": {
+        "required": [
+          "form_record_id",
+          "verified",
+          "failure_reason_code",
+          "committed_content_revision",
+          "committed_operation_id",
+          "is_complete_projection",
+          "readable_items"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "failure_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "is_complete_projection": {
+            "type": "boolean"
+          },
+          "readable_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerifiedProjectionItem"
+            }
           }
         }
       },
@@ -831,6 +1463,109 @@
           },
           "canonical_bytes_base64": {
             "type": "string"
+          }
+        }
+      },
+      "CatalogueEntry": {
+        "required": [
+          "form_record_id",
+          "committed_content_revision",
+          "committed_operation_id",
+          "content_head_quarantined",
+          "resource_quarantined"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "content_head_quarantined": {
+            "type": "boolean"
+          },
+          "resource_quarantined": {
+            "type": "boolean"
+          },
+          "record_registered_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "content_head_modified_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "protection_census_outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CatalogueSnapshotValidation": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "valid",
+          "invalidation_reason",
+          "current_authorization_revision",
+          "current_content_integrity_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "invalidation_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "current_authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "current_content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -1210,6 +1945,366 @@
           }
         }
       },
+      "FieldSearchAdministrationForm": {
+        "required": [
+          "form_definition_id",
+          "form_title",
+          "registered_form_version_number",
+          "registered_on",
+          "field_count",
+          "eligible_field_count",
+          "active_approval_count",
+          "invalidated_approval_count"
+        ],
+        "type": "object",
+        "properties": {
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registered_form_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registered_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "field_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "eligible_field_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "active_approval_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "invalidated_approval_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "FieldSearchAdministrationRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FieldSearchAdministrationResponse": {
+        "required": [
+          "plaintext_search_permitted",
+          "approval_operational",
+          "approval_unavailable_reason",
+          "forms",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "plaintext_search_permitted": {
+            "type": "boolean"
+          },
+          "approval_operational": {
+            "type": "boolean"
+          },
+          "approval_unavailable_reason": {
+            "type": "string"
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchAdministrationForm"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FieldSearchCapabilitiesRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FieldSearchCapabilitiesResponse": {
+        "required": [
+          "form_definition_id",
+          "plaintext_search_permitted",
+          "search_policy_revision",
+          "authorization_revision",
+          "fields",
+          "configuration",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plaintext_search_permitted": {
+            "type": "boolean"
+          },
+          "search_policy_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchableFieldCapability"
+            }
+          },
+          "configuration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FieldSearchConfiguration"
+              }
+            ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "FieldSearchConfiguration": {
+        "required": [
+          "can_approve",
+          "approval_operational",
+          "approval_unavailable_reason",
+          "registered_form_version_number",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "can_approve": {
+            "type": "boolean"
+          },
+          "approval_operational": {
+            "type": "boolean"
+          },
+          "approval_unavailable_reason": {
+            "type": "string"
+          },
+          "registered_form_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchStatus"
+            }
+          },
+          "field_searchers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/FormAccessSubject"
+            }
+          }
+        }
+      },
+      "FieldSearchOption": {
+        "required": [
+          "field_option_id",
+          "option_label"
+        ],
+        "type": "object",
+        "properties": {
+          "field_option_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "option_label": {
+            "type": "string"
+          }
+        }
+      },
+      "FieldSearchStatus": {
+        "required": [
+          "field_definition_id",
+          "field_label",
+          "field_data_type",
+          "field_classification",
+          "protection_mode",
+          "eligibility",
+          "approval_state",
+          "invalidation_reason",
+          "approved_operators",
+          "permitted_operators"
+        ],
+        "type": "object",
+        "properties": {
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_label": {
+            "type": "string"
+          },
+          "field_data_type": {
+            "type": "string"
+          },
+          "field_classification": {
+            "type": "string"
+          },
+          "protection_mode": {
+            "type": "string"
+          },
+          "eligibility": {
+            "type": "string"
+          },
+          "approval_state": {
+            "type": "string"
+          },
+          "invalidation_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approved_operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "permitted_operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "FirstSecurityAdministratorRequest": {
+        "required": [
+          "operation_id",
+          "confirm_organization_id",
+          "target_authority_user_id",
+          "target_issuer_uri",
+          "target_subject_identifier",
+          "justification",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirm_organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_issuer_uri": {
+            "type": "string"
+          },
+          "target_subject_identifier": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "approvals": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "FormAccessState": {
         "required": [
           "form_definition_id",
@@ -1281,6 +2376,104 @@
           "AttachmentLifecycle"
         ]
       },
+      "MigrationCataloguePage": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "organization_id",
+          "form_definition_id",
+          "security_command_id",
+          "authorization_revision",
+          "content_integrity_revision",
+          "total_entry_count",
+          "entries",
+          "next_offset",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "total_entry_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogueEntry"
+            }
+          },
+          "next_offset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "MigrationCatalogueRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "security_command_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "OperationStatus": {
         "required": [
           "command_id",
@@ -1325,6 +2518,118 @@
               "null",
               "string"
             ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OperatorOrganizationPrincipal": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "identity_enabled",
+          "is_security_administrator",
+          "appointed_on"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "identity_enabled": {
+            "type": "boolean"
+          },
+          "is_security_administrator": {
+            "type": "boolean"
+          },
+          "appointed_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "OperatorSecurityAdministratorStatus": {
+        "required": [
+          "organization_id",
+          "organization_display_name",
+          "authorization_revision",
+          "usable_administrator_count",
+          "approval_mode",
+          "approvals_operational",
+          "approval_assurance",
+          "required_approvals",
+          "max_approval_lifetime_seconds",
+          "members",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "usable_administrator_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approvals_operational": {
+            "type": "boolean"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "required_approvals": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "max_approval_lifetime_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorOrganizationPrincipal"
+            }
           },
           "correlation_id": {
             "type": "string",
@@ -1628,6 +2933,518 @@
           "Quarantined"
         ]
       },
+      "ProtectionAttestation": {
+        "required": [
+          "protection_reconciliation_attestation_id",
+          "organization_id",
+          "security_command_id",
+          "form_definition_id",
+          "field_definition_id",
+          "protection_direction",
+          "search_catalogue_snapshot_id",
+          "expected_record_count",
+          "accepted_record_count",
+          "pending_creation_record_count",
+          "quarantined_record_count",
+          "compliant_record_count",
+          "not_applicable_record_count",
+          "old_form_remaining_record_count",
+          "old_form_remaining_occurrence_count",
+          "target_form_occurrence_count",
+          "unverified_record_count",
+          "not_yet_censused_record_count",
+          "envelope_issue_record_count",
+          "archived_record_count",
+          "retired_record_count",
+          "retained_history_revision_count",
+          "active_search_approval_count",
+          "attestation_complete",
+          "attestation_incomplete_reason",
+          "attestation_digest_hex",
+          "authorization_revision",
+          "content_integrity_revision",
+          "audit_journal_revision",
+          "attested_on",
+          "coverage_statement",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "protection_reconciliation_attestation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "protection_direction": {
+            "type": "string"
+          },
+          "search_catalogue_snapshot_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expected_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "accepted_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pending_creation_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantined_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "compliant_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "not_applicable_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "old_form_remaining_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "old_form_remaining_occurrence_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "target_form_occurrence_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unverified_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "not_yet_censused_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "envelope_issue_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "archived_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retired_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retained_history_revision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "active_search_approval_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "attestation_complete": {
+            "type": "boolean"
+          },
+          "attestation_incomplete_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "attestation_digest_hex": {
+            "type": "string"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "audit_journal_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "attested_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverage_statement": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProtectionCensusItem": {
+        "required": [
+          "form_record_id",
+          "expected_committed_operation_id",
+          "observed_items"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_committed_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observed_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
+            }
+          }
+        }
+      },
+      "ProtectionCensusRecordResult": {
+        "required": [
+          "form_record_id",
+          "outcome",
+          "committed_content_revision",
+          "committed_operation_id",
+          "field_occurrence_count",
+          "old_form_occurrence_count",
+          "envelope_issue_count",
+          "reused"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "field_occurrence_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "old_form_occurrence_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "envelope_issue_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reused": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProtectionCensusRequest": {
+        "required": [
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProtectionCensusItem"
+            }
+          },
+          "reuse_since_snapshot_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "ProtectionCensusResponse": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "field_definition_id",
+          "protection_direction",
+          "results",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "protection_direction": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProtectionCensusRecordResult"
+            }
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProtectionCoverageDecision": {
+        "required": [
+          "security_command_id",
+          "form_definition_id",
+          "field_definition_id",
+          "protection_direction",
+          "form_registered_active",
+          "latest_attestation"
+        ],
+        "type": "object",
+        "properties": {
+          "security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "protection_direction": {
+            "type": "string"
+          },
+          "form_registered_active": {
+            "type": "boolean"
+          },
+          "latest_attestation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProtectionAttestation"
+              }
+            ]
+          }
+        }
+      },
+      "ProtectionCoverageRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProtectionCoverageResponse": {
+        "required": [
+          "organization_id",
+          "registered_form_count",
+          "decision_count",
+          "attested_complete_decision_count",
+          "organization_complete",
+          "decisions",
+          "authorization_revision",
+          "computed_on",
+          "coverage_statement",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "registered_form_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "decision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "attested_complete_decision_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "organization_complete": {
+            "type": "boolean"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProtectionCoverageDecision"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "computed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverage_statement": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "RequestedAction": {
         "enum": [
           "Discover",
@@ -1641,7 +3458,8 @@
           "DesignForm",
           "CreateRecord",
           "ManageOrganization",
-          "AdministerSecurity"
+          "AdministerSecurity",
+          "QueryFields"
         ]
       },
       "ResourceKind": {
@@ -1670,6 +3488,537 @@
           }
         }
       },
+      "SearchableFieldCapability": {
+        "required": [
+          "field_definition_id",
+          "field_label",
+          "field_data_type",
+          "operators",
+          "options",
+          "approved_form_version_number"
+        ],
+        "type": "object",
+        "properties": {
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field_label": {
+            "type": "string"
+          },
+          "field_data_type": {
+            "type": "string"
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldSearchOption"
+            }
+          },
+          "approved_form_version_number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SearchCatalogueRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "maximum_entries"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maximum_entries": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SearchCatalogueResponse": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "organization_id",
+          "form_definition_id",
+          "authorization_revision",
+          "projection_revision",
+          "content_integrity_revision",
+          "entries",
+          "snapshot_expires_on",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogueEntry"
+            }
+          },
+          "snapshot_expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchExecutionEvidence": {
+        "required": [
+          "field_definition_ids",
+          "operators",
+          "condition_count",
+          "outcome",
+          "evaluated_record_count",
+          "matched_record_count",
+          "elapsed_milliseconds"
+        ],
+        "type": "object",
+        "properties": {
+          "field_definition_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "condition_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "evaluated_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "matched_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "elapsed_milliseconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "SearchExecutionRecorded": {
+        "required": [
+          "search_catalogue_snapshot_id",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_catalogue_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorCandidate": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityAdministratorEntry": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "appointed_on",
+          "appointed_by_security_command_id"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "appointed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "appointed_by_security_command_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorProvisioningResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "operation_id",
+          "operation_kind",
+          "organization_id",
+          "organization_display_name",
+          "target",
+          "role_name",
+          "current_administrators",
+          "removed_administrator_ids",
+          "consequences",
+          "approval_statement_json",
+          "approval_statement_sha256",
+          "approval_mode",
+          "approval_assurance",
+          "required_approvals",
+          "max_approval_lifetime_seconds",
+          "security_command_id",
+          "command_status",
+          "replayed",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_kind": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/OperatorOrganizationPrincipal"
+          },
+          "role_name": {
+            "type": "string"
+          },
+          "current_administrators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorOrganizationPrincipal"
+            }
+          },
+          "removed_administrator_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval_statement_json": {
+            "type": "string"
+          },
+          "approval_statement_sha256": {
+            "type": "string"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "required_approvals": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "max_approval_lifetime_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "command_status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorRecoveryRequest": {
+        "required": [
+          "operation_id",
+          "confirm_organization_id",
+          "target_authority_user_id",
+          "target_issuer_uri",
+          "target_subject_identifier",
+          "justification",
+          "incident_reference",
+          "removed_administrator_ids",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirm_organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_issuer_uri": {
+            "type": "string"
+          },
+          "target_subject_identifier": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "incident_reference": {
+            "type": "string"
+          },
+          "removed_administrator_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "approvals": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SecurityAdministratorRoster": {
+        "required": [
+          "can_manage",
+          "appointment_operational",
+          "appointment_unavailable_reason",
+          "administrators",
+          "candidates",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "can_manage": {
+            "type": "boolean"
+          },
+          "appointment_operational": {
+            "type": "boolean"
+          },
+          "appointment_unavailable_reason": {
+            "type": "string"
+          },
+          "administrators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAdministratorEntry"
+            }
+          },
+          "candidates": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SecurityAdministratorCandidate"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SecurityAdministratorRosterRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SecurityCommandKind": {
         "enum": [
           "RegisterTeam",
@@ -1687,7 +4036,11 @@
           "PublishFormSecurityRevision",
           "UnlinkChildRecord",
           "UpdateFormUsers",
-          "ReclassifyField"
+          "ReclassifyField",
+          "RegisterPublishedFormVersion",
+          "ApproveFieldSearch",
+          "WithdrawFieldSearch",
+          "UpdateFieldSearchers"
         ]
       },
       "SecurityCommandRequest": {
@@ -1967,6 +4320,53 @@
             "default": false
           }
         }
+      },
+      "VerifyRecordProjectionsRequest": {
+        "required": [
+          "organization_id",
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchVerificationItem"
+            }
+          }
+        }
+      },
+      "VerifyRecordProjectionsResponse": {
+        "required": [
+          "results",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchVerificationResult"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       }
     }
   },
@@ -1984,10 +4384,16 @@
       "name": "Content"
     },
     {
+      "name": "Catalogue"
+    },
+    {
       "name": "Operator"
     },
     {
       "name": "Sessions"
+    },
+    {
+      "name": "FieldSearch"
     }
   ]
 }

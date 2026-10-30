@@ -16,7 +16,10 @@ public sealed class ComposeStack
     public string Compose(string arguments, int timeoutSeconds = 180, bool throwOnError = true)
     {
         var envFile = File.Exists(Path.Combine(DockerDirectory, ".env")) ? ".env" : "env.example";
-        return Run("docker", $"compose -f compose.yaml -f compose.security-test.yaml --env-file {envFile} {arguments}", timeoutSeconds, throwOnError);
+        // Local workstations only: an extra overlay the stack was started with (e.g. pinned subnets), so that recreating one
+        // service does not fight the running stack's networks. Unset on hosted runners.
+        var overlay = Environment.GetEnvironmentVariable("SECTEST_EXTRA_COMPOSE_FILE") is { Length: > 0 } extra ? $" -f \"{extra}\"" : string.Empty;
+        return Run("docker", $"compose -f compose.yaml -f compose.security-test.yaml{overlay} --env-file {envFile} {arguments}", timeoutSeconds, throwOnError);
     }
 
     /// <summary>Executes SQL as the hostile BusinessDb administrator from the attacker container (never from the host).</summary>

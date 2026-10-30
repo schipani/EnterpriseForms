@@ -4,6 +4,7 @@ import { Button, Card, LoadingBlock, PageHeader, Select, StatusMessage, TextInpu
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { ErrorPanel } from "../../support";
+import { SecurityAdministratorsCard } from "../components/SecurityAdministratorsCard";
 import { SecurityPolicyCard } from "../components/SecurityPolicyCard";
 
 type Draft = { organizationDisplayName: string; logoAlternativeText: string; primary: string; primaryText: string; secondary: string; secondaryText: string; secondaryBorder: string; textScale: string; colorMode: string };
@@ -40,7 +41,15 @@ export function BrandingPage() {
   });
 
   if (!session.hasCapability("organization.manage")) {
-    return <StatusMessage tone="danger" title="No permission">Only an organization owner can change branding.</StatusMessage>;
+    // A Security Administrator who is not an owner sees only the Security Administrators section of Organization settings.
+    return session.hasCapability("security.administer") ? (
+      <>
+        <PageHeader title="Organization settings" lead="Security administration for this organization." />
+        <SecurityAdministratorsCard />
+      </>
+    ) : (
+      <StatusMessage tone="danger" title="No permission">Only an organization owner can change branding.</StatusMessage>
+    );
   }
   const current = branding.data;
   if (!current || !draft) {
@@ -101,6 +110,9 @@ export function BrandingPage() {
       </div>
       <div className="mt-6">
         <SecurityPolicyCard />
+      </div>
+      <div className="mt-6">
+        <SecurityAdministratorsCard />
       </div>
       {save.isError ? <div className="mt-4"><ErrorPanel error={save.error} /></div> : null}
       {save.isSuccess ? <div className="mt-4"><StatusMessage tone="success" title="Branding saved" /></div> : null}

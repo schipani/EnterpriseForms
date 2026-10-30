@@ -70,6 +70,36 @@ public static class OrganizationEndpoints
             .WithName("UpdateOrganizationSecurityPolicy")
             .WithSummary("OrganizationOwner only; reason required; audited; revision CAS.");
 
+        var securityAdministrators = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/security-administrators").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        securityAdministrators.MapGet("/", static async Task<Ok<SecurityAdministratorsResponse>> (HttpContext http, SecurityAdministratorsHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handlers.GetAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetSecurityAdministrators")
+            .WithSummary("The organization's Security Administrators (Authority relation system_administrator) — for its organization owners (read-only) and Security Administrators (with candidates); 403 for everyone else.")
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        securityAdministrators.MapPost("/", static async Task<NoContent> (AppointSecurityAdministratorRequest request, HttpContext http, SecurityAdministratorsHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                await handlers.AppointAsync(BusinessAuthentication.RequireContext(http), request, cancellationToken).ConfigureAwait(false);
+                return TypedResults.NoContent();
+            })
+            .WithName("AppointSecurityAdministrator")
+            .WithSummary("Appoints an existing verified member as Security Administrator: a GrantSystemRole security command that only a Security Administrator may submit, with step-up (unavailable in staging and production until PB-08). Reason required; audited by the Authority. 204 once Effective.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        securityAdministrators.MapPost("/{userId:guid}/remove", static async Task<NoContent> (Guid userId, RemoveSecurityAdministratorRequest request, HttpContext http, SecurityAdministratorsHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                await handlers.RemoveAsync(BusinessAuthentication.RequireContext(http), userId, request, cancellationToken).ConfigureAwait(false);
+                return TypedResults.NoContent();
+            })
+            .WithName("RemoveSecurityAdministrator")
+            .WithSummary("Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         var users = endpoints.MapGroup(ApiVersions.V1Prefix + "/users").WithTags("Identity").WithFeatureOwner("Identity").RequireAuthorization(BusinessAuthentication.Policy);
         users.MapGet("/", static async Task<Ok<IReadOnlyList<DirectoryUserResponse>>> (HttpContext http, IBusinessStore store, CancellationToken cancellationToken) =>
             {

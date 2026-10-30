@@ -69,6 +69,23 @@ services:
     image: enterpriseforms/authority:dev
     environment:
       Signing__VaultTransit__Token: ${DEVSTACK_VAULT_AUTHORITY_TOKEN:?use scripts/devstack/devstack.py (the custody file supplies the Vault token)}
+      # Phase C7 M2 (AC-6): development-only synthetic step-up so search approvals can be tried locally (Development +
+      # TestIdentityProvider only; the Authority refuses to start with it anywhere else).
+      FieldSearch__ApprovalStepUp: SyntheticDevelopment
+      # DR-C7-3: development-only synthetic operator approvers, enabled only by `devstack.py security-admin enable-approvals`
+      # (per-environment keys in the custody directory; only the public halves reach the Authority). Unset => Unavailable:
+      # operator appointments are refused. The Authority refuses the synthetic mode outside Development/Testing.
+      OperatorApprovals__Mode: ${DEVSTACK_OPERATOR_APPROVAL_MODE:-Unavailable}
+      OperatorApprovals__Approvers__0__ApproverId: ${DEVSTACK_OPERATOR_APPROVER_1_ID:-}
+      OperatorApprovals__Approvers__0__PublicKeyBase64: ${DEVSTACK_OPERATOR_APPROVER_1_PUBLIC_KEY:-}
+      OperatorApprovals__Approvers__1__ApproverId: ${DEVSTACK_OPERATOR_APPROVER_2_ID:-}
+      OperatorApprovals__Approvers__1__PublicKeyBase64: ${DEVSTACK_OPERATOR_APPROVER_2_PUBLIC_KEY:-}
+      # Phase C7 M4 (OD-1): development-only field-protection verifier credential, enabled only by
+      # `devstack.py protection-verifier enable` (per-environment key in the custody directory). Unset => no verifier:
+      # migration reconciliation reports itself unavailable (fail closed).
+      Identity__Verifier__Issuer: ${DEVSTACK_PROTECTION_VERIFIER_ISSUER:-}
+      Identity__Verifier__Audience: ${DEVSTACK_PROTECTION_VERIFIER_AUDIENCE:-}
+      Identity__Verifier__SharedKeyBase64: ${DEVSTACK_PROTECTION_VERIFIER_KEY:-}
 
   business-migrate:
     image: enterpriseforms/api:dev
@@ -76,11 +93,17 @@ services:
     image: enterpriseforms/api:dev
     environment:
       Encryption__LocalDevelopmentKekBase64: ${DEVSTACK_LOCAL_DEV_KEK_BASE64:?use scripts/devstack/devstack.py (the custody file supplies the KEK)}
+      # Phase C7 M3: verified field-value search (development only; the API refuses to start with it outside Development/Testing).
+      FieldSearch__ExecutionEnabled: "true"
     ports: ["127.0.0.1:${DEVSTACK_API_PORT:-5280}:8080"]
   worker:
     image: enterpriseforms/worker:dev
     environment:
       Encryption__LocalDevelopmentKekBase64: ${DEVSTACK_LOCAL_DEV_KEK_BASE64:?use scripts/devstack/devstack.py (the custody file supplies the KEK)}
+      # Phase C7 M4: the Worker's copy of the verifier credential above (the API never gets it).
+      ProtectionVerifier__Issuer: ${DEVSTACK_PROTECTION_VERIFIER_ISSUER:-}
+      ProtectionVerifier__Audience: ${DEVSTACK_PROTECTION_VERIFIER_AUDIENCE:-}
+      ProtectionVerifier__SharedKeyBase64: ${DEVSTACK_PROTECTION_VERIFIER_KEY:-}
   web:
     image: enterpriseforms/web:dev
     ports: ["127.0.0.1:${DEVSTACK_WEB_PORT:-8091}:8080"]

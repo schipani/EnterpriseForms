@@ -179,6 +179,7 @@ public sealed class PermissionCheckService(IAuthorityStore store, ISpiceDbProjec
             (ResourceKind.FieldItem, RequestedAction.Edit) => (new SpiceDbCheck(ResourceTypeNames.FieldItem, id, "edit", ResourceTypeNames.User, subject), false, null),
             (ResourceKind.FormDefinition, RequestedAction.DesignForm) => (new SpiceDbCheck(ResourceTypeNames.FormDefinition, id, "design", ResourceTypeNames.User, subject), true, ResourceTypeNames.FormDefinition),
             (ResourceKind.FormDefinition, RequestedAction.CreateRecord) => (new SpiceDbCheck(ResourceTypeNames.FormDefinition, id, "create_record", ResourceTypeNames.User, subject), true, ResourceTypeNames.FormDefinition),
+            (ResourceKind.FormDefinition, RequestedAction.QueryFields) => (new SpiceDbCheck(ResourceTypeNames.FormDefinition, id, "query_fields", ResourceTypeNames.User, subject), true, ResourceTypeNames.FormDefinition),
             (ResourceKind.Organization, RequestedAction.ManageOrganization) => (new SpiceDbCheck(ResourceTypeNames.Organization, id, "manage_configuration", ResourceTypeNames.User, subject), false, null),
             (ResourceKind.Organization, RequestedAction.AdministerSecurity) => (new SpiceDbCheck(ResourceTypeNames.Organization, id, "administer_security", ResourceTypeNames.User, subject), false, null),
             (ResourceKind.Organization, RequestedAction.DesignForm) => (new SpiceDbCheck(ResourceTypeNames.Organization, id, "create_form", ResourceTypeNames.User, subject), false, null),

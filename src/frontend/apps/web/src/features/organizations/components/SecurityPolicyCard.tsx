@@ -19,6 +19,7 @@ export function SecurityPolicyCard() {
   const [minimum, setMinimum] = useState("Internal");
   const [plaintext, setPlaintext] = useState(true);
   const [downgrade, setDowngrade] = useState(false);
+  const [searchable, setSearchable] = useState(false);
   const [statement, setStatement] = useState("");
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -26,12 +27,13 @@ export function SecurityPolicyCard() {
       setMinimum(policy.data.minimumFieldClassification);
       setPlaintext(policy.data.plaintextInternalFieldsPermitted);
       setDowngrade(policy.data.plaintextDowngradePermitted);
+      setSearchable(policy.data.plaintextSearchPermitted);
       setStatement(policy.data.isUnreviewedDefault ? "" : policy.data.policyStatementText);
       setLoaded(true);
     }
   }, [policy.data, loaded]);
   const save = useMutation({
-    mutationFn: () => api.organization.updateSecurityPolicy({ minimumFieldClassification: minimum, plaintextInternalFieldsPermitted: plaintext, plaintextDowngradePermitted: downgrade, policyStatementText: statement.trim(), expectedPolicyRevision: Number(policy.data!.securityPolicyRevision) }).then((r) => r.result),
+    mutationFn: () => api.organization.updateSecurityPolicy({ minimumFieldClassification: minimum, plaintextInternalFieldsPermitted: plaintext, plaintextDowngradePermitted: downgrade, plaintextSearchPermitted: searchable, policyStatementText: statement.trim(), expectedPolicyRevision: Number(policy.data!.securityPolicyRevision) }).then((r) => r.result),
     onSuccess: async () => {
       setLoaded(false);
       await queryClient.invalidateQueries({ queryKey: ["organization", "security-policy"] });
@@ -54,6 +56,7 @@ export function SecurityPolicyCard() {
       <Select label="Minimum field classification" value={minimum} disabled={!canManage} options={CLASSIFICATIONS.map((value) => ({ value, label: value }))} onValueChange={setMinimum} helpText="Designers cannot classify a field below this. Confidential or higher means every new field is encrypted." />
       <Checkbox label="Permit plaintext storage for Public/Internal fields" checked={plaintext} disabled={!canManage} onCheckedChange={(checked) => setPlaintext(checked === true)} helpText="Plaintext values are searchable within authorization and readable by a database administrator. Turning this off requires encryption for every new field." />
       <Checkbox label="Permit removal of encryption from Public/Internal fields (governance)" checked={downgrade} disabled={!canManage || !plaintext} onCheckedChange={(checked) => setDowngrade(checked === true)} helpText="ADR-PB-004 Amendment A1. Lets the organization owner or a system administrator release an already encrypted Public/Internal field to plaintext through an audited background migration. Confidential or Restricted fields first need a declassification with a governance approval reference by one administrator and the release by a different one. The policy is published to the Authorization Authority, which enforces it." />
+      <Checkbox label="Permit search approvals for plaintext Public/Internal fields" checked={searchable} disabled={!canManage || !plaintext} onCheckedChange={(checked) => setSearchable(checked === true)} helpText="Phase C7 (AC-6). Lets a security administrator approve individual plaintext Public/Internal fields for Advanced Search. Encrypted, Confidential and Restricted fields can never be approved. Turning this off makes every existing approval unusable and invalidates it in the Authorization Authority. Searching itself stays off until trusted search is enabled." />
       <TextArea label="Policy statement" value={statement} rows={3} maxLength={2000} disabled={!canManage} required helpText="Why plaintext is or is not acceptable for this organization (10 to 2000 characters); recorded with the audit event." onChange={(event) => setStatement(event.target.value)} />
       {!canManage ? <StatusMessage tone="info" title="Read-only">Only the organization owner can change this policy.</StatusMessage> : null}
       {save.isError ? <ErrorPanel error={save.error} /> : null}

@@ -1,10 +1,12 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { assertVerifiedOrigin } from "./isolation";
 
-export type Persona = "owner" | "designer" | "clerk" | "reader";
+export type Persona = "owner" | "designer" | "clerk" | "reader" | "security";
 
 /** Development-login persona buttons end in "(<key>)"; the dev-seed organization is shared across specs, so each spec creates uniquely named forms. */
 export async function signIn(page: Page, persona: Persona) {
   await page.goto("/login");
+  assertVerifiedOrigin(page.url()); // C7 M4 incident: never sign in (and so never write) on an origin the global setup did not verify
   await page.getByRole("button", { name: new RegExp("\\(" + persona + "\\)$") }).click();
   await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
 }

@@ -3,6 +3,7 @@ import { useApi } from "@enterpriseforms/app-runtime";
 import { Badge, Button, Card, DataTable, Dialog, LoadingBlock, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { FieldSearchersCard } from "../../search";
 import { ErrorPanel } from "../../support";
 
 /**
@@ -13,8 +14,10 @@ import { ErrorPanel } from "../../support";
 export function FormAccessPanel({ formDefinitionId, canManage }: { formDefinitionId: string; canManage: boolean }) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const access = useQuery({ queryKey: ["forms", formDefinitionId, "access"], queryFn: () => api.forms.access(formDefinitionId).then((r) => r.result), enabled: canManage });
-  const users = useQuery({ queryKey: ["users"], queryFn: () => api.organization.users().then((r) => r.result), enabled: canManage });
+  // Read for everyone who opens the form: the Authority answers organization administrators too (who may not design this
+  // form), and the search-access card below shows itself only to security administrators.
+  const access = useQuery({ queryKey: ["forms", formDefinitionId, "access"], queryFn: () => api.forms.access(formDefinitionId).then((r) => r.result), retry: false });
+  const users = useQuery({ queryKey: ["users"], queryFn: () => api.organization.users().then((r) => r.result) });
   const [grantOpen, setGrantOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<FormAccessSubjectResponse | null>(null);
   const [personId, setPersonId] = useState<string | undefined>(undefined);
@@ -37,7 +40,12 @@ export function FormAccessPanel({ formDefinitionId, canManage }: { formDefinitio
   });
 
   if (!canManage) {
-    return <StatusMessage tone="info" title="Form permissions">Only designers of this form and organization administrators can see or change who may create records.</StatusMessage>;
+    return (
+      <div className="flex flex-col gap-4">
+        <StatusMessage tone="info" title="Form permissions">Only designers of this form and organization administrators can see or change who may create records.</StatusMessage>
+        <FieldSearchersCard formDefinitionId={formDefinitionId} people={users.data ?? []} teams={access.data?.availableTeams ?? []} />
+      </div>
+    );
   }
   if (access.isPending) {
     return <LoadingBlock label="Reading permissions from the Authorization Authority" />;
@@ -100,6 +108,7 @@ export function FormAccessPanel({ formDefinitionId, canManage }: { formDefinitio
           ]}
         />
       </Card>
+      <FieldSearchersCard formDefinitionId={formDefinitionId} people={users.data ?? []} teams={data.availableTeams} />
 
       <Dialog
         open={grantOpen}

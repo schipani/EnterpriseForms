@@ -79,6 +79,8 @@ The custody file `%USERPROFILE%\.enterpriseforms\dev-vault\enterpriseforms-dev\c
 
 The same folder holds `state.json`, which is not secret: organization id, key metadata, probe record and acceptance record ids.
 
+DR-C7-3 (C-71): after `security-admin enable-approvals` the folder also holds `operator-approvers.json` — two DEVELOPMENT-ONLY synthetic operator approver key pairs (owner-only ACL, never printed). The Authority receives only the public halves. They are synthetic: one person holds both, so approvals made with them are recorded as not two-human evidence. `custody.json` is never rewritten for this. Losing the file only means generating new keys (and recreating the Authority); it protects nothing else.
+
 **Rules:**
 * **Never commit the custody file or paste it anywhere.** `.gitignore` already excludes `.env*`. The custody folder lives outside the working tree, and `artifacts/` (evidence) is git-ignored.
 * **Keep a second copy** of `custody.json` in a password manager or an encrypted vault. Without it the Vault volume cannot be unsealed, and every record in this environment becomes unverifiable, exactly like the incident.
@@ -104,6 +106,7 @@ Run from the repository root. Docker Desktop must be running.
 | Backup | `python scripts/devstack/devstack.py backup` | Records the expected verified state, stops the stack, tars every project volume to `Documents\EnterpriseForms-dev-backups\enterpriseforms-dev\<timestamp>\` with `manifest.json` (SHA-256, entry counts, commit, expected state), then restarts. |
 | Restore drill | `python scripts/devstack/devstack.py restore-test <backup dir>` | Verifies checksums. Restores into the disposable project `enterpriseforms-dev-restoretest` (own volumes, subnets `172.29.x`, ports 5281/8092), unseals with custody and compares against the manifest, then deletes **only** that disposable project. The live stack is not touched. |
 | Proofs | `verify-persistence`, `verify-workflow`, `prepare-acceptance` | See §5. Evidence JSON goes to `artifacts/dev-persistent/`. |
+| Security Administrators (DR-C7-3) | `security-admin status`, `security-admin enable-approvals`, `security-admin appoint --persona owner --justification "..." [--execute]`, `security-admin recover ...` | Operator-plane first appointment or recovery through the dev-seed tool inside the stack network. Dry run by default; `--execute` additionally requires typing the organization id and `APPOINT`; two synthetic approvals then sign that one operation. See `docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md` §7. |
 
 **Restoring for real** (not drilled here; it overwrites):
 1. Stop the stack.

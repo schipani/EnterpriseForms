@@ -16,6 +16,21 @@ public sealed class BusinessProblemHandler : IExceptionHandler
         ProblemDetails problem;
         switch (exception)
         {
+            case Application.Features.Search.FieldSearch.SearchException ex:
+                // ADR-PB-004 typed search failure: retry guidance and the reason, never a predicate value or field existence.
+                problem = Build(ex.HttpStatusCode, ex.ErrorCode, ex.Message);
+                problem.Extensions["retryable"] = ex.Retryable;
+                if (ex.UnavailableReason is not null)
+                {
+                    problem.Extensions["unavailable_reason"] = ex.UnavailableReason;
+                }
+
+                if (ex.LimitKind is not null)
+                {
+                    problem.Extensions["limit_kind"] = ex.LimitKind;
+                }
+
+                break;
             case BusinessException ex:
                 problem = Build(ex.HttpStatusCode, ex.ErrorCode, ex.Message);
                 if (ex.FieldKeys.Count > 0)

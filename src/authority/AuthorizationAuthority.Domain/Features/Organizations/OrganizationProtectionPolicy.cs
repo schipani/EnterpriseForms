@@ -20,6 +20,12 @@ public sealed class OrganizationProtectionPolicy
 
     public long PolicyRevision { get; set; } = 1;
 
+    /// <summary>Phase C7 M2 (AC-6 §4.2): plaintext value search may be approved at all. Default false; turning it off invalidates every approval.</summary>
+    public bool PlaintextSearchPermitted { get; set; }
+
+    /// <summary>Advances whenever field search policy (organization flag or any approval) changes.</summary>
+    public long SearchPolicyRevision { get; set; }
+
     public Guid UpdatedBySecurityCommandId { get; set; }
 
     public DateTimeOffset PolicyUpdatedOn { get; set; }

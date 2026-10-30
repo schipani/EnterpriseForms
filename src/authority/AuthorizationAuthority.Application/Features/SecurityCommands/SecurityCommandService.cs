@@ -9,7 +9,7 @@ using AuthorizationAuthority.Domain.Features.SecurityCommands;
 namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 
 /// <summary>Authoritative security-commit point (CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md §2 "Command sequence").</summary>
-public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock)
+public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate)
 {
     public async Task<OperationStatus> SubmitAsync(VerifiedActor actor, SecurityCommandRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
@@ -66,7 +66,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             }
 
             var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
-            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken).ConfigureAwait(false);
+            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
             ApplyPlan(scope, state, command, plan, bound, request, cancellationToken);
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -77,6 +77,16 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             command.CommandStateName = SecurityCommandStates.Rejected;
             command.RejectionReasonCode = ex.ErrorCode;
             scope.AddCommand(command);
+            if (request.CommandKind is SecurityCommandKind.ApproveFieldSearch or SecurityCommandKind.WithdrawFieldSearch or SecurityCommandKind.UpdateFieldSearchers or SecurityCommandKind.RegisterPublishedFormVersion)
+            {
+                // OD-8: refused AC-6 decisions are also hash-chained, archived evidence on the audit stream (no values, no predicates).
+                AuditJournal.Append(scope, state, "FieldSearchCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), form_definition_id = request.Resource.ResourceId, actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, rejection_detail = ex.ErrorCode is AuthorityErrorCodes.FieldSearchNotEligible ? ex.Message : null, correlation_id = correlationId }, clock);
+            }
+            else if (request.CommandKind is SecurityCommandKind.GrantSystemRole or SecurityCommandKind.RevokeSystemRole)
+            {
+                // Refused Security Administrator appointments and removals: independent, archived evidence on the audit stream.
+                AuditJournal.Append(scope, state, "SecurityAdministratorCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
+            }
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
@@ -172,6 +182,31 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             {
                 scope.AddProtectionPolicy(policy);
             }
+        }
+
+        if (plan.PublishedVersion is { } publishedVersion)
+        {
+            publishedVersion.RegisteredBySecurityCommandId = command.SecurityCommandId;
+            publishedVersion.RegisteredOn = now;
+            scope.AddPublishedFormVersion(publishedVersion);
+        }
+
+        foreach (var approval in plan.NewApprovals)
+        {
+            approval.ApprovedBySecurityCommandId = command.SecurityCommandId;
+            approval.ApprovedOn = now;
+            scope.AddFieldSearchApproval(approval);
+        }
+
+        foreach (var approval in plan.ChangedApprovals)
+        {
+            approval.ChangedBySecurityCommandId = command.SecurityCommandId;
+            approval.StateChangedOn = now;
+        }
+
+        if (plan.SearchPolicyToAdvance is { } searchPolicy)
+        {
+            searchPolicy.SearchPolicyRevision++;
         }
 
         command.CommandStateName = SecurityCommandStates.CommittedAwaitingProjection;

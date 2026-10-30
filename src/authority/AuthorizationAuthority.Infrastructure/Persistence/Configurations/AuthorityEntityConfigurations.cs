@@ -1,4 +1,6 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
@@ -64,6 +66,8 @@ public sealed class AuthorityResourceConfiguration : IEntityTypeConfiguration<Au
         builder.Property(e => e.ResourceTypeName).HasMaxLength(40);
         builder.Property(e => e.ResourceLifecycleState).HasMaxLength(20);
         builder.HasIndex(e => new { e.OrganizationId, e.ResourceTypeName, e.ResourceEntityId }).IsUnique().HasDatabaseName("uq_authority_resource");
+        // Phase C7 AC-5: form-scoped catalogue enumeration without scanning the organization's registry.
+        builder.HasIndex(e => new { e.OrganizationId, e.ResourceTypeName, e.ParentResourceEntityId, e.ResourceLifecycleState }).HasDatabaseName("ix_authority_resources_form_scope");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_resource_org");
         builder.ToTable(t => t.HasCheckConstraint("ck_resource_lifecycle_state", "resource_lifecycle_state IN ('Registered','Active','Revoked','Quarantined')"));
     }
@@ -141,6 +145,8 @@ public sealed class SecurityJournalEntryConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.LastArchiveErrorCode).HasMaxLength(100);
         builder.HasIndex(e => new { e.OrganizationId, e.JournalStreamName, e.JournalStreamRevision }).IsUnique().HasDatabaseName("uq_journal_stream_revision");
         builder.HasIndex(e => new { e.OrganizationId, e.ArchiveDeliveryState }).HasDatabaseName("ix_journal_pending_archive");
+        // Phase C7 M1: a record's checkpoint entry is found by its operation in one indexed lookup (verification was O(content revisions) per record).
+        builder.HasIndex(e => new { e.OrganizationId, e.JournalStreamName, e.ContentChangeOperationId }).HasDatabaseName("ix_journal_content_operation");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_journal_org");
         builder.ToTable(t =>
         {
@@ -263,6 +269,41 @@ public sealed class IntegrityKeyRegistrationConfiguration : IEntityTypeConfigura
     }
 }
 
+public sealed class SearchCatalogueSnapshotConfiguration : IEntityTypeConfiguration<SearchCatalogueSnapshot>
+{
+    public void Configure(EntityTypeBuilder<SearchCatalogueSnapshot> builder)
+    {
+        builder.MapSnakeCase("search_catalogue_snapshots");
+        builder.HasKey(e => e.SearchCatalogueSnapshotId);
+        builder.Property(e => e.SnapshotScopeKind).HasMaxLength(30);
+        builder.Property(e => e.RequestingWorkloadName).HasMaxLength(100);
+        builder.Property(e => e.SnapshotInvalidationReason).HasMaxLength(60);
+        builder.HasIndex(e => new { e.OrganizationId, e.SnapshotExpiresOn }).HasDatabaseName("ix_search_catalogue_snapshots_expiry");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_search_catalogue_snapshot_org");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_search_catalogue_scope_kind", "snapshot_scope_kind IN ('UserSearch','MigrationVerification')");
+            t.HasCheckConstraint("ck_search_catalogue_scope_actor",
+                "(snapshot_scope_kind = 'UserSearch' AND requesting_authority_user_id IS NOT NULL AND scoping_security_command_id IS NULL) OR (snapshot_scope_kind = 'MigrationVerification' AND requesting_workload_name IS NOT NULL AND scoping_security_command_id IS NOT NULL AND requesting_authority_user_id IS NULL)");
+            t.HasCheckConstraint("ck_search_catalogue_entry_count", "catalogue_entry_count >= 0 AND octet_length(catalogue_digest) = 32");
+        });
+    }
+}
+
+public sealed class SearchCatalogueSnapshotEntryConfiguration : IEntityTypeConfiguration<SearchCatalogueSnapshotEntry>
+{
+    public void Configure(EntityTypeBuilder<SearchCatalogueSnapshotEntry> builder)
+    {
+        builder.MapSnakeCase("search_catalogue_snapshot_entries");
+        builder.HasKey(e => e.SearchCatalogueSnapshotEntryId);
+        builder.Property(e => e.ResourceLifecycleState).HasMaxLength(20);
+        builder.HasIndex(e => new { e.SearchCatalogueSnapshotId, e.CatalogueEntryPosition }).IsUnique().HasDatabaseName("uq_search_catalogue_entry_position");
+        builder.HasIndex(e => new { e.SearchCatalogueSnapshotId, e.FormRecordId }).IsUnique().HasDatabaseName("uq_search_catalogue_entry_record");
+        builder.HasOne<SearchCatalogueSnapshot>().WithMany().HasForeignKey(e => e.SearchCatalogueSnapshotId).HasConstraintName("fk_search_catalogue_entry_snapshot");
+        builder.ToTable(t => t.HasCheckConstraint("ck_search_catalogue_entry_revision", "committed_content_revision >= 0 AND catalogue_entry_position >= 0"));
+    }
+}
+
 public sealed class AuthenticatedSessionConfiguration : IEntityTypeConfiguration<AuthenticatedSession>
 {
     public void Configure(EntityTypeBuilder<AuthenticatedSession> builder)
@@ -279,6 +320,100 @@ public sealed class AuthenticatedSessionConfiguration : IEntityTypeConfiguration
             t.HasCheckConstraint("ck_session_digest_length", "octet_length(session_secret_digest) = 32");
             t.HasCheckConstraint("ck_session_expiry_order", "session_expires_on > session_created_on AND session_idle_timeout_seconds > 0");
             t.HasCheckConstraint("ck_session_revocation", "(session_revoked_on IS NULL AND session_revocation_reason IS NULL) OR (session_revoked_on IS NOT NULL AND session_revocation_reason IN ('LOGOUT','REPLACED_BY_NEW_SIGN_IN'))");
+        });
+    }
+}
+
+/// <summary>Phase C7 M2 (OD-3): immutable registered published form versions (append-only for the runtime).</summary>
+public sealed class PublishedFormVersionConfiguration : IEntityTypeConfiguration<PublishedFormVersion>
+{
+    public void Configure(EntityTypeBuilder<PublishedFormVersion> builder)
+    {
+        builder.MapSnakeCase("published_form_versions");
+        builder.HasKey(e => e.PublishedFormVersionId);
+        builder.Property(e => e.LayoutDigestScheme).HasMaxLength(40);
+        builder.Property(e => e.FieldManifestJson).HasColumnType("jsonb");
+        builder.Property(e => e.FormTitleSnapshot).HasMaxLength(300);
+        builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId, e.FormVersionNumber }).IsUnique().HasDatabaseName("uq_published_form_version_number");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_published_form_version_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.RegisteredBySecurityCommandId).HasConstraintName("fk_published_form_version_command");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_published_form_version_number", "form_version_number >= 1");
+            t.HasCheckConstraint("ck_published_form_version_digest", "octet_length(layout_digest) = 32");
+        });
+    }
+}
+
+/// <summary>Phase C7 M2 (AC-6): field search approvals; state changes only through security commands.</summary>
+public sealed class FieldSearchApprovalConfiguration : IEntityTypeConfiguration<FieldSearchApproval>
+{
+    public void Configure(EntityTypeBuilder<FieldSearchApproval> builder)
+    {
+        builder.MapSnakeCase("field_search_approvals");
+        builder.HasKey(e => e.FieldSearchApprovalId);
+        builder.Property(e => e.ApprovedFieldDataType).HasMaxLength(20);
+        builder.Property(e => e.ApprovedFieldClassification).HasMaxLength(20);
+        builder.Property(e => e.ApprovedProtectionMode).HasMaxLength(30);
+        builder.Property(e => e.ApprovedOperatorsJson).HasColumnType("jsonb");
+        builder.Property(e => e.ApprovedFieldLabelSnapshot).HasMaxLength(300);
+        builder.Property(e => e.ApprovedOptionSnapshotJson).HasColumnType("jsonb");
+        builder.Property(e => e.ApprovalReferenceText).HasMaxLength(200);
+        builder.Property(e => e.ApprovalStateName).HasMaxLength(20);
+        builder.Property(e => e.InvalidationReasonCode).HasMaxLength(60);
+        builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId, e.FieldDefinitionId }).HasDatabaseName("ix_field_search_approvals_field");
+        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId }).IsUnique().HasFilter("approval_state_name = 'Active'").HasDatabaseName("uq_field_search_approval_active");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_field_search_approval_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ApprovedBySecurityCommandId).HasConstraintName("fk_field_search_approval_command");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_field_search_approval_state", "approval_state_name IN ('Active','Withdrawn','Invalidated')");
+            t.HasCheckConstraint("ck_field_search_approval_classification", "approved_field_classification IN ('Public','Internal')");
+            t.HasCheckConstraint("ck_field_search_approval_protection", "approved_protection_mode = 'Standard'");
+            t.HasCheckConstraint("ck_field_search_approval_digest", "octet_length(approved_layout_digest) = 32");
+        });
+    }
+}
+
+/// <summary>Phase C7 M4 (G19): one census per (protection decision, record, accepted operation); immutable to the runtime (no DELETE).</summary>
+public sealed class ProtectionCensusResultConfiguration : IEntityTypeConfiguration<ProtectionCensusResult>
+{
+    public void Configure(EntityTypeBuilder<ProtectionCensusResult> builder)
+    {
+        builder.MapSnakeCase("protection_census_results");
+        builder.HasKey(e => e.ProtectionCensusResultId);
+        builder.Property(e => e.CensusOutcomeName).HasMaxLength(40);
+        builder.Property(e => e.VerifiedRecordStatus).HasMaxLength(20);
+        builder.Property(e => e.RequestingWorkloadName).HasMaxLength(100);
+        builder.HasIndex(e => new { e.ScopingSecurityCommandId, e.FormRecordId, e.CommittedOperationId }).IsUnique().HasDatabaseName("uq_protection_census_operation");
+        builder.HasIndex(e => new { e.OrganizationId, e.ScopingSecurityCommandId }).HasDatabaseName("ix_protection_census_command");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_protection_census_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ScopingSecurityCommandId).HasConstraintName("fk_protection_census_command");
+        builder.ToTable(t => t.HasCheckConstraint("ck_protection_census_counts",
+            "committed_content_revision > 0 AND field_occurrence_count >= 0 AND old_form_occurrence_count >= 0 AND old_form_occurrence_count <= field_occurrence_count AND envelope_issue_count >= 0"));
+    }
+}
+
+/// <summary>Phase C7 M4 (G19): Authority-computed reconciliation reports; immutable to the runtime (no DELETE), also journaled on the audit stream.</summary>
+public sealed class ProtectionReconciliationAttestationConfiguration : IEntityTypeConfiguration<ProtectionReconciliationAttestation>
+{
+    public void Configure(EntityTypeBuilder<ProtectionReconciliationAttestation> builder)
+    {
+        builder.MapSnakeCase("protection_reconciliation_attestations");
+        builder.HasKey(e => e.ProtectionReconciliationAttestationId);
+        builder.Property(e => e.ProtectionDirectionName).HasMaxLength(10);
+        builder.Property(e => e.AttestationIncompleteReason).HasMaxLength(60);
+        builder.Property(e => e.RequestingWorkloadName).HasMaxLength(100);
+        builder.HasIndex(e => new { e.OrganizationId, e.ScopingSecurityCommandId, e.AttestedAuditJournalRevision }).HasDatabaseName("ix_protection_attestation_command");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_protection_attestation_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ScopingSecurityCommandId).HasConstraintName("fk_protection_attestation_command");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_protection_attestation_direction", "protection_direction_name IN ('Encrypt','Decrypt')");
+            t.HasCheckConstraint("ck_protection_attestation_digest", "octet_length(attestation_digest) = 32");
+            // A complete attestation can never carry a remaining, quarantined, unverified or uncensused record (defence in depth for the service rule).
+            t.HasCheckConstraint("ck_protection_attestation_complete",
+                "NOT attestation_complete OR (attestation_incomplete_reason IS NULL AND old_form_remaining_record_count = 0 AND quarantined_record_count = 0 AND unverified_record_count = 0 AND not_yet_censused_record_count = 0 AND envelope_issue_record_count = 0 AND active_search_approval_count = 0)");
         });
     }
 }

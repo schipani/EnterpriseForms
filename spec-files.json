@@ -29,8 +29,8 @@
     },
     {
       "path": "SECURITY_GAP_ASSESSMENT.md",
-      "sha256": "f017ce2c185a7f2b0ba0714147dc71f0929670231372bbd9a09bb43c49947319",
-      "bytes": 29512
+      "sha256": "27f6914b1029c94f2bcafb89615a6ef7c423cab9db5192c0a0aa30f5e8c37f6f",
+      "bytes": 36596
     },
     {
       "path": "SECURITY_SIMPLIFICATION_RELEASE_NOTES.md",
@@ -78,6 +78,11 @@
       "bytes": 98554
     },
     {
+      "path": "docs/PHASE_C7_STATUS.md",
+      "sha256": "13a5b3e4abbb718f01a7b6aefc1827d297adaacec5ee04be26980f37c5860284",
+      "bytes": 107933
+    },
+    {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
       "sha256": "94aed64050704da8ec31a90ad594b98345b719ca94a8fa3dc9dd5093211d1fd9",
       "bytes": 3799
@@ -109,8 +114,8 @@
     },
     {
       "path": "docs/api/PB06_API_CONTRACT_STANDARD.md",
-      "sha256": "2bf4738113e263f7c8dae715dc8e95900ef3c799d55a89d67d697d43a4153828",
-      "bytes": 5405
+      "sha256": "f78b800f3430eb5b8a29e10b2a9634defd3f5c676e824d70b6be0f1b15db880d",
+      "bytes": 5934
     },
     {
       "path": "docs/architecture/ADR-ARCH-001-feature-vertical-slices.md",
@@ -119,8 +124,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "eab5801501439c7dc056d8ff1a7f3172baca9c51c189286940fc602a43f361d3",
-      "bytes": 8045
+      "sha256": "7310ed0548d80b4aa78c9b964f9dc2e5bacfc4ebdc4ee979b574511eca0405e1",
+      "bytes": 8907
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -141,6 +146,11 @@
       "path": "docs/architecture/PHASE_C6_RECORD_LIFECYCLE_AND_HISTORY.md",
       "sha256": "a524a9aa45022289f8bb236219fb2709d4cb5c5c21b413f0ad74aabc157a82d8",
       "bytes": 65888
+    },
+    {
+      "path": "docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md",
+      "sha256": "8888acc0f7fe8b96031b30edb58a1ab864e9e122c02c868d7136f3ba5d624723",
+      "bytes": 76194
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -234,8 +244,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "04cab2a56ec200db9e508d7313dcbe8822b476a76b49cecab8a33b3f11055ba7",
-      "bytes": 82533
+      "sha256": "6bb9987b4a1266ddb847a5191b7fb426ade4473641d8f40a5fc2cbae4882a26a",
+      "bytes": 118657
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -299,8 +309,8 @@
     },
     {
       "path": "docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md",
-      "sha256": "351584a8f8f473da1c4f3436075798d02abde451ba2f88eb654faf889391c504",
-      "bytes": 12123
+      "sha256": "bf17f86a8a0ecbe1e09310873505df4daf3c60a7271af3abc2d74c5f0dd86542",
+      "bytes": 13147
     },
     {
       "path": "docs/infrastructure/PB05_DEPLOYMENT_BLUEPRINT.md",
@@ -328,9 +338,19 @@
       "bytes": 3348
     },
     {
+      "path": "docs/security/C7_M4_DEVELOPMENT_INCIDENT_2026-10-29.md",
+      "sha256": "02b847a3363e0e92311a7c78597b79c7a4351d911860bdd0021e262c43b5643e",
+      "bytes": 9385
+    },
+    {
       "path": "docs/security/DOCUMENT_ENCRYPTION_AUDIT.md",
       "sha256": "0cef9d3ddb8d8689f1df57777a34de5bb7af28c8358d60b796a9067e5cf6fc71",
       "bytes": 13412
+    },
+    {
+      "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
+      "sha256": "f1249e4c9c0c43056345a250188bea7d18be0547978afe47187ee59ee15c67e7",
+      "bytes": 29934
     },
     {
       "path": "docs/security/G22_SESSION_CSRF_HOTFIX.md",
@@ -351,6 +371,11 @@
       "path": "docs/security/INDEPENDENT_CRYPTO_REVIEW_PACKAGE.md",
       "sha256": "f98f40734275f986ffbe5d42400121e1c04b6535880d2a16888477c206d2c4f3",
       "bytes": 18024
+    },
+    {
+      "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
+      "sha256": "dc096d0018cd4a745b1e9c12f16870a2dc04aff7387dd91d60bbefdbf7122bcf",
+      "bytes": 21554
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",
@@ -404,8 +429,8 @@
     },
     {
       "path": "docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md",
-      "sha256": "7fb5ab06affbf72abf8cb21c0efc8b03a7853c5ad25f557628aa37fdb00c48f4",
-      "bytes": 3928
+      "sha256": "3beac00d1001fa49d871f9414e2dd4e839c3ea81b30bf14d4310740fc15c30b8",
+      "bytes": 5420
     },
     {
       "path": "docs/ui/PB14_COLOR_CONTRAST.reference.ts",
@@ -461,6 +486,16 @@
       "path": "docs/ui/c1-designer-rebuild/TARGET_DESIGN.png",
       "sha256": "3992f7389ba5f5a1995830336c26ef2a8a0747e271eea3df9f6e173920b447e7",
       "bytes": 470486
+    },
+    {
+      "path": "docs/ui/my-records-search-1440.png",
+      "sha256": "40463ed234d7da60faefc3509ab595fa8278b78a6801c4f14dadc2e03d5e4ac6",
+      "bytes": 293432
+    },
+    {
+      "path": "docs/ui/my-records-search-320.png",
+      "sha256": "52280b9d1eee319fe08b23515ede7807355cc2273ac1d071d4a22ecb28762481",
+      "bytes": 207592
     },
     {
       "path": "form_model/RELATED_FORM_COLLECTIONS.md",
@@ -519,8 +554,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "fb509954f29d355b4da43fc3fb6072f0b3ab13d6e87998e94df09be5bbe7cfa6",
-      "bytes": 51524
+      "sha256": "22091be81d65359474a893af32712653c0d9c17ba6308af758ec5b4e68ba7b62",
+      "bytes": 64202
     },
     {
       "path": "scripts/generate-spec-manifest.py",
@@ -579,8 +614,8 @@
     },
     {
       "path": "security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md",
-      "sha256": "baa470d3e0498be7333b22d2dcd076dba8649fb56257dc335046004523d2c558",
-      "bytes": 3819
+      "sha256": "69f61a8099e89c1b78ed32809196589689621b8d2d0b9251f2c37be40926ec3a",
+      "bytes": 7788
     },
     {
       "path": "security_hardening/SECURITY_ACCEPTANCE_TESTS.md",
@@ -754,8 +789,8 @@
     },
     {
       "path": "trust_authority/spicedb.schema.zed",
-      "sha256": "94adb59a65e626e88e6dc24601d72f032e9ba97e61108ade847c3f0c5f23027f",
-      "bytes": 2507
+      "sha256": "bc1fc8022af81133f7f28a3648fef683fc777fac7b5d163eff360da3535b11f2",
+      "bytes": 2725
     },
     {
       "path": "trust_authority/trust-authority.openapi.yaml",

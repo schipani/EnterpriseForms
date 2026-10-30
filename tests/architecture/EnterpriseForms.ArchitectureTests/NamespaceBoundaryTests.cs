@@ -33,6 +33,35 @@ public sealed class NamespaceBoundaryTests
         Assert.True(result.IsSuccessful, Describe(result));
     }
 
+    /// <summary>
+    /// Phase C7 (ADR-PB-004 §4, C-56 D7): field search never reads the business store directly, so it cannot become a
+    /// BusinessDb-only search. Business rows may reach it only through the FormRecords verified-read port, checked against
+    /// the Authority-supplied catalogue (AC-5); in M0 it has no record dependency at all.
+    /// </summary>
+    private const string PolicyNamespace = "EnterpriseForms.Application.Features.Search.FieldSearchPolicy";
+
+    [Fact]
+    public void FieldSearchHasNoDirectBusinessDatabaseAccess()
+    {
+        var result = Types.InAssembly(typeof(Application.Common.Authority.IAuthorizationAuthorityClient).Assembly)
+            .That().ResideInNamespace("EnterpriseForms.Application.Features.Search")
+            .And().DoNotResideInNamespace(PolicyNamespace)
+            .ShouldNot()
+            .HaveDependencyOnAny(["EnterpriseForms.Application.Common.Persistence", "EnterpriseForms.Domain.Features.FormRecords", "EnterpriseForms.Application.Features.FormRecords.ListRecords"])
+            .GetResult();
+        Assert.True(result.IsSuccessful, Describe(result));
+
+        // Phase C7 M2: search-approval administration relays Authority commands and writes its audit events and directory
+        // display names through the business store, but it never touches records or their values.
+        var policy = Types.InAssembly(typeof(Application.Common.Authority.IAuthorizationAuthorityClient).Assembly)
+            .That().ResideInNamespace(PolicyNamespace)
+            .ShouldNot()
+            .HaveDependencyOnAny(["EnterpriseForms.Domain.Features.FormRecords", "EnterpriseForms.Application.Features.FormRecords", "EnterpriseForms.Application.Features.Search.FieldSearch", "EnterpriseForms.Application.Features.Search.Verification"])
+            .GetResult();
+        Assert.True(policy.IsSuccessful, Describe(policy));
+        Assert.Contains(typeof(Application.Features.Search.FieldSearch.FieldSearchHandler), Types.InAssembly(typeof(Application.Common.Authority.IAuthorizationAuthorityClient).Assembly).That().ResideInNamespace("EnterpriseForms.Application.Features.Search").GetTypes());
+    }
+
     [Fact]
     public void ContractsContainOnlyWireTypes()
     {

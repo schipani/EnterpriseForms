@@ -21,6 +21,15 @@ public static class InternalAuthentication
     public const string OperatorScheme = "Operator";
     public const string WorkloadPolicy = "WorkloadCaller";
     public const string OperatorPolicy = "OperatorCaller";
+
+    /// <summary>
+    /// Phase C7 OD-1: the separate field-protection verifier workload (privileged organization-wide migration catalogue). Its
+    /// own credential, scheme and role; the business API's workload credential can never satisfy it. Unconfigured ⇒ no scheme
+    /// is registered and the policy denies everything (fail closed).
+    /// </summary>
+    public const string VerifierScheme = "Verifier";
+    public const string VerifierPolicy = "VerifierCaller";
+    public const string VerifierRole = "field-protection-verifier";
     public const string UserAssertionHeader = "X-Delegated-User-Assertion";
     public const string CorrelationHeader = "X-Correlation-Id";
 
@@ -31,12 +40,30 @@ public static class InternalAuthentication
         services.AddHostedService<IdentityPolicyStartupGuard>();
 
         var identity = configuration.GetSection(IdentityOptions.SectionName).Get<IdentityOptions>() ?? new IdentityOptions();
-        services.AddAuthentication(WorkloadScheme)
+        var authentication = services.AddAuthentication(WorkloadScheme)
             .AddJwtBearer(WorkloadScheme, options => Configure(options, identity.Workload))
             .AddJwtBearer(OperatorScheme, options => Configure(options, identity.Operator));
+        var verifierConfigured = identity.Verifier.IsConfigured;
+        if (verifierConfigured)
+        {
+            authentication.AddJwtBearer(VerifierScheme, options => Configure(options, identity.Verifier));
+        }
+
         services.AddAuthorizationBuilder()
             .AddPolicy(WorkloadPolicy, policy => policy.AddAuthenticationSchemes(WorkloadScheme).RequireAuthenticatedUser().RequireClaim("workload_role", "business-api"))
-            .AddPolicy(OperatorPolicy, policy => policy.AddAuthenticationSchemes(OperatorScheme).RequireAuthenticatedUser().RequireClaim("workload_role", "authority-operator"));
+            .AddPolicy(OperatorPolicy, policy => policy.AddAuthenticationSchemes(OperatorScheme).RequireAuthenticatedUser().RequireClaim("workload_role", "authority-operator"))
+            .AddPolicy(VerifierPolicy, policy =>
+            {
+                if (verifierConfigured)
+                {
+                    policy.AddAuthenticationSchemes(VerifierScheme).RequireAuthenticatedUser().RequireClaim("workload_role", VerifierRole);
+                }
+                else
+                {
+                    // No verifier credential in this deployment: nothing can ever satisfy the policy.
+                    policy.AddAuthenticationSchemes(WorkloadScheme).RequireAssertion(_ => false);
+                }
+            });
         return services;
     }
 
@@ -113,6 +140,9 @@ public sealed class IdentityOptions
 
     public CredentialOptions Operator { get; set; } = new();
 
+    /// <summary>Optional (Phase C7 OD-1): the field-protection verifier workload credential; absent ⇒ the migration catalogue is unreachable.</summary>
+    public CredentialOptions Verifier { get; set; } = new();
+
     public UserAssertionOptions UserAssertion { get; set; } = new();
 }
 
@@ -175,6 +205,19 @@ public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options
         if (identity.Workload.SharedKeyBase64 == identity.Operator.SharedKeyBase64 || identity.Workload.SharedKeyBase64 == identity.UserAssertion.SharedKeyBase64)
         {
             throw new InvalidOperationException("Workload, operator and user-assertion credentials must be distinct.");
+        }
+
+        var verifier = identity.Verifier;
+        var verifierPartlyConfigured = !string.IsNullOrWhiteSpace(verifier.Issuer) || !string.IsNullOrWhiteSpace(verifier.Audience) || !string.IsNullOrWhiteSpace(verifier.SharedKeyBase64);
+        if (verifierPartlyConfigured && !verifier.IsConfigured)
+        {
+            throw new InvalidOperationException("Identity:Verifier must be configured completely (issuer, audience, ≥256-bit key) or not at all.");
+        }
+
+        if (verifier.IsConfigured && (verifier.SharedKeyBase64 == identity.Workload.SharedKeyBase64 || verifier.SharedKeyBase64 == identity.Operator.SharedKeyBase64 || verifier.SharedKeyBase64 == identity.UserAssertion.SharedKeyBase64
+                                      || verifier.Issuer == identity.Workload.Issuer || verifier.Issuer == identity.Operator.Issuer))
+        {
+            throw new InvalidOperationException("The verifier credential must have its own key and issuer, distinct from the workload, operator and user-assertion credentials (OD-1).");
         }
 
         var provider = identity.UserAssertion.ProviderKind;

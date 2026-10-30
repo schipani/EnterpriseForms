@@ -78,21 +78,25 @@ test.describe("Form control layout standard", () => {
     expect((await input.getAttribute("aria-describedby"))?.split(" ")).toContain(await error.getAttribute("id"));
   });
 
-  test("Form, Status, Sort by and Rows per page share one row with aligned labels, equal control heights and the input's height", async ({ page }) => {
+  test("Form | Status and Sort by | Rows per page form two aligned two-column rows with equal control heights and the input's height (C7 approved layout)", async ({ page }) => {
     await signIn(page, "owner");
     await page.goto("/app/records");
     const names = ["Form", "Status", "Sort by", "Rows per page"];
     const labels = await Promise.all(names.map((name) => box(page.locator("label", { hasText: new RegExp(`^${name}$`) }).first())));
     const controls = await Promise.all(names.map((name) => box(page.getByRole("combobox", { name, exact: true }))));
     for (let i = 0; i < names.length; i++) {
-      expect(Math.abs(labels[i]!.y - labels[0]!.y), `${names[i]} label top`).toBeLessThanOrEqual(TOLERANCE);
-      expect(Math.abs(controls[i]!.y - controls[0]!.y), `${names[i]} control top`).toBeLessThanOrEqual(TOLERANCE);
       expect(Math.abs(controls[i]!.height - controls[0]!.height), `${names[i]} control height`).toBeLessThanOrEqual(TOLERANCE);
       expect(bottom(labels[i]!), `${names[i]} label above its control`).toBeLessThanOrEqual(controls[i]!.y + TOLERANCE);
-      if (i > 0) {
-        expect(controls[i]!.x, `${names[i]} sits to the right of ${names[i - 1]}`).toBeGreaterThan(controls[i - 1]!.x);
-      }
     }
+    for (const [left, right] of [[0, 1], [2, 3]] as const) {
+      expect(Math.abs(labels[right]!.y - labels[left]!.y), `${names[right]} label top`).toBeLessThanOrEqual(TOLERANCE);
+      expect(Math.abs(controls[right]!.y - controls[left]!.y), `${names[right]} control top`).toBeLessThanOrEqual(TOLERANCE);
+      expect(controls[right]!.x, `${names[right]} sits to the right of ${names[left]}`).toBeGreaterThan(controls[left]!.x + controls[left]!.width - TOLERANCE);
+    }
+    // Second row below the first, in the same two columns.
+    expect(labels[2]!.y).toBeGreaterThan(bottom(controls[0]!) - TOLERANCE);
+    expect(Math.abs(controls[2]!.x - controls[0]!.x)).toBeLessThanOrEqual(TOLERANCE);
+    expect(Math.abs(controls[3]!.x - controls[1]!.x)).toBeLessThanOrEqual(TOLERANCE);
     expect(Math.abs(controls[0]!.height - (await box(searchInput(page))).height)).toBeLessThanOrEqual(TOLERANCE); // selects and inputs share a height
   });
 

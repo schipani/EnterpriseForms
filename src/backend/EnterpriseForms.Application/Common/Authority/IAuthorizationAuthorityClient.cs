@@ -53,6 +53,10 @@ public enum SecurityCommandKind
     UnlinkChildRecord,
     UpdateFormUsers,
     ReclassifyField,
+    RegisterPublishedFormVersion,
+    ApproveFieldSearch,
+    WithdrawFieldSearch,
+    UpdateFieldSearchers,
 }
 
 public enum SecurityCommandStatus
@@ -120,6 +124,28 @@ public sealed record FormAccessState(Guid FormDefinitionId, long AuthorizationRe
 
 public sealed record RecordDiscoveryPage(IReadOnlyList<Guid> FormRecordIds, long AuthorizationRevision, string? ContinuationToken);
 
+// Phase C7 M1 — AC-5 record catalogue and OD-6 batch verification (mirrors of the Authority's internal contract).
+
+public sealed record SearchCatalogueRequest(Guid OrganizationId, Guid FormDefinitionId, int MaximumEntries);
+
+/// <remarks>Phase C7 M3: Authority-held registration and head-change times (sorting and display of verified results).</remarks>
+public sealed record CatalogueEntry(Guid FormRecordId, long CommittedContentRevision, Guid? CommittedOperationId, bool ContentHeadQuarantined, bool ResourceQuarantined,
+    DateTimeOffset? RecordRegisteredOn = null, DateTimeOffset? ContentHeadModifiedOn = null, string? ProtectionCensusOutcome = null);
+
+/// <summary>The Authority's expected population of one form for the caller, with accepted heads, at one snapshot.</summary>
+public sealed record SearchCatalogue(Guid SearchCatalogueSnapshotId, Guid OrganizationId, Guid FormDefinitionId, long AuthorizationRevision, long ProjectionRevision, long ContentIntegrityRevision,
+    IReadOnlyList<CatalogueEntry> Entries, DateTimeOffset SnapshotExpiresOn, Guid CorrelationId);
+
+public sealed record CatalogueSnapshotValidation(Guid SearchCatalogueSnapshotId, bool Valid, string? InvalidationReason, long CurrentAuthorizationRevision, long CurrentContentIntegrityRevision, Guid CorrelationId);
+
+public sealed record BatchVerificationItem(Guid FormRecordId, Guid ExpectedCommittedOperationId, IReadOnlyList<StagedContentItem> ObservedItems);
+
+public sealed record VerifyRecordProjectionsRequest(Guid OrganizationId, IReadOnlyList<BatchVerificationItem> Records);
+
+public sealed record BatchVerificationResult(Guid FormRecordId, bool Verified, string? FailureReasonCode, long CommittedContentRevision, Guid? CommittedOperationId, bool IsCompleteProjection, IReadOnlyList<VerifiedProjectionItem> ReadableItems);
+
+public sealed record VerifyRecordProjectionsResponse(IReadOnlyList<BatchVerificationResult> Results, long AuthorizationRevision, Guid CorrelationId);
+
 /// <summary>Stable authority error surfaced to callers; the business API maps it to a Problem Details response without leaking internals.</summary>
 public sealed class AuthorityClientException(string errorCode, int httpStatusCode, bool retryable, string? detail = null) : Exception(detail ?? errorCode)
 {
@@ -155,6 +181,15 @@ public interface IAuthorizationAuthorityClient
 
     Task<VerifyRecordProjectionResult> VerifyRecordProjectionAsync(DelegatedUserContext user, VerifyRecordProjectionRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Phase C7 AC-5: the user-scoped catalogue of one form (Authority snapshot).</summary>
+    Task<SearchCatalogue> IssueSearchCatalogueAsync(DelegatedUserContext user, SearchCatalogueRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 AC-5: validates the caller's own snapshot against current Authority state.</summary>
+    Task<CatalogueSnapshotValidation> ValidateSearchCatalogueAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, CancellationToken cancellationToken);
+
+    /// <summary>Phase C7 OD-6: verifies 1..50 records, each independently against its expected accepted head.</summary>
+    Task<VerifyRecordProjectionsResponse> VerifyRecordProjectionsAsync(DelegatedUserContext user, VerifyRecordProjectionsRequest request, CancellationToken cancellationToken);
+
     /// <summary>AC-1 (Phase C6): accepted content revisions of a record, ascending from <paramref name="afterRevision"/>; full readers only (404 otherwise).</summary>
     Task<ContentHistoryPage> GetContentHistoryAsync(DelegatedUserContext user, Guid organizationId, Guid formRecordId, long? afterRevision, int limit, CancellationToken cancellationToken);
 
@@ -183,4 +218,69 @@ public interface IBrowserSessionStateAuthority
 
     /// <summary>Idempotent.</summary>
     Task<BrowserSessionState> RevokeSessionAsync(DelegatedUserContext user, string sessionDigestBase64, CancellationToken cancellationToken);
+}
+
+// ---- Phase C7 M2 (AC-6): Authority field search capabilities (mirrors AuthorizationAuthority.Contracts.V1.FieldSearchContracts).
+
+public sealed record FieldSearchCapabilitiesQuery(Guid OrganizationId, Guid FormDefinitionId);
+
+public sealed record FieldSearchOptionSnapshot(Guid FieldOptionId, string OptionLabel);
+
+public sealed record AuthoritySearchableField(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, IReadOnlyList<string> Operators, IReadOnlyList<FieldSearchOptionSnapshot> Options, int ApprovedFormVersionNumber);
+
+public sealed record AuthorityFieldSearchStatus(Guid FieldDefinitionId, string FieldLabel, string FieldDataType, string FieldClassification, string ProtectionMode, string Eligibility,
+    string ApprovalState, string? InvalidationReason, IReadOnlyList<string> ApprovedOperators, IReadOnlyList<string> PermittedOperators);
+
+public sealed record AuthorityFieldSearchConfiguration(bool CanApprove, bool ApprovalOperational, string ApprovalUnavailableReason, int? RegisteredFormVersionNumber, IReadOnlyList<AuthorityFieldSearchStatus> Fields,
+    IReadOnlyList<FormAccessSubjectState>? FieldSearchers = null);
+
+public sealed record AuthorityFieldSearchCapabilities(Guid FormDefinitionId, bool PlaintextSearchPermitted, long SearchPolicyRevision, long AuthorizationRevision,
+    IReadOnlyList<AuthoritySearchableField> Fields, AuthorityFieldSearchConfiguration? Configuration, Guid CorrelationId);
+
+/// <summary>Phase C7 M3 (OD-8): evidence of one execution — field ids, operators, counts, outcome (never values or record ids).</summary>
+public sealed record SearchExecutionEvidence(IReadOnlyList<Guid> FieldDefinitionIds, IReadOnlyList<string> Operators, int ConditionCount, string Outcome, int? EvaluatedRecordCount, int? MatchedRecordCount, long ElapsedMilliseconds);
+
+public sealed record FieldSearchAdministrationQuery(Guid OrganizationId);
+
+public sealed record AuthorityFieldSearchAdministrationForm(Guid FormDefinitionId, string? FormTitle, int RegisteredFormVersionNumber, DateTimeOffset RegisteredOn, int FieldCount, int EligibleFieldCount, int ActiveApprovalCount, int InvalidatedApprovalCount);
+
+public sealed record AuthorityFieldSearchAdministration(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<AuthorityFieldSearchAdministrationForm> Forms, long AuthorizationRevision, Guid CorrelationId);
+
+/// <summary>Phase C7 M2/M3: the Authority's field search capabilities, administration listing and execution evidence (narrow port; only the Search feature uses it).</summary>
+public interface IFieldSearchPolicyAuthority
+{
+    Task<AuthorityFieldSearchCapabilities> GetFieldSearchCapabilitiesAsync(DelegatedUserContext user, FieldSearchCapabilitiesQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Security administrators only (<c>administer_security</c>): forms with a registered published version and their search-approval counts.</summary>
+    Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Journals one execution over the caller's own catalogue snapshot on the Authority audit stream.</summary>
+    Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken);
+}
+
+// ---- Owner message 7: Security Administrators (mirrors AuthorizationAuthority.Contracts.V1 SecurityAdministratorRoster) ----
+
+public sealed record SecurityAdministratorRosterQuery(Guid OrganizationId);
+
+public sealed record AuthoritySecurityAdministrator(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, DateTimeOffset AppointedOn, Guid AppointedBySecurityCommandId);
+
+public sealed record AuthoritySecurityAdministratorCandidate(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier);
+
+public sealed record AuthoritySecurityAdministratorRoster(bool CanManage, bool AppointmentOperational, string AppointmentUnavailableReason, IReadOnlyList<AuthoritySecurityAdministrator> Administrators,
+    IReadOnlyList<AuthoritySecurityAdministratorCandidate>? Candidates, long AuthorizationRevision, Guid CorrelationId);
+
+/// <summary>Owner message 7: the Authority's Security Administrator roster (narrow port; only the Organizations feature uses it).</summary>
+public interface ISecurityAdministratorAuthority
+{
+    Task<AuthoritySecurityAdministratorRoster> GetSecurityAdministratorsAsync(DelegatedUserContext user, SecurityAdministratorRosterQuery query, CancellationToken cancellationToken);
+}
+
+// ---- C7 M4 incident correction: isolated test-stack identity (Testing environment only) ----
+
+public sealed record AuthorityStackIdentity(string EnvironmentName, string StackIdentity);
+
+/// <summary>The Authority's configured test-stack identity (Testing only; anything else fails). Used solely by the Testing-only identity endpoint.</summary>
+public interface ITestStackIdentityAuthority
+{
+    Task<AuthorityStackIdentity> GetTestStackIdentityAsync(CancellationToken cancellationToken);
 }

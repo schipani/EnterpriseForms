@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { CurrentProtectionSection } from "./FieldSecuritySection";
 import { OptionsEditor } from "./OptionsEditor";
 import { DependentChoices, RulesTab } from "./RulesTab";
+import { FieldSearchSection } from "../../search";
 import { ErrorPanel } from "../../support";
 
 export interface PlacementTarget {
@@ -41,7 +42,7 @@ export interface DesignerInspectorProps {
   strengthenPending: boolean;
   strengthenError: unknown;
   announce: (message: string) => void;
-  /** Opens the full Configure Field modal (Validation / Conditional Rules / Dropdown Choices / Placement & Alignment / Security & Encryption / Advanced) on `key`, optionally landing on a given tab. */
+  /** Opens the full Configure Field modal (Validation / Conditional Rules / Dropdown Choices / Placement & Alignment / Security & Encryption / Search / Advanced) on `key`, optionally landing on a given tab. */
   onOpenConfig: (key: string, tab?: string) => void;
   /** Repeating groups of the form (Phase C3). */
   groups?: readonly GroupDefinitionResponse[] | undefined;
@@ -64,7 +65,7 @@ const TYPE_LABEL: Record<string, string> = { String: "Text (String)", Integer: "
  * Right-hand inspector (Phase C3 designer UX refinement): the single place a selection starts. A placed field or
  * document collection shows a short **Field Properties** summary (label, type, help text, placeholder) with a
  * **Configure Field** button that opens the full Validation / Conditional Rules / Dropdown Choices (Option fields
- * only) / Placement & Alignment / Security & Encryption / Advanced workspace in a large modal (`FieldConfigModal`);
+ * only) / Placement & Alignment / Security & Encryption / Search / Advanced workspace in a large modal (`FieldConfigModal`);
  * there is no separate General tab — nothing it would show is not already in this quick panel. A section shows
  * **Section Properties** (unchanged, still inline —
  * it is short); an empty cell shows the Add Field options for that exact position. Presentation edits change the
@@ -287,7 +288,7 @@ export function ConfigureFieldButton({ onClick }: { onClick: () => void }) {
 
 /**
  * Full Field Properties content (Validation / Conditional Rules / Dropdown Choices for Option fields / Placement &
- * Alignment / Security & Encryption / Advanced), used only inside `FieldConfigModal` (Phase C3 designer UX
+ * Alignment / Security & Encryption / Search / Advanced), used only inside `FieldConfigModal` (Phase C3 designer UX
  * refinement — this used to render inline in the right-hand panel, with a General tab that duplicated the quick
  * inspector's label/type/help text/placeholder; General is gone, Required moved to Validation, Control stayed on
  * Advanced, and Placement moved to its own tab so nothing here repeats the quick inspector). The vertical tab
@@ -392,6 +393,13 @@ export function FieldProperties(props: DesignerInspectorProps & { element: Field
         </div>
       ),
     },
+    element.kind === "field"
+      ? {
+          value: "search",
+          label: "Search",
+          content: <FieldSearchSection formDefinitionId={props.formDefinitionId} fieldDefinitionId={field.fieldDefinitionId} />,
+        }
+      : null,
     {
       value: "advanced",
       label: "Advanced",

@@ -12,7 +12,7 @@ namespace EnterpriseForms.Application.Features.Dashboard;
 /// </summary>
 public sealed class DashboardHandler(IBusinessStore store, IAuthorizationAuthorityClient authority)
 {
-    public static readonly IReadOnlyList<string> CapabilityNames = ["records.discover", "forms.design", "organization.manage"];
+    public static readonly IReadOnlyList<string> CapabilityNames = ["records.discover", "forms.design", "organization.manage", "security.administer"];
 
     public async Task<IReadOnlyList<string>> CapabilitiesAsync(RequestContext context, CancellationToken cancellationToken)
     {
@@ -21,6 +21,7 @@ public sealed class DashboardHandler(IBusinessStore store, IAuthorizationAuthori
         [
             new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.DesignForm),
             new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.ManageOrganization),
+            new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.AdministerSecurity),
         ], cancellationToken).ConfigureAwait(false);
         var capabilities = new List<string> { "records.discover" };
         if (decisions[0].Allowed)
@@ -31,6 +32,12 @@ public sealed class DashboardHandler(IBusinessStore store, IAuthorizationAuthori
         if (decisions[1].Allowed)
         {
             capabilities.Add("organization.manage");
+        }
+
+        // Phase C7 M3: security administration (search approvals); navigation only — every action is decided by the Authority.
+        if (decisions[2].Allowed)
+        {
+            capabilities.Add("security.administer");
         }
 
         return capabilities;

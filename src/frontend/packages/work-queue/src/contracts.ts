@@ -43,6 +43,10 @@ export type ProblemDetails = {
   retryable?: boolean;
   /** Record fields a validation failure is about: `fieldKey` or `groupKey[n].fieldKey` (C-31). */
   field_keys?: string[];
+  /** Phase C7 search failures (ADR-PB-004): why verification is unavailable, e.g. TRUSTED_SEARCH_NOT_ENABLED. */
+  unavailable_reason?: string;
+  /** Phase C7 SEARCH_VERIFICATION_LIMIT: which ceiling was reached (records, bytes or time). */
+  limit_kind?: string;
 };
 
 export type OperationSuccess = { type: "succeeded"; operationId: string; status: number; result: unknown; etag?: string };

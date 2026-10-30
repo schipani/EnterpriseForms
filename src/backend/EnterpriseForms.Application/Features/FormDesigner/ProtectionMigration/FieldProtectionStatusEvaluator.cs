@@ -59,6 +59,7 @@ public static class FieldProtectionStatusEvaluator
     {
         FieldProtectionMigrationStates.Queued => noun + "MigrationQueued",
         FieldProtectionMigrationStates.Running => noun + "MigrationRunning",
+        FieldProtectionMigrationStates.Verifying => noun + "MigrationVerifying",
         FieldProtectionMigrationStates.Blocked => noun + "MigrationBlocked",
         FieldProtectionMigrationStates.Failed => noun + "MigrationFailed",
         _ => noun + "MigrationIncomplete",

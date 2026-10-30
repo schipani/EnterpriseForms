@@ -1,6 +1,8 @@
 import { emptyLayout, FormRenderer, type RendererField } from "@enterpriseforms/form-renderer";
 import { Badge, Button, Card, Checkbox, DataTable, Dialog, EmptyState, LoadingBlock, PageHeader, ProgressBar, Select, StatusMessage, Tabs, TextArea, TextInput } from "@enterpriseforms/ui";
+import type { FieldSearchCapabilitiesResponse } from "@enterpriseforms/api-client";
 import { useState } from "react";
+import { AdvancedFieldSearch } from "../../search";
 
 const ids = { name: "0199a2b3-c4d5-7e6f-8123-456789abcde1", age: "0199a2b3-c4d5-7e6f-8123-456789abcde2", dob: "0199a2b3-c4d5-7e6f-8123-456789abcde3", custody: "0199a2b3-c4d5-7e6f-8123-456789abcde4", status: "0199a2b3-c4d5-7e6f-8123-456789abcde5" };
 const galleryFields: RendererField[] = [
@@ -28,12 +30,34 @@ const galleryLayout = {
   ],
 };
 
+/**
+ * Synthetic capability response for the Advanced Search preview only: these fields do not exist, nothing is loaded from the
+ * API and Search records only reports what would be sent. My Records takes its capabilities from the server exclusively.
+ */
+const previewCapabilities: FieldSearchCapabilitiesResponse = {
+  formDefinitionId: "0199a2b3-c4d5-7e6f-8123-456789abcdf9",
+  fieldValueSearchAvailable: true,
+  unavailableReasonCode: null,
+  maximumConditions: 5,
+  conditionJoin: "And",
+  policyRevision: null,
+  fields: [
+    { fieldDefinitionId: ids.name, displayLabel: "Given name (sample)", valueType: "String", operators: ["equals", "startsWith"], options: [], minimumTextLength: 3, maximumTextLength: 200 },
+    { fieldDefinitionId: ids.age, displayLabel: "Age (sample)", valueType: "Integer", operators: ["equals", "greaterThan", "lessThan", "between"], options: [], minimumTextLength: null, maximumTextLength: null },
+    { fieldDefinitionId: ids.dob, displayLabel: "Date of birth (sample)", valueType: "Date", operators: ["equals", "before", "after", "between"], options: [], minimumTextLength: null, maximumTextLength: null },
+    { fieldDefinitionId: ids.custody, displayLabel: "In custody (sample)", valueType: "Boolean", operators: ["isTrue", "isFalse"], options: [], minimumTextLength: null, maximumTextLength: null },
+    { fieldDefinitionId: ids.status, displayLabel: "Status (sample)", valueType: "Option", operators: ["is"], options: [{ fieldOptionId: "0199a2b3-c4d5-7e6f-8123-456789abcdf1", displayText: "Active" }, { fieldOptionId: "0199a2b3-c4d5-7e6f-8123-456789abcdf2", displayText: "Closed" }], minimumTextLength: null, maximumTextLength: null },
+  ],
+  notSearchableFields: [{ fieldDefinitionId: "0199a2b3-c4d5-7e6f-8123-456789abcdfa", displayLabel: "Case notes (sample)", reasonCode: "ENCRYPTED" }],
+};
+
 /** PG-069 internal component gallery: every control state with synthetic data only (ADR-PB-014). */
 export function GalleryPage() {
   const [checked, setChecked] = useState(true);
   const [select, setSelect] = useState<string | undefined>("active");
   const [dialog, setDialog] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({ given_name: "Avery", status: "active", in_custody: "true" });
+  const [previewRuns, setPreviewRuns] = useState<number | null>(null);
   return (
     <>
       <PageHeader title="Component gallery" lead="Internal design-system validation page (PG-069). All data on this page is synthetic." />
@@ -94,6 +118,26 @@ export function GalleryPage() {
         </Card>
         <Card title="Table" className="lg:col-span-2">
           <DataTable caption="Sample rows" rowKey={(row) => row.id} rows={[{ id: "1", name: "Avery Lee", status: "Ready" }, { id: "2", name: "Jordan Kim", status: "Scanning" }]} columns={[{ key: "name", header: "Name", isRowHeader: true, render: (row) => row.name }, { key: "status", header: "Status", render: (row) => <Badge tone={row.status === "Ready" ? "success" : "warning"}>{row.status}</Badge> }]} />
+        </Card>
+        <Card title="Advanced Search (synthetic preview)" aria-label="Advanced Search (synthetic preview)" className="lg:col-span-2">
+          <div className="max-w-3xl">
+            <AdvancedFieldSearch
+              formSelected
+              capabilities={previewCapabilities}
+              defaultExpanded
+              onSearch={(conditions) => setPreviewRuns(conditions.length)}
+              notice={
+                <StatusMessage tone="info" title="Preview only">
+                  Sample fields, not connected to any form. Search records sends nothing; in My Records the server decides which fields can be searched.
+                </StatusMessage>
+              }
+            />
+            {previewRuns !== null ? (
+              <p className="mt-3 text-sm" role="status">
+                Preview: a search with {previewRuns} {previewRuns === 1 ? "condition" : "conditions"} would be sent. Nothing was searched.
+              </p>
+            ) : null}
+          </div>
         </Card>
         <Card title="Form renderer (responsive 4/2/1)" className="lg:col-span-2">
           <FormRenderer layout={galleryLayout} fields={galleryFields} values={values} onChange={(key, value) => setValues((current) => ({ ...current, [key]: value }))} />

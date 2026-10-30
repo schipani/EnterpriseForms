@@ -49,12 +49,18 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<AuthorityHttpClient>();
         services.AddSingleton<IAuthorizationAuthorityClient>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IBrowserSessionStateAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<IFieldSearchPolicyAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<ISecurityAdministratorAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<ITestStackIdentityAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IRecordDisplayDirectory, EnterpriseForms.Application.Features.FormRecords.Ports.RecordDisplayDirectory>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearchPolicy.FieldSearchPolicyHandlers>();
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AuthorityCommandAwaiter>();
         // Every host gets the no-op fault seam; only the Testing API host replaces it (TestingWriteFaults, F-C7-01).
         services.TryAddSingleton<EnterpriseForms.Application.Common.IWriteFaultInjector>(EnterpriseForms.Application.Common.NoWriteFaults.Instance);
         services.AddSingleton<RecordCandidateStager>();
+        services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IAcceptedRecordItemsReader, EnterpriseForms.Application.Features.FormRecords.Ports.AcceptedRecordItemsReader>();
         services.AddSingleton<VerifiedRecordReader>();
         services.AddSingleton<EnsureIdentityProjectionHandler>();
         services.AddSingleton<CreateFormDefinitionHandler>();
@@ -62,6 +68,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<OptionListHandlers>();
         services.AddSingleton<FormAccessHandlers>();
         services.AddSingleton<SecurityPolicyHandlers>();
+        services.AddSingleton<SecurityAdministratorsHandlers>();
         services.AddSingleton<CreateFormRecordHandler>();
         services.AddSingleton<GetFormRecordHandler>();
         services.AddSingleton<GetRecordProjectionHandler>();

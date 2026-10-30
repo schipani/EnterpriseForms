@@ -1,0 +1,75 @@
+{
+  "measuredOn": "2026-10-24T18:15:21.3837273+00:00",
+  "records": 200,
+  "valueProfile": "Accused form: 8 fields incl. encrypted names (name lengths 8..47), plaintext date/boolean/option/datetime/guid",
+  "backgroundWorkload": "address edits on another form every 250 ms",
+  "note": "engineering measurement; small samples; p99 of small n is near the maximum; not a capacity claim",
+  "levels": [
+    {
+      "concurrency": 1,
+      "rounds": 20,
+      "attempts": 21,
+      "verifications": 20,
+      "typedRetryableRefusals": 0,
+      "timeLimitRefusals": 0,
+      "serverMilliseconds": {
+        "p50": 2601.6,
+        "p95": 2692.2,
+        "p99": 2694.4,
+        "max": 2694.4,
+        "samples": 20
+      },
+      "clientMilliseconds": {
+        "p50": 2603,
+        "p95": 2693.5,
+        "p99": 2696.2,
+        "max": 2696.2,
+        "samples": 20
+      }
+    },
+    {
+      "concurrency": 4,
+      "rounds": 6,
+      "attempts": 28,
+      "verifications": 15,
+      "typedRetryableRefusals": 9,
+      "timeLimitRefusals": 0,
+      "serverMilliseconds": {
+        "p50": 6727.9,
+        "p95": 7666.6,
+        "p99": 7666.6,
+        "max": 7666.6,
+        "samples": 15
+      },
+      "clientMilliseconds": {
+        "p50": 6729.3,
+        "p95": 7668.7,
+        "p99": 7668.7,
+        "max": 7668.7,
+        "samples": 15
+      }
+    },
+    {
+      "concurrency": 8,
+      "rounds": 4,
+      "attempts": 40,
+      "verifications": 11,
+      "typedRetryableRefusals": 25,
+      "timeLimitRefusals": 0,
+      "serverMilliseconds": {
+        "p50": 13142.6,
+        "p95": 14995.2,
+        "p99": 14995.2,
+        "max": 14995.2,
+        "samples": 11
+      },
+      "clientMilliseconds": {
+        "p50": 13144.5,
+        "p95": 14997.7,
+        "p99": 14997.7,
+        "max": 14997.7,
+        "samples": 11
+      }
+    }
+  ]
+}

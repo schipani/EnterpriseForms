@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using System.Text.Json;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
@@ -134,9 +135,14 @@ public sealed class CommandPlannerTests
         var ex = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), massAssignment, graph, CancellationToken.None));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, ex.ErrorCode);
 
-        var unimplemented = Command(SecurityCommandKind.GrantSystemRole, ResourceKind.Organization, Org, new { });
+        var unimplemented = Command(SecurityCommandKind.UpdateShareScope, ResourceKind.FormRecord, Org, new { });
         var ex2 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), unimplemented, graph, CancellationToken.None));
         Assert.Equal(AuthorityErrorCodes.CommandKindNotImplemented, ex2.ErrorCode);
+
+        // Owner message 7: GrantSystemRole is implemented, and an organization owner cannot use it (no self-elevation).
+        var selfElevation = Command(SecurityCommandKind.GrantSystemRole, ResourceKind.Organization, Org, new { authority_user_id = OwnerUser, role_name = "system_administrator", reason = "none exists" });
+        var ex3 = await Assert.ThrowsAsync<AuthorityException>(() => CommandPlanner.PlanAsync(scope, Org, Actor(OwnerUser), selfElevation, graph, CancellationToken.None));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, ex3.ErrorCode);
     }
 
     [Fact]
@@ -370,6 +376,8 @@ public sealed class CommandPlannerTests
 
         public Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid org, Guid userId, CancellationToken ct) => Task.FromResult(org == organizationId ? Bindings.FirstOrDefault(b => b.AuthorityUserId == userId) : null);
 
+        public Task<List<IdentityBinding>> GetIdentityBindingsAsync(Guid org, CancellationToken ct) => Task.FromResult(org == organizationId ? Bindings.ToList() : []);
+
         public Task<RecordContentHead?> FindContentHeadAsync(Guid org, Guid recordId, bool lockForUpdate, CancellationToken ct) => Task.FromResult(org == organizationId && Heads.TryGetValue(recordId, out var head) ? head : null);
 
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid commitId, CancellationToken ct) => Task.FromResult(Leaves.TryGetValue(commitId, out var leaves) ? leaves : []);
@@ -421,6 +429,8 @@ public sealed class CommandPlannerTests
 
         public void AddJournalEntry(SecurityJournalEntry entry) => throw new NotSupportedException();
 
+        public Task<SecurityJournalEntry?> FindContentCommitJournalEntryAsync(Guid org, Guid operation, CancellationToken ct) => throw new NotSupportedException();
+
         public Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid org, string stream, long revision, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid org, int limit, CancellationToken ct) => throw new NotSupportedException();
@@ -451,9 +461,47 @@ public sealed class CommandPlannerTests
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<List<AuthorityResource>> GetFormRecordResourcesAsync(Guid org, Guid form, IReadOnlyCollection<string> states, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityResource>> GetResourcesAsync(Guid org, string type, IReadOnlyCollection<Guid> ids, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<RecordContentHead>> GetContentHeadsAsync(Guid org, IReadOnlyCollection<Guid> ids, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddCatalogueSnapshot(SearchCatalogueSnapshot snapshot, IEnumerable<SearchCatalogueSnapshotEntry> entries) => throw new NotSupportedException();
+
+        public Task<SearchCatalogueSnapshot?> FindCatalogueSnapshotAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesAsync(Guid id, int offset, int? limit, CancellationToken ct) => throw new NotSupportedException();
+
         public Task<AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession?> FindSessionByDigestAsync(byte[] digest, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddSession(AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession session) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion?> FindLatestPublishedFormVersionAsync(Guid org, Guid form, CancellationToken ct) => Task.FromResult<AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion?>(null);
+
+        public void AddPublishedFormVersion(AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion version) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion>> GetLatestPublishedFormVersionsAsync(Guid org, CancellationToken ct) => Task.FromResult(new List<AuthorizationAuthority.Domain.Features.FieldSearch.PublishedFormVersion>());
+
+        public Task<List<AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid org, Guid? form, CancellationToken ct) => Task.FromResult(new List<AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval>());
+
+        public void AddFieldSearchApproval(AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval approval) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid snapshot, IReadOnlyCollection<Guid> records, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid org, IReadOnlyCollection<string> types, IReadOnlyCollection<string> states, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<Dictionary<Guid, int>> CountManifestCommitsAsync(Guid org, IReadOnlyCollection<Guid> records, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.ProtectionCensusResult>> GetProtectionCensusResultsAsync(Guid org, Guid command, IReadOnlyCollection<Guid> records, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddProtectionCensusResult(AuthorizationAuthority.Domain.Features.Catalogue.ProtectionCensusResult result) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.Catalogue.ProtectionCensusResult?> FindProtectionCensusResultAsync(Guid command, Guid record, Guid operation, CancellationToken ct) => throw new NotSupportedException();
+
+        public void AddProtectionAttestation(AuthorizationAuthority.Domain.Features.Catalogue.ProtectionReconciliationAttestation attestation) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid org, IReadOnlyCollection<Guid> commands, CancellationToken ct) => throw new NotSupportedException();
 
         public Task CommitAsync(CancellationToken ct) => throw new NotSupportedException();
 

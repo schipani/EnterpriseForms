@@ -49,9 +49,23 @@ export type GroupDefinitionResponse = S["GroupDefinitionResponse"];
 export type CreateGroupDefinitionRequest = S["CreateGroupDefinitionRequest"];
 export type UpdateFieldDefinitionRequest = S["UpdateFieldDefinitionRequest"];
 export type FieldProtectionResponse = S["FieldProtectionResponse"];
+export type FieldSearchConfigurationResponse = S["FieldSearchConfigurationResponse"];
+export type FieldSearchStatusResponse = S["FieldSearchStatusResponse"];
+export type ApproveFieldSearchRequest = S["ApproveFieldSearchRequest"];
+export type WithdrawFieldSearchRequest = S["WithdrawFieldSearchRequest"];
+export type UpdateFieldSearchersRequest = S["UpdateFieldSearchersRequest"];
+export type FieldSearchAdministrationResponse = S["FieldSearchAdministrationResponse"];
+export type FieldSearchAdministrationFormResponse = S["FieldSearchAdministrationFormResponse"];
+export type SecurityAdministratorsResponse = S["SecurityAdministratorsResponse"];
+export type SecurityAdministratorResponse = S["SecurityAdministratorResponse"];
+export type AppointSecurityAdministratorRequest = S["AppointSecurityAdministratorRequest"];
+export type RemoveSecurityAdministratorRequest = S["RemoveSecurityAdministratorRequest"];
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
 export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
 export type FieldProtectionVerificationResponse = S["FieldProtectionVerificationResponse"];
+export type FieldProtectionReconciliationResponse = S["FieldProtectionReconciliationResponse"];
+export type FieldProtectionAttestationResponse = S["FieldProtectionAttestationResponse"];
+export type RequestFieldProtectionReconciliationRequest = S["RequestFieldProtectionReconciliationRequest"];
 export type RecordLifecycleRequest = S["RecordLifecycleRequest"];
 export type RecordLifecycleResponse = S["RecordLifecycleResponse"];
 export type RecordLifecycleStateResponse = S["RecordLifecycleStateResponse"];
@@ -78,6 +92,14 @@ export type PublishFormRequest = S["PublishFormRequest"];
 export type RestoreVersionRequest = S["RestoreVersionRequest"];
 export type CreateRelationshipDefinitionRequest = S["CreateRelationshipDefinitionRequest"];
 export type RecordListResponse = S["RecordListResponse"];
+export type FieldSearchCapabilitiesResponse = S["FieldSearchCapabilitiesResponse"];
+export type FieldSearchCapabilityField = S["FieldSearchCapabilityField"];
+export type FieldSearchNotSearchableField = S["FieldSearchNotSearchableField"];
+export type FieldSearchOptionChoice = S["FieldSearchOptionChoice"];
+export type FieldSearchCondition = S["FieldSearchCondition"];
+export type FieldSearchRequest = S["FieldSearchRequest"];
+export type FieldSearchPageRequest = S["FieldSearchPageRequest"];
+export type FieldSearchResponse = S["FieldSearchResponse"];
 export type RecordListItemResponse = S["RecordListItemResponse"];
 export type RecordVersionItemResponse = S["RecordVersionItemResponse"];
 export type RecordVersionListResponse = S["RecordVersionListResponse"];
@@ -162,7 +184,12 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       protection: (formDefinitionId: string, fieldDefinitionId: string, signal?: AbortSignal) => read<FieldProtectionResponse>("forms.protection", { formDefinitionId, fieldDefinitionId }, undefined, "interactive-read", signal),
       strengthenProtection: (formDefinitionId: string, fieldDefinitionId: string, request: StrengthenFieldProtectionRequest) => write<FieldProtectionResponse>("POST", "forms.strengthenProtection", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       retryProtectionMigration: (formDefinitionId: string, fieldDefinitionId: string, request: RetryFieldProtectionMigrationRequest) => write<FieldProtectionResponse>("POST", "forms.retryProtectionMigration", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      requestProtectionReconciliation: (formDefinitionId: string, fieldDefinitionId: string, request: RequestFieldProtectionReconciliationRequest) => write<FieldProtectionResponse>("POST", "forms.requestProtectionReconciliation", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       reclassifyField: (formDefinitionId: string, fieldDefinitionId: string, request: ReclassifyFieldRequest) => write<FieldProtectionResponse>("POST", "forms.reclassifyField", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      fieldSearch: (formDefinitionId: string, signal?: AbortSignal) => read<FieldSearchConfigurationResponse>("forms.fieldSearch", { formDefinitionId }, undefined, "interactive-read", signal),
+      approveFieldSearch: (formDefinitionId: string, fieldDefinitionId: string, request: ApproveFieldSearchRequest) => write<FieldSearchConfigurationResponse>("POST", "forms.approveFieldSearch", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      withdrawFieldSearch: (formDefinitionId: string, fieldDefinitionId: string, request: WithdrawFieldSearchRequest) => write<FieldSearchConfigurationResponse>("POST", "forms.withdrawFieldSearch", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
+      updateFieldSearchers: (formDefinitionId: string, request: UpdateFieldSearchersRequest) => write<void>("PUT", "forms.updateFieldSearchers", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       downgradeProtection: (formDefinitionId: string, fieldDefinitionId: string, request: DowngradeFieldProtectionRequest) => write<FieldProtectionResponse>("POST", "forms.downgradeProtection", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       cancelProtectionDowngrade: (formDefinitionId: string, fieldDefinitionId: string, request: CancelFieldProtectionDowngradeRequest) => write<FieldProtectionResponse>("POST", "forms.cancelProtectionDowngrade", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       access: (formDefinitionId: string, signal?: AbortSignal) => read<FormAccessResponse>("forms.access", { formDefinitionId }, undefined, "interactive-read", signal),
@@ -195,6 +222,13 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       lifecycle: (transition: RecordLifecycleTransition, formRecordId: string, request: RecordLifecycleRequest) => write<RecordLifecycleResponse>("POST", `records.${transition}`, { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
       update: (formRecordId: string, request: UpdateFormRecordRequest) => write<FormRecordResponse>("PATCH", "records.update", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}`, expectedRevision: String(request.expectedContentRevision) }),
     },
+    search: {
+      /** Phase C7: server-authoritative searchable fields and operators for one form (M0: none, trusted search not enabled). */
+      capabilities: (formDefinitionId: string, signal?: AbortSignal) => read<FieldSearchCapabilitiesResponse>("search.capabilities", undefined, { formDefinitionId }, "interactive-read", signal),
+      /** Phase C7: advanced field search; a POST so predicate values never enter a URL. Not idempotency-keyed: a search changes nothing. */
+      fieldSearch: (request: FieldSearchRequest) => write<FieldSearchResponse>("POST", "search.fieldSearch", undefined, request, { lane: "interactive-read" }),
+      page: (request: FieldSearchPageRequest) => write<FieldSearchResponse>("POST", "search.fieldSearchPage", undefined, request, { lane: "interactive-read" }),
+    },
     related: {
       list: (formRecordId: string, formRelationshipDefinitionId: string, signal?: AbortSignal) => read<ChildRecordListResponse>("related.list", { formRecordId, formRelationshipDefinitionId }, undefined, "interactive-read", signal),
       create: (formRecordId: string, request: CreateChildRecordRequest) => write<FormRecordResponse>("POST", "related.create", { formRecordId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
@@ -226,6 +260,10 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       updateBranding: (request: UpdateBrandingRequest) => write<BrandingResponse>("PUT", "organization.updateBranding", undefined, request, { resourceKey: "branding" }),
       uploadLogo: (png: ArrayBuffer) => coordinator.execute<BrandingResponse>({ lane: "interactive-write", method: "POST", endpointKey: "organization.uploadLogo", binaryPayload: png, binaryContentType: "image/png", resourceKey: "branding" }),
       users: (signal?: AbortSignal) => read<DirectoryUserResponse[]>("users.list", undefined, undefined, "background-read", signal),
+      searchApprovals: (signal?: AbortSignal) => read<FieldSearchAdministrationResponse>("organization.searchApprovals", undefined, undefined, "interactive-read", signal),
+      securityAdministrators: (signal?: AbortSignal) => read<SecurityAdministratorsResponse>("organization.securityAdministrators", undefined, undefined, "interactive-read", signal),
+      appointSecurityAdministrator: (request: AppointSecurityAdministratorRequest) => write<void>("POST", "organization.appointSecurityAdministrator", undefined, request, { lane: "security", resourceKey: "organization:security-administrators" }),
+      removeSecurityAdministrator: (userId: string, request: RemoveSecurityAdministratorRequest) => write<void>("POST", "organization.removeSecurityAdministrator", { userId }, request, { lane: "security", resourceKey: "organization:security-administrators" }),
       securityPolicy: (signal?: AbortSignal) => read<OrganizationSecurityPolicyResponse>("organization.securityPolicy", undefined, undefined, "interactive-read", signal),
       updateSecurityPolicy: (request: UpdateOrganizationSecurityPolicyRequest) => write<OrganizationSecurityPolicyResponse>("PUT", "organization.updateSecurityPolicy", undefined, request, { resourceKey: "security-policy" }),
     },

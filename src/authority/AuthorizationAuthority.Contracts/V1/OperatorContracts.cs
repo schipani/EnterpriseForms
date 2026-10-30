@@ -42,3 +42,115 @@ public sealed record FaultInjectionStatus(string ArmedFault, int PausedOperation
 public sealed record ContributorWriteOverrideRequest(bool? Enabled);
 
 public sealed record ContributorWriteSwitchState(bool Enabled, bool ConfiguredEnabled);
+
+// ---- DR-C7-3: first and recovery Security Administrator for an existing organization (operator plane only) ----
+
+/// <summary>The two separate operator operations; a recovery is never a first appointment and vice versa.</summary>
+public static class SecurityAdministratorProvisioningKinds
+{
+    public const string FirstAppointment = "FirstAppointment";
+    public const string Recovery = "Recovery";
+}
+
+/// <summary>Claims of an operator approval (compact JWS, ES256, one per approver key). Bound to the approval statement digest.</summary>
+public static class OperatorApprovalClaims
+{
+    public const string Issuer = "enterpriseforms-operator-approval";
+    public const string Audience = "authorization-authority-operator-approval";
+    public const string StatementDigest = "statement_sha256";
+    public const string OperationId = "operation_id";
+    public const string OperationKind = "operation_kind";
+    public const string OrganizationId = "organization_id";
+    public const string TargetAuthorityUserId = "target_authority_user_id";
+}
+
+/// <summary>
+/// What each approver signs (canonical JSON; its SHA-256 is the <c>statement_sha256</c> claim): the exact organization,
+/// member (immutable identity), role, operation kind, justification, incident reference and recovery scope, under a
+/// single-use operation id.
+/// </summary>
+public sealed record SecurityAdministratorApprovalStatement(
+    int StatementVersion,
+    Guid OperationId,
+    string OperationKind,
+    Guid OrganizationId,
+    Guid TargetAuthorityUserId,
+    string TargetIssuerUri,
+    string TargetSubjectIdentifier,
+    string RoleName,
+    string Justification,
+    string? IncidentReference,
+    IReadOnlyList<Guid> RemovedAdministratorIds);
+
+/// <summary>
+/// First Security Administrator of an organization that has no usable one. <c>DryRun</c> returns the preview and the
+/// statement to approve without changing anything; execution needs two approvals from distinct registered approvers.
+/// </summary>
+public sealed record FirstSecurityAdministratorRequest(
+    Guid OperationId,
+    Guid ConfirmOrganizationId,
+    Guid TargetAuthorityUserId,
+    string TargetIssuerUri,
+    string TargetSubjectIdentifier,
+    string Justification,
+    bool DryRun,
+    IReadOnlyList<string>? Approvals = null);
+
+/// <summary>
+/// Recovery when the organization's Security Administrators are unavailable: appoint one verified member and, explicitly,
+/// remove named unavailable administrators. Incident reference required; raises a security alert.
+/// </summary>
+public sealed record SecurityAdministratorRecoveryRequest(
+    Guid OperationId,
+    Guid ConfirmOrganizationId,
+    Guid TargetAuthorityUserId,
+    string TargetIssuerUri,
+    string TargetSubjectIdentifier,
+    string Justification,
+    string IncidentReference,
+    IReadOnlyList<Guid> RemovedAdministratorIds,
+    bool DryRun,
+    IReadOnlyList<string>? Approvals = null);
+
+public sealed record OperatorOrganizationPrincipal(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, bool IdentityEnabled, bool IsSecurityAdministrator, DateTimeOffset? AppointedOn);
+
+/// <summary>Operator view of an organization's Security Administrators and verified members (identities only; display names live in the business directory).</summary>
+public sealed record OperatorSecurityAdministratorStatus(
+    Guid OrganizationId,
+    string OrganizationDisplayName,
+    long AuthorizationRevision,
+    int UsableAdministratorCount,
+    string ApprovalMode,
+    bool ApprovalsOperational,
+    string ApprovalAssurance,
+    int RequiredApprovals,
+    int MaxApprovalLifetimeSeconds,
+    IReadOnlyList<OperatorOrganizationPrincipal> Members,
+    Guid CorrelationId);
+
+/// <summary>Preview (dry run) or outcome. <c>Replayed</c>: the operation id was already executed with this statement; nothing new happened.</summary>
+public sealed record SecurityAdministratorProvisioningResponse(
+    bool DryRun,
+    bool Eligible,
+    string? RefusalCode,
+    string? RefusalDetail,
+    Guid OperationId,
+    string OperationKind,
+    Guid OrganizationId,
+    string OrganizationDisplayName,
+    OperatorOrganizationPrincipal Target,
+    string RoleName,
+    IReadOnlyList<OperatorOrganizationPrincipal> CurrentAdministrators,
+    IReadOnlyList<Guid> RemovedAdministratorIds,
+    IReadOnlyList<string> Consequences,
+    string ApprovalStatementJson,
+    string ApprovalStatementSha256,
+    string ApprovalMode,
+    string ApprovalAssurance,
+    int RequiredApprovals,
+    int MaxApprovalLifetimeSeconds,
+    Guid? SecurityCommandId,
+    string? CommandStatus,
+    bool Replayed,
+    long AuthorizationRevision,
+    Guid CorrelationId);

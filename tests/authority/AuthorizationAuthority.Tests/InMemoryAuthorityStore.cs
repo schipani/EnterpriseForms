@@ -1,5 +1,7 @@
+using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Domain.Features.Content;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
@@ -27,7 +29,18 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<SecurityJournalEntry> Journal { get; } = [];
     public List<ContentIntegrityCheckpoint> Checkpoints { get; } = [];
     public List<IntegrityKeyRegistration> Keys { get; } = [];
+    public List<SearchCatalogueSnapshot> Snapshots { get; } = [];
+    public List<SecurityCommand> Commands { get; } = [];
+
+    public List<ProjectionOutboxEvent> Outbox { get; } = [];
+    public List<SearchCatalogueSnapshotEntry> SnapshotEntries { get; } = [];
+
     public List<AuthenticatedSession> Sessions { get; } = [];
+    public List<PublishedFormVersion> PublishedVersions { get; } = [];
+    public List<FieldSearchApproval> Approvals { get; } = [];
+    public List<OrganizationProtectionPolicy> Policies { get; } = [];
+    public List<ProtectionCensusResult> CensusResults { get; } = [];
+    public List<ProtectionReconciliationAttestation> Attestations { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -48,6 +61,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<IdentityBinding?> FindIdentityBindingByUserAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken) =>
             Task.FromResult(s.Bindings.FirstOrDefault(b => b.OrganizationId == organizationId && b.AuthorityUserId == authorityUserId));
 
+        public Task<List<IdentityBinding>> GetIdentityBindingsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Bindings.Where(b => b.OrganizationId == organizationId).ToList());
+
         public Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken cancellationToken) => Task.FromResult(s.Bindings.FirstOrDefault(b => b.IdentityBindingId == identityBindingId));
 
         public void AddIdentityBinding(IdentityBinding binding) => s.Bindings.Add(binding);
@@ -60,26 +76,31 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<List<AuthorityResource>> GetActiveResourcesByParentAsync(Guid organizationId, Guid parentResourceEntityId, IReadOnlyCollection<string> resourceTypeNames, CancellationToken cancellationToken) =>
             Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ParentResourceEntityId == parentResourceEntityId && resourceTypeNames.Contains(r.ResourceTypeName) && r.ResourceLifecycleState == ResourceLifecycleStates.Active).ToList());
 
-        public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult<OrganizationProtectionPolicy?>(null);
+        public Task<OrganizationProtectionPolicy?> FindProtectionPolicyAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Policies.FirstOrDefault(p => p.OrganizationId == organizationId));
 
-        public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => throw new NotSupportedException();
+        public void AddProtectionPolicy(OrganizationProtectionPolicy policy) => s.Policies.Add(policy);
 
         public Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid organizationId, CancellationToken cancellationToken) =>
             Task.FromResult(s.Edges.Where(e => e.OrganizationId == organizationId && e.RemovedBySecurityCommandId is null).ToList());
 
         public void AddEdge(AuthorityRelationshipEdge edge) => s.Edges.Add(edge);
 
-        public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) => Task.FromResult<SecurityCommand?>(null);
+        public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.FirstOrDefault(c => c.OrganizationId == organizationId && c.CommandIdempotencyKey == idempotencyKey));
 
-        public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) => Task.FromResult<SecurityCommand?>(null);
+        public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) => Task.FromResult(s.Commands.FirstOrDefault(c => c.SecurityCommandId == securityCommandId));
 
-        public void AddCommand(SecurityCommand command) => throw new NotSupportedException();
+        public void AddCommand(SecurityCommand command) => s.Commands.Add(command);
 
-        public void AddOutboxEvent(ProjectionOutboxEvent outboxEvent) => throw new NotSupportedException();
+        public void AddOutboxEvent(ProjectionOutboxEvent outboxEvent) => s.Outbox.Add(outboxEvent);
 
         public Task<ProjectionOutboxEvent?> FindOutboxEventAsync(Guid organizationId, long targetAuthorizationRevision, CancellationToken cancellationToken) => Task.FromResult<ProjectionOutboxEvent?>(null);
 
         public void AddJournalEntry(SecurityJournalEntry entry) => s.Journal.Add(entry);
+
+        public Task<SecurityJournalEntry?> FindContentCommitJournalEntryAsync(Guid organizationId, Guid contentChangeOperationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Journal.Where(j => j.OrganizationId == organizationId && j.JournalStreamName == JournalStreamNames.Content && j.ContentChangeOperationId == contentChangeOperationId && j.JournalEventKind == "ContentHeadCommitted")
+                .OrderByDescending(j => j.JournalStreamRevision).FirstOrDefault());
 
         public Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken) =>
             Task.FromResult(s.Journal.FirstOrDefault(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName && j.JournalStreamRevision == streamRevision));
@@ -131,10 +152,69 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(new List<Guid>());
 
+        public Task<List<AuthorityResource>> GetFormRecordResourcesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.FormRecord && r.ParentResourceEntityId == formDefinitionId && lifecycleStates.Contains(r.ResourceLifecycleState)).OrderBy(r => r.ResourceEntityId).ToList());
+
+        public Task<List<AuthorityResource>> GetResourcesAsync(Guid organizationId, string resourceTypeName, IReadOnlyCollection<Guid> resourceEntityIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == resourceTypeName && resourceEntityIds.Contains(r.ResourceEntityId)).ToList());
+
+        public Task<List<RecordContentHead>> GetContentHeadsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Heads.Where(h => h.OrganizationId == organizationId && formRecordIds.Contains(h.FormRecordId)).ToList());
+
+        public void AddCatalogueSnapshot(SearchCatalogueSnapshot snapshot, IEnumerable<SearchCatalogueSnapshotEntry> entries)
+        {
+            s.Snapshots.Add(snapshot);
+            s.SnapshotEntries.AddRange(entries);
+        }
+
+        public Task<SearchCatalogueSnapshot?> FindCatalogueSnapshotAsync(Guid searchCatalogueSnapshotId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Snapshots.FirstOrDefault(x => x.SearchCatalogueSnapshotId == searchCatalogueSnapshotId));
+
+        public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesAsync(Guid searchCatalogueSnapshotId, int offset, int? limit, CancellationToken cancellationToken)
+        {
+            var query = s.SnapshotEntries.Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId).OrderBy(e => e.CatalogueEntryPosition).Skip(offset);
+            return Task.FromResult((limit is { } take ? query.Take(take) : query).ToList());
+        }
+
         public Task<AuthenticatedSession?> FindSessionByDigestAsync(byte[] sessionSecretDigest, CancellationToken cancellationToken) =>
             Task.FromResult(s.Sessions.FirstOrDefault(x => x.SessionSecretDigest.AsSpan().SequenceEqual(sessionSecretDigest)));
 
         public void AddSession(AuthenticatedSession session) => s.Sessions.Add(session);
+
+        public Task<PublishedFormVersion?> FindLatestPublishedFormVersionAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PublishedVersions.Where(v => v.OrganizationId == organizationId && v.FormDefinitionId == formDefinitionId).OrderByDescending(v => v.FormVersionNumber).FirstOrDefault());
+
+        public void AddPublishedFormVersion(PublishedFormVersion version) => s.PublishedVersions.Add(version);
+
+        public Task<List<PublishedFormVersion>> GetLatestPublishedFormVersionsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PublishedVersions.Where(v => v.OrganizationId == organizationId).GroupBy(v => v.FormDefinitionId).Select(g => g.MaxBy(v => v.FormVersionNumber)!).ToList());
+
+        public Task<List<FieldSearchApproval>> GetFieldSearchApprovalsAsync(Guid organizationId, Guid? formDefinitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Approvals.Where(a => a.OrganizationId == organizationId && (formDefinitionId == null || a.FormDefinitionId == formDefinitionId)).ToList());
+
+        public void AddFieldSearchApproval(FieldSearchApproval approval) => s.Approvals.Add(approval);
+
+        public Task<List<SearchCatalogueSnapshotEntry>> GetCatalogueSnapshotEntriesForRecordsAsync(Guid searchCatalogueSnapshotId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.SnapshotEntries.Where(e => e.SearchCatalogueSnapshotId == searchCatalogueSnapshotId && formRecordIds.Contains(e.FormRecordId)).ToList());
+
+        public Task<List<AuthorityResource>> GetResourcesByTypeAsync(Guid organizationId, IReadOnlyCollection<string> resourceTypeNames, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && resourceTypeNames.Contains(r.ResourceTypeName) && lifecycleStates.Contains(r.ResourceLifecycleState)).OrderBy(r => r.ResourceEntityId).ToList());
+
+        public Task<Dictionary<Guid, int>> CountManifestCommitsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commits.Where(c => c.OrganizationId == organizationId && formRecordIds.Contains(c.FormRecordId)).GroupBy(c => c.FormRecordId).ToDictionary(g => g.Key, g => g.Count()));
+
+        public Task<List<ProtectionCensusResult>> GetProtectionCensusResultsAsync(Guid organizationId, Guid scopingSecurityCommandId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.CensusResults.Where(r => r.OrganizationId == organizationId && r.ScopingSecurityCommandId == scopingSecurityCommandId && formRecordIds.Contains(r.FormRecordId)).ToList());
+
+        public void AddProtectionCensusResult(ProtectionCensusResult result) => s.CensusResults.Add(result);
+
+        public Task<ProtectionCensusResult?> FindProtectionCensusResultAsync(Guid scopingSecurityCommandId, Guid formRecordId, Guid committedOperationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.CensusResults.FirstOrDefault(r => r.ScopingSecurityCommandId == scopingSecurityCommandId && r.FormRecordId == formRecordId && r.CommittedOperationId == committedOperationId));
+
+        public void AddProtectionAttestation(ProtectionReconciliationAttestation attestation) => s.Attestations.Add(attestation);
+
+        public Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Attestations.Where(a => a.OrganizationId == organizationId && scopingSecurityCommandIds.Contains(a.ScopingSecurityCommandId)).GroupBy(a => a.ScopingSecurityCommandId).Select(g => g.MaxBy(a => a.AttestedAuditJournalRevision)!).ToList());
 
         public Task CommitAsync(CancellationToken cancellationToken)
         {
