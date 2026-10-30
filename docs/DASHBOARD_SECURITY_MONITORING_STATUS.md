@@ -1,7 +1,8 @@
 # Dashboard redesign and security monitoring — status (C-90)
 
-Branch `ui/dashboard-security-monitoring`, based on `ui/consistency-unified` (5e3f7d3). Not merged; awaiting owner
-visual and functional acceptance. This is a development feature, not production Level 2 evidence.
+Branch `ui/dashboard-security-monitoring`, based on `ui/consistency-unified` (5e3f7d3). **Owner visual acceptance
+recorded 2026-10-30 (C-91, §6).** Not merged: a signed pull request into `main` and its required hosted checks are
+still outstanding. This is a development feature, not production Level 2 evidence.
 
 ## 1. What was delivered
 
@@ -115,3 +116,26 @@ the guard trigger refuses rewinding the occurrence count.
 Not run: the complete Stage B suite and SEC-P suite (only the classes above); human NVDA/VoiceOver review; 200%/400%
 browser zoom was approximated with 640 px and 320 px viewports. Persistence across restarts is by construction (rows in
 the business database; the dev stack was rebuilt with the migration and kept its data) but has no dedicated restart test.
+
+## 6. Owner acceptance (C-91, 2026-10-30)
+
+The project owner visually tested and **approved** the Dashboard, the Security monitoring section and incident pages,
+the unified styling, the charts, per-section search and the 15-row pagination as delivered in `3ae5ad7`, and asked that
+they be preserved unchanged. Later work branches from this commit and must not redesign these surfaces.
+
+What the acceptance covers and does not cover:
+
+| Item | Status after C-91 |
+|---|---|
+| Visual and functional acceptance of §1 deliverables | Accepted by the owner (development) |
+| Merge into `main` | Not done. Needs a signed pull request and the required hosted checks (`ci` runs on every pull request; `stage-b-integration` on pull requests into `main`). No pull request is open yet; hosted CI has not run on this branch. |
+| SD-1 Authority journal read / disposition command (AC-10) | **Open** — proposal only |
+| SD-2 Organization-owner security summary permission | **Open** — proposal only |
+| SD-3 Auditor role contract | **Open** — proposal only |
+| SD-4 Investigation note encryption | **Open** — current behaviour (plaintext administrative metadata) unchanged |
+| SD-5 PB-08 step-up for investigation changes | **Open** — not available |
+| SD-6 Per-section refresh amendment to ADR-PB-007 / PG-006 | **Open.** The approved screens have no per-section Refresh buttons; the owner's visual acceptance is consistent with the proposed amendment but is not recorded as the formal ADR amendment. A decision is still required. |
+| §3 trust limitation (triage store is business PostgreSQL, not tamper-proof evidence) | Unchanged |
+| §5 tests not run (full Stage B, SEC-P, NVDA/VoiceOver, real 200%/400% zoom) | Unchanged |
+
+The acceptance is not an independent security review and does not change any production Level 2 gate.

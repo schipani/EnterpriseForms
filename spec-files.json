@@ -44,8 +44,8 @@
     },
     {
       "path": "docs/DASHBOARD_SECURITY_MONITORING_STATUS.md",
-      "sha256": "2318458e02cd14afbc716c1ee2cf099d97a523f450e600b4451bf9c1b3f24a1b",
-      "bytes": 11934
+      "sha256": "b35f1d3bd023598693da1b3dd6e9aba3db6afd988237a73c62d91e01f632b83a",
+      "bytes": 13863
     },
     {
       "path": "docs/PHASE0_STATUS.md",
@@ -274,8 +274,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "6efd4b45eff37877cd215a0833615b91b6fd5fcde349cd8439fd760a7c92d338",
-      "bytes": 140862
+      "sha256": "15689fe0f208e17eff9f1dc296160ef282699f91d7c648b49f2c1221968807e5",
+      "bytes": 141675
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
