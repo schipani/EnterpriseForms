@@ -226,6 +226,10 @@ services:
       Identity__Operator__Issuer: ${OPERATOR_ISSUER}
       Identity__Operator__Audience: ${OPERATOR_AUDIENCE}
       Identity__Operator__SharedKeyBase64: ${OPERATOR_SHARED_KEY_BASE64}
+      # Phase C8 AC-9: reconciler credential (read-only outcome lookup only); empty => the policy denies everything.
+      Identity__Reconciler__Issuer: ${RECONCILER_ISSUER:-}
+      Identity__Reconciler__Audience: ${RECONCILER_AUDIENCE:-}
+      Identity__Reconciler__SharedKeyBase64: ${RECONCILER_SHARED_KEY_BASE64:-}
       Identity__UserAssertion__ProviderKind: TestIdentityProvider
       Identity__UserAssertion__Issuer: ${TEST_IDP_ISSUER}
       Identity__UserAssertion__Audience: ${TEST_IDP_AUDIENCE}
@@ -323,6 +327,10 @@ services:
       TrustAuthority__WorkloadIssuer: ${WORKLOAD_ISSUER}
       TrustAuthority__WorkloadAudience: ${WORKLOAD_AUDIENCE}
       TrustAuthority__WorkloadSharedKeyBase64: ${WORKLOAD_SHARED_KEY_BASE64}
+      # Phase C8 AC-9: the team-membership reconciler credential exists in this service only (never the API, RC-26).
+      TeamMembershipReconciler__Issuer: ${RECONCILER_ISSUER:-}
+      TeamMembershipReconciler__Audience: ${RECONCILER_AUDIENCE:-}
+      TeamMembershipReconciler__SharedKeyBase64: ${RECONCILER_SHARED_KEY_BASE64:-}
       Storage__Provider: AzureBlob
       Storage__BlobServiceUri: http://azurite:10000/devstoreaccount1
       Storage__AccountName: ${DOCUMENTS_ACCOUNT_NAME}

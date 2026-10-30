@@ -25,6 +25,14 @@ public sealed class Program
         builder.Services.AddProtectionVerifier(builder.Configuration);
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormDesigner.ProtectionMigration.FieldProtectionReconciliationService>();
         builder.Services.AddHostedService<EnterpriseForms.Worker.Features.FormDesigner.FieldProtectionReconciliationWorker>();
+        // Phase C8 (C8-M1-01, AC-9): the team-membership reconciler credential and the reconciler exist in this host only. Its
+        // timing parameters are validated at startup (D8-16); shortened windows are refused outside Testing.
+        builder.Services.AddTeamMembershipReconciler(builder.Configuration, builder.Environment.EnvironmentName);
+        var reconciliationOptions = builder.Configuration.GetSection(EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions.SectionName).Get<EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions>() ?? new();
+        reconciliationOptions.Validate(builder.Environment.EnvironmentName, builder.Configuration.GetValue("TrustAuthority:TimeoutSeconds", 10));
+        builder.Services.AddSingleton(reconciliationOptions);
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationService>();
+        builder.Services.AddHostedService<EnterpriseForms.Worker.Features.Teams.TeamMembershipReconciliationWorker>();
         builder.Build().Run();
     }
 }

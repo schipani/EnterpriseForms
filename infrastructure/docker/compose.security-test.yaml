@@ -33,6 +33,11 @@ services:
       Identity__Verifier__Issuer: enterpriseforms-field-protection-verifier
       Identity__Verifier__Audience: authorization-authority-verifier
       Identity__Verifier__SharedKeyBase64: dmVyaWZpZXItdGVzdC1vbmx5LXNoYXJlZC1rZXktMDAwMDAwMDAw
+      # Phase C8 AC-9: synthetic team-membership reconciler credential for this isolated stack only (TestIdentity.ReconcilerToken
+      # mirrors it). RC-25 may recreate the authority with RECONCILER_TESTING_AUTHORITY_KEY set to a rotated key.
+      Identity__Reconciler__Issuer: enterpriseforms-team-membership-reconciler
+      Identity__Reconciler__Audience: authorization-authority-reconciler
+      Identity__Reconciler__SharedKeyBase64: ${RECONCILER_TESTING_AUTHORITY_KEY:-cmVjb25jaWxlci10ZXN0LW9ubHktc2hhcmVkLWtleS0wMDAwMDA=}
       # Phase C7 M2 (AC-6, OD-7): development-only synthetic step-up for search approvals. The Authority refuses to start
       # with this outside Development/Testing or without the synthetic TestIdentityProvider; every other stack leaves it
       # unset (Unavailable), so approvals are refused there until PB-08 step-up exists.
@@ -60,6 +65,12 @@ services:
       # Phase C7 M3: verified field-value search execution (fail-closed gate; refused at startup outside Development/Testing).
       FieldSearch__ExecutionEnabled: "true"
       Testing__StackIdentity: enterpriseforms-security-test
+      # Phase C8 (D8-16): shortened reconciliation windows, permitted in Testing only (the hosts refuse them elsewhere).
+      TeamMembershipReconciliation__InFlightWindowSeconds: "6"
+      TeamMembershipReconciliation__BackoffSeconds: "1"
+      TeamMembershipReconciliation__BackoffCapSeconds: "3"
+      TeamMembershipReconciliation__NeedsAttentionSeconds: "20"
+      TeamMembershipReconciliation__LateCommitSweepIntervalSeconds: "5"
     volumes:
       - api-keyring:/keyring
     ports: ["127.0.0.1:5180:8080"]
@@ -74,6 +85,11 @@ services:
       DataProtection__KeyRingDirectory: /keyring
       FieldSearch__ExecutionEnabled: "true"
       Testing__StackIdentity: enterpriseforms-security-test
+      TeamMembershipReconciliation__InFlightWindowSeconds: "6"
+      TeamMembershipReconciliation__BackoffSeconds: "1"
+      TeamMembershipReconciliation__BackoffCapSeconds: "3"
+      TeamMembershipReconciliation__NeedsAttentionSeconds: "20"
+      TeamMembershipReconciliation__LateCommitSweepIntervalSeconds: "5"
     volumes:
       - api-keyring:/keyring
     ports: ["127.0.0.1:5181:8080"]
@@ -94,6 +110,17 @@ services:
       ProtectionVerifier__Issuer: enterpriseforms-field-protection-verifier
       ProtectionVerifier__Audience: authorization-authority-verifier
       ProtectionVerifier__SharedKeyBase64: dmVyaWZpZXItdGVzdC1vbmx5LXNoYXJlZC1rZXktMDAwMDAwMDAw
+      # Phase C8 AC-9: the synthetic team-membership reconciler credential (Worker only; the API never gets it, RC-26). RC-25
+      # may recreate the worker with RECONCILER_TESTING_WORKER_KEY set to a key the Authority does not accept.
+      TeamMembershipReconciler__Issuer: enterpriseforms-team-membership-reconciler
+      TeamMembershipReconciler__Audience: authorization-authority-reconciler
+      TeamMembershipReconciler__SharedKeyBase64: ${RECONCILER_TESTING_WORKER_KEY:-cmVjb25jaWxlci10ZXN0LW9ubHktc2hhcmVkLWtleS0wMDAwMDA=}
+      # Phase C8 (D8-16): shortened reconciliation windows, Testing only.
+      TeamMembershipReconciliation__InFlightWindowSeconds: "6"
+      TeamMembershipReconciliation__BackoffSeconds: "1"
+      TeamMembershipReconciliation__BackoffCapSeconds: "3"
+      TeamMembershipReconciliation__NeedsAttentionSeconds: "20"
+      TeamMembershipReconciliation__LateCommitSweepIntervalSeconds: "5"
   web:
     profiles: [never]
   attacker-sql:

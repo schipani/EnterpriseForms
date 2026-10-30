@@ -304,6 +304,9 @@ public interface IBusinessScope : IAsyncDisposable
 
     void AddAuthorityCommandOperation(AuthorityCommandOperation operation);
 
+    /// <summary>T1 insert; false when a concurrent request already recorded the same (tenant, key) — the first row wins.</summary>
+    Task<bool> TryAddAuthorityCommandOperationAsync(AuthorityCommandOperation operation, CancellationToken cancellationToken);
+
     /// <summary>The tenant's operation with this exact Authority idempotency key (tracked), or null.</summary>
     Task<AuthorityCommandOperation?> FindAuthorityCommandOperationByKeyAsync(Guid tenantId, string authorityIdempotencyKey, CancellationToken cancellationToken);
 

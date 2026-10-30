@@ -541,6 +541,19 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public void AddAuthorityCommandOperation(AuthorityCommandOperation operation) => context.AuthorityCommandOperations.Add(operation);
 
+        public async Task<bool> TryAddAuthorityCommandOperationAsync(AuthorityCommandOperation operation, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(operation);
+            // Parameterized; ON CONFLICT keeps the first request's row when two requests with the same key race (RC-12).
+            var inserted = await context.Database.ExecuteSqlInterpolatedAsync($@"INSERT INTO authority_command_operations
+                (authority_command_operation_id, tenant_id, initiated_by_user_id, command_kind_name, team_id, member_user_id, authority_idempotency_key,
+                 request_correlation_identifier, operation_created_on, operation_state_name, next_attempt_on, attempt_count, consecutive_error_count, operation_modified_on)
+                VALUES ({operation.AuthorityCommandOperationId}, {operation.TenantId}, {operation.InitiatedByUserId}, {operation.CommandKindName}, {operation.TeamId}, {operation.MemberUserId}, {operation.AuthorityIdempotencyKey},
+                 {operation.RequestCorrelationIdentifier}, {operation.OperationCreatedOn}, {operation.OperationStateName}, {operation.NextAttemptOn}, 0, 0, {operation.OperationModifiedOn})
+                ON CONFLICT (tenant_id, authority_idempotency_key) DO NOTHING", cancellationToken).ConfigureAwait(false);
+            return inserted == 1;
+        }
+
         public Task<AuthorityCommandOperation?> FindAuthorityCommandOperationByKeyAsync(Guid tenantId, string authorityIdempotencyKey, CancellationToken cancellationToken) =>
             context.AuthorityCommandOperations.FirstOrDefaultAsync(o => o.TenantId == tenantId && o.AuthorityIdempotencyKey == authorityIdempotencyKey, cancellationToken);
 

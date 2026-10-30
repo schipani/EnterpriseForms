@@ -1051,6 +1051,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Submits AddTeamMember to the Authority (organization owner or Security Administrator; never oneself as a Security Administrator, G25). The durable operation is recorded first; the roster changes only when the Worker projects the Authority-confirmed state (never written by this request). 409 IDEMPOTENCY_KEY_REUSED for the same key with another request; a completed operation is never re-sent. */
         post: operations["AddTeamMember"];
         delete?: never;
         options?: never;
@@ -1067,7 +1068,76 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Submits RemoveTeamMember to the Authority; same rules as AddTeamMember. The member stays on the roster until the Worker projects the Authority-confirmed removal. */
         post: operations["RemoveTeamMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/membership-operations/{operationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One add/remove operation of the team (organization owners and Security Administrators). Another organization's or team's operation is the same 404 as an unknown id. */
+        get: operations["GetTeamMembershipOperation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/membership-operations/by-key/{clientKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own operation by the Idempotency-Key it sent (after a lost response). Only the initiating administrator finds it; the key is never returned. */
+        get: operations["GetTeamMembershipOperationByKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/membership-operations/{operationId}/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asks the Worker to look the operation up again at once (audited TEAM_MEMBERSHIP_OPERATION_RECHECKED). Never submits or replays a command; a ReconciliationError re-opens and still projects only a validated Authority answer. 409 when the operation is complete. */
+        post: operations["RecheckTeamMembershipOperation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/membership-operations/{operationId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Records that an administrator reviewed a failed or anomalous operation (audited TEAM_MEMBERSHIP_OPERATION_REVIEWED). Changes no roster and no Authority state. */
+        post: operations["MarkTeamMembershipOperationReviewed"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2729,6 +2799,7 @@ export interface components {
             canManage: boolean;
             members: components["schemas"]["TeamMemberResponse"][];
             availableMembers: components["schemas"]["DirectoryUserResponse"][];
+            membershipOperations: components["schemas"]["TeamMembershipOperationResponse"][];
         };
         TeamDirectoryResponse: {
             source: string;
@@ -2747,6 +2818,36 @@ export interface components {
             memberSince: string;
             /** Format: uuid */
             authorityCommandId: null | string;
+        };
+        TeamMembershipChangeResponse: {
+            command: components["schemas"]["CommandOutcome"];
+            operation: components["schemas"]["TeamMembershipOperationResponse"];
+        };
+        TeamMembershipOperationResponse: {
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            teamId: string;
+            /** Format: uuid */
+            memberUserId: string;
+            memberDisplayName: string;
+            direction: string;
+            operationState: string;
+            completed: boolean;
+            rosterUpdated: boolean;
+            outcomeCode: null | string;
+            supersededByLaterChange: boolean;
+            rejectionReasonCode: null | string;
+            errorCode: null | string;
+            needsAttention: boolean;
+            lateCommitDetected: boolean;
+            reviewed: boolean;
+            /** Format: date-time */
+            startedOn: string;
+            /** Format: date-time */
+            completedOn: null | string;
+            canRecheck: boolean;
+            canMarkReviewed: boolean;
         };
         TeamResponse: {
             /** Format: uuid */
@@ -4665,7 +4766,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CommandStatusResponse"];
+                    "application/json": components["schemas"]["TeamMembershipChangeResponse"];
                 };
             };
         };
@@ -4688,7 +4789,189 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CommandStatusResponse"];
+                    "application/json": components["schemas"]["TeamMembershipChangeResponse"];
+                };
+            };
+        };
+    };
+    GetTeamMembershipOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMembershipOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTeamMembershipOperationByKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+                clientKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMembershipOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RecheckTeamMembershipOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMembershipOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MarkTeamMembershipOperationReviewed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+                operationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMembershipOperationResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
