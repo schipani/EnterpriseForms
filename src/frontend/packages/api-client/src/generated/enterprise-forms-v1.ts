@@ -1038,7 +1038,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Display-only rename of the team projection (D8-8; the Authority names no team). Organization owner only; audited (TEAM_RENAMED); 409 TEAM_MODIFIED_CONCURRENTLY when expectedModifiedOn is stale. */
+        /** Display-only rename of the team projection (D8-8; the Authority names no team). Organization owners and Security Administrators (the Authority's team-command rule); audited (TEAM_RENAMED); 409 TEAM_MODIFIED_CONCURRENTLY when expectedModifiedOn is stale. */
         patch: operations["RenameTeam"];
         trace?: never;
     };
