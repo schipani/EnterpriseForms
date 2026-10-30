@@ -164,8 +164,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md",
-      "sha256": "5dff37567d31db453a83e65cb84df29432498ab8e1d8e37bdff92f088453e39b",
-      "bytes": 61002
+      "sha256": "41d72b3f9b6826d6fa3bb26567bee9a55680de250fcee7dc1a3b0ef74707f1d1",
+      "bytes": 63200
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
@@ -269,8 +269,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "c1230bfb876336f919f2ed700c6162f793238f1b44d1d4c10d870fcc074ac4f0",
-      "bytes": 137182
+      "sha256": "e3782a74805f396486fc6271ddd8ff04f2cd6855f27ee045e5dc28afb4ce7664",
+      "bytes": 138127
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
