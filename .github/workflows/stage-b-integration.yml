@@ -67,7 +67,7 @@ jobs:
           for s in authority api worker clamav business-migrate; do
             docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env logs --no-color $s > ../../artifacts/stage-b/logs/$s.log 2>&1 || true
           done
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: stage-b-evidence
@@ -141,7 +141,7 @@ jobs:
           for s in authority api worker clamav business-migrate; do
             docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env logs --no-color $s > ../../artifacts/stage-b/logs/$s.log 2>&1 || true
           done
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: stage-b-browser-evidence
