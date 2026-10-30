@@ -3348,6 +3348,179 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Teams.AuthorityCommandOperation", b =>
+                {
+                    b.Property<Guid>("AuthorityCommandOperationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("authority_command_operation_id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<Guid?>("AuthorityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authority_command_id");
+
+                    b.Property<string>("AuthorityIdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("authority_idempotency_key");
+
+                    b.Property<string>("CommandKindName")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("command_kind_name");
+
+                    b.Property<long?>("CommittedAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("committed_authorization_revision");
+
+                    b.Property<int>("ConsecutiveErrorCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("consecutive_error_count");
+
+                    b.Property<long?>("EvaluatedProjectionRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("evaluated_projection_revision");
+
+                    b.Property<DateTimeOffset?>("FirstNotFoundOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_not_found_on");
+
+                    b.Property<Guid>("InitiatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("initiated_by_user_id");
+
+                    b.Property<string>("LastReconciliationErrorCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("last_reconciliation_error_code");
+
+                    b.Property<DateTimeOffset?>("LateCommitDetectedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("late_commit_detected_on");
+
+                    b.Property<DateTimeOffset?>("LateCommitSweepUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("late_commit_sweep_until");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_on");
+
+                    b.Property<string>("LeaseOwnerName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("lease_owner_name");
+
+                    b.Property<Guid>("MemberUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("member_user_id");
+
+                    b.Property<DateTimeOffset?>("NeedsAttentionFlaggedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("needs_attention_flagged_on");
+
+                    b.Property<DateTimeOffset>("NextAttemptOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_on");
+
+                    b.Property<DateTimeOffset?>("OperationCompletedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("operation_completed_on");
+
+                    b.Property<DateTimeOffset>("OperationCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("operation_created_on");
+
+                    b.Property<DateTimeOffset>("OperationModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("operation_modified_on");
+
+                    b.Property<string>("OperationOutcomeCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("operation_outcome_code");
+
+                    b.Property<Guid?>("OperationReviewedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_reviewed_by_user_id");
+
+                    b.Property<DateTimeOffset?>("OperationReviewedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("operation_reviewed_on");
+
+                    b.Property<string>("OperationStateName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("operation_state_name");
+
+                    b.Property<bool?>("ProjectedMembershipPresent")
+                        .HasColumnType("boolean")
+                        .HasColumnName("projected_membership_present");
+
+                    b.Property<long?>("ProjectedMembershipRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("projected_membership_revision");
+
+                    b.Property<string>("RejectionReasonCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("rejection_reason_code");
+
+                    b.Property<Guid>("RequestCorrelationIdentifier")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_correlation_identifier");
+
+                    b.Property<bool?>("SupersededByLaterRevision")
+                        .HasColumnType("boolean")
+                        .HasColumnName("superseded_by_later_revision");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("AuthorityCommandOperationId");
+
+                    b.HasIndex("InitiatedByUserId");
+
+                    b.HasIndex("OperationStateName", "NextAttemptOn")
+                        .HasDatabaseName("ix_authority_command_operations_due");
+
+                    b.HasIndex("TenantId", "AuthorityIdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_authority_command_operations_key");
+
+                    b.HasIndex("TenantId", "TeamId", "OperationStateName")
+                        .HasDatabaseName("ix_authority_command_operations_team");
+
+                    b.ToTable("authority_command_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_authority_command_operations_counts", "attempt_count >= 0 AND consecutive_error_count >= 0");
+
+                            t.HasCheckConstraint("ck_authority_command_operations_key_prefix", "(command_kind_name = 'AddTeamMember' AND authority_idempotency_key LIKE 'team-add:%') OR (command_kind_name = 'RemoveTeamMember' AND authority_idempotency_key LIKE 'team-remove:%')");
+
+                            t.HasCheckConstraint("ck_authority_command_operations_kind", "command_kind_name IN ('AddTeamMember','RemoveTeamMember')");
+
+                            t.HasCheckConstraint("ck_authority_command_operations_outcome", "operation_outcome_code IS NULL OR operation_outcome_code IN ('MembershipPresentProjected','MembershipAbsentProjected','ProjectionUnchanged','DriftCorrected')");
+
+                            t.HasCheckConstraint("ck_authority_command_operations_projected_complete", "operation_state_name <> 'Projected' OR (authority_command_id IS NOT NULL AND committed_authorization_revision IS NOT NULL AND evaluated_projection_revision IS NOT NULL AND projected_membership_revision IS NOT NULL AND projected_membership_present IS NOT NULL AND operation_outcome_code IS NOT NULL AND operation_completed_on IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_authority_command_operations_revisions", "(committed_authorization_revision IS NULL OR committed_authorization_revision >= 1) AND (evaluated_projection_revision IS NULL OR evaluated_projection_revision >= 0) AND (projected_membership_revision IS NULL OR projected_membership_revision >= 0)");
+
+                            t.HasCheckConstraint("ck_authority_command_operations_state", "operation_state_name IN ('AwaitingCommit','AwaitingEffective','AwaitingQuarantineClearance','ReconciliationError','Projected','Rejected','AuthorityFailed','NotCommitted')");
+                        });
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.Teams.Team", b =>
                 {
                     b.Property<Guid>("TeamId")
@@ -3441,6 +3614,59 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasFilter("removed_on IS NULL");
 
                     b.ToTable("team_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Teams.TeamMembershipProjectionState", b =>
+                {
+                    b.Property<Guid>("TeamMembershipProjectionStateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_membership_projection_state_id");
+
+                    b.Property<Guid?>("LastAuthorityCommandOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_authority_command_operation_id");
+
+                    b.Property<Guid>("MemberUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("member_user_id");
+
+                    b.Property<bool>("ProjectedMembershipPresent")
+                        .HasColumnType("boolean")
+                        .HasColumnName("projected_membership_present");
+
+                    b.Property<long>("ProjectedMembershipRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("projected_membership_revision");
+
+                    b.Property<DateTimeOffset>("ProjectionStateModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("projection_state_modified_on");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("TeamMembershipProjectionStateId");
+
+                    b.HasIndex("LastAuthorityCommandOperationId");
+
+                    b.HasIndex("MemberUserId");
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("TenantId", "TeamId", "MemberUserId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_team_membership_projection_states_pair");
+
+                    b.ToTable("team_membership_projection_states", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_team_membership_projection_states_revision", "projected_membership_revision >= 0");
+                        });
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.UserPreferences.UserUiPreference", b =>
@@ -4195,6 +4421,23 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_record_share_fields_share");
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Teams.AuthorityCommandOperation", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("InitiatedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_authority_command_operations_initiator");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_authority_command_operations_tenant");
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.Teams.Team", b =>
                 {
                     b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
@@ -4227,6 +4470,35 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_team_memberships_user");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Teams.TeamMembershipProjectionState", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Teams.AuthorityCommandOperation", null)
+                        .WithMany()
+                        .HasForeignKey("LastAuthorityCommandOperationId")
+                        .HasConstraintName("fk_team_membership_projection_states_operation");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("MemberUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_membership_projection_states_member");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_membership_projection_states_team");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_membership_projection_states_tenant");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.UserPreferences.UserUiPreference", b =>

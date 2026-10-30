@@ -15,6 +15,12 @@ public interface IAuthorityStore
     /// <summary>Opens one database transaction. Everything performed through the scope commits atomically or not at all.</summary>
     Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Phase C8 AC-9: one REPEATABLE READ, READ ONLY transaction (a single snapshot, no locks). Anything staged through the
+    /// scope fails at commit; callers never commit it.
+    /// </summary>
+    Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken cancellationToken);
+
     /// <summary>Organizations that have pending projection or archive work (used by background processors, outside a scope).</summary>
     Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken);
 }
@@ -54,6 +60,12 @@ public interface IAuthorityScope : IAsyncDisposable
     Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid organizationId, CancellationToken cancellationToken);
 
     void AddEdge(AuthorityRelationshipEdge edge);
+
+    /// <summary>Phase C8 AC-9: every desired-state edge (active and removed) of one exact relationship, read-only.</summary>
+    Task<List<AuthorityRelationshipEdge>> GetRelationshipEdgeHistoryAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, string relationshipName, string subjectTypeName, Guid subjectEntityId, CancellationToken cancellationToken);
+
+    /// <summary>Phase C8 AC-9: committed authorization revisions of the given commands of one organization (read-only; absent or uncommitted ⇒ null).</summary>
+    Task<Dictionary<Guid, long?>> GetCommittedRevisionsAsync(Guid organizationId, IReadOnlyCollection<Guid> securityCommandIds, CancellationToken cancellationToken);
 
     Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken);
 

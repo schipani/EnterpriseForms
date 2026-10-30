@@ -61,6 +61,12 @@ public static class AuthorityErrorCodes
     /// (Submitted or Archived). Decided from the signed header bound to the accepted head, never from a business projection.
     /// </summary>
     public const string RecordNotEditable = "RECORD_NOT_EDITABLE";
+
+    // Phase C8 AC-9 (read-only security-command outcome lookup for the business reconciler).
+    public const string InvalidRequest = "INVALID_REQUEST";
+    public const string DelegatedAssertionNotAccepted = "DELEGATED_ASSERTION_NOT_ACCEPTED";
+    public const string KindNotReconcilable = "KIND_NOT_RECONCILABLE";
+    public const string RateLimited = "RATE_LIMITED";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

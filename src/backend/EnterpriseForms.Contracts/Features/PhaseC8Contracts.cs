@@ -32,7 +32,38 @@ public sealed record TeamDirectoryResponse(string Source, bool CanManage, IReadO
 
 public sealed record TeamMemberResponse(Guid UserId, string DisplayName, DateTimeOffset MemberSince, Guid? AuthorityCommandId);
 
-public sealed record TeamDetailResponse(Guid TeamId, string TeamName, bool IsActive, DateTimeOffset CreatedOn, DateTimeOffset ModifiedOn, string Source, bool CanManage, IReadOnlyList<TeamMemberResponse> Members, IReadOnlyList<DirectoryUserResponse> AvailableMembers);
+/// <summary><c>MembershipOperations</c> (C8-M1-01): the team's open add/remove operations from the server, so every administrator sees them; never their idempotency keys.</summary>
+public sealed record TeamDetailResponse(Guid TeamId, string TeamName, bool IsActive, DateTimeOffset CreatedOn, DateTimeOffset ModifiedOn, string Source, bool CanManage, IReadOnlyList<TeamMemberResponse> Members, IReadOnlyList<DirectoryUserResponse> AvailableMembers, IReadOnlyList<TeamMembershipOperationResponse> MembershipOperations);
+
+/// <summary>
+/// Phase C8 (C8-M1-01, R-4): one durable add/remove operation as the business side tracks it. <c>Completed</c> means terminal;
+/// <c>RosterUpdated</c> means the Worker projected the Authority's confirmed state (the only way the roster changes).
+/// <c>OperationState</c>: AwaitingCommit, AwaitingEffective, AwaitingQuarantineClearance, ReconciliationError, Projected,
+/// Rejected, AuthorityFailed, NotCommitted. Never carries the idempotency key.
+/// </summary>
+public sealed record TeamMembershipOperationResponse(
+    Guid OperationId,
+    Guid TeamId,
+    Guid MemberUserId,
+    string MemberDisplayName,
+    string Direction,
+    string OperationState,
+    bool Completed,
+    bool RosterUpdated,
+    string? OutcomeCode,
+    bool SupersededByLaterChange,
+    string? RejectionReasonCode,
+    string? ErrorCode,
+    bool NeedsAttention,
+    bool LateCommitDetected,
+    bool Reviewed,
+    DateTimeOffset StartedOn,
+    DateTimeOffset? CompletedOn,
+    bool CanRecheck,
+    bool CanMarkReviewed);
+
+/// <summary>Add/remove response: the Authority command outcome (<c>Command.Effective</c> = effective in the Authority) and the business operation that projects it.</summary>
+public sealed record TeamMembershipChangeResponse(CommandOutcome Command, TeamMembershipOperationResponse Operation);
 
 /// <summary>Display-only rename of the team projection (D8-8); <c>ExpectedModifiedOn</c> is the detail's <c>modifiedOn</c> (409 TEAM_MODIFIED_CONCURRENTLY when stale).</summary>
 public sealed record RenameTeamRequest(string TeamName, DateTimeOffset ExpectedModifiedOn);

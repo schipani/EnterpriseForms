@@ -2746,6 +2746,7 @@
         "tags": [
           "Teams"
         ],
+        "summary": "Submits AddTeamMember to the Authority (organization owner or Security Administrator; never oneself as a Security Administrator, G25). The durable operation is recorded first; the roster changes only when the Worker projects the Authority-confirmed state (never written by this request). 409 IDEMPOTENCY_KEY_REUSED for the same key with another request; a completed operation is never re-sent.",
         "operationId": "AddTeamMember",
         "parameters": [
           {
@@ -2774,7 +2775,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommandStatusResponse"
+                  "$ref": "#/components/schemas/TeamMembershipChangeResponse"
                 }
               }
             }
@@ -2787,6 +2788,7 @@
         "tags": [
           "Teams"
         ],
+        "summary": "Submits RemoveTeamMember to the Authority; same rules as AddTeamMember. The member stays on the roster until the Worker projects the Authority-confirmed removal.",
         "operationId": "RemoveTeamMember",
         "parameters": [
           {
@@ -2814,7 +2816,270 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommandStatusResponse"
+                  "$ref": "#/components/schemas/TeamMembershipChangeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{teamId}/membership-operations/{operationId}": {
+      "get": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "One add/remove operation of the team (organization owners and Security Administrators). Another organization's or team's operation is the same 404 as an unknown id.",
+        "operationId": "GetTeamMembershipOperation",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMembershipOperationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{teamId}/membership-operations/by-key/{clientKey}": {
+      "get": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "The caller's own operation by the Idempotency-Key it sent (after a lost response). Only the initiating administrator finds it; the key is never returned.",
+        "operationId": "GetTeamMembershipOperationByKey",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "clientKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMembershipOperationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{teamId}/membership-operations/{operationId}/recheck": {
+      "post": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "Asks the Worker to look the operation up again at once (audited TEAM_MEMBERSHIP_OPERATION_RECHECKED). Never submits or replays a command; a ReconciliationError re-opens and still projects only a validated Authority answer. 409 when the operation is complete.",
+        "operationId": "RecheckTeamMembershipOperation",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMembershipOperationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{teamId}/membership-operations/{operationId}/review": {
+      "post": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "Records that an administrator reviewed a failed or anomalous operation (audited TEAM_MEMBERSHIP_OPERATION_REVIEWED). Changes no roster and no Authority state.",
+        "operationId": "MarkTeamMembershipOperationReviewed",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMembershipOperationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -8797,7 +9062,8 @@
           "source",
           "canManage",
           "members",
-          "availableMembers"
+          "availableMembers",
+          "membershipOperations"
         ],
         "type": "object",
         "properties": {
@@ -8835,6 +9101,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DirectoryUserResponse"
+            }
+          },
+          "membershipOperations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamMembershipOperationResponse"
             }
           }
         }
@@ -8899,6 +9171,121 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "TeamMembershipChangeResponse": {
+        "required": [
+          "command",
+          "operation"
+        ],
+        "type": "object",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/CommandOutcome"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/TeamMembershipOperationResponse"
+          }
+        }
+      },
+      "TeamMembershipOperationResponse": {
+        "required": [
+          "operationId",
+          "teamId",
+          "memberUserId",
+          "memberDisplayName",
+          "direction",
+          "operationState",
+          "completed",
+          "rosterUpdated",
+          "outcomeCode",
+          "supersededByLaterChange",
+          "rejectionReasonCode",
+          "errorCode",
+          "needsAttention",
+          "lateCommitDetected",
+          "reviewed",
+          "startedOn",
+          "completedOn",
+          "canRecheck",
+          "canMarkReviewed"
+        ],
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "memberUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "memberDisplayName": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "operationState": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "rosterUpdated": {
+            "type": "boolean"
+          },
+          "outcomeCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "supersededByLaterChange": {
+            "type": "boolean"
+          },
+          "rejectionReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "needsAttention": {
+            "type": "boolean"
+          },
+          "lateCommitDetected": {
+            "type": "boolean"
+          },
+          "reviewed": {
+            "type": "boolean"
+          },
+          "startedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "canRecheck": {
+            "type": "boolean"
+          },
+          "canMarkReviewed": {
+            "type": "boolean"
           }
         }
       },

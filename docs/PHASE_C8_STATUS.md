@@ -245,3 +245,21 @@ The owner approved **Design R** as the direction for C8-M1-01, **subject to inde
 1. the independent review recorded per §11, with decisions on Q-1…Q-11;
 2. owner decisions on reviewer conditions (notably Q-10, Q-11, and any signed-outcome request under Q-1);
 3. owner authorization naming the implementation scope (package §12).
+
+## 13. AC-9, C8-M1-01 and C8-M1-02 implemented (2026-10-30, C-87) — not reviewed, not merged
+
+- **Owner instruction:** implement all three technically (no closure by waiver); do not claim independent approval; do not merge.
+- **Branch:** `phase-c8/ac9-durable-reconciliation` from `69a6717` (PR #31 head, untouched). Commits `a75827a`, `c600288`, `bc8fe05` and the documentation commit.
+- **What exists now:**
+  * **AC-9** in the Authority: read-only outcome lookup under its own reconciler credential (package §1–§2, C-1…C-3).
+  * **C8-M1-01:** durable `authority_command_operations`; a Worker-only reconciler completes every add/remove from a validated AC-9 answer, independent of the browser, API restarts and Authority outages; the API never writes the roster; the team page sends once and only reads status.
+  * **C8-M1-02:** `team_membership_projection_states` per-pair watermark; roster, watermark and completion in one transaction; stale answers re-looked-up once (R-6); a watermark ahead of the Authority is an alerted anomaly.
+- **Evidence:** `docs/evidence/phase-c8/ac9-reconciliation-verification.md` — RC suite 31/31 on the security-test stack, regression 35/35, unit/contract/architecture suites green; one product defect (V-1) found and fixed during verification.
+- **How Q-1…Q-11 are handled in code:** `docs/architecture/PHASE_C8_AC9_IMPLEMENTATION_PLAN.md` §4. Q-1 signed outcome, Q-10 own container and Q-11 separate database role are **not implemented** (approvals outstanding).
+- **Independence:** all of this was built and verified by the implementation agent. **No independent review has taken place.**
+
+**State: implemented, NOT resolved.** AC-9, C8-M1-01 and C8-M1-02 stay open until:
+1. the independent security review is recorded per package §11 (reviewer reviews the implementation commit);
+2. the owner decides any reviewer conditions (notably Q-1, Q-10, Q-11);
+3. hosted CI and the full Stage B suite pass on the final commit (D8-19);
+4. the owner authorizes the merge.

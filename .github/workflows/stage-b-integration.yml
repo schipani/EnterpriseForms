@@ -29,7 +29,9 @@ jobs:
   integration:
     name: Stage B integration tests (real stack)
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # 60 was exceeded once the Phase C8 RC suite was added (run 41093944068 timed out after 57 min of tests with no failure
+    # reported); the same suite completed inside level3-script. A budget only — no test, filter or assertion changes.
+    timeout-minutes: 90
     env:
       DOTNET_NOLOGO: "1"
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"

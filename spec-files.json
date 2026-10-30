@@ -84,8 +84,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "37aef07caa025733879954ef4460a0721929357b9db731355bea26c00d0fe9b7",
-      "bytes": 33089
+      "sha256": "91f988d9ddb9e62d2de6f612c08f78e795df7a636086f8acafbf8d0f563d9ebc",
+      "bytes": 35104
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -129,8 +129,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "a6e69eaaf0a1fff2e0afbe056be366f6b697de5be244afabc25eed8e5cc836cf",
-      "bytes": 10708
+      "sha256": "46b41239ef1fc2e3d1574184114a264ca3fac33a36b2df826834a0eb3a3b7ce6",
+      "bytes": 11302
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -158,9 +158,14 @@
       "bytes": 76194
     },
     {
+      "path": "docs/architecture/PHASE_C8_AC9_IMPLEMENTATION_PLAN.md",
+      "sha256": "c153e144c238c99b8d66403e9e989f389d4c0470ff9c677164eef4ad40d0de94",
+      "bytes": 9483
+    },
+    {
       "path": "docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md",
-      "sha256": "a99ccf3a0028f99868846814b85c2a22493e70a66abb77874e02e055a2207cfb",
-      "bytes": 52031
+      "sha256": "41d72b3f9b6826d6fa3bb26567bee9a55680de250fcee7dc1a3b0ef74707f1d1",
+      "bytes": 63200
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
@@ -264,8 +269,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "852660b7a523daaaa0460ef7c9e33ec5c6384af6604eecdd398ffa8f661ed29f",
-      "bytes": 134093
+      "sha256": "0db424a3bdaed42535ea474207ebecb837dca46bf20016583165a82dfb13c5b8",
+      "bytes": 139296
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

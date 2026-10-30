@@ -58,6 +58,12 @@ public static class AuditActions
     public const string OrganizationLogoUploaded = "ORGANIZATION_LOGO_UPLOADED";
     public const string OrganizationLogoReplaced = "ORGANIZATION_LOGO_REPLACED";
     public const string TeamRenamed = "TEAM_RENAMED";
+
+    // Phase C8 (C8-M1-01, D8-17): reconciler failures and operator actions. Service actor; the initiator is in metadata only.
+    public const string TeamMembershipReconciliationFailed = "TEAM_MEMBERSHIP_RECONCILIATION_FAILED";
+    public const string TeamMembershipProjectionDrift = "TEAM_MEMBERSHIP_PROJECTION_DRIFT";
+    public const string TeamMembershipOperationRechecked = "TEAM_MEMBERSHIP_OPERATION_RECHECKED";
+    public const string TeamMembershipOperationReviewed = "TEAM_MEMBERSHIP_OPERATION_REVIEWED";
 }
 
 /// <summary>

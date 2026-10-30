@@ -1,8 +1,8 @@
 # Phase C8 — AC-9 independent security review submission (C8-M1-01, Design R)
 
-- **Status:** **Final submission for independent security review (C-85, 2026-10-30). NOT REVIEWED. Not implemented.**
-  * No Authority, Worker, migration, projection or UI change has been made.
-  * Nothing is deployed or merged, M2 has not started, and C8-M1-01 is **open**.
+- **Status:** **Final submission for independent security review (C-85, 2026-10-30). NOT REVIEWED.**
+  * **Update C-87 (2026-10-30):** on the owner's instruction, Design R is **implemented** on branch `phase-c8/ac9-durable-reconciliation` (not merged, not deployed) — see `PHASE_C8_AC9_IMPLEMENTATION_PLAN.md` for how each question Q-1…Q-11 is handled in code. The reviewer may now review the implementation at the commit recorded in C-87 instead of only this design. The independent review below remains a **closure and merge gate**; the implementation is not evidence of review.
+  * Nothing is deployed or merged, M2 has not started, and C8-M1-01 is **open** until §11/§12 and D8-19 are satisfied.
 - **Independence notice:** this package, including every "proposed answer", was written by the implementation agent (Claude) on the owner's instruction, and the owner made the decisions in §0. **Neither the implementation agent nor the owner is an independent reviewer.** Nothing in this document is an independent review, approval or finding. §11 states who qualifies and what the reviewer must record.
 - **History:**
   * C-83: original proposal;
@@ -433,7 +433,7 @@ All severities below are **proposed by the implementation agent**; the reviewer 
 | F-3 | **RO-2**: 12 handlers write projections only in the request that observes Effective (`CreateTeam`, `CreateFormDefinition`, `FormAccess`, `FormDesigner`, `CreateFormRecord`, `TransferOwnership`, `SecurityAdministrators`, `SecurityPolicy`, `ChildRecord`, `FieldSearchPolicy`, `CreateShare`, `RevokeShare`). | Low–Medium (display drift; per-handler assessment needed) | Registered (D8-13, D8-23); out of scope |
 | F-4 | A hostile BusinessDb DBA can edit `team_memberships` directly, bypass the triggers, or stall reconciliation. Display only; detection is partial (T-H). | Low (accepted §4M boundary) | Residual |
 | F-5 | A BusinessDb restore loses operations and watermarks. The roster converges only per pair, on the next operation. Full roster re-sync (O7) is deferred. | Low | Residual |
-| F-6 | Timing differences between `found:true` and `found:false` could leak key existence to a credential holder. | Low (the holder already needs the key) | Residual; RC-18 measures |
+| F-6 | Timing differences between `found:true` and `found:false` could leak key existence to a credential holder. | Low (the holder already needs the key) | Residual. **Not measured by any test** (see §13.4); reviewer assessment required |
 | F-7 | The rate limiter is per Authority instance. | Low | Residual |
 | F-8 | AC-9 is a new Authority read surface and credential (operational burden; joins the AC-5…AC-8 review package). | — | Under review |
 | F-9 | **Credential co-location.** The Worker process already holds the `business-api` workload credential, with the full Authority client registered, and the verifier credential. Adding the reconciler credential gives a Worker compromise all three. AC-9's isolation is at the Authority policy level, not the process level (§2.3). | Low–Medium | **New.** Q-10 |
@@ -528,3 +528,82 @@ A review performed by the owner, by Claude, or by another automated agent acting
 4. Nothing else is required in advance. C8-M1-01 then closes only under D8-19: implementation complete, the closure set passing on the security-test stack, and the required hosted verification passing.
 
 Until then: no AC-9 or Authority change, no Worker or migration work, no projection change, no deployment or merge, and no M2.
+
+*§12 is superseded by C-87: the owner authorized implementation on 2026-10-30. Review, owner decisions and merge authorization remain gates (§13.5).*
+
+## 13. Implementation handoff for the independent reviewer (C-87)
+
+Prepared by the implementation agent. **This section is not a review.** It shows where each design element lives in the code, so the reviewer can check the code instead of trusting this package.
+
+### 13.1 What to review
+
+- **Branch:** `phase-c8/ac9-durable-reconciliation`, PR #32. Its base is the PR #31 branch `phase-c8/administration-governance` at `69a6717`; PR #31 is a separate review and merge.
+- **Diff under review:** `git diff 69a6717..<head of PR #32>`. Code was frozen at `79978a3`. Later commits change only the CI budget (`stage-b-integration.yml` timeout) and documentation.
+- **Evidence:** `docs/evidence/phase-c8/ac9-reconciliation-verification.md`, which keeps local, hosted and not-run results separate.
+
+### 13.2 File map
+
+| Design element | Code | Tests |
+|---|---|---|
+| AC-9 contract (§1.1) | `src/authority/AuthorizationAuthority.Contracts/V1/ReconcilerContracts.cs`; `contracts/openapi/authorization-authority-internal-v1.json` | `ReconcilerBoundaryTests` |
+| AC-9 semantics (§1.2): binding, snapshot, pair at P, uniform not found, status only | `src/authority/AuthorizationAuthority.Application/Features/SecurityCommands/SecurityCommandOutcomeService.cs`; `AuthorityStore.BeginReadOnlySnapshotScopeAsync` | `SecurityCommandOutcomeServiceTests` |
+| Endpoint, assertion refusal, body parsing, 503 mapping, rate limit, C-3 logging | `src/authority/AuthorizationAuthority.Api/Features/SecurityCommands/SecurityCommandOutcomeEndpoints.cs`; `Program.cs` | `ReconcilerBoundaryTests` (RC-18, RC-27, RC-28) |
+| Reconciler scheme and policy; C-1/C-2 Authority guards (§1.4, §2.2) | `src/authority/AuthorizationAuthority.Api/Composition/InternalAuthentication.cs` (`ValidateReconciler`) | `ReconcilerBoundaryTests` |
+| Reconciler client; C-1/C-2 Worker guards | `src/backend/EnterpriseForms.Infrastructure/Authority/TeamMembershipReconcilerHttpClient.cs`; port `ITeamMembershipOutcomeAuthority.cs` | `TeamMembershipReconciliationUnitTests` |
+| §1.3 validation (fail closed) | `.../Features/Teams/MembershipReconciliation/TeamMembershipOutcomeValidator.cs` | `TeamMembershipReconciliationUnitTests` (RC-22) |
+| §4.2 projection with R-6, I-1…I-11, NotCommitted, quarantine, 401/403/429 handling | `.../MembershipReconciliation/TeamMembershipReconciliationService.cs`; host `src/backend/EnterpriseForms.Worker/Features/Teams/TeamMembershipReconciliationWorker.cs` | `TeamMembershipReconcilerServiceTests`; Stage B `TeamMembershipReconciliationTests` |
+| §5 schema, column grants, guard triggers | `src/backend/EnterpriseForms.Infrastructure/Persistence/Migrations/20261030130521_PhaseC8TeamMembershipReconciliation.cs`; `BusinessRuntimeGrants.cs`; `TeamMembershipReconciliationConfigurations.cs`; domain `TeamMembershipReconciliation.cs` | RC-19, RC-23 (Stage B) |
+| R-3 API path (T1/T2, never writes the roster) | `.../Features/Teams/ManageTeam/ChangeTeamMembershipHandler.cs` | `TeamMembershipSingleWriterTests` (RC-26); `PendingAuthorityCommandTests` |
+| R-4 read-only status and audited operator actions | `.../ManageTeam/TeamMembershipOperationHandlers.cs`; `TeamEndpoints.cs`; `TeamDirectoryHandlers.cs`; `apps/web/src/features/teams/pages/TeamDetailPage.tsx` | RC-16, RC-17; `membershipOutcome.test.ts` |
+
+### 13.3 Q-1…Q-11 as implemented (reviewer decides each)
+
+| Q | State in code | Decision still open |
+|---|---|---|
+| Q-1 signed outcome | **Not implemented.** Channel authentication, §1.3 validation and C-1 start guards. Plain HTTP on synthetic stacks only | Signed responses: required or not; if required, a new cryptographic mechanism needing owner approval |
+| Q-2 own pair only | Implemented: the pair comes from the command's stored payload, never from the caller | Accept or change |
+| Q-3 journaling | Logs and metrics; refusals counted and logged as warnings; not journaled | Accept or require journal entries |
+| Q-4 single writer | Implemented in code. The API roster write is removed; RC-26 enforces it | Confirm |
+| Q-5 drift at E = W | Corrected and alerted (`TEAM_MEMBERSHIP_PROJECTION_DRIFT`) | Correct or park |
+| Q-6 rate limit | 20/s, burst 40, per instance, per validated issuer, bounded ≤ 50/s at startup | Accept or change |
+| Q-7 uniform not found | Implemented | Accept or change |
+| Q-8 quarantine | Status only (`membership` null) | Accept or require 503 |
+| Q-9 production identity | Not applicable until Entra exists; own credential everywhere | Before production design |
+| Q-10 Worker isolation | **Not implemented.** Reconciler credential sits in the existing Worker beside the `business-api` and verifier credentials (F-9) | Own container and managed identity: yes/no, and by when |
+| Q-11 database permissions | **Not implemented.** API and Worker share one runtime role; I-10 enforced by code and RC-26 only (F-10) | Separate reconciler role with API reduced to SELECT: yes/no |
+
+### 13.4 Findings: implementation status (final severities are the reviewer's)
+
+| F | State after implementation |
+|---|---|
+| F-1 | Unchanged (plain HTTP everywhere); C-1 implemented on both sides as a start condition |
+| F-2 | Fixed by R-1, R-2, R-6; RC-10 and RC-11 |
+| F-3 | Unchanged (out of scope, D8-23) |
+| F-4, F-5, F-7, F-12 | Unchanged residuals |
+| F-6 | Unchanged residual. **No test measures the found / not-found timing difference, and no timing result exists.** RC-18 asserts only status codes, bodies and absence of state change; the earlier statement that RC-18 measures timing was wrong and is withdrawn (C-88). Non-disclosure is **not claimed**: a deterministic test cannot establish it on a shared CI host (scheduler and database latency noise exceed any plausible code-path difference), and a statistical test would be flaky or prove nothing. Both answers run the same bound lookup in one snapshot, but that is a design argument, not evidence. The reviewer must assess it, and if a measurement is wanted, a dedicated test on a quiet staging host (the `reconciler_outcome_lookup_duration` histogram is not labelled by `found`, so today it cannot separate the two cases) |
+| F-8 | Implemented surface; this review |
+| F-9 | Unchanged (Q-10) |
+| F-10 | Unchanged (Q-11) |
+| F-11 | Corrected (R-6); RC-11 and RC-23 |
+
+**Observations from the implementation agent's own read-through (not findings of an independent review):**
+
+| N | Observation | Effect | Suggested handling |
+|---|---|---|---|
+| N-1 | **Corrected (C-88).** AC-9 enforced its 4 KiB request-body cap only when `Content-Length` was declared | A holder of the reconciler key could send a large body; that holder is already rate-limited | The read itself is now capped at 4096 bytes (a 4097-byte buffer is read at most), so chunked bodies and bodies without `Content-Length` are refused with the same 400 `INVALID_REQUEST` before any parsing or store access; the Kestrel limit is also set when the host allows. Tests `N1TheFourKibBodyCapHoldsForChunkedAndDeclaredLengthBodies` (4096, 4097 and 1,000,000 bytes, declared and chunked; a body over the cap that would otherwise reach the store is refused 400, not 503) |
+| N-2 | **Corrected (C-88).** R-3 recorded the operation (T1) before any permission result was checked | A non-administrator in the same organization could create operation rows that ended `Rejected` | `ChangeTeamMembershipHandler` now runs `AdministrationAccess.RequireAdministratorAsync` (the Authority's own answer for organization owner or Security Administrator, the two principals its team-command rule accepts) before T1; a denial is 403 `FORBIDDEN` with no row and no submit. Nothing is widened, and the Authority still decides the command at submit, bound to the revision from the check: access lost after the check is refused there and recorded `Rejected`. Residual: an administrator can still create rows the Authority later rejects (for example a Security Administrator adding themself, G25, or a nonexistent team). The team is not checked against the projection first, because the Authority may know a team the projection has not received yet. Tests `TeamMembershipPreliminaryAuthorizationTests` (neither role, other organization, either role then Authority refusal, revocation between check and command) |
+| N-3 | The Authority-side C-1 checks `ClientCertificateMode = RequireCertificate` but does not bind the certificate to the reconciler identity | Not reachable today: the Authority refuses to start outside Development/Testing | Part of the production identity design (Q-9) |
+| N-4 | The new tables have no row-level security, like every other BusinessDb table today (G08 open). Tenant isolation is the tenant predicate in each query and handler (uniform 404 across tenants; RC-14) | No regression against the existing business schema | Part of G08 |
+| N-5 | `authority_command_operations.team_id` and `member_user_id` have no foreign keys; `team_membership_projection_states` has them | A row naming a nonexistent team or user cannot project anything: AC-9 answers about the Authority's pair, and the validator rejects any mismatch (RC-13) | Accept or add the FKs |
+
+### 13.5 Confirmations requested from the reviewer
+
+1. **Tenant isolation.** AC-9 reads one organization's rows in one snapshot and answers cross-organization keys with the same `found:false` (RC-14). Business handlers check tenant and team and answer 404 uniformly. The reconciler binds organization across row, request, response and writes (I-6; validator `answer.OrganizationId != operation.TenantId`).
+2. **Authorization.** The Authority remains the only decider of team membership. The reconciler holds no submit capability (RC-26, architecture test). The roster is a display projection and never confers permission (§4M). The reconciler credential satisfies only AC-9, and no other credential satisfies AC-9 (RC-18).
+3. **Integrity.** AC-9 is read-only: no lock, revision, journal, outbox or SpiceDB call. No `RowSignature`, Merkle or signing path changed. The new tables are projection-class (§5.3), guarded by schema-owned triggers and column grants, with no DELETE.
+
+Record the review as §11 requires. Until then AC-9, C8-M1-01 and C8-M1-02 stay **implemented, not resolved**.
+
+### 13.6 Post-implementation corrections before the independent review (C-88)
+
+Owner-approved, narrowly scoped: N-1 and N-2 corrected as above; F-6 evidence statement corrected (no timing claim). Authority semantics, permissions and the Authority API contract are unchanged. Row 409 (RC-18) lists no timing assertion and none exists.

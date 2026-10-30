@@ -86,6 +86,8 @@ export type OrganizationMemberResponse = S["OrganizationMemberResponse"];
 export type TeamDirectoryResponse = S["TeamDirectoryResponse"];
 export type TeamSummaryResponse = S["TeamSummaryResponse"];
 export type TeamDetailResponse = S["TeamDetailResponse"];
+export type TeamMembershipOperationResponse = S["TeamMembershipOperationResponse"];
+export type TeamMembershipChangeResponse = S["TeamMembershipChangeResponse"];
 export type TeamMemberResponse = S["TeamMemberResponse"];
 export type RenameTeamRequest = S["RenameTeamRequest"];
 export type CreateTeamRequest = S["CreateTeamRequest"];
@@ -291,8 +293,12 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       /** Display-only rename of the projection label (D8-8); owner only, audited, concurrency on expectedModifiedOn. */
       rename: (teamId: string, request: RenameTeamRequest) => write<TeamDetailResponse>("PATCH", "teams.rename", { teamId }, request, { resourceKey: `team:${teamId}` }),
       /** C8-M1-01: pass the original idempotencyKey to re-check the same Authority command (never a new one) after a Pending outcome. */
-      addMember: (teamId: string, request: TeamMemberRequest, idempotencyKey?: string) => write<CommandStatusResponse>("POST", "teams.addMember", { teamId }, request, { idempotent: true, ...(idempotencyKey ? { idempotencyKey } : {}), resourceKey: `team:${teamId}` }),
-      removeMember: (teamId: string, userId: string, idempotencyKey?: string) => write<CommandStatusResponse>("POST", "teams.removeMember", { teamId, userId }, {}, { idempotent: true, ...(idempotencyKey ? { idempotencyKey } : {}), resourceKey: `team:${teamId}` }),
+      addMember: (teamId: string, request: TeamMemberRequest, idempotencyKey?: string) => write<TeamMembershipChangeResponse>("POST", "teams.addMember", { teamId }, request, { idempotent: true, ...(idempotencyKey ? { idempotencyKey } : {}), resourceKey: `team:${teamId}` }),
+      removeMember: (teamId: string, userId: string, idempotencyKey?: string) => write<TeamMembershipChangeResponse>("POST", "teams.removeMember", { teamId, userId }, {}, { idempotent: true, ...(idempotencyKey ? { idempotencyKey } : {}), resourceKey: `team:${teamId}` }),
+      membershipOperation: (teamId: string, operationId: string, signal?: AbortSignal) => read<TeamMembershipOperationResponse>("teams.membershipOperation", { teamId, operationId }, undefined, "interactive-read", signal),
+      membershipOperationByKey: (teamId: string, clientKey: string, signal?: AbortSignal) => read<TeamMembershipOperationResponse>("teams.membershipOperationByKey", { teamId, clientKey }, undefined, "interactive-read", signal),
+      recheckMembershipOperation: (teamId: string, operationId: string) => write<TeamMembershipOperationResponse>("POST", "teams.recheckMembershipOperation", { teamId, operationId }, {}, { resourceKey: `team:${teamId}` }),
+      reviewMembershipOperation: (teamId: string, operationId: string) => write<TeamMembershipOperationResponse>("POST", "teams.reviewMembershipOperation", { teamId, operationId }, {}, { resourceKey: `team:${teamId}` }),
     },
     preferences: {
       get: (signal?: AbortSignal) => read<UiPreferenceResponse>("preferences.get", undefined, undefined, "interactive-read", signal),
