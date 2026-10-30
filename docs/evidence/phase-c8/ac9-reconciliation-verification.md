@@ -84,3 +84,15 @@ Read from the public Actions API. Job logs need authentication, so exact test co
 - **Manual NVDA/VoiceOver** of the changed team page — not performed.
 - **Transport and identity** (mTLS, managed identities, Managed HSM, Azure) — not provable on this stack (package §10); C-1 only makes them a start condition.
 - **Independent security review of AC-9** — not performed. The owner and Claude are not independent reviewers.
+
+## 3. Corrections before the independent review (C-88)
+
+Verified by the implementation agent only (not an independent review), by targeted runs; the hour-long Stage B suite was **not** re-run locally and awaits hosted verification.
+
+| Item | Evidence |
+|---|---|
+| N-1 body cap | `ReconcilerBoundaryTests.N1…` 5 cases (4096 within cap; 4097 and 1,000,000 declared; 4097 and 1,000,000 chunked without `Content-Length`) |
+| N-2 gate before persistence | `TeamMembershipPreliminaryAuthorizationTests` 6 cases: neither role (add, remove), other organization, either administrative role then Authority refusal recorded Rejected, revocation between check and command |
+| F-6 | Documentation corrected; **no timing evidence exists** and none is claimed |
+
+Targeted run: `ReconcilerBoundaryTests` + `TeamMembershipPreliminaryAuthorizationTests`, 30 / 30. Further targeted runs are recorded in the commit message.

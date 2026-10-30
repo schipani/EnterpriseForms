@@ -23,6 +23,7 @@ public static class SecurityCommandOutcomeEndpoints
 {
     public const string Route = InternalApi.Prefix + "/security-command-outcomes/lookup";
     public const string RateLimitPolicy = "reconciler-outcome-lookup";
+    public const int MaxBodyBytes = 4096;
 
     public static IEndpointRouteBuilder MapSecurityCommandOutcomeEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -106,14 +107,43 @@ public static class SecurityCommandOutcomeEndpoints
 
     private static async Task<SecurityCommandOutcomeLookupRequest> ReadRequestAsync(HttpContext context, CancellationToken cancellationToken)
     {
-        if (context.Request.ContentLength is > 4096)
+        if (context.Request.ContentLength is > MaxBodyBytes)
+        {
+            throw Invalid();
+        }
+
+        // N-1: the cap applies to the bytes actually read, so a chunked body or one with no Content-Length cannot exceed it.
+        // Kestrel also enforces it at the transport when the feature is writable; the bounded read below holds on every host.
+        var limit = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+        if (limit is { IsReadOnly: false })
+        {
+            limit.MaxRequestBodySize = MaxBodyBytes;
+        }
+
+        var buffer = new byte[MaxBodyBytes + 1];
+        var total = 0;
+        try
+        {
+            int read;
+            while (total < buffer.Length
+                && (read = await context.Request.Body.ReadAsync(buffer.AsMemory(total), cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                total += read;
+            }
+        }
+        catch (Microsoft.AspNetCore.Http.BadHttpRequestException)
+        {
+            throw Invalid();
+        }
+
+        if (total > MaxBodyBytes)
         {
             throw Invalid();
         }
 
         try
         {
-            using var document = await JsonDocument.ParseAsync(context.Request.Body, cancellationToken: cancellationToken).ConfigureAwait(false);
+            using var document = JsonDocument.Parse(buffer.AsMemory(0, total));
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object
                 || !root.TryGetProperty("organization_id", out var organization) || !organization.TryGetGuid(out var organizationId)

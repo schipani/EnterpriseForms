@@ -24,7 +24,11 @@ public sealed class ChangeTeamMembershipHandler(IBusinessStore store, IAuthoriza
         var kind = add ? TeamMembershipCommandKinds.AddTeamMember : TeamMembershipCommandKinds.RemoveTeamMember;
         var authorityKey = TeamMembershipCommandKinds.KeyPrefix(kind) + idempotencyKey;
         var user = context.ToDelegatedUser();
-        var decision = await authority.CheckPermissionAsync(user, new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.ManageOrganization), cancellationToken).ConfigureAwait(false);
+        // N-2: a preliminary gate BEFORE anything is persisted, so a caller the Authority would refuse cannot fill the operations table
+        // with rejected commands. It asks the Authority for the same two principals its team-command rule accepts (organization owner
+        // or Security Administrator) and widens nothing. It is only a gate: the Authority still decides the command itself at submit,
+        // bound to this revision, so a change of authorization after this point is refused there (409/403) and recorded as Rejected.
+        var decision = await AdministrationAccess.RequireAdministratorAsync(authority, context, cancellationToken).ConfigureAwait(false);
 
         var operation = await RecordAsync(context, teamId, memberUserId, kind, authorityKey, cancellationToken).ConfigureAwait(false);
         if (operation.IsTerminal)

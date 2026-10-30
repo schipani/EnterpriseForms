@@ -182,6 +182,49 @@ public sealed class ReconcilerBoundaryTests
         Assert.Contains("KIND_NOT_RECONCILABLE", await disallowed.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
     }
 
+    /// <summary>A content with no known length, so HttpClient sends it with Transfer-Encoding: chunked and no Content-Length.</summary>
+    private sealed class UnknownLengthContent(byte[] bytes) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => stream.WriteAsync(bytes, 0, bytes.Length);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
+    [Theory]
+    [InlineData(4096, false)]
+    [InlineData(4097, false)]
+    [InlineData(1_000_000, false)]
+    [InlineData(4097, true)]
+    [InlineData(1_000_000, true)]
+    public async Task N1TheFourKibBodyCapHoldsForChunkedAndDeclaredLengthBodies(int totalBytes, bool chunked)
+    {
+        using var authority = Authority(reconcilerConfigured: true);
+        using var client = authority.CreateClient();
+        var json = System.Text.Json.JsonSerializer.Serialize(new { organization_id = Guid.CreateVersion7(), idempotency_key = "team-add:" + Guid.NewGuid().ToString("D"), expected_command_kind = "AddTeamMember" });
+        var padded = System.Text.Encoding.UTF8.GetBytes(json.PadRight(totalBytes, ' '));
+        using var request = new HttpRequestMessage(HttpMethod.Post, Route)
+        {
+            Content = chunked ? new UnknownLengthContent(padded) : new ByteArrayContent(padded),
+        };
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Genuine());
+        request.Headers.Add("X-Correlation-Id", Guid.CreateVersion7().ToString("D"));
+        if (chunked)
+        {
+            request.Headers.TransferEncodingChunked = true;
+        }
+
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        // Within the cap the request is valid and reaches the (unreachable) store: 503. Over the cap it is refused as 400 before
+        // any parsing or store access, however the length is expressed.
+        Assert.Equal(totalBytes <= 4096 ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task RC27TheRateLimitAnswers429WithRetryAfter()
     {
