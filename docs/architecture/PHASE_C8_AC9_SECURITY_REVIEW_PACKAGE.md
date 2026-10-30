@@ -1,8 +1,8 @@
 # Phase C8 — AC-9 independent security review submission (C8-M1-01, Design R)
 
-- **Status:** **Final submission for independent security review (C-85, 2026-10-30). NOT REVIEWED. Not implemented.**
-  * No Authority, Worker, migration, projection or UI change has been made.
-  * Nothing is deployed or merged, M2 has not started, and C8-M1-01 is **open**.
+- **Status:** **Final submission for independent security review (C-85, 2026-10-30). NOT REVIEWED.**
+  * **Update C-87 (2026-10-30):** on the owner's instruction, Design R is **implemented** on branch `phase-c8/ac9-durable-reconciliation` (not merged, not deployed) — see `PHASE_C8_AC9_IMPLEMENTATION_PLAN.md` for how each question Q-1…Q-11 is handled in code. The reviewer may now review the implementation at the commit recorded in C-87 instead of only this design. The independent review below remains a **closure and merge gate**; the implementation is not evidence of review.
+  * Nothing is deployed or merged, M2 has not started, and C8-M1-01 is **open** until §11/§12 and D8-19 are satisfied.
 - **Independence notice:** this package, including every "proposed answer", was written by the implementation agent (Claude) on the owner's instruction, and the owner made the decisions in §0. **Neither the implementation agent nor the owner is an independent reviewer.** Nothing in this document is an independent review, approval or finding. §11 states who qualifies and what the reviewer must record.
 - **History:**
   * C-83: original proposal;

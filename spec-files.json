@@ -129,8 +129,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "a6e69eaaf0a1fff2e0afbe056be366f6b697de5be244afabc25eed8e5cc836cf",
-      "bytes": 10708
+      "sha256": "46b41239ef1fc2e3d1574184114a264ca3fac33a36b2df826834a0eb3a3b7ce6",
+      "bytes": 11302
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -164,8 +164,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_AC9_SECURITY_REVIEW_PACKAGE.md",
-      "sha256": "a99ccf3a0028f99868846814b85c2a22493e70a66abb77874e02e055a2207cfb",
-      "bytes": 52031
+      "sha256": "dc63a48c4c2a8661a5b5bc8054a0ec874411cc5540e07c35b4c39a6277111241",
+      "bytes": 52462
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
