@@ -188,7 +188,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Renames a form (display name only; no new version). Requires the Authority design permission on the form (404 otherwise); 409 FORM_DEFINITION_MODIFIED_CONCURRENTLY when expectedFormDefinitionRevision is stale; 422 for an empty, over-long or control-character name; audited (FORM_RENAMED). */
+        patch: operations["RenameFormDefinition"];
         trace?: never;
     };
     "/api/v1/form-definitions/designer": {
@@ -2435,6 +2436,8 @@ export interface components {
             canCreateRecord: boolean;
             /** Format: date-time */
             modifiedOn: string;
+            /** Format: int64 */
+            formDefinitionRevision: number | string;
         };
         FormDraftResponse: {
             /** Format: uuid */
@@ -2903,6 +2906,11 @@ export interface components {
             reason: null | string;
             /** @default false */
             useDevelopmentStepUp: boolean;
+        };
+        RenameFormDefinitionRequest: {
+            formDefinitionName: string;
+            /** Format: int64 */
+            expectedFormDefinitionRevision: number | string;
         };
         RenameTeamRequest: {
             teamName: string;
@@ -3645,6 +3653,32 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDefinitionDetailResponse"];
+                };
+            };
+        };
+    };
+    RenameFormDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formDefinitionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameFormDefinitionRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

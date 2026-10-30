@@ -15,6 +15,7 @@ import { FieldConfigModal } from "../components/FieldConfigModal";
 import { OptionListsDialog } from "../components/OptionListsDialog";
 import { FormAccessPanel } from "../components/FormAccessPanel";
 import { RemoveSectionDialog } from "../components/RemoveSectionDialog";
+import { RenameFormDialog, type RenameFormTarget } from "../components/RenameFormDialog";
 
 type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" | "access" | "relationships";
 
@@ -104,6 +105,8 @@ export function DesignerPage() {
   const [maxChildren, setMaxChildren] = useState("50");
   const [announcement, setAnnouncement] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [renameTarget, setRenameTarget] = useState<RenameFormTarget | null>(null);
+  const [renamedNotice, setRenamedNotice] = useState<string | null>(null);
   const announce = useCallback((message: string) => setAnnouncement((current) => (current === message ? `${message} ` : message)), []);
 
   const resetHistory = () => {
@@ -338,6 +341,7 @@ export function DesignerPage() {
   }
   const form = detail.data;
   const canDesign = form.summary.canDesign;
+  const openRename = () => setRenameTarget({ formDefinitionId, formDefinitionName: form.summary.formDefinitionName, formDefinitionRevision: form.summary.formDefinitionRevision });
   const rendererFields: RendererField[] = form.fields.map((field) => ({ fieldDefinitionId: field.fieldDefinitionId, fieldKey: field.fieldKey, fieldDisplayName: field.fieldDisplayName, fieldDataType: field.fieldDataType, optionSelectionMode: field.optionSelectionMode, options: field.options.map((option) => ({ ...option, optionSortOrder: Number(option.optionSortOrder) })), applicationEncrypted: field.fieldProtectionMode === "ApplicationEncrypted", groupDefinitionId: field.groupDefinitionId ?? null }));
   const relationships = form.relationships.map((relationship) => ({ formRelationshipDefinitionId: relationship.formRelationshipDefinitionId, relationshipDisplayName: relationship.relationshipDisplayName, childFormDefinitionName: relationship.childFormDefinitionName }));
   const dirty = layout !== null && serializeLayout(layout) !== baseJson;
@@ -745,7 +749,14 @@ export function DesignerPage() {
         <Card title="Form settings">
           <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[12rem_1fr]">
             <dt className="font-medium">Form name</dt>
-            <dd>{form.summary.formDefinitionName}</dd>
+            <dd className="flex flex-wrap items-center gap-2">
+              <span className="break-words">{form.summary.formDefinitionName}</span>
+              {canDesign ? (
+                <Button size="sm" variant="secondary" icon={ActionIcons.edit} onClick={openRename}>
+                  Edit name
+                </Button>
+              ) : null}
+            </dd>
             <dt className="font-medium">Description</dt>
             <dd>{form.summary.formDefinitionDescription || <span className="text-muted">None</span>}</dd>
             <dt className="font-medium">Current version</dt>
@@ -825,7 +836,14 @@ export function DesignerPage() {
         <span aria-hidden="true">←</span> All forms
       </Link>
       <p className="text-xl font-bold leading-tight">Form Designer</p>
-      <h1 className="break-words text-base font-semibold leading-snug">{form.summary.formDefinitionName}</h1>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <h1 className="break-words text-base font-semibold leading-snug">{form.summary.formDefinitionName}</h1>
+        {canDesign ? (
+          <Button size="sm" variant="ghost" icon={ActionIcons.edit} aria-label={`Edit name of ${form.summary.formDefinitionName}`} onClick={openRename}>
+            Edit name
+          </Button>
+        ) : null}
+      </div>
       <div className="flex flex-wrap gap-1.5">
         <Badge tone={form.draft ? "success" : "neutral"}>{form.draft ? `Draft revision ${form.draft.draftRevision}` : "No draft"}</Badge>
         <Badge tone={form.summary.currentVersionNumber === null ? "neutral" : "info"}>{form.summary.currentVersionNumber === null ? "Not published" : `Published v${form.summary.currentVersionNumber}`}</Badge>
@@ -852,6 +870,19 @@ export function DesignerPage() {
         {announcement}
       </div>
       {parseError ? <StatusMessage tone="danger" title="The stored layout could not be parsed">{parseError}</StatusMessage> : null}
+      {renamedNotice !== null ? (
+        <StatusMessage
+          tone="success"
+          title="Form renamed"
+          actions={
+            <Button size="sm" variant="ghost" onClick={() => setRenamedNotice(null)}>
+              Dismiss
+            </Button>
+          }
+        >
+          The form is now called “{renamedNotice}”. Published versions and your unsaved draft changes are unaffected.
+        </StatusMessage>
+      ) : null}
       {/* Phase C3 designer UX refinement: the form name, draft status and primary actions stay reachable while the
           canvas (or any tab's content) scrolls, without a second independently-scrolling box. Height is measured
           (pinnedRef) so the nav list and quick inspector below can offset by exactly this much. */}
@@ -886,6 +917,7 @@ export function DesignerPage() {
           ),
         }))}
       />
+      <RenameFormDialog target={renameTarget} onClose={() => setRenameTarget(null)} onRenamed={setRenamedNotice} />
       {configTarget && inspectorProps ? <FieldConfigModal {...inspectorProps} open configKey={configTarget.key} initialTab={configTarget.tab} onClose={() => setConfigTarget(null)} /> : null}
 
       {removeSectionIndex !== null && layout ? (

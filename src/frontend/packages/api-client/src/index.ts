@@ -57,6 +57,7 @@ export type FormDraftResponse = S["FormDraftResponse"];
 export type RelationshipDefinitionResponse = S["RelationshipDefinitionResponse"];
 export type CreateFormDefinitionV2Request = S["CreateFormDefinitionV2Request"];
 export type AddFieldDefinitionRequest = S["AddFieldDefinitionRequest"];
+export type RenameFormDefinitionRequest = S["RenameFormDefinitionRequest"];
 export type GroupDefinitionResponse = S["GroupDefinitionResponse"];
 export type CreateGroupDefinitionRequest = S["CreateGroupDefinitionRequest"];
 export type UpdateFieldDefinitionRequest = S["UpdateFieldDefinitionRequest"];
@@ -229,6 +230,7 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       list: (signal?: AbortSignal) => read<FormDefinitionSummaryResponse[]>("forms.list", undefined, undefined, "interactive-read", signal),
       get: (formDefinitionId: string, signal?: AbortSignal) => read<FormDefinitionDetailResponse>("forms.get", { formDefinitionId }, undefined, "interactive-read", signal),
       create: (request: CreateFormDefinitionV2Request) => write<FormDefinitionDetailResponse>("POST", "forms.create", undefined, request, { idempotent: true }),
+      rename: (formDefinitionId: string, request: RenameFormDefinitionRequest) => write<FormDefinitionDetailResponse>("PATCH", "forms.rename", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       addField: (formDefinitionId: string, request: AddFieldDefinitionRequest) => write<FieldDefinitionResponse>("POST", "forms.addField", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       createGroup: (formDefinitionId: string, request: CreateGroupDefinitionRequest) => write<GroupDefinitionResponse>("POST", "forms.createGroup", { formDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),
       updateField: (formDefinitionId: string, fieldDefinitionId: string, request: UpdateFieldDefinitionRequest) => write<FieldDefinitionResponse>("PATCH", "forms.updateField", { formDefinitionId, fieldDefinitionId }, request, { resourceKey: `form:${formDefinitionId}` }),

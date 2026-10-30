@@ -1,7 +1,9 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { ActionIcons, Badge, Button, Card, DataTable, LoadingBlock, PageHeader, RowActions } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, LoadingBlock, PageHeader, RowActions, StatusMessage } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { RenameFormDialog, type RenameFormTarget } from "../../form-designer";
 import { ErrorPanel } from "../../support";
 
 /** PG-029 form catalog: what the authority lets this user design or use. */
@@ -9,6 +11,8 @@ export function FormsPage() {
   const api = useApi();
   const session = useSession();
   const forms = useQuery({ queryKey: ["forms"], queryFn: () => api.forms.list().then((r) => r.result) });
+  const [renaming, setRenaming] = useState<RenameFormTarget | null>(null);
+  const [renamed, setRenamed] = useState<string | null>(null);
   return (
     <>
       <PageHeader
@@ -27,6 +31,19 @@ export function FormsPage() {
           </>
         }
       />
+      {renamed !== null ? (
+        <StatusMessage
+          tone="success"
+          title="Form renamed"
+          actions={
+            <Button size="sm" variant="ghost" onClick={() => setRenamed(null)}>
+              Dismiss
+            </Button>
+          }
+        >
+          The form is now called “{renamed}”. Its versions, records and permissions are unchanged.
+        </StatusMessage>
+      ) : null}
       <Card>
         {forms.isPending ? <LoadingBlock label="Loading forms" /> : null}
         {forms.isError ? <ErrorPanel error={forms.error} onRetry={() => void forms.refetch()} /> : null}
@@ -64,8 +81,20 @@ export function FormsPage() {
                         ) : null}
                       </>
                     }
-                    overflow={
-                      row.currentVersionNumber !== null
+                    overflow={[
+                      ...(row.canDesign
+                        ? [
+                            {
+                              key: "rename",
+                              content: (
+                                <button type="button" onClick={() => setRenaming({ formDefinitionId: row.formDefinitionId, formDefinitionName: row.formDefinitionName, formDefinitionRevision: row.formDefinitionRevision })}>
+                                  Rename
+                                </button>
+                              ),
+                            },
+                          ]
+                        : []),
+                      ...(row.currentVersionNumber !== null
                         ? [
                             {
                               key: "records",
@@ -76,8 +105,8 @@ export function FormsPage() {
                               ),
                             },
                           ]
-                        : []
-                    }
+                        : []),
+                    ]}
                   />
                 ),
               },
@@ -85,6 +114,13 @@ export function FormsPage() {
           />
         ) : null}
       </Card>
+      <RenameFormDialog
+        target={renaming}
+        onClose={() => setRenaming(null)}
+        onRenamed={(name) => {
+          setRenamed(name);
+        }}
+      />
     </>
   );
 }

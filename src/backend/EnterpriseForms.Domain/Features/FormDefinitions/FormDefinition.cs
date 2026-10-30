@@ -27,6 +27,24 @@ public sealed class FormDefinition
 
     /// <summary>Authority command that registered the form; without it the form is not a registered resource.</summary>
     public Guid? AuthorityCommandId { get; set; }
+
+    /// <summary>Optimistic-concurrency revision of the editable catalog metadata (the display name). Identity, versions and records never change with it.</summary>
+    public long FormDefinitionRevision { get; set; } = 1;
+}
+
+/// <summary>Naming rule shared by form creation and rename: trimmed, 1-200 characters, no control characters. Names need not be unique.</summary>
+public static class FormDefinitionNameRules
+{
+    public const int MaximumLength = 200;
+
+    public const string Requirement = "form_definition_name is required (max 200, no control characters)";
+
+    /// <summary>The trimmed name, or null when it breaks the rule.</summary>
+    public static string? Normalize(string? name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        return trimmed.Length is 0 or > MaximumLength || trimmed.Any(char.IsControl) ? null : trimmed;
+    }
 }
 
 /// <summary>Immutable published snapshot. Stage A layouts are schema v1 text fields only.</summary>

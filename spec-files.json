@@ -48,6 +48,11 @@
       "bytes": 13863
     },
     {
+      "path": "docs/FORM_RENAME_STATUS.md",
+      "sha256": "711326b99f099a8efe6f605e4d5a37c505e057385f4c1730bd3062947500ef79",
+      "bytes": 4073
+    },
+    {
       "path": "docs/PHASE0_STATUS.md",
       "sha256": "d013f5cc90a1d88854de0ff9579483361f28349cedd63c061b3caa83b15477df",
       "bytes": 25771
@@ -134,8 +139,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "0735a7970cf2e92912631ad88224de40e67c2af56622c662c1345c7d4e6584a4",
-      "bytes": 12182
+      "sha256": "7cbd379d73c0c48f3bdecccdf073a362c6be5039d6428f950888624fa9851a20",
+      "bytes": 12589
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -274,8 +279,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "15689fe0f208e17eff9f1dc296160ef282699f91d7c648b49f2c1221968807e5",
-      "bytes": 141675
+      "sha256": "839a798fec00d0cfecfb4ae118ecf66b736d14a05e7612aff993d4b12d7f3cdd",
+      "bytes": 142803
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
