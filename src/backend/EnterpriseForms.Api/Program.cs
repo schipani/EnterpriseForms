@@ -54,6 +54,14 @@ public sealed class Program
 
         builder.Services.AddTrustAuthorityReadinessProbe(builder.Configuration);
         builder.Services.AddBusinessInfrastructure(builder.Configuration);
+        // Phase C8 (D8-16): the team-membership timing options are validated at startup in the API as in the Worker.
+        var membershipReconciliation = builder.Configuration.GetSection(EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions.SectionName).Get<EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions>() ?? new();
+        if (!Composition.HostExecutionMode.IsOpenApiDocumentGeneration)
+        {
+            membershipReconciliation.Validate(builder.Environment.EnvironmentName, builder.Configuration.GetValue("TrustAuthority:TimeoutSeconds", 10));
+        }
+
+        builder.Services.AddSingleton(membershipReconciliation);
         // Phase C6 AC-2 tests: Testing-only bypass of the business lifecycle lock on the contributor path; refuses to start elsewhere.
         builder.Services.AddSingleton(EnterpriseForms.Application.Features.FormRecords.Lifecycle.LifecycleTestingHooks.FromConfiguration(
             builder.Configuration.GetValue<bool>(EnterpriseForms.Application.Features.FormRecords.Lifecycle.LifecycleTestingHooks.ConfigurationKey), builder.Environment.EnvironmentName));

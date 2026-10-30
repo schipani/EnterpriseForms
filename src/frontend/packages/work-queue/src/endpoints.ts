@@ -98,6 +98,11 @@ export const ENDPOINTS = {
   "teams.rename": { method: "PATCH", path: "/api/v1/teams/{teamId}" },
   "teams.addMember": { method: "POST", path: "/api/v1/teams/{teamId}/members" },
   "teams.removeMember": { method: "POST", path: "/api/v1/teams/{teamId}/members/{userId}/remove" },
+  // Phase C8 (C8-M1-01, R-4): durable membership operations (browsers poll these; they never re-POST) and operator actions.
+  "teams.membershipOperation": { method: "GET", path: "/api/v1/teams/{teamId}/membership-operations/{operationId}" },
+  "teams.membershipOperationByKey": { method: "GET", path: "/api/v1/teams/{teamId}/membership-operations/by-key/{clientKey}" },
+  "teams.recheckMembershipOperation": { method: "POST", path: "/api/v1/teams/{teamId}/membership-operations/{operationId}/recheck" },
+  "teams.reviewMembershipOperation": { method: "POST", path: "/api/v1/teams/{teamId}/membership-operations/{operationId}/review" },
 } as const satisfies Record<string, { method: HttpMethod; path: string }>;
 
 export type EndpointKey = keyof typeof ENDPOINTS;

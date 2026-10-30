@@ -15,6 +15,7 @@ public static class TestIdentity
     private const string OperatorKeyBase64 = "b3BlcmF0b3ItZGV2LW9ubHktc2hhcmVkLWtleS0wMDAwMDAwMDAwMA==";
     private const string WorkloadKeyBase64 = "d29ya2xvYWQtZGV2LW9ubHktc2hhcmVkLWtleS0wMDAwMDAwMDAwMA==";
     private const string VerifierKeyBase64 = "dmVyaWZpZXItdGVzdC1vbmx5LXNoYXJlZC1rZXktMDAwMDAwMDAw";
+    private const string ReconcilerKeyBase64 = "cmVjb25jaWxlci10ZXN0LW9ubHktc2hhcmVkLWtleS0wMDAwMDA=";
 
     private static readonly JsonWebTokenHandler Handler = new();
 
@@ -36,6 +37,10 @@ public static class TestIdentity
     /// <summary>Phase C7 OD-1: the field-protection verifier workload (compose.security-test.yaml synthetic credential).</summary>
     public static string VerifierToken(string workloadName = "field-protection-verifier") =>
         Mint(VerifierKeyBase64, "enterpriseforms-field-protection-verifier", "authorization-authority-verifier", "c7-verifier-harness", new Dictionary<string, object> { ["workload_role"] = "field-protection-verifier", ["workload_name"] = workloadName }, TimeSpan.FromMinutes(5));
+
+    /// <summary>Phase C8 AC-9: the team-membership reconciler workload (compose.security-test.yaml synthetic credential).</summary>
+    public static string ReconcilerToken(string role = "business-projection-reconciler", string? keyBase64 = null) =>
+        Mint(keyBase64 ?? ReconcilerKeyBase64, "enterpriseforms-team-membership-reconciler", "authorization-authority-reconciler", "c8-reconciler-harness", new Dictionary<string, object> { ["workload_role"] = role, ["workload_name"] = "c8-reconciler-harness" }, TimeSpan.FromMinutes(5));
 
     /// <summary>A correctly signed user token that expired ten minutes ago (beyond the 30-second clock skew).</summary>
     public static string ExpiredUserToken(TestUser user, Guid organizationId) =>

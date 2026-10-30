@@ -40,11 +40,12 @@ public sealed class TeamDirectoryHandlers(IBusinessStore store, IAuthorizationAu
         var memberships = await scope.GetActiveTeamMembershipsAsync(context.OrganizationId, teamId, cancellationToken).ConfigureAwait(false);
         var members = memberships.Select(m => new TeamMemberResponse(m.UserId, users.GetValueOrDefault(m.UserId) ?? m.UserId.ToString("D"), m.CreatedOn, m.AuthorityCommandId)).OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
         var memberIds = memberships.Select(m => m.UserId).ToHashSet();
+        var operations = (await scope.GetOpenAuthorityCommandOperationsAsync(context.OrganizationId, teamId, cancellationToken).ConfigureAwait(false)).Select(o => TeamMembershipOperationView.ToResponse(o, users)).ToList();
         // G25 mirrored as a hint: a Security Administrator who is not an owner is never offered themself (the Authority refuses it anyway).
         var available = CanManageTeams(decision)
             ? users.Where(u => !memberIds.Contains(u.Key) && (decision.CanManageConfiguration || u.Key != context.LocalUserId)).Select(u => new DirectoryUserResponse(u.Key, u.Value)).OrderBy(u => u.DisplayName, StringComparer.OrdinalIgnoreCase).ToList()
             : [];
-        return new TeamDetailResponse(team.TeamId, team.TeamName, team.IsActive, team.CreatedOn, team.ModifiedOn, Source, CanManageTeams(decision), members, available);
+        return new TeamDetailResponse(team.TeamId, team.TeamName, team.IsActive, team.CreatedOn, team.ModifiedOn, Source, CanManageTeams(decision), members, available, operations);
     }
 
     /// <summary>D8-8: rename is a display-only change of the projection label (no Authority state names a team); same principals as the Authority's team commands (owner or Security Administrator), audited, concurrency on the detail's modifiedOn.</summary>

@@ -82,6 +82,9 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<ListSharesHandler>();
         services.AddSingleton<CreateTeamHandler>();
         services.AddSingleton<ChangeTeamMembershipHandler>();
+        services.AddSingleton<TeamMembershipOperationHandlers>();
+        // Phase C8: timing options (the Worker replaces this with its startup-validated instance; the API reads only the projection wait).
+        services.TryAddSingleton(sp => configuration.GetSection(EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions.SectionName).Get<EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions>() ?? new());
         services.AddSingleton<GetRecordActivityHandler>();
         services.AddSingleton<BrandingHandlers>();
         services.AddSingleton<OrganizationOverviewHandler>();
