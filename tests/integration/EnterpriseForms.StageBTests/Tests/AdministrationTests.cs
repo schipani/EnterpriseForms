@@ -79,7 +79,7 @@ public sealed class AdministrationTests(StageBFixture fixture)
 
         var owner = await fixture.Api.GetAsync("/api/v1/organization/members", s.Token(s.Designer));
         AssertOk(owner);
-        Assert.StartsWith("business projection", owner.Root.GetProperty("source").GetString(), StringComparison.Ordinal);
+        Assert.StartsWith("business directory", owner.Root.GetProperty("source").GetString(), StringComparison.Ordinal);
         Assert.True(owner.Root.GetProperty("rolesAvailable").GetBoolean());
         var members = owner.Root.GetProperty("members").EnumerateArray().ToList();
         Assert.Equal(5, members.Count);

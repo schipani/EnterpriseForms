@@ -32,6 +32,9 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
     /// <summary>Designer only (no organization administration): may strengthen protection, may never remove it.</summary>
     public TestUser DesignerOnly { get; } = TestUser.New("DesignerOnly");
 
+    /// <summary>Bound by the Authority without roles but never calls the API (C8 M2 directory tests); only when bootstrapped with <c>withNeverSignedInMember</c>.</summary>
+    public TestUser Newcomer { get; } = TestUser.New("Newcomer");
+
     public Guid AccusedFormId { get; private set; }
 
     public Guid AddressFormId { get; private set; }
@@ -47,8 +50,11 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
     public static string TokenFor(TestUser user, Guid organizationId) => TestIdentity.UserToken(user, organizationId);
 
     /// <summary><paramref name="withSecurityAdministrator"/> false: the Administrator persona is an ordinary member and the organization has no Security Administrator (DR-C7-3 tests).</summary>
-    public async Task BootstrapAsync(bool withSecurityAdministrator = true)
+    public async Task BootstrapAsync(bool withSecurityAdministrator = true, bool withNeverSignedInMember = false)
     {
+        var newcomer = withNeverSignedInMember
+            ? new object[] { new { authority_user_id = Newcomer.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Newcomer.Subject, organization_roles = Array.Empty<string>() } }
+            : [];
         var bootstrap = await Fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/organizations", new
         {
             organization_id = OrganizationId,
@@ -60,7 +66,7 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
                 new { authority_user_id = Reader.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Reader.Subject, organization_roles = Array.Empty<string>() },
                 new { authority_user_id = Administrator.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Administrator.Subject, organization_roles = withSecurityAdministrator ? new[] { "system_administrator" } : Array.Empty<string>() },
                 new { authority_user_id = DesignerOnly.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = DesignerOnly.Subject, organization_roles = new[] { "designer" } },
-            },
+            }.Concat(newcomer).ToArray(),
         }).ConfigureAwait(false);
         Assert.True(bootstrap.IsSuccess, "bootstrap failed: " + bootstrap.Body);
         await WaitGateReadyAsync().ConfigureAwait(false);

@@ -168,6 +168,8 @@ export type DashboardPeriodQuery = { periodDays: 7 | 30 | 90; timeZone?: string 
 
 /** Shared shape of the dashboard section queries: every list is paged on the server (default 15 rows, opaque cursor). */
 export type DashboardPageQuery = { pageSize?: number; continuationToken?: string };
+/** People directory (C8 M2): server-paged, default 15 rows. */
+export type OrganizationMemberQuery = { q?: string; role?: "SecurityAdministrator" | "None"; signInStatus?: "SignedIn" | "NotRecorded" | "NeverSignedIn"; pageSize?: number; continuationToken?: string };
 
 export type DashboardUploadQuery = DashboardPageQuery & { q?: string; status?: "InProgress" | "Completed" | "Failed" | "Cancelled"; from?: string; before?: string };
 
@@ -322,7 +324,7 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       /** Phase C8 M1 (PG-041): independently computed parts; owners and Security Administrators only. */
       overview: (signal?: AbortSignal) => read<OrganizationOverviewResponse>("organization.overview", undefined, undefined, "interactive-read", signal),
       /** Phase C8 M1 (PG-050, read-only): projection rows labelled as such, Security Administrator badges from the Authority roster. */
-      members: (signal?: AbortSignal) => read<OrganizationMemberDirectoryResponse>("organization.members", undefined, undefined, "interactive-read", signal),
+      members: (query: OrganizationMemberQuery, signal?: AbortSignal) => read<OrganizationMemberDirectoryResponse>("organization.members", undefined, query, "interactive-read", signal),
     },
     teams: {
       /** Phase C8 M1 (PG-048): directory with member counts; owners and Security Administrators only. */

@@ -67,6 +67,9 @@ public interface IBusinessScope : IAsyncDisposable
     // Identity projections
     Task EnsureTenantAndUserProjectionAsync(Guid tenantId, Guid userId, string issuerUri, string subjectIdentifier, string displayName, CancellationToken cancellationToken);
 
+    /// <summary>Stamps the user's last sign-in (display only). Call after <see cref="EnsureTenantAndUserProjectionAsync"/> in the same scope.</summary>
+    Task RecordUserSignInAsync(Guid tenantId, Guid userId, DateTimeOffset signedInOn, CancellationToken cancellationToken);
+
     Task<List<User>> GetUsersAsync(Guid tenantId, CancellationToken cancellationToken);
 
     // FormDefinitions / FormDesigner

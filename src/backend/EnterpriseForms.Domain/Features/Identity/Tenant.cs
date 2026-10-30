@@ -37,4 +37,7 @@ public sealed class User
     public DateTimeOffset CreatedOn { get; set; }
 
     public DateTimeOffset ModifiedOn { get; set; }
+
+    /// <summary>Last successful sign-in to this organization through the BFF (C8 M2). Display only; recorded from this column's introduction on.</summary>
+    public DateTimeOffset? LastSignedInOn { get; set; }
 }

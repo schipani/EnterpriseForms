@@ -49,6 +49,16 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             }
         }
 
+        public async Task RecordUserSignInAsync(Guid tenantId, Guid userId, DateTimeOffset signedInOn, CancellationToken cancellationToken)
+        {
+            var user = context.Users.Local.FirstOrDefault(u => u.UserId == userId && u.TenantId == tenantId)
+                       ?? await context.Users.FirstOrDefaultAsync(u => u.UserId == userId && u.TenantId == tenantId, cancellationToken).ConfigureAwait(false);
+            if (user is not null)
+            {
+                user.LastSignedInOn = signedInOn;
+            }
+        }
+
         public Task<List<User>> GetUsersAsync(Guid tenantId, CancellationToken cancellationToken) =>
             context.Users.AsNoTracking().Where(u => u.TenantId == tenantId && u.IsActive).OrderBy(u => u.DisplayName).ToListAsync(cancellationToken);
 

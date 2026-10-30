@@ -1,19 +1,69 @@
 import type { OrganizationMemberResponse } from "@enterpriseforms/api-client";
-import { Badge, DataTable } from "@enterpriseforms/ui";
+import { Badge, Button, DataTable, RowActions } from "@enterpriseforms/ui";
 
-const ROLE_LABELS: Record<string, string> = { SecurityAdministrator: "Security Administrator" };
+const ROLE_LABELS: Record<string, string> = {
+  SecurityAdministrator: "Security Administrator",
+};
 
-/** Read-only people table (PG-050, Phase C8 M1): names, non-secret identity binding, Authority role badges, teams. No actions until AC-7 (M2). */
-export function MemberTable({ members, rolesAvailable }: { members: OrganizationMemberResponse[]; rolesAvailable: boolean }) {
+const SIGN_IN_LABELS: Record<string, { label: string; tone: "success" | "neutral" | "warning" }> = {
+  SignedIn: { label: "Signed in", tone: "success" },
+  NotRecorded: { label: "Sign-in not recorded", tone: "neutral" },
+  NeverSignedIn: { label: "Never signed in", tone: "warning" },
+};
+
+export type MemberAction = "AppointSecurityAdministrator" | "RemoveSecurityAdministrator";
+
+/** Name shown for a person; an Authority-bound identity that has never signed in has no name yet. */
+export function memberName(member: OrganizationMemberResponse): string {
+  return member.displayName || member.identitySubject;
+}
+
+/**
+ * People table (PG-050, C8 M2): names, non-secret identity binding, Authority role badges, sign-in state, teams and last
+ * sign-in. The Actions column appears only when some row offers an action the caller may request (Security Administrator
+ * appointment or removal through the existing Authority commands); the Authority still decides every command.
+ */
+export function MemberTable({
+  members,
+  rolesAvailable,
+  onAction,
+}: {
+  members: OrganizationMemberResponse[];
+  rolesAvailable: boolean;
+  onAction?: (member: OrganizationMemberResponse, action: MemberAction) => void;
+}) {
+  const showActions = onAction !== undefined && members.some((m) => (m.availableActions ?? []).length > 0);
   return (
     <DataTable
       caption="People"
       rowKey={(row) => row.userId}
       rows={members}
-      emptyMessage="Nobody has signed in to this organization yet."
+      stickyActions={showActions}
+      emptyMessage="No people match."
       columns={[
-        { key: "name", header: "Name", isRowHeader: true, render: (row) => (row.isCurrentUser ? `${row.displayName} (you)` : row.displayName) },
-        { key: "identity", header: "Verified identity", render: (row) => <span className="break-all text-sm">{`${row.identitySubject} · ${row.identityIssuer}`}</span> },
+        {
+          key: "name",
+          header: "Name",
+          isRowHeader: true,
+          render: (row) =>
+            row.displayName ? (
+              row.isCurrentUser ? (
+                `${row.displayName} (you)`
+              ) : (
+                row.displayName
+              )
+            ) : (
+              <span>
+                <span className="text-muted">Name not known yet</span>
+                <span className="sr-only"> ({row.identitySubject})</span>
+              </span>
+            ),
+        },
+        {
+          key: "identity",
+          header: "Verified identity",
+          render: (row) => <span className="break-all text-sm">{`${row.identitySubject} · ${row.identityIssuer}`}</span>,
+        },
         {
           key: "roles",
           header: "Authority roles",
@@ -32,8 +82,52 @@ export function MemberTable({ members, rolesAvailable }: { members: Organization
               </span>
             ),
         },
-        { key: "teams", header: "Teams", render: (row) => (row.teams.length === 0 ? <span className="text-muted">—</span> : row.teams.map((team) => team.teamName).join(", ")) },
-        { key: "seen", header: "First seen", render: (row) => new Date(row.firstSeenOn).toLocaleDateString() },
+        {
+          key: "status",
+          header: "Sign-in",
+          render: (row) => {
+            const status = SIGN_IN_LABELS[row.signInStatus ?? "NotRecorded"] ?? SIGN_IN_LABELS["NotRecorded"]!;
+            return <Badge tone={status.tone}>{status.label}</Badge>;
+          },
+        },
+        {
+          key: "teams",
+          header: "Teams",
+          render: (row) => (row.teams.length === 0 ? <span className="text-muted">—</span> : row.teams.map((team) => team.teamName).join(", ")),
+        },
+        {
+          key: "last",
+          header: "Last sign-in",
+          render: (row) => (row.lastSignedInOn ? <span className="whitespace-nowrap">{new Date(row.lastSignedInOn).toLocaleString()}</span> : <span className="text-muted">—</span>),
+        },
+        ...(showActions
+          ? [
+              {
+                key: "actions",
+                header: "Actions",
+                isActions: true,
+                render: (row: OrganizationMemberResponse) => {
+                  const actions = row.availableActions ?? [];
+                  return (
+                    <RowActions
+                      overflowLabel={`More actions for ${memberName(row)}`}
+                      primary={
+                        actions.includes("AppointSecurityAdministrator") ? (
+                          <Button size="sm" variant="secondary" aria-label={`Make Security Administrator: ${memberName(row)}`} onClick={() => onAction?.(row, "AppointSecurityAdministrator")}>
+                            Make Security Administrator
+                          </Button>
+                        ) : actions.includes("RemoveSecurityAdministrator") ? (
+                          <Button size="sm" variant="ghost" aria-label={`Remove Security Administrator: ${memberName(row)}`} onClick={() => onAction?.(row, "RemoveSecurityAdministrator")}>
+                            Remove Security Administrator
+                          </Button>
+                        ) : null
+                      }
+                    />
+                  );
+                },
+              },
+            ]
+          : []),
       ]}
     />
   );

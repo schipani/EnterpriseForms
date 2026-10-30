@@ -74,6 +74,7 @@ public sealed class Program
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.ListRecordsHandler>();
         // Dashboard sections and security incident lists page with the same opaque cursors (API only; the Worker serves no lists).
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Dashboard.DashboardSectionHandlers>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Identity.MemberDirectory.GetMemberDirectoryHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.SecurityOperations.Incidents.SecurityIncidentHandlers>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordHistoryHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordRestoreHandler>();

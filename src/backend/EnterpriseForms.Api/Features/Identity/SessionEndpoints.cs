@@ -61,7 +61,7 @@ public static class SessionEndpoints
                 };
                 (var csrf, expires) = await BusinessAuthentication.StartSessionAsync(http, assertion, claims, expires, cancellationToken).ConfigureAwait(false);
                 var context = new RequestContext(persona.OrganizationId, persona.AuthorityUserId, claims["iss"], persona.SubjectIdentifier, persona.DisplayName, assertion, Guid.CreateVersion7());
-                await projection.HandleAsync(context, cancellationToken).ConfigureAwait(false);
+                await projection.RecordSignInAsync(context, cancellationToken).ConfigureAwait(false);
                 // Development only: project the other seeded personas of this organization so directory pickers (form users,
                 // shares) can name people who have not signed in yet. Display data only; the authority still decides access.
                 await projection.HandleManyAsync(persona.OrganizationId, development.Personas().Where(p => p.OrganizationId == persona.OrganizationId).Select(p => (p.AuthorityUserId, claims["iss"], p.SubjectIdentifier, p.DisplayName)).ToList(), cancellationToken).ConfigureAwait(false);

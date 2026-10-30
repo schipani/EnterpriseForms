@@ -74,8 +74,50 @@
         "tags": [
           "Identity"
         ],
-        "summary": "People directory (PG-050, read-only): identities the Authority has bound that have signed in (business projection, labelled), their teams, and Security Administrator badges from the Authority roster. Organization owners and Security Administrators only; 403 otherwise. Never an email key; never record content.",
+        "summary": "People directory (PG-050, C8 M2): one server page (default 15) of the organization's people, searchable (q: name, identity, team) and filterable (role: SecurityAdministrator|None; signInStatus: SignedIn|NotRecorded|NeverSignedIn), with an opaque cursor bound to the caller and filters. Rows: business directory plus the Authority's Security Administrator roster; for Security Administrators also every enabled Authority binding (including people who never signed in). Last sign-in, teams, Security Administrator badges and per-row Security Administrator action hints. Organization owners and Security Administrators only; 403 otherwise. Never an email key; never record content.",
         "operationId": "ListOrganizationMembers",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signInStatus",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -8065,6 +8107,63 @@
               "null",
               "string"
             ]
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          },
+          "nextToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "includesMembersWhoNeverSignedIn": {
+            "type": "boolean",
+            "default": false
+          },
+          "coverageStatement": {
+            "type": "string",
+            "default": ""
+          },
+          "securityAdministratorChangesOperational": {
+            "type": "boolean",
+            "default": false
+          },
+          "securityAdministratorChangesUnavailableReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -8095,7 +8194,10 @@
             "type": "string"
           },
           "firstSeenOn": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "date-time"
           },
           "authorityRoles": {
@@ -8112,6 +8214,26 @@
           },
           "isCurrentUser": {
             "type": "boolean"
+          },
+          "lastSignedInOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "signInStatus": {
+            "type": "string",
+            "default": "NotRecorded"
+          },
+          "availableActions": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

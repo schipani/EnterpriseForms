@@ -62,7 +62,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** People directory (PG-050, read-only): identities the Authority has bound that have signed in (business projection, labelled), their teams, and Security Administrator badges from the Authority roster. Organization owners and Security Administrators only; 403 otherwise. Never an email key; never record content. */
+        /** People directory (PG-050, C8 M2): one server page (default 15) of the organization's people, searchable (q: name, identity, team) and filterable (role: SecurityAdministrator|None; signInStatus: SignedIn|NotRecorded|NeverSignedIn), with an opaque cursor bound to the caller and filters. Rows: business directory plus the Authority's Security Administrator roster; for Security Administrators also every enabled Authority binding (including people who never signed in). Last sign-in, teams, Security Administrator badges and per-row Security Administrator action hints. Organization owners and Security Administrators only; 403 otherwise. Never an email key; never record content. */
         get: operations["ListOrganizationMembers"];
         put?: never;
         post?: never;
@@ -2534,6 +2534,30 @@ export interface components {
             members: components["schemas"]["OrganizationMemberResponse"][];
             rolesAvailable: boolean;
             rolesUnavailableReason: null | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            totalCount: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            pageStart: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            pageSize: number | string;
+            nextToken?: null | string;
+            previousToken?: null | string;
+            /** @default false */
+            includesMembersWhoNeverSignedIn: boolean;
+            /** @default  */
+            coverageStatement: string;
+            /** @default false */
+            securityAdministratorChangesOperational: boolean;
+            securityAdministratorChangesUnavailableReason?: null | string;
         };
         OrganizationMemberResponse: {
             /** Format: uuid */
@@ -2542,10 +2566,15 @@ export interface components {
             identityIssuer: string;
             identitySubject: string;
             /** Format: date-time */
-            firstSeenOn: string;
+            firstSeenOn: null | string;
             authorityRoles: string[];
             teams: components["schemas"]["DirectoryTeamResponse"][];
             isCurrentUser: boolean;
+            /** Format: date-time */
+            lastSignedInOn?: null | string;
+            /** @default NotRecorded */
+            signInStatus: string;
+            availableActions?: null | string[];
         };
         OrganizationOverviewAuthentication: {
             authenticationRequirementName: string;
@@ -3463,7 +3492,13 @@ export interface operations {
     };
     ListOrganizationMembers: {
         parameters: {
-            query?: never;
+            query?: {
+                q?: string;
+                role?: string;
+                signInStatus?: string;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

@@ -2878,6 +2878,10 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<DateTimeOffset?>("LastSignedInOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_signed_in_on");
+
                     b.Property<DateTimeOffset>("ModifiedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on");

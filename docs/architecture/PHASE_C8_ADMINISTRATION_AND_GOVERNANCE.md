@@ -207,6 +207,8 @@ Manual NVDA/VoiceOver review remains outstanding, as for every earlier page.
 
 ### M2 — AC-7: members and organization roles (Authority change; needs D8-2…D8-5)
 
+- **Status (C-93, 2026-10-30):** the part that needs no Authority change is implemented on `phase-c8/m2-user-management` (`docs/PHASE_C8_STATUS.md` §14). AC-7 is specified in `PHASE_C8_M2_AC7_SECURITY_CONTRACT.md` and awaits D8-24…D8-32; not implemented.
+
 - **Functional:**
   * People detail: identity (issuer and subject shown as non-secret metadata, never email as key), membership state, organization roles, teams, form-level grants (read), directly owned record **count** (from the Authority, no titles), and a security change timeline;
   * actions: grant/revoke `organization_owner` and `designer`; disable/enable membership;

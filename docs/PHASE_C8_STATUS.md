@@ -263,3 +263,45 @@ The owner approved **Design R** as the direction for C8-M1-01, **subject to inde
 2. the owner decides any reviewer conditions (notably Q-1, Q-10, Q-11);
 3. hosted CI and the full Stage B suite pass on the final commit (D8-19);
 4. the owner authorizes the merge.
+
+## 14. M2 user management — part available within the current Authority (2026-10-30, C-93) — not merged
+
+Branch `phase-c8/m2-user-management`, from `feature/form-rename` (which is on the owner-accepted C-91 baseline).
+**No Authority change.** The remaining M2 scope (add user, owner/designer roles, disable/enable, roster read) is the
+AC-7 security contract `docs/architecture/PHASE_C8_M2_AC7_SECURITY_CONTRACT.md`, awaiting decisions D8-24…D8-32.
+
+### 14.1 Delivered
+
+| Item | Detail |
+|---|---|
+| People directory API | `GET /api/v1/organization/members?q&role&signInStatus&pageSize&continuationToken`: server pages (default 15) with opaque cursors bound to caller, organization and filters; search over name, identity and team; filters role (`SecurityAdministrator`/`None`) and sign-in (`SignedIn`/`NotRecorded`/`NeverSignedIn`). Authorization unchanged (owner or Security Administrator, decided by the Authority before any read). |
+| All members | For **Security Administrators** the directory adds every enabled Authority binding returned by the **existing** Security Administrator roster read (appointment candidates), so people who have never signed in are listed (name not known yet). Organization owners see people known to the business directory plus the Security Administrators; the page states this coverage. |
+| Last sign-in | New business column `users.last_signed_in_on` (migration `20261030225401_UserLastSignIn`, additive, display only), stamped at sign-in (`EnsureIdentityProjectionHandler.RecordSignInAsync`; today the Development/Testing persona login — the future PB-08 OIDC callback must call it too). |
+| Roles and actions | Security Administrator badges from the Authority roster. For Security Administrators each row carries action hints mirroring the existing C-70 rules (`AppointSecurityAdministrator` for enabled non-holders, `RemoveSecurityAdministrator` unless it is the last); the People page runs them through the existing `appoint`/`remove` endpoints with reason and the development-only step-up. |
+| Not offered | **Add user** is shown disabled, described by an on-page explanation; no owner/designer role or disable controls are rendered (AC-7). |
+| UI | People page uses the approved standard: 40px inputs, 8px controls, 12px cards, search + filters, 15-row `Pager`, success message, dialogs with locked state. Accessible names of row actions start with their visible text (axe `label-content-name-mismatch` found and fixed). |
+
+### 14.2 Tests (executed 2026-10-30, isolated security-test stack rebuilt from this branch)
+
+| Suite | Result |
+|---|---|
+| .NET contract tests (incl. 7 new `MemberDirectoryTests`) | 468 / 468 |
+| Architecture tests (naming, boundaries, ownership, signed-column registry) | 71 / 71 |
+| Stage B: new `PeopleDirectoryTests` + `AdministrationTests`, `SecurityAdministratorTests`, `FormRenameTests` | 13 / 13 |
+| Vitest (incl. updated `MemberTable.test.tsx`, new `PeopleDirectoryPage.test.tsx`) | 268 / 268 |
+| ESLint, TypeScript, production build | clean |
+| Playwright: `organization-administration.spec.ts` (5, owner and Security Administrator People flows with axe), `security-administrators`, `dashboard`, `ui-consistency`, `responsive` (320 px) | 14 / 14 |
+
+`PeopleDirectoryTests` proves on the real stack: the Security Administrator sees 6 people including a bound member who
+never called the API (empty name, `NeverSignedIn`, appoint hint) and has no removal hint on themself as the last
+administrator; the owner sees 5 and no hints; clerk, reader and designer-only get 403 without counts; 4-row pages do not
+overlap; a cursor used by another caller or with other filters is refused; search by subject and the role and sign-in
+filters work; an unknown role filter is 422; another organization's Security Administrator sees none of these people.
+
+Not run: the complete Stage B and SEC-P suites; hosted CI.
+
+### 14.3 Limitations
+
+- Owners do not see members who never signed in, nor anyone's owner/designer role, until AC-7.3.
+- "Sign-in not recorded" covers people seen before the column existed and development personas projected without logging in.
+- Last sign-in is a business-database display value (G21 family residual), not evidence.

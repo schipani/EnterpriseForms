@@ -20,11 +20,24 @@ public sealed record OrganizationOverviewAuthentication(string AuthenticationReq
 
 public sealed record OrganizationOverviewResponse(bool CanManageConfiguration, bool CanAdministerSecurity, OrganizationOverviewOrganization Organization, OrganizationOverviewMembers Members, OrganizationOverviewTeams Teams, OrganizationOverviewDataProtection DataProtection, OrganizationOverviewAuthentication Authentication);
 
-/// <summary>A person seen in this organization: projection row (labels only) with Authority-sourced role badges where available.</summary>
-public sealed record OrganizationMemberResponse(Guid UserId, string DisplayName, string IdentityIssuer, string IdentitySubject, DateTimeOffset FirstSeenOn, IReadOnlyList<string> AuthorityRoles, IReadOnlyList<DirectoryTeamResponse> Teams, bool IsCurrentUser);
+/// <summary>
+/// A person of this organization (C8 M2). <c>DisplayName</c> is empty for an Authority-bound identity that has never signed
+/// in (no name is known yet). <c>SignInStatus</c>: <c>SignedIn</c> (a sign-in was recorded), <c>NotRecorded</c> (seen in the
+/// business directory before sign-ins were recorded), <c>NeverSignedIn</c> (bound by the Authority, never seen).
+/// <c>AvailableActions</c> are hints for the caller (the Authority decides every command): <c>AppointSecurityAdministrator</c>,
+/// <c>RemoveSecurityAdministrator</c>.
+/// </summary>
+public sealed record OrganizationMemberResponse(Guid UserId, string DisplayName, string IdentityIssuer, string IdentitySubject, DateTimeOffset? FirstSeenOn, IReadOnlyList<string> AuthorityRoles, IReadOnlyList<DirectoryTeamResponse> Teams, bool IsCurrentUser,
+    DateTimeOffset? LastSignedInOn = null, string SignInStatus = "NotRecorded", IReadOnlyList<string>? AvailableActions = null);
 
-/// <summary><c>Source</c> names where the rows come from (business projection of identities that have signed in); <c>RolesAvailable</c> says whether the Authority roster answered.</summary>
-public sealed record OrganizationMemberDirectoryResponse(string Source, IReadOnlyList<OrganizationMemberResponse> Members, bool RolesAvailable, string? RolesUnavailableReason);
+/// <summary>
+/// One server page (default 15) of the people directory. <c>Source</c> and <c>CoverageStatement</c> say where rows come from
+/// and what is missing; <c>IncludesMembersWhoNeverSignedIn</c> is true only when the Authority roster listed every enabled
+/// binding (Security Administrators); <c>RolesAvailable</c> says whether the Authority roster answered.
+/// </summary>
+public sealed record OrganizationMemberDirectoryResponse(string Source, IReadOnlyList<OrganizationMemberResponse> Members, bool RolesAvailable, string? RolesUnavailableReason,
+    int TotalCount = 0, int PageStart = 0, int PageSize = 0, string? NextToken = null, string? PreviousToken = null, bool IncludesMembersWhoNeverSignedIn = false, string CoverageStatement = "",
+    bool SecurityAdministratorChangesOperational = false, string? SecurityAdministratorChangesUnavailableReason = null);
 
 public sealed record TeamSummaryResponse(Guid TeamId, string TeamName, bool IsActive, int MemberCount, DateTimeOffset CreatedOn, DateTimeOffset ModifiedOn);
 

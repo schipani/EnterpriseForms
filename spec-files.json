@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "91f988d9ddb9e62d2de6f612c08f78e795df7a636086f8acafbf8d0f563d9ebc",
-      "bytes": 35104
+      "sha256": "bf19c4cf4f412d702c37090a6a10751c42af33f7c3ba292dc317ed5ac7ba58ab",
+      "bytes": 39321
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "7cbd379d73c0c48f3bdecccdf073a362c6be5039d6428f950888624fa9851a20",
-      "bytes": 12589
+      "sha256": "58374a80982d279365fb5fc5fa3f8448600749378fb64dd00f1c4560b8c603f3",
+      "bytes": 13001
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -179,13 +179,18 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
-      "sha256": "48b931679a9e872b6616d305ee45aaa75d021301c25b7116907bed82e5cdae59",
-      "bytes": 44132
+      "sha256": "345df1cb4ce1f37a08ff3d5a3b6ba4db4b352caaa2bc824c889ca559d85817ea",
+      "bytes": 44391
     },
     {
       "path": "docs/architecture/PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md",
       "sha256": "4a75d9dfe380a2ebf0660d2acf6ca3a35bb7f14ca0d07382bd3ca9c086cbe7df",
       "bytes": 46445
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M2_AC7_SECURITY_CONTRACT.md",
+      "sha256": "fa198d1f21970557636df5f13749751cf42128fb78367f8dad6855788d13166f",
+      "bytes": 14896
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -279,8 +284,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "839a798fec00d0cfecfb4ae118ecf66b736d14a05e7612aff993d4b12d7f3cdd",
-      "bytes": 142803
+      "sha256": "482a1adfe5b4b5ee4698eb86b3e4ae8be38938b034beb5aead09055fa1b31c92",
+      "bytes": 144242
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

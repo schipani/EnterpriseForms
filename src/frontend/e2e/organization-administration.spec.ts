@@ -47,8 +47,12 @@ test.describe("Organization administration (C8 M1)", () => {
     const people = page.getByRole("table", { name: "People" });
     await expect(people.getByRole("rowheader", { name: /Avery Owner/ })).toBeVisible();
     await expect(people.getByRole("columnheader", { name: "Actions" })).toHaveCount(0);
-    await expect(page.getByText(/Source: business projection/)).toBeVisible();
-    await page.getByLabel("Filter by name, identity or team").fill("casey");
+    await expect(page.getByText(/Source: business directory/)).toBeVisible();
+    // C8 M2: the owner's own sign-in is recorded; AC-7 capabilities are not offered (Add user disabled, reason beside it).
+    await expect(people.getByRole("row", { name: /Avery Owner/ })).toContainText("Signed in");
+    await expect(page.getByRole("button", { name: "Add user" })).toBeDisabled();
+    await expect(page.getByText("Adding people and changing owner or designer roles are not available yet")).toBeVisible();
+    await page.getByLabel("Search people").fill("casey");
     await expect(people.getByRole("rowheader", { name: /Casey Clerk/ })).toBeVisible();
     await expect(people.getByRole("rowheader", { name: /Avery Owner/ })).toHaveCount(0);
     await axe(page);
@@ -181,6 +185,19 @@ test.describe("Organization administration (C8 M1)", () => {
     await page.keyboard.press("Escape");
     await add.getByRole("button", { name: "Cancel" }).click();
     await expect(add).toBeHidden();
+    await axe(page);
+    // C8 M2: People for a Security Administrator lists every enabled Authority binding and offers the existing
+    // Security Administrator appointment (reason + development step-up); cancelled here so the shared organization is unchanged.
+    await orgNav(page, "People").click();
+    await expect(page.getByText(/Lists every identity the Authorization Authority has bound/)).toBeVisible();
+    await page.getByRole("button", { name: /Make Security Administrator: Casey Clerk/ }).click();
+    const appoint = page.getByRole("dialog", { name: /Make Casey Clerk.* a Security Administrator/ });
+    await expect(appoint.getByRole("button", { name: "Appoint" })).toBeDisabled();
+    await appoint.getByLabel(/Reason/).fill("browser test, cancelled");
+    await expect(appoint.getByRole("button", { name: "Appoint" })).toBeDisabled();
+    await axe(page);
+    await appoint.getByRole("button", { name: "Cancel" }).click();
+    await expect(appoint).toBeHidden();
     await axe(page);
     await orgNav(page, "Data protection").click();
     await expect(page.getByText("Only the organization owner can change this policy.")).toBeVisible();
