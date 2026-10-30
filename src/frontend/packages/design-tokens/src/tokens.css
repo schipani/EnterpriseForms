@@ -27,4 +27,14 @@
   --ui-text-control: 0.875rem;          /* 14px: control values and button labels */
   --ui-text-label: 0.8125rem;           /* 13px: field labels, legends, choice labels, table headers */
   --ui-text-help: 0.75rem;              /* 12px: help text, notes, validation messages */
+
+  /* Data visualization (dashboard). Fixed product values, never organization-themeable. Categorical slots are assigned in
+     this order and never cycled; validated as a set on the white surface (adjacent CVD ΔE ≥ 9.1, normal-vision ΔE ≥ 22.9).
+     Slots 3 and 4 are below 3:1 on white, so every chart ships a legend and a table view and text never uses these colors. */
+  --ui-chart-1: #2a78d6;  /* blue */
+  --ui-chart-2: #eb6834;  /* orange */
+  --ui-chart-3: #1baf7a;  /* aqua */
+  --ui-chart-4: #eda100;  /* yellow */
+  --ui-chart-neutral: #94a3b8;  /* "other"/inactive share; never a series identity on its own */
+  --ui-chart-grid: #e2e8f0;     /* hairline gridlines and axes: recessive */
 }

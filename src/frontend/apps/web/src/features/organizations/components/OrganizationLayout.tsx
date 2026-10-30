@@ -20,7 +20,7 @@ export function organizationNavigation(hasCapability: (capability: string) => bo
     { to: "/app/organization/teams", label: "Teams", show: administrator },
     { to: "/app/organization/branding", label: "Branding", show: manage },
     { to: "/app/organization/data-protection", label: "Data protection", show: administrator },
-    { to: "/app/organization/security-administrators", label: "Security Administrators", show: administrator },
+    { to: "/app/organization/security-administrators", label: "Security administrators", show: administrator },
     { to: "/app/organization/search-approvals", label: "Search approvals", show: security },
   ];
   return items.filter((item) => item.show).map((item) => ({ to: item.to, label: item.label, ...(item.exact ? { exact: true } : {}) }));
@@ -47,7 +47,7 @@ export function OrganizationLayout({ title, lead, actions, children }: PropsWith
   return (
     <>
       <PageHeader title={title} lead={lead} actions={actions} />
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
         <nav aria-label="Organization" className="min-w-0 rounded-panel border border-line bg-surface p-3 lg:sticky lg:top-4">
           <ul className="-mx-1 flex min-w-0 flex-row gap-1 overflow-x-auto px-1 pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
             {items.map((item) => (
@@ -55,8 +55,8 @@ export function OrganizationLayout({ title, lead, actions, children }: PropsWith
                 <Link
                   to={item.to}
                   activeOptions={{ exact: item.exact ?? false }}
-                  className="inline-flex min-h-11 w-full items-center rounded-control px-3 text-base font-medium text-muted hover:bg-page hover:text-body"
-                  activeProps={{ className: "inline-flex min-h-11 w-full items-center rounded-control px-3 text-base font-medium bg-page text-body underline underline-offset-8 decoration-4", "aria-current": "page" }}
+                  className="inline-flex min-h-11 w-full items-center whitespace-nowrap rounded-control px-3 text-base font-medium text-muted hover:bg-page hover:text-body lg:whitespace-normal"
+                  activeProps={{ className: "inline-flex min-h-11 w-full items-center whitespace-nowrap rounded-control px-3 text-base font-medium bg-page text-body underline underline-offset-8 decoration-4 lg:whitespace-normal", "aria-current": "page" }}
                 >
                   {item.label}
                 </Link>

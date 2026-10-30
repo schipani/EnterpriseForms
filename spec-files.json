@@ -43,6 +43,11 @@
       "bytes": 45279
     },
     {
+      "path": "docs/DASHBOARD_SECURITY_MONITORING_STATUS.md",
+      "sha256": "2318458e02cd14afbc716c1ee2cf099d97a523f450e600b4451bf9c1b3f24a1b",
+      "bytes": 11934
+    },
+    {
       "path": "docs/PHASE0_STATUS.md",
       "sha256": "d013f5cc90a1d88854de0ff9579483361f28349cedd63c061b3caa83b15477df",
       "bytes": 25771
@@ -129,8 +134,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "46b41239ef1fc2e3d1574184114a264ca3fac33a36b2df826834a0eb3a3b7ce6",
-      "bytes": 11302
+      "sha256": "0735a7970cf2e92912631ad88224de40e67c2af56622c662c1345c7d4e6584a4",
+      "bytes": 12182
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -269,8 +274,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "0db424a3bdaed42535ea474207ebecb837dca46bf20016583165a82dfb13c5b8",
-      "bytes": 139296
+      "sha256": "6efd4b45eff37877cd215a0833615b91b6fd5fcde349cd8439fd760a7c92d338",
+      "bytes": 140862
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

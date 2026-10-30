@@ -60,7 +60,7 @@ test.describe("Organization administration (C8 M1)", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Data protection" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Save data protection policy" })).toBeVisible();
     await axe(page);
-    await orgNav(page, "Security Administrators").click();
+    await orgNav(page, "Security administrators").click();
     await expect(page.getByRole("heading", { level: 1, name: "Security Administrators" })).toBeVisible();
     await expect(page.getByText("Only Security Administrators can appoint or remove Security Administrators.")).toBeVisible();
     await axe(page);

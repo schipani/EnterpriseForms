@@ -57,6 +57,7 @@ function PrimaryNav({ wide }: { wide: boolean }) {
     { to: "/app/activity", label: "My activity", show: true },
     { to: "/app/organization", label: "Organization", show: session.hasCapability("organization.manage") || session.hasCapability("security.administer") },
     { to: "/app/organization/search-approvals", label: "Search approvals", show: session.hasCapability("security.administer") },
+    { to: "/app/security/incidents", label: "Security incidents", show: session.hasCapability("security.administer") },
   ];
   return (
     <nav aria-label="Primary" className={`mx-auto w-full ${wide ? "max-w-[100rem]" : "max-w-7xl"} px-4`}>

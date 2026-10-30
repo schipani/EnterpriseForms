@@ -93,8 +93,6 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<EnterpriseForms.Application.Features.Identity.MemberDirectory.GetMemberDirectoryHandler>();
         services.AddSingleton<TeamDirectoryHandlers>();
         services.AddSingleton<DashboardHandler>();
-        services.AddSingleton<DashboardSectionHandlers>();
-        services.AddSingleton<SecurityIncidentHandlers>();
         services.AddSingleton<ISecurityIncidentRecorder, SecurityIncidentRecorder>();
         services.AddSingleton<UploadSessionHandlers>();
         services.AddSingleton<DocumentHandlers>();
