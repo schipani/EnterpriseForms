@@ -80,6 +80,17 @@ export type UpdateFormAccessRequest = S["UpdateFormAccessRequest"];
 export type FormAccessResponse = S["FormAccessResponse"];
 export type FormAccessSubjectResponse = S["FormAccessSubjectResponse"];
 export type DirectoryTeamResponse = S["DirectoryTeamResponse"];
+export type OrganizationOverviewResponse = S["OrganizationOverviewResponse"];
+export type OrganizationMemberDirectoryResponse = S["OrganizationMemberDirectoryResponse"];
+export type OrganizationMemberResponse = S["OrganizationMemberResponse"];
+export type TeamDirectoryResponse = S["TeamDirectoryResponse"];
+export type TeamSummaryResponse = S["TeamSummaryResponse"];
+export type TeamDetailResponse = S["TeamDetailResponse"];
+export type TeamMemberResponse = S["TeamMemberResponse"];
+export type RenameTeamRequest = S["RenameTeamRequest"];
+export type CreateTeamRequest = S["CreateTeamRequest"];
+export type TeamResponse = S["TeamResponse"];
+export type TeamMemberRequest = S["TeamMemberRequest"];
 export type UpdateFieldOptionsRequest = S["UpdateFieldOptionsRequest"];
 export type FieldOptionChange = S["FieldOptionChange"];
 export type OptionListResponse = S["OptionListResponse"];
@@ -266,6 +277,21 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       removeSecurityAdministrator: (userId: string, request: RemoveSecurityAdministratorRequest) => write<void>("POST", "organization.removeSecurityAdministrator", { userId }, request, { lane: "security", resourceKey: "organization:security-administrators" }),
       securityPolicy: (signal?: AbortSignal) => read<OrganizationSecurityPolicyResponse>("organization.securityPolicy", undefined, undefined, "interactive-read", signal),
       updateSecurityPolicy: (request: UpdateOrganizationSecurityPolicyRequest) => write<OrganizationSecurityPolicyResponse>("PUT", "organization.updateSecurityPolicy", undefined, request, { resourceKey: "security-policy" }),
+      /** Phase C8 M1 (PG-041): independently computed parts; owners and Security Administrators only. */
+      overview: (signal?: AbortSignal) => read<OrganizationOverviewResponse>("organization.overview", undefined, undefined, "interactive-read", signal),
+      /** Phase C8 M1 (PG-050, read-only): projection rows labelled as such, Security Administrator badges from the Authority roster. */
+      members: (signal?: AbortSignal) => read<OrganizationMemberDirectoryResponse>("organization.members", undefined, undefined, "interactive-read", signal),
+    },
+    teams: {
+      /** Phase C8 M1 (PG-048): directory with member counts; owners and Security Administrators only. */
+      directory: (signal?: AbortSignal) => read<TeamDirectoryResponse>("teams.directory", undefined, undefined, "interactive-read", signal),
+      get: (teamId: string, signal?: AbortSignal) => read<TeamDetailResponse>("teams.get", { teamId }, undefined, "interactive-read", signal),
+      /** RegisterTeam Authority command (owner); the idempotency key fixes the team id, so a retry completes the same team. */
+      create: (request: CreateTeamRequest) => write<TeamResponse>("POST", "teams.create", undefined, request, { idempotent: true, resourceKey: "teams" }),
+      /** Display-only rename of the projection label (D8-8); owner only, audited, concurrency on expectedModifiedOn. */
+      rename: (teamId: string, request: RenameTeamRequest) => write<TeamDetailResponse>("PATCH", "teams.rename", { teamId }, request, { resourceKey: `team:${teamId}` }),
+      addMember: (teamId: string, request: TeamMemberRequest) => write<CommandStatusResponse>("POST", "teams.addMember", { teamId }, request, { idempotent: true, resourceKey: `team:${teamId}` }),
+      removeMember: (teamId: string, userId: string) => write<CommandStatusResponse>("POST", "teams.removeMember", { teamId, userId }, {}, { idempotent: true, resourceKey: `team:${teamId}` }),
     },
     preferences: {
       get: (signal?: AbortSignal) => read<UiPreferenceResponse>("preferences.get", undefined, undefined, "interactive-read", signal),

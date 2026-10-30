@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** People directory (PG-050, read-only): identities the Authority has bound that have signed in (business projection, labelled), their teams, and Security Administrator badges from the Authority roster. Organization owners and Security Administrators only; 403 otherwise. Never an email key; never record content. */
+        get: operations["ListOrganizationMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/session": {
         parameters: {
             query?: never;
@@ -1007,6 +1024,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Team detail and roster (PG-049) from the projection, each membership carrying the Authority command that made it effective. Owners and Security Administrators only; another organization's team is the same generic 404 as an unknown id. */
+        get: operations["GetTeam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Display-only rename of the team projection (D8-8; the Authority names no team). Organization owner only; audited (TEAM_RENAMED); 409 TEAM_MODIFIED_CONCURRENTLY when expectedModifiedOn is stale. */
+        patch: operations["RenameTeam"];
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/members": {
         parameters: {
             query?: never;
@@ -1033,6 +1068,23 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["RemoveTeamMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Team directory with member counts (PG-048). Organization owners and Security Administrators only; 403 otherwise, without counts. */
+        get: operations["GetTeamDirectory"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1202,6 +1254,23 @@ export interface paths {
         put?: never;
         /** Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains. */
         post: operations["RemoveSecurityAdministrator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Organization overview (PG-041): organization identity, member and Security Administrator counts, teams, data-protection floor and authentication status as independently computed parts (an unavailable part never fails the page). Organization owners and Security Administrators only; 403 for everyone else, without counts. */
+        get: operations["GetOrganizationOverview"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2145,6 +2214,67 @@ export interface components {
              */
             boundFieldCount: number | string;
         };
+        OrganizationMemberDirectoryResponse: {
+            source: string;
+            members: components["schemas"]["OrganizationMemberResponse"][];
+            rolesAvailable: boolean;
+            rolesUnavailableReason: null | string;
+        };
+        OrganizationMemberResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            identityIssuer: string;
+            identitySubject: string;
+            /** Format: date-time */
+            firstSeenOn: string;
+            authorityRoles: string[];
+            teams: components["schemas"]["DirectoryTeamResponse"][];
+            isCurrentUser: boolean;
+        };
+        OrganizationOverviewAuthentication: {
+            authenticationRequirementName: string;
+            authenticationRolloutStatus: string;
+            statusExplanation: string;
+        };
+        OrganizationOverviewDataProtection: {
+            status: components["schemas"]["OverviewPartStatus"];
+            minimumFieldClassification: null | string;
+            plaintextInternalFieldsPermitted: null | boolean;
+            isUnreviewedDefault: null | boolean;
+            /** Format: int64 */
+            securityPolicyRevision: null | number | string;
+        };
+        OrganizationOverviewMembers: {
+            status: components["schemas"]["OverviewPartStatus"];
+            /** Format: int32 */
+            projectedMemberCount: null | number | string;
+            memberCountSource: string;
+            /** Format: int32 */
+            securityAdministratorCount: null | number | string;
+            securityAdministratorsCanManage: boolean;
+        };
+        OrganizationOverviewOrganization: {
+            status: components["schemas"]["OverviewPartStatus"];
+            organizationDisplayName: null | string;
+            hasLogo: boolean;
+            /** Format: int64 */
+            brandingRevision: null | number | string;
+        };
+        OrganizationOverviewResponse: {
+            canManageConfiguration: boolean;
+            canAdministerSecurity: boolean;
+            organization: components["schemas"]["OrganizationOverviewOrganization"];
+            members: components["schemas"]["OrganizationOverviewMembers"];
+            teams: components["schemas"]["OrganizationOverviewTeams"];
+            dataProtection: components["schemas"]["OrganizationOverviewDataProtection"];
+            authentication: components["schemas"]["OrganizationOverviewAuthentication"];
+        };
+        OrganizationOverviewTeams: {
+            status: components["schemas"]["OverviewPartStatus"];
+            /** Format: int32 */
+            teamCount: null | number | string;
+        };
         OrganizationSecurityPolicyResponse: {
             minimumFieldClassification: string;
             plaintextInternalFieldsPermitted: boolean;
@@ -2162,6 +2292,10 @@ export interface components {
             authorityCommandId?: null | string;
             /** @default false */
             plaintextSearchPermitted: boolean;
+        };
+        OverviewPartStatus: {
+            available: boolean;
+            unavailableReason: null | string;
         };
         ProbeResponse: {
             probeStatus: string;
@@ -2449,6 +2583,11 @@ export interface components {
             /** @default false */
             useDevelopmentStepUp: boolean;
         };
+        RenameTeamRequest: {
+            teamName: string;
+            /** Format: date-time */
+            expectedModifiedOn: string;
+        };
         RequestFieldProtectionReconciliationRequest: {
             requestReason: string;
         };
@@ -2577,15 +2716,55 @@ export interface components {
             /** Format: int64 */
             expectedProtectionRevision: number | string;
         };
+        TeamDetailResponse: {
+            /** Format: uuid */
+            teamId: string;
+            teamName: string;
+            isActive: boolean;
+            /** Format: date-time */
+            createdOn: string;
+            /** Format: date-time */
+            modifiedOn: string;
+            source: string;
+            canManage: boolean;
+            members: components["schemas"]["TeamMemberResponse"][];
+            availableMembers: components["schemas"]["DirectoryUserResponse"][];
+        };
+        TeamDirectoryResponse: {
+            source: string;
+            canManage: boolean;
+            teams: components["schemas"]["TeamSummaryResponse"][];
+        };
         TeamMemberRequest: {
             /** Format: uuid */
             userId: string;
+        };
+        TeamMemberResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            /** Format: date-time */
+            memberSince: string;
+            /** Format: uuid */
+            authorityCommandId: null | string;
         };
         TeamResponse: {
             /** Format: uuid */
             teamId: string;
             teamName: string;
             command: components["schemas"]["CommandOutcome"];
+        };
+        TeamSummaryResponse: {
+            /** Format: uuid */
+            teamId: string;
+            teamName: string;
+            isActive: boolean;
+            /** Format: int32 */
+            memberCount: number | string;
+            /** Format: date-time */
+            createdOn: string;
+            /** Format: date-time */
+            modifiedOn: string;
         };
         TransferOwnershipRequest: {
             /** Format: uuid */
@@ -2781,6 +2960,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+        };
+    };
+    ListOrganizationMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationMemberDirectoryResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
@@ -4343,6 +4551,99 @@ export interface operations {
             };
         };
     };
+    GetTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamDetailResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RenameTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameTeamRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamDetailResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     AddTeamMember: {
         parameters: {
             query?: never;
@@ -4388,6 +4689,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CommandStatusResponse"];
+                };
+            };
+        };
+    };
+    GetTeamDirectory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamDirectoryResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
@@ -4756,6 +5086,35 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetOrganizationOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOverviewResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

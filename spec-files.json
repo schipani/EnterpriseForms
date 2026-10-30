@@ -84,8 +84,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "cff6422fd523735e0c687290bdb1a7dfefb4a2571efccc485e1d5a21ba210cc3",
-      "bytes": 1733
+      "sha256": "0743455ba7aa938fee56275d8d7e831be19570cbe38ba9a2fb6f8e8a6e61c0df",
+      "bytes": 14840
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -129,8 +129,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "7310ed0548d80b4aa78c9b964f9dc2e5bacfc4ebdc4ee979b574511eca0405e1",
-      "bytes": 8907
+      "sha256": "a6e69eaaf0a1fff2e0afbe056be366f6b697de5be244afabc25eed8e5cc836cf",
+      "bytes": 10708
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -159,8 +159,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
-      "sha256": "c1554f8bc1fb3ed3ddae0c688018af4b54da66adebfbdf406765cd787a9d432f",
-      "bytes": 34834
+      "sha256": "4d4993526e296b7bb59a4f6cb19c5c2f75936bcb9d9cbd594481491e175392b8",
+      "bytes": 36766
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -254,8 +254,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "895815203b2fc370101908819067822bf724c6495f1be16753b6911eb5505b0c",
-      "bytes": 120170
+      "sha256": "63ac5cae3afdf3ddfa16832815ae067aa49d17998b3c79f62a8e1c39e6db06bb",
+      "bytes": 124710
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -424,8 +424,8 @@
     },
     {
       "path": "docs/testing/PB14_UI_DESIGN_ACCEPTANCE_TESTS.csv",
-      "sha256": "a06f90e129955c578175e3dfe77d3367168378312cb5fd513f36f791be80ab56",
-      "bytes": 4288
+      "sha256": "5bd048435810e8f6ff8b974b670d3ee2d70ea3a31d3d9087e74f07af993ce3ea",
+      "bytes": 5177
     },
     {
       "path": "docs/ui/C1_DESIGNER_UX_IMPLEMENTATION_BRIEF.md",

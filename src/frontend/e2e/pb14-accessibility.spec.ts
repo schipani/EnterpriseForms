@@ -160,7 +160,7 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
     await signIn(page, "owner");
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.goto("/app/organization/branding");
+      await page.goto("/app/organization/data-protection");
       await expect(page.getByRole("region", { name: "Data protection policy" })).toBeVisible();
       await scan(page, `${viewport.id} organization data-protection policy @${viewport.name}`);
     }

@@ -90,6 +90,14 @@ export const ENDPOINTS = {
   "preferences.update": { method: "PUT", path: "/api/v1/me/ui-preferences" },
   "users.list": { method: "GET", path: "/api/v1/users" },
   "teams.create": { method: "POST", path: "/api/v1/teams" },
+  // Phase C8 M1: administration shell (organization overview, people directory, team directory/detail/rename/membership).
+  "organization.overview": { method: "GET", path: "/api/v1/organization/overview" },
+  "organization.members": { method: "GET", path: "/api/v1/organization/members" },
+  "teams.directory": { method: "GET", path: "/api/v1/organization/teams" },
+  "teams.get": { method: "GET", path: "/api/v1/teams/{teamId}" },
+  "teams.rename": { method: "PATCH", path: "/api/v1/teams/{teamId}" },
+  "teams.addMember": { method: "POST", path: "/api/v1/teams/{teamId}/members" },
+  "teams.removeMember": { method: "POST", path: "/api/v1/teams/{teamId}/members/{userId}/remove" },
 } as const satisfies Record<string, { method: HttpMethod; path: string }>;
 
 export type EndpointKey = keyof typeof ENDPOINTS;

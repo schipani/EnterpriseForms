@@ -1,8 +1,8 @@
 # Phase C8 — Administration and Governance: architecture and milestone plan
 
-- **Status:** M0 (planning) only, C-77. **Nothing in this document is implemented.** Every Authority change it describes (AC-7, AC-8) is a **proposal awaiting owner approval** (§9). The C7 merge does not authorize them.
+- **Status:** M0 approved with conditions (C-78, 2026-10-29: D8-1…D8-10 approved as proposed; owner-role grants need two distinct owners, designer grants one owner, member additions stay on the operator two-approval process in Development/Testing, no disabling while directly owning records, disabling keeps roles and shares, the auditor role is separate from Security Administrator, C-74 cleanup verified before any C8 image reaches the development stack, and AC-7/AC-8 need separate architecture/security approval). **M1 implemented (C-79) and awaiting owner acceptance; M2–M4 not started.** AC-7 and AC-8 remain proposals: no Authority command, relation or schema was changed. The C7 merge does not authorize them.
 - **Branch:** `phase-c8/administration-governance`, from `main` `b1e1b30` (the Phase C7 squash merge, PR #29).
-- **Status log:** `docs/PHASE_C8_STATUS.md`. **Decision:** C-77 in `docs/decisions/PHASE_C_DECISION_LOG.md`.
+- **Status log:** `docs/PHASE_C8_STATUS.md`. **Decisions:** C-77 (M0 plan), C-78 (approvals), C-79 (M1 implementation) in `docs/decisions/PHASE_C_DECISION_LOG.md`.
 - **Normative inputs:**
   * `CLAUDE.md` §4B (RBAC, teams, ownership), §4D (audit), §4E–§4G (organization settings, preferences, catalogs), §4J (passwordless policy), §4M–§4N (Authority, consistency), §4T (simplification precedence), §4U (feature ownership);
   * `CLAUDE-DESIGN.MD` §16.6–§16.7 (PG-041…PG-059);
@@ -189,9 +189,9 @@ Manual NVDA/VoiceOver review remains outstanding, as for every earlier page.
   * existing team endpoints unchanged.
   * OpenAPI changes are additive only.
   * Role badges in M1 use only the existing Security Administrator roster. Owner and designer badges wait for the AC-7 roster read (M2).
-- **Authorization:**
-  * overview, people and team reads require the Authority `manage_configuration` or `administer_security` decision;
-  * team commands keep requiring `manage_configuration` at the Authority, unchanged, including the C-70/G25 rule that a Security Administrator cannot join a team themself.
+- **Authorization (as implemented, C-79):**
+  * overview, people and team reads require the Authority `manage_configuration` or `administer_security` decision (`AdministrationAccess`, batch-checked on every call; 403 without counts otherwise);
+  * team commands are unchanged at the Authority. **Correction to the M0 text:** the Authority's existing rule (`CommandPlanner.IsOrganizationAdministrator`, verified on the real stack in `AdministrationTests`) lets an organization owner **or a Security Administrator** register teams and change membership, and refuses a Security Administrator who adds themself (C-70/G25). M1 mirrors exactly that rule in the UI hints (`canManage`, the "available members" list never offers a Security Administrator themself) and applies the same principals to the display-only rename; it neither widens nor narrows the Authority's decision.
 - **Tests:**
   * contract tests;
   * a test that every new endpoint is organization-scoped;
@@ -203,6 +203,7 @@ Manual NVDA/VoiceOver review remains outstanding, as for every earlier page.
   * responsive specs at 320 px.
 - **Acceptance:** owner functional acceptance on the isolated stack. A pending command never shows as effective.
 - **Risks:** the business projection can lag the Authority. The UI labels the source and shows pending state.
+- **Delivered (C-79, 2026-10-29):** see `docs/PHASE_C8_STATUS.md` §3–§6 for the files, endpoints, evidence and limitations. Implementation notes that differ from the M0 sketch: the people route is `/app/organization/users` (design document) with the visible label "People"; the overview is one aggregate endpoint whose parts fail independently, while the data-protection and Security Administrators cards use their own existing queries and refresh on their own; the Security Administrators card moved to `/app/organization/security-administrators`, and the data-protection card to `/app/organization/data-protection`, both unchanged in behaviour; the team rename uses the detail's `modifiedOn` as its concurrency token (no new column); the overview's authentication card is status text only (PB-08 unchanged).
 
 ### M2 — AC-7: members and organization roles (Authority change; needs D8-2…D8-5)
 

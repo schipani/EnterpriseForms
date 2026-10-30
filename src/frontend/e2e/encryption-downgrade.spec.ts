@@ -36,7 +36,7 @@ async function addEncryptedInternalField(page: import("@playwright/test").Page, 
 test.describe.serial("Field encryption removal: policy switch, administrator-only controls, verified plaintext migration", () => {
   test("owner permits removal of encryption on the data-protection policy", async ({ page }) => {
     await signIn(page, "owner");
-    await page.goto("/app/organization/branding");
+    await page.goto("/app/organization/data-protection");
     const card = policyCard(page);
     await expect(card.getByRole("checkbox", { name: /Permit plaintext storage/ })).toBeChecked();
     await card.getByRole("checkbox", { name: /Permit removal of encryption/ }).check();
@@ -131,7 +131,7 @@ test.describe.serial("Field encryption removal: policy switch, administrator-onl
 
   test("the development organization's policy is restored", async ({ page }) => {
     await signIn(page, "owner");
-    await page.goto("/app/organization/branding");
+    await page.goto("/app/organization/data-protection");
     const card = policyCard(page);
     await card.getByRole("checkbox", { name: /Permit removal of encryption/ }).uncheck();
     await card.getByLabel("Policy statement").fill(`Playwright ${run}: restored the development default after the encryption removal spec.`);

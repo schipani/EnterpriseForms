@@ -38,3 +38,7 @@ PB14-36,Theme revalidation after token algorithm update,Unsafe stored settings r
 PB14-37,Add field dialog Security & Encryption section,Free text defaults to Confidential/encrypted; search impact stated; plaintext only under organization policy; axe clean at 320/768/1440 and zoom equivalents
 PB14-38,Organization data-protection policy card,Owner-only edit with reason and revision; read-only for other roles; unreviewed development default visibly labelled; axe clean
 PB14-39,Encrypted value on the record view,Decrypted value with an Encrypted badge for authorized viewers; unauthorized viewer denied without the value
+PB14-40,Organization administration shell (Phase C8 M1),Left-hand Organization navigation shows only capability-matched pages; member without administration capabilities gets a generic message and no navigation; axe clean at 320/768/1440
+PB14-41,Organization overview cards (PG-041),Each card has its own refresh action; an unavailable part is labelled Unavailable instead of a guessed value; member-count source stated; authentication shown as not enforced (PB-08)
+PB14-42,People directory read-only (PG-050),No action column; Security Administrator badge from the Authority roster; non-secret identity binding shown; filter narrows authorized rows only; axe clean
+PB14-43,Team directory and detail (PG-048/049),Create/add/remove through Authority commands with pending state never shown as done; display-only rename audited; Security Administrator sees no management controls; axe clean

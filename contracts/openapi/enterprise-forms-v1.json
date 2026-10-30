@@ -69,6 +69,37 @@
         }
       }
     },
+    "/api/v1/organization/members": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "People directory (PG-050, read-only): identities the Authority has bound that have signed in (business projection, labelled), their teams, and Security Administrator badges from the Authority roster. Organization owners and Security Administrators only; 403 otherwise. Never an email key; never record content.",
+        "operationId": "ListOrganizationMembers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberDirectoryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/session": {
       "get": {
         "tags": [
@@ -2588,6 +2619,128 @@
         }
       }
     },
+    "/api/v1/teams/{teamId}": {
+      "get": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "Team detail and roster (PG-049) from the projection, each membership carrying the Authority command that made it effective. Owners and Security Administrators only; another organization's team is the same generic 404 as an unknown id.",
+        "operationId": "GetTeam",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDetailResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "Display-only rename of the team projection (D8-8; the Authority names no team). Organization owners and Security Administrators (the Authority's team-command rule); audited (TEAM_RENAMED); 409 TEAM_MODIFIED_CONCURRENTLY when expectedModifiedOn is stale.",
+        "operationId": "RenameTeam",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameTeamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDetailResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/teams/{teamId}/members": {
       "post": {
         "tags": [
@@ -2662,6 +2815,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CommandStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/teams": {
+      "get": {
+        "tags": [
+          "Teams"
+        ],
+        "summary": "Team directory with member counts (PG-048). Organization owners and Security Administrators only; 403 otherwise, without counts.",
+        "operationId": "GetTeamDirectory",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDirectoryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3107,6 +3291,37 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/overview": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Organization overview (PG-041): organization identity, member and Security Administrator counts, teams, data-protection floor and authentication status as independently computed parts (an unavailable part never fails the page). Organization owners and Security Administrators only; 403 for everyone else, without counts.",
+        "operationId": "GetOrganizationOverview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOverviewResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6578,6 +6793,270 @@
           }
         }
       },
+      "OrganizationMemberDirectoryResponse": {
+        "required": [
+          "source",
+          "members",
+          "rolesAvailable",
+          "rolesUnavailableReason"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMemberResponse"
+            }
+          },
+          "rolesAvailable": {
+            "type": "boolean"
+          },
+          "rolesUnavailableReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OrganizationMemberResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "identityIssuer",
+          "identitySubject",
+          "firstSeenOn",
+          "authorityRoles",
+          "teams",
+          "isCurrentUser"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "identityIssuer": {
+            "type": "string"
+          },
+          "identitySubject": {
+            "type": "string"
+          },
+          "firstSeenOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authorityRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryTeamResponse"
+            }
+          },
+          "isCurrentUser": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OrganizationOverviewAuthentication": {
+        "required": [
+          "authenticationRequirementName",
+          "authenticationRolloutStatus",
+          "statusExplanation"
+        ],
+        "type": "object",
+        "properties": {
+          "authenticationRequirementName": {
+            "type": "string"
+          },
+          "authenticationRolloutStatus": {
+            "type": "string"
+          },
+          "statusExplanation": {
+            "type": "string"
+          }
+        }
+      },
+      "OrganizationOverviewDataProtection": {
+        "required": [
+          "status",
+          "minimumFieldClassification",
+          "plaintextInternalFieldsPermitted",
+          "isUnreviewedDefault",
+          "securityPolicyRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OverviewPartStatus"
+          },
+          "minimumFieldClassification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plaintextInternalFieldsPermitted": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "isUnreviewedDefault": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "securityPolicyRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "OrganizationOverviewMembers": {
+        "required": [
+          "status",
+          "projectedMemberCount",
+          "memberCountSource",
+          "securityAdministratorCount",
+          "securityAdministratorsCanManage"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OverviewPartStatus"
+          },
+          "projectedMemberCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "memberCountSource": {
+            "type": "string"
+          },
+          "securityAdministratorCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "securityAdministratorsCanManage": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OrganizationOverviewOrganization": {
+        "required": [
+          "status",
+          "organizationDisplayName",
+          "hasLogo",
+          "brandingRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OverviewPartStatus"
+          },
+          "organizationDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasLogo": {
+            "type": "boolean"
+          },
+          "brandingRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "OrganizationOverviewResponse": {
+        "required": [
+          "canManageConfiguration",
+          "canAdministerSecurity",
+          "organization",
+          "members",
+          "teams",
+          "dataProtection",
+          "authentication"
+        ],
+        "type": "object",
+        "properties": {
+          "canManageConfiguration": {
+            "type": "boolean"
+          },
+          "canAdministerSecurity": {
+            "type": "boolean"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationOverviewOrganization"
+          },
+          "members": {
+            "$ref": "#/components/schemas/OrganizationOverviewMembers"
+          },
+          "teams": {
+            "$ref": "#/components/schemas/OrganizationOverviewTeams"
+          },
+          "dataProtection": {
+            "$ref": "#/components/schemas/OrganizationOverviewDataProtection"
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/OrganizationOverviewAuthentication"
+          }
+        }
+      },
+      "OrganizationOverviewTeams": {
+        "required": [
+          "status",
+          "teamCount"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OverviewPartStatus"
+          },
+          "teamCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "OrganizationSecurityPolicyResponse": {
         "required": [
           "minimumFieldClassification",
@@ -6638,6 +7117,24 @@
           "plaintextSearchPermitted": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "OverviewPartStatus": {
+        "required": [
+          "available",
+          "unavailableReason"
+        ],
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "unavailableReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -7741,6 +8238,22 @@
           }
         }
       },
+      "RenameTeamRequest": {
+        "required": [
+          "teamName",
+          "expectedModifiedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "teamName": {
+            "type": "string"
+          },
+          "expectedModifiedOn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "RequestFieldProtectionReconciliationRequest": {
         "required": [
           "requestReason"
@@ -8274,6 +8787,80 @@
           }
         }
       },
+      "TeamDetailResponse": {
+        "required": [
+          "teamId",
+          "teamName",
+          "isActive",
+          "createdOn",
+          "modifiedOn",
+          "source",
+          "canManage",
+          "members",
+          "availableMembers"
+        ],
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modifiedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string"
+          },
+          "canManage": {
+            "type": "boolean"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamMemberResponse"
+            }
+          },
+          "availableMembers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryUserResponse"
+            }
+          }
+        }
+      },
+      "TeamDirectoryResponse": {
+        "required": [
+          "source",
+          "canManage",
+          "teams"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "canManage": {
+            "type": "boolean"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamSummaryResponse"
+            }
+          }
+        }
+      },
       "TeamMemberRequest": {
         "required": [
           "userId"
@@ -8282,6 +8869,35 @@
         "properties": {
           "userId": {
             "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "TeamMemberResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "memberSince",
+          "authorityCommandId"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "memberSince": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authorityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           }
         }
@@ -8303,6 +8919,45 @@
           },
           "command": {
             "$ref": "#/components/schemas/CommandOutcome"
+          }
+        }
+      },
+      "TeamSummaryResponse": {
+        "required": [
+          "teamId",
+          "teamName",
+          "isActive",
+          "memberCount",
+          "createdOn",
+          "modifiedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "memberCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modifiedOn": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
