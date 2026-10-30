@@ -26,6 +26,11 @@ public static class FormDesignerEndpoints
                 TypedResults.Ok(await handlers.GetAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, cancellationToken).ConfigureAwait(false)))
             .WithName("GetFormDefinition");
 
+        group.MapPatch("/{formDefinitionId:guid}", static async Task<Ok<FormDefinitionDetailResponse>> (Guid formDefinitionId, RenameFormDefinitionRequest request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.RenameAsync(BusinessAuthentication.RequireContext(http), formDefinitionId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("RenameFormDefinition")
+            .WithSummary("Renames a form (display name only; no new version). Requires the Authority design permission on the form (404 otherwise); 409 FORM_DEFINITION_MODIFIED_CONCURRENTLY when expectedFormDefinitionRevision is stale; 422 for an empty, over-long or control-character name; audited (FORM_RENAMED).");
+
         group.MapPost("/designer", static async Task<Created<FormDefinitionDetailResponse>> (CreateFormDefinitionV2Request request, HttpContext http, FormDesignerHandlers handlers, CancellationToken cancellationToken) =>
             {
                 var response = await handlers.CreateAsync(BusinessAuthentication.RequireContext(http), request, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false);

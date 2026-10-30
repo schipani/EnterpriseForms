@@ -22,9 +22,9 @@ public sealed partial class CreateFormDefinitionHandler(IBusinessStore store, Au
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
-        if (string.IsNullOrWhiteSpace(request.FormDefinitionName) || request.FormDefinitionName.Length > 200)
+        if (FormDefinitionNameRules.Normalize(request.FormDefinitionName) is null)
         {
-            throw new BusinessException("INVALID_REQUEST", 422, "form_definition_name is required (max 200)");
+            throw new BusinessException("INVALID_REQUEST", 422, FormDefinitionNameRules.Requirement);
         }
 
         if (request.Fields.Count is 0 or > 250 || request.Fields.Select(f => f.FieldKey).Distinct(StringComparer.Ordinal).Count() != request.Fields.Count

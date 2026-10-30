@@ -19,6 +19,7 @@ const titles: Record<string, string> = {
   DRAFT_REVISION_CONFLICT: "The draft changed since you loaded it",
   BRANDING_REVISION_CONFLICT: "Branding changed since you loaded it",
   VERSION_CONFLICT: "A newer version was published",
+  FORM_DEFINITION_MODIFIED_CONCURRENTLY: "Someone else renamed this form",
   PRECONDITION_FAILED: "The record changed since you loaded it",
   VALIDATION_FAILED: "Some values are not valid",
   INVALID_REQUEST: "The request is not valid",

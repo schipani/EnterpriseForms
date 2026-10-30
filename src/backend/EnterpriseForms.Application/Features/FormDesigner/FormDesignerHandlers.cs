@@ -158,9 +158,9 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
-        if (string.IsNullOrWhiteSpace(request.FormDefinitionName) || request.FormDefinitionName.Length > 200 || (request.FormDefinitionDescription?.Length ?? 0) > 2000)
+        if (FormDefinitionNameRules.Normalize(request.FormDefinitionName) is null || (request.FormDefinitionDescription?.Length ?? 0) > 2000)
         {
-            throw new BusinessException("INVALID_REQUEST", 422, "form_definition_name is required (max 200)");
+            throw new BusinessException("INVALID_REQUEST", 422, FormDefinitionNameRules.Requirement);
         }
 
         var decision = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.DesignForm), cancellationToken).ConfigureAwait(false);
@@ -211,6 +211,50 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
                     UpdatedByUserId = context.LocalUserId,
                 });
                 AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormCreated, "form definition registered with the authority", formDefinitionId: formDefinitionId, metadata: new { commandId = command.CommandId });
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return await GetAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Renames a form: a display-name change of the catalog row only. The form id, published versions (immutable layout
+    /// snapshots, whose stored titles stay as published), drafts, records, Authority registration, form permissions and
+    /// shares are untouched, and no form version is created: the Authority's RegisterFormDefinition payload carries no
+    /// name, and every page reads the catalog name. Requires the Authority's design permission on this form (404 otherwise,
+    /// like every designer write); 409 when the expected revision is stale; audited as FORM_RENAMED in the same transaction.
+    /// Re-sending a rename that already took effect returns the current form without a second change.
+    /// </summary>
+    public async Task<FormDefinitionDetailResponse> RenameAsync(RequestContext context, Guid formDefinitionId, RenameFormDefinitionRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(request);
+        var name = FormDefinitionNameRules.Normalize(request.FormDefinitionName)
+                   ?? throw new BusinessException("INVALID_REQUEST", 422, FormDefinitionNameRules.Requirement);
+        await RequireDesignAsync(context, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var definition = await scope.FindFormDefinitionAsync(context.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false);
+            if (definition is null || definition.LifecycleStatus == "Deleted")
+            {
+                throw new BusinessException("NOT_FOUND", 404, "form definition not found");
+            }
+
+            if (!string.Equals(definition.FormDefinitionName, name, StringComparison.Ordinal))
+            {
+                if (request.ExpectedFormDefinitionRevision != definition.FormDefinitionRevision)
+                {
+                    throw new BusinessException("FORM_DEFINITION_MODIFIED_CONCURRENTLY", 409, "the form was renamed by someone else; reload and retry");
+                }
+
+                var previous = definition.FormDefinitionName;
+                definition.FormDefinitionName = name;
+                definition.FormDefinitionRevision++;
+                definition.ModifiedOn = clock.GetUtcNow();
+                definition.ModifiedByUserId = context.LocalUserId;
+                AuditRecorder.Record(scope, context, clock, AuditCategories.Form, AuditActions.FormRenamed, "form renamed (display name only; identity, versions, records and permissions unchanged)", formDefinitionId: formDefinitionId,
+                    metadata: new { previousFormDefinitionName = previous, formDefinitionName = name, formDefinitionRevision = definition.FormDefinitionRevision, currentFormVersionId = definition.CurrentFormVersionId });
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             }
         }
@@ -1623,7 +1667,7 @@ public sealed partial class FormDesignerHandlers(IBusinessStore store, IAuthoriz
         };
 
     private static FormDefinitionSummaryResponse Summary(FormDefinition d, FormVersion? current, bool hasDraft, bool canDesign, bool canCreate) =>
-        new(d.FormDefinitionId, d.FormDefinitionName, d.FormDefinitionDescription, d.LifecycleStatus, current?.VersionNumber, current?.FormVersionId, hasDraft, canDesign, canCreate, d.ModifiedOn);
+        new(d.FormDefinitionId, d.FormDefinitionName, d.FormDefinitionDescription, d.LifecycleStatus, current?.VersionNumber, current?.FormVersionId, hasDraft, canDesign, canCreate, d.ModifiedOn, d.FormDefinitionRevision);
 
     private static FormVersionResponse ToVersion(FormVersion v) => new(v.FormVersionId, v.VersionNumber, v.LayoutSchemaVersion, v.LayoutJson, v.ChangeReason, v.RestoredFromFormVersionId, v.PublishedOn, v.PublishedByUserId);
 

@@ -296,6 +296,46 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "FormDesigner"
+        ],
+        "summary": "Renames a form (display name only; no new version). Requires the Authority design permission on the form (404 otherwise); 409 FORM_DEFINITION_MODIFIED_CONCURRENTLY when expectedFormDefinitionRevision is stale; 422 for an empty, over-long or control-character name; audited (FORM_RENAMED).",
+        "operationId": "RenameFormDefinition",
+        "parameters": [
+          {
+            "name": "formDefinitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameFormDefinitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormDefinitionDetailResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/form-definitions/designer": {
@@ -7617,7 +7657,8 @@
           "hasDraft",
           "canDesign",
           "canCreateRecord",
-          "modifiedOn"
+          "modifiedOn",
+          "formDefinitionRevision"
         ],
         "type": "object",
         "properties": {
@@ -7662,6 +7703,14 @@
           "modifiedOn": {
             "type": "string",
             "format": "date-time"
+          },
+          "formDefinitionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -9470,6 +9519,26 @@
           "useDevelopmentStepUp": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "RenameFormDefinitionRequest": {
+        "required": [
+          "formDefinitionName",
+          "expectedFormDefinitionRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "formDefinitionName": {
+            "type": "string"
+          },
+          "expectedFormDefinitionRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },
