@@ -3,9 +3,11 @@ using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Journal;
 using AuthorizationAuthority.Application.Features.OperatorPlane;
+using AuthorizationAuthority.Application.Features.PlatformOperators;
 using AuthorizationAuthority.Application.Features.SecurityCommands;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 
 namespace AuthorizationAuthority.Application.Features.Membership;
@@ -92,63 +94,14 @@ public sealed class MembershipProvisioningService(IAuthorityStore store, Operato
                 throw refusal;
             }
 
-            var binding = new IdentityBinding
-            {
-                IdentityBindingId = Guid.CreateVersion7(),
-                OrganizationId = organizationId,
-                AuthorityUserId = request.RequestedAuthorityUserId,
-                IdentityIssuerUri = request.RequestedIssuerUri,
-                IdentitySubjectIdentifier = request.RequestedSubjectIdentifier,
-                IdentityBindingEnabled = true,
-                IdentityCreatedOn = now,
-                OrganizationMembershipRequestId = request.OrganizationMembershipRequestId,
-            };
-            var plan = new CommandPlan { NewBinding = binding, ApprovedMembershipRequest = request };
-            if (request.RequestedInitialRoleName == OrganizationRoleNames.Designer)
-            {
-                plan.AddEdges.Add((ResourceTypeNames.Organization, organizationId, OrganizationRoleNames.Designer, ResourceTypeNames.User, binding.AuthorityUserId, string.Empty));
-            }
-
-            plan.NormalizedPayloadJson = CanonicalJson.Serialize(new MembershipApprovalPayload(requestId, binding.AuthorityUserId, binding.IdentityIssuerUri, binding.IdentitySubjectIdentifier, request.RequestedInitialRoleName,
-                request.RequestedByAuthorityUserId, justification, operatorName, verifier.Assurance, statementSha256, approvals.Select(a => new ApprovalRecord(a.ApproverId, a.ApprovalSha256, a.IssuedOn, a.ExpiresOn)).ToList()));
-            var command = new SecurityCommand
-            {
-                SecurityCommandId = Guid.CreateVersion7(),
-                OrganizationId = organizationId,
-                // As for operator appointments: the operator plane has no organization identity; the actor binding is the new member's.
-                ActorIdentityBindingId = binding.IdentityBindingId,
-                CommandKindName = "ApproveOrganizationMembership",
-                CommandIdempotencyKey = idempotencyKey,
-                CommandRequestDigest = statementDigest,
-                ExpectedAuthorizationRevision = state.AuthorizationRevision,
-                CommandPayloadJson = plan.NormalizedPayloadJson,
-                CommandReasonText = "operator membership approval: " + justification,
-                CorrelationIdentifier = correlationId,
-                CommandCreatedOn = now,
-                CommandModifiedOn = now,
-            };
-            var actor = new BoundActor(new VerifiedActor("authority-operator-plane", operatorName, operatorName), binding);
-            var commandRequest = new SecurityCommandRequest(organizationId, SecurityCommandKind.RequestOrganizationMembership, new ResourceRef(ResourceKind.Organization, organizationId), state.AuthorizationRevision,
-                JsonDocument.Parse(plan.NormalizedPayloadJson).RootElement, command.CommandReasonText);
-            SecurityCommandService.ApplyPlan(scope, state, command, plan, actor, commandRequest, cancellationToken);
-            AuditJournal.Append(scope, state, "OrganizationMembershipApproved", new
-            {
-                security_command_id = command.SecurityCommandId,
-                membership_request_id = requestId,
-                organization_id = organizationId,
-                new_authority_user_id = binding.AuthorityUserId,
-                new_identity_binding_id = binding.IdentityBindingId,
-                issuer_uri = binding.IdentityIssuerUri,
-                subject_identifier = binding.IdentitySubjectIdentifier,
-                initial_role_name = request.RequestedInitialRoleName,
-                requested_by_authority_user_id = request.RequestedByAuthorityUserId,
-                operator_workload = operatorName,
-                approval_assurance = verifier.Assurance,
-                approvers = approvals.Select(a => new { approver_id = a.ApproverId, approval_sha256 = a.ApprovalSha256 }),
-                statement_sha256 = statementSha256,
-                authorization_revision = state.AuthorizationRevision,
-                correlation_id = correlationId,
-            }, clock);
+            var command = CommitApproval(scope, state, request, idempotencyKey, statementDigest, "operator membership approval: " + justification,
+                binding => CanonicalJson.Serialize(new MembershipApprovalPayload(requestId, binding.AuthorityUserId, binding.IdentityIssuerUri, binding.IdentitySubjectIdentifier, request.RequestedInitialRoleName,
+                    request.RequestedByAuthorityUserId, justification, operatorName, verifier.Assurance, statementSha256, approvals.Select(a => new ApprovalRecord(a.ApproverId, a.ApprovalSha256, a.IssuedOn, a.ExpiresOn)).ToList())),
+                new VerifiedActor("authority-operator-plane", operatorName, operatorName), operatorName, verifier.Assurance, approvals.Select(a => new { approver_id = a.ApproverId, approval_sha256 = a.ApprovalSha256 }).ToList(), statementSha256,
+                correlationId, now, clock, cancellationToken);
+            // C8 M2 Stage 2: a pending Platform Operator approval of this request can never complete it any more.
+            var superseded = await PlatformApprovalLedger.InvalidatePendingAsync(scope, requestId, PlatformApprovalClosureReasons.RequestDecidedElsewhere, now, cancellationToken).ConfigureAwait(false);
+            AppendInvalidations(scope, state, superseded, PlatformApprovalClosureReasons.RequestDecidedElsewhere, correlationId, clock);
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             var status = await SecurityCommandService.ToStatusAsync(scope, state, command, cancellationToken).ConfigureAwait(false);
             return Response(false, state, request, statementJson, statementSha256, null, command.SecurityCommandId, status.CommandStatus.ToString(), replayed: false, correlationId);
@@ -157,9 +110,7 @@ public sealed class MembershipProvisioningService(IAuthorityStore store, Operato
         {
             if (ex.ErrorCode == AuthorityErrorCodes.MembershipRequestExpired && request.RequestStateName == MembershipRequestStates.Pending)
             {
-                request.RequestStateName = MembershipRequestStates.Expired;
-                request.RequestDecidedOn = now;
-                request.RequestDecisionReasonText = "expired before operator approval";
+                await RecordExpiredAsync(scope, state, request, now, correlationId, clock, cancellationToken).ConfigureAwait(false);
             }
 
             AuditJournal.Append(scope, state, "OrganizationMembershipApprovalRejected", new
@@ -207,12 +158,14 @@ public sealed class MembershipProvisioningService(IAuthorityStore store, Operato
         request.RequestDecidedByOperatorName = operatorName;
         request.RequestDecisionReasonText = reason;
         AuditJournal.Append(scope, state, "OrganizationMembershipRejected", new { membership_request_id = requestId, organization_id = organizationId, operator_workload = operatorName, reason, correlation_id = correlationId }, clock);
+        var superseded = await PlatformApprovalLedger.InvalidatePendingAsync(scope, requestId, PlatformApprovalClosureReasons.RequestRejected, now, cancellationToken).ConfigureAwait(false);
+        AppendInvalidations(scope, state, superseded, PlatformApprovalClosureReasons.RequestRejected, correlationId, clock);
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return OrganizationRosterService.ToEntry(request, now);
     }
 
     /// <summary>Preconditions on the Authority's current state (inside the organization lock when executing). Null when eligible.</summary>
-    private static AuthorityException? Evaluate(Domain.Features.Organizations.OrganizationAuthorizationState state, OrganizationMembershipRequest request, DesiredStateGraph graph, IReadOnlyList<IdentityBinding> bindings, DateTimeOffset now)
+    internal static AuthorityException? Evaluate(Domain.Features.Organizations.OrganizationAuthorizationState state, OrganizationMembershipRequest request, DesiredStateGraph graph, IReadOnlyList<IdentityBinding> bindings, DateTimeOffset now)
     {
         if (state.IntegrityQuarantineEnabled)
         {
@@ -248,18 +201,114 @@ public sealed class MembershipProvisioningService(IAuthorityStore store, Operato
         return null;
     }
 
+    /// <summary>
+    /// Creates the membership (identity binding plus the optional designer edge) as one journaled security command and records
+    /// <c>OrganizationMembershipApproved</c>. Shared by the legacy operator-plane approval and the two-operator platform approval
+    /// (C8 M2 Stage 2): the idempotency key <c>membership-approve:{request}</c> is the same for both, so a request is approved at most
+    /// once. The caller has verified the approvals and <see cref="Evaluate"/> inside the organization lock, and commits the scope.
+    /// </summary>
+    internal static SecurityCommand CommitApproval(IAuthorityScope scope, Domain.Features.Organizations.OrganizationAuthorizationState state, OrganizationMembershipRequest request, string idempotencyKey, byte[] requestDigest,
+        string reasonText, Func<IdentityBinding, string> payloadJson, VerifiedActor actorIdentity, string operatorName, string assurance, object approversForAudit, string statementSha256, Guid correlationId, DateTimeOffset now,
+        TimeProvider clock, CancellationToken cancellationToken)
+    {
+        var binding = new IdentityBinding
+        {
+            IdentityBindingId = Guid.CreateVersion7(),
+            OrganizationId = state.OrganizationId,
+            AuthorityUserId = request.RequestedAuthorityUserId,
+            IdentityIssuerUri = request.RequestedIssuerUri,
+            IdentitySubjectIdentifier = request.RequestedSubjectIdentifier,
+            IdentityBindingEnabled = true,
+            IdentityCreatedOn = now,
+            OrganizationMembershipRequestId = request.OrganizationMembershipRequestId,
+        };
+        var plan = new CommandPlan { NewBinding = binding, ApprovedMembershipRequest = request };
+        if (request.RequestedInitialRoleName == OrganizationRoleNames.Designer)
+        {
+            plan.AddEdges.Add((ResourceTypeNames.Organization, state.OrganizationId, OrganizationRoleNames.Designer, ResourceTypeNames.User, binding.AuthorityUserId, string.Empty));
+        }
+
+        plan.NormalizedPayloadJson = payloadJson(binding);
+        var command = new SecurityCommand
+        {
+            SecurityCommandId = Guid.CreateVersion7(),
+            OrganizationId = state.OrganizationId,
+            // As for operator appointments: the operator plane has no organization identity; the actor binding is the new member's.
+            ActorIdentityBindingId = binding.IdentityBindingId,
+            CommandKindName = "ApproveOrganizationMembership",
+            CommandIdempotencyKey = idempotencyKey,
+            CommandRequestDigest = requestDigest,
+            ExpectedAuthorizationRevision = state.AuthorizationRevision,
+            CommandPayloadJson = plan.NormalizedPayloadJson,
+            CommandReasonText = reasonText.Length <= 1000 ? reasonText : reasonText[..1000],
+            CorrelationIdentifier = correlationId,
+            CommandCreatedOn = now,
+            CommandModifiedOn = now,
+        };
+        var actor = new BoundActor(actorIdentity, binding);
+        var commandRequest = new SecurityCommandRequest(state.OrganizationId, SecurityCommandKind.RequestOrganizationMembership, new ResourceRef(ResourceKind.Organization, state.OrganizationId), state.AuthorizationRevision,
+            JsonDocument.Parse(plan.NormalizedPayloadJson).RootElement, command.CommandReasonText);
+        SecurityCommandService.ApplyPlan(scope, state, command, plan, actor, commandRequest, cancellationToken);
+        AuditJournal.Append(scope, state, "OrganizationMembershipApproved", new
+        {
+            security_command_id = command.SecurityCommandId,
+            membership_request_id = request.OrganizationMembershipRequestId,
+            organization_id = state.OrganizationId,
+            new_authority_user_id = binding.AuthorityUserId,
+            new_identity_binding_id = binding.IdentityBindingId,
+            issuer_uri = binding.IdentityIssuerUri,
+            subject_identifier = binding.IdentitySubjectIdentifier,
+            initial_role_name = request.RequestedInitialRoleName,
+            requested_by_authority_user_id = request.RequestedByAuthorityUserId,
+            operator_workload = operatorName,
+            approval_assurance = assurance,
+            approvers = approversForAudit,
+            statement_sha256 = statementSha256,
+            authorization_revision = state.AuthorizationRevision,
+            correlation_id = correlationId,
+        }, clock);
+        return command;
+    }
+
+    /// <summary>Records a Pending request as Expired (found too old by a decision) and closes its pending operator approvals.</summary>
+    internal static async Task RecordExpiredAsync(IAuthorityScope scope, Domain.Features.Organizations.OrganizationAuthorizationState state, OrganizationMembershipRequest request, DateTimeOffset now, Guid correlationId, TimeProvider clock, CancellationToken cancellationToken)
+    {
+        request.RequestStateName = MembershipRequestStates.Expired;
+        request.RequestDecidedOn = now;
+        request.RequestDecisionReasonText = "expired before operator approval";
+        var closed = await PlatformApprovalLedger.InvalidatePendingAsync(scope, request.OrganizationMembershipRequestId, PlatformApprovalClosureReasons.RequestExpired, now, cancellationToken).ConfigureAwait(false);
+        AppendInvalidations(scope, state, closed, PlatformApprovalClosureReasons.RequestExpired, correlationId, clock);
+    }
+
+    internal static void AppendInvalidations(IAuthorityScope scope, Domain.Features.Organizations.OrganizationAuthorizationState state, IReadOnlyList<PlatformOperatorApproval> closed, string reason, Guid correlationId, TimeProvider clock)
+    {
+        if (closed.Count == 0)
+        {
+            return;
+        }
+
+        AuditJournal.Append(scope, state, "PlatformOperatorApprovalsInvalidated", new
+        {
+            approvals = closed.Select(a => new { platform_operator_approval_id = a.PlatformOperatorApprovalId, membership_request_id = a.OrganizationMembershipRequestId, platform_operator_id = a.PlatformOperatorId, closure_reason = reason }),
+            correlation_id = correlationId,
+        }, clock);
+    }
+
+    /// <summary>The consequences shown before any approval (legacy dry run and platform detail).</summary>
+    internal static List<string> Consequences(Domain.Features.Organizations.OrganizationAuthorizationState state, OrganizationMembershipRequest request, string approvalRequirement) =>
+    [
+        $"{request.RequestedSubjectIdentifier} ({request.RequestedIssuerUri}) becomes a member of \"{state.OrganizationDisplayName}\" with {(request.RequestedInitialRoleName is null ? "no organization role" : "the designer role")}.",
+        "Membership is not sign-in: the person can sign in only through the organization's identity provider once the Entra integration (PB-08) exists.",
+        "No organization owner, Security Administrator, record, share or team access is granted.",
+        $"Requested by owner {request.RequestedByAuthorityUserId}; expires {request.RequestExpiresOn:O}.",
+        approvalRequirement,
+    ];
+
     private MembershipApprovalResponse Response(bool dryRun, Domain.Features.Organizations.OrganizationAuthorizationState state, OrganizationMembershipRequest request, string statementJson, string statementSha256,
         AuthorityException? refusal, Guid? commandId, string? commandStatus, bool replayed, Guid correlationId)
     {
         var target = new OperatorOrganizationPrincipal(request.RequestedAuthorityUserId, request.RequestedIssuerUri, request.RequestedSubjectIdentifier, commandId is not null, false, null);
-        var consequences = new List<string>
-        {
-            $"{request.RequestedSubjectIdentifier} ({request.RequestedIssuerUri}) becomes a member of \"{state.OrganizationDisplayName}\" with {(request.RequestedInitialRoleName is null ? "no organization role" : "the designer role")}.",
-            "Membership is not sign-in: the person can sign in only through the organization's identity provider once the Entra integration (PB-08) exists.",
-            "No organization owner, Security Administrator, record, share or team access is granted.",
-            $"Requested by owner {request.RequestedByAuthorityUserId}; expires {request.RequestExpiresOn:O}.",
-            $"Requires {OperatorApprovalVerifier.RequiredApprovals} approvals from distinct registered approvers ({verifier.Assurance}).",
-        };
+        var consequences = Consequences(state, request, $"Requires {OperatorApprovalVerifier.RequiredApprovals} approvals from distinct registered approvers ({verifier.Assurance}).");
         return new MembershipApprovalResponse(dryRun, refusal is null, refusal?.ErrorCode, refusal?.Detail, request.OrganizationMembershipRequestId, ApprovalKind, state.OrganizationId, state.OrganizationDisplayName, target,
             request.RequestedInitialRoleName, request.RequestStateName, consequences, statementJson, statementSha256, verifier.Mode, verifier.Assurance, OperatorApprovalVerifier.RequiredApprovals, commandId, commandStatus, replayed,
             state.AuthorizationRevision, correlationId);

@@ -74,6 +74,11 @@ public sealed class Program
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.OperatorPlane.OperatorApprovalVerifier.Create(
             builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.OperatorPlane.OperatorApprovalOptions.SectionName).Get<AuthorizationAuthority.Application.Features.OperatorPlane.OperatorApprovalOptions>(),
             builder.Environment.EnvironmentName));
+        // C8 M2 Stages 1-2: Platform Operators. Unavailable unless configured; Create refuses the development-only synthetic mode
+        // outside Development/Testing (startup failure). Production stays closed until PB-08, PIM and an independent review.
+        builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorPolicy.Create(
+            builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorOptions.SectionName).Get<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorOptions>(),
+            builder.Environment.EnvironmentName));
         // Phase C7 M1 (AC-5): provisional catalogue limits (section Catalogue, C-56 D4); a bad value fails at startup.
         var catalogueOptions = builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions.SectionName).Get<AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions>() ?? new AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions();
         AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptionsValidation.Validate(catalogueOptions);
@@ -111,6 +116,7 @@ public sealed class Program
         app.MapContentEndpoints();
         app.MapCatalogueEndpoints();
         app.MapOperatorEndpoints();
+        AuthorizationAuthority.Api.Features.PlatformOperators.PlatformEndpoints.MapPlatformEndpoints(app);
         app.MapSessionEndpoints();
         app.MapFieldSearchEndpoints();
         AuthorizationAuthority.Api.Features.Membership.MembershipEndpoints.MapMembershipEndpoints(app);

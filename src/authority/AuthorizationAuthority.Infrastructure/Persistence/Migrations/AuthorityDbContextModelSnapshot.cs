@@ -1419,6 +1419,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("request_decided_by_operator_name");
 
+                    b.Property<Guid?>("RequestDecidedByPlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_decided_by_platform_operator_id");
+
                     b.Property<DateTimeOffset?>("RequestDecidedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("request_decided_on");
@@ -1483,6 +1487,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_membership_request_replaces")
                         .HasFilter("replaces_membership_request_id IS NOT NULL");
+
+                    b.HasIndex("RequestDecidedByPlatformOperatorId");
 
                     b.HasIndex("OrganizationId", "RequestCreatedOn")
                         .HasDatabaseName("ix_membership_requests_recent");
@@ -1637,6 +1643,492 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_role_change_proposal_not_self", "proposed_by_authority_user_id <> target_authority_user_id");
 
                             t.HasCheckConstraint("ck_role_change_proposal_state", "(proposal_state_name = 'Pending' AND consumed_by_security_command_id IS NULL) OR (proposal_state_name = 'Consumed' AND consumed_by_security_command_id IS NOT NULL AND proposal_consumed_on IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformJournalEntry", b =>
+                {
+                    b.Property<Guid>("PlatformJournalEntryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_journal_entry_id");
+
+                    b.Property<int>("ArchiveAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("archive_attempt_count");
+
+                    b.Property<string>("ArchiveDeliveryState")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("archive_delivery_state");
+
+                    b.Property<byte[]>("ArchiveReceiptDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("archive_receipt_digest");
+
+                    b.Property<string>("ArchiveReceiptReference")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("archive_receipt_reference");
+
+                    b.Property<DateTimeOffset?>("JournalArchivedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("journal_archived_on");
+
+                    b.Property<DateTimeOffset>("JournalCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("journal_created_on");
+
+                    b.Property<string>("JournalEventBodyJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("journal_event_body_json");
+
+                    b.Property<byte[]>("JournalEventDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("journal_event_digest");
+
+                    b.Property<string>("JournalEventKind")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("journal_event_kind");
+
+                    b.Property<byte[]>("JournalPreviousDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("journal_previous_digest");
+
+                    b.Property<string>("LastArchiveErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_archive_error_code");
+
+                    b.Property<long>("PlatformJournalRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("platform_journal_revision");
+
+                    b.HasKey("PlatformJournalEntryId");
+
+                    b.HasIndex("ArchiveDeliveryState")
+                        .HasDatabaseName("ix_platform_journal_pending_archive");
+
+                    b.HasIndex("PlatformJournalRevision")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_journal_revision");
+
+                    b.ToTable("platform_journal_entries", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_platform_journal_archive_state", "archive_delivery_state IN ('Pending','Anchored','VerificationFailed')");
+
+                            t.HasCheckConstraint("ck_platform_journal_digest", "octet_length(journal_event_digest) = 32 AND platform_journal_revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformJournalHead", b =>
+                {
+                    b.Property<Guid>("PlatformJournalHeadId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_journal_head_id");
+
+                    b.Property<DateTimeOffset>("HeadModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("head_modified_on");
+
+                    b.Property<byte[]>("LatestPlatformJournalDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("latest_platform_journal_digest");
+
+                    b.Property<long>("PlatformJournalRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("platform_journal_revision");
+
+                    b.Property<bool>("PlatformQuarantineEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("platform_quarantine_enabled");
+
+                    b.Property<string>("PlatformQuarantineReasonCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("platform_quarantine_reason_code");
+
+                    b.HasKey("PlatformJournalHeadId");
+
+                    b.ToTable("platform_journal_heads", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_platform_journal_head_revision", "platform_journal_revision >= 0 AND (latest_platform_journal_digest IS NULL OR octet_length(latest_platform_journal_digest) = 32)");
+
+                            t.HasCheckConstraint("ck_platform_journal_single_head", "platform_journal_head_id = '01990000-0000-7000-8000-00000000c8a2'");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", b =>
+                {
+                    b.Property<Guid>("PlatformOperatorId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_operator_id");
+
+                    b.Property<long>("LastPlatformJournalRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_platform_journal_revision");
+
+                    b.Property<string>("OperatorDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("operator_display_name");
+
+                    b.Property<string>("OperatorEvidenceKindName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("operator_evidence_kind_name");
+
+                    b.Property<string>("OperatorIssuerUri")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("operator_issuer_uri");
+
+                    b.Property<DateTimeOffset>("OperatorProvisionedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("operator_provisioned_on");
+
+                    b.Property<long>("OperatorRowRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("operator_row_revision");
+
+                    b.Property<DateTimeOffset>("OperatorStatusChangedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("operator_status_changed_on");
+
+                    b.Property<string>("OperatorStatusName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("operator_status_name");
+
+                    b.Property<string>("OperatorStatusReasonText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("operator_status_reason_text");
+
+                    b.Property<string>("OperatorSubjectIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("operator_subject_identifier");
+
+                    b.Property<Guid?>("ProvisionedByPlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provisioned_by_platform_operator_id");
+
+                    b.Property<string>("SyntheticApprovalKeyIdentifier")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("synthetic_approval_key_identifier");
+
+                    b.Property<byte[]>("SyntheticApprovalPublicKey")
+                        .HasColumnType("bytea")
+                        .HasColumnName("synthetic_approval_public_key");
+
+                    b.HasKey("PlatformOperatorId");
+
+                    b.HasIndex("ProvisionedByPlatformOperatorId");
+
+                    b.HasIndex("SyntheticApprovalKeyIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_operator_key")
+                        .HasFilter("synthetic_approval_key_identifier IS NOT NULL");
+
+                    b.HasIndex("OperatorIssuerUri", "OperatorSubjectIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_operator_identity");
+
+                    b.ToTable("platform_operators", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_platform_operator_evidence_kind", "operator_evidence_kind_name IN ('SyntheticDevelopmentJws','EntraTransactionStepUp')");
+
+                            t.HasCheckConstraint("ck_platform_operator_revision", "operator_row_revision > 0 AND last_platform_journal_revision >= 0");
+
+                            t.HasCheckConstraint("ck_platform_operator_status", "operator_status_name IN ('Active','Suspended','Removed')");
+
+                            t.HasCheckConstraint("ck_platform_operator_synthetic_key", "operator_evidence_kind_name <> 'SyntheticDevelopmentJws' OR (synthetic_approval_key_identifier IS NOT NULL AND synthetic_approval_public_key IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorApproval", b =>
+                {
+                    b.Property<Guid>("PlatformOperatorApprovalId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_operator_approval_id");
+
+                    b.Property<DateTimeOffset?>("ApprovalClosedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approval_closed_on");
+
+                    b.Property<string>("ApprovalClosureReasonName")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("approval_closure_reason_name");
+
+                    b.Property<string>("ApprovalEvidenceKindName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("approval_evidence_kind_name");
+
+                    b.Property<byte[]>("ApprovalEvidenceSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("approval_evidence_sha256");
+
+                    b.Property<string>("ApprovalJustificationText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("approval_justification_text");
+
+                    b.Property<DateTimeOffset>("ApprovalRecordedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approval_recorded_on");
+
+                    b.Property<string>("ApprovalStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("approval_state_name");
+
+                    b.Property<byte[]>("ApprovalStatementSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("approval_statement_sha256");
+
+                    b.Property<int>("ApprovalStatementVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("approval_statement_version");
+
+                    b.Property<DateTimeOffset>("ApprovalValidUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approval_valid_until");
+
+                    b.Property<Guid?>("ConsumedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consumed_by_security_command_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("OrganizationMembershipRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_membership_request_id");
+
+                    b.Property<Guid>("PlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_operator_id");
+
+                    b.HasKey("PlatformOperatorApprovalId");
+
+                    b.HasIndex("ApprovalEvidenceSha256")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_approval_evidence");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("OrganizationMembershipRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_approval_pending_request")
+                        .HasFilter("approval_state_name = 'Pending'");
+
+                    b.HasIndex("OrganizationMembershipRequestId", "ApprovalRecordedOn")
+                        .HasDatabaseName("ix_platform_approvals_request");
+
+                    b.HasIndex("PlatformOperatorId", "ApprovalStateName")
+                        .HasDatabaseName("ix_platform_approvals_operator");
+
+                    b.ToTable("platform_operator_approvals", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_platform_approval_closure", "(approval_state_name = 'Pending') = (approval_closed_on IS NULL AND approval_closure_reason_name IS NULL)");
+
+                            t.HasCheckConstraint("ck_platform_approval_digests", "octet_length(approval_statement_sha256) = 32 AND octet_length(approval_evidence_sha256) = 32");
+
+                            t.HasCheckConstraint("ck_platform_approval_state", "approval_state_name IN ('Pending','Consumed','Withdrawn','Invalidated')");
+
+                            t.HasCheckConstraint("ck_platform_approval_statement_version", "approval_statement_version = 2");
+
+                            t.HasCheckConstraint("ck_platform_approval_window", "approval_valid_until > approval_recorded_on");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorChangeProposal", b =>
+                {
+                    b.Property<Guid>("PlatformOperatorChangeProposalId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_operator_change_proposal_id");
+
+                    b.Property<Guid?>("ConfirmedByPlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmed_by_platform_operator_id");
+
+                    b.Property<DateTimeOffset?>("ProposalConsumedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proposal_consumed_on");
+
+                    b.Property<DateTimeOffset>("ProposalCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proposal_created_on");
+
+                    b.Property<DateTimeOffset>("ProposalExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proposal_expires_on");
+
+                    b.Property<string>("ProposalJustificationText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("proposal_justification_text");
+
+                    b.Property<string>("ProposalStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("proposal_state_name");
+
+                    b.Property<byte[]>("ProposalStatementSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("proposal_statement_sha256");
+
+                    b.Property<Guid>("ProposedByPlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("proposed_by_platform_operator_id");
+
+                    b.Property<string>("ProposedChangeName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("proposed_change_name");
+
+                    b.Property<string>("TargetDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("target_display_name");
+
+                    b.Property<string>("TargetEvidenceKindName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("target_evidence_kind_name");
+
+                    b.Property<string>("TargetIssuerUri")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("target_issuer_uri");
+
+                    b.Property<Guid>("TargetPlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_platform_operator_id");
+
+                    b.Property<long>("TargetRowRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("target_row_revision");
+
+                    b.Property<string>("TargetSubjectIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("target_subject_identifier");
+
+                    b.Property<string>("TargetSyntheticKeyIdentifier")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_synthetic_key_identifier");
+
+                    b.Property<byte[]>("TargetSyntheticPublicKey")
+                        .HasColumnType("bytea")
+                        .HasColumnName("target_synthetic_public_key");
+
+                    b.HasKey("PlatformOperatorChangeProposalId");
+
+                    b.HasIndex("ConfirmedByPlatformOperatorId");
+
+                    b.HasIndex("ProposalCreatedOn")
+                        .HasDatabaseName("ix_platform_operator_proposals_recent");
+
+                    b.HasIndex("ProposedByPlatformOperatorId");
+
+                    b.ToTable("platform_operator_change_proposals", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_platform_proposal_change", "proposed_change_name IN ('Provision','Reinstate','Remove')");
+
+                            t.HasCheckConstraint("ck_platform_proposal_consumed", "(proposal_state_name = 'Consumed') = (confirmed_by_platform_operator_id IS NOT NULL AND proposal_consumed_on IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_platform_proposal_expiry", "proposal_expires_on > proposal_created_on");
+
+                            t.HasCheckConstraint("ck_platform_proposal_state", "proposal_state_name IN ('Pending','Consumed')");
+
+                            t.HasCheckConstraint("ck_platform_proposal_statement", "octet_length(proposal_statement_sha256) = 32");
+
+                            t.HasCheckConstraint("ck_platform_proposal_two_operators", "confirmed_by_platform_operator_id IS NULL OR confirmed_by_platform_operator_id <> proposed_by_platform_operator_id");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorEvidenceUse", b =>
+                {
+                    b.Property<Guid>("PlatformOperatorEvidenceUseId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_operator_evidence_use_id");
+
+                    b.Property<string>("EvidenceDecisionName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("evidence_decision_name");
+
+                    b.Property<string>("EvidenceUseIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("evidence_use_identifier");
+
+                    b.Property<byte[]>("EvidenceUseSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("evidence_use_sha256");
+
+                    b.Property<DateTimeOffset>("EvidenceUsedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("evidence_used_on");
+
+                    b.Property<Guid?>("PlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_operator_id");
+
+                    b.HasKey("PlatformOperatorEvidenceUseId");
+
+                    b.HasIndex("EvidenceUseIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_evidence_identifier");
+
+                    b.HasIndex("EvidenceUseSha256")
+                        .IsUnique()
+                        .HasDatabaseName("uq_platform_evidence_digest");
+
+                    b.HasIndex("PlatformOperatorId");
+
+                    b.ToTable("platform_operator_evidence_uses", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_platform_evidence_digest", "octet_length(evidence_use_sha256) = 32");
                         });
                 });
 
@@ -2199,6 +2691,11 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ReplacesMembershipRequestId")
                         .HasConstraintName("fk_membership_request_replaces");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("RequestDecidedByPlatformOperatorId")
+                        .HasConstraintName("fk_membership_request_platform_operator");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationProtectionPolicy", b =>
@@ -2233,6 +2730,62 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_role_change_proposal_command");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("ProvisionedByPlatformOperatorId")
+                        .HasConstraintName("fk_platform_operator_provisioner");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorApproval", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_platform_approval_org");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationMembershipRequest", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationMembershipRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_platform_approval_request");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("PlatformOperatorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_platform_approval_operator");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorChangeProposal", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("ConfirmedByPlatformOperatorId")
+                        .HasConstraintName("fk_platform_proposal_confirmer");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("ProposedByPlatformOperatorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_platform_proposal_proposer");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorEvidenceUse", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("PlatformOperatorId")
+                        .HasConstraintName("fk_platform_evidence_operator");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SecurityCommands.AuthorityRelationshipEdge", b =>

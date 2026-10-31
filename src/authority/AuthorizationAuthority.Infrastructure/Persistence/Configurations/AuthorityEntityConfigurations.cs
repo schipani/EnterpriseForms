@@ -94,6 +94,7 @@ public sealed class OrganizationMembershipRequestConfiguration : IEntityTypeConf
         builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.DecidedBySecurityCommandId).HasConstraintName("fk_membership_request_decision");
         builder.HasOne<OrganizationMembershipRequest>().WithMany().HasForeignKey(e => e.ReplacesMembershipRequestId).HasConstraintName("fk_membership_request_replaces");
         builder.HasIndex(e => e.ReplacesMembershipRequestId).IsUnique().HasFilter("replaces_membership_request_id IS NOT NULL").HasDatabaseName("uq_membership_request_replaces");
+        builder.HasOne<Domain.Features.PlatformOperators.PlatformOperator>().WithMany().HasForeignKey(e => e.RequestDecidedByPlatformOperatorId).HasConstraintName("fk_membership_request_platform_operator");
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_membership_request_state", "request_state_name IN ('Pending','Approved','Rejected','Expired','Cancelled','Replaced')");

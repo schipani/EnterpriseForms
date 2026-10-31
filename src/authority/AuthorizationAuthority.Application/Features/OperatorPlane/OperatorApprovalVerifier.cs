@@ -144,6 +144,13 @@ public sealed class OperatorApprovalVerifier
         return Verify(approvals, new ApprovalBinding(statement.OperationId, statement.OperationKind, statement.OrganizationId, statement.TargetAuthorityUserId), statementSha256, now);
     }
 
+    /// <summary>
+    /// C8 M2 Stage 1: the Platform Operator recovery ceremony (no organization, no member): the same two-approver verification,
+    /// bound to <see cref="Guid.Empty"/> organization and target so an approval for any organization operation can never be reused here.
+    /// </summary>
+    public IReadOnlyList<VerifiedOperatorApproval> VerifyPlatformCeremony(IReadOnlyList<string>? approvals, Guid operationId, string operationKind, string statementSha256, DateTimeOffset now) =>
+        Verify(approvals, new ApprovalBinding(operationId, operationKind, Guid.Empty, Guid.Empty), statementSha256, now);
+
     private List<VerifiedOperatorApproval> Verify(IReadOnlyList<string>? approvals, ApprovalBinding statement, string statementSha256, DateTimeOffset now)
     {
         if (!Operational)

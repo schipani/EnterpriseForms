@@ -3,6 +3,7 @@ using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Features.Content;
 using AuthorizationAuthority.Application.Features.Membership;
 using AuthorizationAuthority.Application.Features.OperatorPlane;
+using AuthorizationAuthority.Application.Features.PlatformOperators;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Infrastructure.Faults;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -69,6 +70,28 @@ public static class OperatorEndpoints
                 return TypedResults.Ok(await service.RejectAsync(organizationId, requestId, request, operatorName, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
             })
             .WithName("RejectOrganizationMembership");
+
+        // C8 M2 Stage 1: Platform Operator status, the recovery ceremony (two custodian approvals, only below two active operators)
+        // and platform journal replay after a database restore. Never reachable with the Platform Console or business credentials.
+        group.MapGet("/platform-operators", static async Task<Ok<PlatformOperatorPlaneStatus>> (HttpContext context, PlatformOperatorRegistryService registry, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await registry.GetPlaneStatusAsync(InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+            .WithName("GetPlatformOperatorPlaneStatus");
+
+        group.MapPost("/platform-operators/bootstrap", static async Task<Ok<PlatformOperatorBootstrapResponse>> (PlatformOperatorBootstrapRequest request, HttpContext context, PlatformOperatorRegistryService registry, CancellationToken cancellationToken) =>
+            {
+                var operatorName = context.User.FindFirst("workload_name")?.Value ?? "operator";
+                return TypedResults.Ok(await registry.BootstrapAsync(request, operatorName, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("BootstrapPlatformOperators")
+            .WithSummary("Recovery ceremony: registers new Platform Operator identities only while fewer than two are active. Dry run first; execution needs two ES256 custodian approvals (DR-C7-3 keys) over the statement. Critical alert; platform journal.");
+
+        group.MapPost("/platform-journal/replay", static async Task<Ok<PlatformJournalReplayResponse>> (HttpContext context, PlatformJournal journal, CancellationToken cancellationToken) =>
+            {
+                var operatorName = context.User.FindFirst("workload_name")?.Value ?? "operator";
+                return TypedResults.Ok(await journal.ReplayAsync(operatorName, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("ReplayPlatformJournal")
+            .WithSummary("After a database restore: re-applies archived platform events beyond the database head, each verified against the chain; quarantines on mismatch. Never chooses or edits state.");
 
         group.MapPost("/fault-injection", static Results<Ok<FaultInjectionRequest>, ProblemHttpResult> (FaultInjectionRequest request, IServiceProvider services, IHostEnvironment environment) =>
             {

@@ -4,6 +4,7 @@ using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +67,18 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<ProtectionCensusResult> ProtectionCensusResults => Set<ProtectionCensusResult>();
 
     public DbSet<ProtectionReconciliationAttestation> ProtectionAttestations => Set<ProtectionReconciliationAttestation>();
+
+    public DbSet<PlatformOperator> PlatformOperators => Set<PlatformOperator>();
+
+    public DbSet<PlatformOperatorChangeProposal> PlatformOperatorProposals => Set<PlatformOperatorChangeProposal>();
+
+    public DbSet<PlatformOperatorApproval> PlatformOperatorApprovals => Set<PlatformOperatorApproval>();
+
+    public DbSet<PlatformOperatorEvidenceUse> PlatformEvidenceUses => Set<PlatformOperatorEvidenceUse>();
+
+    public DbSet<PlatformJournalHead> PlatformJournalHeads => Set<PlatformJournalHead>();
+
+    public DbSet<PlatformJournalEntry> PlatformJournalEntries => Set<PlatformJournalEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -3,7 +3,9 @@ using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.FieldSearch;
+using AuthorizationAuthority.Application.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using EnterpriseForms.Integrity.Merkle;
 
@@ -65,6 +67,9 @@ public sealed class CommandPlan
 
     public OrganizationMembershipRequest? ApprovedMembershipRequest { get; set; }
 
+    /// <summary>C8 M2 Stage 2: pending Platform Operator approvals of a request this command moves out of Pending, closed (Invalidated) in the same transaction.</summary>
+    public List<(PlatformOperatorApproval Approval, string Reason)> InvalidatedPlatformApprovals { get; } = [];
+
     public IdentityBinding? NewBinding { get; set; }
 
     public string NormalizedPayloadJson { get; set; } = "{}";
@@ -90,7 +95,7 @@ public static partial class CommandPlanner
         ArgumentNullException.ThrowIfNull(request);
         var at = now ?? DateTimeOffset.UtcNow;
         var gate = approvalGate ?? FieldSearchApprovalGate.Unavailable;
-        return request.CommandKind switch
+        var plan = request.CommandKind switch
         {
             SecurityCommandKind.RegisterTeam => await RegisterTeamAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.AddTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: true, cancellationToken).ConfigureAwait(false),
@@ -121,6 +126,20 @@ public static partial class CommandPlanner
             SecurityCommandKind.ReplaceOrganizationMembershipRequest => await ReplaceMembershipRequestAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
             _ => throw new AuthorityException(AuthorityErrorCodes.CommandKindNotImplemented, 422, false, $"command kind {request.CommandKind} is not implemented in Stage A"),
         };
+
+        // C8 M2 Stage 2: a request leaving Pending (owner cancel or replace, recorded expiry) closes its pending operator approval in the same transaction.
+        if (plan.CancelledMembershipRequest is { } cancelled)
+        {
+            var reason = plan.NewMembershipRequest is null ? PlatformApprovalClosureReasons.RequestCancelled : PlatformApprovalClosureReasons.RequestReplaced;
+            plan.InvalidatedPlatformApprovals.AddRange((await PlatformApprovalLedger.PendingForRequestAsync(scope, cancelled.OrganizationMembershipRequestId, cancellationToken).ConfigureAwait(false)).Select(a => (a, reason)));
+        }
+
+        foreach (var expired in plan.ExpiredMembershipRequests)
+        {
+            plan.InvalidatedPlatformApprovals.AddRange((await PlatformApprovalLedger.PendingForRequestAsync(scope, expired.OrganizationMembershipRequestId, cancellationToken).ConfigureAwait(false)).Select(a => (a, PlatformApprovalClosureReasons.RequestExpired)));
+        }
+
+        return plan;
     }
 
     private static bool IsOrganizationAdministrator(DesiredStateGraph graph, Guid organizationId, Guid userId) =>

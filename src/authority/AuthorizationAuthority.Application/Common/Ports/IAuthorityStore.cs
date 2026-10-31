@@ -4,6 +4,7 @@ using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 
@@ -201,5 +202,75 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>Phase C7 M4: the most recent attestation of each of the given protection decisions (read-only).</summary>
     Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken);
 
+    // ---- C8 M2 Stages 1-2: Platform Operators. Lock order: organization state row first, then the platform journal head. ----
+
+    /// <summary>SELECT ... FOR UPDATE on the single platform journal head row: serializes every platform mutation.</summary>
+    Task<PlatformJournalHead?> LockPlatformJournalAsync(CancellationToken cancellationToken);
+
+    Task<PlatformJournalHead?> ReadPlatformJournalAsync(CancellationToken cancellationToken);
+
+    void AddPlatformJournalHead(PlatformJournalHead head);
+
+    void AddPlatformJournalEntry(PlatformJournalEntry entry);
+
+    /// <summary>Pending-archive platform entries in revision order (tracked).</summary>
+    Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken);
+
+    Task<int> CountPendingPlatformArchiveAsync(CancellationToken cancellationToken);
+
+    /// <summary>Tracked.</summary>
+    Task<PlatformOperator?> FindPlatformOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked.</summary>
+    Task<PlatformOperator?> FindPlatformOperatorByIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken);
+
+    /// <summary>Every registered operator (tracked), in registration order.</summary>
+    Task<List<PlatformOperator>> GetPlatformOperatorsAsync(CancellationToken cancellationToken);
+
+    void AddPlatformOperator(PlatformOperator platformOperator);
+
+    /// <summary>Tracked.</summary>
+    Task<PlatformOperatorChangeProposal?> FindPlatformOperatorProposalAsync(Guid proposalId, CancellationToken cancellationToken);
+
+    /// <summary>Proposals created since the given instant (tracked).</summary>
+    Task<List<PlatformOperatorChangeProposal>> GetPlatformOperatorProposalsAsync(DateTimeOffset createdSince, CancellationToken cancellationToken);
+
+    void AddPlatformOperatorProposal(PlatformOperatorChangeProposal proposal);
+
+    /// <summary>Tracked.</summary>
+    Task<PlatformOperatorApproval?> FindPlatformApprovalAsync(Guid platformOperatorApprovalId, CancellationToken cancellationToken);
+
+    /// <summary>Every approval of one request (tracked), in recording order.</summary>
+    Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestAsync(Guid organizationMembershipRequestId, CancellationToken cancellationToken);
+
+    /// <summary>Pending approvals recorded by one operator (tracked).</summary>
+    Task<List<PlatformOperatorApproval>> GetPendingPlatformApprovalsForOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken);
+
+    /// <summary>Approvals of the given requests (read-only).</summary>
+    Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationMembershipRequestIds, CancellationToken cancellationToken);
+
+    void AddPlatformApproval(PlatformOperatorApproval approval);
+
+    /// <summary>True when an evidence identifier or digest was already accepted once.</summary>
+    Task<bool> IsPlatformEvidenceUsedAsync(string evidenceUseIdentifier, byte[] evidenceUseSha256, CancellationToken cancellationToken);
+
+    /// <summary>Tracked (journal replay upserts by id).</summary>
+    Task<PlatformOperatorEvidenceUse?> FindPlatformEvidenceUseAsync(Guid platformOperatorEvidenceUseId, CancellationToken cancellationToken);
+
+    void AddPlatformEvidenceUse(PlatformOperatorEvidenceUse evidenceUse);
+
+    /// <summary>Cross-organization page of membership requests (read-only), newest first, keyset after the cursor, with the total.</summary>
+    Task<PlatformRequestStorePage> SearchMembershipRequestsAsync(PlatformMembershipRequestQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Writes staged changes inside the open transaction without committing (orders updates that free a unique value before inserts that take it).</summary>
+    Task FlushAsync(CancellationToken cancellationToken);
+
     Task CommitAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>Filters are applied in the store; <see cref="Status"/> is one of <c>PlatformRequestFilters</c>.</summary>
+public sealed record PlatformMembershipRequestQuery(string? Text, string Status, DateTimeOffset Now, (DateTimeOffset CreatedOn, Guid RequestId)? After, int Limit);
+
+public sealed record PlatformRequestStoreRow(OrganizationMembershipRequest Request, string OrganizationDisplayName);
+
+public sealed record PlatformRequestStorePage(IReadOnlyList<PlatformRequestStoreRow> Rows, int TotalCount);

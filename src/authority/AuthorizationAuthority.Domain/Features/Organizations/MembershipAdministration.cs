@@ -90,6 +90,9 @@ public sealed class OrganizationMembershipRequest
 
     public Guid? DecidedBySecurityCommandId { get; set; }
 
+    /// <summary>C8 M2 Stage 2: the Platform Operator who completed the approval (second approval) or rejected the request; null for legacy operator-plane decisions.</summary>
+    public Guid? RequestDecidedByPlatformOperatorId { get; set; }
+
     /// <summary>AC-7.5: when, by which owner and why an owner cancelled or replaced this request (set exactly for Cancelled and Replaced).</summary>
     public DateTimeOffset? RequestCancelledOn { get; set; }
 

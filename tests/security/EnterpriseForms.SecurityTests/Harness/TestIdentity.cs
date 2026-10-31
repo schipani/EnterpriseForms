@@ -93,6 +93,70 @@ public static class TestIdentity
         return header + "." + payload + "." + System.Buffers.Text.Base64Url.EncodeToString(signature);
     }
 
+    // ---- C8 M2 Stages 1-2: Platform Operators (compose.security-test.yaml holds the console and operator-assertion keys) ----
+
+    public const string PlatformOperatorIssuer = "https://platform-operators.sectest.enterpriseforms.invalid/";
+    private const string PlatformConsoleKeyBase64 = "cGxhdGZvcm0tY29uc29sZS1zZWN0ZXN0LW9ubHktc2hhcmVkLWtleS0wMA==";
+    private const string OperatorAssertionKeyBase64 = "cGxhdGZvcm0tb3BlcmF0b3ItYXNzZXJ0aW9uLXNlY3Rlc3Qtb25seS1rMDE=";
+
+    /// <summary>
+    /// Three DEVELOPMENT/TEST-ONLY synthetic Platform Operators (subject, display name, approval key id, PKCS#8 private key). They are
+    /// registered by the recovery ceremony the first time a fresh stack needs them; the Authority only ever receives the public halves.
+    /// One harness process holds all three keys, so nothing done with them is two-human approval evidence.
+    /// </summary>
+    public static readonly IReadOnlyList<(string Subject, string DisplayName, string KeyId, string PrivateKeyBase64)> SyntheticPlatformOperators =
+    [
+        ("sectest-operator-avery", "Avery Operator (synthetic)", "sectest-operator-key-avery", "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgUhXaF4rF\u002BJn6kloGJ2ZEPjy4kigiueg/90ohtF4X78ihRANCAASXj1UlLlZd41HaQ74j976Lf15SkD2Uuso1F9EM0U766fG6ZT9oxfUjIAKt1jIl2Zr/VRbm5dXUPsBuKMKf\u002BqqZ"),
+        ("sectest-operator-blair", "Blair Operator (synthetic)", "sectest-operator-key-blair", "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg/lNZswPvAMHcat3NXfbfS1vcDJ3ZHmguQypX0UQrEcihRANCAASC0hCuDryciPThMmeLcphkkZr77IiHyv9IgiQhVIHIz2Ks\u002BRCkVQauEAr7WpyfaB0cpsER4mLR74CEtUhyifR7"),
+        ("sectest-operator-cameron", "Cameron Operator (synthetic)", "sectest-operator-key-cameron", "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwU/2uyEyssxFLRMGeiWqwCyoNgDkYAqC3niAP8OY3lmhRANCAATMAehdEXwB\u002BXQCGVLPvuYHrt9qWZLVWAgkK/C/j90Qpre2xUE2J2KlD8xTKJeNI0Z0Zl2EoQZfBDjakVUQl4Xp"),
+    ];
+
+    /// <summary>The Platform Console workload credential of the security-test stack.</summary>
+    public static string PlatformConsoleToken(string role = "platform-console", string? keyBase64 = null) =>
+        Mint(keyBase64 ?? PlatformConsoleKeyBase64, "enterpriseforms-platform-console", "authorization-authority-platform", "c8-platform-console-harness", new Dictionary<string, object> { ["workload_role"] = role, ["workload_name"] = "c8-platform-console-harness" }, TimeSpan.FromMinutes(5));
+
+    /// <summary>The signed-in Platform Operator as the Platform Console asserts it (identity only; decisions need evidence).</summary>
+    public static string PlatformOperatorAssertion(string subject, string? keyBase64 = null) =>
+        Mint(keyBase64 ?? OperatorAssertionKeyBase64, PlatformOperatorIssuer, "authorization-authority-platform-operator", subject, [], TimeSpan.FromMinutes(5));
+
+    public static string PlatformOperatorPublicKey(string privateKeyBase64)
+    {
+        using var key = System.Security.Cryptography.ECDsa.Create();
+        key.ImportPkcs8PrivateKey(Convert.FromBase64String(privateKeyBase64), out _);
+        return Convert.ToBase64String(key.ExportSubjectPublicKeyInfo());
+    }
+
+    public static string JustificationSha256(string justification) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(justification)));
+
+    /// <summary>One operator's evidence (compact JWS, ES256) of one decision, signed with <paramref name="privateKeyBase64"/>.</summary>
+    public static string PlatformOperatorEvidence(string keyId, string privateKeyBase64, Guid platformOperatorId, string decision, string operationKind, Guid operationId, Guid organizationId, string statementSha256, string justification, Action<Dictionary<string, object>>? tamper = null)
+    {
+        using var key = System.Security.Cryptography.ECDsa.Create();
+        key.ImportPkcs8PrivateKey(Convert.FromBase64String(privateKeyBase64), out _);
+        var now = DateTimeOffset.UtcNow;
+        var claims = new Dictionary<string, object>
+        {
+            ["iss"] = "enterpriseforms-platform-operator-evidence",
+            ["aud"] = "authorization-authority-platform-operator",
+            ["sub"] = keyId,
+            ["jti"] = Guid.NewGuid().ToString("N"),
+            ["iat"] = now.ToUnixTimeSeconds(),
+            ["nbf"] = now.AddSeconds(-5).ToUnixTimeSeconds(),
+            ["exp"] = now.AddMinutes(5).ToUnixTimeSeconds(),
+            ["platform_operator_id"] = platformOperatorId.ToString("D"),
+            ["decision"] = decision,
+            ["operation_kind"] = operationKind,
+            ["operation_id"] = operationId.ToString("D"),
+            ["organization_id"] = organizationId.ToString("D"),
+            ["statement_sha256"] = statementSha256,
+            ["justification_sha256"] = JustificationSha256(justification),
+        };
+        tamper?.Invoke(claims);
+        var header = System.Buffers.Text.Base64Url.EncodeToString(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { alg = "ES256", typ = "JWT", kid = (string)claims["sub"] }));
+        var payload = System.Buffers.Text.Base64Url.EncodeToString(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(claims));
+        return header + "." + payload + "." + System.Buffers.Text.Base64Url.EncodeToString(key.SignData(System.Text.Encoding.ASCII.GetBytes(header + "." + payload), System.Security.Cryptography.HashAlgorithmName.SHA256));
+    }
+
     /// <summary>A token signed with a key the authority does not trust (forged issuer).</summary>
     public static string ForgedUserToken(TestUser user, Guid organizationId) =>
         Mint(Convert.ToBase64String(new byte[32]), Issuer, Audience, user.Subject, new Dictionary<string, object> { ["org"] = organizationId.ToString("D"), ["authority_user_id"] = user.AuthorityUserId.ToString("D") }, TimeSpan.FromMinutes(5));

@@ -1,8 +1,9 @@
 # Phase C8 M2 — Platform Operator administration and two-person operator approvals (architecture proposal)
 
-- **Status:** **proposal, awaiting owner decisions D8-33…D8-44 (§13).** Nothing in this document is implemented. No Authority
-  permission, signing mechanism, authentication method or migration may be built until the owner records the decisions.
-  Not independently reviewed; work by Claude or the owner is never an independent review (C-85).
+- **Status:** **D8-33…D8-44 approved by the owner for Development/Testing implementation (C-97, 2026-10-31), with the added
+  condition of a separately protected rollback checkpoint; Stages 1 and 2 (Authority only) implemented for Development/Testing
+  (C-98) — see §16.** Stage 3 (Platform Console BFF and web UI) is not started. Production stays closed. Not independently
+  reviewed; work by Claude or the owner is never an independent review (C-85). (Original status: proposal, C-96.)
 - **Date / branch:** 2026-10-31, `phase-c8/m2-user-management`, starting commit `18b471c`.
 - **Audience:** the project owner (decisions), the future independent Authority reviewer (this joins the AC-5/AC-6/AC-7/AC-9
   package), implementers.
@@ -557,8 +558,105 @@ Stage B/SEC-P run is implied.
 
 ---
 
-## 15. What this task did not do
+## 15. What the proposal task (C-96) did not do
 
 No code, permission, signing mechanism, authentication method or migration was implemented. Executed: inspection of the
 operator plane, verifier, membership provisioning, journals, sessions and the dev tooling, and the focused Authority unit
 tests in F-13. Not run: Stage B, SEC-P, Playwright, hosted CI. Nothing merged, deployed or started for M3.
+
+---
+
+## 16. Stages 1 and 2 implemented for Development/Testing (C-98, 2026-10-31)
+
+Authority only. No Platform Console BFF or web UI, no People page change, no business-database change, the legacy CLI approval
+path retained. Not merged, not deployed, not independently reviewed.
+
+### 16.1 What was built
+
+| Area | Delivered |
+|---|---|
+| Registry (Stage 1) | `platform_operators` (Authority-owned, platform-scoped; never an identity binding or SpiceDB edge). Four permissions (`PlatformPermissions`), one role in V1, checked by the Authority on every call. |
+| Two-operator changes | `POST /internal/v1/platform/operators/proposals` (Provision, Reinstate, Remove; dry run returns the statement) and `…/proposals/{id}/confirm` by a different active operator who is not the target; single use, 24 h, proposer must still be active, target row revision bound into the statement. |
+| Suspension | `POST /internal/v1/platform/operators/{id}/suspend`: one active operator (self included), immediate, closes the target's pending approvals, alerted. |
+| Recovery ceremony | `POST /internal/v1/operator/platform-operators/bootstrap` (operator plane, two DR-C7-3 custodian approvals, dry run first): registers new identities only while fewer than two operators are active; never reinstates; critical alert. |
+| Platform journal | `platform_journal_heads` (one locked row) + `platform_journal_entries`: hash-chained envelopes (`DynamicForms/PlatformJournal/v1`) whose bodies carry the resulting registry, proposal, approval and evidence rows; delivered to the independent archive before the answer when possible, re-delivered by the work loop; digest or archive mismatch quarantines. |
+| Rollback checkpoint | Before every platform operation (read or write) the Authority asks the separately administered, create-only archive whether an event exists at `head + 1`. If so, AuthorityDb is behind already-accepted evidence (a restore) and everything fails closed with `PLATFORM_JOURNAL_BEHIND_ARCHIVE` (423, critical alert); an unreachable archive fails closed with `PLATFORM_JOURNAL_UNVERIFIABLE`. Grant-direction decisions additionally require every earlier event to be anchored. `POST /internal/v1/operator/platform-journal/replay` re-applies the archived events (digest, revision and chain verified; mismatch quarantines). |
+| Credentials | New `PlatformConsole` scheme (own key, issuer, role `platform-console`) plus a separate `Identity:OperatorAssertion` key for `X-Platform-Operator-Assertion`; complete-or-absent, distinct from every other credential, client certificates required outside Development/Testing; unconfigured ⇒ the policy denies everything. |
+| Evidence | `PlatformOperatorEvidenceVerifier`: ES256 JWS by the operator's own registered synthetic key, bound to operator id, decision, operation kind and id, organization, statement and justification digests, 10-minute maximum lifetime; single-use by `jti` and digest (`platform_operator_evidence_uses`). `EntraTransactionStepUp` is always refused. |
+| Statement v2 (Stage 2) | `MembershipApprovalStatementV2` built by the Authority from its own rows (organization name, identity, display name, role, requester identity, reason digest, request digest, lineage); no justification, no operator. |
+| Approvals | `POST /internal/v1/platform/organizations/{org}/membership-requests/{id}/approvals` · `…/approvals/withdraw` · `…/reject`; the first valid approval is `Pending` evidence (24 h, never beyond the request's expiry); a valid second approval by a different active operator creates the membership through the same journaled `ApproveOrganizationMembership` command as the legacy path (same idempotency key, so at most once) and consumes both. |
+| Invalidation | Owner cancel/replace and recorded expiry (planner hook, same transaction, `PlatformOperatorApprovalsInvalidated` audit event), legacy approve/reject, platform rejection, suspension, removal; a stale pending approval (expired window, inactive operator, changed statement) is also closed at the next decision. |
+| Reads | `POST /internal/v1/platform/membership-requests/search` (cross-organization, status filters, text search, 15 per page, max 50, HMAC-protected keyset cursor bound to operator and filter) and `GET …/organizations/{org}/membership-requests/{id}` (statement, consequences, approvals, eligibility; the view is journaled). Metadata only. |
+| Separation | Operators resolve only from the registry; organization identities and roles never qualify; operators are refused by every organization endpoint (not bound); conflict of interest (bound in the organization, requester, proposed member) refused. |
+
+### 16.2 Differences from the proposal (all in the safer direction)
+
+1. **Rollback checkpoint (owner condition):** the independent archive is the separately protected checkpoint, probed at `head + 1` on every platform call, with synchronous anchoring and an operator-plane replay. The proposal only said "replayed during G14".
+2. **Pending approvals, withdrawals and rejections are platform-journal events** (not only organization audit events), so a restore cannot silently resurrect a withdrawn approval or reuse evidence: both are detected and repaired by replay. Organization audit streams carry mirrors (recorded, withdrawn, invalidated, refused, approved, rejected).
+3. **Every operator decision needs evidence:** propose, confirm, suspend, approve, withdraw and reject.
+4. **Closed approvals are immutable through a trigger that keeps the stored row** (a concurrent second closer becomes a no-op instead of failing an owner's cancel).
+5. Organization id is part of the platform request paths; the cursor key is per process (a cursor does not survive an Authority restart).
+6. The roster's `operator_approval_count` for owners (§7.5) is deferred to Stage 5 with the People page work (no People change in this stage).
+
+### 16.3 Migration `PlatformOperatorApprovals` (AuthorityDb, additive)
+
+New tables `platform_operators`, `platform_operator_change_proposals`, `platform_operator_approvals`, `platform_operator_evidence_uses`,
+`platform_journal_heads` (seeded with the single head row, revision 0), `platform_journal_entries`; new nullable column
+`organization_membership_requests.request_decided_by_platform_operator_id` (FK). Unique: operator identity and key id; evidence
+identifier and digest; journal revision; one `Pending` approval per request. Checks on every state, digest length, window and
+two distinct operators per confirmed proposal. Trigger `trg_platform_operator_approvals_keep_closed` (SECURITY INVOKER, fixed
+`search_path`, EXECUTE revoked from PUBLIC). Runtime grants: `SELECT, INSERT, UPDATE` on the six tables, no `DELETE`. No existing row
+changes; `Down` drops the trigger, function, tables and column. Verified by applying it to the rebuilt isolated security-test
+AuthorityDb.
+
+### 16.4 Security findings and residual risks
+
+| # | Finding | Status |
+|---|---|---|
+| PF-1 | Development/Testing: one console (and the harness) holds every synthetic operator key, so synthetic approvals are never two-human evidence; recorded as `SyntheticDevelopment (…)` in every command payload and journal event. | By design; production evidence is Entra (PB-08) |
+| PF-2 | The operator assertion is an HS256 token from the console key: a compromised console can assert any operator identity. Decisions still need that operator's evidence; in Development/Testing the console would also hold the evidence keys (Stage 3). | Accepted for Dev/Testing; production uses Entra tokens |
+| PF-3 | An event committed but not yet anchored (archive outage) is lost if AuthorityDb is restored before delivery. The answer then says `Pending`, and grant-direction decisions stay blocked until it is anchored. | Residual (RPO of the archive path) |
+| PF-4 | Rollback detection relies on the archive being separately administered and append-only. An attacker who can both restore AuthorityDb and delete archive objects defeats it. Azurite is a test double; production needs WORM storage (G14). | Open production dependency |
+| PF-5 | Platform replay restores platform state only. An organization-level AuthorityDb restore that loses a completed membership command is the existing G14 organization recovery item. | Existing gap (G14) |
+| PF-6 | One human registered as two operators cannot be detected cryptographically (T-3). | Procedural; production via Entra workforce identities + PIM |
+| PF-7 | All platform decisions serialize on one head row lock. Adequate at the PB-09 envelope; measured nowhere yet. | Track under PB-09 |
+| PF-8 | `GET` of a request detail writes a view event (and an archive object) per call. | Accepted; revisit volume in Stage 3 |
+| PF-9 | Suspension cannot revoke console sessions yet (the console does not exist); the suspended operator is refused at the next call by the registry. | Stage 3 |
+
+### 16.5 Remaining production restrictions (unchanged by this stage)
+
+`PlatformOperators:Mode=SyntheticDevelopment` is refused at startup outside Development/Testing; with the default `Unavailable` every
+platform operation and the ceremony return `PLATFORM_OPERATORS_UNAVAILABLE`. Production needs, before any activation: PB-08 Entra
+sign-in and transaction-bound FIDO2 step-up for operators (the `EntraTransactionStepUp` evidence kind is a refusal stub today),
+Entra PIM for the role, Entra workload identity + mTLS for the console credential, WORM archive storage, a separate security
+deployment pipeline (PB-11) and PB-12 evidence, Canadian residency of console and evidence (PB-10), executed G14 recovery, and an
+independent security review of AC-7 and this design.
+
+### 16.6 Tests executed (2026-10-31)
+
+| Suite | Result |
+|---|---|
+| Authority unit tests (all; 22 new in `PlatformOperatorTests`) | **263 / 263** |
+| Business + Authority contract tests (all; 13 new in `PlatformConsoleBoundaryTests`, real Authority host pipeline) | **488 / 488** |
+| Architecture tests | **71 / 71** |
+| Real stack — isolated security-test stack recreated from this branch (`down -v`, rebuilt images, migration applied): new `PlatformOperatorApprovalTests` (4) + `MembershipAdministrationTests` + `MembershipRequestEditCancelTests` | **11 / 12 on the first run.** The failure was the existing AC-7.5 three-way owner race (`StaleAndConcurrentChangesLoseCleanlyAndValidationHolds`): one loser answered with a code other than the two the test accepts; the response body was not captured. Re-run in isolation 21 times: 21 passed. Recorded as PF-10 (unexplained intermittent; the test involves no operator approval, and this stage only adds one read to the cancel/replace planner). |
+| Internal OpenAPI artifact | Regenerated; 13 operations added, none removed or changed (semantic comparison) |
+
+Not run: the complete Stage B and SEC-P suites, Playwright, hosted CI. The persistent development stack was not touched (no
+migration, no configuration change).
+
+PO-T coverage: T01, T02, T16 (credentials), T19, T20 — contract tests; T03, T04, T05, T06, T07, T09, T10, T12, T13, T14, T16, T17,
+T21, T22 — unit tests; T04, T05, T07, T08, T11, T15, T18, T21, T22 — real stack (T08 and T18 also unit). Not applicable yet: T23
+(roster count, Stage 5), T24 (legacy path retained), T25 (console sessions, Stage 3).
+
+| # | Additional finding | Status |
+|---|---|---|
+| PF-10 | One intermittent failure of the existing AC-7.5 three-way owner race test on a freshly started stack (1 of 22 runs), body not captured. | Open: capture the body on the next full Stage B run before treating it as test-only |
+
+### 16.7 Needs owner approval before Stage 3
+
+1. Platform Console host details (§9.2): separate container and origin (proposed dev `:8092`, Vite `:5174`), session lifetimes (15 min idle / 2 h absolute), and Development/Testing evidence signing through per-operator non-exportable ECDSA keys in the local Vault Transit.
+2. Activating the platform plane on the persistent development stack: applying migration `PlatformOperatorApprovals` to the development AuthorityDb (after `devstack.py backup`), adding the console and operator-assertion credentials, and bootstrapping three synthetic development operators through the ceremony (`devstack.py` command still to be written).
+3. Whether request-detail views stay journaled (PF-8).
+4. PG-070 catalog entry and feature ownership (`operator-approvals` in a new `platform-console` app).
+5. The point at which the legacy single-call approval is retired (D8-42: after the console's real-stack tests pass).

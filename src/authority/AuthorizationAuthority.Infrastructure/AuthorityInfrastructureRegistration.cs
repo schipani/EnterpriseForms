@@ -85,6 +85,12 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton<AuthorizationAuthority.Application.Features.FieldSearch.SecurityAdministratorRosterService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.Membership.OrganizationRosterService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.Membership.MembershipProvisioningService>();
+        // C8 M2 Stages 1-2: Platform Operators. Unavailable unless the API host registers the configured policy (Development/Testing only).
+        services.TryAddSingleton(AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorPolicy.Unavailable);
+        services.AddSingleton<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorEvidenceVerifier>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformJournal>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorRegistryService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformMembershipApprovalService>();
         return services;
     }
 

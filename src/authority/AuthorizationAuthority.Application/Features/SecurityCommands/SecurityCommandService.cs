@@ -217,6 +217,16 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
         }
 
         ApplyMembershipChanges(scope, command, plan, now);
+        if (plan.InvalidatedPlatformApprovals.Count > 0)
+        {
+            AuditJournal.Append(scope, state, "PlatformOperatorApprovalsInvalidated", new
+            {
+                security_command_id = command.SecurityCommandId,
+                command_kind = command.CommandKindName,
+                approvals = plan.InvalidatedPlatformApprovals.Select(i => new { platform_operator_approval_id = i.Approval.PlatformOperatorApprovalId, membership_request_id = i.Approval.OrganizationMembershipRequestId, platform_operator_id = i.Approval.PlatformOperatorId, closure_reason = i.Reason }),
+                correlation_id = command.CorrelationIdentifier,
+            }, TimeProvider.System);
+        }
 
         command.CommandStateName = SecurityCommandStates.CommittedAwaitingProjection;
         command.CommittedAuthorizationRevision = revision;
@@ -324,6 +334,11 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             approved.RequestStateName = MembershipRequestStates.Approved;
             approved.RequestDecidedOn = now;
             approved.DecidedBySecurityCommandId = command.SecurityCommandId;
+        }
+
+        foreach (var (approval, reason) in plan.InvalidatedPlatformApprovals)
+        {
+            Features.PlatformOperators.PlatformApprovalLedger.Close(approval, Domain.Features.PlatformOperators.PlatformApprovalStates.Invalidated, reason, now);
         }
     }
 

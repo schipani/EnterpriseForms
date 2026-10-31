@@ -523,6 +523,52 @@ public sealed class CommandPlannerTests
 
         public Task<List<AuthorizationAuthority.Domain.Features.Catalogue.ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid org, IReadOnlyCollection<Guid> commands, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformJournalHead?> LockPlatformJournalAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformJournalHead?> ReadPlatformJournalAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddPlatformJournalHead(AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformJournalHead head) => throw new NotSupportedException();
+
+        public void AddPlatformJournalEntry(AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformJournalEntry entry) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<int> CountPendingPlatformArchiveAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator?> FindPlatformOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator?> FindPlatformOperatorByIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator>> GetPlatformOperatorsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddPlatformOperator(AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator platformOperator) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorChangeProposal?> FindPlatformOperatorProposalAsync(Guid proposalId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorChangeProposal>> GetPlatformOperatorProposalsAsync(DateTimeOffset createdSince, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddPlatformOperatorProposal(AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorChangeProposal proposal) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorApproval?> FindPlatformApprovalAsync(Guid platformOperatorApprovalId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorApproval>> GetPlatformApprovalsForRequestAsync(Guid organizationMembershipRequestId, CancellationToken cancellationToken) => Task.FromResult(new List<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorApproval>());
+
+        public Task<List<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorApproval>> GetPendingPlatformApprovalsForOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorApproval>> GetPlatformApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationMembershipRequestIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddPlatformApproval(AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorApproval approval) => throw new NotSupportedException();
+
+        public Task<bool> IsPlatformEvidenceUsedAsync(string evidenceUseIdentifier, byte[] evidenceUseSha256, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorEvidenceUse?> FindPlatformEvidenceUseAsync(Guid platformOperatorEvidenceUseId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddPlatformEvidenceUse(AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorEvidenceUse evidenceUse) => throw new NotSupportedException();
+
+        public Task<PlatformRequestStorePage> SearchMembershipRequestsAsync(PlatformMembershipRequestQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
         public Task CommitAsync(CancellationToken ct) => throw new NotSupportedException();
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

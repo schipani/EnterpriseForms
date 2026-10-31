@@ -4,7 +4,9 @@ using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
+using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 
@@ -43,6 +45,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<ProtectionReconciliationAttestation> Attestations { get; } = [];
     public List<OrganizationRoleChangeProposal> Proposals { get; } = [];
     public List<OrganizationMembershipRequest> MembershipRequests { get; } = [];
+    public List<PlatformOperator> PlatformOperators { get; } = [];
+    public List<PlatformOperatorChangeProposal> PlatformProposals { get; } = [];
+    public List<PlatformOperatorApproval> PlatformApprovals { get; } = [];
+    public List<PlatformOperatorEvidenceUse> PlatformEvidenceUses { get; } = [];
+    public List<PlatformJournalEntry> PlatformJournal { get; } = [];
+    public PlatformJournalHead? PlatformHead { get; set; }
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -255,6 +263,110 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken) =>
             Task.FromResult(s.Attestations.Where(a => a.OrganizationId == organizationId && scopingSecurityCommandIds.Contains(a.ScopingSecurityCommandId)).GroupBy(a => a.ScopingSecurityCommandId).Select(g => g.MaxBy(a => a.AttestedAuditJournalRevision)!).ToList());
+
+        // ---- C8 M2 Stages 1-2: Platform Operators ----
+
+        public Task<PlatformJournalHead?> LockPlatformJournalAsync(CancellationToken cancellationToken) => Task.FromResult(s.PlatformHead);
+
+        public Task<PlatformJournalHead?> ReadPlatformJournalAsync(CancellationToken cancellationToken) => Task.FromResult(s.PlatformHead);
+
+        public void AddPlatformJournalHead(PlatformJournalHead head) => s.PlatformHead = head;
+
+        public void AddPlatformJournalEntry(PlatformJournalEntry entry) => s.PlatformJournal.Add(entry);
+
+        public Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformJournal.Where(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).OrderBy(e => e.PlatformJournalRevision).Take(limit).ToList());
+
+        public Task<int> CountPendingPlatformArchiveAsync(CancellationToken cancellationToken) => Task.FromResult(s.PlatformJournal.Count(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending));
+
+        public Task<PlatformOperator?> FindPlatformOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken) => Task.FromResult(s.PlatformOperators.FirstOrDefault(o => o.PlatformOperatorId == platformOperatorId));
+
+        public Task<PlatformOperator?> FindPlatformOperatorByIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformOperators.FirstOrDefault(o => o.OperatorIssuerUri == issuerUri && o.OperatorSubjectIdentifier == subjectIdentifier));
+
+        public Task<List<PlatformOperator>> GetPlatformOperatorsAsync(CancellationToken cancellationToken) => Task.FromResult(s.PlatformOperators.OrderBy(o => o.OperatorProvisionedOn).ThenBy(o => o.PlatformOperatorId).ToList());
+
+        public void AddPlatformOperator(PlatformOperator platformOperator)
+        {
+            if (s.PlatformOperators.Any(o => o.PlatformOperatorId == platformOperator.PlatformOperatorId || (o.OperatorIssuerUri == platformOperator.OperatorIssuerUri && o.OperatorSubjectIdentifier == platformOperator.OperatorSubjectIdentifier)))
+            {
+                throw new InvalidOperationException("uq_platform_operator_identity");
+            }
+
+            s.PlatformOperators.Add(platformOperator);
+        }
+
+        public Task<PlatformOperatorChangeProposal?> FindPlatformOperatorProposalAsync(Guid proposalId, CancellationToken cancellationToken) => Task.FromResult(s.PlatformProposals.FirstOrDefault(p => p.PlatformOperatorChangeProposalId == proposalId));
+
+        public Task<List<PlatformOperatorChangeProposal>> GetPlatformOperatorProposalsAsync(DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformProposals.Where(p => p.ProposalCreatedOn >= createdSince).OrderBy(p => p.ProposalCreatedOn).ToList());
+
+        public void AddPlatformOperatorProposal(PlatformOperatorChangeProposal proposal) => s.PlatformProposals.Add(proposal);
+
+        public Task<PlatformOperatorApproval?> FindPlatformApprovalAsync(Guid platformOperatorApprovalId, CancellationToken cancellationToken) => Task.FromResult(s.PlatformApprovals.FirstOrDefault(a => a.PlatformOperatorApprovalId == platformOperatorApprovalId));
+
+        public Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestAsync(Guid organizationMembershipRequestId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformApprovals.Where(a => a.OrganizationMembershipRequestId == organizationMembershipRequestId).OrderBy(a => a.ApprovalRecordedOn).ToList());
+
+        public Task<List<PlatformOperatorApproval>> GetPendingPlatformApprovalsForOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformApprovals.Where(a => a.PlatformOperatorId == platformOperatorId && a.ApprovalStateName == PlatformApprovalStates.Pending).ToList());
+
+        public Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationMembershipRequestIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformApprovals.Where(a => organizationMembershipRequestIds.Contains(a.OrganizationMembershipRequestId)).ToList());
+
+        /// <summary>Mirrors <c>uq_platform_approval_pending_request</c> and <c>uq_platform_approval_evidence</c> at insert time.</summary>
+        public void AddPlatformApproval(PlatformOperatorApproval approval)
+        {
+            if ((approval.ApprovalStateName == PlatformApprovalStates.Pending && s.PlatformApprovals.Any(a => a.OrganizationMembershipRequestId == approval.OrganizationMembershipRequestId && a.ApprovalStateName == PlatformApprovalStates.Pending))
+                || s.PlatformApprovals.Any(a => a.ApprovalEvidenceSha256.AsSpan().SequenceEqual(approval.ApprovalEvidenceSha256)))
+            {
+                throw new InvalidOperationException("unique platform approval constraint violated");
+            }
+
+            s.PlatformApprovals.Add(approval);
+        }
+
+        public Task<bool> IsPlatformEvidenceUsedAsync(string evidenceUseIdentifier, byte[] evidenceUseSha256, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformEvidenceUses.Any(e => e.EvidenceUseIdentifier == evidenceUseIdentifier || e.EvidenceUseSha256.AsSpan().SequenceEqual(evidenceUseSha256)));
+
+        public Task<PlatformOperatorEvidenceUse?> FindPlatformEvidenceUseAsync(Guid platformOperatorEvidenceUseId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.PlatformEvidenceUses.FirstOrDefault(e => e.PlatformOperatorEvidenceUseId == platformOperatorEvidenceUseId));
+
+        public void AddPlatformEvidenceUse(PlatformOperatorEvidenceUse evidenceUse) => s.PlatformEvidenceUses.Add(evidenceUse);
+
+        public Task<PlatformRequestStorePage> SearchMembershipRequestsAsync(PlatformMembershipRequestQuery query, CancellationToken cancellationToken)
+        {
+            var now = query.Now;
+            bool Pending(OrganizationMembershipRequest r) => r.RequestStateName == MembershipRequestStates.Pending && r.RequestExpiresOn > now;
+            bool HasApproval(OrganizationMembershipRequest r) => s.PlatformApprovals.Any(a => a.OrganizationMembershipRequestId == r.OrganizationMembershipRequestId && a.ApprovalStateName == PlatformApprovalStates.Pending && a.ApprovalValidUntil > now);
+            var rows = s.MembershipRequests.Select(r => new PlatformRequestStoreRow(r, s.Organizations.Single(o => o.OrganizationId == r.OrganizationId).OrganizationDisplayName)).Where(x => query.Status switch
+            {
+                PlatformRequestFilters.NeedsDecision => Pending(x.Request),
+                PlatformRequestFilters.AwaitingFirstApproval => Pending(x.Request) && !HasApproval(x.Request),
+                PlatformRequestFilters.AwaitingSecondApproval => Pending(x.Request) && HasApproval(x.Request),
+                PlatformRequestFilters.Approved => x.Request.RequestStateName == MembershipRequestStates.Approved,
+                PlatformRequestFilters.Rejected => x.Request.RequestStateName == MembershipRequestStates.Rejected,
+                PlatformRequestFilters.Expired => x.Request.RequestStateName == MembershipRequestStates.Expired || (x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn <= now),
+                PlatformRequestFilters.CancelledOrReplaced => x.Request.RequestStateName is MembershipRequestStates.Cancelled or MembershipRequestStates.Replaced,
+                _ => true,
+            });
+            if (!string.IsNullOrWhiteSpace(query.Text))
+            {
+                rows = rows.Where(x => new[] { x.Request.RequestedDisplayNameHint, x.Request.RequestedSubjectIdentifier, x.Request.RequestedIssuerUri, x.OrganizationDisplayName, x.Request.OrganizationMembershipRequestId.ToString("D") }
+                    .Any(v => v.Contains(query.Text, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            var all = rows.ToList();
+            var ordered = all.OrderByDescending(x => x.Request.RequestCreatedOn).ThenByDescending(x => x.Request.OrganizationMembershipRequestId).AsEnumerable();
+            if (query.After is { } after)
+            {
+                ordered = ordered.Where(x => x.Request.RequestCreatedOn < after.CreatedOn || (x.Request.RequestCreatedOn == after.CreatedOn && x.Request.OrganizationMembershipRequestId.CompareTo(after.RequestId) < 0));
+            }
+
+            return Task.FromResult(new PlatformRequestStorePage(ordered.Take(query.Limit).ToList(), all.Count));
+        }
+
+        public Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task CommitAsync(CancellationToken cancellationToken)
         {

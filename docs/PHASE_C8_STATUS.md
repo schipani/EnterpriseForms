@@ -436,3 +436,16 @@ Not run: the complete Stage B and SEC-P suites; the first `people-administration
 ## 19. Platform Operator approvals — architecture proposal (2026-10-31, C-96) — awaiting owner decisions, nothing implemented
 
 `docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` proposes replacing `devstack.py membership approve` with a separate Platform Console in which two distinct, individually authenticated Platform Operators each approve the exact request and the Authority executes the membership only after verifying both. It lists the reusable machinery, gaps G-1…G-10, the threat model, tests PO-T01…T25, the staged implementation (Opus/Sonnet) and owner decisions D8-33…D8-44. Until those are recorded, the CLI procedure in §15 remains the only way to decide membership requests (Development/Testing only).
+
+## 20. Platform Operator Stages 1-2 implemented in the Authority (2026-10-31, C-97 approval, C-98) — Development/Testing, not merged, not independently reviewed
+
+The owner approved D8-33…D8-44 for Development/Testing (C-97) with an added condition: a separately protected checkpoint so a database restore cannot silently restore suspended operators. Stages 1 and 2 are implemented in the Authority only, as described in `docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` §16 (registry, two-operator changes, suspension, recovery ceremony, platform journal with archive rollback detection and replay, Platform Console credential, statement v2, per-operator evidence, pending approvals, atomic completion, withdrawal, rejection, invalidation, conflict of interest, cross-organization reads). AuthorityDb migration `PlatformOperatorApprovals` (additive). There is no Platform Console BFF or web UI yet, the People page is unchanged, and the legacy `devstack.py membership approve` path is retained (it now closes any pending platform approval of the request it decides).
+
+| Suite | Result (2026-10-31) |
+|---|---|
+| Authority unit tests (22 new) | 263 / 263 |
+| Contract tests (13 new `PlatformConsoleBoundaryTests`) | 488 / 488 |
+| Architecture tests | 71 / 71 |
+| Real stack (isolated stack rebuilt from this branch): `PlatformOperatorApprovalTests` (4) + `MembershipAdministrationTests` + `MembershipRequestEditCancelTests` | 11 / 12 on the first run; the failure was the existing AC-7.5 three-way owner race test (PF-10, body not captured); 21 / 21 on re-run |
+
+Not run: the complete Stage B and SEC-P suites, Playwright, hosted CI. The persistent development stack was not changed: activating the platform plane there (migration, credentials, three synthetic operators) needs owner approval with Stage 3. Production remains closed: `PlatformOperators:Mode=SyntheticDevelopment` is refused outside Development/Testing and the default `Unavailable` refuses every platform operation; Entra transaction-bound step-up evidence is a refusal stub until PB-08.

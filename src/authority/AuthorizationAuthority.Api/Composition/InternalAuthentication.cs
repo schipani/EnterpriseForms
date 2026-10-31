@@ -39,6 +39,17 @@ public static class InternalAuthentication
     public const string ReconcilerScheme = "Reconciler";
     public const string ReconcilerPolicy = "ReconcilerCaller";
     public const string ReconcilerRole = "business-projection-reconciler";
+    /// <summary>
+    /// C8 M2 Stage 1 (D8-33): the Platform Console workload. Its own credential, scheme and role; it satisfies only the platform
+    /// plane (<c>/internal/v1/platform/*</c>), always together with a Platform Operator assertion. Unconfigured => no scheme is
+    /// registered and the policy denies everything (fail closed). The business workload and operator credentials never satisfy it.
+    /// </summary>
+    public const string PlatformConsoleScheme = "PlatformConsole";
+    public const string PlatformConsolePolicy = "PlatformConsoleCaller";
+    public const string PlatformConsoleRole = "platform-console";
+
+    /// <summary>The signed-in Platform Operator, asserted by the Platform Console with its own key (never the business user-assertion key).</summary>
+    public const string OperatorAssertionHeader = "X-Platform-Operator-Assertion";
     public const string UserAssertionHeader = "X-Delegated-User-Assertion";
     public const string CorrelationHeader = "X-Correlation-Id";
 
@@ -46,6 +57,7 @@ public static class InternalAuthentication
     {
         services.Configure<IdentityOptions>(configuration.GetSection(IdentityOptions.SectionName));
         services.AddSingleton<DelegatedUserAssertionValidator>();
+        services.AddSingleton<PlatformOperatorAssertionValidator>();
         services.AddHostedService<IdentityPolicyStartupGuard>();
 
         var identity = configuration.GetSection(IdentityOptions.SectionName).Get<IdentityOptions>() ?? new IdentityOptions();
@@ -62,6 +74,12 @@ public static class InternalAuthentication
         if (reconcilerConfigured)
         {
             authentication.AddJwtBearer(ReconcilerScheme, options => Configure(options, identity.Reconciler));
+        }
+
+        var consoleConfigured = identity.PlatformConsole.IsConfigured && identity.OperatorAssertion.IsConfigured;
+        if (consoleConfigured)
+        {
+            authentication.AddJwtBearer(PlatformConsoleScheme, options => Configure(options, identity.PlatformConsole));
         }
 
         services.AddAuthorizationBuilder()
@@ -88,6 +106,18 @@ public static class InternalAuthentication
                 else
                 {
                     // No reconciler credential in this deployment: nothing can ever satisfy the policy.
+                    policy.AddAuthenticationSchemes(WorkloadScheme).RequireAssertion(_ => false);
+                }
+            })
+            .AddPolicy(PlatformConsolePolicy, policy =>
+            {
+                if (consoleConfigured)
+                {
+                    policy.AddAuthenticationSchemes(PlatformConsoleScheme).RequireAuthenticatedUser().RequireClaim("workload_role", PlatformConsoleRole);
+                }
+                else
+                {
+                    // No Platform Console credential in this deployment: nothing can ever satisfy the policy.
                     policy.AddAuthenticationSchemes(WorkloadScheme).RequireAssertion(_ => false);
                 }
             });
@@ -126,6 +156,14 @@ public static class InternalAuthentication
     {
         ArgumentNullException.ThrowIfNull(context);
         return string.IsNullOrWhiteSpace(context.Request.Headers[UserAssertionHeader].ToString()) ? null : RequireActor(context, validator);
+    }
+
+    /// <summary>C8 M2: the signed-in Platform Operator from <see cref="OperatorAssertionHeader"/>; absent or invalid => 401. The registry decides whether that identity is an active operator.</summary>
+    public static VerifiedActor RequireOperator(HttpContext context, PlatformOperatorAssertionValidator validator)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(validator);
+        return validator.Validate(context.Request.Headers[OperatorAssertionHeader].ToString(), context.User.FindFirstValue("workload_name") ?? "platform-console");
     }
 
     public static Guid Correlation(HttpContext context)
@@ -172,6 +210,12 @@ public sealed class IdentityOptions
 
     /// <summary>Optional (Phase C8 AC-9): the team-membership reconciler credential; absent ⇒ the outcome lookup is unreachable.</summary>
     public CredentialOptions Reconciler { get; set; } = new();
+
+    /// <summary>Optional (C8 M2): the Platform Console workload credential; absent => the platform plane is unreachable.</summary>
+    public CredentialOptions PlatformConsole { get; set; } = new();
+
+    /// <summary>Optional (C8 M2): the key the Platform Console signs operator assertions with; required together with <see cref="PlatformConsole"/>.</summary>
+    public CredentialOptions OperatorAssertion { get; set; } = new();
 
     public UserAssertionOptions UserAssertion { get; set; } = new();
 }
@@ -251,6 +295,7 @@ public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options
         }
 
         ValidateReconciler(identity, environment, configuration);
+        ValidatePlatformConsole(identity, environment, configuration);
 
         var provider = identity.UserAssertion.ProviderKind;
         var testProviderAllowed = environment.IsDevelopment() || environment.IsEnvironment("Testing");
@@ -268,6 +313,51 @@ public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// C8 M2 Stage 1: the Platform Console credential and the operator-assertion key are configured together or not at all, each
+    /// with its own key and issuer, distinct from every other credential (with HS256 the key separates callers). Outside
+    /// Development/Testing a configured console requires client certificates, as for the reconciler; the platform plane itself
+    /// stays Unavailable there until PB-08.
+    /// </summary>
+    public static void ValidatePlatformConsole(IdentityOptions identity, IHostEnvironment environment, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(configuration);
+        static bool Partly(CredentialOptions c) => !string.IsNullOrWhiteSpace(c.Issuer) || !string.IsNullOrWhiteSpace(c.Audience) || !string.IsNullOrWhiteSpace(c.SharedKeyBase64);
+        var console = identity.PlatformConsole;
+        var assertion = identity.OperatorAssertion;
+        if ((Partly(console) && !console.IsConfigured) || (Partly(assertion) && !assertion.IsConfigured) || console.IsConfigured != assertion.IsConfigured)
+        {
+            throw new InvalidOperationException("Identity:PlatformConsole and Identity:OperatorAssertion must both be configured completely (issuer, audience, >=256-bit key) or both be absent.");
+        }
+
+        if (!console.IsConfigured)
+        {
+            return;
+        }
+
+        var others = new[] { identity.Workload, identity.Operator, identity.UserAssertion, identity.Verifier, identity.Reconciler };
+        foreach (var mine in new[] { console, assertion })
+        {
+            if (others.Any(o => !string.IsNullOrWhiteSpace(o.SharedKeyBase64) && o.SharedKeyBase64 == mine.SharedKeyBase64) || others.Any(o => !string.IsNullOrWhiteSpace(o.Issuer) && o.Issuer == mine.Issuer))
+            {
+                throw new InvalidOperationException("The Platform Console credential and the operator-assertion key must each have their own key and issuer, distinct from the workload, operator, user-assertion, verifier and reconciler credentials.");
+            }
+        }
+
+        if (console.SharedKeyBase64 == assertion.SharedKeyBase64 || console.Issuer == assertion.Issuer)
+        {
+            throw new InvalidOperationException("The Platform Console credential and the operator-assertion key must differ from each other.");
+        }
+
+        var syntheticEnvironment = environment.IsDevelopment() || environment.IsEnvironment("Testing");
+        if (!syntheticEnvironment && !string.Equals(configuration["Kestrel:EndpointDefaults:ClientCertificateMode"], "RequireCertificate", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Outside Development/Testing the Platform Console policy requires the server to demand client certificates (Kestrel:EndpointDefaults:ClientCertificateMode = RequireCertificate).");
+        }
+    }
 
     /// <summary>
     /// Phase C8 AC-9. C-2: the reconciler credential is complete or absent, and has its own key and issuer, distinct from the
@@ -303,5 +393,50 @@ public sealed class IdentityPolicyStartupGuard(IOptions<IdentityOptions> options
         {
             throw new InvalidOperationException("Outside Development/Testing the reconciler policy requires the server to demand client certificates (Kestrel:EndpointDefaults:ClientCertificateMode = RequireCertificate, C-1).");
         }
+    }
+}
+
+/// <summary>
+/// C8 M2 Stage 1: validates the Platform Operator assertion the Platform Console attaches to every platform-plane call (HS256 with the
+/// dedicated <c>Identity:OperatorAssertion</c> key; production: the operator's Entra token, PB-08). Yields the asserted identity only;
+/// whether it is an active operator is decided by the registry, and the evidence of every decision is verified separately.
+/// </summary>
+public sealed class PlatformOperatorAssertionValidator(IOptions<IdentityOptions> options)
+{
+    private readonly JsonWebTokenHandler handler = new();
+
+    public VerifiedActor Validate(string assertion, string workloadName)
+    {
+        var settings = options.Value.OperatorAssertion;
+        if (string.IsNullOrWhiteSpace(assertion) || !settings.IsConfigured)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.Unauthorized, 401, false, "platform operator assertion missing");
+        }
+
+        var result = handler.ValidateTokenAsync(assertion, new TokenValidationParameters
+        {
+            ValidIssuer = settings.Issuer,
+            ValidAudience = settings.Audience,
+            IssuerSigningKey = settings.SymmetricKey(),
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+            RequireSignedTokens = true,
+            RequireExpirationTime = true,
+        }).GetAwaiter().GetResult();
+        if (!result.IsValid)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.Unauthorized, 401, false, "platform operator assertion invalid");
+        }
+
+        var subject = result.Claims.TryGetValue("sub", out var sub) ? sub?.ToString() : null;
+        var issuer = result.Claims.TryGetValue("iss", out var iss) ? iss?.ToString() : null;
+        if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(issuer))
+        {
+            throw new AuthorityException(AuthorityErrorCodes.Unauthorized, 401, false, "platform operator assertion lacks iss/sub");
+        }
+
+        return new VerifiedActor(issuer, subject, workloadName);
     }
 }

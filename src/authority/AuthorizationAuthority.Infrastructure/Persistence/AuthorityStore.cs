@@ -1,10 +1,12 @@
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
@@ -281,6 +283,110 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
                     .GroupBy(a => a.ScopingSecurityCommandId)
                     .Select(g => g.MaxBy(a => a.AttestedAuditJournalRevision)!)
                     .ToList();
+
+        // ---- C8 M2 Stages 1-2: Platform Operators ----
+
+        public Task<PlatformJournalHead?> LockPlatformJournalAsync(CancellationToken cancellationToken) =>
+            context.PlatformJournalHeads.FromSqlInterpolated($"SELECT * FROM authority.platform_journal_heads WHERE platform_journal_head_id = {PlatformJournalHead.SingletonId} FOR UPDATE")
+                .AsTracking().FirstOrDefaultAsync(cancellationToken);
+
+        public Task<PlatformJournalHead?> ReadPlatformJournalAsync(CancellationToken cancellationToken) =>
+            context.PlatformJournalHeads.AsNoTracking().FirstOrDefaultAsync(h => h.PlatformJournalHeadId == PlatformJournalHead.SingletonId, cancellationToken);
+
+        public void AddPlatformJournalHead(PlatformJournalHead head) => context.PlatformJournalHeads.Add(head);
+
+        public void AddPlatformJournalEntry(PlatformJournalEntry entry) => context.PlatformJournalEntries.Add(entry);
+
+        public Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
+            context.PlatformJournalEntries.AsTracking().Where(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).OrderBy(e => e.PlatformJournalRevision).Take(limit).ToListAsync(cancellationToken);
+
+        public Task<int> CountPendingPlatformArchiveAsync(CancellationToken cancellationToken) =>
+            context.PlatformJournalEntries.CountAsync(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending, cancellationToken);
+
+        public Task<PlatformOperator?> FindPlatformOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken) =>
+            context.PlatformOperators.AsTracking().FirstOrDefaultAsync(o => o.PlatformOperatorId == platformOperatorId, cancellationToken);
+
+        public Task<PlatformOperator?> FindPlatformOperatorByIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) =>
+            context.PlatformOperators.AsTracking().FirstOrDefaultAsync(o => o.OperatorIssuerUri == issuerUri && o.OperatorSubjectIdentifier == subjectIdentifier, cancellationToken);
+
+        public Task<List<PlatformOperator>> GetPlatformOperatorsAsync(CancellationToken cancellationToken) =>
+            context.PlatformOperators.AsTracking().OrderBy(o => o.OperatorProvisionedOn).ThenBy(o => o.PlatformOperatorId).ToListAsync(cancellationToken);
+
+        public void AddPlatformOperator(PlatformOperator platformOperator) => context.PlatformOperators.Add(platformOperator);
+
+        public Task<PlatformOperatorChangeProposal?> FindPlatformOperatorProposalAsync(Guid proposalId, CancellationToken cancellationToken) =>
+            context.PlatformOperatorProposals.AsTracking().FirstOrDefaultAsync(p => p.PlatformOperatorChangeProposalId == proposalId, cancellationToken);
+
+        public Task<List<PlatformOperatorChangeProposal>> GetPlatformOperatorProposalsAsync(DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            context.PlatformOperatorProposals.AsTracking().Where(p => p.ProposalCreatedOn >= createdSince).OrderBy(p => p.ProposalCreatedOn).ToListAsync(cancellationToken);
+
+        public void AddPlatformOperatorProposal(PlatformOperatorChangeProposal proposal) => context.PlatformOperatorProposals.Add(proposal);
+
+        public Task<PlatformOperatorApproval?> FindPlatformApprovalAsync(Guid platformOperatorApprovalId, CancellationToken cancellationToken) =>
+            context.PlatformOperatorApprovals.AsTracking().FirstOrDefaultAsync(a => a.PlatformOperatorApprovalId == platformOperatorApprovalId, cancellationToken);
+
+        public Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestAsync(Guid organizationMembershipRequestId, CancellationToken cancellationToken) =>
+            context.PlatformOperatorApprovals.AsTracking().Where(a => a.OrganizationMembershipRequestId == organizationMembershipRequestId).OrderBy(a => a.ApprovalRecordedOn).ToListAsync(cancellationToken);
+
+        public Task<List<PlatformOperatorApproval>> GetPendingPlatformApprovalsForOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken) =>
+            context.PlatformOperatorApprovals.AsTracking().Where(a => a.PlatformOperatorId == platformOperatorId && a.ApprovalStateName == PlatformApprovalStates.Pending).ToListAsync(cancellationToken);
+
+        public async Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationMembershipRequestIds, CancellationToken cancellationToken) =>
+            organizationMembershipRequestIds.Count == 0
+                ? []
+                : await context.PlatformOperatorApprovals.AsNoTracking().Where(a => organizationMembershipRequestIds.Contains(a.OrganizationMembershipRequestId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        public void AddPlatformApproval(PlatformOperatorApproval approval) => context.PlatformOperatorApprovals.Add(approval);
+
+        public Task<bool> IsPlatformEvidenceUsedAsync(string evidenceUseIdentifier, byte[] evidenceUseSha256, CancellationToken cancellationToken) =>
+            context.PlatformEvidenceUses.AnyAsync(e => e.EvidenceUseIdentifier == evidenceUseIdentifier || e.EvidenceUseSha256 == evidenceUseSha256, cancellationToken);
+
+        public Task<PlatformOperatorEvidenceUse?> FindPlatformEvidenceUseAsync(Guid platformOperatorEvidenceUseId, CancellationToken cancellationToken) =>
+            context.PlatformEvidenceUses.AsTracking().FirstOrDefaultAsync(e => e.PlatformOperatorEvidenceUseId == platformOperatorEvidenceUseId, cancellationToken);
+
+        public void AddPlatformEvidenceUse(PlatformOperatorEvidenceUse evidenceUse) => context.PlatformEvidenceUses.Add(evidenceUse);
+
+        public async Task<PlatformRequestStorePage> SearchMembershipRequestsAsync(PlatformMembershipRequestQuery query, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            var now = query.Now;
+            var rows = from r in context.MembershipRequests.AsNoTracking()
+                       join o in context.OrganizationStates.AsNoTracking() on r.OrganizationId equals o.OrganizationId
+                       select new { Request = r, OrganizationDisplayName = o.OrganizationDisplayName };
+            var pendingApprovals = context.PlatformOperatorApprovals.AsNoTracking().Where(a => a.ApprovalStateName == PlatformApprovalStates.Pending && a.ApprovalValidUntil > now);
+            rows = query.Status switch
+            {
+                PlatformRequestFilters.NeedsDecision => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn > now),
+                PlatformRequestFilters.AwaitingFirstApproval => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn > now
+                                                                                     && !pendingApprovals.Any(a => a.OrganizationMembershipRequestId == x.Request.OrganizationMembershipRequestId)),
+                PlatformRequestFilters.AwaitingSecondApproval => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn > now
+                                                                                      && pendingApprovals.Any(a => a.OrganizationMembershipRequestId == x.Request.OrganizationMembershipRequestId)),
+                PlatformRequestFilters.Approved => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Approved),
+                PlatformRequestFilters.Rejected => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Rejected),
+                PlatformRequestFilters.Expired => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Expired || (x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn <= now)),
+                PlatformRequestFilters.CancelledOrReplaced => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Cancelled || x.Request.RequestStateName == MembershipRequestStates.Replaced),
+                _ => rows,
+            };
+            if (!string.IsNullOrWhiteSpace(query.Text))
+            {
+                var pattern = "%" + query.Text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+                var id = Guid.TryParse(query.Text, out var parsed) ? parsed : (Guid?)null;
+                rows = rows.Where(x => EF.Functions.ILike(x.Request.RequestedDisplayNameHint, pattern, "\\") || EF.Functions.ILike(x.Request.RequestedSubjectIdentifier, pattern, "\\")
+                                       || EF.Functions.ILike(x.Request.RequestedIssuerUri, pattern, "\\") || EF.Functions.ILike(x.OrganizationDisplayName, pattern, "\\")
+                                       || (id != null && (x.Request.OrganizationMembershipRequestId == id || x.Request.OrganizationId == id)));
+            }
+
+            var total = await rows.CountAsync(cancellationToken).ConfigureAwait(false);
+            if (query.After is { } after)
+            {
+                rows = rows.Where(x => x.Request.RequestCreatedOn < after.CreatedOn || (x.Request.RequestCreatedOn == after.CreatedOn && x.Request.OrganizationMembershipRequestId.CompareTo(after.RequestId) < 0));
+            }
+
+            var page = await rows.OrderByDescending(x => x.Request.RequestCreatedOn).ThenByDescending(x => x.Request.OrganizationMembershipRequestId).Take(query.Limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new PlatformRequestStorePage(page.Select(x => new PlatformRequestStoreRow(x.Request, x.OrganizationDisplayName)).ToList(), total);
+        }
+
+        public Task FlushAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
 
         public async Task CommitAsync(CancellationToken cancellationToken)
         {
