@@ -109,7 +109,7 @@ export function PeopleDirectoryPage() {
       {directory.isPending && allowed ? <LoadingBlock label="Loading people" /> : null}
       {directory.isError ? <ErrorPanel error={directory.error} onRetry={() => void directory.refetch()} /> : null}
       {data ? (
-        <>
+        <div className="flex flex-col gap-6">
           <ApprovalsPanel onApprove={(proposal) => setChange({ kind: "proposal", proposal })} />
           <Card title={`People (${Number(data.totalCount)})`}>
             <p className="m-0 text-sm text-muted">{data.coverageStatement}</p>
@@ -187,7 +187,7 @@ export function PeopleDirectoryPage() {
               sign-in arrives with PB-08.
             </p>
           </Card>
-        </>
+        </div>
       ) : null}
       <MemberChangeDialog
         change={change}

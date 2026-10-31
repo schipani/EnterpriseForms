@@ -410,3 +410,8 @@ Shown in: People, team rosters (Presence column), team "Add member" picker, reco
 | Playwright (isolated): `people-profile-presence` (8), `people-layout` (3), `people-administration` (2 of 3), `organization-administration` (5), `security-administrators` (2) | 20 / 20 run |
 
 Not run: the complete Stage B and SEC-P suites; the first `people-administration` test (it needs a persona that owns records, which a freshly built isolated stack does not have; its designer grant/remove path is covered by `MembershipAdministrationTests`); hosted CI; human screen-reader review. Note: that test, run on a stack without records, really disables its target (it did in the isolated stack; restored).
+
+## 17. People spacing done; membership-request edit/cancel stopped for Authority approval (2026-10-31)
+
+- **Spacing (done):** the People page now separates the Owner proposals and membership requests card from the People card with 24px (`gap-6` on their shared wrapper, not card padding), unchanged card styling; verified at 320, 768 and 1440 px by `people-layout.spec.ts`.
+- **Edit/Cancel request (not implemented):** the Authority has no owner-initiated cancel/replace for a membership request (states Pending/Approved/Rejected/Expired; reject is operator-only). New Authority commands and an AuthorityDb migration are required, so the security-sensitive part is **documented and awaiting approval**: `docs/architecture/PHASE_C8_M2_MEMBERSHIP_REQUEST_EDIT_CANCEL_PROPOSAL.md` (decisions requested in its §3).

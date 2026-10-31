@@ -114,3 +114,16 @@ test("tablet and phone: rows become cards without horizontal overflow", async ({
   }
   await signOut(page);
 });
+
+test("24px of space separates the approvals card from the People card at phone, tablet and desktop widths", async ({ page }) => {
+  await signIn(page, "owner");
+  for (const width of [320, 768, 1440]) {
+    await openPeople(page, width);
+    const card = (heading: RegExp) => page.getByRole("heading", { level: 2, name: heading }).locator("xpath=ancestor::*[contains(@class,'rounded-panel')][1]");
+    const approvals = (await card(/Owner proposals and membership requests/).boundingBox())!;
+    const people = (await card(/^People \(\d+\)$/).boundingBox())!;
+    expect(Math.round(people.y - (approvals.y + approvals.height)), `gap at ${width}px`).toBe(24);
+    expect(await noHorizontalOverflow(page)).toBe(true);
+  }
+  await signOut(page);
+});
