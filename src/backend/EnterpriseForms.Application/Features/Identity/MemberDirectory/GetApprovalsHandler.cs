@@ -20,7 +20,7 @@ public sealed class GetApprovalsHandler(IBusinessStore store, IAuthorizationAuth
 
     public static readonly IReadOnlyList<string> ProposalStatuses = ["Pending", "Approved", "Rejected", "Expired"];
 
-    public static readonly IReadOnlyList<string> RequestStatuses = ["Pending", "Approved", "Rejected", "Expired"];
+    public static readonly IReadOnlyList<string> RequestStatuses = ["Pending", "Approved", "Rejected", "Expired", "Cancelled", "Replaced"];
 
     public Task<OwnerProposalPageResponse> GetProposalsAsync(RequestContext context, ApprovalQuery query, CancellationToken cancellationToken) =>
         PageAsync(context, query, "owner-proposals", ProposalStatuses, (r, users, me) => Proposals(r, users, me),
@@ -86,7 +86,8 @@ public sealed class GetApprovalsHandler(IBusinessStore store, IAuthorizationAuth
 
     private static List<MembershipRequestResponse> Requests(AuthorityOrganizationRoster roster, IReadOnlyDictionary<Guid, string> names) =>
         roster.MembershipRequests.Select(r => new MembershipRequestResponse(r.RequestId, r.RequestedAuthorityUserId, r.IssuerUri, r.SubjectIdentifier, r.DisplayNameHint, r.InitialRoleName is null ? null : GetMemberDirectoryHandler.DesignerRole,
-            r.RequestedByAuthorityUserId, Name(names, r.RequestedByAuthorityUserId), r.Reason, r.RequestedOn, r.ExpiresOn, r.RequestState, r.DecidedOn, r.DecisionReason)).ToList();
+            r.RequestedByAuthorityUserId, Name(names, r.RequestedByAuthorityUserId), r.Reason, r.RequestedOn, r.ExpiresOn, r.RequestState, r.DecidedOn, r.DecisionReason,
+            r.RequestDigest, r.ReplacesRequestId, r.ReplacedByRequestId, r.CancelledOn, roster.CanManageMembers && r.RequestState == "Pending")).ToList();
 
     private static string Name(IReadOnlyDictionary<Guid, string> names, Guid id) => names.TryGetValue(id, out var name) ? name : id.ToString("D");
 

@@ -1,6 +1,6 @@
 # C8 M2 — Edit and cancel pending membership requests: Authority proposal (awaiting owner approval)
 
-Status: **proposal only; nothing in this document is implemented.** It needs the owner's approval because it adds two Authority security commands and a schema change to the independently administered Authority (CLAUDE.md §4M; no silent new Authority capability).
+Status: **approved by the owner (2026-10-31) and implemented for Development/Testing** (decisions: cancel-and-replace; any enabled owner; a distinct `Replaced` state; the replacement gets a new id and a fresh seven-day expiry; the original and its audit history are preserved). Not independently reviewed; not available in staging or production until PB-08 step-up exists. Implementation notes and the three small differences from this proposal are in §4.
 
 ## 1. Review of the existing AC-7 lifecycle (what is and is not supported)
 
@@ -62,3 +62,15 @@ Authority unit/real-stack: owner-only (clerk, designer, Security Administrator, 
 4. Confirm that an edit restarts the 7-day expiry (recommended: the replacement is a new request).
 
 Until approved, the People page shows pending requests read-only (Copy ID only), exactly as before.
+
+## 4. Implementation notes (2026-10-31)
+
+Implemented as specified in §2 with these differences, all in the safer direction:
+
+1. **"Replaced by" is derived, not stored.** The proposal had `replaced_by_membership_request_id`; the implementation stores only `replaces_membership_request_id` on the replacement (self FK, unique) and the roster derives the original's replacement from it. A second stored link could disagree with the first and would force the original's UPDATE to follow the replacement's INSERT, which the partial unique index "one Pending request per identity" forbids in the same transaction.
+2. **The replacement gets a fresh Authority user id.** `uq_membership_request_user` makes the pre-allocated Authority user id unique per request, so the replacement allocates its own; the identity (issuer and subject) and organization are still copied from the original by the Authority, never supplied by the caller. The user id is an internal id, not part of the verified identity.
+3. **Concurrent losers.** Two owners acting on the same reading are serialized by the organization lock: exactly one wins. The loser receives either `MEMBERSHIP_REQUEST_CHANGED` (digest check) or, when the commands truly overlap, `STALE_AUTHORIZATION_REVISION` (the Authority's global revision check). Both are 409s that change nothing.
+
+Migration `MembershipRequestEditCancel` (AuthorityDb): states `Cancelled` and `Replaced`; `request_cancelled_on`, `request_cancelled_by_authority_user_id`, `request_cancellation_reason_text`, `replaces_membership_request_id`; `ck_membership_request_cancellation` (present exactly for Cancelled/Replaced), `ck_membership_request_lineage` (no self reference). Business: `POST /api/v1/organization/membership-requests/{id}/cancel|replace`; the membership-request list returns `requestDigest`, `canChange`, `replacesRequestId`, `replacedByRequestId`, `cancelledOn`.
+
+Evidence: Authority unit tests `MembershipAdministrationTests` (new AC-7.5 group), Stage B `MembershipRequestEditCancelTests` (real stack, operator plane included), Vitest `PeopleDirectoryPage.test.tsx`, Playwright `membership-request-edit-cancel.spec.ts`.

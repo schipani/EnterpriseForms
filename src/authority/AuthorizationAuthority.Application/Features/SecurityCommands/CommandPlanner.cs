@@ -56,6 +56,13 @@ public sealed class CommandPlan
 
     public List<OrganizationMembershipRequest> ExpiredMembershipRequests { get; } = [];
 
+    /// <summary>C8 M2 (AC-7.5): the Pending request this command cancels (alone) or replaces (together with <see cref="NewMembershipRequest"/>), with who and why.</summary>
+    public OrganizationMembershipRequest? CancelledMembershipRequest { get; set; }
+
+    public Guid CancelledByAuthorityUserId { get; set; }
+
+    public string CancellationReason { get; set; } = string.Empty;
+
     public OrganizationMembershipRequest? ApprovedMembershipRequest { get; set; }
 
     public IdentityBinding? NewBinding { get; set; }
@@ -110,6 +117,8 @@ public static partial class CommandPlanner
             SecurityCommandKind.DisableIdentityBinding => await MembershipStateAsync(scope, organizationId, actor, request, graph, gate, at, enable: false, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.EnableIdentityBinding => await MembershipStateAsync(scope, organizationId, actor, request, graph, gate, at, enable: true, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RequestOrganizationMembership => await RequestMembershipAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.CancelOrganizationMembershipRequest => await CancelMembershipRequestAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.ReplaceOrganizationMembershipRequest => await ReplaceMembershipRequestAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
             _ => throw new AuthorityException(AuthorityErrorCodes.CommandKindNotImplemented, 422, false, $"command kind {request.CommandKind} is not implemented in Stage A"),
         };
     }

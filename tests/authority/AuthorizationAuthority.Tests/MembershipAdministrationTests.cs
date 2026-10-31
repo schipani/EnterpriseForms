@@ -411,6 +411,226 @@ public sealed class MembershipAdministrationTests : IDisposable
         Assert.Equal(AuthorityErrorCodes.MembershipRequestNotPending, preview.RefusalCode);
     }
 
+    // ---- AC-7.5: cancel and replace (edit) a pending membership request ----
+
+    private Task<OperationStatus> CancelRequestAsync(Guid actor, OrganizationMembershipRequest request, string? digest = null, string? key = null, string? stepUp = FieldSearchApprovalGate.SyntheticStepUpEvidence) =>
+        SubmitAsync(actor, SecurityCommandKind.CancelOrganizationMembershipRequest, new CancelMembershipRequestPayload(request.OrganizationMembershipRequestId, digest ?? MembershipRequestDigest.Compute(request), "entered for the wrong unit", stepUp), key);
+
+    private Task<OperationStatus> ReplaceRequestAsync(Guid actor, OrganizationMembershipRequest request, string hint = "Nia Newcomer-Okafor", string? role = null, string reason = "corrected after the intake call", string? digest = null, string? key = null, string? stepUp = FieldSearchApprovalGate.SyntheticStepUpEvidence) =>
+        SubmitAsync(actor, SecurityCommandKind.ReplaceOrganizationMembershipRequest, new ReplaceMembershipRequestPayload(request.OrganizationMembershipRequestId, digest ?? MembershipRequestDigest.Compute(request), hint, role, reason, stepUp), key);
+
+    private Task<MembershipApprovalResponse> TryApproveAsync(Guid requestId, bool dryRun, object? preview = null) =>
+        Provisioning().ApproveAsync(Org, requestId, dryRun ? Approval(true) : Approval(false, [Sign(approverOne, "approver-1", (MembershipApprovalResponse)preview!), Sign(approverTwo, "approver-2", (MembershipApprovalResponse)preview!)]), "operator-test", Guid.CreateVersion7(), Ct);
+
+    [Fact]
+    public async Task CancellingARequestRecordsWhoWhenAndWhyGrantsNothingAndItCanNeverBeApprovedOrRejected()
+    {
+        await RequestAsync(OwnerA, "cancel-person-01");
+        var request = store.MembershipRequests.Single();
+        var before = Revision;
+        var bindings = store.Bindings.Count;
+        var outcome = await CancelRequestAsync(OwnerB, request);
+        Assert.Equal(before + 1, Revision);
+        Assert.Equal(MembershipRequestStates.Cancelled, request.RequestStateName);
+        Assert.Equal(OwnerB, request.RequestCancelledByAuthorityUserId);
+        Assert.Equal(clock.GetUtcNow(), request.RequestCancelledOn);
+        Assert.Equal("entered for the wrong unit", request.RequestCancellationReasonText);
+        Assert.Equal(outcome.CommandId, request.DecidedBySecurityCommandId);
+        Assert.Equal(bindings, store.Bindings.Count); // nothing granted, nothing changed
+        Assert.Contains(store.Journal, j => j.JournalEventKind == "SecurityCommandCommitted" && j.JournalEventBodyJson.Contains("CancelOrganizationMembershipRequest", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("synthetic", store.Commands.Last().CommandPayloadJson, StringComparison.Ordinal); // step-up never journaled
+
+        // Operator plane: neither a dry run, nor a stale approval, nor a rejection can decide a cancelled request.
+        var preview = await TryApproveAsync(request.OrganizationMembershipRequestId, dryRun: true);
+        Assert.False(preview.Eligible);
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestNotPending, preview.RefusalCode);
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestNotPending, await RefusedAsync(() => Provisioning().RejectAsync(Org, request.OrganizationMembershipRequestId, new MembershipRejectionRequest(Org, "not a member of this unit"), "operator-test", Guid.CreateVersion7(), Ct)));
+        Assert.DoesNotContain(store.Bindings, b => b.IdentitySubjectIdentifier == "cancel-person-01");
+
+        // A new request for the same identity may follow a cancellation (existing rules apply).
+        await RequestAsync(OwnerA, "cancel-person-01");
+        Assert.Equal(2, store.MembershipRequests.Count(r => r.RequestedSubjectIdentifier == "cancel-person-01"));
+        Assert.Single(store.MembershipRequests, r => r.RequestedSubjectIdentifier == "cancel-person-01" && r.RequestStateName == MembershipRequestStates.Pending);
+    }
+
+    [Fact]
+    public async Task ReplacingARequestKeepsTheOriginalCreatesANewPendingOneWithLineageAndAFreshExpiryAndCopiesTheIdentity()
+    {
+        await RequestAsync(OwnerA, "replace-person-01");
+        var original = store.MembershipRequests.Single();
+        var originalCreated = original.RequestCreatedOn;
+        var originalExpiry = original.RequestExpiresOn;
+        var oldPreview = await TryApproveAsync(original.OrganizationMembershipRequestId, dryRun: true); // an operator already looked at the original
+        Assert.True(oldPreview.Eligible);
+        clock.Advance(TimeSpan.FromDays(3));
+        var outcome = await ReplaceRequestAsync(OwnerB, original, "Nia Newcomer-Okafor", role: null, reason: "corrected after the intake call");
+
+        var replacement = store.MembershipRequests.Single(r => r.OrganizationMembershipRequestId == outcome.CommandId);
+        Assert.NotEqual(original.OrganizationMembershipRequestId, replacement.OrganizationMembershipRequestId);
+        Assert.Equal(MembershipRequestStates.Pending, replacement.RequestStateName);
+        Assert.Equal(original.OrganizationMembershipRequestId, replacement.ReplacesMembershipRequestId);
+        Assert.Equal(clock.GetUtcNow() + TimeSpan.FromDays(7), replacement.RequestExpiresOn); // a fresh seven days
+        Assert.True(replacement.RequestExpiresOn > originalExpiry);
+        Assert.Equal(OwnerB, replacement.RequestedByAuthorityUserId);
+        Assert.Equal(original.RequestedIssuerUri, replacement.RequestedIssuerUri); // identity copied by the Authority, never supplied
+        Assert.Equal(original.RequestedSubjectIdentifier, replacement.RequestedSubjectIdentifier);
+        Assert.NotEqual(original.RequestedAuthorityUserId, replacement.RequestedAuthorityUserId);
+        Assert.Equal("Nia Newcomer-Okafor", replacement.RequestedDisplayNameHint);
+        Assert.Null(replacement.RequestedInitialRoleName);
+
+        // The original is preserved in full, only marked Replaced with who/when/why.
+        Assert.Equal(MembershipRequestStates.Replaced, original.RequestStateName);
+        Assert.Equal("Nia Newcomer", original.RequestedDisplayNameHint);
+        Assert.Equal(OrganizationRoleNames.Designer, original.RequestedInitialRoleName);
+        Assert.Equal("joins intake", original.RequestReasonText);
+        Assert.Equal(originalCreated, original.RequestCreatedOn);
+        Assert.Equal(OwnerB, original.RequestCancelledByAuthorityUserId);
+        Assert.Equal(outcome.CommandId, original.DecidedBySecurityCommandId);
+        Assert.DoesNotContain(store.Bindings, b => b.IdentitySubjectIdentifier == "replace-person-01"); // replacing grants nothing
+
+        // The roster shows the lineage in both directions; one pending request for the identity.
+        ProjectionCaughtUp();
+        var view = await new OrganizationRosterService(store, StepUp, OperatorApprovalVerifier.Unavailable, clock).GetAsync(Actor(OwnerA), new OrganizationRosterRequest(Org), Guid.CreateVersion7(), Ct);
+        var oldEntry = view.MembershipRequests.Single(r => r.RequestId == original.OrganizationMembershipRequestId);
+        var newEntry = view.MembershipRequests.Single(r => r.RequestId == replacement.OrganizationMembershipRequestId);
+        Assert.Equal("Replaced", oldEntry.RequestState);
+        Assert.Equal(replacement.OrganizationMembershipRequestId, oldEntry.ReplacedByRequestId);
+        Assert.Equal(original.OrganizationMembershipRequestId, newEntry.ReplacesRequestId);
+        Assert.NotEqual(oldEntry.RequestDigest, newEntry.RequestDigest);
+        Assert.Single(store.MembershipRequests, r => r.RequestedSubjectIdentifier == "replace-person-01" && r.RequestStateName == MembershipRequestStates.Pending);
+
+        // Two-operator approval applies to the replacement only; the original can never be approved, with or without an old preview.
+        var stale = await TryApproveAsync(original.OrganizationMembershipRequestId, dryRun: true);
+        Assert.False(stale.Eligible);
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestNotPending, stale.RefusalCode);
+        var preview = await TryApproveAsync(replacement.OrganizationMembershipRequestId, dryRun: true);
+        Assert.True(preview.Eligible);
+        // Two valid operator approvals signed over the OLD request's preview are refused: the original is no longer pending.
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestNotPending, await RefusedAsync(() => Provisioning().ApproveAsync(Org, original.OrganizationMembershipRequestId,
+            Approval(false, [Sign(approverOne, "approver-1", oldPreview), Sign(approverTwo, "approver-2", oldPreview)]), "operator-test", Guid.CreateVersion7(), Ct)));
+        // Approvals signed for the new request never apply to the old one either (whatever the refusal, nothing is bound).
+        Assert.Contains(await RefusedAsync(() => Provisioning().ApproveAsync(Org, original.OrganizationMembershipRequestId,
+            Approval(false, [Sign(approverOne, "approver-1", preview), Sign(approverTwo, "approver-2", preview)]), "operator-test", Guid.CreateVersion7(), Ct)), new[] { AuthorityErrorCodes.MembershipRequestNotPending, AuthorityErrorCodes.OperatorApprovalInvalid });
+        Assert.DoesNotContain(store.Bindings, b => b.IdentitySubjectIdentifier == "replace-person-01");
+        await TryApproveAsync(replacement.OrganizationMembershipRequestId, dryRun: false, preview);
+        var binding = Binding(replacement.RequestedAuthorityUserId);
+        Assert.Equal("replace-person-01", binding.IdentitySubjectIdentifier);
+        Assert.Equal(replacement.OrganizationMembershipRequestId, binding.OrganizationMembershipRequestId);
+        Assert.False(Holds(OrganizationRoleNames.Designer, replacement.RequestedAuthorityUserId)); // the edited initial role (none) was applied
+        Assert.Equal(MembershipRequestStates.Replaced, original.RequestStateName);
+    }
+
+    [Theory]
+    [InlineData("SecurityAdministrator")]
+    [InlineData("Designer")]
+    [InlineData("Member")]
+    public async Task OnlyOwnersCancelOrReplaceARequestAndRefusalsAreJournaled(string who)
+    {
+        await RequestAsync(OwnerA, "authz-person-01");
+        var request = store.MembershipRequests.Single();
+        var actor = who switch { "SecurityAdministrator" => Administrator, "Designer" => Designer, _ => Member };
+        var before = Revision;
+        Assert.Equal(AuthorityErrorCodes.Forbidden, await RefusedAsync(() => CancelRequestAsync(actor, request)));
+        Assert.Equal(AuthorityErrorCodes.Forbidden, await RefusedAsync(() => ReplaceRequestAsync(actor, request)));
+        Assert.Equal(before, Revision);
+        Assert.Equal(MembershipRequestStates.Pending, request.RequestStateName);
+        Assert.Equal(2, RejectionsJournaled);
+    }
+
+    [Fact]
+    public async Task StepUpIsRequiredAndAnotherOrganizationsRequestIsNotFound()
+    {
+        await RequestAsync(OwnerA, "authz-person-02");
+        var request = store.MembershipRequests.Single();
+        Assert.NotEqual(string.Empty, await RefusedAsync(() => CancelRequestAsync(OwnerA, request, stepUp: null)));
+        Assert.NotEqual(string.Empty, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, request, stepUp: null)));
+        Assert.NotEqual(string.Empty, await RefusedAsync(() => CancelRequestAsync(OwnerA, request, stepUp: "forged")));
+        Assert.Equal(MembershipRequestStates.Pending, request.RequestStateName);
+
+        // A request that belongs to another organization is simply not found for this organization's owner.
+        var otherOrg = Guid.CreateVersion7();
+        var foreign = new OrganizationMembershipRequest
+        {
+            OrganizationMembershipRequestId = Guid.CreateVersion7(), OrganizationId = otherOrg, RequestedAuthorityUserId = Guid.CreateVersion7(), RequestedIssuerUri = Issuer, RequestedSubjectIdentifier = "foreign-person",
+            RequestedDisplayNameHint = "Foreign", RequestedByAuthorityUserId = Guid.CreateVersion7(), RequestReasonText = "other organization", RequestCreatedOn = clock.GetUtcNow(), RequestExpiresOn = clock.GetUtcNow().AddDays(7), RequestStateName = MembershipRequestStates.Pending,
+        };
+        store.MembershipRequests.Add(foreign);
+        Assert.Equal(AuthorityErrorCodes.NotFound, await RefusedAsync(() => CancelRequestAsync(OwnerA, foreign)));
+        Assert.Equal(AuthorityErrorCodes.NotFound, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, foreign)));
+        Assert.Equal(MembershipRequestStates.Pending, foreign.RequestStateName);
+    }
+
+    [Fact]
+    public async Task StaleDigestsExpiredAndDecidedRequestsAreRefusedAndNothingChanges()
+    {
+        await RequestAsync(OwnerA, "stale-person-01");
+        var request = store.MembershipRequests.Single();
+        var readByBothOwners = MembershipRequestDigest.Compute(request);
+
+        // Two owners edit the same reading: exactly one wins, the other is refused as changed and can neither cancel nor replace.
+        var first = await ReplaceRequestAsync(OwnerA, request, digest: readByBothOwners);
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestChanged, await RefusedAsync(() => ReplaceRequestAsync(OwnerB, request, "Someone Else", digest: readByBothOwners)));
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestChanged, await RefusedAsync(() => CancelRequestAsync(OwnerB, request, digest: readByBothOwners)));
+        Assert.Single(store.MembershipRequests, r => r.ReplacesMembershipRequestId == request.OrganizationMembershipRequestId);
+        var replacement = store.MembershipRequests.Single(r => r.OrganizationMembershipRequestId == first.CommandId);
+
+        // A digest of the right request but an older reading is refused too (the edited content changed the digest).
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestChanged, await RefusedAsync(() => CancelRequestAsync(OwnerA, replacement, digest: readByBothOwners)));
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestChanged, await RefusedAsync(() => CancelRequestAsync(OwnerA, replacement, digest: "00" + MembershipRequestDigest.Compute(replacement)[2..])));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => CancelRequestAsync(OwnerA, replacement, digest: " ")));
+
+        // An already approved request cannot be cancelled or replaced.
+        var preview = await TryApproveAsync(replacement.OrganizationMembershipRequestId, dryRun: true);
+        await TryApproveAsync(replacement.OrganizationMembershipRequestId, dryRun: false, preview);
+        Assert.Equal(MembershipRequestStates.Approved, replacement.RequestStateName);
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestNotPending, await RefusedAsync(() => CancelRequestAsync(OwnerA, replacement)));
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestNotPending, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, replacement)));
+        Assert.True(Binding(replacement.RequestedAuthorityUserId).IdentityBindingEnabled); // an effective membership is never touched
+
+        // An expired request cannot be changed; the owner makes a new one.
+        await RequestAsync(OwnerA, "stale-person-02");
+        var aging = store.MembershipRequests.Single(r => r.RequestedSubjectIdentifier == "stale-person-02");
+        clock.Advance(TimeSpan.FromDays(7));
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestExpired, await RefusedAsync(() => CancelRequestAsync(OwnerA, aging)));
+        Assert.Equal(AuthorityErrorCodes.MembershipRequestExpired, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, aging)));
+        Assert.Equal(MembershipRequestStates.Pending, aging.RequestStateName);
+    }
+
+    [Fact]
+    public async Task ReplaceValidatesTheEditableFieldsAndRefusesNoChange()
+    {
+        await RequestAsync(OwnerA, "valid-person-01");
+        var request = store.MembershipRequests.Single();
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, request, hint: " ")));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, request, hint: new string('x', 201))));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, request, hint: "Bad\u0007Name")));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, request, role: OrganizationRoleNames.OrganizationOwner)));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, request, role: OrganizationRoleNames.SystemAdministrator)));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, request, reason: " ")));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => ReplaceRequestAsync(OwnerA, request, hint: request.RequestedDisplayNameHint, role: request.RequestedInitialRoleName, reason: request.RequestReasonText)));
+        Assert.Equal(MembershipRequestStates.Pending, request.RequestStateName);
+        Assert.Single(store.MembershipRequests);
+    }
+
+    [Fact]
+    public async Task RetriesOfCancelAndReplaceAreIdempotentAndCreateOneChange()
+    {
+        await RequestAsync(OwnerA, "idem-person-01");
+        await RequestAsync(OwnerA, "idem-person-02");
+        var toReplace = store.MembershipRequests.Single(r => r.RequestedSubjectIdentifier == "idem-person-01");
+        var toCancel = store.MembershipRequests.Single(r => r.RequestedSubjectIdentifier == "idem-person-02");
+        var digestOne = MembershipRequestDigest.Compute(toReplace);
+        var one = await ReplaceRequestAsync(OwnerA, toReplace, key: "ac75-replace-0001", digest: digestOne);
+        var oneAgain = await ReplaceRequestAsync(OwnerA, toReplace, key: "ac75-replace-0001", digest: digestOne);
+        Assert.Equal(one.CommandId, oneAgain.CommandId);
+        Assert.Equal(1, store.MembershipRequests.Count(r => r.ReplacesMembershipRequestId == toReplace.OrganizationMembershipRequestId));
+        var digestTwo = MembershipRequestDigest.Compute(toCancel);
+        var two = await CancelRequestAsync(OwnerA, toCancel, digestTwo, key: "ac75-cancel-0001");
+        var twoAgain = await CancelRequestAsync(OwnerA, toCancel, digestTwo, key: "ac75-cancel-0001");
+        Assert.Equal(two.CommandId, twoAgain.CommandId);
+        Assert.Equal(MembershipRequestStates.Cancelled, toCancel.RequestStateName);
+    }
+
     // ---- roster ----
 
     [Fact]

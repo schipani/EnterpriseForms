@@ -175,10 +175,12 @@ test("approvals are paged five at a time with independent lists and filters that
     .catch(() => undefined);
   await page.keyboard.press("Escape");
 
-  // The full object ID is reachable (tooltip and a Copy action) while the row stays one line high.
+  // The full object ID is reachable (tooltip and a Copy ID action in the row menu) while the row stays one line high.
   const first = requests.getByRole("row").nth(1);
   await expect(first.locator('[title^="e2e-page-"]')).toHaveCount(1);
-  await expect(first.getByRole("button", { name: /^Copy ID/ })).toBeVisible();
+  await first.getByRole("button", { name: /^Actions for/ }).click();
+  await expect(page.getByRole("menuitem", { name: /^Copy ID:/ })).toBeVisible(); // Copy ID is part of the row Actions menu
+  await page.keyboard.press("Escape");
   const height = await first.evaluate((el) => (el as HTMLElement).offsetHeight);
   expect(height).toBeLessThanOrEqual(80);
   await signOut(page);

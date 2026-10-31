@@ -3232,6 +3232,31 @@
               "null",
               "string"
             ]
+          },
+          "request_digest": {
+            "type": "string",
+            "default": ""
+          },
+          "replaces_request_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "replaced_by_request_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "cancelled_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -4772,7 +4797,9 @@
           "ProposeOrganizationOwnerChange",
           "DisableIdentityBinding",
           "EnableIdentityBinding",
-          "RequestOrganizationMembership"
+          "RequestOrganizationMembership",
+          "CancelOrganizationMembershipRequest",
+          "ReplaceOrganizationMembershipRequest"
         ]
       },
       "SecurityCommandOutcome": {

@@ -124,6 +124,18 @@ public static class IdentityEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         var organization = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        organization.MapPost("/membership-requests/{requestId:guid}/cancel", static async Task<Ok<MemberCommandResponse>> (Guid requestId, CancelMembershipRequestRequest request, HttpContext http, MemberAdministrationHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.CancelRequestAsync(BusinessAuthentication.RequireContext(http), requestId, request, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false)))
+            .WithName("CancelMembershipRequest")
+            .WithSummary("AC-7.5: an owner cancels a pending membership request (reason, development step-up, the digest the list showed). A cancelled request can never be approved; 409 MEMBERSHIP_REQUEST_CHANGED if it changed meanwhile.")
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        organization.MapPost("/membership-requests/{requestId:guid}/replace", static async Task<Ok<MemberCommandResponse>> (Guid requestId, ReplaceMembershipRequestRequest request, HttpContext http, MemberAdministrationHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.ReplaceRequestAsync(BusinessAuthentication.RequireContext(http), requestId, request, FormDefinitionEndpoints.RequireIdempotencyKey(http), cancellationToken).ConfigureAwait(false)))
+            .WithName("ReplaceMembershipRequest")
+            .WithSummary("AC-7.5: an owner edits a pending request (display name, initial role, reason) by replacing it: the original becomes Replaced, a new request with a new id, a fresh seven-day expiry and no carried-over approval is created. Identity cannot be changed; the response requestId is the replacement.")
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         organization.MapGet("/owner-proposals", static async Task<Ok<OwnerProposalPageResponse>> (string? q, string? status, int? pageSize, string? continuationToken, HttpContext http, GetApprovalsHandler handler, CancellationToken cancellationToken) =>
             {
                 http.Response.Headers.CacheControl = "no-store";

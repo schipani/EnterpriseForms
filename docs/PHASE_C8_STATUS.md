@@ -415,3 +415,20 @@ Not run: the complete Stage B and SEC-P suites; the first `people-administration
 
 - **Spacing (done):** the People page now separates the Owner proposals and membership requests card from the People card with 24px (`gap-6` on their shared wrapper, not card padding), unchanged card styling; verified at 320, 768 and 1440 px by `people-layout.spec.ts`.
 - **Edit/Cancel request (not implemented):** the Authority has no owner-initiated cancel/replace for a membership request (states Pending/Approved/Rejected/Expired; reject is operator-only). New Authority commands and an AuthorityDb migration are required, so the security-sensitive part is **documented and awaiting approval**: `docs/architecture/PHASE_C8_M2_MEMBERSHIP_REQUEST_EDIT_CANCEL_PROPOSAL.md` (decisions requested in its §3).
+
+## 18. Membership request edit and cancel implemented (2026-10-31, owner approval of the proposal) — Development/Testing, not merged, not independently reviewed
+
+Authority commands `CancelOrganizationMembershipRequest` and `ReplaceOrganizationMembershipRequest` plus the AuthorityDb migration `MembershipRequestEditCancel`, as approved in `docs/architecture/PHASE_C8_M2_MEMBERSHIP_REQUEST_EDIT_CANCEL_PROPOSAL.md` (see its §4 for three small differences). Any enabled owner may cancel or edit a Pending request, with the existing AC-7 step-up (refused in staging and production until PB-08). Edit never mutates a request: the original becomes **Replaced**, a new Pending request with a new id, a fresh seven-day expiry and a link back to the original is created in the same transaction, the verified identity and organization are copied by the Authority (never accepted from the caller), and no approval carries over. Cancelled and Replaced requests can never be approved or rejected (operator dry run and execute both refuse `MEMBERSHIP_REQUEST_NOT_PENDING`); approved memberships are never touched. A stale or concurrently changed request is refused (`MEMBERSHIP_REQUEST_CHANGED` / `STALE_AUTHORIZATION_REVISION`); the commands are idempotent; refusals are journaled (`MembershipCommandRejected`) and accepted commands are in the archived security-command journal; the business audit timeline records `MEMBERSHIP_REQUEST_CANCELLED` / `MEMBERSHIP_REQUEST_REPLACED`.
+
+People page: Membership requests Actions by status — Awaiting operators: Edit request, Cancel request, Copy ID; Approved and Replaced: View details, Copy ID; Rejected, Expired and Cancelled: View details, Create new request (opens Add user pre-filled), Copy ID. Edit shows the identity read-only; cancel needs a reason and the step-up. Five-row paging, search and the status filter (now including Cancelled and Replaced) are unchanged.
+
+| Suite | Result (2026-10-31) |
+|---|---|
+| Authority unit tests (incl. 7 new AC-7.5 tests) | 241 / 241 |
+| Stage B real stack: new `MembershipRequestEditCancelTests` (5) + `MembershipAdministrationTests`, `PeopleProfilesPresenceTests` | 11 / 11 |
+| Business contract tests / architecture tests | 475 / 475, 71 / 71 |
+| Vitest | 309 / 309 |
+| ESLint, TypeScript, production build | clean |
+| Playwright (isolated): `membership-request-edit-cancel` (3), `people-profile-presence` (7), `people-layout` (4), `people-administration` (2), `organization-administration` (5), `security-administrators` (2) | all run passed |
+
+Not run: the complete Stage B and SEC-P suites; the first `people-administration` test (needs a persona that owns records); hosted CI; human screen-reader review. G14 replay of the new request states has no executed test.

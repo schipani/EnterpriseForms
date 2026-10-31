@@ -186,13 +186,15 @@ export type OwnerProposalResponse = S["OwnerProposalResponse"];
 export type OwnerProposalPageResponse = S["OwnerProposalPageResponse"];
 export type MembershipRequestPageResponse = S["MembershipRequestPageResponse"];
 export type UserProfileResponse = S["UserProfileResponse"];
+export type CancelMembershipRequestRequest = S["CancelMembershipRequestRequest"];
+export type ReplaceMembershipRequestRequest = S["ReplaceMembershipRequestRequest"];
 export type UpdateUserProfileRequest = S["UpdateUserProfileRequest"];
 export type PresenceQueryResponse = S["PresenceQueryResponse"];
 export type UserPresenceResponse = S["UserPresenceResponse"];
 /** Informational presence of a person; "Unknown" means it could not be determined (never "offline"). */
 export type PresenceState = "Available" | "Away" | "Offline" | "Unknown";
 /** Approval lists (C8 M2): two independent server-paged lists, default 5 rows, newest first. */
-export type ApprovalQuery = { q?: string; status?: "Pending" | "Approved" | "Rejected" | "Expired"; pageSize?: number; continuationToken?: string };
+export type ApprovalQuery = { q?: string; status?: "Pending" | "Approved" | "Rejected" | "Expired" | "Cancelled" | "Replaced"; pageSize?: number; continuationToken?: string };
 export type MembershipRequestResponse = S["MembershipRequestResponse"];
 
 export type DashboardUploadQuery = DashboardPageQuery & { q?: string; status?: "InProgress" | "Completed" | "Failed" | "Cancelled"; from?: string; before?: string };
@@ -361,6 +363,9 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       members: (query: OrganizationMemberQuery, signal?: AbortSignal) => read<OrganizationMemberDirectoryResponse>("organization.members", undefined, query, "interactive-read", signal),
       ownerProposals: (query: ApprovalQuery, signal?: AbortSignal) => read<OwnerProposalPageResponse>("organization.ownerProposals", undefined, query, "interactive-read", signal),
       membershipRequests: (query: ApprovalQuery, signal?: AbortSignal) => read<MembershipRequestPageResponse>("organization.membershipRequests", undefined, query, "interactive-read", signal),
+      /** C8 M2 (AC-7.5): cancel, or edit by replacement, a pending membership request (Authority commands; one Idempotency-Key per user action). */
+      cancelMembershipRequest: (requestId: string, request: CancelMembershipRequestRequest) => write<MemberCommandResponse>("POST", "organization.cancelMembershipRequest", { requestId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      replaceMembershipRequest: (requestId: string, request: ReplaceMembershipRequestRequest) => write<MemberCommandResponse>("POST", "organization.replaceMembershipRequest", { requestId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
       memberProfile: (userId: string, signal?: AbortSignal) => read<UserProfileResponse>("organization.memberProfile", { userId }, undefined, "interactive-read", signal),
       updateMemberProfile: (userId: string, request: UpdateUserProfileRequest) => write<UserProfileResponse>("PUT", "organization.updateMemberProfile", { userId }, request, { resourceKey: `profile:${userId}` }),
       // C8 M2 (AC-7): every change is an Authority security command; one Idempotency-Key per user action.

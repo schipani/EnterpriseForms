@@ -111,6 +111,12 @@ public enum SecurityCommandKind
 
     /// <summary>C8 M2 (AC-7.4): records a request to add a person; only two operator approvals create the binding.</summary>
     RequestOrganizationMembership,
+
+    /// <summary>C8 M2 (AC-7.5): an owner cancels a Pending membership request; it can never be approved afterwards.</summary>
+    CancelOrganizationMembershipRequest,
+
+    /// <summary>C8 M2 (AC-7.5): an owner edits a Pending request by atomically replacing it with a new request (new id, fresh expiry, no approval carried over).</summary>
+    ReplaceOrganizationMembershipRequest,
 }
 
 /// <summary>command_payload is validated against the exact command-specific schema in the authority; unknown fields are rejected.</summary>

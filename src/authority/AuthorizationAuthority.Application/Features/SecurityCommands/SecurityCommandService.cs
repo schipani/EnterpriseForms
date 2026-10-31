@@ -88,7 +88,8 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
                 AuditJournal.Append(scope, state, "SecurityAdministratorCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
             }
             else if (request.CommandKind is SecurityCommandKind.GrantOrganizationRole or SecurityCommandKind.RevokeOrganizationRole or SecurityCommandKind.ProposeOrganizationOwnerChange
-                     or SecurityCommandKind.DisableIdentityBinding or SecurityCommandKind.EnableIdentityBinding or SecurityCommandKind.RequestOrganizationMembership)
+                     or SecurityCommandKind.DisableIdentityBinding or SecurityCommandKind.EnableIdentityBinding or SecurityCommandKind.RequestOrganizationMembership
+                     or SecurityCommandKind.CancelOrganizationMembershipRequest or SecurityCommandKind.ReplaceOrganizationMembershipRequest)
             {
                 // C8 M2 (AC-7): refused membership and role commands are archived evidence too (no identities beyond the actor's binding).
                 AuditJournal.Append(scope, state, "MembershipCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
@@ -295,6 +296,16 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             expired.RequestStateName = MembershipRequestStates.Expired;
             expired.RequestDecidedOn = now;
             expired.RequestDecisionReasonText = "expired before operator approval";
+        }
+
+        // AC-7.5: the original leaves Pending (Cancelled or Replaced) in the same transaction as any replacement is inserted.
+        if (plan.CancelledMembershipRequest is { } cancelled)
+        {
+            cancelled.RequestStateName = plan.NewMembershipRequest is null ? MembershipRequestStates.Cancelled : MembershipRequestStates.Replaced;
+            cancelled.RequestCancelledOn = now;
+            cancelled.RequestCancelledByAuthorityUserId = plan.CancelledByAuthorityUserId;
+            cancelled.RequestCancellationReasonText = plan.CancellationReason;
+            cancelled.DecidedBySecurityCommandId = command.SecurityCommandId;
         }
 
         if (plan.NewMembershipRequest is { } request)

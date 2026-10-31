@@ -227,6 +227,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/membership-requests/{requestId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.5: an owner cancels a pending membership request (reason, development step-up, the digest the list showed). A cancelled request can never be approved; 409 MEMBERSHIP_REQUEST_CHANGED if it changed meanwhile. */
+        post: operations["CancelMembershipRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/membership-requests/{requestId}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.5: an owner edits a pending request (display name, initial role, reason) by replacing it: the original becomes Replaced, a new request with a new id, a fresh seven-day expiry and no carried-over approval is created. Identity cannot be changed; the response requestId is the replacement. */
+        post: operations["ReplaceMembershipRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organization/owner-proposals": {
         parameters: {
             query?: never;
@@ -1952,6 +1986,12 @@ export interface components {
         CancelFieldProtectionDowngradeRequest: {
             changeReason: string;
         };
+        CancelMembershipRequestRequest: {
+            expectedRequestDigest: string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
         ChildRecordListResponse: {
             relationship: components["schemas"]["RelationshipDefinitionResponse"];
             items: components["schemas"]["ChildRecordSummaryResponse"][];
@@ -2767,6 +2807,16 @@ export interface components {
             /** Format: date-time */
             decidedOn: null | string;
             decisionReason: null | string;
+            /** @default  */
+            requestDigest: string;
+            /** Format: uuid */
+            replacesRequestId?: null | string;
+            /** Format: uuid */
+            replacedByRequestId?: null | string;
+            /** Format: date-time */
+            cancelledOn?: null | string;
+            /** @default false */
+            canChange: boolean;
         };
         OptionListItemChange: {
             /** Format: uuid */
@@ -3278,6 +3328,14 @@ export interface components {
             teamName: string;
             /** Format: date-time */
             expectedModifiedOn: string;
+        };
+        ReplaceMembershipRequestRequest: {
+            expectedRequestDigest: string;
+            displayNameHint: string;
+            initialRoleName: null | string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
         };
         RequestFieldProtectionReconciliationRequest: {
             requestReason: string;
@@ -4171,6 +4229,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PresenceQueryResponse"];
+                };
+            };
+        };
+    };
+    CancelMembershipRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelMembershipRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReplaceMembershipRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceMembershipRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

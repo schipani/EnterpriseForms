@@ -39,6 +39,7 @@ export function PeopleDirectoryPage() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [change, setChange] = useState<MemberChange | null>(null);
   const [adding, setAdding] = useState(false);
+  const [newRequest, setNewRequest] = useState<{ subject: string; name: string; role: string | null } | undefined>(undefined);
   const [editing, setEditing] = useState<OrganizationMemberResponse | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const settled = useDebouncedValue(text);
@@ -110,7 +111,12 @@ export function PeopleDirectoryPage() {
       {directory.isError ? <ErrorPanel error={directory.error} onRetry={() => void directory.refetch()} /> : null}
       {data ? (
         <div className="flex flex-col gap-6">
-          <ApprovalsPanel onApprove={(proposal) => setChange({ kind: "proposal", proposal })} />
+          <ApprovalsPanel
+            onApprove={(proposal) => setChange({ kind: "proposal", proposal })}
+            operational={!!data.membershipCommandsOperational}
+            onCreateNew={(initial) => (setNewRequest(initial), setAdding(true))}
+            onDone={setDone}
+          />
           <Card title={`People (${Number(data.totalCount)})`}>
             <p className="m-0 text-sm text-muted">{data.coverageStatement}</p>
             {!data.rolesAvailable ? (
@@ -198,11 +204,13 @@ export function PeopleDirectoryPage() {
       />
       <EditProfileDialog member={editing} onClose={() => setEditing(null)} onDone={setDone} />
       <AddUserDialog
+        key={newRequest ? `${newRequest.subject}:${adding}` : `fresh:${adding}`}
+        initial={newRequest}
         open={adding}
         issuer={data?.organizationIdentityIssuer}
         operational={!!data?.membershipCommandsOperational}
         operatorApprovalOperational={!!data?.operatorApprovalOperational}
-        onClose={() => setAdding(false)}
+        onClose={() => (setAdding(false), setNewRequest(undefined))}
         onDone={setDone}
       />
     </OrganizationLayout>

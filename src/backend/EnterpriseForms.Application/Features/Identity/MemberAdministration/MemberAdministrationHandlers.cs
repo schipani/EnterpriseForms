@@ -111,6 +111,35 @@ public sealed class MemberAdministrationHandlers(IBusinessStore store, IAuthoriz
         return outcome with { RequestId = outcome.CommandId, ExpiresOn = clock.GetUtcNow().AddDays(7) };
     }
 
+    /// <summary>AC-7.5: cancels a Pending request. The Authority decides (owners only, step-up, unchanged digest, still pending); a cancelled request can never be approved.</summary>
+    public async Task<MemberCommandResponse> CancelRequestAsync(RequestContext context, Guid requestId, CancelMembershipRequestRequest request, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var outcome = await SubmitAsync(context, SecurityCommandKind.CancelOrganizationMembershipRequest,
+            new { membership_request_id = requestId, expected_request_digest = request.ExpectedRequestDigest?.Trim() ?? string.Empty, reason = Reason(request.Reason), step_up_evidence = StepUp(request.UseDevelopmentStepUp) },
+            request.Reason, idempotencyKey, cancellationToken).ConfigureAwait(false);
+        await AuditAsync(context, AuditActions.MembershipRequestCancelled, "membership request cancelled", "membership_request", requestId, outcome.CommandId,
+            new { requestId, reason = request.Reason.Trim(), commandId = outcome.CommandId }, cancellationToken).ConfigureAwait(false);
+        return outcome;
+    }
+
+    /// <summary>AC-7.5: edits a Pending request by replacement (new id, fresh expiry, lineage, no approval carried over). Identity is never sent: the Authority copies it from the original.</summary>
+    public async Task<MemberCommandResponse> ReplaceRequestAsync(RequestContext context, Guid requestId, ReplaceMembershipRequestRequest request, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.InitialRoleName is not (null or "Designer"))
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, "a new member may start with no role or the Designer role");
+        }
+
+        var outcome = await SubmitAsync(context, SecurityCommandKind.ReplaceOrganizationMembershipRequest,
+            new { membership_request_id = requestId, expected_request_digest = request.ExpectedRequestDigest?.Trim() ?? string.Empty, display_name_hint = request.DisplayNameHint?.Trim() ?? string.Empty, initial_role_name = request.InitialRoleName is null ? null : "designer", reason = Reason(request.Reason), step_up_evidence = StepUp(request.UseDevelopmentStepUp) },
+            request.Reason, idempotencyKey, cancellationToken).ConfigureAwait(false);
+        await AuditAsync(context, AuditActions.MembershipRequestReplaced, "membership request edited (replaced by a new request awaiting two operator approvals)", "membership_request", requestId, outcome.CommandId,
+            new { originalRequestId = requestId, replacementRequestId = outcome.CommandId, initialRole = request.InitialRoleName, commandId = outcome.CommandId }, cancellationToken).ConfigureAwait(false);
+        return outcome with { RequestId = outcome.CommandId, ExpiresOn = clock.GetUtcNow().AddDays(7) };
+    }
+
     private async Task<AuthorityOrganizationRoster> RosterAsync(RequestContext context, CancellationToken cancellationToken)
     {
         try

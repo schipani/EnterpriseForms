@@ -34,6 +34,7 @@ export function AddUserDialog({
   issuer,
   operational,
   operatorApprovalOperational,
+  initial,
   onClose,
   onDone,
 }: {
@@ -41,14 +42,16 @@ export function AddUserDialog({
   issuer: string | null | undefined;
   operational: boolean;
   operatorApprovalOperational: boolean;
+  /** Pre-filled values for "Create new request" after a rejected, expired or cancelled request (still editable; a new request, nothing is carried over). */
+  initial?: { subject: string; name: string; role: string | null } | undefined;
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const [subject, setSubject] = useState("");
-  const [name, setName] = useState("");
-  const [role, setRole] = useState("none");
+  const [subject, setSubject] = useState(initial?.subject ?? "");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [role, setRole] = useState(initial?.role === "Designer" ? "Designer" : "none");
   const [reason, setReason] = useState("");
   const [stepUp, setStepUp] = useState(false);
   const [touched, setTouched] = useState(false);
@@ -70,9 +73,9 @@ export function AddUserDialog({
     },
   });
   const close = () => {
-    setSubject("");
-    setName("");
-    setRole("none");
+    setSubject(initial?.subject ?? "");
+    setName(initial?.name ?? "");
+    setRole(initial?.role === "Designer" ? "Designer" : "none");
     setReason("");
     setStepUp(false);
     setTouched(false);

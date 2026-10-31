@@ -22,6 +22,18 @@ public sealed record MembershipStatePayload(Guid AuthorityUserId, string Reason,
 /// </summary>
 public sealed record MembershipRequestPayload(string IssuerUri, string SubjectIdentifier, string DisplayNameHint, string? InitialRoleName, string Reason, string? StepUpEvidence = null);
 
+/// <summary>
+/// Payload of CancelOrganizationMembershipRequest. <c>ExpectedRequestDigest</c> is the digest the roster showed for the request
+/// (<see cref="OrganizationMembershipRequestEntry.RequestDigest"/>); a request that changed meanwhile is refused (409 MEMBERSHIP_REQUEST_CHANGED).
+/// </summary>
+public sealed record CancelMembershipRequestPayload(Guid MembershipRequestId, string ExpectedRequestDigest, string Reason, string? StepUpEvidence = null);
+
+/// <summary>
+/// Payload of ReplaceOrganizationMembershipRequest. Only the display name, initial role (null or designer) and reason are supplied;
+/// the identity (issuer, subject) and the organization are always copied from the original request by the Authority.
+/// </summary>
+public sealed record ReplaceMembershipRequestPayload(Guid MembershipRequestId, string ExpectedRequestDigest, string DisplayNameHint, string? InitialRoleName, string Reason, string? StepUpEvidence = null);
+
 public sealed record OrganizationRosterRequest(Guid OrganizationId);
 
 /// <summary>
@@ -36,9 +48,10 @@ public sealed record OrganizationRosterMember(Guid AuthorityUserId, string Issue
 public sealed record OrganizationOwnerProposal(Guid ProposalId, Guid TargetAuthorityUserId, string ProposedChange, Guid ProposedByAuthorityUserId, string Reason, DateTimeOffset ProposedOn, DateTimeOffset ExpiresOn,
     string ProposalState, Guid? ConsumedBySecurityCommandId);
 
-/// <summary><c>RequestState</c>: Pending, Expired, Approved or Rejected.</summary>
+/// <summary><c>RequestState</c>: Pending, Expired, Approved, Rejected, Cancelled or Replaced. <c>RequestDigest</c> is the optimistic-concurrency token for cancel and replace.</summary>
 public sealed record OrganizationMembershipRequestEntry(Guid RequestId, Guid RequestedAuthorityUserId, string IssuerUri, string SubjectIdentifier, string DisplayNameHint, string? InitialRoleName,
-    Guid RequestedByAuthorityUserId, string Reason, DateTimeOffset RequestedOn, DateTimeOffset ExpiresOn, string RequestState, DateTimeOffset? DecidedOn, string? DecisionReason);
+    Guid RequestedByAuthorityUserId, string Reason, DateTimeOffset RequestedOn, DateTimeOffset ExpiresOn, string RequestState, DateTimeOffset? DecidedOn, string? DecisionReason,
+    string RequestDigest = "", Guid? ReplacesRequestId = null, Guid? ReplacedByRequestId = null, DateTimeOffset? CancelledOn = null);
 
 /// <summary>
 /// AC-7.3 complete roster for organization owners and Security Administrators (anyone else: not found). Proposals and

@@ -563,6 +563,110 @@
         }
       }
     },
+    "/api/v1/organization/membership-requests/{requestId}/cancel": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.5: an owner cancels a pending membership request (reason, development step-up, the digest the list showed). A cancelled request can never be approved; 409 MEMBERSHIP_REQUEST_CHANGED if it changed meanwhile.",
+        "operationId": "CancelMembershipRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelMembershipRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/membership-requests/{requestId}/replace": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.5: an owner edits a pending request (display name, initial role, reason) by replacing it: the original becomes Replaced, a new request with a new id, a fresh seven-day expiry and no carried-over approval is created. Identity cannot be changed; the response requestId is the replacement.",
+        "operationId": "ReplaceMembershipRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceMembershipRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organization/owner-proposals": {
       "get": {
         "tags": [
@@ -5588,6 +5692,25 @@
           }
         }
       },
+      "CancelMembershipRequestRequest": {
+        "required": [
+          "expectedRequestDigest",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedRequestDigest": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "ChildRecordListResponse": {
         "required": [
           "relationship",
@@ -8827,6 +8950,35 @@
               "null",
               "string"
             ]
+          },
+          "requestDigest": {
+            "type": "string",
+            "default": ""
+          },
+          "replacesRequestId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "replacedByRequestId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "cancelledOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "canChange": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -10775,6 +10927,36 @@
           "expectedModifiedOn": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ReplaceMembershipRequestRequest": {
+        "required": [
+          "expectedRequestDigest",
+          "displayNameHint",
+          "initialRoleName",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedRequestDigest": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "initialRoleName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
           }
         }
       },

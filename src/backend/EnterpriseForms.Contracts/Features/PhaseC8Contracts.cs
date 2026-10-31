@@ -40,7 +40,8 @@ public sealed record OwnerProposalResponse(Guid ProposalId, Guid TargetUserId, s
 
 /// <summary>C8 M2 (AC-7.4): an owner's request to add a person. <c>RequestState</c>: Pending (awaiting two operator approvals), Approved, Rejected or Expired. Membership is not sign-in readiness.</summary>
 public sealed record MembershipRequestResponse(Guid RequestId, Guid RequestedUserId, string IssuerUri, string SubjectIdentifier, string DisplayNameHint, string? InitialRoleName, Guid RequestedByUserId, string RequestedByDisplayName,
-    string Reason, DateTimeOffset RequestedOn, DateTimeOffset ExpiresOn, string RequestState, DateTimeOffset? DecidedOn, string? DecisionReason);
+    string Reason, DateTimeOffset RequestedOn, DateTimeOffset ExpiresOn, string RequestState, DateTimeOffset? DecidedOn, string? DecisionReason,
+    string RequestDigest = "", Guid? ReplacesRequestId = null, Guid? ReplacedByRequestId = null, DateTimeOffset? CancelledOn = null, bool CanChange = false);
 
 /// <summary>
 /// One server page (default 15) of the people directory. <c>Source</c> and <c>CoverageStatement</c> say where rows come from

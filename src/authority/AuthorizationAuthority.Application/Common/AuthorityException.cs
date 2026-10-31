@@ -84,6 +84,9 @@ public static class AuthorityErrorCodes
     public const string IdentityNotAllowed = "IDENTITY_NOT_ALLOWED";
     public const string MembershipRequestExists = "MEMBERSHIP_REQUEST_EXISTS";
     public const string MembershipRequestNotPending = "MEMBERSHIP_REQUEST_NOT_PENDING";
+
+    /// <summary>C8 M2 (AC-7.5): the request was cancelled, replaced, decided or edited since the caller read it.</summary>
+    public const string MembershipRequestChanged = "MEMBERSHIP_REQUEST_CHANGED";
     public const string MembershipRequestExpired = "MEMBERSHIP_REQUEST_EXPIRED";
 }
 

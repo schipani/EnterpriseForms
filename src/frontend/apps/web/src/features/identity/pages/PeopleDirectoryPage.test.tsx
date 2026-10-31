@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
+import { OperationError } from "@enterpriseforms/work-queue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -78,6 +79,11 @@ const directory = (members: unknown[], extra: Record<string, unknown> = {}) => (
       requestState: "Pending",
       decidedOn: null,
       decisionReason: null,
+      requestDigest: "digest-r1",
+      replacesRequestId: null,
+      replacedByRequestId: null,
+      cancelledOn: null,
+      canChange: true,
     },
   ],
   ...extra,
@@ -93,6 +99,8 @@ const api = {
     disableMember: vi.fn(),
     enableMember: vi.fn(),
     requestMembership: vi.fn(),
+    cancelMembershipRequest: vi.fn(),
+    replaceMembershipRequest: vi.fn(),
     appointSecurityAdministrator: vi.fn(),
     removeSecurityAdministrator: vi.fn(),
     ownerProposals: vi.fn(),
@@ -336,5 +344,144 @@ describe("PeopleDirectoryPage", () => {
       }),
     );
     expect(await screen.findByText("Profile saved for Pat Three.")).toBeInTheDocument();
+  });
+
+  const request = (state: string, extra: Record<string, unknown> = {}) => ({
+    ...directory([]).membershipRequests[0]!,
+    requestId: `r-${state}`,
+    displayNameHint: `Person ${state}`,
+    requestState: state,
+    canChange: state === "Pending",
+    ...extra,
+  });
+
+  async function openRequestActions(name: string) {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: `Actions for ${name}` }));
+    return user;
+  }
+
+  it("offers Edit request, Cancel request and Copy ID for an awaiting request, and the right actions for every other status", async () => {
+    const rows = [request("Pending"), request("Approved"), request("Rejected"), request("Expired"), request("Cancelled"), request("Replaced", { replacedByRequestId: "r-new" })];
+    api.organization.membershipRequests.mockResolvedValue(approvalPage(rows));
+    renderPage();
+    const user = userEvent.setup();
+    const expectations: Array<[string, string[]]> = [
+      ["Person Pending", ["Edit request", "Cancel request", "Copy ID"]],
+      ["Person Approved", ["View details", "Copy ID"]],
+      ["Person Rejected", ["View details", "Create new request", "Copy ID"]],
+      ["Person Expired", ["View details", "Create new request", "Copy ID"]],
+      ["Person Cancelled", ["View details", "Create new request", "Copy ID"]],
+      ["Person Replaced", ["View details", "Copy ID"]],
+    ];
+    for (const [name, labels] of expectations) {
+      await user.click(await screen.findByRole("button", { name: `Actions for ${name}` }));
+      expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(labels);
+      await user.keyboard("{Escape}");
+    }
+    expect(screen.getByText("Replaced by a newer request")).toBeInTheDocument();
+  });
+
+  it("does not offer Edit or Cancel on a pending request the caller may not change (a Security Administrator)", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending", { canChange: false })]));
+    const user = await openRequestActions("Person Pending");
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["View details", "Copy ID"]);
+    await user.keyboard("{Escape}");
+  });
+
+  it("edits a pending request: identity read-only, only name, role and reason can change, the digest is sent, and the list refreshes", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending", { subjectIdentifier: "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", requestDigest: "digest-edit" })]));
+    api.organization.replaceMembershipRequest.mockResolvedValue({
+      result: { commandId: "r-new", commandStatus: "Effective", authorizationRevision: 5, requestId: "r-new", expiresOn: "2026-11-08T00:00:00Z" },
+    });
+    const user = await openRequestActions("Person Pending");
+    await user.click(screen.getByRole("menuitem", { name: "Edit request: Person Pending" }));
+    const dialog = await screen.findByRole("dialog", { name: /Edit request: Person Pending/ });
+    expect(within(dialog).getByLabelText("Object ID")).toHaveAttribute("readonly");
+    expect(within(dialog).getByLabelText("Object ID")).toHaveValue("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0");
+    expect(within(dialog).getByLabelText("Identity provider")).toHaveAttribute("readonly");
+    expect(within(dialog).getByText(/cancel this request and create a new one/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/^Name/)).toHaveValue("Person Pending");
+    expect(within(dialog).getByLabelText(/Reason/)).toHaveValue("joins");
+    expect(within(dialog).getByRole("combobox", { name: /Initial role/ })).toHaveTextContent("Designer");
+    // nothing changed → refused with a message; empty name → refused
+    await user.click(within(dialog).getByRole("checkbox", { name: /development-only step-up/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    expect(within(dialog).getByText(/Change the name, role or reason/)).toBeInTheDocument();
+    expect(api.organization.replaceMembershipRequest).not.toHaveBeenCalled();
+    await user.clear(within(dialog).getByLabelText(/^Name/));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    expect(within(dialog).getByText("Enter the person's name.")).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText(/^Name/), "Pat Corrected");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api.organization.replaceMembershipRequest).toHaveBeenCalledWith("r-Pending", {
+        expectedRequestDigest: "digest-edit",
+        displayNameHint: "Pat Corrected",
+        initialRoleName: "Designer",
+        reason: "joins",
+        useDevelopmentStepUp: true,
+      }),
+    );
+    expect(await screen.findByText(/Request for Pat Corrected updated/)).toBeInTheDocument();
+    await waitFor(() => expect(api.organization.membershipRequests.mock.calls.length).toBeGreaterThan(1)); // the list was refreshed without a reload
+  });
+
+  it("says when a request changed while the edit dialog was open and sends nothing further", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending")]));
+    api.organization.replaceMembershipRequest.mockRejectedValue(new OperationError({ type: "failed", operationId: "op-1", status: 409, errorCode: "MEMBERSHIP_REQUEST_CHANGED", retryable: false }));
+    const user = await openRequestActions("Person Pending");
+    await user.click(screen.getByRole("menuitem", { name: "Edit request: Person Pending" }));
+    const dialog = await screen.findByRole("dialog", { name: /Edit request/ });
+    await user.type(within(dialog).getByLabelText(/^Name/), " Jr");
+    await user.click(within(dialog).getByRole("checkbox", { name: /development-only step-up/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    expect(await within(dialog).findByText("This request changed")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+
+  it("cancels a pending request only after confirmation with a reason and the step-up", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending", { requestDigest: "digest-cancel" })]));
+    api.organization.cancelMembershipRequest.mockResolvedValue({ result: { commandId: "c", commandStatus: "Effective", authorizationRevision: 6 } });
+    const user = await openRequestActions("Person Pending");
+    await user.click(screen.getByRole("menuitem", { name: "Cancel request: Person Pending" }));
+    const dialog = await screen.findByRole("dialog", { name: "Cancel request: Person Pending" });
+    await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+    expect(within(dialog).getByText("Give a reason (3 to 500 characters).")).toBeInTheDocument();
+    expect(api.organization.cancelMembershipRequest).not.toHaveBeenCalled(); // no cancellation without a reason and confirmation
+    await user.type(within(dialog).getByLabelText(/Reason/), "wrong unit");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+    expect(api.organization.cancelMembershipRequest).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("checkbox", { name: /development-only step-up/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+    await waitFor(() =>
+      expect(api.organization.cancelMembershipRequest).toHaveBeenCalledWith("r-Pending", { expectedRequestDigest: "digest-cancel", reason: "wrong unit", useDevelopmentStepUp: true }),
+    );
+    expect(await screen.findByText(/Request for Person Pending cancelled/)).toBeInTheDocument();
+  });
+
+  it("keeps the request when the owner chooses Keep request", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending")]));
+    const user = await openRequestActions("Person Pending");
+    await user.click(screen.getByRole("menuitem", { name: "Cancel request: Person Pending" }));
+    await user.click(within(await screen.findByRole("dialog", { name: /Cancel request/ })).getByRole("button", { name: "Keep request" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(api.organization.cancelMembershipRequest).not.toHaveBeenCalled();
+  });
+
+  it("shows details for a finished request and pre-fills Add user for Create new request", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Cancelled", { subjectIdentifier: "dev-nia", displayNameHint: "Nia Newcomer", cancelledOn: "2026-10-31T09:00:00Z" })]));
+    const user = await openRequestActions("Nia Newcomer");
+    await user.click(screen.getByRole("menuitem", { name: "View details: Nia Newcomer" }));
+    const details = await screen.findByRole("dialog", { name: /Request details/ });
+    expect(within(details).getAllByText("Cancelled").length).toBeGreaterThan(0);
+    expect(within(details).getByText("dev-nia")).toBeInTheDocument();
+    await user.click(within(details).getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "Actions for Nia Newcomer" }));
+    await user.click(screen.getByRole("menuitem", { name: "Create new request: Nia Newcomer" }));
+    const add = await screen.findByRole("dialog", { name: "Add user" });
+    expect(within(add).getByLabelText(/Object ID/)).toHaveValue("dev-nia");
+    expect(within(add).getByLabelText(/^Name/)).toHaveValue("Nia Newcomer");
   });
 });

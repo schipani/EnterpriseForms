@@ -85,15 +85,20 @@ public sealed class OrganizationMembershipRequestConfiguration : IEntityTypeConf
         builder.Property(e => e.RequestStateName).HasMaxLength(20);
         builder.Property(e => e.RequestDecidedByOperatorName).HasMaxLength(128);
         builder.Property(e => e.RequestDecisionReasonText).HasMaxLength(500);
+        builder.Property(e => e.RequestCancellationReasonText).HasMaxLength(500);
         builder.HasIndex(e => new { e.OrganizationId, e.RequestCreatedOn }).HasDatabaseName("ix_membership_requests_recent");
         builder.HasIndex(e => new { e.OrganizationId, e.RequestedIssuerUri, e.RequestedSubjectIdentifier }).IsUnique().HasFilter("request_state_name = 'Pending'").HasDatabaseName("uq_membership_request_pending_identity");
         builder.HasIndex(e => new { e.OrganizationId, e.RequestedAuthorityUserId }).IsUnique().HasDatabaseName("uq_membership_request_user");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_membership_request_org");
         builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.OrganizationMembershipRequestId).HasConstraintName("fk_membership_request_command");
         builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.DecidedBySecurityCommandId).HasConstraintName("fk_membership_request_decision");
+        builder.HasOne<OrganizationMembershipRequest>().WithMany().HasForeignKey(e => e.ReplacesMembershipRequestId).HasConstraintName("fk_membership_request_replaces");
+        builder.HasIndex(e => e.ReplacesMembershipRequestId).IsUnique().HasFilter("replaces_membership_request_id IS NOT NULL").HasDatabaseName("uq_membership_request_replaces");
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_membership_request_state", "request_state_name IN ('Pending','Approved','Rejected','Expired')");
+            t.HasCheckConstraint("ck_membership_request_state", "request_state_name IN ('Pending','Approved','Rejected','Expired','Cancelled','Replaced')");
+            t.HasCheckConstraint("ck_membership_request_cancellation", "(request_state_name IN ('Cancelled','Replaced')) = (request_cancelled_on IS NOT NULL AND request_cancelled_by_authority_user_id IS NOT NULL AND request_cancellation_reason_text IS NOT NULL AND decided_by_security_command_id IS NOT NULL)");
+            t.HasCheckConstraint("ck_membership_request_lineage", "replaces_membership_request_id IS DISTINCT FROM organization_membership_request_id");
             t.HasCheckConstraint("ck_membership_request_role", "requested_initial_role_name IS NULL OR requested_initial_role_name = 'designer'");
             t.HasCheckConstraint("ck_membership_request_approved", "request_state_name <> 'Approved' OR decided_by_security_command_id IS NOT NULL");
             t.HasCheckConstraint("ck_membership_request_expiry", "request_expires_on > request_created_on");

@@ -1393,6 +1393,23 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<Guid?>("ReplacesMembershipRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replaces_membership_request_id");
+
+                    b.Property<string>("RequestCancellationReasonText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("request_cancellation_reason_text");
+
+                    b.Property<Guid?>("RequestCancelledByAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_cancelled_by_authority_user_id");
+
+                    b.Property<DateTimeOffset?>("RequestCancelledOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("request_cancelled_on");
+
                     b.Property<DateTimeOffset>("RequestCreatedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("request_created_on");
@@ -1462,6 +1479,11 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("DecidedBySecurityCommandId");
 
+                    b.HasIndex("ReplacesMembershipRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_membership_request_replaces")
+                        .HasFilter("replaces_membership_request_id IS NOT NULL");
+
                     b.HasIndex("OrganizationId", "RequestCreatedOn")
                         .HasDatabaseName("ix_membership_requests_recent");
 
@@ -1478,11 +1500,15 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_membership_request_approved", "request_state_name <> 'Approved' OR decided_by_security_command_id IS NOT NULL");
 
+                            t.HasCheckConstraint("ck_membership_request_cancellation", "(request_state_name IN ('Cancelled','Replaced')) = (request_cancelled_on IS NOT NULL AND request_cancelled_by_authority_user_id IS NOT NULL AND request_cancellation_reason_text IS NOT NULL AND decided_by_security_command_id IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_membership_request_expiry", "request_expires_on > request_created_on");
+
+                            t.HasCheckConstraint("ck_membership_request_lineage", "replaces_membership_request_id IS DISTINCT FROM organization_membership_request_id");
 
                             t.HasCheckConstraint("ck_membership_request_role", "requested_initial_role_name IS NULL OR requested_initial_role_name = 'designer'");
 
-                            t.HasCheckConstraint("ck_membership_request_state", "request_state_name IN ('Pending','Approved','Rejected','Expired')");
+                            t.HasCheckConstraint("ck_membership_request_state", "request_state_name IN ('Pending','Approved','Rejected','Expired','Cancelled','Replaced')");
                         });
                 });
 
@@ -2168,6 +2194,11 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_membership_request_command");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationMembershipRequest", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacesMembershipRequestId")
+                        .HasConstraintName("fk_membership_request_replaces");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationProtectionPolicy", b =>

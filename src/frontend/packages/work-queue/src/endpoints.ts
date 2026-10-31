@@ -105,6 +105,8 @@ export const ENDPOINTS = {
   "users.updateMyProfile": { method: "PUT", path: "/api/v1/users/me/profile" },
   "organization.memberProfile": { method: "GET", path: "/api/v1/organization/members/{userId}/profile" },
   "organization.updateMemberProfile": { method: "PUT", path: "/api/v1/organization/members/{userId}/profile" },
+  "organization.cancelMembershipRequest": { method: "POST", path: "/api/v1/organization/membership-requests/{requestId}/cancel" },
+  "organization.replaceMembershipRequest": { method: "POST", path: "/api/v1/organization/membership-requests/{requestId}/replace" },
   "organization.ownerProposals": { method: "GET", path: "/api/v1/organization/owner-proposals" },
   "organization.membershipRequests": { method: "GET", path: "/api/v1/organization/membership-requests" },
   "presence.heartbeat": { method: "POST", path: "/api/v1/presence/heartbeat" },

@@ -58,6 +58,8 @@ public static class AuditActions
     public const string MembershipDisabled = "MEMBERSHIP_DISABLED";
     public const string MembershipEnabled = "MEMBERSHIP_ENABLED";
     public const string MembershipRequested = "MEMBERSHIP_REQUESTED";
+    public const string MembershipRequestCancelled = "MEMBERSHIP_REQUEST_CANCELLED";
+    public const string MembershipRequestReplaced = "MEMBERSHIP_REQUEST_REPLACED";
     public const string UserProfileUpdated = "USER_PROFILE_UPDATED";
     public const string FieldSearchWithdrawn = "FIELD_SEARCH_WITHDRAWN";
     public const string FieldSearchersChanged = "FIELD_SEARCHERS_CHANGED";

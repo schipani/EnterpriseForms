@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "e07a810f59b02bf19b34166d1687cc5b7e8c39cc3f3382c99396b8f61312567c",
-      "bytes": 48670
+      "sha256": "91bd39468762df3e2e6a6a5a3975a598d16e2c951e00e1ebfa29283b483c66d8",
+      "bytes": 58713
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -191,6 +191,11 @@
       "path": "docs/architecture/PHASE_C8_M2_AC7_SECURITY_CONTRACT.md",
       "sha256": "cc125cb8d160c08fdb61382a135232a6d2549e37199816990280f69ea4f6f1e0",
       "bytes": 15018
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M2_MEMBERSHIP_REQUEST_EDIT_CANCEL_PROPOSAL.md",
+      "sha256": "b3724fcbe13e629023a8f325c2f0eaca75cd73d10af9a80bd4fd2a2612a34946",
+      "bytes": 11579
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -604,8 +609,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "b945e68fe78d2957ed1d6213676439427628a13e3336c69dd55818e04eb7ed7f",
-      "bytes": 70379
+      "sha256": "b219b751596058f3b458f9dfa699bb0f8874ff6e2afaeb4ff729cf11d21c5afe",
+      "bytes": 74052
     },
     {
       "path": "scripts/generate-spec-manifest.py",

@@ -1,9 +1,10 @@
 import type { ApprovalQuery, MembershipRequestResponse, OwnerProposalResponse } from "@enterpriseforms/api-client";
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, LoadingBlock, Pager, Select, TextInput, useDebouncedValue } from "@enterpriseforms/ui";
+import { Badge, Button, Card, LoadingBlock, OverflowMenu, Pager, Select, StatusMessage, TextInput, useDebouncedValue } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { ErrorPanel } from "../../support";
+import { CancelRequestDialog, EditRequestDialog, REQUEST_STATUS_LABELS, RequestDetailsDialog, requestStatusTone } from "./MembershipRequestDialogs";
 
 /** Approval lists are paged five rows at a time on the server, newest first. */
 export const APPROVAL_PAGE_SIZE = 5;
@@ -21,13 +22,15 @@ const stateTone = (state: string) => (state === "Pending" ? "warning" : state ==
 
 const stateLabel = (state: string) => (state === "Consumed" ? "Approved" : state);
 
-const STATUS_OPTIONS = [
+const PROPOSAL_STATUS_OPTIONS = [
   { value: "all", label: "Any status" },
   { value: "Pending", label: "Pending" },
   { value: "Approved", label: "Approved" },
   { value: "Rejected", label: "Rejected" },
   { value: "Expired", label: "Expired" },
 ];
+
+const REQUEST_STATUS_OPTIONS = [...PROPOSAL_STATUS_OPTIONS, { value: "Cancelled", label: "Cancelled" }, { value: "Replaced", label: "Replaced" }];
 
 const date = (value: string) => new Date(value).toLocaleDateString();
 
@@ -97,6 +100,23 @@ function ResponsiveRows<T>({ caption, rows, rowKey, columns, emptyMessage }: { c
   );
 }
 
+/** Second line of a request status: when it expires, or when and how it ended. */
+function requestDetail(row: MembershipRequestResponse): string {
+  switch (row.requestState) {
+    case "Pending":
+      return `Expires ${date(row.expiresOn)}`;
+    case "Replaced":
+      return "Replaced by a newer request";
+    case "Cancelled":
+      return `Cancelled ${date(row.cancelledOn ?? row.expiresOn)}`;
+    case "Approved":
+    case "Rejected":
+      return `${row.requestState} ${date(row.decidedOn ?? row.expiresOn)}`;
+    default:
+      return `Expired ${date(row.expiresOn)}`;
+  }
+}
+
 /** Name with a short muted second line; the full text is the tooltip. */
 function TwoLine({ primary, secondary }: { primary: string; secondary?: string | undefined }) {
   return (
@@ -137,7 +157,7 @@ function useApprovalList() {
   };
 }
 
-function Filters({ list, idPrefix, noun }: { list: ReturnType<typeof useApprovalList>; idPrefix: string; noun: string }) {
+function Filters({ list, idPrefix, noun, options }: { list: ReturnType<typeof useApprovalList>; idPrefix: string; noun: string; options: { value: string; label: string }[] }) {
   return (
     <div className="grid items-start gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
       <TextInput
@@ -148,7 +168,7 @@ function Filters({ list, idPrefix, noun }: { list: ReturnType<typeof useApproval
         name={`${idPrefix}-search`}
         onChange={(event) => list.changeText(event.target.value)}
       />
-      <Select label="Status" value={list.status} options={STATUS_OPTIONS} onValueChange={list.changeStatus} />
+      <Select label="Status" value={list.status} options={options} onValueChange={list.changeStatus} />
       {list.filtered ? (
         <div className="sm:pt-6">
           <Button size="sm" variant="ghost" onClick={list.clear}>
@@ -160,20 +180,54 @@ function Filters({ list, idPrefix, noun }: { list: ReturnType<typeof useApproval
   );
 }
 
-function CopyId({ id, name }: { id: string; name: string }) {
-  const [copied, setCopied] = useState(false);
+/**
+ * Actions of one membership request, by status: a pending request (and an owner viewing it) can be edited or cancelled; an approved or
+ * replaced one shows details; a rejected, expired or cancelled one also offers "Create new request". Copy ID is always there. The
+ * Authority decides every change; these are its rules mirrored for this person.
+ */
+function RequestActions({
+  row,
+  onEdit,
+  onCancel,
+  onDetails,
+  onCreateNew,
+  onCopied,
+}: {
+  row: MembershipRequestResponse;
+  onEdit: () => void;
+  onCancel: () => void;
+  onDetails: () => void;
+  onCreateNew: () => void;
+  onCopied: () => void;
+}) {
+  const name = row.displayNameHint || row.subjectIdentifier;
+  const item = (key: string, label: string, run: () => void) => ({
+    key,
+    content: (
+      <button type="button" aria-label={`${label}: ${name}`} onClick={run}>
+        {label}
+      </button>
+    ),
+  });
+  const copy = item("copy", "Copy ID", () => {
+    void navigator.clipboard?.writeText(row.subjectIdentifier).then(onCopied);
+  });
+  const items =
+    row.requestState === "Pending" && row.canChange
+      ? [item("edit", "Edit request", onEdit), item("cancel", "Cancel request", onCancel), copy]
+      : row.requestState === "Rejected" || row.requestState === "Expired" || row.requestState === "Cancelled"
+        ? [item("details", "View details", onDetails), item("new", "Create new request", onCreateNew), copy]
+        : [item("details", "View details", onDetails), copy];
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      aria-label={`Copy ID: ${name}`}
-      onClick={() => {
-        void navigator.clipboard?.writeText(id).then(() => setCopied(true));
-        window.setTimeout(() => setCopied(false), 2000);
-      }}
-    >
-      {copied ? "Copied" : "Copy ID"}
-    </Button>
+    <OverflowMenu
+      label={`Actions for ${name}`}
+      items={items}
+      trigger={
+        <Button size="sm" variant="secondary" aria-label={`Actions for ${name}`}>
+          Actions <span aria-hidden="true">&#9662;</span>
+        </Button>
+      }
+    />
   );
 }
 
@@ -183,8 +237,24 @@ function CopyId({ id, name }: { id: string; name: string }) {
  * membership requests are decided by two operators, never from this page. Long object IDs are truncated; the tooltip and the
  * "Copy ID" action give the full value.
  */
-export function ApprovalsPanel({ onApprove }: { onApprove: (proposal: OwnerProposalResponse) => void }) {
+export function ApprovalsPanel({
+  onApprove,
+  operational,
+  onCreateNew,
+  onDone,
+}: {
+  onApprove: (proposal: OwnerProposalResponse) => void;
+  /** Whether the Authority accepts membership commands here (development step-up available). */
+  operational: boolean;
+  /** "Create new request" after a rejected, expired or cancelled request: opens Add user with the person pre-filled. */
+  onCreateNew: (initial: { subject: string; name: string; role: string | null }) => void;
+  onDone: (message: string) => void;
+}) {
   const api = useApi();
+  const [editing, setEditing] = useState<MembershipRequestResponse | null>(null);
+  const [cancelling, setCancelling] = useState<MembershipRequestResponse | null>(null);
+  const [details, setDetails] = useState<MembershipRequestResponse | null>(null);
+  const [copied, setCopied] = useState(false);
   const proposals = useApprovalList();
   const requests = useApprovalList();
   const proposalQuery = useQuery({
@@ -223,7 +293,7 @@ export function ApprovalsPanel({ onApprove }: { onApprove: (proposal: OwnerPropo
         <h3 id="owner-proposals-heading" className="m-0 text-base font-semibold">
           Owner proposals{proposalData ? ` (${Number(proposalData.totalCount)})` : ""}
         </h3>
-        <Filters list={proposals} idPrefix="proposals" noun="proposals" />
+        <Filters list={proposals} idPrefix="proposals" noun="proposals" options={PROPOSAL_STATUS_OPTIONS} />
         {proposalQuery.isPending ? <LoadingBlock label="Loading owner proposals" /> : null}
         {proposalQuery.isError ? <ErrorPanel error={proposalQuery.error} onRetry={() => void proposalQuery.refetch()} /> : null}
         {proposalData ? (
@@ -303,7 +373,7 @@ export function ApprovalsPanel({ onApprove }: { onApprove: (proposal: OwnerPropo
         <h3 id="membership-requests-heading" className="m-0 text-base font-semibold">
           Membership requests{requestData ? ` (${Number(requestData.totalCount)})` : ""}
         </h3>
-        <Filters list={requests} idPrefix="requests" noun="requests" />
+        <Filters list={requests} idPrefix="requests" noun="requests" options={REQUEST_STATUS_OPTIONS} />
         {requestQuery.isPending ? <LoadingBlock label="Loading membership requests" /> : null}
         {requestQuery.isError ? <ErrorPanel error={requestQuery.error} onRetry={() => void requestQuery.refetch()} /> : null}
         {requestData ? (
@@ -314,7 +384,21 @@ export function ApprovalsPanel({ onApprove }: { onApprove: (proposal: OwnerPropo
               rowKey={(row) => row.requestId}
               emptyMessage={requests.filtered ? "No requests match." : "No membership requests in the last 30 days."}
               columns={[
-                { key: "person", header: "Person", width: "minmax(0,1.8fr)", render: (row) => <TwoLine primary={row.displayNameHint} secondary={row.subjectIdentifier} /> },
+                {
+                  key: "person",
+                  header: "Person",
+                  width: "minmax(0,1.8fr)",
+                  render: (row) => (
+                    <>
+                      <TwoLine primary={row.displayNameHint} secondary={row.subjectIdentifier} />
+                      {row.replacesRequestId ? (
+                        <div className="truncate text-help text-muted" title={row.replacesRequestId}>
+                          Edited request (replaces an earlier one)
+                        </div>
+                      ) : null}
+                    </>
+                  ),
+                },
                 { key: "role", header: "Initial role", width: "6.5rem", render: (row) => row.initialRoleName ?? <span className="text-muted">None</span> },
                 {
                   key: "by",
@@ -333,13 +417,33 @@ export function ApprovalsPanel({ onApprove }: { onApprove: (proposal: OwnerPropo
                   render: (row) => (
                     <>
                       <span className="whitespace-nowrap">
-                        <Badge tone={stateTone(row.requestState)}>{row.requestState === "Pending" ? "Awaiting operators" : row.requestState}</Badge>
+                        <Badge tone={requestStatusTone(row.requestState)}>{REQUEST_STATUS_LABELS[row.requestState] ?? row.requestState}</Badge>
                       </span>
-                      <div className="truncate text-help text-muted">Expires {date(row.expiresOn)}</div>
+                      <div className="truncate text-help text-muted" title={row.replacedByRequestId ?? undefined}>
+                        {requestDetail(row)}
+                      </div>
                     </>
                   ),
                 },
-                { key: "actions", header: "Actions", width: "6rem", right: true, render: (row) => <CopyId id={row.subjectIdentifier} name={row.displayNameHint || row.subjectIdentifier} /> },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  width: "7.5rem",
+                  right: true,
+                  render: (row) => (
+                    <RequestActions
+                      row={row}
+                      onEdit={() => setEditing(row)}
+                      onCancel={() => setCancelling(row)}
+                      onDetails={() => setDetails(row)}
+                      onCreateNew={() => onCreateNew({ subject: row.subjectIdentifier, name: row.displayNameHint, role: row.initialRoleName ?? null })}
+                      onCopied={() => {
+                        setCopied(true);
+                        window.setTimeout(() => setCopied(false), 3000);
+                      }}
+                    />
+                  ),
+                },
               ]}
             />
             {Number(requestData.totalCount) > 0 ? (
@@ -360,6 +464,10 @@ export function ApprovalsPanel({ onApprove }: { onApprove: (proposal: OwnerPropo
           </>
         ) : null}
       </section>
+      {copied ? <StatusMessage tone="success" title="Object ID copied" /> : null}
+      <EditRequestDialog request={editing} operational={operational} onClose={() => setEditing(null)} onDone={onDone} />
+      <CancelRequestDialog request={cancelling} operational={operational} onClose={() => setCancelling(null)} onDone={onDone} />
+      <RequestDetailsDialog request={details} onClose={() => setDetails(null)} />
     </Card>
   );
 }

@@ -63,6 +63,12 @@ public enum SecurityCommandKind
     DisableIdentityBinding,
     EnableIdentityBinding,
     RequestOrganizationMembership,
+
+    /// <summary>C8 M2 (AC-7.5): cancel a Pending membership request.</summary>
+    CancelOrganizationMembershipRequest,
+
+    /// <summary>C8 M2 (AC-7.5): edit a Pending request by replacing it with a new request.</summary>
+    ReplaceOrganizationMembershipRequest,
 }
 
 public enum SecurityCommandStatus
@@ -284,7 +290,8 @@ public sealed record AuthorityRosterMember(Guid AuthorityUserId, string IssuerUr
 public sealed record AuthorityOwnerProposal(Guid ProposalId, Guid TargetAuthorityUserId, string ProposedChange, Guid ProposedByAuthorityUserId, string Reason, DateTimeOffset ProposedOn, DateTimeOffset ExpiresOn, string ProposalState, Guid? ConsumedBySecurityCommandId);
 
 public sealed record AuthorityMembershipRequest(Guid RequestId, Guid RequestedAuthorityUserId, string IssuerUri, string SubjectIdentifier, string DisplayNameHint, string? InitialRoleName, Guid RequestedByAuthorityUserId,
-    string Reason, DateTimeOffset RequestedOn, DateTimeOffset ExpiresOn, string RequestState, DateTimeOffset? DecidedOn, string? DecisionReason);
+    string Reason, DateTimeOffset RequestedOn, DateTimeOffset ExpiresOn, string RequestState, DateTimeOffset? DecidedOn, string? DecisionReason,
+    string RequestDigest = "", Guid? ReplacesRequestId = null, Guid? ReplacedByRequestId = null, DateTimeOffset? CancelledOn = null);
 
 public sealed record AuthorityOrganizationRoster(bool CanManageMembers, bool CanAdministerSecurity, bool CommandsOperational, string CommandsUnavailableReason, bool OperatorApprovalOperational, string? OrganizationIdentityIssuer,
     IReadOnlyList<AuthorityRosterMember> Members, IReadOnlyList<AuthorityOwnerProposal> OwnerProposals, IReadOnlyList<AuthorityMembershipRequest> MembershipRequests, long AuthorizationRevision, Guid CorrelationId);

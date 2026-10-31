@@ -26,3 +26,16 @@ public sealed record OwnerProposalPageResponse(IReadOnlyList<OwnerProposalRespon
 
 /// <summary>One server page (default 5, newest first) of membership requests. States: Pending, Approved, Rejected, Expired.</summary>
 public sealed record MembershipRequestPageResponse(IReadOnlyList<MembershipRequestResponse> Items, int TotalCount, int PageStart, int PageSize, string? NextToken, string? PreviousToken);
+
+/// <summary>
+/// C8 M2 (AC-7.5): cancel a Pending membership request. <c>ExpectedRequestDigest</c> is the <c>requestDigest</c> the list showed; a request
+/// that changed meanwhile is refused (409 MEMBERSHIP_REQUEST_CHANGED). Needs an Idempotency-Key and the development step-up.
+/// </summary>
+public sealed record CancelMembershipRequestRequest(string ExpectedRequestDigest, string Reason, bool UseDevelopmentStepUp = false);
+
+/// <summary>
+/// C8 M2 (AC-7.5): edit a Pending request by replacing it. Only the display name, initial role (null or Designer) and the request reason can
+/// change; the verified identity, issuer and organization are copied by the Authority from the original and are not part of this request.
+/// The response carries the replacement's new <c>requestId</c> (fresh seven-day expiry, no approval carried over).
+/// </summary>
+public sealed record ReplaceMembershipRequestRequest(string ExpectedRequestDigest, string DisplayNameHint, string? InitialRoleName, string Reason, bool UseDevelopmentStepUp = false);

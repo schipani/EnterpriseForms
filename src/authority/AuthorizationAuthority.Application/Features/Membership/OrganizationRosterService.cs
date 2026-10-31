@@ -51,16 +51,18 @@ public sealed class OrganizationRosterService(IAuthorityStore store, FieldSearch
             .Select(p => new OrganizationOwnerProposal(p.OrganizationRoleChangeProposalId, p.TargetAuthorityUserId, p.ProposedChangeName, p.ProposedByAuthorityUserId, p.ProposalReasonText, p.ProposalCreatedOn, p.ProposalExpiresOn,
                 p.ProposalStateName == ProposalStates.Pending && p.ProposalExpiresOn <= now ? "Expired" : p.ProposalStateName, p.ConsumedBySecurityCommandId))
             .ToList();
-        var requestEntries = requests.Where(r => r.RequestCreatedOn >= since || r.RequestStateName == MembershipRequestStates.Pending).Select(r => ToEntry(r, now)).ToList();
+        var replacedBy = requests.Where(r => r.ReplacesMembershipRequestId is not null).GroupBy(r => r.ReplacesMembershipRequestId!.Value).ToDictionary(g => g.Key, g => (Guid?)g.First().OrganizationMembershipRequestId);
+        var requestEntries = requests.Where(r => r.RequestCreatedOn >= since || r.RequestStateName == MembershipRequestStates.Pending).Select(r => ToEntry(r, now, replacedBy.GetValueOrDefault(r.OrganizationMembershipRequestId))).ToList();
         return new OrganizationRosterResponse(isOwner, isSecurityAdministrator, gate.ApprovalsOperational, gate.UnavailableReason, operatorApprovals.Operational,
             CommandPlanner.OrganizationIdentityIssuer(graph, state.OrganizationId, bindings), members, proposals, requestEntries, state.AuthorizationRevision, correlationId);
     }
 
-    public static OrganizationMembershipRequestEntry ToEntry(OrganizationMembershipRequest r, DateTimeOffset now)
+    public static OrganizationMembershipRequestEntry ToEntry(OrganizationMembershipRequest r, DateTimeOffset now, Guid? replacedByRequestId = null)
     {
         ArgumentNullException.ThrowIfNull(r);
         var stateName = r.RequestStateName == MembershipRequestStates.Pending && r.RequestExpiresOn <= now ? MembershipRequestStates.Expired : r.RequestStateName;
         return new OrganizationMembershipRequestEntry(r.OrganizationMembershipRequestId, r.RequestedAuthorityUserId, r.RequestedIssuerUri, r.RequestedSubjectIdentifier, r.RequestedDisplayNameHint, r.RequestedInitialRoleName,
-            r.RequestedByAuthorityUserId, r.RequestReasonText, r.RequestCreatedOn, r.RequestExpiresOn, stateName, r.RequestDecidedOn, r.RequestDecisionReasonText);
+            r.RequestedByAuthorityUserId, r.RequestReasonText, r.RequestCreatedOn, r.RequestExpiresOn, stateName, r.RequestDecidedOn, r.RequestDecisionReasonText,
+            MembershipRequestDigest.Compute(r), r.ReplacesMembershipRequestId, replacedByRequestId, r.RequestCancelledOn);
     }
 }

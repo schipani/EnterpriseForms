@@ -79,7 +79,7 @@ public sealed class OrganizationMembershipRequest
 
     public DateTimeOffset RequestExpiresOn { get; set; }
 
-    /// <summary>Pending, Approved, Rejected or Expired (Expired is recorded when an approval finds the request too old).</summary>
+    /// <summary>Pending, Approved, Rejected, Expired (recorded when an approval finds the request too old), Cancelled or Replaced (an owner's cancel or edit).</summary>
     public string RequestStateName { get; set; } = MembershipRequestStates.Pending;
 
     public DateTimeOffset? RequestDecidedOn { get; set; }
@@ -89,6 +89,16 @@ public sealed class OrganizationMembershipRequest
     public string? RequestDecisionReasonText { get; set; }
 
     public Guid? DecidedBySecurityCommandId { get; set; }
+
+    /// <summary>AC-7.5: when, by which owner and why an owner cancelled or replaced this request (set exactly for Cancelled and Replaced).</summary>
+    public DateTimeOffset? RequestCancelledOn { get; set; }
+
+    public Guid? RequestCancelledByAuthorityUserId { get; set; }
+
+    public string? RequestCancellationReasonText { get; set; }
+
+    /// <summary>AC-7.5 lineage: the request this one replaced. The replaced original's "replaced by" is derived (the request whose replaces id is the original's id), so the link can never disagree with itself.</summary>
+    public Guid? ReplacesMembershipRequestId { get; set; }
 }
 
 public static class MembershipRequestStates
@@ -97,4 +107,6 @@ public static class MembershipRequestStates
     public const string Approved = "Approved";
     public const string Rejected = "Rejected";
     public const string Expired = "Expired";
+    public const string Cancelled = "Cancelled";
+    public const string Replaced = "Replaced";
 }
