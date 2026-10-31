@@ -432,3 +432,7 @@ People page: Membership requests Actions by status — Awaiting operators: Edit 
 | Playwright (isolated): `membership-request-edit-cancel` (3), `people-profile-presence` (7), `people-layout` (4), `people-administration` (2), `organization-administration` (5), `security-administrators` (2) | all run passed |
 
 Not run: the complete Stage B and SEC-P suites; the first `people-administration` test (needs a persona that owns records); hosted CI; human screen-reader review. G14 replay of the new request states has no executed test.
+
+## 19. Platform Operator approvals — architecture proposal (2026-10-31, C-96) — awaiting owner decisions, nothing implemented
+
+`docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` proposes replacing `devstack.py membership approve` with a separate Platform Console in which two distinct, individually authenticated Platform Operators each approve the exact request and the Authority executes the membership only after verifying both. It lists the reusable machinery, gaps G-1…G-10, the threat model, tests PO-T01…T25, the staged implementation (Opus/Sonnet) and owner decisions D8-33…D8-44. Until those are recorded, the CLI procedure in §15 remains the only way to decide membership requests (Development/Testing only).
