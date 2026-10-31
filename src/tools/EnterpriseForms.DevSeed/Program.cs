@@ -30,6 +30,8 @@ public static class Program
                 return await OperatorSecurityAdministratorTool.RunAsync(authority, Env("DEVSEED_OUTPUT_PATH", "infrastructure/docker/dev-seed/dev-personas.json")).ConfigureAwait(false);
             case "operator-membership":
                 return await OperatorMembershipTool.RunAsync(authority, Env("DEVSEED_OUTPUT_PATH", "infrastructure/docker/dev-seed/dev-personas.json")).ConfigureAwait(false);
+            case "seed-acceptance":
+                return await AcceptanceOrganizationTool.RunAsync(authority, Env("DEVSEED_OUTPUT_PATH", "infrastructure/docker/dev-seed/dev-personas.json")).ConfigureAwait(false);
             case "seed":
                 break;
             default:

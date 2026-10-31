@@ -1148,6 +1148,56 @@ def cmd_membership(args) -> None:
     print("[membership] recorded with synthetic development approvals (not two-human evidence). The person is a member but cannot sign in until the Entra integration (PB-08).")
 
 
+def cmd_seed_acceptance(args) -> None:
+    """C8 M2 owner acceptance: bootstraps ONE extra synthetic organization with three owners (personas acc-*) through the
+    Authority operator plane and merges its personas into dev-personas.json. The original organization is not touched.
+    The Authority's Vault policy is pinned to exact key paths, so for the one bootstrap the operator (root custody) grants
+    create+read on the NEW organization's exact key path only, then re-pins every organization key to read/hmac/verify."""
+    stack = Stack(args.project, load_custody(args.project))
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    stack.compose("build", "dev-seed", timeout=1800)
+    run = lambda mode, *extra: stack.compose("run", "--rm", "--no-deps", "-T", "-e", f"DEVSEED_MODE={mode}", *extra, "dev-seed", check=False, timeout=600)
+    prepared = run("seed-acceptance", "-e", "DEVSEED_PREPARE_ONLY=1")
+    found = re.search(r"ORGANIZATION_ID=([0-9a-f-]{36})", prepared.stdout)
+    if prepared.returncode != 0 or not found:
+        raise DevStackError(f"could not prepare the acceptance organization id: {(prepared.stdout + prepared.stderr).strip()[-600:]}")
+    new_key = f"org-{uuid.UUID(found.group(1)).hex}-{KEY_PURPOSE}"
+    root = stack.custody["vault_root_token"]
+    current = stack.vault("vault policy read authority-transit", token=root).stdout
+    existing = sorted(set(re.findall(r'path "transit/keys/(org-[0-9a-f]{32}-[a-z0-9-]+)"', current)))
+    if not existing:
+        raise DevStackError("could not read the pinned Authority policy; nothing changed")
+
+    def write_policy(keys: list[str], creatable: str | None) -> None:
+        lines = []
+        for key in keys:
+            caps = '["read", "create", "update"]' if key == creatable else '["read"]'
+            lines += [f'path "transit/keys/{key}" {{ capabilities = {caps} }}',
+                      f'path "transit/hmac/{key}/sha2-256" {{ capabilities = ["update"] }}',
+                      f'path "transit/verify/{key}/sha2-256" {{ capabilities = ["update"] }}']
+        lines.append('path "auth/token/lookup-self" { capabilities = ["read"] }')
+        stack.vault("vault policy write authority-transit - <<'POLICY'\n" + "\n".join(lines) + "\nPOLICY\n", token=root)
+
+    keys = sorted(set(existing) | {new_key})
+    write_policy(keys, new_key)
+    try:
+        result = run("seed-acceptance")
+        print((result.stdout + result.stderr).strip())
+    finally:
+        write_policy(keys, None)  # always return to read/hmac/verify only
+    if result.returncode != 0:
+        raise DevStackError(f"seed-acceptance failed ({result.returncode}); the Authority Vault policy is back to read/hmac/verify only")
+    authority = stack.custody["authority_vault_token"]
+    for key in keys:
+        stack.vault(f"vault read -format=json transit/keys/{key} >/dev/null", token=authority)
+    for denied in (f"vault write transit/keys/{new_key}/config deletion_allowed=true", f"vault write -f transit/keys/{new_key}/rotate",
+                   f"vault write transit/keys/{new_key} type=hmac key_size=32"):
+        if stack.vault(denied + " >/dev/null 2>&1", token=authority, check=False).returncode == 0:
+            raise DevStackError("the re-pinned Authority policy still allows: " + denied.split(" ")[2])
+    print(f"[seed-acceptance] Authority Vault policy re-pinned to {len(keys)} organization keys (config, rotate, create denied)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", default=os.environ.get("DEVSTACK_PROJECT", DEFAULT_PROJECT))
@@ -1159,6 +1209,7 @@ def main() -> int:
     rebuild = commands.add_parser("rebuild", help="rebuild and recreate stateless application services only (authority, api, worker, web)")
     rebuild.add_argument("services", nargs="*")
     rebuild.set_defaults(handler=cmd_rebuild)
+    commands.add_parser("seed-acceptance", help="C8 M2: add a second synthetic organization with three owners for hands-on two-owner testing").set_defaults(handler=cmd_seed_acceptance)
     membership = commands.add_parser("membership", help="C8 M2 (AC-7.4): list, approve (two synthetic operator approvals; dry run by default) or reject owner membership requests")
     membership.add_argument("action", choices=["list", "approve", "reject"])
     membership.add_argument("--request-id")

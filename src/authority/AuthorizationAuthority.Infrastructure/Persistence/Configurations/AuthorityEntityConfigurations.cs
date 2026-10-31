@@ -376,7 +376,7 @@ public sealed class AuthenticatedSessionConfiguration : IEntityTypeConfiguration
         {
             t.HasCheckConstraint("ck_session_digest_length", "octet_length(session_secret_digest) = 32");
             t.HasCheckConstraint("ck_session_expiry_order", "session_expires_on > session_created_on AND session_idle_timeout_seconds > 0");
-            t.HasCheckConstraint("ck_session_revocation", "(session_revoked_on IS NULL AND session_revocation_reason IS NULL) OR (session_revoked_on IS NOT NULL AND session_revocation_reason IN ('LOGOUT','REPLACED_BY_NEW_SIGN_IN'))");
+            t.HasCheckConstraint("ck_session_revocation", "(session_revoked_on IS NULL AND session_revocation_reason IS NULL) OR (session_revoked_on IS NOT NULL AND session_revocation_reason IN ('LOGOUT','REPLACED_BY_NEW_SIGN_IN','MEMBERSHIP_DISABLED'))");
         });
     }
 }
