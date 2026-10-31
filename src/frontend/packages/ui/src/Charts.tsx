@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 
 /**
  * Lightweight, dependency-free charts for the dashboard. Colors come from the fixed --ui-chart-* tokens, assigned to a
@@ -12,6 +12,56 @@ export type ChartColor = "chart-1" | "chart-2" | "chart-3" | "chart-4" | "chart-
 const colorVar = (color: ChartColor) => `var(--ui-${color})`;
 
 const numberFormat = new Intl.NumberFormat();
+
+/**
+ * The rendered width of an element, kept current with ResizeObserver, so a chart adapts to its card rather than to the
+ * viewport. Null until measured (and where layout is not available, e.g. jsdom).
+ */
+function useElementWidth(ref: RefObject<HTMLElement | null>): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return undefined;
+    }
+    const read = (value: number) => setWidth(value > 0 ? value : null);
+    read(element.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+    const observer = new ResizeObserver((entries) => read(entries[0]?.contentRect.width ?? 0));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
+
+/**
+ * Which buckets get an axis label: evenly every `step` buckets from the first, where `step` buckets are wide enough for the
+ * longest label (estimated at the 12px help size) at the plot's measured width; the last bucket is always labelled and
+ * replaces its predecessor when the two would be closer than one step. Without a measurement, about seven labels.
+ */
+export function axisLabelIndices(labels: string[], plotWidth: number | null): number[] {
+  const count = labels.length;
+  if (count <= 1) {
+    return count === 1 ? [0] : [];
+  }
+  const longest = Math.max(...labels.map((label) => label.length));
+  const slot = longest * 7 + 16;
+  const step = plotWidth === null ? Math.max(1, Math.ceil(count / 7)) : Math.max(1, Math.ceil(slot / (plotWidth / count)));
+  const indices: number[] = [];
+  for (let index = 0; index < count; index += step) {
+    indices.push(index);
+  }
+  const last = count - 1;
+  if (indices.at(-1) !== last) {
+    if (indices.length > 1 && last - indices.at(-1)! < step) {
+      indices.pop();
+    }
+    indices.push(last);
+  }
+  return indices;
+}
 
 export interface DonutSlice {
   key: string;
@@ -31,59 +81,68 @@ export function DonutChart({ title, slices, totalLabel, emptyMessage = "Nothing 
   const focused = slices.find((s) => s.key === active);
   let offset = 0;
   return (
-    <figure className="flex min-w-0 flex-col items-center gap-4 sm:flex-row sm:items-center">
-      <div className="relative h-40 w-40 shrink-0">
-        <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" role="img" aria-label={summary}>
-          <circle cx="60" cy="60" r={radius} fill="none" stroke="var(--ui-chart-grid)" strokeWidth="14" />
-          {total > 0
-            ? slices.map((slice) => {
-                if (slice.value <= 0) {
-                  return null;
-                }
-                const length = (slice.value / total) * circumference;
-                const dash = Math.max(0, length - gap);
-                const element = (
-                  <circle
-                    key={slice.key}
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    fill="none"
-                    stroke={colorVar(slice.color)}
-                    strokeWidth={active === slice.key ? 18 : 14}
-                    strokeDasharray={`${dash} ${circumference - dash}`}
-                    strokeDashoffset={-offset}
-                    onMouseEnter={() => setActive(slice.key)}
-                    onMouseLeave={() => setActive(null)}
-                  >
-                    <title>{`${slice.label}: ${numberFormat.format(slice.value)} (${Math.round((slice.value / total) * 100)}%)`}</title>
-                  </circle>
-                );
-                offset += length;
-                return element;
-              })
-            : null}
-        </svg>
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-2xl font-semibold tabular-nums text-body">{numberFormat.format(focused ? focused.value : total)}</span>
-          <span className="max-w-24 text-help text-muted">{focused ? focused.label : totalLabel}</span>
+    // Container query (the card's width, not the viewport): the legend sits beside the donut only when there is room for both,
+    // otherwise below it; every legend entry is a grid row, so colour, status, count and share can never overlap.
+    <div className="@container min-w-0">
+      <figure className="flex min-w-0 flex-col items-center gap-5 @md:flex-row @md:items-center @md:gap-8">
+        <div className="relative h-40 w-40 shrink-0">
+          <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" role="img" aria-label={summary}>
+            <circle cx="60" cy="60" r={radius} fill="none" stroke="var(--ui-chart-grid)" strokeWidth="14" />
+            {total > 0
+              ? slices.map((slice) => {
+                  if (slice.value <= 0) {
+                    return null;
+                  }
+                  const length = (slice.value / total) * circumference;
+                  const dash = Math.max(0, length - gap);
+                  const element = (
+                    <circle
+                      key={slice.key}
+                      cx="60"
+                      cy="60"
+                      r={radius}
+                      fill="none"
+                      stroke={colorVar(slice.color)}
+                      strokeWidth={active === slice.key ? 18 : 14}
+                      strokeDasharray={`${dash} ${circumference - dash}`}
+                      strokeDashoffset={-offset}
+                      onMouseEnter={() => setActive(slice.key)}
+                      onMouseLeave={() => setActive(null)}
+                    >
+                      <title>{`${slice.label}: ${numberFormat.format(slice.value)} (${Math.round((slice.value / total) * 100)}%)`}</title>
+                    </circle>
+                  );
+                  offset += length;
+                  return element;
+                })
+              : null}
+          </svg>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="text-2xl font-semibold tabular-nums text-body">{numberFormat.format(focused ? focused.value : total)}</span>
+            <span className="max-w-24 text-help text-muted">{focused ? focused.label : totalLabel}</span>
+          </div>
         </div>
-      </div>
-      <figcaption className="min-w-0 flex-1">
-        <span className="sr-only">{title}</span>
-        {total === 0 ? <p className="text-help text-muted">{emptyMessage}</p> : null}
-        <ul className="flex flex-col gap-1.5" aria-label={`${title} legend`}>
-          {slices.map((slice) => (
-            <li key={slice.key} className={`flex items-center gap-2 rounded-control px-2 py-1 text-control ${active === slice.key ? "bg-page" : ""}`} onMouseEnter={() => setActive(slice.key)} onMouseLeave={() => setActive(null)}>
-              <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-sm" style={{ background: colorVar(slice.color) }} />
-              <span className="min-w-0 flex-1 text-body">{slice.label}</span>
-              <span className="tabular-nums font-medium text-body">{numberFormat.format(slice.value)}</span>
-              <span className="w-10 text-right tabular-nums text-help text-muted">{total > 0 ? `${Math.round((slice.value / total) * 100)}%` : "–"}</span>
-            </li>
-          ))}
-        </ul>
-      </figcaption>
-    </figure>
+        <figcaption className="w-full min-w-0 max-w-sm @md:max-w-md @md:flex-1">
+          <span className="sr-only">{title}</span>
+          {total === 0 ? <p className="mb-1 text-help text-muted">{emptyMessage}</p> : null}
+          <ul className="flex flex-col gap-1" aria-label={`${title} legend`}>
+            {slices.map((slice) => (
+              <li
+                key={slice.key}
+                className={`grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-3 rounded-control px-2 py-1 text-control ${active === slice.key ? "bg-page" : ""}`}
+                onMouseEnter={() => setActive(slice.key)}
+                onMouseLeave={() => setActive(null)}
+              >
+                <span aria-hidden="true" className="h-3 w-3 rounded-sm" style={{ background: colorVar(slice.color) }} />
+                <span className="min-w-0 break-words text-body">{slice.label}</span>
+                <span className="whitespace-nowrap text-right tabular-nums font-medium text-body">{numberFormat.format(slice.value)}</span>
+                <span className="min-w-[2.75rem] whitespace-nowrap text-right tabular-nums text-help text-muted">{total > 0 ? `${Math.round((slice.value / total) * 100)}%` : "–"}</span>
+              </li>
+            ))}
+          </ul>
+        </figcaption>
+      </figure>
+    </div>
   );
 }
 
@@ -120,12 +179,17 @@ function niceMaximum(value: number): number {
 export function ColumnChart({ title, buckets, series, stacked = false, valueNoun, emptyMessage = "No activity in this period." }: { title: string; buckets: ColumnBucket[]; series: ColumnSeries[]; stacked?: boolean; valueNoun: string; emptyMessage?: string }) {
   const [active, setActive] = useState<number | null>(null);
   const tooltipId = useId();
+  const plotRef = useRef<HTMLDivElement>(null);
+  const plotWidth = useElementWidth(plotRef);
+  const labelled = axisLabelIndices(
+    buckets.map((b) => b.label),
+    plotWidth,
+  );
   const bucketTotals = buckets.map((_, index) => series.reduce((sum, s) => sum + (s.values[index] ?? 0), 0));
   const grandTotal = bucketTotals.reduce((a, b) => a + b, 0);
   const peak = stacked ? Math.max(0, ...bucketTotals) : Math.max(0, ...series.flatMap((s) => s.values));
   const maximum = niceMaximum(peak);
   const ticks = [maximum, maximum / 2, 0];
-  const labelEvery = Math.max(1, Math.ceil(buckets.length / 7));
   const describe = (index: number) =>
     `${buckets[index]!.fullLabel}: ${series.map((s) => `${s.label} ${numberFormat.format(s.values[index] ?? 0)}`).join(", ")}${stacked ? `; total ${numberFormat.format(bucketTotals[index] ?? 0)}` : ""}`;
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -152,9 +216,10 @@ export function ColumnChart({ title, buckets, series, stacked = false, valueNoun
           ))}
         </ul>
       ) : null}
-      <div className="relative">
-        <div className="flex gap-2">
-          <div aria-hidden="true" className="flex h-44 w-8 shrink-0 flex-col justify-between text-right text-help tabular-nums text-muted">
+      <div className="relative min-w-0">
+        {/* Two columns (axis, plot) shared by the value axis and the date axis, so the dates always line up with the plot. */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2">
+          <div aria-hidden="true" className="flex h-44 min-w-6 flex-col justify-between whitespace-nowrap text-right text-help tabular-nums text-muted">
             {ticks.map((tick) => (
               <span key={tick} className="-translate-y-1/2 first:translate-y-0 last:translate-y-0">
                 {numberFormat.format(tick)}
@@ -162,6 +227,7 @@ export function ColumnChart({ title, buckets, series, stacked = false, valueNoun
             ))}
           </div>
           <div
+            ref={plotRef}
             role="group"
             tabIndex={0}
             aria-label={`${title}. ${grandTotal === 0 ? emptyMessage : `${numberFormat.format(grandTotal)} ${valueNoun} in total. Use the left and right arrow keys to read each period.`}`}
@@ -176,7 +242,7 @@ export function ColumnChart({ title, buckets, series, stacked = false, valueNoun
               <span key={tick} aria-hidden="true" className="pointer-events-none absolute inset-x-0 border-t border-[var(--ui-chart-grid)]" style={{ bottom: `${(tick / maximum) * 100}%` }} />
             ))}
             {buckets.map((bucket, index) => (
-              <div key={bucket.key} className={`relative flex h-full min-w-0 flex-1 items-end justify-center ${active === index ? "bg-page" : ""}`} onMouseEnter={() => setActive(index)}>
+              <div key={bucket.key} data-chart-bucket className={`relative flex h-full min-w-0 flex-1 items-end justify-center ${active === index ? "bg-page" : ""}`} onMouseEnter={() => setActive(index)}>
                 {stacked ? (
                   <div className="flex h-full w-full max-w-6 flex-col-reverse justify-start">
                     {series.map((s) => {
@@ -194,18 +260,36 @@ export function ColumnChart({ title, buckets, series, stacked = false, valueNoun
                 )}
               </div>
             ))}
-            {grandTotal === 0 ? <p className="absolute inset-0 flex items-center justify-center text-help text-muted">{emptyMessage}</p> : null}
+            {grandTotal === 0 ? (
+              <p className="absolute inset-0 flex items-center justify-center px-3 text-center text-help text-muted">
+                <span className="max-w-full">{emptyMessage}</span>
+              </p>
+            ) : null}
+          </div>
+          <span aria-hidden="true" />
+          {/* Labels sit at their bucket's centre; the first starts at the plot's left edge and the last ends at its right
+              edge, so no label (in particular the final date) can extend past the plot. */}
+          <div aria-hidden="true" className="relative mt-1 h-4 min-w-0">
+            {labelled.map((index) => {
+              const bucket = buckets[index]!;
+              const placement =
+                buckets.length === 1
+                  ? { left: "50%", transform: "translateX(-50%)" }
+                  : index === 0
+                    ? { left: 0 }
+                    : index === buckets.length - 1
+                      ? { right: 0 }
+                      : { left: `${((index + 0.5) / buckets.length) * 100}%`, transform: "translateX(-50%)" };
+              return (
+                <span key={bucket.key} data-chart-axis-label className="absolute top-0 whitespace-nowrap text-help leading-4 text-muted" style={placement}>
+                  {bucket.label}
+                </span>
+              );
+            })}
           </div>
         </div>
-        <div aria-hidden="true" className="ml-10 mt-1 flex gap-px">
-          {buckets.map((bucket, index) => (
-            <span key={bucket.key} className="min-w-0 flex-1 overflow-visible whitespace-nowrap text-center text-help text-muted">
-              {index % labelEvery === 0 || index === buckets.length - 1 ? bucket.label : ""}
-            </span>
-          ))}
-        </div>
         {active !== null && buckets[active] ? (
-          <div id={tooltipId} role="status" className="pointer-events-none absolute right-0 top-0 z-10 max-w-[16rem] rounded-control border border-line bg-surface px-3 py-2 text-help text-body shadow-sm">
+          <div id={tooltipId} role="status" className="pointer-events-none absolute right-0 top-0 z-10 max-w-[min(16rem,100%)] rounded-control border border-line bg-surface px-3 py-2 text-help text-body shadow-sm">
             <p className="font-semibold">{buckets[active]!.fullLabel}</p>
             {series.map((s) => (
               <p key={s.key} className="flex items-center gap-2">
