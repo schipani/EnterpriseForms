@@ -163,10 +163,10 @@ public sealed class MemberDirectoryTests
         proposals.Add(new AuthorityOwnerProposal(Guid.CreateVersion7(), members[2].AuthorityUserId, "GrantOwner", Guid.CreateVersion7(), "x", Now, Now.AddHours(24), "Pending", null));
         var all = (await Directory().GetAsync(Context, Query(), CancellationToken.None)).Members.Concat((await Directory().GetAsync(Context, Query(search: "Tess"), CancellationToken.None)).Members).ToList();
         Assert.Empty(all.Single(m => m.UserId == Me).AvailableActions!);
-        Assert.Equal(["GrantDesigner", "ProposeOwnerGrant", "DisableMembership"], all.Single(m => m.DisplayName == "Person 00").AvailableActions);
-        Assert.Equal(["GrantDesigner", "DisableMembership"], all.Single(m => m.DisplayName == "Person 01").AvailableActions); // a GrantOwner proposal is already pending
+        Assert.Equal(["EditProfile", "GrantDesigner", "ProposeOwnerGrant", "DisableMembership"], all.Single(m => m.DisplayName == "Person 00").AvailableActions); // Edit profile first (a profile row exists; never on one's own row)
+        Assert.Equal(["EditProfile", "GrantDesigner", "DisableMembership"], all.Single(m => m.DisplayName == "Person 01").AvailableActions); // a GrantOwner proposal is already pending
         Assert.Contains("RevokeDesigner", all.Single(m => m.DisplayName == "Person 04").AvailableActions!);
-        Assert.Equal(["EnableMembership"], all.Single(m => m.DisplayName == "Person 06").AvailableActions);
+        Assert.Equal(["EditProfile", "EnableMembership"], all.Single(m => m.DisplayName == "Person 06").AvailableActions);
     }
 
     [Fact]

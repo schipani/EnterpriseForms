@@ -45,14 +45,14 @@ const members: OrganizationMemberResponse[] = [
 ];
 
 describe("MemberTable", () => {
-  it("shows one Person cell with the identity beneath the name, then roles, membership, sign-in, teams and last sign-in", () => {
+  it("shows one Person cell with the identity beneath the name, then roles, membership, presence and teams", () => {
     render(<MemberTable members={members} rolesAvailable />);
     const table = screen.getByRole("table", { name: "People" });
     expect(
       within(table)
         .getAllByRole("columnheader")
         .map((h) => h.textContent),
-    ).toEqual(["Person", "Roles", "Membership", "Sign-in", "Teams", "Last sign-in"]);
+    ).toEqual(["Person", "Roles", "Membership", "Presence", "Teams"]);
     const owner = within(table).getByRole("rowheader", { name: /Avery Owner/ });
     expect(owner).toHaveTextContent("Avery Owner");
     expect(owner).toHaveTextContent("dev-owner · idp.test");
@@ -62,9 +62,32 @@ describe("MemberTable", () => {
     expect(within(table).getByText("Security administrator")).toBeInTheDocument();
     expect(within(table).getByText("Disabled")).toBeInTheDocument();
     expect(within(table).getAllByText("Active")).toHaveLength(2);
-    expect(within(table).getByText("Never signed in")).toBeInTheDocument();
+    expect(within(table).queryByText("Never signed in")).toBeNull(); // sign-in state is no longer a column
+    expect(within(table).getAllByText("Presence unknown").length).toBe(3); // no presence supplied: Unknown, never Offline
     expect(within(table).getByText("Intake")).toBeInTheDocument();
     expect(within(table).getByRole("rowheader", { name: /Name not known yet/ })).toBeInTheDocument();
+  });
+
+  it("shows the supplied presence for each person, separate from membership", () => {
+    render(<MemberTable members={members} rolesAvailable presence={{ u1: "Available", u2: "Away", u3: "Offline" }} />);
+    const rows = within(screen.getByRole("table", { name: "People" }))
+      .getAllByRole("row")
+      .slice(1);
+    expect(rows[0]).toHaveTextContent("Available");
+    expect(rows[1]).toHaveTextContent("Away");
+    expect(rows[2]).toHaveTextContent("Offline");
+    expect(rows[2]).toHaveTextContent("Disabled"); // membership is a different column: a disabled person is Offline, an Active one may be Away
+    expect(rows[1]).toHaveTextContent("Active");
+  });
+
+  it("offers Edit profile first in the Actions menu when the server hints it", async () => {
+    const user = userEvent.setup();
+    const onAction = vi.fn();
+    render(<MemberTable members={[{ ...members[1]!, availableActions: ["EditProfile", "GrantDesigner"] }]} rolesAvailable onAction={onAction} />);
+    await user.click(screen.getByRole("button", { name: "Actions for Sam Security" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Edit profile", "Make designer"]);
+    await user.click(screen.getByRole("menuitem", { name: "Edit profile: Sam Security" }));
+    expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ userId: "u2" }), "EditProfile");
   });
 
   it("shows no identity line when the server did not return an identity", () => {

@@ -1,15 +1,10 @@
-import type { OrganizationMemberResponse } from "@enterpriseforms/api-client";
-import { Badge, Button, OverflowMenu } from "@enterpriseforms/ui";
+import type { OrganizationMemberResponse, PresenceState } from "@enterpriseforms/api-client";
+import { Badge, Button, OverflowMenu, PresenceIndicator } from "@enterpriseforms/ui";
 
 const ROLE_LABELS: Record<string, string> = { OrganizationOwner: "Owner", Designer: "Designer", SecurityAdministrator: "Security administrator" };
 
-const SIGN_IN_LABELS: Record<string, { label: string; tone: "success" | "neutral" | "warning" }> = {
-  SignedIn: { label: "Signed in", tone: "success" },
-  NotRecorded: { label: "Not recorded", tone: "neutral" },
-  NeverSignedIn: { label: "Never signed in", tone: "warning" },
-};
-
 export type MemberAction =
+  | "EditProfile"
   | "GrantDesigner"
   | "RevokeDesigner"
   | "ProposeOwnerGrant"
@@ -23,6 +18,7 @@ export type MemberAction =
 
 /** Visible labels of the row actions; accessible names start with the same text (WCAG 2.5.3). */
 export const MEMBER_ACTION_LABELS: Record<MemberAction, string> = {
+  EditProfile: "Edit profile",
   GrantDesigner: "Make designer",
   RevokeDesigner: "Remove designer role",
   ProposeOwnerGrant: "Propose as owner",
@@ -56,29 +52,32 @@ export function providerName(issuer: string): string {
 }
 
 /** Desktop column widths (container query); below that each person is a compact card with labelled fields. */
-const GRID_WITH_ACTIONS = "@4xl:grid-cols-[minmax(0,2.6fr)_minmax(0,2fr)_5.5rem_8rem_minmax(0,1fr)_7rem_6.5rem]";
-const GRID_READ_ONLY = "@4xl:grid-cols-[minmax(0,2.6fr)_minmax(0,2fr)_5.5rem_8rem_minmax(0,1fr)_7rem]";
+const GRID_WITH_ACTIONS = "@4xl:grid-cols-[minmax(0,2.6fr)_minmax(0,2fr)_5.5rem_7.5rem_minmax(0,1.2fr)_6.5rem]";
+const GRID_READ_ONLY = "@4xl:grid-cols-[minmax(0,2.6fr)_minmax(0,2fr)_5.5rem_7.5rem_minmax(0,1.2fr)]";
 const CELL = "min-w-0 before:mb-0.5 before:block before:text-help before:text-muted before:content-[attr(data-label)] @4xl:before:hidden";
 
 /**
  * People directory (PG-050, C8 M2): one Person cell (name, then the verified identity as a short muted line whose full value is
- * the tooltip), Authority roles, membership state, sign-in state, teams, last sign-in and one Actions menu. The actions are the
+ * the tooltip), Authority roles, membership state (Active or Disabled, never presence), informational presence, teams and one Actions menu. The actions are the
  * server's hints for this caller (the Authority decides every command); without an action handler the table is read-only. On
  * narrow containers the rows become cards. The identity line appears only when the server returned it.
  */
 export function MemberTable({
   members,
   rolesAvailable,
+  presence,
   onAction,
 }: {
   members: OrganizationMemberResponse[];
   rolesAvailable: boolean;
+  /** Informational presence by user id; absent or missing means Unknown. */
+  presence?: Record<string, PresenceState> | undefined;
   onAction?: (member: OrganizationMemberResponse, action: MemberAction) => void;
 }) {
   const actionsOf = (m: OrganizationMemberResponse) => (onAction ? (m.availableActions ?? []).filter(isMemberAction) : []);
   const showActions = members.some((m) => actionsOf(m).length > 0);
   const grid = showActions ? GRID_WITH_ACTIONS : GRID_READ_ONLY;
-  const headers = ["Person", "Roles", "Membership", "Sign-in", "Teams", "Last sign-in", ...(showActions ? ["Actions"] : [])];
+  const headers = ["Person", "Roles", "Membership", "Presence", "Teams", ...(showActions ? ["Actions"] : [])];
   return (
     <div className="@container w-full">
       <div role="table" aria-label="People" className="w-full overflow-hidden text-sm @4xl:rounded-control @4xl:border @4xl:border-line">
@@ -101,15 +100,14 @@ export function MemberTable({
               const rowActions = actionsOf(row);
               const name = memberName(row);
               const identity = row.identitySubject ? `${row.identitySubject} · ${providerName(row.identityIssuer)}` : "";
-              const status = SIGN_IN_LABELS[row.signInStatus] ?? SIGN_IN_LABELS["NotRecorded"]!;
               const teams = row.teams.map((team) => team.teamName).join(", ");
               return (
                 <div
                   key={row.userId}
                   role="row"
-                  className={`grid grid-cols-2 gap-x-3 gap-y-3 rounded-panel @xl:grid-cols-[minmax(0,1.5fr)_auto_auto_minmax(0,1fr)_auto] border border-line bg-surface p-4 @4xl:items-center @4xl:rounded-none @4xl:border-0 @4xl:border-b @4xl:px-3 @4xl:py-2 @4xl:last:border-b-0 ${grid}`}
+                  className={`grid grid-cols-2 gap-x-3 gap-y-3 rounded-panel @xl:grid-cols-[minmax(0,1.5fr)_auto_auto_minmax(0,1fr)] border border-line bg-surface p-4 @4xl:items-center @4xl:rounded-none @4xl:border-0 @4xl:border-b @4xl:px-3 @4xl:py-2 @4xl:last:border-b-0 ${grid}`}
                 >
-                  <div role="rowheader" className="col-span-2 min-w-0 font-normal @xl:col-span-4 @4xl:col-span-1">
+                  <div role="rowheader" className="col-span-2 min-w-0 font-normal @xl:col-span-3 @4xl:col-span-1">
                     <div className="truncate font-semibold" title={name}>
                       {row.displayName ? row.displayName : <span className="font-normal text-muted">Name not known yet</span>}
                     </div>
@@ -144,10 +142,10 @@ export function MemberTable({
                       <span className="text-muted">Unknown</span>
                     )}
                   </div>
-                  <div role="cell" data-label="Sign-in" className={`${CELL} whitespace-nowrap`}>
-                    <Badge tone={status.tone}>{status.label}</Badge>
+                  <div role="cell" data-label="Presence" className={`${CELL} whitespace-nowrap`}>
+                    <PresenceIndicator state={presence?.[row.userId] ?? "Unknown"} />
                   </div>
-                  <div role="cell" data-label="Teams" className={CELL}>
+                  <div role="cell" data-label="Teams" className={`${CELL} col-span-2 @xl:col-span-1`}>
                     {teams ? (
                       <div className="truncate" title={teams}>
                         {teams}
@@ -156,20 +154,10 @@ export function MemberTable({
                       <span className="text-muted">—</span>
                     )}
                   </div>
-                  <div role="cell" data-label="Last sign-in" className={CELL}>
-                    {row.lastSignedInOn ? (
-                      <time dateTime={row.lastSignedInOn} className="block whitespace-nowrap">
-                        {new Date(row.lastSignedInOn).toLocaleDateString()}
-                        <span className="block text-help text-muted">{new Date(row.lastSignedInOn).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
-                      </time>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </div>
                   {showActions ? (
                     <div
                       role="cell"
-                      className="min-w-0 self-end justify-self-end @xl:col-start-5 @xl:row-start-1 @xl:self-start @4xl:col-start-auto @4xl:row-start-auto @4xl:self-center @4xl:justify-self-stretch @4xl:text-right"
+                      className="col-span-2 min-w-0 justify-self-end @xl:col-span-1 @xl:col-start-4 @xl:row-start-1 @xl:self-start @4xl:col-start-auto @4xl:row-start-auto @4xl:self-center @4xl:justify-self-stretch @4xl:text-right"
                     >
                       {rowActions.length > 0 ? (
                         <OverflowMenu

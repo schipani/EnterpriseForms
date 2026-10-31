@@ -95,6 +95,10 @@ const api = {
     requestMembership: vi.fn(),
     appointSecurityAdministrator: vi.fn(),
     removeSecurityAdministrator: vi.fn(),
+    ownerProposals: vi.fn(),
+    membershipRequests: vi.fn(),
+    memberProfile: vi.fn(),
+    updateMemberProfile: vi.fn(),
   },
 };
 const refresh = vi.fn();
@@ -102,6 +106,7 @@ const refresh = vi.fn();
 vi.mock("@enterpriseforms/app-runtime", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@enterpriseforms/app-runtime")>()),
   useApi: () => api,
+  usePresence: (ids: string[]) => Object.fromEntries(ids.map((id, index) => [id, index === 0 ? "Available" : index === 1 ? "Away" : "Offline"])),
   useSession: () => ({ hasCapability: (capability: string) => capability === "organization.manage", refresh }),
 }));
 
@@ -140,8 +145,14 @@ async function confirmChange(dialogName: RegExp, button: string) {
   fireEvent.click(confirm);
 }
 
+const approvalPage = (items: unknown[], extra: Record<string, unknown> = {}) => ({
+  result: { items, totalCount: items.length, pageStart: items.length ? 1 : 0, pageSize: 5, nextToken: null, previousToken: null, ...extra },
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  api.organization.ownerProposals.mockImplementation(() => Promise.resolve(approvalPage(directory([]).ownerProposals)));
+  api.organization.membershipRequests.mockImplementation(() => Promise.resolve(approvalPage(directory([]).membershipRequests)));
   api.organization.members.mockImplementation((query: { continuationToken?: string }) =>
     Promise.resolve({
       result: query.continuationToken
@@ -182,8 +193,8 @@ describe("PeopleDirectoryPage", () => {
   it("lets a second owner approve a pending owner proposal", async () => {
     renderPage();
     await screen.findByText("Person 01");
-    expect(screen.getByRole("table", { name: "Owner proposals list" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Approve: Make Organization Owner for Person 09/ }));
+    expect(await screen.findByRole("table", { name: "Owner proposals list" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /Approve: Make Owner for Person 09/ }));
     await confirmChange(/Approve/, "Approve and apply");
     await waitFor(() => expect(api.organization.approveOwnerProposal).toHaveBeenCalledWith("p-1", { reason: "unit decision", useDevelopmentStepUp: true }));
   });
@@ -191,8 +202,8 @@ describe("PeopleDirectoryPage", () => {
   it("adds a user as a request that needs operator approval and never claims sign-in", async () => {
     renderPage();
     await screen.findByText("Person 01");
-    expect(screen.getByText("Waiting for operator approval")).toBeInTheDocument();
-    expect(screen.getAllByText(/Needs Entra integration/).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Awaiting operators")).toBeInTheDocument();
+    expect(screen.getByText(/sign-in needs the Entra integration, PB-08/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Add user" }));
     const dialog = await screen.findByRole("dialog", { name: "Add user" });
     expect(within(dialog).getByLabelText(/Identity provider/)).toHaveValue("https://idp.test");
@@ -222,5 +233,108 @@ describe("PeopleDirectoryPage", () => {
     renderPage();
     await screen.findByText("Person 01");
     expect(screen.queryByRole("button", { name: "Add user" })).toBeNull();
+  });
+
+  it("lists people with Name, Roles, Membership, Presence, Teams and Actions only (no Sign-in or Last sign-in columns)", async () => {
+    renderPage();
+    await screen.findByText("Person 01");
+    const table = screen.getByRole("table", { name: "People" });
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent),
+    ).toEqual(["Person", "Roles", "Membership", "Presence", "Teams", "Actions"]);
+    expect(within(table).getAllByText("Available").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("Away").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("Offline").length).toBeGreaterThan(0);
+  });
+
+  it("shows presence separately from membership (a disabled member can be Offline; an Active one can be Away)", async () => {
+    api.organization.members.mockResolvedValue({ result: directory([person(1), person(2, { membershipState: "Disabled" })]) });
+    renderPage();
+    await screen.findByText("Person 01");
+    const rows = within(screen.getByRole("table", { name: "People" }))
+      .getAllByRole("row")
+      .slice(1);
+    expect(rows[0]).toHaveTextContent("Active");
+    expect(rows[0]).toHaveTextContent("Available");
+    expect(rows[1]).toHaveTextContent("Disabled");
+    expect(rows[1]).toHaveTextContent("Away");
+  });
+
+  it("asks the server for five approvals at a time and pages each list independently, resetting to page one when a filter changes", async () => {
+    const proposals = Array.from({ length: 5 }, (_, i) => ({ ...directory([]).ownerProposals[0]!, proposalId: `p-${i}`, targetDisplayName: `Target ${i}` }));
+    api.organization.ownerProposals.mockImplementation((query: { continuationToken?: string; status?: string }) =>
+      Promise.resolve(
+        query.continuationToken
+          ? approvalPage([{ ...proposals[0]!, proposalId: "p-last", targetDisplayName: "Target last" }], { totalCount: 6, pageStart: 6, previousToken: "back-p" })
+          : approvalPage(proposals, { totalCount: 6, nextToken: "next-p" }),
+      ),
+    );
+    renderPage();
+    await screen.findByText("Target 0");
+    expect(api.organization.ownerProposals).toHaveBeenCalledWith({ pageSize: 5 }, expect.anything());
+    const nav = screen.getByRole("navigation", { name: "Owner proposals pages" });
+    expect(nav).toHaveTextContent("Showing 1–5 of 6 proposals");
+    expect(nav).toHaveTextContent("Page 1 of 2");
+    fireEvent.click(within(nav).getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Target last")).toBeInTheDocument();
+    expect(api.organization.ownerProposals).toHaveBeenLastCalledWith({ pageSize: 5, continuationToken: "next-p" }, expect.anything());
+    // the membership requests list is separate: it never moved
+    expect(api.organization.membershipRequests).toHaveBeenCalledTimes(1);
+    expect(api.organization.membershipRequests).toHaveBeenCalledWith({ pageSize: 5 }, expect.anything());
+    // changing a filter starts again on the first page
+    fireEvent.change(screen.getByLabelText("Search proposals"), { target: { value: "Target 3" } });
+    await waitFor(() => expect(api.organization.ownerProposals).toHaveBeenLastCalledWith({ pageSize: 5, q: "Target 3" }, expect.anything()));
+  });
+
+  it("shows empty states for the approval lists", async () => {
+    api.organization.ownerProposals.mockResolvedValue(approvalPage([]));
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([]));
+    renderPage();
+    expect(await screen.findByText("No owner proposals in the last 30 days.")).toBeInTheDocument();
+    expect(screen.getByText("No membership requests in the last 30 days.")).toBeInTheDocument();
+  });
+
+  it("edits a profile from the Actions menu with the revision token, and a stale revision offers a reload", async () => {
+    const profile = {
+      userId: "u-3",
+      displayName: "Person 03",
+      identityDisplayName: "Person 03",
+      displayNameOverridden: false,
+      preferredName: null,
+      jobTitle: null,
+      profileRevision: 4,
+      profileModifiedOn: null,
+      identityIssuer: "https://idp.test",
+      identitySubject: "sub-3",
+      isCurrentUser: false,
+      canEdit: true,
+    };
+    api.organization.members.mockResolvedValue({ result: directory([person(1), person(2), person(3, { availableActions: ["EditProfile", "GrantDesigner"] })]) });
+    api.organization.memberProfile.mockResolvedValue({ result: profile });
+    api.organization.updateMemberProfile.mockResolvedValue({ result: { ...profile, displayName: "Pat Three", profileRevision: 5 } });
+    renderPage();
+    await screen.findByText("Person 03");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Actions for Person 03" }));
+    await user.click(screen.getByRole("menuitem", { name: "Edit profile: Person 03" }));
+    const dialog = await screen.findByRole("dialog", { name: /Edit profile: Person 03/ });
+    expect(await within(dialog).findByLabelText(/Display name/)).toHaveValue("Person 03");
+    expect(within(dialog).getByText(/cannot be changed in a profile/)).toBeInTheDocument();
+    await user.clear(within(dialog).getByLabelText(/Display name/));
+    await user.type(within(dialog).getByLabelText(/Display name/), "Pat Three");
+    await user.type(within(dialog).getByLabelText("Job title"), "Intake lead");
+    await user.click(within(dialog).getByRole("button", { name: "Save profile" }));
+    await waitFor(() =>
+      expect(api.organization.updateMemberProfile).toHaveBeenCalledWith("u-3", {
+        displayName: "Pat Three",
+        preferredName: null,
+        jobTitle: "Intake lead",
+        expectedRevision: 4,
+        resetDisplayName: false,
+      }),
+    );
+    expect(await screen.findByText("Profile saved for Pat Three.")).toBeInTheDocument();
   });
 });

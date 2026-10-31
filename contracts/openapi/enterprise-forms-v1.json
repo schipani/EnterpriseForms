@@ -69,6 +69,66 @@
         }
       }
     },
+    "/api/v1/users/me/profile": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "My profile: display name, preferred name and job title with the revision token; verified identity shown read-only.",
+        "operationId": "GetMyProfile",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Edit my display name, preferred name and job title (revision-checked, audited). Identity, membership and roles are never writable here.",
+        "operationId": "UpdateMyProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organization/members": {
       "get": {
         "tags": [
@@ -367,6 +427,303 @@
         }
       }
     },
+    "/api/v1/organization/members/{userId}/profile": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "A person's directory profile (the person themselves or an organization owner of the same organization).",
+        "operationId": "GetMemberProfile",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Edit a person's display name, preferred name and job title (organization owner or the person; revision-checked, audited). Verified identity, membership and roles cannot be changed.",
+        "operationId": "UpdateMemberProfile",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/presence/heartbeat": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Authenticated heartbeat for the signed-in user only (the identity comes from the session, never from the request). interactionAgeSeconds is how long ago the person last interacted.",
+        "operationId": "PresenceHeartbeat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresenceHeartbeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/v1/presence": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Presence (Available, Away, Offline, Unknown) of up to 100 people of the caller's own organization. Informational only.",
+        "operationId": "QueryPresence",
+        "parameters": [
+          {
+            "name": "userIds",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresenceQueryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/owner-proposals": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "One server page (default 5, newest first) of owner proposals, searchable (q) and filterable by status (Pending, Approved, Rejected, Expired); opaque cursor. Owners and Security Administrators only.",
+        "operationId": "ListOwnerProposals",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerProposalPageResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/membership-requests": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "One server page (default 5, newest first) of membership requests, searchable (q) and filterable by status; opaque cursor. Owners and Security Administrators only.",
+        "operationId": "ListMembershipRequests",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipRequestPageResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.4: an owner asks to add a person of the organization's identity provider tenant (immutable subject id, never an email). Grants nothing: two operator approvals (Development/Testing only) create the membership; the request expires after 7 days. Membership is not sign-in readiness.",
+        "operationId": "RequestMembership",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMembershipRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organization/owner-proposals/{proposalId}/approve": {
       "post": {
         "tags": [
@@ -390,37 +747,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/MemberCommandRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemberCommandResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/organization/membership-requests": {
-      "post": {
-        "tags": [
-          "Identity"
-        ],
-        "summary": "AC-7.4: an owner asks to add a person of the organization's identity provider tenant (immutable subject id, never an email). Grants nothing: two operator approvals (Development/Testing only) create the membership; the request expires after 7 days. Membership is not sign-in readiness.",
-        "operationId": "RequestMembership",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateMembershipRequestRequest"
               }
             }
           },
@@ -8371,6 +8697,61 @@
           }
         }
       },
+      "MembershipRequestPageResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "pageStart",
+          "pageSize",
+          "nextToken",
+          "previousToken"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MembershipRequestResponse"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "MembershipRequestResponse": {
         "required": [
           "requestId",
@@ -9045,6 +9426,61 @@
           }
         }
       },
+      "OwnerProposalPageResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "pageStart",
+          "pageSize",
+          "nextToken",
+          "previousToken"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerProposalResponse"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "OwnerProposalRequest": {
         "required": [
           "change",
@@ -9117,6 +9553,54 @@
           },
           "canApprove": {
             "type": "boolean"
+          }
+        }
+      },
+      "PresenceHeartbeatRequest": {
+        "required": [
+          "interactionAgeSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "interactionAgeSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "PresenceQueryResponse": {
+        "required": [
+          "presence",
+          "available",
+          "asOf",
+          "refreshAfterSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "presence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserPresenceResponse"
+            }
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshAfterSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -12050,6 +12534,47 @@
           }
         }
       },
+      "UpdateUserProfileRequest": {
+        "required": [
+          "displayName",
+          "preferredName",
+          "jobTitle",
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "preferredName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jobTitle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expectedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "resetDisplayName": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "UploadActivityBucketResponse": {
         "required": [
           "bucketStartDate",
@@ -12268,6 +12793,93 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "UserPresenceResponse": {
+        "required": [
+          "userId",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
+      "UserProfileResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "identityDisplayName",
+          "displayNameOverridden",
+          "preferredName",
+          "jobTitle",
+          "profileRevision",
+          "profileModifiedOn",
+          "identityIssuer",
+          "identitySubject",
+          "isCurrentUser",
+          "canEdit"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "identityDisplayName": {
+            "type": "string"
+          },
+          "displayNameOverridden": {
+            "type": "boolean"
+          },
+          "preferredName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jobTitle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "profileRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "profileModifiedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "identityIssuer": {
+            "type": "string"
+          },
+          "identitySubject": {
+            "type": "string"
+          },
+          "isCurrentUser": {
+            "type": "boolean"
+          },
+          "canEdit": {
+            "type": "boolean"
           }
         }
       },

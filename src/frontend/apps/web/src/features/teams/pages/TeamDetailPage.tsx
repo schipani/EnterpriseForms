@@ -1,6 +1,6 @@
 import type { TeamMemberResponse, TeamMembershipOperationResponse } from "@enterpriseforms/api-client";
-import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { ActionIcons, Badge, Button, Card, DescriptionList, Dialog, LoadingBlock, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { useApi, usePresence, useSession } from "@enterpriseforms/app-runtime";
+import { ActionIcons, Badge, Button, Card, DescriptionList, Dialog, LoadingBlock, PresenceIndicator, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -33,6 +33,7 @@ export function TeamDetailPage() {
     // While the server reports an unfinished operation, re-read the team so every administrator sees Pending turn into the result.
     refetchInterval: (query) => (query.state.data?.membershipOperations.some((o) => !o.completed) ? 3_000 : false),
   });
+  const presence = usePresence([...(team.data?.members ?? []).map((m) => m.userId), ...(team.data?.availableMembers ?? []).map((u) => u.userId)], allowed && !!team.data);
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [removing, setRemoving] = useState<TeamMemberResponse | null>(null);
@@ -281,7 +282,7 @@ export function TeamDetailPage() {
             <p className="m-0 text-sm text-muted">Members of a team-owned record's owning team hold the record's owner permissions. Adding someone here is an Authority security command; it never grants form design rights.</p>
           </Card>
           <Card title={`Members (${team.data.members.length})`}>
-            <TeamRoster members={team.data.members} canManage={team.data.canManage} onRemove={(member) => setRemoving(member)} removingUserId={remove.isPending ? remove.variables?.userId : null} />
+            <TeamRoster presence={presence} members={team.data.members} canManage={team.data.canManage} onRemove={(member) => setRemoving(member)} removingUserId={remove.isPending ? remove.variables?.userId : null} />
             <p className="m-0 text-sm text-muted">This roster is the organization's display copy. Access is always decided by the Authorization Authority, and a change made elsewhere can take a moment to appear here.</p>
             {!team.data.canManage ? <p className="m-0 text-sm text-muted">Only an organization owner or Security Administrator can add or remove members.</p> : null}
           </Card>
@@ -305,7 +306,7 @@ export function TeamDetailPage() {
           </>
         }
       >
-        <Select label="Person" value={userId} placeholder="Choose a person" options={(team.data?.availableMembers ?? []).map((u) => ({ value: u.userId, label: u.displayName }))} onValueChange={setUserId} />
+        <Select label="Person" value={userId} placeholder="Choose a person" options={(team.data?.availableMembers ?? []).map((u) => ({ value: u.userId, label: u.displayName, trailing: <PresenceIndicator state={presence[u.userId] ?? "Unknown"} /> }))} onValueChange={setUserId} />
       </Dialog>
 
       <Dialog

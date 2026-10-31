@@ -40,12 +40,22 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             var user = await context.Users.FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken).ConfigureAwait(false);
             if (user is null)
             {
-                context.Users.Add(new User { UserId = userId, TenantId = tenantId, ExternalIssuerUri = issuerUri, ExternalSubjectIdentifier = subjectIdentifier, DisplayName = displayName, EmailAddress = string.Empty, IsActive = true, CreatedOn = now, ModifiedOn = now });
+                context.Users.Add(new User { UserId = userId, TenantId = tenantId, ExternalIssuerUri = issuerUri, ExternalSubjectIdentifier = subjectIdentifier, DisplayName = displayName, IdentityDisplayName = displayName, EmailAddress = string.Empty, IsActive = true, CreatedOn = now, ModifiedOn = now });
             }
-            else if (!string.IsNullOrWhiteSpace(displayName) && user.DisplayName != displayName)
+            else if (!string.IsNullOrWhiteSpace(displayName))
             {
-                user.DisplayName = displayName;
-                user.ModifiedOn = now;
+                // The identity provider's name is always recorded; the shown name follows it unless a profile edit overrides it.
+                if (user.IdentityDisplayName != displayName)
+                {
+                    user.IdentityDisplayName = displayName;
+                    user.ModifiedOn = now;
+                }
+
+                if (!user.IsDisplayNameOverridden && user.DisplayName != displayName)
+                {
+                    user.DisplayName = displayName;
+                    user.ModifiedOn = now;
+                }
             }
         }
 
@@ -57,6 +67,40 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
             {
                 user.LastSignedInOn = signedInOn;
             }
+        }
+
+        public Task<User?> FindUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken) =>
+            context.Users.FirstOrDefaultAsync(u => u.TenantId == tenantId && u.UserId == userId && u.IsActive, cancellationToken);
+
+        public async Task TouchPresenceAsync(Guid tenantId, Guid userId, DateTimeOffset heartbeatOn, DateTimeOffset interactionOn, CancellationToken cancellationToken)
+        {
+            var id = Guid.CreateVersion7();
+            // One atomic upsert (parallel tabs cannot collide); the interaction time only moves forward and a repeat within 10 seconds writes nothing.
+            await context.Database.ExecuteSqlInterpolatedAsync($@"
+                INSERT INTO user_presences (user_presence_id, tenant_id, user_id, last_heartbeat_on, last_interaction_on, presence_modified_on)
+                VALUES ({id}, {tenantId}, {userId}, {heartbeatOn}, {interactionOn}, {heartbeatOn})
+                ON CONFLICT (user_id) DO UPDATE SET
+                    last_heartbeat_on = EXCLUDED.last_heartbeat_on,
+                    last_interaction_on = GREATEST(user_presences.last_interaction_on, EXCLUDED.last_interaction_on),
+                    presence_modified_on = EXCLUDED.presence_modified_on
+                WHERE user_presences.tenant_id = EXCLUDED.tenant_id
+                  AND (user_presences.last_heartbeat_on IS NULL
+                       OR user_presences.last_heartbeat_on < EXCLUDED.last_heartbeat_on - interval '10 seconds'
+                       OR user_presences.last_interaction_on IS NULL
+                       OR user_presences.last_interaction_on < EXCLUDED.last_interaction_on)", cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task ClearPresenceAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken) =>
+            await context.Database.ExecuteSqlInterpolatedAsync($"UPDATE user_presences SET last_heartbeat_on = NULL, presence_modified_on = {clock.GetUtcNow()} WHERE user_id = {userId} AND tenant_id = {tenantId}", cancellationToken).ConfigureAwait(false);
+
+        public async Task<List<UserPresenceSnapshot>> GetPresenceAsync(Guid tenantId, IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
+        {
+            var ids = userIds.ToList();
+            return await (from u in context.Users.AsNoTracking()
+                          where u.TenantId == tenantId && ids.Contains(u.UserId)
+                          join p in context.UserPresences.AsNoTracking() on u.UserId equals p.UserId into joined
+                          from p in joined.DefaultIfEmpty()
+                          select new UserPresenceSnapshot(u.UserId, p == null ? null : p.LastHeartbeatOn, p == null ? null : p.LastInteractionOn)).ToListAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public Task<List<User>> GetUsersAsync(Guid tenantId, CancellationToken cancellationToken) =>

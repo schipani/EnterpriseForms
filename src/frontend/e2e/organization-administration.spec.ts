@@ -48,7 +48,7 @@ test.describe("Organization administration (C8 M1)", () => {
     await expect(people.getByRole("rowheader", { name: /Avery Owner/ })).toBeVisible();
     await expect(page.getByText(/Source: Authorization Authority roster/)).toBeVisible();
     // C8 M2 (AC-7): the owner's own sign-in is recorded; owner actions are offered for others, never for themself.
-    await expect(people.getByRole("row", { name: /Avery Owner/ })).toContainText("Signed in");
+    await expect(people.getByRole("row", { name: /Avery Owner/ })).toContainText(/Available|Away|Offline|Presence unknown/);
     await expect(people.getByRole("row", { name: /Avery Owner/ }).getByRole("button")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Add user" })).toBeEnabled();
     await page.getByLabel("Search people").fill("casey");
@@ -189,7 +189,8 @@ test.describe("Organization administration (C8 M1)", () => {
     // Security Administrator appointment (reason + development step-up); cancelled here so the shared organization is unchanged.
     await orgNav(page, "People").click();
     await expect(page.getByText(/Lists every identity the Authorization Authority has bound/)).toBeVisible();
-    await page.getByRole("button", { name: /Make Security Administrator: Casey Clerk/ }).click();
+    await page.getByRole("button", { name: /^Actions for Casey Clerk/ }).click();
+    await page.getByRole("menuitem", { name: /^Make Security Administrator: Casey Clerk/ }).click();
     const appoint = page.getByRole("dialog", { name: /Make Casey Clerk.* a Security Administrator/ });
     await expect(appoint.getByRole("button", { name: "Appoint" })).toBeDisabled();
     await appoint.getByLabel(/Reason/).fill("browser test, cancelled");

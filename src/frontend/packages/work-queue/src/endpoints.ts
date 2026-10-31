@@ -100,6 +100,15 @@ export const ENDPOINTS = {
   "preferences.get": { method: "GET", path: "/api/v1/me/ui-preferences" },
   "preferences.update": { method: "PUT", path: "/api/v1/me/ui-preferences" },
   "users.list": { method: "GET", path: "/api/v1/users" },
+  // C8 M2: directory profiles, shared presence and the paged approval lists.
+  "users.myProfile": { method: "GET", path: "/api/v1/users/me/profile" },
+  "users.updateMyProfile": { method: "PUT", path: "/api/v1/users/me/profile" },
+  "organization.memberProfile": { method: "GET", path: "/api/v1/organization/members/{userId}/profile" },
+  "organization.updateMemberProfile": { method: "PUT", path: "/api/v1/organization/members/{userId}/profile" },
+  "organization.ownerProposals": { method: "GET", path: "/api/v1/organization/owner-proposals" },
+  "organization.membershipRequests": { method: "GET", path: "/api/v1/organization/membership-requests" },
+  "presence.heartbeat": { method: "POST", path: "/api/v1/presence/heartbeat" },
+  "presence.query": { method: "GET", path: "/api/v1/presence" },
   "teams.create": { method: "POST", path: "/api/v1/teams" },
   // Phase C8 M1: administration shell (organization overview, people directory, team directory/detail/rename/membership).
   "organization.overview": { method: "GET", path: "/api/v1/organization/overview" },

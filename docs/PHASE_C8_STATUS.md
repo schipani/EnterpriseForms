@@ -359,3 +359,54 @@ Not run: complete Stage B and SEC-P suites, hosted CI, human screen-reader revie
 - Membership is not sign-in: no Entra OIDC sign-in exists yet; an added real identity cannot sign in.
 - AC-7 is not independently reviewed (joins the AC-5/AC-6/AC-9 package); G25/G26, PB-08, DR (G14 replay of the new lifecycle columns has no executed test) and production Level 2 are unchanged.
 - FR-OBS-1 (Form Designer sign-out with unsaved changes) remains open.
+
+## 16. People profiles, live presence and paged approvals (2026-10-31) — Development/Testing, not merged, not independently reviewed
+
+Owner request after visual review of the People page. **No new Authority command, permission or Authority schema change.** Everything below is business-side (BusinessDb migration `UserProfilesAndPresence`, business API, web). Profile edits and presence are display data: neither grants, removes or changes any permission, membership, session or role.
+
+### 16.1 People table
+
+Columns: Person (name, verified identity beneath it, "(you)"), Roles, Membership, **Presence**, Teams, Actions. The Sign-in and Last sign-in columns were removed from the table (the API still returns them and the Sign-in filter is kept). Membership (Active/Disabled, from the Authority) and presence (live activity) are separate columns and never share a badge.
+
+### 16.2 Profiles
+
+| Item | Detail |
+|---|---|
+| Storage | Existing `users` row. New columns: `preferred_name`, `job_title`, `identity_display_name`, `is_display_name_overridden`, `profile_revision`, `profile_modified_on`, `profile_modified_by_user_id`. |
+| Editable | Display name, preferred name, job title. **Never** issuer, subject, tenant binding, Authority membership or roles (the request has no such field); no email field exists. A display name that looks like an email address is refused. |
+| Entra-sourced name policy | `identity_display_name` records what the identity provider last asserted at every sign-in. `display_name` (what the application shows everywhere) follows it **unless** a profile edit overrode it; sign-in never overwrites an override. "Use the name from the identity provider" returns to it. This is the explicit supported policy for the one identity attribute that is editable. |
+| Who | A person edits their own (My profile, account menu). An organization owner (the Authority's ManageOrganization decision, the same authority as membership) edits anyone's in the same organization from People → Actions → Edit profile. Another organization's user is simply not found. The action is not offered on one's own row (My profile covers it). A person who has never signed in has no profile row and cannot be edited. |
+| Concurrency and audit | `expectedRevision` token; stale → 409 `PROFILE_REVISION_CONFLICT` and the dialog offers a reload. One business audit event `USER_PROFILE_UPDATED` per effective change with changed field **names** only (never values); no event for a no-op. |
+| Consistency | Directory, pickers, rosters, audit actors and the shell header use `users.display_name`; bootstrap and `GET /users/me` return it, so the header changes at once after a save. |
+
+### 16.3 Presence
+
+Informational only (never read by authentication, authorization, membership or session code). One row per user in `user_presences` (`last_heartbeat_on`, `last_interaction_on`), shared by all tabs and devices: heartbeat = latest, interaction = greatest. A closed tab sends nothing, so it cannot mark anyone Offline while another tab/device beats.
+
+| State | Rule |
+|---|---|
+| Available | a heartbeat within 150 s and an interaction within 5 min |
+| Away | a heartbeat within 150 s but no interaction for more than 5 min |
+| Offline | no heartbeat within 150 s (network failure, closed browser), explicit sign-out (heartbeat cleared), or never seen |
+| Unknown | presence could not be determined (store failure, person not in the caller's organization, unknown id) — shown as "Presence unknown", never as Offline |
+
+Client: one heartbeat on shell mount and once a minute through the coordinator's low-priority `polling` lane, carrying only "seconds since last interaction"; never retried or queued; an interaction after more than 4 minutes idle sends one early beat so the person shows Available at once; after 30 minutes without interaction the tab stops beating. Presence readers refresh once a minute and only while the page is visible (no hidden-tab polling). Server: user and organization come from the session (the request carries no user id), atomic upsert, repeats within 10 s write nothing, `interactionAgeSeconds` bounded 0–86400, queries bounded to 100 ids and the caller's own organization.
+
+Shown in: People, team rosters (Presence column), team "Add member" picker, record-share recipient picker. Not shown in audit logs, histories or in every mention of a name. Not added to the form-access picker (its component renders the picker after early returns; deferred rather than risk hook order). Documented limitation: signing out on one device while another device is active clears the shared heartbeat until that device's next beat (at most about a minute).
+
+### 16.4 Approvals
+
+`GET /api/v1/organization/owner-proposals` and `/membership-requests`: server pages of **5**, newest first (id tie-break), `q` search, `status` filter (Pending, Approved, Rejected, Expired), opaque cursor bound to the caller and filters (a cursor from other filters is refused). The two lists page independently. Owners and Security Administrators only. The Authority roster window is 30 days and is read per request; only one page leaves the server. The members endpoint still returns the proposal/request arrays for compatibility (the web no longer uses them). Rows are compact two-line rows (long object IDs truncated, full value as tooltip plus a Copy ID action) and become cards below 768 px.
+
+### 16.5 Tests (executed 2026-10-31)
+
+| Suite | Result |
+|---|---|
+| Stage B (isolated stack rebuilt from this tree): new `PeopleProfilesPresenceTests` (3) + `MembershipAdministrationTests`, `PeopleDirectoryTests`, `SecurityAdministratorTests`, `SessionRevocationTests`, `FormRenameTests` | 21 / 21 |
+| Contract tests (OpenAPI snapshot, directory hints) | 475 / 475 |
+| Architecture tests | 71 / 71 |
+| Vitest | 302 / 302 |
+| ESLint, TypeScript, production build | clean |
+| Playwright (isolated): `people-profile-presence` (8), `people-layout` (3), `people-administration` (2 of 3), `organization-administration` (5), `security-administrators` (2) | 20 / 20 run |
+
+Not run: the complete Stage B and SEC-P suites; the first `people-administration` test (it needs a persona that owns records, which a freshly built isolated stack does not have; its designer grant/remove path is covered by `MembershipAdministrationTests`); hosted CI; human screen-reader review. Note: that test, run on a stack without records, really disables its target (it did in the isolated stack; restored).

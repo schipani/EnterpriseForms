@@ -37,6 +37,7 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
     public const string EnableMembership = "EnableMembership";
     public const string ProposeOwnerDisable = "ProposeOwnerDisable";
     public const string ProposeOwnerEnable = "ProposeOwnerEnable";
+    public const string EditProfile = "EditProfile";
 
     public static readonly IReadOnlyList<string> RoleFilters = [OrganizationOwnerRole, DesignerRole, SecurityAdministratorRole, NoRole];
 
@@ -107,7 +108,7 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
                 var roles = m.OrganizationRoles.Select(r => RoleNames.GetValueOrDefault(r, r)).ToList();
                 return new OrganizationMemberResponse(m.AuthorityUserId, user is { DisplayName.Length: > 0 } ? user.DisplayName : m.DisplayNameHint ?? string.Empty, m.IssuerUri, m.SubjectIdentifier, user?.CreatedOn, roles,
                     teamsOfUser.GetValueOrDefault(m.AuthorityUserId) ?? [], m.AuthorityUserId == me, user?.LastSignedInOn, user is null ? "NeverSignedIn" : user.LastSignedInOn is null ? "NotRecorded" : "SignedIn",
-                    ActionsFor(authorityRoster, m, roles, me, pending, enabledAdministrators), m.MembershipEnabled ? "Enabled" : "Disabled", m.DisabledOn);
+                    ActionsFor(authorityRoster, m, roles, me, pending, enabledAdministrators, user is not null), m.MembershipEnabled ? "Enabled" : "Disabled", m.DisabledOn);
             }).ToList();
             proposals = authorityRoster.OwnerProposals.Select(p => new OwnerProposalResponse(p.ProposalId, p.TargetAuthorityUserId, NameOf(p.TargetAuthorityUserId), p.ProposedChange, p.ProposedByAuthorityUserId, NameOf(p.ProposedByAuthorityUserId),
                 p.Reason, p.ProposedOn, p.ExpiresOn, p.ProposalState, authorityRoster.CanManageMembers && p.ProposalState == "Pending" && p.ProposedByAuthorityUserId != me && p.TargetAuthorityUserId != me)).ToList();
@@ -136,9 +137,15 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
     }
 
     /// <summary>Hints only, mirroring the Authority (owners for membership and owner/designer roles, Security Administrators for their role; never oneself).</summary>
-    private static List<string> ActionsFor(AuthorityOrganizationRoster roster, AuthorityRosterMember member, List<string> roles, Guid me, List<AuthorityOwnerProposal> pending, int enabledAdministrators)
+    private static List<string> ActionsFor(AuthorityOrganizationRoster roster, AuthorityRosterMember member, List<string> roles, Guid me, List<AuthorityOwnerProposal> pending, int enabledAdministrators, bool hasProfile)
     {
         var actions = new List<string>();
+        // Own profile: the My profile page (never offered on one's own People row, like every other owner action).
+        if (hasProfile && roster.CanManageMembers && member.AuthorityUserId != me)
+        {
+            actions.Add(EditProfile);
+        }
+
         var self = member.AuthorityUserId == me;
         var owner = roles.Contains(OrganizationOwnerRole);
         bool Pending(string change) => pending.Any(p => p.TargetAuthorityUserId == member.AuthorityUserId && p.ProposedChange == change);

@@ -1,14 +1,16 @@
 import type { OrganizationMemberQuery } from "@enterpriseforms/api-client";
-import { presentError, useApi, useSession } from "@enterpriseforms/app-runtime";
+import { presentError, useApi, usePresence, useSession } from "@enterpriseforms/app-runtime";
 import { ActionIcons, Button, Card, LoadingBlock, Pager, Select, StatusMessage, TextInput, useDebouncedValue } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { OrganizationLayout } from "../../organizations";
 import { ErrorPanel } from "../../support";
+import type { OrganizationMemberResponse } from "@enterpriseforms/api-client";
 import { AddUserDialog } from "../components/AddUserDialog";
+import { ApprovalsPanel } from "../components/ApprovalsPanel";
+import { EditProfileDialog } from "../components/EditProfileDialog";
 import { MemberChangeDialog, type MemberChange } from "../components/MemberChangeDialog";
 import { MemberTable } from "../components/MemberTable";
-import { PendingMemberChanges } from "../components/PendingMemberChanges";
 
 export const membersKey = ["organization", "members"];
 
@@ -37,6 +39,7 @@ export function PeopleDirectoryPage() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [change, setChange] = useState<MemberChange | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<OrganizationMemberResponse | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const settled = useDebouncedValue(text);
   const query: OrganizationMemberQuery = {
@@ -63,6 +66,7 @@ export function PeopleDirectoryPage() {
     setCursor(undefined);
   };
   const data = directory.data;
+  const presence = usePresence(data?.members.map((m) => m.userId) ?? [], allowed && !!data);
   const filtered = text !== "" || role !== "all" || signIn !== "all" || membership !== "all";
   const canAdd = !!data?.canManageMembers && !!data.organizationIdentityIssuer;
   const operational = data?.canManageMembers ? !!data.membershipCommandsOperational : !!data?.securityAdministratorChangesOperational;
@@ -106,7 +110,7 @@ export function PeopleDirectoryPage() {
       {directory.isError ? <ErrorPanel error={directory.error} onRetry={() => void directory.refetch()} /> : null}
       {data ? (
         <>
-          <PendingMemberChanges proposals={[...(data.ownerProposals ?? [])]} requests={[...(data.membershipRequests ?? [])]} onApprove={(proposal) => setChange({ kind: "proposal", proposal })} />
+          <ApprovalsPanel onApprove={(proposal) => setChange({ kind: "proposal", proposal })} />
           <Card title={`People (${Number(data.totalCount)})`}>
             <p className="m-0 text-sm text-muted">{data.coverageStatement}</p>
             {!data.rolesAvailable ? (
@@ -157,7 +161,12 @@ export function PeopleDirectoryPage() {
                 </Button>
               </div>
             ) : null}
-            <MemberTable members={[...data.members]} rolesAvailable={data.rolesAvailable} onAction={(member, action) => setChange({ kind: "member", member, action })} />
+            <MemberTable
+              members={[...data.members]}
+              rolesAvailable={data.rolesAvailable}
+              presence={presence}
+              onAction={(member, action) => (action === "EditProfile" ? setEditing(member) : setChange({ kind: "member", member, action }))}
+            />
             {Number(data.totalCount) > 0 ? (
               <Pager
                 label="People pages"
@@ -174,7 +183,8 @@ export function PeopleDirectoryPage() {
               />
             ) : null}
             <p className="m-0 text-xs text-muted">
-              Source: {data.source}. Last sign-in is recorded from this release on. Being a member does not mean someone can sign in: real Microsoft Entra sign-in arrives with PB-08.
+              Source: {data.source}. Presence is informational (it never affects access) and refreshes about once a minute. Being a member does not mean someone can sign in: real Microsoft Entra
+              sign-in arrives with PB-08.
             </p>
           </Card>
         </>
@@ -186,6 +196,7 @@ export function PeopleDirectoryPage() {
         onClose={() => setChange(null)}
         onDone={setDone}
       />
+      <EditProfileDialog member={editing} onClose={() => setEditing(null)} onDone={setDone} />
       <AddUserDialog
         open={adding}
         issuer={data?.organizationIdentityIssuer}

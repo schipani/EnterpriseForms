@@ -34,7 +34,7 @@ test("desktop: Person cell, compact aligned rows, one Actions menu, no overflow"
   for (const width of [1440, 1600]) {
     await openPeople(page, width);
     const table = page.getByRole("table", { name: "People" });
-    await expect(table.getByRole("columnheader")).toHaveText(["Person", "Roles", "Membership", "Sign-in", "Teams", "Last sign-in", "Actions"]);
+    await expect(table.getByRole("columnheader")).toHaveText(["Person", "Roles", "Membership", "Presence", "Teams", "Actions"]);
     await expect(table.getByRole("columnheader", { name: "Verified identity" })).toHaveCount(0);
     const owner = table.getByRole("row", { name: /Avery Owner/ });
     await expect(owner.getByRole("rowheader")).toContainText("Avery Owner");

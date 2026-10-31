@@ -2874,9 +2874,28 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(512)")
                         .HasColumnName("external_subject_identifier");
 
+                    b.Property<string>("IdentityDisplayName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasDefaultValue("")
+                        .HasColumnName("identity_display_name");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDisplayNameOverridden")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_display_name_overridden");
+
+                    b.Property<string>("JobTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("job_title");
 
                     b.Property<DateTimeOffset?>("LastSignedInOn")
                         .HasColumnType("timestamp with time zone")
@@ -2885,6 +2904,25 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("ModifiedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on");
+
+                    b.Property<string>("PreferredName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("preferred_name");
+
+                    b.Property<Guid?>("ProfileModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ProfileModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("profile_modified_on");
+
+                    b.Property<long>("ProfileRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("profile_revision");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -2897,6 +2935,44 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("uq_users_tenant_subject");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Identity.UserPresence", b =>
+                {
+                    b.Property<Guid>("UserPresenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_presence_id");
+
+                    b.Property<DateTimeOffset?>("LastHeartbeatOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_heartbeat_on");
+
+                    b.Property<DateTimeOffset?>("LastInteractionOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_interaction_on");
+
+                    b.Property<DateTimeOffset>("PresenceModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("presence_modified_on");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("UserPresenceId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_user_presences_user");
+
+                    b.ToTable("user_presences", (string)null);
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.Organizations.OrganizationBranding", b =>
@@ -4569,6 +4645,23 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_users_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Identity.UserPresence", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_presences_tenant");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_presences_user");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.Organizations.OrganizationBranding", b =>

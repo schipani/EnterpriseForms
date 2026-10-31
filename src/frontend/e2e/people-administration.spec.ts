@@ -79,6 +79,7 @@ test("an owner change is only a proposal until a different owner approves it", a
     await row(page, /Dana Designer/)
       .getByRole("button", { name: /^Actions for/ })
       .click();
+    await expect(page.getByRole("menu")).toBeVisible();
     const propose = page.getByRole("menuitem", { name: /^Propose as owner:/ });
     const available = (await propose.count()) > 0;
     await page.keyboard.press("Escape");
@@ -88,7 +89,7 @@ test("an owner change is only a proposal until a different owner approves it", a
   }
   const proposals = page.getByRole("table", { name: "Owner proposals list" });
   const proposal = proposals.getByRole("row", { name: /Dana Designer/ }).first();
-  await expect(proposal).toContainText("Waiting for approval");
+  await expect(proposal).toContainText("Pending");
   await expect(proposal).toContainText("Another owner approves"); // the proposer cannot approve their own proposal
   await expect(row(page, /Dana Designer/)).not.toContainText(/Owner/);
   await axe(page);
@@ -114,8 +115,7 @@ test("adding a user records a request that two operators must approve; the perso
   await expect(dialog).toBeHidden({ timeout: 60_000 });
   await expect(page.getByRole("status").filter({ hasText: `Request recorded for Nia Newcomer ${run}` })).toBeVisible();
   const request = page.getByRole("table", { name: "Membership requests list" }).getByRole("row", { name: new RegExp(`Nia Newcomer ${run}`) });
-  await expect(request).toContainText("Waiting for operator approval");
-  await expect(request).toContainText("Needs Entra integration");
+  await expect(request).toContainText("Awaiting operators");
   await expect(row(page, new RegExp(`Nia Newcomer ${run}`))).toHaveCount(0);
   await signOut(page);
 });

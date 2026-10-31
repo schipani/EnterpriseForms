@@ -52,6 +52,7 @@ const searchApprovalsRoute = createRoute({ getParentRoute: () => appRoute, path:
 // PG-056 security incidents (security-operations): Security Administrators only; every request is authorized again by the server.
 const securityIncidentsRoute = createRoute({ getParentRoute: () => appRoute, path: "/security/incidents", component: lazyRouteComponent(() => import("../features/security-operations"), "SecurityIncidentsPage") });
 const securityIncidentRoute = createRoute({ getParentRoute: () => appRoute, path: "/security/incidents/$securityIncidentId", component: lazyRouteComponent(() => import("../features/security-operations"), "SecurityIncidentPage") });
+const profileRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/profile", component: lazyRouteComponent(() => import("../features/identity"), "MyProfilePage") });
 const preferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
 /**
  * PG-069 component gallery (ADR-PB-014: internal, never a production route). It exists only in development builds (the Vite
@@ -65,7 +66,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, preferencesRoute, ...developmentRoutes, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, profileRoute, preferencesRoute, ...developmentRoutes, noPermissionRoute]),
 ]);
 
 export function createAppRouter() {

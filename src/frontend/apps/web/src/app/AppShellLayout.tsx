@@ -1,4 +1,4 @@
-import { LOGO_PATH, useRuntime, useSession } from "@enterpriseforms/app-runtime";
+import { LOGO_PATH, PresenceHeartbeat, useRuntime, useSession } from "@enterpriseforms/app-runtime";
 import { Button, LoadingBlock, menuContentClass, menuItemClass, StatusMessage } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Link, Navigate, useNavigate, useRouterState } from "@tanstack/react-router";
@@ -42,6 +42,7 @@ export function AppShellLayout({ children }: PropsWithChildren) {
       <main id="main-content" tabIndex={-1} className={`mx-auto w-full px-4 ${wide ? "max-w-[100rem] py-4" : "max-w-7xl py-6"}`}>
         {children}
       </main>
+      {session.status === "authenticated" ? <PresenceHeartbeat /> : null}
       <SessionExpiredNotice />
     </div>
   );
@@ -92,6 +93,9 @@ function UserMenu() {
           <DropdownMenu.Label className="px-3 py-2 text-xs text-muted">
             {session.session?.organizationDisplayName} · {session.identityProviderKind === "TestIdentityProvider" ? "development identity" : session.identityProviderKind}
           </DropdownMenu.Label>
+          <DropdownMenu.Item className={menuItemClass} onSelect={() => void navigate({ to: "/app/me/profile" })}>
+            My profile
+          </DropdownMenu.Item>
           <DropdownMenu.Item className={menuItemClass} onSelect={() => void navigate({ to: "/app/me/preferences" })}>
             Text size preferences
           </DropdownMenu.Item>
