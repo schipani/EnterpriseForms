@@ -305,3 +305,57 @@ Not run: the complete Stage B and SEC-P suites; hosted CI.
 - Owners do not see members who never signed in, nor anyone's owner/designer role, until AC-7.3.
 - "Sign-in not recorded" covers people seen before the column existed and development personas projected without logging in.
 - Last sign-in is a business-database display value (G21 family residual), not evidence.
+
+## 15. AC-7 implemented for Development/Testing (2026-10-31, C-94 approval, C-95) — not merged, not independently reviewed
+
+Owner approved D8-24…D8-32 and SD-6 (C-94). Implemented on `phase-c8/m2-user-management` on top of §14 (same branch).
+The approved Dashboard, charts, security monitoring, unified styling, form rename and the §14 People features are preserved.
+
+### 15.1 Authorization Authority
+
+| Item | Detail |
+|---|---|
+| Commands | `GrantOrganizationRole` / `RevokeOrganizationRole` (`organization_owner`, `designer`), `ProposeOrganizationOwnerChange` (GrantOwner, RevokeOwner, DisableOwner, EnableOwner), `DisableIdentityBinding` / `EnableIdentityBinding`, `RequestOrganizationMembership`. All through the existing journal → desired state → outbox → SpiceDB projection → Effective gate, with idempotency key + canonical digest, expected-revision CAS, the organization row lock, and refusals journaled on the audit stream (`MembershipCommandRejected`). |
+| Rules | Actor must be an enabled `organization_owner` (`administer_security` and `designer` never qualify); no self-change; step-up through the existing PB-08 gate (synthetic in Development/Testing, refused in staging/production); designer changes by one owner; owner grant/revoke and owner disable/enable by two distinct owners via a single-use proposal (24 h) whose proposer must still be an enabled owner when it is executed and which the target can never approve; last enabled owner and last enabled Security Administrator protected; disabling refused while the person directly owns active records (`OWNS_RECORDS`, count only); a disabled member cannot receive roles. |
+| Disable / enable | One transaction: binding disabled, lifecycle columns stamped, every unrevoked Authority session of that binding revoked (`MEMBERSHIP_DISABLED`). Edges (roles, teams, shares) are kept and unusable because `ActorResolver` and session validation already refuse disabled bindings. Re-enable restores them; revoked sessions stay revoked. |
+| Membership requests | `RequestOrganizationMembership` records a request only (identity of the organization's issuer, immutable subject, display hint, optional designer role, 7-day expiry, Authority user id allocated up front). Operator plane `GET /internal/v1/operator/organizations/{id}/membership-requests`, `POST …/{requestId}/approve` (dry run, then exactly two ES256 approvals from distinct registered approvers over the statement; Development/Testing only) and `POST …/{requestId}/reject` (one operator; grants nothing). Approval re-checks inside the organization lock: still pending, unexpired (an expired one is recorded `Expired`), requester still an enabled owner, identity not bound, issuer still the organization's. Creates the binding (and designer edge) as one journaled command; the request id is the single-use operation id (replay returns the recorded outcome). |
+| Roster read | `POST /internal/v1/organizations/roster` (AC-7.3): every binding with enabled state and roles, proposals and requests of the last 30 days with computed state, flags for command/operator availability, the organization identity issuer. Owners and Security Administrators only; anyone else 404. Behind the organization gate. |
+| Database | AuthorityDb migration `MembershipAdministration`: `identity_bindings` + `identity_disabled_on`, `identity_disabled_by_security_command_id`, `identity_enabled_by_security_command_id`, `organization_membership_request_id`, check `ck_identity_binding_disabled_state`; new `organization_role_change_proposals` and `organization_membership_requests` (multiword snake_case, FKs to the commands, state/expiry/self-proposal checks, one pending request per identity); both added to `AuthorityRuntimeGrants`. No business schema change in this step. |
+
+### 15.2 Business API and UI
+
+- `GET /api/v1/organization/members` now reads the Authority roster: owners and Security Administrators see every member (enabled or disabled, including never signed in), roles and membership state; new filters `role` (OrganizationOwner, Designer, SecurityAdministrator, None) and `membershipState`; owner and Security Administrator action hints; pending proposals and membership requests. Fallback when the roster is unavailable: names only, no roles, no actions.
+- Commands (`Idempotency-Key`, reason, development step-up): `POST …/members/{id}/roles`, `…/roles/{roleName}/remove` (Designer), `…/owner-proposals`, `…/disable`, `…/enable`, `POST /api/v1/organization/owner-proposals/{id}/approve`, `POST /api/v1/organization/membership-requests` (issuer set by the server from the Authority). Business audit: one event per effective command (a retry records nothing new).
+- People page: Add user (request dialog: issuer read-only, object id, name, initial role, reason, step-up, "Membership is not sign-in"); row actions (Make designer, Remove designer role, Propose as owner / owner removal / disabling / re-enabling, Disable / Re-enable membership, Security Administrator actions); "Owner proposals and membership requests" panel with Approve for a second owner; Membership filter and column. Existing 15-row searchable pagination, 8px controls, dialogs and notices unchanged in style.
+- Development tooling: `python scripts/devstack/devstack.py membership list | approve --request-id ID --justification "…" [--execute] | reject --request-id ID --reason "…"` (synthetic approver keys; not two-human evidence).
+
+### 15.3 Implementation choices the owner should know
+
+1. **Re-enabling an owner also needs two owners** (symmetric with disabling, D8-28); the contract only named disabling.
+2. **"Configured Entra tenant" (D8-30)** is enforced as the single identity issuer of the organization's enabled owners, which the operator plane bound at bootstrap; for Entra issuers the subject must be the object id (GUID). Email-like subjects are always refused. There is no separate tenant setting yet; real Entra validation arrives with PB-08.
+3. **With exactly two owners, neither can be removed or disabled**: the proposer and the executor must both differ from the person, so a third owner is needed. The last-owner rule is enforced in addition.
+4. Approving a proposal re-reads it from the Authority and sends the matching command; the Authority decides. Concurrent approvals of one proposal produce exactly one change (the organization lock serializes them).
+5. Business `users.is_active` is not changed by disabling (the Authority decides; pickers may still list a disabled person, and the Authority refuses them).
+
+### 15.4 Tests (executed 2026-10-31; isolated security-test stack rebuilt from this branch, Authority included)
+
+| Suite | Result |
+|---|---|
+| Authority unit tests (incl. 21 new `MembershipAdministrationTests`) | 231 / 231 |
+| Business contract tests (incl. rewritten `MemberDirectoryTests`) | 475 / 475 |
+| Architecture tests | 71 / 71 |
+| Stage B real stack: new `MembershipAdministrationTests` (3) + `PeopleDirectoryTests`, `AdministrationTests`, `SecurityAdministratorTests`, `SecurityAdministratorProvisioningTests`, `SessionRevocationTests`, `FormRenameTests` | 28 / 28 |
+| Vitest | 270 / 270 |
+| ESLint, TypeScript, production build | clean |
+| Playwright (isolated): new `people-administration.spec.ts` (3, axe), `organization-administration` (5), `security-administrators`, `dashboard`, `ui-consistency`, `form-rename`, `responsive` (320 px) | 20 / 20 |
+
+Real-stack proofs include: clerk, Security Administrator, designer-only and another organization's owner refused; self-change and missing step-up refused and journaled; a granted designer can create forms and a revoked one cannot; a disabled member's next request is refused, roles are kept, re-enabling restores access; disabling a record owner refused with a count; the last Security Administrator protected; owner grant needs another owner, the proposer and the target cannot approve, a consumed proposal cannot be reused, two simultaneous approvals produce one change, a disabled owner is refused; a membership request grants nothing, email subjects and duplicates refused, one operator approval refused, two create the member once (replay reports replayed), the new member shows as never signed in with the requested name and designer role, a rejected request cannot be approved; the business audit sequence is exact. In the browser, the disable attempt on a record-owning persona showed the `OWNS_RECORDS` refusal with its count (every persona of the shared test organization owns records or is its last Security Administrator, so the full disable/re-enable path is proven in Stage B).
+
+Not run: complete Stage B and SEC-P suites, hosted CI, human screen-reader review, real Entra.
+
+### 15.5 Remaining restrictions
+
+- AC-7 is unavailable in staging and production until PB-08 step-up and the required assurance exist (D8-31): the Authority's step-up gate refuses every AC-7 command there; operator approval is Development/Testing only until production PIM.
+- Membership is not sign-in: no Entra OIDC sign-in exists yet; an added real identity cannot sign in.
+- AC-7 is not independently reviewed (joins the AC-5/AC-6/AC-9 package); G25/G26, PB-08, DR (G14 replay of the new lifecycle columns has no executed test) and production Level 2 are unchanged.
+- FR-OBS-1 (Form Designer sign-out with unsaved changes) remains open.

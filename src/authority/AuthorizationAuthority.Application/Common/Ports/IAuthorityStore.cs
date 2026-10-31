@@ -45,6 +45,24 @@ public interface IAuthorityScope : IAsyncDisposable
 
     void AddIdentityBinding(IdentityBinding binding);
 
+    /// <summary>C8 M2 (AC-7.2): the binding tracked for update inside the organization lock.</summary>
+    Task<IdentityBinding?> FindIdentityBindingForUpdateAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken);
+
+    /// <summary>C8 M2 (AC-7.2): sessions of one binding that are not revoked (tracked, to revoke them with the disabling command).</summary>
+    Task<List<AuthenticatedSession>> GetUnrevokedSessionsAsync(Guid identityBindingId, CancellationToken cancellationToken);
+
+    Task<OrganizationRoleChangeProposal?> FindRoleChangeProposalAsync(Guid organizationId, Guid proposalId, CancellationToken cancellationToken);
+
+    Task<List<OrganizationRoleChangeProposal>> GetRoleChangeProposalsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken);
+
+    void AddRoleChangeProposal(OrganizationRoleChangeProposal proposal);
+
+    Task<OrganizationMembershipRequest?> FindMembershipRequestAsync(Guid organizationId, Guid requestId, CancellationToken cancellationToken);
+
+    Task<List<OrganizationMembershipRequest>> GetMembershipRequestsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken);
+
+    void AddMembershipRequest(OrganizationMembershipRequest request);
+
     Task<AuthorityResource?> FindResourceAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, CancellationToken cancellationToken);
 
     void AddResource(AuthorityResource resource);

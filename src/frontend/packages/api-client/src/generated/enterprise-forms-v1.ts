@@ -72,6 +72,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/members/{userId}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.1: grant the Designer role (one organization owner, step-up, never oneself). The Organization Owner role is granted only by approving another owner's proposal. */
+        post: operations["GrantMemberRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/roles/{roleName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.1: revoke the Designer role (one organization owner). The Organization Owner role is revoked only through a proposal approved by another owner. */
+        post: operations["RevokeMemberRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/owner-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.1/7.2: propose GrantOwner, RevokeOwner, DisableOwner or EnableOwner. Grants nothing; another owner (not the proposer, not the person) approves within 24 hours. */
+        post: operations["ProposeOwnerChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.2: disable a member who is not an owner (one owner). Sessions are revoked at once; roles, teams and shares are kept but unusable. Refused (OWNS_RECORDS, with a count) while the person directly owns active records, and for the last enabled Security Administrator. */
+        post: operations["DisableMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.2: re-enable a disabled member who is not an owner (one owner). The kept roles, teams and shares become usable again; nothing new is granted. */
+        post: operations["EnableMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/owner-proposals/{proposalId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.1/7.2: a second owner executes a pending proposal. The Authority re-checks the proposal (pending, unexpired, single use), that the proposer is still an enabled owner, and every role, membership, last-owner and record-ownership rule at this moment. */
+        post: operations["ApproveOwnerProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/membership-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.4: an owner asks to add a person of the organization's identity provider tenant (immutable subject id, never an email). Grants nothing: two operator approvals (Development/Testing only) create the membership; the request expires after 7 days. Membership is not sign-in readiness. */
+        post: operations["RequestMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/session": {
         parameters: {
             query?: never;
@@ -1814,6 +1933,14 @@ export interface components {
             groupKey: string;
             groupDisplayName: string;
         };
+        CreateMembershipRequestRequest: {
+            subjectIdentifier: string;
+            displayNameHint: string;
+            initialRoleName: null | string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
         CreateOptionListRequest: {
             optionListName: string;
             optionListDescription: null | string;
@@ -2496,6 +2623,52 @@ export interface components {
             groupDisplayName: string;
             lifecycleStatus: string;
         };
+        MemberCommandRequest: {
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        MemberCommandResponse: {
+            /** Format: uuid */
+            commandId: string;
+            commandStatus: string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            /** Format: uuid */
+            proposalId?: null | string;
+            /** Format: uuid */
+            requestId?: null | string;
+            /** Format: date-time */
+            expiresOn?: null | string;
+        };
+        MemberRoleChangeRequest: {
+            roleName: string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        MembershipRequestResponse: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            requestedUserId: string;
+            issuerUri: string;
+            subjectIdentifier: string;
+            displayNameHint: string;
+            initialRoleName: null | string;
+            /** Format: uuid */
+            requestedByUserId: string;
+            requestedByDisplayName: string;
+            reason: string;
+            /** Format: date-time */
+            requestedOn: string;
+            /** Format: date-time */
+            expiresOn: string;
+            requestState: string;
+            /** Format: date-time */
+            decidedOn: null | string;
+            decisionReason: null | string;
+        };
         OptionListItemChange: {
             /** Format: uuid */
             optionListItemId: null | string;
@@ -2558,6 +2731,16 @@ export interface components {
             /** @default false */
             securityAdministratorChangesOperational: boolean;
             securityAdministratorChangesUnavailableReason?: null | string;
+            /** @default false */
+            canManageMembers: boolean;
+            /** @default false */
+            membershipCommandsOperational: boolean;
+            membershipCommandsUnavailableReason?: null | string;
+            /** @default false */
+            operatorApprovalOperational: boolean;
+            organizationIdentityIssuer?: null | string;
+            ownerProposals?: null | components["schemas"]["OwnerProposalResponse"][];
+            membershipRequests?: null | components["schemas"]["MembershipRequestResponse"][];
         };
         OrganizationMemberResponse: {
             /** Format: uuid */
@@ -2575,6 +2758,10 @@ export interface components {
             /** @default NotRecorded */
             signInStatus: string;
             availableActions?: null | string[];
+            /** @default Enabled */
+            membershipState: string;
+            /** Format: date-time */
+            disabledOn?: null | string;
         };
         OrganizationOverviewAuthentication: {
             authenticationRequirementName: string;
@@ -2640,6 +2827,30 @@ export interface components {
         OverviewPartStatus: {
             available: boolean;
             unavailableReason: null | string;
+        };
+        OwnerProposalRequest: {
+            change: string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        OwnerProposalResponse: {
+            /** Format: uuid */
+            proposalId: string;
+            /** Format: uuid */
+            targetUserId: string;
+            targetDisplayName: string;
+            proposedChange: string;
+            /** Format: uuid */
+            proposedByUserId: string;
+            proposedByDisplayName: string;
+            reason: string;
+            /** Format: date-time */
+            proposedOn: string;
+            /** Format: date-time */
+            expiresOn: string;
+            proposalState: string;
+            canApprove: boolean;
         };
         ProbeResponse: {
             probeStatus: string;
@@ -3496,6 +3707,7 @@ export interface operations {
                 q?: string;
                 role?: string;
                 signInStatus?: string;
+                membershipState?: string;
                 pageSize?: number | string;
                 continuationToken?: string;
             };
@@ -3521,6 +3733,187 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GrantMemberRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberRoleChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    RevokeMemberRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+                roleName: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    ProposeOwnerChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    DisableMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    EnableMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    ApproveOwnerProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    RequestMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMembershipRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
                 };
             };
         };

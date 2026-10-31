@@ -1,8 +1,9 @@
 # Phase C8 M2 — AC-7 security contract (user management in the Authorization Authority)
 
-- **Status:** proposal for owner and security approval (C-93, 2026-10-30). **Nothing in this document is implemented.**
-  No Authority command, relation, table, column, endpoint or SpiceDB schema was changed. Approval checkpoint: no AC-7
-  Authority code is written until the decisions in §9 are recorded.
+- **Status:** **approved by the owner (C-94, 2026-10-31: D8-24…D8-32 as proposed) and implemented for Development/Testing
+  (C-95, 2026-10-31)** — see `docs/PHASE_C8_STATUS.md` §15 for what was built, the implementation choices that refine this
+  text (§15.3) and the test evidence. Not merged, not independently reviewed, unavailable in staging and production until
+  PB-08. (Original status: proposal, C-93, 2026-10-30.)
 - **Audience:** the project owner (decisions), the independent Authority reviewer (AC-5/AC-6/AC-9 package), implementers.
 - **Supersedes:** the AC-7 sketch in `PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md` §4 (M2) and §5.1–§5.4, which it makes
   specific. C-78 conditions are carried forward unchanged.

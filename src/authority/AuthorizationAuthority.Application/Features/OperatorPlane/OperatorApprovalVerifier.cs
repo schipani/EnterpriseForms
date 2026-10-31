@@ -134,6 +134,18 @@ public sealed class OperatorApprovalVerifier
     public IReadOnlyList<VerifiedOperatorApproval> Verify(IReadOnlyList<string>? approvals, SecurityAdministratorApprovalStatement statement, string statementSha256, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(statement);
+        return Verify(approvals, new ApprovalBinding(statement.OperationId, statement.OperationKind, statement.OrganizationId, statement.TargetAuthorityUserId), statementSha256, now);
+    }
+
+    /// <summary>C8 M2 (AC-7.4): the same two-approver verification for a membership request.</summary>
+    public IReadOnlyList<VerifiedOperatorApproval> Verify(IReadOnlyList<string>? approvals, MembershipApprovalStatement statement, string statementSha256, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(statement);
+        return Verify(approvals, new ApprovalBinding(statement.OperationId, statement.OperationKind, statement.OrganizationId, statement.TargetAuthorityUserId), statementSha256, now);
+    }
+
+    private List<VerifiedOperatorApproval> Verify(IReadOnlyList<string>? approvals, ApprovalBinding statement, string statementSha256, DateTimeOffset now)
+    {
         if (!Operational)
         {
             throw new AuthorityException(AuthorityErrorCodes.OperatorDualControlUnavailable, 403, false, "dual-controlled operator approval is not available in this environment (production requires the privileged identity model)");
@@ -153,7 +165,10 @@ public sealed class OperatorApprovalVerifier
         return verified;
     }
 
-    private VerifiedOperatorApproval VerifyOne(string token, SecurityAdministratorApprovalStatement statement, string statementSha256, DateTimeOffset now)
+    /// <summary>The claims an approval must bind besides the statement digest.</summary>
+    private sealed record ApprovalBinding(Guid OperationId, string OperationKind, Guid OrganizationId, Guid TargetAuthorityUserId);
+
+    private VerifiedOperatorApproval VerifyOne(string token, ApprovalBinding statement, string statementSha256, DateTimeOffset now)
     {
         var parts = (token ?? string.Empty).Split('.');
         if (parts.Length != 3 || token!.Length > 8192)

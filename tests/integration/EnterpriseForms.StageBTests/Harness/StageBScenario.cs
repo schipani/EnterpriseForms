@@ -35,6 +35,11 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
     /// <summary>Bound by the Authority without roles but never calls the API (C8 M2 directory tests); only when bootstrapped with <c>withNeverSignedInMember</c>.</summary>
     public TestUser Newcomer { get; } = TestUser.New("Newcomer");
 
+    /// <summary>C8 M2 (AC-7): two more organization owners, only when bootstrapped with <c>withAdditionalOwners</c> (two-owner rules need three).</summary>
+    public TestUser SecondOwner { get; } = TestUser.New("SecondOwner");
+
+    public TestUser ThirdOwner { get; } = TestUser.New("ThirdOwner");
+
     public Guid AccusedFormId { get; private set; }
 
     public Guid AddressFormId { get; private set; }
@@ -50,10 +55,17 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
     public static string TokenFor(TestUser user, Guid organizationId) => TestIdentity.UserToken(user, organizationId);
 
     /// <summary><paramref name="withSecurityAdministrator"/> false: the Administrator persona is an ordinary member and the organization has no Security Administrator (DR-C7-3 tests).</summary>
-    public async Task BootstrapAsync(bool withSecurityAdministrator = true, bool withNeverSignedInMember = false)
+    public async Task BootstrapAsync(bool withSecurityAdministrator = true, bool withNeverSignedInMember = false, bool withAdditionalOwners = false)
     {
         var newcomer = withNeverSignedInMember
             ? new object[] { new { authority_user_id = Newcomer.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Newcomer.Subject, organization_roles = Array.Empty<string>() } }
+            : [];
+        var owners = withAdditionalOwners
+            ? new object[]
+            {
+                new { authority_user_id = SecondOwner.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = SecondOwner.Subject, organization_roles = new[] { "organization_owner" } },
+                new { authority_user_id = ThirdOwner.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = ThirdOwner.Subject, organization_roles = new[] { "organization_owner" } },
+            }
             : [];
         var bootstrap = await Fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/organizations", new
         {
@@ -66,11 +78,11 @@ public sealed class StageBScenario(StageBFixture fixture, string name)
                 new { authority_user_id = Reader.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Reader.Subject, organization_roles = Array.Empty<string>() },
                 new { authority_user_id = Administrator.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Administrator.Subject, organization_roles = withSecurityAdministrator ? new[] { "system_administrator" } : Array.Empty<string>() },
                 new { authority_user_id = DesignerOnly.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = DesignerOnly.Subject, organization_roles = new[] { "designer" } },
-            }.Concat(newcomer).ToArray(),
+            }.Concat(newcomer).Concat(owners).ToArray(),
         }).ConfigureAwait(false);
         Assert.True(bootstrap.IsSuccess, "bootstrap failed: " + bootstrap.Body);
         await WaitGateReadyAsync().ConfigureAwait(false);
-        foreach (var user in new[] { Designer, Clerk, Reader, Administrator, DesignerOnly })
+        foreach (var user in new[] { Designer, Clerk, Reader, Administrator, DesignerOnly }.Concat(withAdditionalOwners ? [SecondOwner, ThirdOwner] : []))
         {
             var me = await Fixture.Api.GetAsync("/api/v1/users/me", Token(user)).ConfigureAwait(false);
             Assert.True(me.IsSuccess, "users/me failed for " + user.DisplayName + ": " + me.Body);

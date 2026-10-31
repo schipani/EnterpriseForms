@@ -99,6 +99,13 @@
             }
           },
           {
+            "name": "membershipState",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "pageSize",
             "in": "query",
             "schema": {
@@ -135,6 +142,297 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/members/{userId}/roles": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.1: grant the Designer role (one organization owner, step-up, never oneself). The Organization Owner role is granted only by approving another owner's proposal.",
+        "operationId": "GrantMemberRole",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberRoleChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/members/{userId}/roles/{roleName}/remove": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.1: revoke the Designer role (one organization owner). The Organization Owner role is revoked only through a proposal approved by another owner.",
+        "operationId": "RevokeMemberRole",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roleName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/members/{userId}/owner-proposals": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.1/7.2: propose GrantOwner, RevokeOwner, DisableOwner or EnableOwner. Grants nothing; another owner (not the proposer, not the person) approves within 24 hours.",
+        "operationId": "ProposeOwnerChange",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/members/{userId}/disable": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.2: disable a member who is not an owner (one owner). Sessions are revoked at once; roles, teams and shares are kept but unusable. Refused (OWNS_RECORDS, with a count) while the person directly owns active records, and for the last enabled Security Administrator.",
+        "operationId": "DisableMember",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/members/{userId}/enable": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.2: re-enable a disabled member who is not an owner (one owner). The kept roles, teams and shares become usable again; nothing new is granted.",
+        "operationId": "EnableMember",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/owner-proposals/{proposalId}/approve": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.1/7.2: a second owner executes a pending proposal. The Authority re-checks the proposal (pending, unexpired, single use), that the proposer is still an enabled owner, and every role, membership, last-owner and record-ownership rule at this moment.",
+        "operationId": "ApproveOwnerProposal",
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/membership-requests": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "AC-7.4: an owner asks to add a person of the organization's identity provider tenant (immutable subject id, never an email). Grants nothing: two operator approvals (Development/Testing only) create the membership; the request expires after 7 days. Membership is not sign-in readiness.",
+        "operationId": "RequestMembership",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMembershipRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberCommandResponse"
                 }
               }
             }
@@ -5248,6 +5546,36 @@
           }
         }
       },
+      "CreateMembershipRequestRequest": {
+        "required": [
+          "subjectIdentifier",
+          "displayNameHint",
+          "initialRoleName",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "initialRoleName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "CreateOptionListRequest": {
         "required": [
           "optionListName",
@@ -7963,6 +8291,164 @@
           }
         }
       },
+      "MemberCommandRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "MemberCommandResponse": {
+        "required": [
+          "commandId",
+          "commandStatus",
+          "authorizationRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commandStatus": {
+            "type": "string"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "proposalId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "expiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "MemberRoleChangeRequest": {
+        "required": [
+          "roleName",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "roleName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "MembershipRequestResponse": {
+        "required": [
+          "requestId",
+          "requestedUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "initialRoleName",
+          "requestedByUserId",
+          "requestedByDisplayName",
+          "reason",
+          "requestedOn",
+          "expiresOn",
+          "requestState",
+          "decidedOn",
+          "decisionReason"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "initialRoleName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestedByUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedByDisplayName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requestedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestState": {
+            "type": "string"
+          },
+          "decidedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "decisionReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "OptionListItemChange": {
         "required": [
           "optionListItemId",
@@ -8164,6 +8650,48 @@
               "null",
               "string"
             ]
+          },
+          "canManageMembers": {
+            "type": "boolean",
+            "default": false
+          },
+          "membershipCommandsOperational": {
+            "type": "boolean",
+            "default": false
+          },
+          "membershipCommandsUnavailableReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operatorApprovalOperational": {
+            "type": "boolean",
+            "default": false
+          },
+          "organizationIdentityIssuer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ownerProposals": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/OwnerProposalResponse"
+            }
+          },
+          "membershipRequests": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/MembershipRequestResponse"
+            }
           }
         }
       },
@@ -8234,6 +8762,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "membershipState": {
+            "type": "string",
+            "default": "Enabled"
+          },
+          "disabledOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -8503,6 +9042,81 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "OwnerProposalRequest": {
+        "required": [
+          "change",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "change": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "OwnerProposalResponse": {
+        "required": [
+          "proposalId",
+          "targetUserId",
+          "targetDisplayName",
+          "proposedChange",
+          "proposedByUserId",
+          "proposedByDisplayName",
+          "reason",
+          "proposedOn",
+          "expiresOn",
+          "proposalState",
+          "canApprove"
+        ],
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetDisplayName": {
+            "type": "string"
+          },
+          "proposedChange": {
+            "type": "string"
+          },
+          "proposedByUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposedByDisplayName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "proposedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proposalState": {
+            "type": "string"
+          },
+          "canApprove": {
+            "type": "boolean"
           }
         }
       },

@@ -134,7 +134,7 @@ What the acceptance covers and does not cover:
 | SD-3 Auditor role contract | **Open** — proposal only |
 | SD-4 Investigation note encryption | **Open** — current behaviour (plaintext administrative metadata) unchanged |
 | SD-5 PB-08 step-up for investigation changes | **Open** — not available |
-| SD-6 Per-section refresh amendment to ADR-PB-007 / PG-006 | **Open.** The approved screens have no per-section Refresh buttons; the owner's visual acceptance is consistent with the proposed amendment but is not recorded as the formal ADR amendment. A decision is still required. |
+| SD-6 Per-section refresh amendment to ADR-PB-007 / PG-006 | **Approved 2026-10-31 (C-94)**: recorded as ADR-PB-007 Amendment A1 and noted in the PG-006 screen contract. |
 | §3 trust limitation (triage store is business PostgreSQL, not tamper-proof evidence) | Unchanged |
 | §5 tests not run (full Stage B, SEC-P, NVDA/VoiceOver, real 200%/400% zoom) | Unchanged |
 

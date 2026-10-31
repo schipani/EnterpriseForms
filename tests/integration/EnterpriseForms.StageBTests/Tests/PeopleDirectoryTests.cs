@@ -43,13 +43,15 @@ public sealed class PeopleDirectoryTests(StageBFixture fixture)
         Assert.Empty(Actions(self)); // the last Security Administrator cannot be removed
         Assert.DoesNotContain("email", asAdministrator.Body, StringComparison.OrdinalIgnoreCase);
 
-        // Organization owner (not a Security Administrator): known people and administrators only, no action hints.
+        // Organization owner (C8 M2, AC-7.3): the same complete Authority roster, owner action hints, never on themself.
         var asOwner = await fixture.Api.GetAsync("/api/v1/organization/members", s.Token(s.Designer));
         Assert.True(asOwner.IsSuccess, asOwner.Body);
-        Assert.False(asOwner.Root.GetProperty("includesMembersWhoNeverSignedIn").GetBoolean());
-        Assert.Equal(5, asOwner.Root.GetProperty("totalCount").GetInt32());
-        Assert.DoesNotContain(Members(asOwner), m => m.GetProperty("userId").GetGuid() == s.Newcomer.AuthorityUserId);
-        Assert.All(Members(asOwner), m => Assert.Empty(Actions(m)));
+        Assert.True(asOwner.Root.GetProperty("includesMembersWhoNeverSignedIn").GetBoolean());
+        Assert.Equal(6, asOwner.Root.GetProperty("totalCount").GetInt32());
+        Assert.True(asOwner.Root.GetProperty("canManageMembers").GetBoolean());
+        Assert.Contains("GrantDesigner", Actions(Members(asOwner).Single(m => m.GetProperty("userId").GetGuid() == s.Newcomer.AuthorityUserId)));
+        Assert.Empty(Actions(Members(asOwner).Single(m => m.GetProperty("userId").GetGuid() == s.Designer.AuthorityUserId)));
+        Assert.DoesNotContain(Members(asOwner).SelectMany(Actions), a => a is "AppointSecurityAdministrator" or "RemoveSecurityAdministrator");
 
         // Everyone else is refused without counts or names.
         foreach (var user in new[] { s.Clerk, s.Reader, s.DesignerOnly })
@@ -78,7 +80,7 @@ public sealed class PeopleDirectoryTests(StageBFixture fixture)
         Assert.Equal([s.Administrator.AuthorityUserId], Members(administrators).Select(m => m.GetProperty("userId").GetGuid()));
         var never = await fixture.Api.GetAsync("/api/v1/organization/members?signInStatus=NeverSignedIn", s.Token(s.Administrator));
         Assert.Equal(1, never.Root.GetProperty("totalCount").GetInt32());
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await fixture.Api.GetAsync("/api/v1/organization/members?role=OrganizationOwner", s.Token(s.Administrator))).Status);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await fixture.Api.GetAsync("/api/v1/organization/members?role=Root", s.Token(s.Administrator))).Status);
 
         // Another organization: its Security Administrator never sees these people.
         var other = new StageBScenario(fixture, "c8-m2-people-other");

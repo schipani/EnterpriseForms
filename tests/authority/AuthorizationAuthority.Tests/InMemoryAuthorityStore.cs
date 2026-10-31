@@ -41,6 +41,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<OrganizationProtectionPolicy> Policies { get; } = [];
     public List<ProtectionCensusResult> CensusResults { get; } = [];
     public List<ProtectionReconciliationAttestation> Attestations { get; } = [];
+    public List<OrganizationRoleChangeProposal> Proposals { get; } = [];
+    public List<OrganizationMembershipRequest> MembershipRequests { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -76,6 +78,28 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken cancellationToken) => Task.FromResult(s.Bindings.FirstOrDefault(b => b.IdentityBindingId == identityBindingId));
 
         public void AddIdentityBinding(IdentityBinding binding) => s.Bindings.Add(binding);
+
+        public Task<IdentityBinding?> FindIdentityBindingForUpdateAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Bindings.FirstOrDefault(b => b.OrganizationId == organizationId && b.AuthorityUserId == authorityUserId));
+
+        public Task<List<AuthenticatedSession>> GetUnrevokedSessionsAsync(Guid identityBindingId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Sessions.Where(x => x.IdentityBindingId == identityBindingId && x.SessionRevokedOn == null).ToList());
+
+        public Task<OrganizationRoleChangeProposal?> FindRoleChangeProposalAsync(Guid organizationId, Guid proposalId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Proposals.FirstOrDefault(p => p.OrganizationId == organizationId && p.OrganizationRoleChangeProposalId == proposalId));
+
+        public Task<List<OrganizationRoleChangeProposal>> GetRoleChangeProposalsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Proposals.Where(p => p.OrganizationId == organizationId && p.ProposalCreatedOn >= createdSince).OrderByDescending(p => p.ProposalCreatedOn).ToList());
+
+        public void AddRoleChangeProposal(OrganizationRoleChangeProposal proposal) => s.Proposals.Add(proposal);
+
+        public Task<OrganizationMembershipRequest?> FindMembershipRequestAsync(Guid organizationId, Guid requestId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.MembershipRequests.FirstOrDefault(r => r.OrganizationId == organizationId && r.OrganizationMembershipRequestId == requestId));
+
+        public Task<List<OrganizationMembershipRequest>> GetMembershipRequestsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            Task.FromResult(s.MembershipRequests.Where(r => r.OrganizationId == organizationId && r.RequestCreatedOn >= createdSince).OrderByDescending(r => r.RequestCreatedOn).ToList());
+
+        public void AddMembershipRequest(OrganizationMembershipRequest request) => s.MembershipRequests.Add(request);
 
         public Task<AuthorityResource?> FindResourceAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, CancellationToken cancellationToken) =>
             Task.FromResult(s.Resources.FirstOrDefault(r => r.OrganizationId == organizationId && r.ResourceTypeName == resourceTypeName && r.ResourceEntityId == resourceEntityId));
@@ -165,7 +189,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => s.Keys.Add(registration);
 
-        public Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(new List<Guid>());
+        public Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.FormRecord && r.ResourceLifecycleState == ResourceLifecycleStates.Active).Select(r => r.ResourceEntityId).ToList());
 
         public Task<List<AuthorityResource>> GetFormRecordResourcesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<string> lifecycleStates, CancellationToken cancellationToken) =>
             Task.FromResult(s.Resources.Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.FormRecord && r.ParentResourceEntityId == formDefinitionId && lifecycleStates.Contains(r.ResourceLifecycleState)).OrderBy(r => r.ResourceEntityId).ToList());

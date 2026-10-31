@@ -66,7 +66,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             }
 
             var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
-            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate).ConfigureAwait(false);
+            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
             ApplyPlan(scope, state, command, plan, bound, request, cancellationToken);
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -86,6 +86,12 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             {
                 // Refused Security Administrator appointments and removals: independent, archived evidence on the audit stream.
                 AuditJournal.Append(scope, state, "SecurityAdministratorCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
+            }
+            else if (request.CommandKind is SecurityCommandKind.GrantOrganizationRole or SecurityCommandKind.RevokeOrganizationRole or SecurityCommandKind.ProposeOrganizationOwnerChange
+                     or SecurityCommandKind.DisableIdentityBinding or SecurityCommandKind.EnableIdentityBinding or SecurityCommandKind.RequestOrganizationMembership)
+            {
+                // C8 M2 (AC-7): refused membership and role commands are archived evidence too (no identities beyond the actor's binding).
+                AuditJournal.Append(scope, state, "MembershipCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
             }
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw;
@@ -209,6 +215,8 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             searchPolicy.SearchPolicyRevision++;
         }
 
+        ApplyMembershipChanges(scope, command, plan, now);
+
         command.CommandStateName = SecurityCommandStates.CommittedAwaitingProjection;
         command.CommittedAuthorizationRevision = revision;
         command.CommandModifiedOn = now;
@@ -245,6 +253,67 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             command.CommandReasonText,
             command.CorrelationIdentifier);
         scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Authorization, revision, "SecurityCommandCommitted", body, command.SecurityCommandId, null, TimeProvider.System));
+    }
+
+    /// <summary>C8 M2 (AC-7): proposals, membership state, revoked sessions and membership requests, in the command's transaction.</summary>
+    private static void ApplyMembershipChanges(IAuthorityScope scope, SecurityCommand command, CommandPlan plan, DateTimeOffset now)
+    {
+        if (plan.NewProposal is { } proposal)
+        {
+            proposal.OrganizationRoleChangeProposalId = command.SecurityCommandId;
+            scope.AddRoleChangeProposal(proposal);
+        }
+
+        if (plan.ConsumedProposal is { } consumed)
+        {
+            consumed.ProposalStateName = ProposalStates.Consumed;
+            consumed.ConsumedBySecurityCommandId = command.SecurityCommandId;
+            consumed.ProposalConsumedOn = now;
+        }
+
+        if (plan.BindingToDisable is { } disabled)
+        {
+            disabled.IdentityBindingEnabled = false;
+            disabled.IdentityDisabledOn = now;
+            disabled.IdentityDisabledBySecurityCommandId = command.SecurityCommandId;
+            foreach (var session in plan.SessionsToRevoke)
+            {
+                session.SessionRevokedOn = now;
+                session.SessionRevocationReason = Domain.Features.Sessions.SessionRevocationReasons.MembershipDisabled;
+            }
+        }
+
+        if (plan.BindingToEnable is { } enabled)
+        {
+            enabled.IdentityBindingEnabled = true;
+            enabled.IdentityDisabledOn = null;
+            enabled.IdentityEnabledBySecurityCommandId = command.SecurityCommandId;
+        }
+
+        foreach (var expired in plan.ExpiredMembershipRequests)
+        {
+            expired.RequestStateName = MembershipRequestStates.Expired;
+            expired.RequestDecidedOn = now;
+            expired.RequestDecisionReasonText = "expired before operator approval";
+        }
+
+        if (plan.NewMembershipRequest is { } request)
+        {
+            request.OrganizationMembershipRequestId = command.SecurityCommandId;
+            scope.AddMembershipRequest(request);
+        }
+
+        if (plan.NewBinding is { } binding)
+        {
+            scope.AddIdentityBinding(binding);
+        }
+
+        if (plan.ApprovedMembershipRequest is { } approved)
+        {
+            approved.RequestStateName = MembershipRequestStates.Approved;
+            approved.RequestDecidedOn = now;
+            approved.DecidedBySecurityCommandId = command.SecurityCommandId;
+        }
     }
 
     internal static async Task<OperationStatus> ToStatusAsync(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CancellationToken cancellationToken)

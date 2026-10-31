@@ -65,6 +65,28 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddIdentityBinding(IdentityBinding binding) => context.IdentityBindings.Add(binding);
 
+        public Task<IdentityBinding?> FindIdentityBindingForUpdateAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken) =>
+            context.IdentityBindings.AsTracking().FirstOrDefaultAsync(b => b.OrganizationId == organizationId && b.AuthorityUserId == authorityUserId, cancellationToken);
+
+        public Task<List<AuthenticatedSession>> GetUnrevokedSessionsAsync(Guid identityBindingId, CancellationToken cancellationToken) =>
+            context.Sessions.AsTracking().Where(s => s.IdentityBindingId == identityBindingId && s.SessionRevokedOn == null).ToListAsync(cancellationToken);
+
+        public Task<OrganizationRoleChangeProposal?> FindRoleChangeProposalAsync(Guid organizationId, Guid proposalId, CancellationToken cancellationToken) =>
+            context.RoleChangeProposals.AsTracking().FirstOrDefaultAsync(p => p.OrganizationId == organizationId && p.OrganizationRoleChangeProposalId == proposalId, cancellationToken);
+
+        public Task<List<OrganizationRoleChangeProposal>> GetRoleChangeProposalsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            context.RoleChangeProposals.AsNoTracking().Where(p => p.OrganizationId == organizationId && p.ProposalCreatedOn >= createdSince).OrderByDescending(p => p.ProposalCreatedOn).ToListAsync(cancellationToken);
+
+        public void AddRoleChangeProposal(OrganizationRoleChangeProposal proposal) => context.RoleChangeProposals.Add(proposal);
+
+        public Task<OrganizationMembershipRequest?> FindMembershipRequestAsync(Guid organizationId, Guid requestId, CancellationToken cancellationToken) =>
+            context.MembershipRequests.AsTracking().FirstOrDefaultAsync(r => r.OrganizationId == organizationId && r.OrganizationMembershipRequestId == requestId, cancellationToken);
+
+        public Task<List<OrganizationMembershipRequest>> GetMembershipRequestsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            context.MembershipRequests.AsNoTracking().Where(r => r.OrganizationId == organizationId && r.RequestCreatedOn >= createdSince).OrderByDescending(r => r.RequestCreatedOn).ToListAsync(cancellationToken);
+
+        public void AddMembershipRequest(OrganizationMembershipRequest request) => context.MembershipRequests.Add(request);
+
         public Task<AuthorityResource?> FindResourceAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, CancellationToken cancellationToken) =>
             context.Resources.FirstOrDefaultAsync(r => r.OrganizationId == organizationId && r.ResourceTypeName == resourceTypeName && r.ResourceEntityId == resourceEntityId, cancellationToken);
 

@@ -18,6 +18,9 @@ passed on a command line or written into the working tree.
     python scripts/devstack/devstack.py verify-workflow      # M1 lifecycle and restriction checks through the API
     python scripts/devstack/devstack.py prepare-acceptance   # synthetic Draft records for the owner's browser review
     python scripts/devstack/devstack.py security-admin status            # DR-C7-3: members and Security Administrators
+    python scripts/devstack/devstack.py membership list                  # C8 M2: owner membership requests (AC-7.4)
+    python scripts/devstack/devstack.py membership approve --request-id ID --justification "..."            # dry run
+    python scripts/devstack/devstack.py membership approve --request-id ID --justification "..." --execute  # confirm
     python scripts/devstack/devstack.py security-admin enable-approvals  # DR-C7-3: synthetic approver keys (once)
     python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "..."            # dry run
     python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "..." --execute  # confirm
@@ -1065,6 +1068,86 @@ def cmd_security_admin(args) -> None:
     print("[security-admin] recorded with synthetic development approvals (not two-human evidence). Reload the browser to see the role.")
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# C8 M2 (AC-7.4): owner membership requests decided on the Authority operator plane (development procedure)
+# --------------------------------------------------------------------------------------------------------------------
+
+def membership_tool(stack: Stack, request: dict) -> dict:
+    """Runs the dev-seed image's membership mode. Approver private keys travel on stdin only; output never contains them."""
+    result = stack.compose("run", "--rm", "--no-deps", "-T", "-e", "DEVSEED_MODE=operator-membership", "dev-seed",
+                           input_text=json.dumps(request), check=False, timeout=300)
+    text = result.stdout.strip()
+    start = text.find("{")
+    if start < 0:
+        raise DevStackError(f"membership tool failed ({result.returncode}): {result.stderr.strip()[-1200:]}")
+    return json.loads(text[start:])
+
+
+def cmd_membership(args) -> None:
+    stack = Stack(args.project, load_custody(args.project))
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    stack.compose("build", "dev-seed", timeout=1800)
+    if args.action == "list":
+        listing = membership_tool(stack, {"action": "list"})
+        if "error_code" in listing:
+            raise DevStackError(f"refused: {listing['error_code']} {listing.get('detail') or ''}")
+        print(f"Organization : {listing['organization_display_name']}  ({listing['organization_id']})")
+        print(f"Approvals    : {listing['approval_mode']}{'' if listing['approvals_operational'] else '  (not available: run `devstack.py security-admin enable-approvals`)'}")
+        for r in listing["requests"]:
+            role = r.get("initial_role_name") or "no role"
+            print(f"  {r['request_state']:9} {r['request_id']}  {r['display_name_hint']:30} {r['subject_identifier']:40} {role:9} expires {r['expires_on']}")
+        if not listing["requests"]:
+            print("  (no membership requests in the last 30 days)")
+        return
+
+    if not args.request_id:
+        raise DevStackError("--request-id is required (see `devstack.py membership list`)")
+    if args.action == "reject":
+        if not args.reason:
+            raise DevStackError("--reason is required")
+        outcome = membership_tool(stack, {"action": "reject", "request_id": args.request_id, "reason": args.reason})
+        if "error_code" in outcome:
+            raise DevStackError(f"refused: {outcome['error_code']} {outcome.get('detail') or ''}")
+        print(f"[membership] request {args.request_id} rejected; nothing was granted")
+        return
+
+    if not args.justification:
+        raise DevStackError("--justification is required (10 to 500 characters)")
+    request = {"action": "approve", "request_id": args.request_id, "justification": args.justification}
+    preview = membership_tool(stack, request)
+    if "error_code" in preview:
+        raise DevStackError(f"refused: {preview['error_code']} {preview.get('detail') or ''}")
+    target = preview["target"]
+    print(f"Operation    : membership approval (single-use id {preview['operation_id']}){'  [DRY RUN - nothing changed]' if preview['dry_run'] else ''}")
+    print(f"Organization : {preview['organization_display_name']}  ({preview['organization_id']})")
+    print(f"Identity     : {target['subject_identifier']}  issuer {target['issuer_uri']}  user {target['authority_user_id']}")
+    print(f"Initial role : {preview.get('initial_role_name') or 'none'}    request state: {preview['request_state']}")
+    print("Consequences :")
+    for line in preview["consequences"]:
+        print(f"  - {line}")
+    print(f"Approvals    : {preview['required_approvals']} x {preview['approval_assurance']}")
+    if not preview["eligible"]:
+        raise DevStackError(f"not eligible: {preview['refusal_code']} - {preview.get('refusal_detail') or ''}; nothing changed")
+    if not args.execute:
+        print("\n[membership] dry run only. Re-run with --execute to approve after confirming.")
+        return
+    approvers = load_approvers(args.project)
+    if len(approvers) < 2:
+        raise DevStackError("no synthetic approver keys; run `devstack.py security-admin enable-approvals` first")
+    if input("Type the organization id: ").strip() != preview["organization_id"]:
+        raise DevStackError("organization id did not match; nothing changed")
+    if input(f"Type APPROVE to make {target['subject_identifier']} a member: ").strip() != "APPROVE":
+        raise DevStackError("not confirmed; nothing changed")
+    request["execute"] = True
+    request["approvers"] = [{"approver_id": a["approver_id"], "private_key_pkcs8_base64": a["private_key_pkcs8_base64"]} for a in approvers[:2]]
+    outcome = membership_tool(stack, request)
+    if "error_code" in outcome:
+        raise DevStackError(f"refused: {outcome['error_code']} {outcome.get('detail') or ''}; nothing changed")
+    print(f"\n[membership] approved: command {outcome['security_command_id']} ({outcome['command_status']}), revision {outcome['authorization_revision']}")
+    print("[membership] recorded with synthetic development approvals (not two-human evidence). The person is a member but cannot sign in until the Entra integration (PB-08).")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", default=os.environ.get("DEVSTACK_PROJECT", DEFAULT_PROJECT))
@@ -1076,6 +1159,13 @@ def main() -> int:
     rebuild = commands.add_parser("rebuild", help="rebuild and recreate stateless application services only (authority, api, worker, web)")
     rebuild.add_argument("services", nargs="*")
     rebuild.set_defaults(handler=cmd_rebuild)
+    membership = commands.add_parser("membership", help="C8 M2 (AC-7.4): list, approve (two synthetic operator approvals; dry run by default) or reject owner membership requests")
+    membership.add_argument("action", choices=["list", "approve", "reject"])
+    membership.add_argument("--request-id")
+    membership.add_argument("--justification")
+    membership.add_argument("--reason")
+    membership.add_argument("--execute", action="store_true")
+    membership.set_defaults(handler=cmd_membership)
     security = commands.add_parser("security-admin", help="DR-C7-3: first/recovery Security Administrator via the Authority operator plane (dry run by default)")
     security.add_argument("action", choices=["status", "enable-approvals", "appoint", "recover"])
     security.add_argument("--persona", choices=list(PERSONAS))

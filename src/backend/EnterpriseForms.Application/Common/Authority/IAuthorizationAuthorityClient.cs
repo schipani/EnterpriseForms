@@ -57,6 +57,12 @@ public enum SecurityCommandKind
     ApproveFieldSearch,
     WithdrawFieldSearch,
     UpdateFieldSearchers,
+    GrantOrganizationRole,
+    RevokeOrganizationRole,
+    ProposeOrganizationOwnerChange,
+    DisableIdentityBinding,
+    EnableIdentityBinding,
+    RequestOrganizationMembership,
 }
 
 public enum SecurityCommandStatus
@@ -268,6 +274,26 @@ public sealed record AuthoritySecurityAdministratorCandidate(Guid AuthorityUserI
 
 public sealed record AuthoritySecurityAdministratorRoster(bool CanManage, bool AppointmentOperational, string AppointmentUnavailableReason, IReadOnlyList<AuthoritySecurityAdministrator> Administrators,
     IReadOnlyList<AuthoritySecurityAdministratorCandidate>? Candidates, long AuthorizationRevision, Guid CorrelationId);
+
+// ---- C8 M2 (AC-7.3): the organization's complete roster from the Authority (owners and Security Administrators only) ----
+
+public sealed record OrganizationRosterQuery(Guid OrganizationId);
+
+public sealed record AuthorityRosterMember(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, bool MembershipEnabled, DateTimeOffset BoundOn, DateTimeOffset? DisabledOn, IReadOnlyList<string> OrganizationRoles, string? DisplayNameHint);
+
+public sealed record AuthorityOwnerProposal(Guid ProposalId, Guid TargetAuthorityUserId, string ProposedChange, Guid ProposedByAuthorityUserId, string Reason, DateTimeOffset ProposedOn, DateTimeOffset ExpiresOn, string ProposalState, Guid? ConsumedBySecurityCommandId);
+
+public sealed record AuthorityMembershipRequest(Guid RequestId, Guid RequestedAuthorityUserId, string IssuerUri, string SubjectIdentifier, string DisplayNameHint, string? InitialRoleName, Guid RequestedByAuthorityUserId,
+    string Reason, DateTimeOffset RequestedOn, DateTimeOffset ExpiresOn, string RequestState, DateTimeOffset? DecidedOn, string? DecisionReason);
+
+public sealed record AuthorityOrganizationRoster(bool CanManageMembers, bool CanAdministerSecurity, bool CommandsOperational, string CommandsUnavailableReason, bool OperatorApprovalOperational, string? OrganizationIdentityIssuer,
+    IReadOnlyList<AuthorityRosterMember> Members, IReadOnlyList<AuthorityOwnerProposal> OwnerProposals, IReadOnlyList<AuthorityMembershipRequest> MembershipRequests, long AuthorizationRevision, Guid CorrelationId);
+
+/// <summary>C8 M2 (AC-7.3): narrow port to the Authority roster read. Confers nothing; every change is a security command.</summary>
+public interface IOrganizationRosterAuthority
+{
+    Task<AuthorityOrganizationRoster> GetRosterAsync(DelegatedUserContext user, OrganizationRosterQuery query, CancellationToken cancellationToken);
+}
 
 /// <summary>Owner message 7: the Authority's Security Administrator roster (narrow port; used by Organizations, and read-only by SecurityOperations to list and validate incident investigators).</summary>
 public interface ISecurityAdministratorAuthority

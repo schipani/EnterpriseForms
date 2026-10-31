@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, ITestStackIdentityAuthority
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, ITestStackIdentityAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -116,6 +116,9 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
     public Task<AuthoritySecurityAdministratorRoster> GetSecurityAdministratorsAsync(DelegatedUserContext user, SecurityAdministratorRosterQuery query, CancellationToken cancellationToken) =>
         SendAsync<AuthoritySecurityAdministratorRoster>(HttpMethod.Post, "internal/v1/security-administrators", user, query, null, cancellationToken);
+
+    public Task<AuthorityOrganizationRoster> GetRosterAsync(DelegatedUserContext user, OrganizationRosterQuery query, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityOrganizationRoster>(HttpMethod.Post, "internal/v1/organizations/roster", user, query, null, cancellationToken);
 
     public Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken) =>
         SendAsync<AuthorityFieldSearchAdministration>(HttpMethod.Post, "internal/v1/field-search/administration", user, query, null, cancellationToken);

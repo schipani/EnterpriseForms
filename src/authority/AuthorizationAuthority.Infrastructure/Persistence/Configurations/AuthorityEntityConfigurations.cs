@@ -41,6 +41,63 @@ public sealed class IdentityBindingConfiguration : IEntityTypeConfiguration<Iden
         builder.HasIndex(e => new { e.OrganizationId, e.IdentityIssuerUri, e.IdentitySubjectIdentifier }).IsUnique().HasDatabaseName("uq_identity_subject");
         builder.HasIndex(e => new { e.OrganizationId, e.AuthorityUserId }).IsUnique().HasDatabaseName("uq_authority_user_per_org");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_identity_org");
+        // AC-7.2: a disabled membership always records when it was disabled; an enabled one never carries that time.
+        builder.ToTable(t => t.HasCheckConstraint("ck_identity_binding_disabled_state", "(identity_binding_enabled AND identity_disabled_on IS NULL) OR (NOT identity_binding_enabled AND identity_disabled_on IS NOT NULL)"));
+    }
+}
+
+/// <summary>C8 M2 (AC-7): two-owner proposals. Single use; at most one pending proposal per person and change.</summary>
+public sealed class OrganizationRoleChangeProposalConfiguration : IEntityTypeConfiguration<OrganizationRoleChangeProposal>
+{
+    public void Configure(EntityTypeBuilder<OrganizationRoleChangeProposal> builder)
+    {
+        builder.MapSnakeCase("organization_role_change_proposals");
+        builder.HasKey(e => e.OrganizationRoleChangeProposalId);
+        builder.Property(e => e.ProposedChangeName).HasMaxLength(30);
+        builder.Property(e => e.ProposalReasonText).HasMaxLength(500);
+        builder.Property(e => e.ProposalStateName).HasMaxLength(20);
+        builder.HasIndex(e => new { e.OrganizationId, e.ProposalCreatedOn }).HasDatabaseName("ix_role_change_proposals_recent");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_role_change_proposal_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.OrganizationRoleChangeProposalId).HasConstraintName("fk_role_change_proposal_command");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.ConsumedBySecurityCommandId).HasConstraintName("fk_role_change_proposal_consumer");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_role_change_proposal_change", "proposed_change_name IN ('GrantOwner','RevokeOwner','DisableOwner','EnableOwner')");
+            t.HasCheckConstraint("ck_role_change_proposal_state", "(proposal_state_name = 'Pending' AND consumed_by_security_command_id IS NULL) OR (proposal_state_name = 'Consumed' AND consumed_by_security_command_id IS NOT NULL AND proposal_consumed_on IS NOT NULL)");
+            t.HasCheckConstraint("ck_role_change_proposal_not_self", "proposed_by_authority_user_id <> target_authority_user_id");
+            t.HasCheckConstraint("ck_role_change_proposal_expiry", "proposal_expires_on > proposal_created_on");
+        });
+    }
+}
+
+/// <summary>C8 M2 (AC-7.4): owner requests to add a person; only the operator plane decides them.</summary>
+public sealed class OrganizationMembershipRequestConfiguration : IEntityTypeConfiguration<OrganizationMembershipRequest>
+{
+    public void Configure(EntityTypeBuilder<OrganizationMembershipRequest> builder)
+    {
+        builder.MapSnakeCase("organization_membership_requests");
+        builder.HasKey(e => e.OrganizationMembershipRequestId);
+        builder.Property(e => e.RequestedIssuerUri).HasMaxLength(512);
+        builder.Property(e => e.RequestedSubjectIdentifier).HasMaxLength(512);
+        builder.Property(e => e.RequestedDisplayNameHint).HasMaxLength(200);
+        builder.Property(e => e.RequestedInitialRoleName).HasMaxLength(40);
+        builder.Property(e => e.RequestReasonText).HasMaxLength(500);
+        builder.Property(e => e.RequestStateName).HasMaxLength(20);
+        builder.Property(e => e.RequestDecidedByOperatorName).HasMaxLength(128);
+        builder.Property(e => e.RequestDecisionReasonText).HasMaxLength(500);
+        builder.HasIndex(e => new { e.OrganizationId, e.RequestCreatedOn }).HasDatabaseName("ix_membership_requests_recent");
+        builder.HasIndex(e => new { e.OrganizationId, e.RequestedIssuerUri, e.RequestedSubjectIdentifier }).IsUnique().HasFilter("request_state_name = 'Pending'").HasDatabaseName("uq_membership_request_pending_identity");
+        builder.HasIndex(e => new { e.OrganizationId, e.RequestedAuthorityUserId }).IsUnique().HasDatabaseName("uq_membership_request_user");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_membership_request_org");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.OrganizationMembershipRequestId).HasConstraintName("fk_membership_request_command");
+        builder.HasOne<SecurityCommand>().WithMany().HasForeignKey(e => e.DecidedBySecurityCommandId).HasConstraintName("fk_membership_request_decision");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_membership_request_state", "request_state_name IN ('Pending','Approved','Rejected','Expired')");
+            t.HasCheckConstraint("ck_membership_request_role", "requested_initial_role_name IS NULL OR requested_initial_role_name = 'designer'");
+            t.HasCheckConstraint("ck_membership_request_approved", "request_state_name <> 'Approved' OR decided_by_security_command_id IS NOT NULL");
+            t.HasCheckConstraint("ck_membership_request_expiry", "request_expires_on > request_created_on");
+        });
     }
 }
 

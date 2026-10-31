@@ -50,6 +50,14 @@ public static class AuditActions
     public const string FieldSearchApproved = "FIELD_SEARCH_APPROVED";
     public const string SecurityAdministratorAppointed = "SECURITY_ADMINISTRATOR_APPOINTED";
     public const string SecurityAdministratorRemoved = "SECURITY_ADMINISTRATOR_REMOVED";
+
+    // C8 M2 (AC-7): membership and organization roles. The Authority journal is the independent evidence; these are the business timeline.
+    public const string OrganizationRoleGranted = "ORGANIZATION_ROLE_GRANTED";
+    public const string OrganizationRoleRevoked = "ORGANIZATION_ROLE_REVOKED";
+    public const string OrganizationOwnerChangeProposed = "ORGANIZATION_OWNER_CHANGE_PROPOSED";
+    public const string MembershipDisabled = "MEMBERSHIP_DISABLED";
+    public const string MembershipEnabled = "MEMBERSHIP_ENABLED";
+    public const string MembershipRequested = "MEMBERSHIP_REQUESTED";
     public const string FieldSearchWithdrawn = "FIELD_SEARCH_WITHDRAWN";
     public const string FieldSearchersChanged = "FIELD_SEARCHERS_CHANGED";
     public const string FormVersionAuthorityRegistered = "FORM_VERSION_AUTHORITY_REGISTERED";

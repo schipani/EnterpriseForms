@@ -93,6 +93,24 @@ public enum SecurityCommandKind
 
     /// <summary>Phase C7 M2 (OD-4): grants/revokes the per-form field_searcher relation.</summary>
     UpdateFieldSearchers,
+
+    /// <summary>C8 M2 (AC-7.1): grants organization_owner (with another owner's proposal) or designer. Owners only, step-up.</summary>
+    GrantOrganizationRole,
+
+    /// <summary>C8 M2 (AC-7.1): revokes organization_owner (with another owner's proposal) or designer. Never the last owner.</summary>
+    RevokeOrganizationRole,
+
+    /// <summary>C8 M2 (AC-7.1/7.2): first half of a two-owner change (grant/revoke owner, disable/enable an owner). Grants nothing.</summary>
+    ProposeOrganizationOwnerChange,
+
+    /// <summary>C8 M2 (AC-7.2): disables a membership (binding refused, sessions revoked, edges kept).</summary>
+    DisableIdentityBinding,
+
+    /// <summary>C8 M2 (AC-7.2): re-enables a disabled membership with its kept edges; grants nothing new.</summary>
+    EnableIdentityBinding,
+
+    /// <summary>C8 M2 (AC-7.4): records a request to add a person; only two operator approvals create the binding.</summary>
+    RequestOrganizationMembership,
 }
 
 /// <summary>command_payload is validated against the exact command-specific schema in the authority; unknown fields are rejected.</summary>

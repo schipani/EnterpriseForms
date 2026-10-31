@@ -1,8 +1,13 @@
 using System.Reflection;
+using System.Text.Json;
 using EnterpriseForms.Application.Common;
 using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
+using EnterpriseForms.Application.Features.FormDefinitions.CreateFormDefinition;
+using EnterpriseForms.Application.Features.Identity.MemberAdministration;
 using EnterpriseForms.Application.Features.Identity.MemberDirectory;
+using EnterpriseForms.Contracts.Features;
+using EnterpriseForms.Domain.Features.Audit;
 using EnterpriseForms.Domain.Features.Identity;
 using EnterpriseForms.Domain.Features.Teams;
 using Xunit;
@@ -10,176 +15,244 @@ using Xunit;
 namespace EnterpriseForms.Api.ContractTests;
 
 /// <summary>
-/// C8 M2 people directory within the existing Authority: owners/Security Administrators only (decided before any read);
-/// Security Administrators also see Authority-bound people who never signed in (the roster's candidates), owners do not;
-/// 15-row server pages with a cursor bound to caller and filters; search and filters; Security Administrator action hints
-/// that mirror the Authority's rules (no removal of the last one); last sign-in and sign-in status.
+/// C8 M2 people directory and membership commands (business side; the Authority decides). Directory: owners/Security
+/// Administrators only (decided before any read); the Authority roster is the member list (disabled members and people who
+/// never signed in included); 15-row pages with cursors bound to caller and filters; role, sign-in and membership filters;
+/// action hints mirror the Authority rules for the caller; an unavailable roster falls back to names only with no actions.
+/// Commands: payloads and kinds sent to the Authority, the organization issuer taken from the Authority, owner proposals
+/// dispatched to the right command, pending reported as pending, invalid input refused before the Authority is called.
 /// </summary>
 public sealed class MemberDirectoryTests
 {
     private static readonly Guid Org = Guid.CreateVersion7();
     private static readonly Guid Me = Guid.CreateVersion7();
     private static readonly RequestContext Context = new(Org, Me, "https://issuer.invalid", "subject", "Tester", "assertion", Guid.CreateVersion7());
-    private static readonly DateTimeOffset Now = new(2026, 10, 30, 15, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Now = new(2026, 10, 31, 9, 0, 0, TimeSpan.Zero);
 
     private readonly List<User> users = [];
-    private readonly List<AuthoritySecurityAdministrator> administrators = [];
-    private readonly List<AuthoritySecurityAdministratorCandidate> candidates = [];
+    private readonly List<AuthorityRosterMember> members = [];
+    private readonly List<AuthorityOwnerProposal> proposals = [];
     private readonly Guid teamId = Guid.CreateVersion7();
     private readonly List<TeamMembership> memberships = [];
+    private readonly List<SecurityCommandRequest> submitted = [];
     private bool ownerAllowed = true;
-    private bool securityAllowed = true;
-    private bool rosterCanManage = true;
+    private bool securityAllowed;
+    private bool rosterUnavailable;
+    private SecurityCommandStatus commandStatus = SecurityCommandStatus.Effective;
     private int scopes;
 
     public MemberDirectoryTests()
     {
-        users.Add(new User { UserId = Me, TenantId = Org, DisplayName = "Tess Tester", ExternalIssuerUri = "https://issuer.invalid", ExternalSubjectIdentifier = "subject", CreatedOn = Now.AddDays(-3), LastSignedInOn = Now });
-        administrators.Add(new AuthoritySecurityAdministrator(Me, "https://issuer.invalid", "subject", Now, Guid.CreateVersion7()));
+        Add(Me, "Tess Tester", ["organization_owner"], signedIn: true);
         for (var i = 0; i < 20; i++)
         {
-            var id = Guid.CreateVersion7();
-            users.Add(new User { UserId = id, TenantId = Org, DisplayName = $"Person {i:00}", ExternalIssuerUri = "https://issuer.invalid", ExternalSubjectIdentifier = $"sub-{i:00}", CreatedOn = Now.AddDays(-1), LastSignedInOn = i % 2 == 0 ? Now.AddHours(-i) : null });
-            candidates.Add(new AuthoritySecurityAdministratorCandidate(id, "https://issuer.invalid", $"sub-{i:00}"));
+            Add(Guid.CreateVersion7(), $"Person {i:00}", i == 4 ? ["designer"] : [], signedIn: i % 2 == 0, enabled: i != 6);
         }
 
-        candidates.Add(new AuthoritySecurityAdministratorCandidate(Guid.CreateVersion7(), "https://issuer.invalid", "never-signed-in"));
-        memberships.Add(new TeamMembership { TeamMembershipId = Guid.CreateVersion7(), TeamId = teamId, UserId = users[3].UserId, CreatedOn = Now });
+        members.Add(new AuthorityRosterMember(Guid.CreateVersion7(), "https://issuer.invalid", "never-signed-in", true, Now, null, [], "Nia Newcomer"));
+        memberships.Add(new TeamMembership { TeamMembershipId = Guid.CreateVersion7(), TeamId = teamId, UserId = members[3].AuthorityUserId, CreatedOn = Now });
     }
 
-    private GetMemberDirectoryHandler Handler(bool candidatesReturned = true)
+    private void Add(Guid id, string name, IReadOnlyList<string> roles, bool signedIn, bool enabled = true)
     {
-        var authority = Stubs.Create<IAuthorizationAuthorityClient>((method, args) => method.Name == nameof(IAuthorizationAuthorityClient.CheckPermissionsBatchAsync)
-            ? Task.FromResult<IReadOnlyList<PermissionDecision>>(((IReadOnlyList<PermissionCheckRequest>)args[1]!).Select(r => new PermissionDecision(r.RequestedAction == ProtectedAction.ManageOrganization ? ownerAllowed : securityAllowed, null, 9, 9, null, Guid.Empty)).ToList())
-            : throw new NotSupportedException(method.Name));
-        var roster = Stubs.Create<ISecurityAdministratorAuthority>((_, _) => Task.FromResult(new AuthoritySecurityAdministratorRoster(rosterCanManage, true, string.Empty, administrators, candidatesReturned ? candidates : null, 9, Guid.Empty)));
-        var scope = Stubs.Create<IBusinessScope>((method, _) => method.Name switch
+        users.Add(new User { UserId = id, TenantId = Org, DisplayName = name, ExternalIssuerUri = "https://issuer.invalid", ExternalSubjectIdentifier = "sub-" + name.Replace(' ', '-'), CreatedOn = Now.AddDays(-3), LastSignedInOn = signedIn ? Now : null });
+        members.Add(new AuthorityRosterMember(id, "https://issuer.invalid", "sub-" + name.Replace(' ', '-'), enabled, Now.AddDays(-5), enabled ? null : Now.AddDays(-1), roles, null));
+    }
+
+    private AuthorityOrganizationRoster Roster() => rosterUnavailable
+        ? throw new AuthorityClientException("AUTHORITY_UNAVAILABLE", 503, true)
+        : new AuthorityOrganizationRoster(ownerAllowed, securityAllowed, true, string.Empty, true, "https://issuer.invalid", members, proposals, [], 9, Guid.Empty);
+
+    private IAuthorizationAuthorityClient Authority() => Stubs.Create<IAuthorizationAuthorityClient>((method, args) => method.Name switch
+    {
+        nameof(IAuthorizationAuthorityClient.CheckPermissionsBatchAsync) => Task.FromResult<IReadOnlyList<PermissionDecision>>(((IReadOnlyList<PermissionCheckRequest>)args[1]!)
+            .Select(r => new PermissionDecision(r.RequestedAction == ProtectedAction.ManageOrganization ? ownerAllowed : securityAllowed, null, 9, 9, null, Guid.Empty)).ToList()),
+        nameof(IAuthorizationAuthorityClient.CheckPermissionAsync) => Task.FromResult(new PermissionDecision(ownerAllowed, null, 9, 9, null, Guid.Empty)),
+        nameof(IAuthorizationAuthorityClient.SubmitSecurityCommandAsync) => Submit((SecurityCommandRequest)args[1]!),
+        _ => throw new NotSupportedException(method.Name),
+    });
+
+    private Task<SecurityCommandResult> Submit(SecurityCommandRequest request)
+    {
+        submitted.Add(request);
+        return Task.FromResult(new SecurityCommandResult(Guid.CreateVersion7(), commandStatus, 10, 10, "Ready", null, Guid.Empty));
+    }
+
+    private IOrganizationRosterAuthority RosterAuthority() => Stubs.Create<IOrganizationRosterAuthority>((_, _) => Task.FromResult(Roster()));
+
+    private IBusinessStore Store() => Stubs.Create<IBusinessStore>((_, _) =>
+    {
+        scopes++;
+        return Task.FromResult(Stubs.Create<IBusinessScope>((method, _) => method.Name switch
         {
             nameof(IBusinessScope.GetUsersAsync) => (object?)Task.FromResult(users),
             nameof(IBusinessScope.GetTeamsAsync) => Task.FromResult(new List<Team> { new() { TeamId = teamId, TenantId = Org, TeamName = "Intake desk", IsActive = true } }),
             nameof(IBusinessScope.GetActiveTeamMembershipsAsync) => Task.FromResult(memberships),
+            nameof(IBusinessScope.AddAuditEvent) => null,
+            nameof(IBusinessScope.GetTargetAuditEventsAsync) => Task.FromResult(new List<EnterpriseForms.Domain.Features.Audit.AuditEvent>()),
+            nameof(IBusinessScope.CommitAsync) => Task.CompletedTask,
             nameof(IAsyncDisposable.DisposeAsync) => ValueTask.CompletedTask,
             _ => throw new NotSupportedException(method.Name),
-        });
-        var store = Stubs.Create<IBusinessStore>((_, _) =>
-        {
-            scopes++;
-            return Task.FromResult(scope);
-        });
-        return new GetMemberDirectoryHandler(store, authority, roster, new TestProtector());
+        }));
+    });
+
+    private GetMemberDirectoryHandler Directory() => new(Store(), Authority(), RosterAuthority(), new TestProtector());
+
+    private MemberAdministrationHandlers Commands()
+    {
+        var authority = Authority();
+        return new MemberAdministrationHandlers(Store(), authority, RosterAuthority(), new AuthorityCommandAwaiter(authority, new JumpingClock()), TimeProvider.System);
     }
 
-    private static MemberDirectoryQuery Query(string? search = null, string? role = null, string? status = null, string? token = null) => new(search, role, status, null, token);
+    private static MemberDirectoryQuery Query(string? search = null, string? role = null, string? status = null, string? token = null, string? membership = null) => new(search, role, status, null, token, membership);
+
+    // ---- directory ----
 
     [Fact]
-    public async Task ASecurityAdministratorSeesEveryEnabledBindingInFifteenRowPages()
+    public async Task TheAuthorityRosterIsTheMemberListInFifteenRowPages()
     {
-        var handler = Handler();
+        var handler = Directory();
         var first = await handler.GetAsync(Context, Query(), CancellationToken.None);
         Assert.Equal(22, first.TotalCount);
         Assert.Equal(15, first.Members.Count);
-        Assert.Equal(15, first.PageSize);
-        Assert.True(first.IncludesMembersWhoNeverSignedIn);
         Assert.Equal(GetMemberDirectoryHandler.CompleteCoverage, first.CoverageStatement);
         var second = await handler.GetAsync(Context, Query(token: first.NextToken), CancellationToken.None);
         Assert.Equal(7, second.Members.Count);
-        Assert.Equal(16, second.PageStart);
         var all = first.Members.Concat(second.Members).ToList();
         Assert.Equal(22, all.Select(m => m.UserId).Distinct().Count());
-        var never = Assert.Single(all, m => m.SignInStatus == "NeverSignedIn");
-        Assert.Equal(string.Empty, never.DisplayName);
-        Assert.Equal("never-signed-in", never.IdentitySubject);
-        Assert.Null(never.FirstSeenOn);
-        Assert.Same(never, all[^1]); // nameless rows sort after named ones
-    }
-
-    [Fact]
-    public async Task AnOwnerWhoIsNotASecurityAdministratorSeesOnlyKnownPeopleAndAdministrators()
-    {
-        securityAllowed = false;
-        rosterCanManage = false;
-        var page = await Handler(candidatesReturned: false).GetAsync(Context, Query(), CancellationToken.None);
-        Assert.Equal(21, page.TotalCount);
-        Assert.False(page.IncludesMembersWhoNeverSignedIn);
-        Assert.Equal(GetMemberDirectoryHandler.PartialCoverage, page.CoverageStatement);
-        Assert.All(page.Members, m => Assert.Empty(m.AvailableActions!));
-        Assert.False(page.SecurityAdministratorChangesOperational);
+        var newcomer = Assert.Single(all, m => m.SignInStatus == "NeverSignedIn");
+        Assert.Equal("Nia Newcomer", newcomer.DisplayName); // the approved request's display hint until they sign in
+        Assert.Equal("Disabled", Assert.Single(all, m => m.DisplayName == "Person 06").MembershipState);
+        Assert.Equal(["OrganizationOwner"], all.Single(m => m.UserId == Me).AuthorityRoles);
     }
 
     [Fact]
     public async Task SomeoneWhoIsNeitherOwnerNorSecurityAdministratorIsRefusedBeforeAnythingIsRead()
     {
         ownerAllowed = false;
-        securityAllowed = false;
-        var error = await Assert.ThrowsAsync<BusinessException>(() => Handler().GetAsync(Context, Query(), CancellationToken.None));
+        var error = await Assert.ThrowsAsync<BusinessException>(() => Directory().GetAsync(Context, Query(), CancellationToken.None));
         Assert.Equal(403, error.HttpStatusCode);
         Assert.Equal(0, scopes);
     }
 
     [Fact]
-    public async Task SearchCoversNamesIdentitiesAndTeamsAndFiltersCombine()
+    public async Task FiltersCoverRolesSignInAndMembershipAndUnknownValuesAreRefused()
     {
-        var handler = Handler();
+        var handler = Directory();
         Assert.Equal(["Person 02"], (await handler.GetAsync(Context, Query(search: "intake"), CancellationToken.None)).Members.Select(m => m.DisplayName));
-        Assert.Equal(["Person 07"], (await handler.GetAsync(Context, Query(search: "SUB-07"), CancellationToken.None)).Members.Select(m => m.DisplayName));
-        var administratorsOnly = await handler.GetAsync(Context, Query(role: "SecurityAdministrator"), CancellationToken.None);
-        Assert.Equal([Me], administratorsOnly.Members.Select(m => m.UserId));
-        var neverSignedIn = await handler.GetAsync(Context, Query(status: "NeverSignedIn"), CancellationToken.None);
-        Assert.Equal(1, neverSignedIn.TotalCount);
-        var signedIn = await handler.GetAsync(Context, Query(role: "None", status: "SignedIn"), CancellationToken.None);
-        Assert.Equal(10, signedIn.TotalCount);
-        Assert.All(signedIn.Members, m => Assert.NotNull(m.LastSignedInOn));
-        await Assert.ThrowsAsync<BusinessException>(() => handler.GetAsync(Context, Query(role: "OrganizationOwner"), CancellationToken.None));
-        await Assert.ThrowsAsync<BusinessException>(() => handler.GetAsync(Context, Query(status: "Disabled"), CancellationToken.None));
+        Assert.Equal(["Person 04"], (await handler.GetAsync(Context, Query(role: "Designer"), CancellationToken.None)).Members.Select(m => m.DisplayName));
+        Assert.Equal([Me], (await handler.GetAsync(Context, Query(role: "OrganizationOwner"), CancellationToken.None)).Members.Select(m => m.UserId));
+        Assert.Equal(["Person 06"], (await handler.GetAsync(Context, Query(membership: "Disabled"), CancellationToken.None)).Members.Select(m => m.DisplayName));
+        Assert.Equal(1, (await handler.GetAsync(Context, Query(status: "NeverSignedIn"), CancellationToken.None)).TotalCount);
+        await Assert.ThrowsAsync<BusinessException>(() => handler.GetAsync(Context, Query(membership: "Deleted"), CancellationToken.None));
+        await Assert.ThrowsAsync<BusinessException>(() => handler.GetAsync(Context, Query(role: "Root"), CancellationToken.None));
     }
 
     [Fact]
     public async Task ACursorIsBoundToItsFiltersAndCaller()
     {
-        var handler = Handler();
+        var handler = Directory();
         var first = await handler.GetAsync(Context, Query(), CancellationToken.None);
-        Assert.NotNull(first.NextToken);
         await Assert.ThrowsAsync<BusinessException>(() => handler.GetAsync(Context, Query(search: "person", token: first.NextToken), CancellationToken.None));
         await Assert.ThrowsAsync<BusinessException>(() => handler.GetAsync(Context with { LocalUserId = Guid.CreateVersion7() }, Query(token: first.NextToken), CancellationToken.None));
     }
 
     [Fact]
-    public async Task ActionHintsMirrorTheAuthorityRules()
+    public async Task OwnerActionHintsMirrorTheAuthorityRulesAndNeverOfferChangesToOneself()
     {
-        var page = await Handler().GetAsync(Context, Query(search: "Tess"), CancellationToken.None);
-        var self = Assert.Single(page.Members);
-        Assert.Equal(["SecurityAdministrator"], self.AuthorityRoles);
-        Assert.Empty(self.AvailableActions!); // the last Security Administrator cannot be removed
-        var candidate = (await Handler().GetAsync(Context, Query(search: "Person 05"), CancellationToken.None)).Members.Single();
-        Assert.Equal([GetMemberDirectoryHandler.AppointSecurityAdministrator], candidate.AvailableActions);
-
-        administrators.Add(new AuthoritySecurityAdministrator(users[5].UserId, "https://issuer.invalid", "sub-04", Now, Guid.CreateVersion7()));
-        candidates.RemoveAll(c => c.AuthorityUserId == users[5].UserId);
-        var withTwo = await Handler().GetAsync(Context, Query(role: "SecurityAdministrator"), CancellationToken.None);
-        Assert.All(withTwo.Members, m => Assert.Equal([GetMemberDirectoryHandler.RemoveSecurityAdministrator], m.AvailableActions));
-        Assert.True(withTwo.SecurityAdministratorChangesOperational);
+        proposals.Add(new AuthorityOwnerProposal(Guid.CreateVersion7(), members[2].AuthorityUserId, "GrantOwner", Guid.CreateVersion7(), "x", Now, Now.AddHours(24), "Pending", null));
+        var all = (await Directory().GetAsync(Context, Query(), CancellationToken.None)).Members.Concat((await Directory().GetAsync(Context, Query(search: "Tess"), CancellationToken.None)).Members).ToList();
+        Assert.Empty(all.Single(m => m.UserId == Me).AvailableActions!);
+        Assert.Equal(["GrantDesigner", "ProposeOwnerGrant", "DisableMembership"], all.Single(m => m.DisplayName == "Person 00").AvailableActions);
+        Assert.Equal(["GrantDesigner", "DisableMembership"], all.Single(m => m.DisplayName == "Person 01").AvailableActions); // a GrantOwner proposal is already pending
+        Assert.Contains("RevokeDesigner", all.Single(m => m.DisplayName == "Person 04").AvailableActions!);
+        Assert.Equal(["EnableMembership"], all.Single(m => m.DisplayName == "Person 06").AvailableActions);
     }
 
     [Fact]
-    public async Task AnUnavailableRosterShowsNoRolesAndNoActions()
+    public async Task ASecurityAdministratorWhoIsNotAnOwnerGetsOnlyTheSecurityAdministratorHints()
     {
-        var authority = Stubs.Create<IAuthorizationAuthorityClient>((_, args) => Task.FromResult<IReadOnlyList<PermissionDecision>>(((IReadOnlyList<PermissionCheckRequest>)args[1]!).Select(_ => new PermissionDecision(true, null, 9, 9, null, Guid.Empty)).ToList()));
-        var roster = Stubs.Create<ISecurityAdministratorAuthority>((_, _) => throw new AuthorityClientException("AUTHORITY_UNAVAILABLE", 503, true));
-        var scope = Stubs.Create<IBusinessScope>((method, _) => method.Name switch
-        {
-            nameof(IBusinessScope.GetUsersAsync) => (object?)Task.FromResult(users),
-            nameof(IBusinessScope.GetTeamsAsync) => Task.FromResult(new List<Team>()),
-            nameof(IBusinessScope.GetActiveTeamMembershipsAsync) => Task.FromResult(new List<TeamMembership>()),
-            nameof(IAsyncDisposable.DisposeAsync) => ValueTask.CompletedTask,
-            _ => throw new NotSupportedException(method.Name),
-        });
-        var handler = new GetMemberDirectoryHandler(Stubs.Create<IBusinessStore>((_, _) => Task.FromResult(scope)), authority, roster, new TestProtector());
-        var page = await handler.GetAsync(Context, Query(), CancellationToken.None);
+        ownerAllowed = false;
+        securityAllowed = true;
+        var page = await Directory().GetAsync(Context, Query(search: "Person 00"), CancellationToken.None);
+        Assert.Equal(["AppointSecurityAdministrator"], Assert.Single(page.Members).AvailableActions);
+        Assert.False(page.CanManageMembers);
+    }
+
+    [Fact]
+    public async Task AnUnavailableRosterFallsBackToNamesWithoutRolesOrActions()
+    {
+        rosterUnavailable = true;
+        var page = await Directory().GetAsync(Context, Query(), CancellationToken.None);
         Assert.False(page.RolesAvailable);
-        Assert.NotNull(page.RolesUnavailableReason);
+        Assert.Equal(GetMemberDirectoryHandler.FallbackCoverage, page.CoverageStatement);
         Assert.Equal(21, page.TotalCount);
-        Assert.All(page.Members, m => Assert.Empty(m.AuthorityRoles));
         Assert.All(page.Members, m => Assert.Empty(m.AvailableActions!));
+        Assert.All(page.Members, m => Assert.Equal("Unknown", m.MembershipState));
+    }
+
+    // ---- commands ----
+
+    [Fact]
+    public async Task DesignerChangesAreSentAsOneOwnerCommandsWithTheDevelopmentStepUp()
+    {
+        var target = members[5].AuthorityUserId;
+        var outcome = await Commands().GrantDesignerAsync(Context, target, new MemberRoleChangeRequest("Designer", "covers forms", UseDevelopmentStepUp: true), "key-0001", CancellationToken.None);
+        Assert.Equal("Effective", outcome.CommandStatus);
+        var command = Assert.Single(submitted);
+        Assert.Equal(SecurityCommandKind.GrantOrganizationRole, command.CommandKind);
+        Assert.Equal("designer", command.CommandPayload.GetProperty("role_name").GetString());
+        Assert.Equal(target, command.CommandPayload.GetProperty("authority_user_id").GetGuid());
+        Assert.Equal(MemberAdministrationHandlers.SyntheticStepUpMarker, command.CommandPayload.GetProperty("step_up_evidence").GetString());
+        await Assert.ThrowsAsync<BusinessException>(() => Commands().GrantDesignerAsync(Context, target, new MemberRoleChangeRequest("OrganizationOwner", "x y z"), "key-0002", CancellationToken.None));
+        await Assert.ThrowsAsync<BusinessException>(() => Commands().GrantDesignerAsync(Context, target, new MemberRoleChangeRequest("Designer", " "), "key-0003", CancellationToken.None));
+        Assert.Single(submitted); // refused before the Authority is called
+    }
+
+    [Theory]
+    [InlineData("GrantOwner", SecurityCommandKind.GrantOrganizationRole)]
+    [InlineData("RevokeOwner", SecurityCommandKind.RevokeOrganizationRole)]
+    [InlineData("DisableOwner", SecurityCommandKind.DisableIdentityBinding)]
+    [InlineData("EnableOwner", SecurityCommandKind.EnableIdentityBinding)]
+    public async Task ApprovingAProposalSendsTheMatchingCommandWithTheProposalId(string change, SecurityCommandKind expected)
+    {
+        var proposalId = Guid.CreateVersion7();
+        var target = members[7].AuthorityUserId;
+        proposals.Add(new AuthorityOwnerProposal(proposalId, target, change, Guid.CreateVersion7(), "board", Now, Now.AddHours(24), "Pending", null));
+        await Commands().ApproveProposalAsync(Context, proposalId, new MemberCommandRequest("second owner agrees", true), "key-0004", CancellationToken.None);
+        var command = Assert.Single(submitted);
+        Assert.Equal(expected, command.CommandKind);
+        Assert.Equal(proposalId, command.CommandPayload.GetProperty("proposal_id").GetGuid());
+        Assert.Equal(target, command.CommandPayload.GetProperty("authority_user_id").GetGuid());
+        await Assert.ThrowsAsync<BusinessException>(() => Commands().ApproveProposalAsync(Context, Guid.CreateVersion7(), new MemberCommandRequest("x y z"), "key-0005", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AMembershipRequestUsesTheOrganizationIssuerFromTheAuthorityAndReturnsTheRequestId()
+    {
+        var outcome = await Commands().RequestMembershipAsync(Context, new CreateMembershipRequestRequest(" 0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0 ", "Nia Newcomer", "Designer", "joins intake", true), "key-0006", CancellationToken.None);
+        var command = Assert.Single(submitted);
+        Assert.Equal(SecurityCommandKind.RequestOrganizationMembership, command.CommandKind);
+        Assert.Equal("https://issuer.invalid", command.CommandPayload.GetProperty("issuer_uri").GetString());
+        Assert.Equal("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", command.CommandPayload.GetProperty("subject_identifier").GetString());
+        Assert.Equal("designer", command.CommandPayload.GetProperty("initial_role_name").GetString());
+        Assert.Equal(outcome.CommandId, outcome.RequestId);
+        await Assert.ThrowsAsync<BusinessException>(() => Commands().RequestMembershipAsync(Context, new CreateMembershipRequestRequest("x", "y", "OrganizationOwner", "a b c"), "key-0007", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task APendingCommandIsReportedAsPendingNeverAsDone()
+    {
+        commandStatus = SecurityCommandStatus.CommittedAwaitingProjection;
+        await Assert.ThrowsAsync<PendingCommandException>(() => Commands().SetMembershipAsync(Context, members[9].AuthorityUserId, enable: false, new MemberCommandRequest("left the unit", true), "key-0008", CancellationToken.None));
+    }
+
+    /// <summary>Every reading is a minute later, so the awaiter's budget is spent at once (no real waiting in a unit test).</summary>
+    private sealed class JumpingClock : TimeProvider
+    {
+        private DateTimeOffset now = Now;
+
+        public override DateTimeOffset GetUtcNow() => now = now.AddMinutes(1);
     }
 
     private sealed class TestProtector : IOpaqueCursorProtector

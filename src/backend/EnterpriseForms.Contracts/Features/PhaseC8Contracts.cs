@@ -28,7 +28,19 @@ public sealed record OrganizationOverviewResponse(bool CanManageConfiguration, b
 /// <c>RemoveSecurityAdministrator</c>.
 /// </summary>
 public sealed record OrganizationMemberResponse(Guid UserId, string DisplayName, string IdentityIssuer, string IdentitySubject, DateTimeOffset? FirstSeenOn, IReadOnlyList<string> AuthorityRoles, IReadOnlyList<DirectoryTeamResponse> Teams, bool IsCurrentUser,
-    DateTimeOffset? LastSignedInOn = null, string SignInStatus = "NotRecorded", IReadOnlyList<string>? AvailableActions = null);
+    DateTimeOffset? LastSignedInOn = null, string SignInStatus = "NotRecorded", IReadOnlyList<string>? AvailableActions = null, string MembershipState = "Enabled", DateTimeOffset? DisabledOn = null);
+
+/// <summary>
+/// C8 M2 (AC-7): the first half of a two-owner change. <c>ProposedChange</c>: GrantOwner, RevokeOwner, DisableOwner,
+/// EnableOwner. <c>ProposalState</c>: Pending, Expired or Consumed. <c>CanApprove</c>: the caller is another owner than the
+/// proposer and the person (the Authority re-checks everything when the approval is submitted).
+/// </summary>
+public sealed record OwnerProposalResponse(Guid ProposalId, Guid TargetUserId, string TargetDisplayName, string ProposedChange, Guid ProposedByUserId, string ProposedByDisplayName, string Reason,
+    DateTimeOffset ProposedOn, DateTimeOffset ExpiresOn, string ProposalState, bool CanApprove);
+
+/// <summary>C8 M2 (AC-7.4): an owner's request to add a person. <c>RequestState</c>: Pending (awaiting two operator approvals), Approved, Rejected or Expired. Membership is not sign-in readiness.</summary>
+public sealed record MembershipRequestResponse(Guid RequestId, Guid RequestedUserId, string IssuerUri, string SubjectIdentifier, string DisplayNameHint, string? InitialRoleName, Guid RequestedByUserId, string RequestedByDisplayName,
+    string Reason, DateTimeOffset RequestedOn, DateTimeOffset ExpiresOn, string RequestState, DateTimeOffset? DecidedOn, string? DecisionReason);
 
 /// <summary>
 /// One server page (default 15) of the people directory. <c>Source</c> and <c>CoverageStatement</c> say where rows come from
@@ -37,7 +49,28 @@ public sealed record OrganizationMemberResponse(Guid UserId, string DisplayName,
 /// </summary>
 public sealed record OrganizationMemberDirectoryResponse(string Source, IReadOnlyList<OrganizationMemberResponse> Members, bool RolesAvailable, string? RolesUnavailableReason,
     int TotalCount = 0, int PageStart = 0, int PageSize = 0, string? NextToken = null, string? PreviousToken = null, bool IncludesMembersWhoNeverSignedIn = false, string CoverageStatement = "",
-    bool SecurityAdministratorChangesOperational = false, string? SecurityAdministratorChangesUnavailableReason = null);
+    bool SecurityAdministratorChangesOperational = false, string? SecurityAdministratorChangesUnavailableReason = null,
+    bool CanManageMembers = false, bool MembershipCommandsOperational = false, string? MembershipCommandsUnavailableReason = null, bool OperatorApprovalOperational = false, string? OrganizationIdentityIssuer = null,
+    IReadOnlyList<OwnerProposalResponse>? OwnerProposals = null, IReadOnlyList<MembershipRequestResponse>? MembershipRequests = null);
+
+/// <summary>C8 M2: grant or revoke the Designer role (one owner). Owner changes go through proposals.</summary>
+public sealed record MemberRoleChangeRequest(string RoleName, string Reason, bool UseDevelopmentStepUp = false);
+
+/// <summary>C8 M2: disable, re-enable, or remove a role from a member (one owner; an owner's membership goes through a proposal).</summary>
+public sealed record MemberCommandRequest(string Reason, bool UseDevelopmentStepUp = false);
+
+/// <summary>C8 M2: propose GrantOwner, RevokeOwner, DisableOwner or EnableOwner; another owner approves it within 24 hours.</summary>
+public sealed record OwnerProposalRequest(string Change, string Reason, bool UseDevelopmentStepUp = false);
+
+/// <summary>
+/// C8 M2 (AC-7.4): ask to add a person. The identity provider is the organization's configured Microsoft Entra tenant (set
+/// by the server); <c>SubjectIdentifier</c> is the person's immutable object id, never an email address. <c>InitialRoleName</c>:
+/// null or <c>Designer</c>. Two operator approvals are required before the person becomes a member.
+/// </summary>
+public sealed record CreateMembershipRequestRequest(string SubjectIdentifier, string DisplayNameHint, string? InitialRoleName, string Reason, bool UseDevelopmentStepUp = false);
+
+/// <summary>Outcome of a membership or role command: <c>CommandStatus</c> is Effective once the Authority applied it. <c>ProposalId</c>/<c>RequestId</c> for proposals and requests.</summary>
+public sealed record MemberCommandResponse(Guid CommandId, string CommandStatus, long AuthorizationRevision, Guid? ProposalId = null, Guid? RequestId = null, DateTimeOffset? ExpiresOn = null);
 
 public sealed record TeamSummaryResponse(Guid TeamId, string TeamName, bool IsActive, int MemberCount, DateTimeOffset CreatedOn, DateTimeOffset ModifiedOn);
 

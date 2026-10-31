@@ -1056,6 +1056,138 @@
         }
       }
     },
+    "/internal/v1/operator/organizations/{organizationId}/membership-requests": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "operationId": "ListOrganizationMembershipRequests",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorMembershipRequests"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/membership-requests/{requestId}/approve": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "AC-7.4: dry run, then two ES256 approvals from distinct registered approvers over the exact statement (Development/Testing only until PIM). Re-checks request state, expiry, the requesting owner, the identity and its issuer inside the organization lock; creates the identity binding (and optional designer role) as one journaled command.",
+        "operationId": "ApproveOrganizationMembership",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipApprovalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/membership-requests/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "operationId": "RejectOrganizationMembership",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipRejectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMembershipRequestEntry"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/operator/fault-injection": {
       "post": {
         "tags": [
@@ -1316,6 +1448,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SecurityAdministratorRoster"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/organizations/roster": {
+      "post": {
+        "tags": [
+          "Membership"
+        ],
+        "summary": "AC-7.3: every identity binding of the caller's organization with its enabled state and organization roles, two-owner proposals and membership requests of the last 30 days. Organization owners and Security Administrators only; anyone else gets 404. No record content or counts.",
+        "operationId": "GetOrganizationRoster",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationRosterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRosterResponse"
                 }
               }
             }
@@ -2473,6 +2636,178 @@
           "AttachmentLifecycle"
         ]
       },
+      "MembershipApprovalRequest": {
+        "required": [
+          "confirm_organization_id",
+          "justification",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "confirm_organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "approvals": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "MembershipApprovalResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "operation_id",
+          "operation_kind",
+          "organization_id",
+          "organization_display_name",
+          "target",
+          "initial_role_name",
+          "request_state",
+          "consequences",
+          "approval_statement_json",
+          "approval_statement_sha256",
+          "approval_mode",
+          "approval_assurance",
+          "required_approvals",
+          "security_command_id",
+          "command_status",
+          "replayed",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_kind": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/OperatorOrganizationPrincipal"
+          },
+          "initial_role_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "request_state": {
+            "type": "string"
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval_statement_json": {
+            "type": "string"
+          },
+          "approval_statement_sha256": {
+            "type": "string"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "required_approvals": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "command_status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "MembershipRejectionRequest": {
+        "required": [
+          "confirm_organization_id",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "confirm_organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "MigrationCataloguePage": {
         "required": [
           "search_catalogue_snapshot_id",
@@ -2615,6 +2950,42 @@
               "null",
               "string"
             ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OperatorMembershipRequests": {
+        "required": [
+          "organization_id",
+          "organization_display_name",
+          "approval_mode",
+          "approvals_operational",
+          "requests",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approvals_operational": {
+            "type": "boolean"
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMembershipRequestEntry"
+            }
           },
           "correlation_id": {
             "type": "string",
@@ -2787,6 +3158,264 @@
           },
           "integrity_quarantine_enabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "OrganizationMembershipRequestEntry": {
+        "required": [
+          "request_id",
+          "requested_authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "display_name_hint",
+          "initial_role_name",
+          "requested_by_authority_user_id",
+          "reason",
+          "requested_on",
+          "expires_on",
+          "request_state",
+          "decided_on",
+          "decision_reason"
+        ],
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requested_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name_hint": {
+            "type": "string"
+          },
+          "initial_role_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requested_by_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_state": {
+            "type": "string"
+          },
+          "decided_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "decision_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OrganizationOwnerProposal": {
+        "required": [
+          "proposal_id",
+          "target_authority_user_id",
+          "proposed_change",
+          "proposed_by_authority_user_id",
+          "reason",
+          "proposed_on",
+          "expires_on",
+          "proposal_state",
+          "consumed_by_security_command_id"
+        ],
+        "type": "object",
+        "properties": {
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposed_change": {
+            "type": "string"
+          },
+          "proposed_by_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "proposed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proposal_state": {
+            "type": "string"
+          },
+          "consumed_by_security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationRosterMember": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "membership_enabled",
+          "bound_on",
+          "disabled_on",
+          "organization_roles",
+          "display_name_hint"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "membership_enabled": {
+            "type": "boolean"
+          },
+          "bound_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disabled_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "organization_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "display_name_hint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OrganizationRosterRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationRosterResponse": {
+        "required": [
+          "can_manage_members",
+          "can_administer_security",
+          "commands_operational",
+          "commands_unavailable_reason",
+          "operator_approval_operational",
+          "organization_identity_issuer",
+          "members",
+          "owner_proposals",
+          "membership_requests",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "can_manage_members": {
+            "type": "boolean"
+          },
+          "can_administer_security": {
+            "type": "boolean"
+          },
+          "commands_operational": {
+            "type": "boolean"
+          },
+          "commands_unavailable_reason": {
+            "type": "string"
+          },
+          "operator_approval_operational": {
+            "type": "boolean"
+          },
+          "organization_identity_issuer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationRosterMember"
+            }
+          },
+          "owner_proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOwnerProposal"
+            }
+          },
+          "membership_requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMembershipRequestEntry"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -4137,7 +4766,13 @@
           "RegisterPublishedFormVersion",
           "ApproveFieldSearch",
           "WithdrawFieldSearch",
-          "UpdateFieldSearchers"
+          "UpdateFieldSearchers",
+          "GrantOrganizationRole",
+          "RevokeOrganizationRole",
+          "ProposeOrganizationOwnerChange",
+          "DisableIdentityBinding",
+          "EnableIdentityBinding",
+          "RequestOrganizationMembership"
         ]
       },
       "SecurityCommandOutcome": {
@@ -4683,6 +5318,9 @@
     },
     {
       "name": "FieldSearch"
+    },
+    {
+      "name": "Membership"
     }
   ]
 }

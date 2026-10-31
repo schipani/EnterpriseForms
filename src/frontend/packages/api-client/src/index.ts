@@ -169,7 +169,21 @@ export type DashboardPeriodQuery = { periodDays: 7 | 30 | 90; timeZone?: string 
 /** Shared shape of the dashboard section queries: every list is paged on the server (default 15 rows, opaque cursor). */
 export type DashboardPageQuery = { pageSize?: number; continuationToken?: string };
 /** People directory (C8 M2): server-paged, default 15 rows. */
-export type OrganizationMemberQuery = { q?: string; role?: "SecurityAdministrator" | "None"; signInStatus?: "SignedIn" | "NotRecorded" | "NeverSignedIn"; pageSize?: number; continuationToken?: string };
+export type OrganizationMemberQuery = {
+  q?: string;
+  role?: "OrganizationOwner" | "Designer" | "SecurityAdministrator" | "None";
+  signInStatus?: "SignedIn" | "NotRecorded" | "NeverSignedIn";
+  membershipState?: "Enabled" | "Disabled";
+  pageSize?: number;
+  continuationToken?: string;
+};
+export type MemberRoleChangeRequest = S["MemberRoleChangeRequest"];
+export type MemberCommandRequest = S["MemberCommandRequest"];
+export type OwnerProposalRequest = S["OwnerProposalRequest"];
+export type CreateMembershipRequestRequest = S["CreateMembershipRequestRequest"];
+export type MemberCommandResponse = S["MemberCommandResponse"];
+export type OwnerProposalResponse = S["OwnerProposalResponse"];
+export type MembershipRequestResponse = S["MembershipRequestResponse"];
 
 export type DashboardUploadQuery = DashboardPageQuery & { q?: string; status?: "InProgress" | "Completed" | "Failed" | "Cancelled"; from?: string; before?: string };
 
@@ -325,6 +339,16 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       overview: (signal?: AbortSignal) => read<OrganizationOverviewResponse>("organization.overview", undefined, undefined, "interactive-read", signal),
       /** Phase C8 M1 (PG-050, read-only): projection rows labelled as such, Security Administrator badges from the Authority roster. */
       members: (query: OrganizationMemberQuery, signal?: AbortSignal) => read<OrganizationMemberDirectoryResponse>("organization.members", undefined, query, "interactive-read", signal),
+      // C8 M2 (AC-7): every change is an Authority security command; one Idempotency-Key per user action.
+      grantMemberRole: (userId: string, request: MemberRoleChangeRequest) => write<MemberCommandResponse>("POST", "organization.grantMemberRole", { userId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      revokeMemberRole: (userId: string, roleName: string, request: MemberCommandRequest) =>
+        write<MemberCommandResponse>("POST", "organization.revokeMemberRole", { userId, roleName }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      proposeOwnerChange: (userId: string, request: OwnerProposalRequest) => write<MemberCommandResponse>("POST", "organization.proposeOwnerChange", { userId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      approveOwnerProposal: (proposalId: string, request: MemberCommandRequest) =>
+        write<MemberCommandResponse>("POST", "organization.approveOwnerProposal", { proposalId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      disableMember: (userId: string, request: MemberCommandRequest) => write<MemberCommandResponse>("POST", "organization.disableMember", { userId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      enableMember: (userId: string, request: MemberCommandRequest) => write<MemberCommandResponse>("POST", "organization.enableMember", { userId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      requestMembership: (request: CreateMembershipRequestRequest) => write<MemberCommandResponse>("POST", "organization.requestMembership", undefined, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
     },
     teams: {
       /** Phase C8 M1 (PG-048): directory with member counts; owners and Security Administrators only. */

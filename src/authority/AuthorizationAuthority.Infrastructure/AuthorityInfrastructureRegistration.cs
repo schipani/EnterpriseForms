@@ -83,6 +83,8 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton<SessionService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.FieldSearch.FieldSearchCapabilityService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.FieldSearch.SecurityAdministratorRosterService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.Membership.OrganizationRosterService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.Membership.MembershipProvisioningService>();
         return services;
     }
 

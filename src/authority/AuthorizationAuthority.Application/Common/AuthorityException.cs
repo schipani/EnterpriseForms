@@ -67,6 +67,24 @@ public static class AuthorityErrorCodes
     public const string DelegatedAssertionNotAccepted = "DELEGATED_ASSERTION_NOT_ACCEPTED";
     public const string KindNotReconcilable = "KIND_NOT_RECONCILABLE";
     public const string RateLimited = "RATE_LIMITED";
+
+    // C8 M2 (AC-7) membership and organization-role administration.
+    public const string SelfChangeForbidden = "SELF_CHANGE_FORBIDDEN";
+    public const string OwnerApprovalRequired = "OWNER_APPROVAL_REQUIRED";
+    public const string ProposalNotPending = "PROPOSAL_NOT_PENDING";
+    public const string ProposalExpired = "PROPOSAL_EXPIRED";
+    public const string ProposalMismatch = "PROPOSAL_MISMATCH";
+    public const string ProposalExists = "PROPOSAL_EXISTS";
+    public const string LastOwner = "LAST_OWNER";
+    public const string RoleAlreadyHeld = "ROLE_ALREADY_HELD";
+    public const string RoleNotHeld = "ROLE_NOT_HELD";
+    public const string MembershipStateConflict = "MEMBERSHIP_STATE_CONFLICT";
+    public const string OwnsRecords = "OWNS_RECORDS";
+    public const string IdentityAlreadyBound = "IDENTITY_ALREADY_BOUND";
+    public const string IdentityNotAllowed = "IDENTITY_NOT_ALLOWED";
+    public const string MembershipRequestExists = "MEMBERSHIP_REQUEST_EXISTS";
+    public const string MembershipRequestNotPending = "MEMBERSHIP_REQUEST_NOT_PENDING";
+    public const string MembershipRequestExpired = "MEMBERSHIP_REQUEST_EXPIRED";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

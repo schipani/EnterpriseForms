@@ -23,6 +23,10 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<IdentityBinding> IdentityBindings => Set<IdentityBinding>();
 
+    public DbSet<OrganizationRoleChangeProposal> RoleChangeProposals => Set<OrganizationRoleChangeProposal>();
+
+    public DbSet<OrganizationMembershipRequest> MembershipRequests => Set<OrganizationMembershipRequest>();
+
     public DbSet<AuthorityResource> Resources => Set<AuthorityResource>();
 
     public DbSet<SecurityCommand> SecurityCommands => Set<SecurityCommand>();

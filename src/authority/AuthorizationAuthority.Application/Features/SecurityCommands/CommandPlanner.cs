@@ -39,6 +39,27 @@ public sealed class CommandPlan
     /// <summary>The policy whose search_policy_revision advances because field search policy changed under this command.</summary>
     public OrganizationProtectionPolicy? SearchPolicyToAdvance { get; set; }
 
+    /// <summary>C8 M2 (AC-7): a new two-owner proposal (its id becomes the command id) or a tracked proposal this command consumes.</summary>
+    public OrganizationRoleChangeProposal? NewProposal { get; set; }
+
+    public OrganizationRoleChangeProposal? ConsumedProposal { get; set; }
+
+    /// <summary>C8 M2 (AC-7.2): tracked bindings whose membership this command disables or re-enables, and sessions it revokes.</summary>
+    public IdentityBinding? BindingToDisable { get; set; }
+
+    public IdentityBinding? BindingToEnable { get; set; }
+
+    public List<Domain.Features.Sessions.AuthenticatedSession> SessionsToRevoke { get; } = [];
+
+    /// <summary>C8 M2 (AC-7.4): a new membership request (its id becomes the command id), stale pending ones recorded as expired, and an operator-approved request with its new binding.</summary>
+    public OrganizationMembershipRequest? NewMembershipRequest { get; set; }
+
+    public List<OrganizationMembershipRequest> ExpiredMembershipRequests { get; } = [];
+
+    public OrganizationMembershipRequest? ApprovedMembershipRequest { get; set; }
+
+    public IdentityBinding? NewBinding { get; set; }
+
     public string NormalizedPayloadJson { get; set; } = "{}";
 }
 
@@ -56,9 +77,12 @@ public static partial class CommandPlanner
         SecurityCommandRequest request,
         DesiredStateGraph graph,
         CancellationToken cancellationToken,
-        FieldSearchApprovalGate? approvalGate = null)
+        FieldSearchApprovalGate? approvalGate = null,
+        DateTimeOffset? now = null)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var at = now ?? DateTimeOffset.UtcNow;
+        var gate = approvalGate ?? FieldSearchApprovalGate.Unavailable;
         return request.CommandKind switch
         {
             SecurityCommandKind.RegisterTeam => await RegisterTeamAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -80,6 +104,12 @@ public static partial class CommandPlanner
             SecurityCommandKind.UpdateFieldSearchers => await UpdateFieldSearchersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.GrantSystemRole => await SecurityAdministratorAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, appoint: true, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RevokeSystemRole => await SecurityAdministratorAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, appoint: false, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.GrantOrganizationRole => await OrganizationRoleAsync(scope, organizationId, actor, request, graph, gate, at, grant: true, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RevokeOrganizationRole => await OrganizationRoleAsync(scope, organizationId, actor, request, graph, gate, at, grant: false, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.ProposeOrganizationOwnerChange => await ProposeOwnerChangeAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.DisableIdentityBinding => await MembershipStateAsync(scope, organizationId, actor, request, graph, gate, at, enable: false, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.EnableIdentityBinding => await MembershipStateAsync(scope, organizationId, actor, request, graph, gate, at, enable: true, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RequestOrganizationMembership => await RequestMembershipAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
             _ => throw new AuthorityException(AuthorityErrorCodes.CommandKindNotImplemented, 422, false, $"command kind {request.CommandKind} is not implemented in Stage A"),
         };
     }

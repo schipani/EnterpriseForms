@@ -46,12 +46,11 @@ test.describe("Organization administration (C8 M1)", () => {
     await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
     const people = page.getByRole("table", { name: "People" });
     await expect(people.getByRole("rowheader", { name: /Avery Owner/ })).toBeVisible();
-    await expect(people.getByRole("columnheader", { name: "Actions" })).toHaveCount(0);
-    await expect(page.getByText(/Source: business directory/)).toBeVisible();
-    // C8 M2: the owner's own sign-in is recorded; AC-7 capabilities are not offered (Add user disabled, reason beside it).
+    await expect(page.getByText(/Source: Authorization Authority roster/)).toBeVisible();
+    // C8 M2 (AC-7): the owner's own sign-in is recorded; owner actions are offered for others, never for themself.
     await expect(people.getByRole("row", { name: /Avery Owner/ })).toContainText("Signed in");
-    await expect(page.getByRole("button", { name: "Add user" })).toBeDisabled();
-    await expect(page.getByText("Adding people and changing owner or designer roles are not available yet")).toBeVisible();
+    await expect(people.getByRole("row", { name: /Avery Owner/ }).getByRole("button")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add user" })).toBeEnabled();
     await page.getByLabel("Search people").fill("casey");
     await expect(people.getByRole("rowheader", { name: /Casey Clerk/ })).toBeVisible();
     await expect(people.getByRole("rowheader", { name: /Avery Owner/ })).toHaveCount(0);

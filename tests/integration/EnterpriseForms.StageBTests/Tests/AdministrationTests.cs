@@ -79,7 +79,7 @@ public sealed class AdministrationTests(StageBFixture fixture)
 
         var owner = await fixture.Api.GetAsync("/api/v1/organization/members", s.Token(s.Designer));
         AssertOk(owner);
-        Assert.StartsWith("business directory", owner.Root.GetProperty("source").GetString(), StringComparison.Ordinal);
+        Assert.StartsWith("Authorization Authority roster", owner.Root.GetProperty("source").GetString(), StringComparison.Ordinal);
         Assert.True(owner.Root.GetProperty("rolesAvailable").GetBoolean());
         var members = owner.Root.GetProperty("members").EnumerateArray().ToList();
         Assert.Equal(5, members.Count);
@@ -87,7 +87,7 @@ public sealed class AdministrationTests(StageBFixture fixture)
         Assert.Equal(["SecurityAdministrator"], administrator.GetProperty("authorityRoles").EnumerateArray().Select(r => r.GetString()).ToList());
         var self = Assert.Single(members, m => m.GetProperty("userId").GetGuid() == s.Designer.AuthorityUserId);
         Assert.True(self.GetProperty("isCurrentUser").GetBoolean());
-        Assert.Empty(self.GetProperty("authorityRoles").EnumerateArray()); // owner/designer badges wait for AC-7 (M2)
+        Assert.Equal(["OrganizationOwner", "Designer"], self.GetProperty("authorityRoles").EnumerateArray().Select(r => r.GetString()).ToList()); // AC-7.3 roster (C8 M2)
         Assert.Equal(TestIdentity.Issuer, self.GetProperty("identityIssuer").GetString());
         Assert.DoesNotContain("email", owner.Body, StringComparison.OrdinalIgnoreCase);
 

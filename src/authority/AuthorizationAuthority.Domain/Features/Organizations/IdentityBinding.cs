@@ -16,4 +16,14 @@ public sealed class IdentityBinding
     public bool IdentityBindingEnabled { get; set; } = true;
 
     public DateTimeOffset IdentityCreatedOn { get; set; }
+
+    /// <summary>AC-7.2: set while the membership is disabled (identity_binding_enabled = false); cleared on re-enable.</summary>
+    public DateTimeOffset? IdentityDisabledOn { get; set; }
+
+    public Guid? IdentityDisabledBySecurityCommandId { get; set; }
+
+    public Guid? IdentityEnabledBySecurityCommandId { get; set; }
+
+    /// <summary>AC-7.4: the operator-approved membership request that created this binding (null for bootstrap bindings).</summary>
+    public Guid? OrganizationMembershipRequestId { get; set; }
 }

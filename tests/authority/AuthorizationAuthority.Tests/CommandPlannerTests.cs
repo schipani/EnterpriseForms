@@ -402,6 +402,22 @@ public sealed class CommandPlannerTests
 
         public void AddIdentityBinding(IdentityBinding binding) => throw new NotSupportedException();
 
+        public Task<IdentityBinding?> FindIdentityBindingForUpdateAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<AuthorizationAuthority.Domain.Features.Sessions.AuthenticatedSession>> GetUnrevokedSessionsAsync(Guid identityBindingId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationRoleChangeProposal?> FindRoleChangeProposalAsync(Guid organizationId, Guid proposalId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<OrganizationRoleChangeProposal>> GetRoleChangeProposalsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddRoleChangeProposal(OrganizationRoleChangeProposal proposal) => throw new NotSupportedException();
+
+        public Task<OrganizationMembershipRequest?> FindMembershipRequestAsync(Guid organizationId, Guid requestId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<OrganizationMembershipRequest>> GetMembershipRequestsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddMembershipRequest(OrganizationMembershipRequest request) => throw new NotSupportedException();
+
         public void AddResource(AuthorityResource resource) => throw new NotSupportedException();
 
         public OrganizationProtectionPolicy? Policy { get; set; }

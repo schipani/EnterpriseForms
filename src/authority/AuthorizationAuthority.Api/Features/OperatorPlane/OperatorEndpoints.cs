@@ -1,6 +1,7 @@
 using AuthorizationAuthority.Api.Composition;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Features.Content;
+using AuthorizationAuthority.Application.Features.Membership;
 using AuthorizationAuthority.Application.Features.OperatorPlane;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Infrastructure.Faults;
@@ -48,6 +49,26 @@ public static class OperatorEndpoints
             })
             .WithName("RecoverSecurityAdministrator")
             .WithSummary("DR-C7-3: recovery when the organization's Security Administrators are unavailable. Incident reference required; explicit scope (one appointee, named administrators removed); two independent approvals; critical security alert; journaled.");
+
+        // C8 M2 (AC-7.4): owner membership requests, decided only here (approval: two independent approvals; rejection: one operator).
+        group.MapGet("/organizations/{organizationId:guid}/membership-requests", static async Task<Ok<OperatorMembershipRequests>> (Guid organizationId, HttpContext context, MembershipProvisioningService service, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await service.ListAsync(organizationId, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+            .WithName("ListOrganizationMembershipRequests");
+
+        group.MapPost("/organizations/{organizationId:guid}/membership-requests/{requestId:guid}/approve", static async Task<Ok<MembershipApprovalResponse>> (Guid organizationId, Guid requestId, MembershipApprovalRequest request, HttpContext context, MembershipProvisioningService service, CancellationToken cancellationToken) =>
+            {
+                var operatorName = context.User.FindFirst("workload_name")?.Value ?? "operator";
+                return TypedResults.Ok(await service.ApproveAsync(organizationId, requestId, request, operatorName, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("ApproveOrganizationMembership")
+            .WithSummary("AC-7.4: dry run, then two ES256 approvals from distinct registered approvers over the exact statement (Development/Testing only until PIM). Re-checks request state, expiry, the requesting owner, the identity and its issuer inside the organization lock; creates the identity binding (and optional designer role) as one journaled command.");
+
+        group.MapPost("/organizations/{organizationId:guid}/membership-requests/{requestId:guid}/reject", static async Task<Ok<OrganizationMembershipRequestEntry>> (Guid organizationId, Guid requestId, MembershipRejectionRequest request, HttpContext context, MembershipProvisioningService service, CancellationToken cancellationToken) =>
+            {
+                var operatorName = context.User.FindFirst("workload_name")?.Value ?? "operator";
+                return TypedResults.Ok(await service.RejectAsync(organizationId, requestId, request, operatorName, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("RejectOrganizationMembership");
 
         group.MapPost("/fault-injection", static Results<Ok<FaultInjectionRequest>, ProblemHttpResult> (FaultInjectionRequest request, IServiceProvider services, IHostEnvironment environment) =>
             {

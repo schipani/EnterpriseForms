@@ -113,6 +113,7 @@ public sealed class Program
         app.MapOperatorEndpoints();
         app.MapSessionEndpoints();
         app.MapFieldSearchEndpoints();
+        AuthorizationAuthority.Api.Features.Membership.MembershipEndpoints.MapMembershipEndpoints(app);
 
         app.Run();
         return 0;

@@ -6,36 +6,54 @@ using EnterpriseForms.Contracts.Features;
 
 namespace EnterpriseForms.Application.Features.Identity.MemberDirectory;
 
-public sealed record MemberDirectoryQuery(string? Search, string? Role, string? SignInStatus, int? PageSize, string? ContinuationToken);
+public sealed record MemberDirectoryQuery(string? Search, string? Role, string? SignInStatus, int? PageSize, string? ContinuationToken, string? MembershipState = null);
 
 /// <summary>
-/// People directory (PG-050; C8 M2 within the existing Authority). Rows merge the business <c>users</c> directory (names,
-/// first seen, last sign-in) with the Authority's Security Administrator roster: its administrators for every caller, and
-/// — only when the caller is a Security Administrator, to whom the Authority returns them as appointment candidates —
-/// every other enabled identity binding, so people who have never signed in are listed too. Owner and designer roles,
-/// disabled membership and adding members need the AC-7 commands and roster read, which are not approved; nothing here
-/// infers them. Paged on the server (default 15) with an opaque cursor bound to the caller and filters. Visible to
-/// organization owners and Security Administrators only. Nothing here confers or reveals record access.
+/// People directory (PG-050; C8 M2). Rows are the Authority's complete roster (AC-7.3): every identity binding of the
+/// organization with its enabled state and organization roles, for organization owners and Security Administrators. The
+/// business <c>users</c> directory adds names, first seen, last sign-in and teams (labels only). Owner proposals and
+/// membership requests come from the same read. Action hints mirror the Authority's rules for the caller; the Authority
+/// decides every command. If the roster is unavailable the page falls back to the business directory with no roles and no
+/// actions (never guessed). Paged on the server (default 15) with an opaque cursor bound to the caller and filters.
 /// </summary>
-public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, ISecurityAdministratorAuthority roster, IOpaqueCursorProtector cursors)
+public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizationAuthorityClient authority, IOrganizationRosterAuthority roster, IOpaqueCursorProtector cursors)
 {
-    public const string Source = "business directory of people seen in this organization, plus the Authorization Authority's Security Administrator roster (Security Administrators also receive every enabled Authority identity binding)";
+    public const string Source = "Authorization Authority roster of identity bindings and organization roles, with names, sign-in times and teams from the business directory";
+
+    public const string FallbackSource = "business directory only (the Authorization Authority roster is unavailable)";
 
     public const string SecurityAdministratorRole = "SecurityAdministrator";
-
+    public const string OrganizationOwnerRole = "OrganizationOwner";
+    public const string DesignerRole = "Designer";
     public const string NoRole = "None";
 
     public const string AppointSecurityAdministrator = "AppointSecurityAdministrator";
-
     public const string RemoveSecurityAdministrator = "RemoveSecurityAdministrator";
+    public const string GrantDesigner = "GrantDesigner";
+    public const string RevokeDesigner = "RevokeDesigner";
+    public const string ProposeOwnerGrant = "ProposeOwnerGrant";
+    public const string ProposeOwnerRevoke = "ProposeOwnerRevoke";
+    public const string DisableMembership = "DisableMembership";
+    public const string EnableMembership = "EnableMembership";
+    public const string ProposeOwnerDisable = "ProposeOwnerDisable";
+    public const string ProposeOwnerEnable = "ProposeOwnerEnable";
 
-    public static readonly IReadOnlyList<string> RoleFilters = [SecurityAdministratorRole, NoRole];
+    public static readonly IReadOnlyList<string> RoleFilters = [OrganizationOwnerRole, DesignerRole, SecurityAdministratorRole, NoRole];
 
     public static readonly IReadOnlyList<string> SignInStatuses = ["SignedIn", "NotRecorded", "NeverSignedIn"];
 
-    public const string CompleteCoverage = "Lists every identity the Authorization Authority has bound to this organization and enabled, including people who have never signed in. Disabled memberships and organization owner or designer roles cannot be shown until the Authority roster read (AC-7) is approved.";
+    public static readonly IReadOnlyList<string> MembershipStates = ["Enabled", "Disabled"];
 
-    public const string PartialCoverage = "Lists people who have used this organization and its Security Administrators. People who have never signed in are listed for Security Administrators only, and organization owner or designer roles cannot be shown, until the Authority roster read (AC-7) is approved.";
+    public const string CompleteCoverage = "Lists every identity the Authorization Authority has bound to this organization, enabled or disabled, with its organization roles.";
+
+    public const string FallbackCoverage = "The Authorization Authority roster is unavailable: only people known to this application are listed, without roles or membership state, and no change can be made.";
+
+    private static readonly Dictionary<string, string> RoleNames = new(StringComparer.Ordinal)
+    {
+        ["organization_owner"] = OrganizationOwnerRole,
+        ["designer"] = DesignerRole,
+        ["system_administrator"] = SecurityAdministratorRole,
+    };
 
     public async Task<OrganizationMemberDirectoryResponse> GetAsync(RequestContext context, MemberDirectoryQuery query, CancellationToken cancellationToken)
     {
@@ -44,64 +62,134 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
         var text = Normalize(query.Search);
         var role = Allowed(query.Role, RoleFilters, "role filter");
         var signIn = Allowed(query.SignInStatus, SignInStatuses, "sign-in status filter");
+        var membership = Allowed(query.MembershipState, MembershipStates, "membership filter");
         var size = OffsetPageCursor.ClampPageSize(query.PageSize);
-        var digest = OffsetPageCursor.Digest("organization-members", text, role, signIn, size);
+        var digest = OffsetPageCursor.Digest("organization-members", text, role, signIn, membership, size);
         await AdministrationAccess.RequireAdministratorAsync(authority, context, cancellationToken).ConfigureAwait(false);
         var offset = OffsetPageCursor.DecodeOffset(cursors, query.ContinuationToken, context, digest);
 
-        AuthoritySecurityAdministratorRoster? authorityRoster = null;
+        AuthorityOrganizationRoster? authorityRoster = null;
         string? rolesUnavailableReason = null;
         try
         {
-            authorityRoster = await roster.GetSecurityAdministratorsAsync(context.ToDelegatedUser(), new SecurityAdministratorRosterQuery(context.OrganizationId), cancellationToken).ConfigureAwait(false);
+            authorityRoster = await roster.GetRosterAsync(context.ToDelegatedUser(), new OrganizationRosterQuery(context.OrganizationId), cancellationToken).ConfigureAwait(false);
         }
-        catch (AuthorityClientException)
+        catch (AuthorityClientException ex) when (ex.HttpStatusCode != 404)
         {
-            rolesUnavailableReason = "the Authorization Authority roster is unavailable; no role is shown and people who have never signed in are not listed";
+            rolesUnavailableReason = "the Authorization Authority roster is unavailable; no role or membership state is shown and no change can be made";
         }
 
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-        var users = await scope.GetUsersAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false);
+        var users = (await scope.GetUsersAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false)).ToDictionary(u => u.UserId);
         var teams = (await scope.GetTeamsAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false)).Where(t => t.IsActive).ToDictionary(t => t.TeamId, t => t.TeamName);
         var memberships = await scope.GetActiveTeamMembershipsAsync(context.OrganizationId, null, cancellationToken).ConfigureAwait(false);
         var teamsOfUser = memberships.Where(m => teams.ContainsKey(m.TeamId)).GroupBy(m => m.UserId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<DirectoryTeamResponse>)g.Select(m => new DirectoryTeamResponse(m.TeamId, teams[m.TeamId])).OrderBy(t => t.TeamName, StringComparer.OrdinalIgnoreCase).ToList());
 
-        var administrators = authorityRoster?.Administrators.ToDictionary(a => a.AuthorityUserId) ?? [];
-        var candidates = authorityRoster?.Candidates?.ToDictionary(c => c.AuthorityUserId) ?? [];
-        var canChangeAdministrators = authorityRoster?.CanManage == true;
-        IReadOnlyList<string> ActionsOf(Guid userId) => !canChangeAdministrators ? []
-            : administrators.ContainsKey(userId) ? (administrators.Count > 1 ? [RemoveSecurityAdministrator] : [])
-            : candidates.ContainsKey(userId) ? [AppointSecurityAdministrator] : [];
-        IReadOnlyList<string> RolesOf(Guid userId) => administrators.ContainsKey(userId) ? [SecurityAdministratorRole] : [];
-
-        var rows = users.Select(u => new OrganizationMemberResponse(u.UserId, u.DisplayName, u.ExternalIssuerUri, u.ExternalSubjectIdentifier, u.CreatedOn, RolesOf(u.UserId),
-            teamsOfUser.GetValueOrDefault(u.UserId) ?? [], u.UserId == context.LocalUserId, u.LastSignedInOn, u.LastSignedInOn is null ? "NotRecorded" : "SignedIn", ActionsOf(u.UserId))).ToList();
-        var known = rows.Select(r => r.UserId).ToHashSet();
-        var bound = administrators.Values.Select(a => (a.AuthorityUserId, a.IssuerUri, a.SubjectIdentifier))
-            .Concat(candidates.Values.Select(c => (c.AuthorityUserId, c.IssuerUri, c.SubjectIdentifier)));
-        foreach (var (userId, issuer, subject) in bound)
+        List<OrganizationMemberResponse> rows;
+        IReadOnlyList<OwnerProposalResponse> proposals = [];
+        IReadOnlyList<MembershipRequestResponse> requests = [];
+        if (authorityRoster is null)
         {
-            if (known.Add(userId))
+            rows = users.Values.Select(u => new OrganizationMemberResponse(u.UserId, u.DisplayName, u.ExternalIssuerUri, u.ExternalSubjectIdentifier, u.CreatedOn, [], teamsOfUser.GetValueOrDefault(u.UserId) ?? [],
+                u.UserId == context.LocalUserId, u.LastSignedInOn, u.LastSignedInOn is null ? "NotRecorded" : "SignedIn", [], "Unknown")).ToList();
+        }
+        else
+        {
+            var me = context.LocalUserId;
+            string NameOf(Guid id) => users.TryGetValue(id, out var u) && u.DisplayName.Length > 0 ? u.DisplayName
+                : authorityRoster.Members.FirstOrDefault(m => m.AuthorityUserId == id)?.DisplayNameHint ?? authorityRoster.Members.FirstOrDefault(m => m.AuthorityUserId == id)?.SubjectIdentifier ?? id.ToString("D");
+            var pending = authorityRoster.OwnerProposals.Where(p => p.ProposalState == "Pending").ToList();
+            var enabledAdministrators = authorityRoster.Members.Count(m => m.MembershipEnabled && m.OrganizationRoles.Contains("system_administrator"));
+            rows = authorityRoster.Members.Select(m =>
             {
-                rows.Add(new OrganizationMemberResponse(userId, string.Empty, issuer, subject, null, RolesOf(userId), teamsOfUser.GetValueOrDefault(userId) ?? [], userId == context.LocalUserId, null, "NeverSignedIn", ActionsOf(userId)));
-            }
+                users.TryGetValue(m.AuthorityUserId, out var user);
+                var roles = m.OrganizationRoles.Select(r => RoleNames.GetValueOrDefault(r, r)).ToList();
+                return new OrganizationMemberResponse(m.AuthorityUserId, user is { DisplayName.Length: > 0 } ? user.DisplayName : m.DisplayNameHint ?? string.Empty, m.IssuerUri, m.SubjectIdentifier, user?.CreatedOn, roles,
+                    teamsOfUser.GetValueOrDefault(m.AuthorityUserId) ?? [], m.AuthorityUserId == me, user?.LastSignedInOn, user is null ? "NeverSignedIn" : user.LastSignedInOn is null ? "NotRecorded" : "SignedIn",
+                    ActionsFor(authorityRoster, m, roles, me, pending, enabledAdministrators), m.MembershipEnabled ? "Enabled" : "Disabled", m.DisabledOn);
+            }).ToList();
+            proposals = authorityRoster.OwnerProposals.Select(p => new OwnerProposalResponse(p.ProposalId, p.TargetAuthorityUserId, NameOf(p.TargetAuthorityUserId), p.ProposedChange, p.ProposedByAuthorityUserId, NameOf(p.ProposedByAuthorityUserId),
+                p.Reason, p.ProposedOn, p.ExpiresOn, p.ProposalState, authorityRoster.CanManageMembers && p.ProposalState == "Pending" && p.ProposedByAuthorityUserId != me && p.TargetAuthorityUserId != me)).ToList();
+            requests = authorityRoster.MembershipRequests.Select(r => new MembershipRequestResponse(r.RequestId, r.RequestedAuthorityUserId, r.IssuerUri, r.SubjectIdentifier, r.DisplayNameHint, r.InitialRoleName is null ? null : DesignerRole,
+                r.RequestedByAuthorityUserId, NameOf(r.RequestedByAuthorityUserId), r.Reason, r.RequestedOn, r.ExpiresOn, r.RequestState, r.DecidedOn, r.DecisionReason)).ToList();
         }
 
         var matching = rows
             .Where(r => text is null || r.DisplayName.Contains(text, StringComparison.OrdinalIgnoreCase) || r.IdentitySubject.Contains(text, StringComparison.OrdinalIgnoreCase)
                         || r.IdentityIssuer.Contains(text, StringComparison.OrdinalIgnoreCase) || r.Teams.Any(t => t.TeamName.Contains(text, StringComparison.OrdinalIgnoreCase)))
-            .Where(r => role switch { SecurityAdministratorRole => r.AuthorityRoles.Contains(SecurityAdministratorRole), NoRole => r.AuthorityRoles.Count == 0, _ => true })
+            .Where(r => role is null || (role == NoRole ? r.AuthorityRoles.Count == 0 : r.AuthorityRoles.Contains(role)))
             .Where(r => signIn is null || r.SignInStatus == signIn)
+            .Where(r => membership is null || r.MembershipState == membership)
             .OrderBy(r => r.DisplayName.Length == 0 ? 1 : 0).ThenBy(r => r.DisplayName.Length == 0 ? r.IdentitySubject : r.DisplayName, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.UserId)
             .ToList();
         offset = Math.Min(offset, matching.Count);
         var items = matching.Skip(offset).Take(size).ToList();
         var (next, previous) = OffsetPageCursor.Links(cursors, context, digest, offset, items.Count, size, matching.Count);
-        var complete = authorityRoster?.Candidates is not null;
-        return new OrganizationMemberDirectoryResponse(Source, items, authorityRoster is not null, rolesUnavailableReason, matching.Count, matching.Count == 0 ? 0 : offset + 1, size, next, previous,
-            complete, complete ? CompleteCoverage : PartialCoverage,
-            canChangeAdministrators && authorityRoster!.AppointmentOperational, canChangeAdministrators && !authorityRoster!.AppointmentOperational ? authorityRoster.AppointmentUnavailableReason : null);
+        var available = authorityRoster is not null;
+        var canAdministerSecurity = authorityRoster?.CanAdministerSecurity == true;
+        return new OrganizationMemberDirectoryResponse(available ? Source : FallbackSource, items, available, rolesUnavailableReason, matching.Count, matching.Count == 0 ? 0 : offset + 1, size, next, previous,
+            available, available ? CompleteCoverage : FallbackCoverage,
+            canAdministerSecurity && authorityRoster!.CommandsOperational, canAdministerSecurity && !authorityRoster!.CommandsOperational ? authorityRoster.CommandsUnavailableReason : null,
+            authorityRoster?.CanManageMembers == true, authorityRoster?.CommandsOperational == true, authorityRoster is { CommandsOperational: false } ? authorityRoster.CommandsUnavailableReason : null,
+            authorityRoster?.OperatorApprovalOperational == true, authorityRoster?.OrganizationIdentityIssuer, proposals, requests);
+    }
+
+    /// <summary>Hints only, mirroring the Authority (owners for membership and owner/designer roles, Security Administrators for their role; never oneself).</summary>
+    private static List<string> ActionsFor(AuthorityOrganizationRoster roster, AuthorityRosterMember member, List<string> roles, Guid me, List<AuthorityOwnerProposal> pending, int enabledAdministrators)
+    {
+        var actions = new List<string>();
+        var self = member.AuthorityUserId == me;
+        var owner = roles.Contains(OrganizationOwnerRole);
+        bool Pending(string change) => pending.Any(p => p.TargetAuthorityUserId == member.AuthorityUserId && p.ProposedChange == change);
+        if (roster.CanManageMembers && !self)
+        {
+            if (roles.Contains(DesignerRole))
+            {
+                actions.Add(RevokeDesigner);
+            }
+            else if (member.MembershipEnabled)
+            {
+                actions.Add(GrantDesigner);
+            }
+
+            if (member.MembershipEnabled && !owner && !Pending("GrantOwner"))
+            {
+                actions.Add(ProposeOwnerGrant);
+            }
+
+            if (owner && !Pending("RevokeOwner"))
+            {
+                actions.Add(ProposeOwnerRevoke);
+            }
+
+            if (member.MembershipEnabled)
+            {
+                actions.Add(owner ? (Pending("DisableOwner") ? string.Empty : ProposeOwnerDisable) : DisableMembership);
+            }
+            else
+            {
+                actions.Add(owner ? (Pending("EnableOwner") ? string.Empty : ProposeOwnerEnable) : EnableMembership);
+            }
+        }
+
+        if (roster.CanAdministerSecurity)
+        {
+            if (roles.Contains(SecurityAdministratorRole))
+            {
+                if (enabledAdministrators > 1 || !member.MembershipEnabled)
+                {
+                    actions.Add(RemoveSecurityAdministrator);
+                }
+            }
+            else if (member.MembershipEnabled)
+            {
+                actions.Add(AppointSecurityAdministrator);
+            }
+        }
+
+        actions.RemoveAll(a => a.Length == 0);
+        return actions;
     }
 
     private static string? Normalize(string? text)

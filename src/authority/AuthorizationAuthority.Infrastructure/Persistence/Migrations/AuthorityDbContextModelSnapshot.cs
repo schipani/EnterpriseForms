@@ -1244,6 +1244,18 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("identity_created_on");
 
+                    b.Property<Guid?>("IdentityDisabledBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("identity_disabled_by_security_command_id");
+
+                    b.Property<DateTimeOffset?>("IdentityDisabledOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("identity_disabled_on");
+
+                    b.Property<Guid?>("IdentityEnabledBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("identity_enabled_by_security_command_id");
+
                     b.Property<string>("IdentityIssuerUri")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -1260,6 +1272,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<Guid?>("OrganizationMembershipRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_membership_request_id");
+
                     b.HasKey("IdentityBindingId");
 
                     b.HasIndex("OrganizationId", "AuthorityUserId")
@@ -1270,7 +1286,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_identity_subject");
 
-                    b.ToTable("identity_bindings", "authority");
+                    b.ToTable("identity_bindings", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_identity_binding_disabled_state", "(identity_binding_enabled AND identity_disabled_on IS NULL) OR (NOT identity_binding_enabled AND identity_disabled_on IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", b =>
@@ -1360,6 +1379,113 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationMembershipRequest", b =>
+                {
+                    b.Property<Guid>("OrganizationMembershipRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_membership_request_id");
+
+                    b.Property<Guid?>("DecidedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by_security_command_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset>("RequestCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("request_created_on");
+
+                    b.Property<string>("RequestDecidedByOperatorName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("request_decided_by_operator_name");
+
+                    b.Property<DateTimeOffset?>("RequestDecidedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("request_decided_on");
+
+                    b.Property<string>("RequestDecisionReasonText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("request_decision_reason_text");
+
+                    b.Property<DateTimeOffset>("RequestExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("request_expires_on");
+
+                    b.Property<string>("RequestReasonText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("request_reason_text");
+
+                    b.Property<string>("RequestStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("request_state_name");
+
+                    b.Property<Guid>("RequestedAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_authority_user_id");
+
+                    b.Property<Guid>("RequestedByAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_authority_user_id");
+
+                    b.Property<string>("RequestedDisplayNameHint")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("requested_display_name_hint");
+
+                    b.Property<string>("RequestedInitialRoleName")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("requested_initial_role_name");
+
+                    b.Property<string>("RequestedIssuerUri")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("requested_issuer_uri");
+
+                    b.Property<string>("RequestedSubjectIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("requested_subject_identifier");
+
+                    b.HasKey("OrganizationMembershipRequestId");
+
+                    b.HasIndex("DecidedBySecurityCommandId");
+
+                    b.HasIndex("OrganizationId", "RequestCreatedOn")
+                        .HasDatabaseName("ix_membership_requests_recent");
+
+                    b.HasIndex("OrganizationId", "RequestedAuthorityUserId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_membership_request_user");
+
+                    b.HasIndex("OrganizationId", "RequestedIssuerUri", "RequestedSubjectIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("uq_membership_request_pending_identity")
+                        .HasFilter("request_state_name = 'Pending'");
+
+                    b.ToTable("organization_membership_requests", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_membership_request_approved", "request_state_name <> 'Approved' OR decided_by_security_command_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_membership_request_expiry", "request_expires_on > request_created_on");
+
+                            t.HasCheckConstraint("ck_membership_request_role", "requested_initial_role_name IS NULL OR requested_initial_role_name = 'designer'");
+
+                            t.HasCheckConstraint("ck_membership_request_state", "request_state_name IN ('Pending','Approved','Rejected','Expired')");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationProtectionPolicy", b =>
                 {
                     b.Property<Guid>("OrganizationProtectionPolicyId")
@@ -1414,6 +1540,77 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.ToTable("organization_protection_policies", "authority", t =>
                         {
                             t.HasCheckConstraint("ck_protection_policy_classification", "minimum_field_classification IN ('Public','Internal','Confidential','Restricted')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationRoleChangeProposal", b =>
+                {
+                    b.Property<Guid>("OrganizationRoleChangeProposalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_role_change_proposal_id");
+
+                    b.Property<Guid?>("ConsumedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consumed_by_security_command_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset?>("ProposalConsumedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proposal_consumed_on");
+
+                    b.Property<DateTimeOffset>("ProposalCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proposal_created_on");
+
+                    b.Property<DateTimeOffset>("ProposalExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proposal_expires_on");
+
+                    b.Property<string>("ProposalReasonText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("proposal_reason_text");
+
+                    b.Property<string>("ProposalStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("proposal_state_name");
+
+                    b.Property<Guid>("ProposedByAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("proposed_by_authority_user_id");
+
+                    b.Property<string>("ProposedChangeName")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("proposed_change_name");
+
+                    b.Property<Guid>("TargetAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_authority_user_id");
+
+                    b.HasKey("OrganizationRoleChangeProposalId");
+
+                    b.HasIndex("ConsumedBySecurityCommandId");
+
+                    b.HasIndex("OrganizationId", "ProposalCreatedOn")
+                        .HasDatabaseName("ix_role_change_proposals_recent");
+
+                    b.ToTable("organization_role_change_proposals", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_role_change_proposal_change", "proposed_change_name IN ('GrantOwner','RevokeOwner','DisableOwner','EnableOwner')");
+
+                            t.HasCheckConstraint("ck_role_change_proposal_expiry", "proposal_expires_on > proposal_created_on");
+
+                            t.HasCheckConstraint("ck_role_change_proposal_not_self", "proposed_by_authority_user_id <> target_authority_user_id");
+
+                            t.HasCheckConstraint("ck_role_change_proposal_state", "(proposal_state_name = 'Pending' AND consumed_by_security_command_id IS NULL) OR (proposal_state_name = 'Consumed' AND consumed_by_security_command_id IS NOT NULL AND proposal_consumed_on IS NOT NULL)");
                         });
                 });
 
@@ -1950,6 +2147,29 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_identity_org");
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationMembershipRequest", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBySecurityCommandId")
+                        .HasConstraintName("fk_membership_request_decision");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_membership_request_org");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationMembershipRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_membership_request_command");
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationProtectionPolicy", b =>
                 {
                     b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
@@ -1959,6 +2179,29 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_protection_policy_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationRoleChangeProposal", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("ConsumedBySecurityCommandId")
+                        .HasConstraintName("fk_role_change_proposal_consumer");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_change_proposal_org");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SecurityCommands.SecurityCommand", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationRoleChangeProposalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_change_proposal_command");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SecurityCommands.AuthorityRelationshipEdge", b =>

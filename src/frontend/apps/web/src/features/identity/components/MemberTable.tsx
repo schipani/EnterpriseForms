@@ -1,9 +1,7 @@
 import type { OrganizationMemberResponse } from "@enterpriseforms/api-client";
 import { Badge, Button, DataTable, RowActions } from "@enterpriseforms/ui";
 
-const ROLE_LABELS: Record<string, string> = {
-  SecurityAdministrator: "Security Administrator",
-};
+const ROLE_LABELS: Record<string, string> = { OrganizationOwner: "Organization Owner", Designer: "Designer", SecurityAdministrator: "Security Administrator" };
 
 const SIGN_IN_LABELS: Record<string, { label: string; tone: "success" | "neutral" | "warning" }> = {
   SignedIn: { label: "Signed in", tone: "success" },
@@ -11,17 +9,43 @@ const SIGN_IN_LABELS: Record<string, { label: string; tone: "success" | "neutral
   NeverSignedIn: { label: "Never signed in", tone: "warning" },
 };
 
-export type MemberAction = "AppointSecurityAdministrator" | "RemoveSecurityAdministrator";
+export type MemberAction =
+  | "GrantDesigner"
+  | "RevokeDesigner"
+  | "ProposeOwnerGrant"
+  | "ProposeOwnerRevoke"
+  | "DisableMembership"
+  | "EnableMembership"
+  | "ProposeOwnerDisable"
+  | "ProposeOwnerEnable"
+  | "AppointSecurityAdministrator"
+  | "RemoveSecurityAdministrator";
 
-/** Name shown for a person; an Authority-bound identity that has never signed in has no name yet. */
+/** Visible labels of the row actions; accessible names start with the same text (WCAG 2.5.3). */
+export const MEMBER_ACTION_LABELS: Record<MemberAction, string> = {
+  GrantDesigner: "Make designer",
+  RevokeDesigner: "Remove designer role",
+  ProposeOwnerGrant: "Propose as owner",
+  ProposeOwnerRevoke: "Propose owner removal",
+  DisableMembership: "Disable membership",
+  EnableMembership: "Re-enable membership",
+  ProposeOwnerDisable: "Propose disabling",
+  ProposeOwnerEnable: "Propose re-enabling",
+  AppointSecurityAdministrator: "Make Security Administrator",
+  RemoveSecurityAdministrator: "Remove Security Administrator",
+};
+
+const isMemberAction = (value: string): value is MemberAction => value in MEMBER_ACTION_LABELS;
+
+/** Name shown for a person; an identity that has never signed in shows the requested display name or its subject. */
 export function memberName(member: OrganizationMemberResponse): string {
   return member.displayName || member.identitySubject;
 }
 
 /**
- * People table (PG-050, C8 M2): names, non-secret identity binding, Authority role badges, sign-in state, teams and last
- * sign-in. The Actions column appears only when some row offers an action the caller may request (Security Administrator
- * appointment or removal through the existing Authority commands); the Authority still decides every command.
+ * People table (PG-050, C8 M2): names, verified identity, Authority roles, membership state, sign-in state, teams and last
+ * sign-in. Row actions are the server's hints for this caller (the Authority decides every command): the first is shown,
+ * the rest are in the row's "…" menu. Without an action handler the table is read-only.
  */
 export function MemberTable({
   members,
@@ -32,7 +56,8 @@ export function MemberTable({
   rolesAvailable: boolean;
   onAction?: (member: OrganizationMemberResponse, action: MemberAction) => void;
 }) {
-  const showActions = onAction !== undefined && members.some((m) => (m.availableActions ?? []).length > 0);
+  const actionsOf = (m: OrganizationMemberResponse) => (onAction ? (m.availableActions ?? []).filter(isMemberAction) : []);
+  const showActions = members.some((m) => actionsOf(m).length > 0);
   return (
     <DataTable
       caption="People"
@@ -59,11 +84,7 @@ export function MemberTable({
               </span>
             ),
         },
-        {
-          key: "identity",
-          header: "Verified identity",
-          render: (row) => <span className="break-all text-sm">{`${row.identitySubject} · ${row.identityIssuer}`}</span>,
-        },
+        { key: "identity", header: "Verified identity", render: (row) => <span className="break-all text-sm">{`${row.identitySubject} · ${row.identityIssuer}`}</span> },
         {
           key: "roles",
           header: "Authority roles",
@@ -71,7 +92,7 @@ export function MemberTable({
             !rolesAvailable ? (
               <span className="text-muted">Unavailable</span>
             ) : row.authorityRoles.length === 0 ? (
-              <span className="text-muted">None shown</span>
+              <span className="text-muted">None</span>
             ) : (
               <span className="flex flex-wrap gap-1">
                 {row.authorityRoles.map((role) => (
@@ -83,18 +104,26 @@ export function MemberTable({
             ),
         },
         {
+          key: "membership",
+          header: "Membership",
+          render: (row) =>
+            row.membershipState === "Disabled" ? (
+              <Badge tone="danger">Disabled</Badge>
+            ) : row.membershipState === "Enabled" ? (
+              <Badge tone="success">Active</Badge>
+            ) : (
+              <span className="text-muted">Unknown</span>
+            ),
+        },
+        {
           key: "status",
           header: "Sign-in",
           render: (row) => {
-            const status = SIGN_IN_LABELS[row.signInStatus ?? "NotRecorded"] ?? SIGN_IN_LABELS["NotRecorded"]!;
+            const status = SIGN_IN_LABELS[row.signInStatus] ?? SIGN_IN_LABELS["NotRecorded"]!;
             return <Badge tone={status.tone}>{status.label}</Badge>;
           },
         },
-        {
-          key: "teams",
-          header: "Teams",
-          render: (row) => (row.teams.length === 0 ? <span className="text-muted">—</span> : row.teams.map((team) => team.teamName).join(", ")),
-        },
+        { key: "teams", header: "Teams", render: (row) => (row.teams.length === 0 ? <span className="text-muted">—</span> : row.teams.map((team) => team.teamName).join(", ")) },
         {
           key: "last",
           header: "Last sign-in",
@@ -107,21 +136,25 @@ export function MemberTable({
                 header: "Actions",
                 isActions: true,
                 render: (row: OrganizationMemberResponse) => {
-                  const actions = row.availableActions ?? [];
+                  const [first, ...rest] = actionsOf(row);
                   return (
                     <RowActions
                       overflowLabel={`More actions for ${memberName(row)}`}
                       primary={
-                        actions.includes("AppointSecurityAdministrator") ? (
-                          <Button size="sm" variant="secondary" aria-label={`Make Security Administrator: ${memberName(row)}`} onClick={() => onAction?.(row, "AppointSecurityAdministrator")}>
-                            Make Security Administrator
-                          </Button>
-                        ) : actions.includes("RemoveSecurityAdministrator") ? (
-                          <Button size="sm" variant="ghost" aria-label={`Remove Security Administrator: ${memberName(row)}`} onClick={() => onAction?.(row, "RemoveSecurityAdministrator")}>
-                            Remove Security Administrator
+                        first ? (
+                          <Button size="sm" variant="secondary" aria-label={`${MEMBER_ACTION_LABELS[first]}: ${memberName(row)}`} onClick={() => onAction?.(row, first)}>
+                            {MEMBER_ACTION_LABELS[first]}
                           </Button>
                         ) : null
                       }
+                      overflow={rest.map((action) => ({
+                        key: action,
+                        content: (
+                          <button type="button" aria-label={`${MEMBER_ACTION_LABELS[action]}: ${memberName(row)}`} onClick={() => onAction?.(row, action)}>
+                            {MEMBER_ACTION_LABELS[action]}
+                          </button>
+                        ),
+                      }))}
                     />
                   );
                 },

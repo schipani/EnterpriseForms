@@ -104,6 +104,13 @@ export const ENDPOINTS = {
   // Phase C8 M1: administration shell (organization overview, people directory, team directory/detail/rename/membership).
   "organization.overview": { method: "GET", path: "/api/v1/organization/overview" },
   "organization.members": { method: "GET", path: "/api/v1/organization/members" },
+  "organization.grantMemberRole": { method: "POST", path: "/api/v1/organization/members/{userId}/roles" },
+  "organization.revokeMemberRole": { method: "POST", path: "/api/v1/organization/members/{userId}/roles/{roleName}/remove" },
+  "organization.proposeOwnerChange": { method: "POST", path: "/api/v1/organization/members/{userId}/owner-proposals" },
+  "organization.approveOwnerProposal": { method: "POST", path: "/api/v1/organization/owner-proposals/{proposalId}/approve" },
+  "organization.disableMember": { method: "POST", path: "/api/v1/organization/members/{userId}/disable" },
+  "organization.enableMember": { method: "POST", path: "/api/v1/organization/members/{userId}/enable" },
+  "organization.requestMembership": { method: "POST", path: "/api/v1/organization/membership-requests" },
   "teams.directory": { method: "GET", path: "/api/v1/organization/teams" },
   "teams.get": { method: "GET", path: "/api/v1/teams/{teamId}" },
   "teams.rename": { method: "PATCH", path: "/api/v1/teams/{teamId}" },
