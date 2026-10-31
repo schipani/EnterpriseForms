@@ -28,13 +28,8 @@ const row = (page: Page, name: RegExp) => page.getByRole("table", { name: "Peopl
 /** Opens a row action (the primary button or the row's "…" menu), fills the reason, confirms the step-up and submits. */
 async function change(page: Page, person: RegExp, action: string, confirm: string) {
   const target = row(page, person);
-  const direct = target.getByRole("button", { name: new RegExp(`^${action}:`) });
-  if (await direct.count()) {
-    await direct.click();
-  } else {
-    await target.getByRole("button", { name: /More actions for/ }).click();
-    await page.getByRole("menuitem", { name: new RegExp(`^${action}:`) }).click();
-  }
+  await target.getByRole("button", { name: /^Actions for/ }).click();
+  await page.getByRole("menuitem", { name: new RegExp(`^${action}:`) }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("button", { name: confirm })).toBeDisabled();
   await dialog.getByLabel(/Reason/).fill(`browser test ${run}`);
@@ -56,7 +51,9 @@ test("an owner makes and removes a designer, and cannot disable a member who sti
 
   // Every persona of the shared test organization owns records (or is its last Security Administrator), so disabling is
   // refused with a count and nothing changes. The full disable -> refused -> re-enable path runs in Stage B (MembershipAdministrationTests).
-  await row(page, /Riley Reader/).getByRole("button", { name: /More actions for/ }).click();
+  await row(page, /Riley Reader/)
+    .getByRole("button", { name: /^Actions for/ })
+    .click();
   await page.getByRole("menuitem", { name: /^Disable membership:/ }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel(/Reason/).fill(`browser test ${run}`);
@@ -74,8 +71,14 @@ test("an owner change is only a proposal until a different owner approves it", a
   await signIn(page, "owner");
   await openPeople(page);
   // An identical pending proposal (from an earlier run within 24 hours) removes the action; then only the proposal is checked.
-  if (await row(page, /Dana Designer/).getByRole("button", { name: /More actions for/ }).count()) {
-    await row(page, /Dana Designer/).getByRole("button", { name: /More actions for/ }).click();
+  if (
+    await row(page, /Dana Designer/)
+      .getByRole("button", { name: /^Actions for/ })
+      .count()
+  ) {
+    await row(page, /Dana Designer/)
+      .getByRole("button", { name: /^Actions for/ })
+      .click();
     const propose = page.getByRole("menuitem", { name: /^Propose as owner:/ });
     const available = (await propose.count()) > 0;
     await page.keyboard.press("Escape");
@@ -87,7 +90,7 @@ test("an owner change is only a proposal until a different owner approves it", a
   const proposal = proposals.getByRole("row", { name: /Dana Designer/ }).first();
   await expect(proposal).toContainText("Waiting for approval");
   await expect(proposal).toContainText("Another owner approves"); // the proposer cannot approve their own proposal
-  await expect(row(page, /Dana Designer/)).not.toContainText("Organization Owner");
+  await expect(row(page, /Dana Designer/)).not.toContainText(/Owner/);
   await axe(page);
   await signOut(page);
 });

@@ -1,8 +1,9 @@
 import type { OrganizationMemberResponse } from "@enterpriseforms/api-client";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { subjectProblem } from "./AddUserDialog";
-import { MemberTable } from "./MemberTable";
+import { MemberTable, providerName } from "./MemberTable";
 
 const base = { identityIssuer: "https://idp.test", firstSeenOn: "2026-10-01T10:00:00Z", teams: [], isCurrentUser: false, lastSignedInOn: null, disabledOn: null };
 
@@ -44,17 +45,31 @@ const members: OrganizationMemberResponse[] = [
 ];
 
 describe("MemberTable", () => {
-  it("shows roles, membership, sign-in, teams and last sign-in", () => {
+  it("shows one Person cell with the identity beneath the name, then roles, membership, sign-in, teams and last sign-in", () => {
     render(<MemberTable members={members} rolesAvailable />);
     const table = screen.getByRole("table", { name: "People" });
-    expect(within(table).getByRole("rowheader", { name: "Avery Owner (you)" })).toBeInTheDocument();
-    expect(within(table).getByText("Organization Owner")).toBeInTheDocument();
-    expect(within(table).getByText("Security Administrator")).toBeInTheDocument();
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent),
+    ).toEqual(["Person", "Roles", "Membership", "Sign-in", "Teams", "Last sign-in"]);
+    const owner = within(table).getByRole("rowheader", { name: /Avery Owner/ });
+    expect(owner).toHaveTextContent("Avery Owner");
+    expect(owner).toHaveTextContent("dev-owner · idp.test");
+    expect(owner).toHaveTextContent("(you)");
+    expect(within(owner).getByTitle("dev-owner · https://idp.test")).toBeInTheDocument(); // full value for the tooltip
+    expect(within(table).getByText("Owner")).toBeInTheDocument();
+    expect(within(table).getByText("Security administrator")).toBeInTheDocument();
     expect(within(table).getByText("Disabled")).toBeInTheDocument();
     expect(within(table).getAllByText("Active")).toHaveLength(2);
     expect(within(table).getByText("Never signed in")).toBeInTheDocument();
     expect(within(table).getByText("Intake")).toBeInTheDocument();
     expect(within(table).getByRole("rowheader", { name: /Name not known yet/ })).toBeInTheDocument();
+  });
+
+  it("shows no identity line when the server did not return an identity", () => {
+    render(<MemberTable members={[{ ...members[1]!, identitySubject: "", identityIssuer: "" }]} rolesAvailable />);
+    expect(screen.getByRole("rowheader")).toHaveTextContent(/^Sam Security$/);
   });
 
   it("is read-only without an action handler", () => {
@@ -63,20 +78,43 @@ describe("MemberTable", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("shows the first hinted action and puts the rest in the row menu, with names that start with the visible text", () => {
+  it("offers one Actions menu per row, only for rows with hinted actions, with names that start with the visible text", async () => {
     const onAction = vi.fn();
+    const user = userEvent.setup();
     render(<MemberTable members={members} rolesAvailable onAction={onAction} />);
-    fireEvent.click(screen.getByRole("button", { name: "Make designer: Sam Security" }));
+    expect(screen.getByRole("columnheader", { name: "Actions" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Actions for Avery Owner/ })).toBeNull(); // no authorized action for that row
+    await user.click(screen.getByRole("button", { name: "Actions for Sam Security" }));
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Make designer", "Propose as owner", "Disable membership"]);
+    await user.click(screen.getByRole("menuitem", { name: "Make designer: Sam Security" }));
     expect(onAction).toHaveBeenCalledWith(members[1], "GrantDesigner");
-    fireEvent.click(screen.getByRole("button", { name: "Re-enable membership: dev-new" }));
+    await user.click(screen.getByRole("button", { name: "Actions for dev-new" }));
+    await user.click(screen.getByRole("menuitem", { name: "Re-enable membership: dev-new" }));
     expect(onAction).toHaveBeenCalledWith(members[2], "EnableMembership");
-    expect(screen.getByRole("button", { name: "More actions for Sam Security" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Avery Owner/ })).toBeNull();
+  });
+
+  it("opens the Actions menu from the keyboard", async () => {
+    const user = userEvent.setup();
+    render(<MemberTable members={members} rolesAvailable onAction={vi.fn()} />);
+    screen.getByRole("button", { name: "Actions for Sam Security" }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("menuitem", { name: /Make designer/ })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menuitem")).toBeNull();
   });
 
   it("says roles are unavailable when the Authority roster did not answer", () => {
     render(<MemberTable members={members} rolesAvailable={false} />);
     expect(screen.getAllByText("Unavailable")).toHaveLength(3);
+  });
+});
+
+describe("providerName", () => {
+  it("shortens issuers to a provider name", () => {
+    expect(providerName("https://login.microsoftonline.com/11111111-2222-3333-4444-555555555555/v2.0")).toBe("Microsoft Entra ID");
+    expect(providerName("https://test-idp.enterpriseforms.invalid")).toBe("Test identity provider");
+    expect(providerName("https://idp.test")).toBe("idp.test");
+    expect(providerName("not a url")).toBe("not a url");
   });
 });
 

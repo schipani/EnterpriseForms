@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -171,7 +172,8 @@ describe("PeopleDirectoryPage", () => {
   it("makes a designer through the Authority with a reason and step-up", async () => {
     renderPage();
     await screen.findByText("Person 01");
-    fireEvent.click(screen.getByRole("button", { name: "Make designer: Person 03" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Actions for Person 03" }));
+    await userEvent.setup().click(screen.getByRole("menuitem", { name: "Make designer: Person 03" }));
     await confirmChange(/Make Person 03 a designer/, "Make designer");
     await waitFor(() => expect(api.organization.grantMemberRole).toHaveBeenCalledWith("u-3", { roleName: "Designer", reason: "unit decision", useDevelopmentStepUp: true }));
     expect(await screen.findByText("Person 03 is now a designer.")).toBeInTheDocument();
