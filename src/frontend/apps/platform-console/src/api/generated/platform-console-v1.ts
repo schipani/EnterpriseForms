@@ -223,6 +223,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/console-api/v1/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-072: organizations with lifecycle and owner, Security Administrator and member counts (15 per page by default, at most 50). */
+        get: operations["SearchOrganizations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/organizations/{organizationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-072 details: owner identities, counts and onboarding provenance. The Authority audits each view (fail closed). */
+        get: operations["GetOrganization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/organization-onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-074 queue: onboarding requests, newest first (15 per page by default), and the owner issuers this environment accepts. */
+        get: operations["SearchOrganizationOnboarding"];
+        put?: never;
+        /** PG-073: create an immutable onboarding request (dryRun validates only). Creating grants nothing; approvals carry each operator's own evidence. */
+        post: operations["CreateOrganizationOnboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/organization-onboarding/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-074: the request, its frozen statement and fingerprint, owners, approvals, key custody status, activation and the operator's eligibility. */
+        get: operations["GetOrganizationOnboarding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/organization-onboarding/{requestId}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The signed-in operator's approval. The second valid approval by a different operator approves the request (key custody follows). */
+        post: operations["ApproveOrganizationOnboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/organization-onboarding/{requestId}/approvals/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraws the signed-in operator's own approval. */
+        post: operations["WithdrawOrganizationOnboardingApproval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/organization-onboarding/{requestId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rejects a request awaiting approval; nothing is created. */
+        post: operations["RejectOrganizationOnboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/organization-onboarding/{requestId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels an approved request before initialization; nothing is created. */
+        post: operations["CancelOrganizationOnboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/organization-onboarding/{requestId}/initialize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates the organization, its initial owners and owner roles in one Authority transaction after verifying the custody key; usable once the first change is projected and anchored. */
+        post: operations["InitializeOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -282,9 +436,233 @@ export interface components {
                 [key: string]: string;
             };
         };
+        OnboardingCreateInput: {
+            idempotencyKey: string;
+            organizationDisplayName: string;
+            initialOwners: components["schemas"]["OnboardingOwnerInput"][];
+            justification: string;
+            /** @default false */
+            dryRun: boolean;
+        };
+        OnboardingOwnerInput: {
+            issuerUri: string;
+            subjectIdentifier: string;
+            displayNameHint: string;
+            verificationMethod: string;
+            verificationReference: string;
+        };
         OperatorDecisionInput: {
             expectedStatementSha256: string;
             justification: string;
+        };
+        OrganizationActivation: {
+            status: string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            /** Format: int64 */
+            projectionAppliedRevision: number | string;
+        };
+        OrganizationDirectoryDetail: {
+            summary: components["schemas"]["OrganizationDirectoryItem"];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            /** Format: int64 */
+            projectionAppliedRevision: number | string;
+            owners: components["schemas"]["OrganizationDirectoryOwner"][];
+            onboardingApprovedBy: string[];
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OrganizationDirectoryItem: {
+            /** Format: uuid */
+            organizationId: string;
+            organizationDisplayName: string;
+            lifecycle: string;
+            /** Format: int32 */
+            enabledOwnerCount: number | string;
+            /** Format: int32 */
+            securityAdministratorCount: number | string;
+            /** Format: int32 */
+            memberCount: number | string;
+            needsOwners: boolean;
+            /** Format: uuid */
+            onboardingRequestId: null | string;
+        };
+        OrganizationDirectoryOwner: {
+            /** Format: uuid */
+            authorityUserId: string;
+            issuerUri: string;
+            subjectIdentifier: string;
+            enabled: boolean;
+        };
+        OrganizationDirectoryPage: {
+            items: components["schemas"]["OrganizationDirectoryItem"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            nextCursor: null | string;
+            /** Format: int32 */
+            limit: number | string;
+            filter: string;
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OrganizationOnboardingApprovalView: {
+            /** Format: uuid */
+            approvalId: string;
+            /** Format: uuid */
+            platformOperatorId: string;
+            operatorDisplayName: string;
+            isMine: boolean;
+            justification: string;
+            /** Format: date-time */
+            recordedOn: string;
+            state: string;
+            closureReason: null | string;
+        };
+        OrganizationOnboardingCreateResponse: {
+            dryRun: boolean;
+            eligible: boolean;
+            refusalCode: null | string;
+            refusalDetail: null | string;
+            warnings: string[];
+            request: null | components["schemas"]["OrganizationOnboardingDetail"];
+            replayed: boolean;
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OrganizationOnboardingDecisionResponse: {
+            dryRun: boolean;
+            eligible: boolean;
+            refusalCode: null | string;
+            refusalDetail: null | string;
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            organizationId: string;
+            decision: string;
+            statementJson: string;
+            statementSha256: string;
+            outcome: string;
+            /** Format: int32 */
+            approvalsRecorded: number | string;
+            /** Format: int32 */
+            approvalsRequired: number | string;
+            state: string;
+            displayState: string;
+            /** Format: uuid */
+            securityCommandId: null | string;
+            archiveState: null | string;
+            replayed: boolean;
+            approvalAssurance: string;
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OrganizationOnboardingDetail: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            organizationId: string;
+            organizationDisplayName: string;
+            identityIssuerUri: string;
+            state: string;
+            displayState: string;
+            justification: string;
+            /** Format: uuid */
+            createdByPlatformOperatorId: string;
+            createdByOperatorDisplayName: string;
+            /** Format: date-time */
+            createdOn: string;
+            /** Format: date-time */
+            expiresOn: string;
+            /** Format: date-time */
+            approvedOn: null | string;
+            /** Format: date-time */
+            keyCustodyExpiresOn: null | string;
+            /** Format: date-time */
+            initializedOn: null | string;
+            /** Format: date-time */
+            closedOn: null | string;
+            closureReason: null | string;
+            closureJustification: null | string;
+            lastInitializationFailureCode: null | string;
+            /** Format: date-time */
+            lastInitializationFailureOn: null | string;
+            owners: components["schemas"]["OrganizationOnboardingOwnerView"][];
+            approvals: components["schemas"]["OrganizationOnboardingApprovalView"][];
+            /** Format: int32 */
+            approvalsRecorded: number | string;
+            /** Format: int32 */
+            approvalsRequired: number | string;
+            statementJson: string;
+            statementSha256: string;
+            keyCustody: components["schemas"]["OrganizationOnboardingKeyCustody"];
+            activation: null | components["schemas"]["OrganizationActivation"];
+            myEligibility: components["schemas"]["OrganizationOnboardingEligibility"];
+            /** Format: int64 */
+            rowRevision: number | string;
+            approvalAssurance: string;
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OrganizationOnboardingEligibility: {
+            canApprove: boolean;
+            canWithdraw: boolean;
+            canReject: boolean;
+            canCancel: boolean;
+            canInitialize: boolean;
+            approveRefusalCode: null | string;
+            approveRefusalDetail: null | string;
+            initializeRefusalCode: null | string;
+            initializeRefusalDetail: null | string;
+        };
+        OrganizationOnboardingKeyCustody: {
+            keyName: string;
+            status: string;
+            detail: null | string;
+        };
+        OrganizationOnboardingListItem: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            organizationId: string;
+            organizationDisplayName: string;
+            /** Format: int32 */
+            ownerCount: number | string;
+            state: string;
+            displayState: string;
+            /** Format: date-time */
+            createdOn: string;
+            /** Format: date-time */
+            expiresOn: string;
+            /** Format: int32 */
+            approvalsRecorded: number | string;
+            /** Format: int32 */
+            approvalsRequired: number | string;
+            approvedByMe: boolean;
+            createdByOperatorDisplayName: string;
+        };
+        OrganizationOnboardingOwnerView: {
+            /** Format: uuid */
+            authorityUserId: string;
+            issuerUri: string;
+            subjectIdentifier: string;
+            displayNameHint: string;
+            verificationMethod: string;
+            verificationReference: string;
+            memberOfOtherOrganizations: boolean;
+        };
+        OrganizationOnboardingPage: {
+            items: components["schemas"]["OrganizationOnboardingListItem"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            nextCursor: null | string;
+            /** Format: int32 */
+            limit: number | string;
+            status: string;
+            approvedIdentityIssuers: string[];
+            approvalAssurance: string;
+            /** Format: uuid */
+            correlationId: string;
         };
         PlatformApprovalStatus: {
             /** Format: int32 */
@@ -734,6 +1112,254 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformMembershipDecisionResponse"];
+                };
+            };
+        };
+    };
+    SearchOrganizations: {
+        parameters: {
+            query?: {
+                q?: string;
+                filter?: string;
+                cursor?: string;
+                limit?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationDirectoryPage"];
+                };
+            };
+        };
+    };
+    GetOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationDirectoryDetail"];
+                };
+            };
+        };
+    };
+    SearchOrganizationOnboarding: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: string;
+                cursor?: string;
+                limit?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOnboardingPage"];
+                };
+            };
+        };
+    };
+    CreateOrganizationOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingCreateInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOnboardingCreateResponse"];
+                };
+            };
+        };
+    };
+    GetOrganizationOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOnboardingDetail"];
+                };
+            };
+        };
+    };
+    ApproveOrganizationOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOnboardingDecisionResponse"];
+                };
+            };
+        };
+    };
+    WithdrawOrganizationOnboardingApproval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOnboardingDecisionResponse"];
+                };
+            };
+        };
+    };
+    RejectOrganizationOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOnboardingDecisionResponse"];
+                };
+            };
+        };
+    };
+    CancelOrganizationOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOnboardingDecisionResponse"];
+                };
+            };
+        };
+    };
+    InitializeOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationOnboardingDecisionResponse"];
                 };
             };
         };

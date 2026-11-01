@@ -60,6 +60,8 @@ services:
       Identity__OperatorAssertion__Issuer: https://platform-operators.sectest.enterpriseforms.invalid/
       Identity__OperatorAssertion__Audience: authorization-authority-platform-operator
       Identity__OperatorAssertion__SharedKeyBase64: cGxhdGZvcm0tb3BlcmF0b3ItYXNzZXJ0aW9uLXNlY3Rlc3Qtb25seS1rMDE=
+      # C8 onboarding (C-104): Platform Console onboarding on this isolated stack, owners from the synthetic test identity provider only.
+      OrganizationOnboarding__ApprovedIdentityIssuers__0: ${TEST_IDP_ISSUER}
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
     # C8 M2 Stage 3: the Platform Console reaches the Authority over its own network (never trust-edge, which the business shares).
@@ -90,6 +92,30 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
       CONSOLE_TOKEN: sectest-platform-console-vault-token-0001
+    depends_on:
+      vault-transit-init:
+        condition: service_completed_successfully
+    networks: [authority-net]
+    restart: "no"
+  vault-custody-init:
+    # C8 onboarding (C-104, Testing only): the dedicated organization key custody credential. Vault authorizes a Transit key create as
+    # `update`, so the policy grants `update` on exactly one path segment (transit/keys/<name>: never .../rotate, .../config, .../trim)
+    # with parameters pinned to a non-exportable 256-bit HMAC key (plus token self-lookup). It can create a key; re-creating an existing
+    # key changes nothing; it can never read, rotate, reconfigure, export or delete a key, or sign. The Authority verifies (never creates)
+    # the key before initialization. Fixed synthetic token id (this stack only); the real-stack tests assert the denials.
+    image: hashicorp/vault:1.20.4
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        printf '%s\n' 'path "transit/keys/+" {' '  capabilities = ["update"]' '  allowed_parameters = { "type" = ["hmac"], "key_size" = ["32"], "exportable" = ["false"], "allow_plaintext_backup" = ["false"] }' '}' 'path "auth/token/lookup-self" { capabilities = ["read"] }' > /tmp/custody.hcl
+        vault policy write organization-key-custody /tmp/custody.hcl >/dev/null
+        vault token lookup "$$CUSTODY_TOKEN" >/dev/null 2>&1 || vault token create -id="$$CUSTODY_TOKEN" -orphan -no-default-policy -policy=organization-key-custody -ttl=720h -display-name=organization-key-custody-sectest >/dev/null
+        echo "organization key custody policy and token ready"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      CUSTODY_TOKEN: sectest-organization-key-custody-token-0001
     depends_on:
       vault-transit-init:
         condition: service_completed_successfully

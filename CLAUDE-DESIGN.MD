@@ -1317,6 +1317,21 @@ Use current supported stable versions and pinned lockfiles; do not assume an old
 - **Actions:** Approve (first approval pending; a second, different operator's approval creates the membership), withdraw own pending approval, reject with justification. Evidence is produced by the console for the signed-in operator only (Development/Testing: per-operator Vault Transit keys; production: Entra transaction-bound step-up, PB-08, not implemented).
 - **Async/edge:** Server-side paging (15), stale statement → reload with explanation, archive outage / rollback refusal → fail-closed banner, suspended operator → session ends. Development banner: synthetic approvals are not two-person evidence. Feature owner: Platform administration / Security. Stage 3 delivered the BFF API; Stage 4 (C-100) delivered the pages in `src/frontend/apps/platform-console` (separate site, dev `http://127.0.0.1:8095/platform/sign-in`).
 
+#### PG-071 — Operators (reserved, not built) · Platform administration (separate Platform Console)
+- Reserved for Platform Operator management (D8-43, owner decision 11 of C-104). Registry changes stay on the Authority platform plane (two-operator provision/reinstate/remove, single-operator suspension). No page exists; do not scaffold it before its own approval.
+
+#### PG-072 — Organizations (`/platform/organizations`, `/platform/organizations/:organizationId`) · Platform administration (separate Platform Console)
+- **Audience/permission:** Active Platform Operators only. Organization metadata and owner identities only: no records, documents, teams, shares or audit content (C-103 D8-61 as proposed).
+- **Sections:** Directory (name, lifecycle Active/Activating/Quarantined, enabled owners with "fewer than two owners" warning and "three recommended" advice, Security Administrators, members), details (owners and binding state, onboarding provenance with approving operators, technical revisions). Each detail view is audited on the organization's audit stream before it is returned (fail closed).
+- **Async/edge:** Server-side paging (15), search, "needs owners" filter. Owner recovery (PG-075) is not available yet.
+
+#### PG-073 — New organization (`/platform/onboarding/new`) · Platform administration (separate Platform Console)
+- **Sections:** Organization name, 2–10 initial owners from the approved identity issuer (subject, display name, verification method and reference; three recommended), justification; Check (Authority dry run: conflicts, warnings) and Create request. The Authority generates the organization id and every owner's user id; the request is immutable afterwards.
+
+#### PG-074 — Onboarding request (`/platform/onboarding`, `/platform/onboarding/:requestId`) · Platform administration (separate Platform Console)
+- **Sections:** Queue (status filter, search, paging 15) and details: lifecycle stepper (Awaiting approval → Approved → Key provisioning → Initialized → Active), owners, approvals with justifications, frozen statement and fingerprint, key custody status (the key is created by a separate custody credential, never from the browser), initialization failures, activation.
+- **Actions:** Approve (two different operators; the creator may give one), withdraw own approval, reject, cancel (approved, before initialization), initialize (after the custody key is verified; one Authority transaction creates the organization, the owners and their owner roles only). Evidence is signed by the console for the signed-in operator only. Development banner: synthetic approvals are not two-person evidence. Delivered C-104 (Development/Testing).
+
 ### 16.9 Critical end-to-end UX journeys (must be implemented and tested)
 
 - **J-01 New user:** External sign-in → safe organization chooser/bootstrap → role-aware dashboard → permitted form catalog → create first record → become default owner → see only own record.
@@ -1336,7 +1351,7 @@ Use current supported stable versions and pinned lockfiles; do not assume an old
 
 Claude must create `docs/ui/SCREEN_IMPLEMENTATION_MATRIX.md` during implementation. Each `PG-###` requires a row with: route; owning feature/package; minimum privilege; related API/OpenAPI operation; independent async region query keys; mutation commands; loading/empty/error/denied and integrity states; keyboard/axe test ID; Playwright test ID; implemented/verified status. **Do not mark a page complete solely because the route exists or a static screenshot was built.**
 
-- Treat **PG-001 through PG-055**, **PG-060 through PG-066**, and **PG-068** as required functional screens for the complete enterprise application, with capability gating; **PG-056 through PG-059** and **PG-067** are controlled operational screens required for Level 2 deployment/readiness, but may live in a separate security-operator frontend rather than the ordinary tenant SPA. **PG-069** is an internal development-only tool, never a public production route. **PG-070** is a controlled platform-administration screen of the separate Platform Console (C8 M2), never part of the tenant SPA.
+- Treat **PG-001 through PG-055**, **PG-060 through PG-066**, and **PG-068** as required functional screens for the complete enterprise application, with capability gating; **PG-056 through PG-059** and **PG-067** are controlled operational screens required for Level 2 deployment/readiness, but may live in a separate security-operator frontend rather than the ordinary tenant SPA. **PG-069** is an internal development-only tool, never a public production route. **PG-070**, **PG-072**, **PG-073** and **PG-074** are controlled platform-administration screens of the separate Platform Console (C8 M2 and C8 onboarding), never part of the tenant SPA; **PG-071** is reserved for Platform Operator management and not built.
 - If two pages are implemented as tabs within one route, preserve distinct deep links, server permissions and acceptance tests. It is acceptable to consolidate presentation but **not** to omit capabilities or weaken access checks.
 - Every page containing one or more server-backed cards or sections must demonstrate *independent refresh* of those regions. Full-page-only refresh does not meet the requirement.
 - Before reporting completion, run end-to-end tests for J-01 through J-12, all page permission gates, responsive layouts, organization theme contrast, and background upload navigation. Tests for undeployed Level 2 infrastructure must be marked **pending**, never falsely declared passing.
@@ -1421,6 +1436,10 @@ Every screen in Section 16 belongs to **exactly one** frontend feature. `app/` m
 | PG-068 | `exports` | Authorized export builder |
 | PG-069 | `support` | Design-system component gallery |
 | PG-070 | `operator-approvals` | Operator approvals (Platform Console) |
+| PG-071 | `platform-operators` | Operators (Platform Console; reserved, not built) |
+| PG-072 | `organization-directory` | Organizations (Platform Console) |
+| PG-073 | `organization-onboarding` | New organization (Platform Console) |
+| PG-074 | `organization-onboarding` | Onboarding request (Platform Console) |
 
 ### 17.1 Feature-to-backend traceability and permitted dependencies
 

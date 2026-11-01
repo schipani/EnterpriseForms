@@ -44,6 +44,38 @@ public sealed class AuthorityPlatformClient(HttpClient http, IOptions<PlatformCo
         return SendAsync<PlatformMembershipDecisionResponse>(HttpMethod.Post, RequestPath(organizationId, requestId, action), subject, request, correlationId, cancellationToken);
     }
 
+    // ---- C8 onboarding (C-104) ----
+
+    public Task<OrganizationOnboardingCreateResponse> CreateOnboardingAsync(string subject, OrganizationOnboardingCreateRequest request, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OrganizationOnboardingCreateResponse>(HttpMethod.Post, "internal/v1/platform/organization-onboarding", subject, request, correlationId, cancellationToken);
+
+    public Task<OrganizationOnboardingPage> SearchOnboardingAsync(string subject, OrganizationOnboardingSearchRequest request, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OrganizationOnboardingPage>(HttpMethod.Post, "internal/v1/platform/organization-onboarding/search", subject, request, correlationId, cancellationToken);
+
+    public Task<OrganizationOnboardingDetail> GetOnboardingAsync(string subject, Guid requestId, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OrganizationOnboardingDetail>(HttpMethod.Get, $"internal/v1/platform/organization-onboarding/{requestId:D}", subject, null, correlationId, cancellationToken);
+
+    /// <summary><paramref name="decision"/> selects the endpoint: approve, withdraw, reject, cancel or initialize.</summary>
+    public Task<OrganizationOnboardingDecisionResponse> DecideOnboardingAsync(string subject, Guid requestId, string decision, OrganizationOnboardingDecisionRequest request, Guid correlationId, CancellationToken cancellationToken)
+    {
+        var action = decision switch
+        {
+            OperatorDecisions.Approve => "/approvals",
+            OperatorDecisions.Withdraw => "/approvals/withdraw",
+            OperatorDecisions.Reject => "/reject",
+            OperatorDecisions.Cancel => "/cancel",
+            OperatorDecisions.Initialize => "/initialize",
+            _ => throw new ArgumentOutOfRangeException(nameof(decision)),
+        };
+        return SendAsync<OrganizationOnboardingDecisionResponse>(HttpMethod.Post, $"internal/v1/platform/organization-onboarding/{requestId:D}{action}", subject, request, correlationId, cancellationToken);
+    }
+
+    public Task<OrganizationDirectoryPage> SearchOrganizationsAsync(string subject, OrganizationDirectorySearchRequest request, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OrganizationDirectoryPage>(HttpMethod.Post, "internal/v1/platform/organizations/search", subject, request, correlationId, cancellationToken);
+
+    public Task<OrganizationDirectoryDetail> GetOrganizationAsync(string subject, Guid organizationId, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OrganizationDirectoryDetail>(HttpMethod.Get, $"internal/v1/platform/organizations/{organizationId:D}", subject, null, correlationId, cancellationToken);
+
     private static string RequestPath(Guid organizationId, Guid requestId, string action) =>
         $"internal/v1/platform/organizations/{organizationId:D}/membership-requests/{requestId:D}{action}";
 
@@ -129,4 +161,10 @@ public static class OperatorDecisions
     public const string Approve = "approve";
     public const string Reject = "reject";
     public const string Withdraw = "withdraw";
+
+    /// <summary>C8 onboarding (C-104): close an approved request before initialization.</summary>
+    public const string Cancel = "cancel";
+
+    /// <summary>C8 onboarding (C-104): create the organization from an approved request whose key custody is complete.</summary>
+    public const string Initialize = "initialize";
 }

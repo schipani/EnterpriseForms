@@ -2,6 +2,10 @@ import { Button, LoadingBlock } from "@enterpriseforms/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApprovalsPage } from "../pages/ApprovalsPage";
+import { OnboardingDetailPage } from "../pages/OnboardingDetailPage";
+import { OnboardingNewPage } from "../pages/OnboardingNewPage";
+import { OnboardingQueuePage } from "../pages/OnboardingQueuePage";
+import { OrganizationDetailPage, OrganizationsPage } from "../pages/OrganizationsPage";
 import { ReviewPage } from "../pages/ReviewPage";
 import { SignInPage } from "../pages/SignInPage";
 import { formatTime } from "./format";
@@ -9,6 +13,18 @@ import { navigate, useRoute } from "./router";
 import { SessionProvider, useConsoleSession } from "./session";
 
 export const DEVELOPMENT_BANNER = "Development/Test operator — synthetic approval evidence";
+
+const pageTitles: Record<string, string> = {
+  review: "Review request",
+  "sign-in": "Sign in",
+  organizations: "Organizations",
+  organization: "Organization",
+  onboarding: "Organization onboarding",
+  "onboarding-new": "New organization",
+  "onboarding-detail": "Onboarding request",
+};
+
+const navLinkClass = "flex min-h-11 items-center rounded-control px-3 text-control font-medium underline-offset-4 hover:underline aria-[current=page]:underline";
 
 export function App() {
   // One client per mount; signing out drops every cached queue and request so nothing outlives the session.
@@ -37,7 +53,7 @@ function Shell() {
   }, [state.status, route.name]);
 
   useEffect(() => {
-    document.title = route.name === "review" ? "Review request — Platform Console" : route.name === "sign-in" ? "Sign in — Platform Console" : "Operator approvals — Platform Console";
+    document.title = `${pageTitles[route.name] ?? "Operator approvals"} — Platform Console`;
   }, [route.name]);
 
   const signedIn = state.status === "signed-in" ? state : null;
@@ -56,15 +72,22 @@ function Shell() {
               <span className="text-lg font-semibold">Platform Console</span>
             </a>
             {signedIn ? (
-              <nav aria-label="Platform administration" className="flex items-center">
-                <a
-                  href="/platform/approvals"
-                  aria-current={route.name === "approvals" || route.name === "review" ? "page" : undefined}
-                  onClick={(event) => { event.preventDefault(); navigate("/platform/approvals"); }}
-                  className="flex min-h-11 items-center rounded-control px-3 text-control font-medium underline-offset-4 hover:underline aria-[current=page]:underline"
-                >
-                  Operator approvals
-                </a>
+              <nav aria-label="Platform administration" className="flex flex-wrap items-center">
+                {[
+                  { href: "/platform/organizations", label: "Organizations", current: route.name === "organizations" || route.name === "organization" },
+                  { href: "/platform/onboarding", label: "Onboarding", current: route.name === "onboarding" || route.name === "onboarding-new" || route.name === "onboarding-detail" },
+                  { href: "/platform/approvals", label: "Operator approvals", current: route.name === "approvals" || route.name === "review" },
+                ].map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    aria-current={link.current ? "page" : undefined}
+                    onClick={(event) => { event.preventDefault(); navigate(link.href); }}
+                    className={navLinkClass}
+                  >
+                    {link.label}
+                  </a>
+                ))}
               </nav>
             ) : null}
             {signedIn ? (
@@ -103,6 +126,11 @@ function Shell() {
         {state.status === "signed-out" ? <SignInPage notice={state.notice} /> : null}
         {signedIn && (route.name === "approvals" || route.name === "sign-in") ? <ApprovalsPage /> : null}
         {signedIn && route.name === "review" ? <ReviewPage key={route.requestId} organizationId={route.organizationId} requestId={route.requestId} /> : null}
+        {signedIn && route.name === "organizations" ? <OrganizationsPage /> : null}
+        {signedIn && route.name === "organization" ? <OrganizationDetailPage key={route.organizationId} organizationId={route.organizationId} /> : null}
+        {signedIn && route.name === "onboarding" ? <OnboardingQueuePage /> : null}
+        {signedIn && route.name === "onboarding-new" ? <OnboardingNewPage /> : null}
+        {signedIn && route.name === "onboarding-detail" ? <OnboardingDetailPage key={route.requestId} requestId={route.requestId} /> : null}
         {signedIn && route.name === "not-found" ? (
           <div className="flex flex-col items-start gap-3">
             <h1 className="text-2xl font-semibold">Page not found</h1>

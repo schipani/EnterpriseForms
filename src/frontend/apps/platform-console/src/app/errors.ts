@@ -42,6 +42,20 @@ export function describeError(error: unknown): ErrorView {
     case "PLATFORM_JOURNAL_UNVERIFIABLE":
     case "PLATFORM_JOURNAL_ARCHIVE_PENDING":
       return { title: "Temporarily unavailable", message: "The Authority cannot confirm the independent audit archive right now, so it refuses to act (fail closed). Nothing was recorded. Try again shortly.", tone: "warning", reload: false, retryable: true, reference };
+    case "ORGANIZATION_KEY_NOT_PROVISIONED":
+      return { title: "The organization key is not provisioned yet", message: "Key custody has not provisioned this organization's key, so it cannot be initialized. Nothing was changed. Ask the key custodian, then reload.", tone: "warning", reload: true, retryable: false, reference };
+    case "ORGANIZATION_ONBOARDING_EXPIRED":
+      return { title: "The request expired", message: "This onboarding request expired, so it can no longer be decided. Reload to see its current status.", tone: "warning", reload: true, retryable: false, reference };
+    case "ORGANIZATION_ONBOARDING_NOT_PENDING":
+      return { title: "The request does not allow this now", message: "It was already decided, cancelled or initialized. Reload to see its current status.", tone: "warning", reload: true, retryable: false, reference };
+    case "ORGANIZATION_NAME_CONFLICT":
+      return { title: "Organization name already in use", message: "Another organization or pending request already uses this name. Choose a different name.", tone: "warning", reload: false, retryable: false, reference };
+    case "ORGANIZATION_OWNER_IS_OPERATOR":
+      return { title: "An owner is a Platform Operator", message: "A Platform Operator cannot be an initial owner of an organization they onboard. Choose a different owner.", tone: "danger", reload: false, retryable: false, reference };
+    case "SIGNING_UNAVAILABLE":
+      return { title: "Service unavailable", message: "Signing is not available right now. Nothing was recorded. Try again shortly.", tone: "warning", reload: false, retryable: true, reference };
+    case "INVALID_REQUEST":
+      return { title: "The request was not valid", message: "Check the entered values and try again.", tone: "danger", reload: false, retryable: false, reference };
     case "PLATFORM_OPERATORS_UNAVAILABLE":
       return { title: "Operator decisions are not available", message: "The platform plane is not enabled in this environment.", tone: "danger", reload: false, retryable: false, reference };
     case "OPERATOR_SIGNING_UNAVAILABLE":

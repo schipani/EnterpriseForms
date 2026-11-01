@@ -437,6 +437,421 @@
           }
         }
       }
+    },
+    "/console-api/v1/organizations": {
+      "get": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-072: organizations with lifecycle and owner, Security Administrator and member counts (15 per page by default, at most 50).",
+        "operationId": "SearchOrganizations",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDirectoryPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}": {
+      "get": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-072 details: owner identities, counts and onboarding provenance. The Authority audits each view (fail closed).",
+        "operationId": "GetOrganization",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDirectoryDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding": {
+      "get": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-074 queue: onboarding requests, newest first (15 per page by default), and the owner issuers this environment accepts.",
+        "operationId": "SearchOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-073: create an immutable onboarding request (dryRun validates only). Creating grants nothing; approvals carry each operator's own evidence.",
+        "operationId": "CreateOrganizationOnboarding",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingCreateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingCreateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}": {
+      "get": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-074: the request, its frozen statement and fingerprint, owners, approvals, key custody status, activation and the operator's eligibility.",
+        "operationId": "GetOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/approvals": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "The signed-in operator's approval. The second valid approval by a different operator approves the request (key custody follows).",
+        "operationId": "ApproveOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "Withdraws the signed-in operator's own approval.",
+        "operationId": "WithdrawOrganizationOnboardingApproval",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "Rejects a request awaiting approval; nothing is created.",
+        "operationId": "RejectOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/cancel": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "Cancels an approved request before initialization; nothing is created.",
+        "operationId": "CancelOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/initialize": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "Creates the organization, its initial owners and owner roles in one Authority transaction after verifying the custody key; usable once the first change is projected and anchored.",
+        "operationId": "InitializeOrganization",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -653,6 +1068,65 @@
         },
         "additionalProperties": false
       },
+      "OnboardingCreateInput": {
+        "required": [
+          "idempotencyKey",
+          "organizationDisplayName",
+          "initialOwners",
+          "justification"
+        ],
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "initialOwners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnboardingOwnerInput"
+            }
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "OnboardingOwnerInput": {
+        "required": [
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "verificationMethod",
+          "verificationReference"
+        ],
+        "type": "object",
+        "properties": {
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "verificationMethod": {
+            "type": "string"
+          },
+          "verificationReference": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "OperatorDecisionInput": {
         "required": [
           "expectedStatementSha256",
@@ -665,6 +1139,878 @@
           },
           "justification": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationActivation": {
+        "required": [
+          "status",
+          "authorizationRevision",
+          "projectionAppliedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projectionAppliedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationDirectoryDetail": {
+        "required": [
+          "summary",
+          "authorizationRevision",
+          "projectionAppliedRevision",
+          "owners",
+          "onboardingApprovedBy",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/OrganizationDirectoryItem"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projectionAppliedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationDirectoryOwner"
+            }
+          },
+          "onboardingApprovedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationDirectoryItem": {
+        "required": [
+          "organizationId",
+          "organizationDisplayName",
+          "lifecycle",
+          "enabledOwnerCount",
+          "securityAdministratorCount",
+          "memberCount",
+          "needsOwners",
+          "onboardingRequestId"
+        ],
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string"
+          },
+          "enabledOwnerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "securityAdministratorCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "memberCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "needsOwners": {
+            "type": "boolean"
+          },
+          "onboardingRequestId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationDirectoryOwner": {
+        "required": [
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationDirectoryPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "filter",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationDirectoryItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "filter": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingApprovalView": {
+        "required": [
+          "approvalId",
+          "platformOperatorId",
+          "operatorDisplayName",
+          "isMine",
+          "justification",
+          "recordedOn",
+          "state",
+          "closureReason"
+        ],
+        "type": "object",
+        "properties": {
+          "approvalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operatorDisplayName": {
+            "type": "string"
+          },
+          "isMine": {
+            "type": "boolean"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "recordedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingCreateResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "warnings",
+          "request",
+          "replayed",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "request": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationOnboardingDetail"
+              }
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingDecisionResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "requestId",
+          "organizationId",
+          "decision",
+          "statementJson",
+          "statementSha256",
+          "outcome",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "state",
+          "displayState",
+          "securityCommandId",
+          "archiveState",
+          "replayed",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "securityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "archiveState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingDetail": {
+        "required": [
+          "requestId",
+          "organizationId",
+          "organizationDisplayName",
+          "identityIssuerUri",
+          "state",
+          "displayState",
+          "justification",
+          "createdByPlatformOperatorId",
+          "createdByOperatorDisplayName",
+          "createdOn",
+          "expiresOn",
+          "approvedOn",
+          "keyCustodyExpiresOn",
+          "initializedOn",
+          "closedOn",
+          "closureReason",
+          "closureJustification",
+          "lastInitializationFailureCode",
+          "lastInitializationFailureOn",
+          "owners",
+          "approvals",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "statementJson",
+          "statementSha256",
+          "keyCustody",
+          "activation",
+          "myEligibility",
+          "rowRevision",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "identityIssuerUri": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "createdByPlatformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdByOperatorDisplayName": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "keyCustodyExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "initializedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "closureJustification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastInitializationFailureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastInitializationFailureOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingOwnerView"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingApprovalView"
+            }
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "keyCustody": {
+            "$ref": "#/components/schemas/OrganizationOnboardingKeyCustody"
+          },
+          "activation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationActivation"
+              }
+            ]
+          },
+          "myEligibility": {
+            "$ref": "#/components/schemas/OrganizationOnboardingEligibility"
+          },
+          "rowRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingEligibility": {
+        "required": [
+          "canApprove",
+          "canWithdraw",
+          "canReject",
+          "canCancel",
+          "canInitialize",
+          "approveRefusalCode",
+          "approveRefusalDetail",
+          "initializeRefusalCode",
+          "initializeRefusalDetail"
+        ],
+        "type": "object",
+        "properties": {
+          "canApprove": {
+            "type": "boolean"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          },
+          "canReject": {
+            "type": "boolean"
+          },
+          "canCancel": {
+            "type": "boolean"
+          },
+          "canInitialize": {
+            "type": "boolean"
+          },
+          "approveRefusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approveRefusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initializeRefusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initializeRefusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingKeyCustody": {
+        "required": [
+          "keyName",
+          "status",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "keyName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingListItem": {
+        "required": [
+          "requestId",
+          "organizationId",
+          "organizationDisplayName",
+          "ownerCount",
+          "state",
+          "displayState",
+          "createdOn",
+          "expiresOn",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "approvedByMe",
+          "createdByOperatorDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "ownerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvedByMe": {
+            "type": "boolean"
+          },
+          "createdByOperatorDisplayName": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingOwnerView": {
+        "required": [
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "verificationMethod",
+          "verificationReference",
+          "memberOfOtherOrganizations"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "verificationMethod": {
+            "type": "string"
+          },
+          "verificationReference": {
+            "type": "string"
+          },
+          "memberOfOtherOrganizations": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "status",
+          "approvedIdentityIssuers",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingListItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "approvedIdentityIssuers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -1294,6 +2640,9 @@
     },
     {
       "name": "OperatorApprovals"
+    },
+    {
+      "name": "OrganizationOnboarding"
     }
   ]
 }

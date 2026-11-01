@@ -185,6 +185,8 @@ class Stack:
             env["DEVSTACK_PROTECTION_VERIFIER_KEY"] = verifier["shared_key_base64"]
         # C8 M2 Stage 3: the platform plane and the Platform Console, once `platform-console init` created their custody file.
         env.update(console_env(self.project))
+        # C8 onboarding (C-104): the approved owner issuer, once `onboarding init` created the custody file.
+        env.update(onboarding_env(self.project))
         env.update(self.overrides)
         return env
 
@@ -1177,6 +1179,8 @@ def cmd_seed_acceptance(args) -> None:
     root = stack.custody["vault_root_token"]
     current = stack.vault("vault policy read authority-transit", token=root).stdout
     existing = sorted(set(re.findall(r'path "transit/keys/(org-[0-9a-f]{32}-[a-z0-9-]+)"', current)))
+    if not existing and load_onboarding(args.project):
+        existing = existing_organization_keys(stack)  # C8 onboarding: the policy is by prefix, so list the registered keys instead
     if not existing:
         raise DevStackError("could not read the pinned Authority policy; nothing changed")
 
@@ -1188,6 +1192,8 @@ def cmd_seed_acceptance(args) -> None:
                       f'path "transit/hmac/{key}/sha2-256" {{ capabilities = ["update"] }}',
                       f'path "transit/verify/{key}/sha2-256" {{ capabilities = ["update"] }}']
         lines.append('path "auth/token/lookup-self" { capabilities = ["read"] }')
+        if load_onboarding(args.project) and creatable is None:
+            lines = AUTHORITY_ONBOARDING_POLICY_HCL.splitlines()  # C8 onboarding: read/hmac/verify by prefix; never create
         stack.vault("vault policy write authority-transit - <<'POLICY'\n" + "\n".join(lines) + "\nPOLICY\n", token=root)
 
     keys = sorted(set(existing) | {new_key})
@@ -1615,6 +1621,250 @@ def cmd_platform_console(args) -> None:
     print(f"[platform-console] web app: http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_WEB_PORT', '8095')}/platform/sign-in")
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# C8 onboarding (C-104): organization onboarding and key custody on the persistent development stack (development procedure)
+# --------------------------------------------------------------------------------------------------------------------
+
+ONBOARDING_FILE = "organization-key-custody.json"  # separate custody file (custody credential); never part of custody.json
+ONBOARDING_MIGRATION = "20261101131420_OrganizationOnboarding"
+CUSTODY_POLICY = "organization-key-custody"
+# The dedicated custody credential: create a key, nothing else. Vault authorizes a Transit key create as `update`, so the grant is
+# `update` on exactly one path segment (transit/keys/<name>, never .../rotate, .../config or .../trim) with parameters pinned to a
+# non-exportable 256-bit HMAC key; re-creating an existing key changes nothing; no read, export, delete or signing. lookup-self lets a
+# re-run confirm the token is still valid. Residual: a created key's name is not forced to start with org- (it is unusable regardless).
+CUSTODY_POLICY_HCL = "\n".join((
+    'path "transit/keys/+" {',
+    '  capabilities = ["update"]',
+    '  allowed_parameters = { "type" = ["hmac"], "key_size" = ["32"], "exportable" = ["false"], "allow_plaintext_backup" = ["false"] }',
+    '}',
+    'path "auth/token/lookup-self" { capabilities = ["read"] }',
+))
+# The Authority reads, HMACs and verifies with organization keys and creates none: new keys come from custody, so no per-key policy
+# widening by root custody is needed any more for onboarded organizations.
+AUTHORITY_ONBOARDING_POLICY_HCL = "\n".join((
+    'path "transit/keys/org-*" { capabilities = ["read"] }',
+    'path "transit/hmac/org-*" { capabilities = ["update"] }',
+    'path "transit/verify/org-*" { capabilities = ["update"] }',
+    'path "auth/token/lookup-self" { capabilities = ["read"] }',
+))
+ONBOARDING_KEY_PATTERN = re.compile(r"^org-[0-9a-f]{32}-row-integrity-v1$")
+
+
+def load_onboarding(project: str) -> dict | None:
+    path = custody_dir(project) / ONBOARDING_FILE
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def onboarding_env(project: str) -> dict:
+    """Compose variables for Platform Console onboarding, once `onboarding init` created the custody file."""
+    onboarding = load_onboarding(project)
+    return {"DEVSTACK_ONBOARDING_IDENTITY_ISSUER": onboarding["identity_issuer"]} if onboarding else {}
+
+
+def onboarding_migration_applied(stack: "Stack") -> bool:
+    return authority_sql(stack, f"SELECT count(*) FROM authority.ef_migrations_history WHERE \"MigrationId\" = '{ONBOARDING_MIGRATION}';") == "1"
+
+
+def onboarding_tool(stack: "Stack", request: dict) -> tuple[int, dict]:
+    """The dev-seed image's onboarding mode (operator plane, read-only key custody status; persona merge)."""
+    result = stack.compose("run", "--rm", "--no-deps", "-T", "-e", "DEVSEED_MODE=operator-onboarding", "dev-seed", input_text=json.dumps(request), check=False, timeout=300)
+    text = result.stdout.strip()
+    start = text.find("{")
+    if start < 0:
+        raise DevStackError(f"onboarding tool failed ({result.returncode}): {result.stderr.strip()[-1200:]}")
+    return result.returncode, json.loads(text[start:])
+
+
+def vault_denied(stack: "Stack", script: str, token: str) -> bool:
+    result = stack.vault(script + " 2>&1", token=token, check=False)
+    return result.returncode != 0 and "permission denied" in (result.stdout + result.stderr).lower()
+
+
+def existing_organization_keys(stack: "Stack") -> list[str]:
+    rows = authority_sql(stack, "SELECT provider_key_name FROM authority.integrity_key_registrations ORDER BY provider_key_name;")
+    return [r for r in rows.splitlines() if ONBOARDING_KEY_PATTERN.match(r)]
+
+
+def ensure_custody_vault(stack: "Stack", onboarding: dict) -> dict:
+    """The custody policy and token (created once; a superseded token is revoked); the Authority policy switched to read/hmac/verify by prefix."""
+    root = stack.custody["vault_root_token"]
+    stack.vault(f"vault policy write {CUSTODY_POLICY} - <<'POLICY'\n{CUSTODY_POLICY_HCL}\nPOLICY\n", token=root)
+    token = onboarding.get("custody_token")
+    if not token or stack.vault("vault token lookup >/dev/null 2>&1", token=token, check=False).returncode != 0:
+        created = json.loads(stack.vault(f"vault token create -orphan -no-default-policy -policy={CUSTODY_POLICY} -ttl=87600h -display-name=organization-key-custody-dev -format=json", token=root).stdout)["auth"]
+        if onboarding.get("custody_accessor"):
+            stack.vault(f"vault token revoke -accessor {onboarding['custody_accessor']} >/dev/null 2>&1 || true", token=root, check=False)
+        onboarding["custody_token"], onboarding["custody_accessor"] = created["client_token"], created["accessor"]
+        print("[onboarding] created the organization key custody token (policy organization-key-custody: create new org keys only)")
+    stack.vault(f"vault policy write authority-transit - <<'POLICY'\n{AUTHORITY_ONBOARDING_POLICY_HCL}\nPOLICY\n", token=root)
+    print("[onboarding] Authority Vault policy: read/hmac/verify on organization keys by prefix; create, update, rotate and config denied")
+    return onboarding
+
+
+def verify_custody_isolation(stack: "Stack", onboarding: dict) -> dict:
+    """Proves the two credentials stay narrow (no key is created by this check)."""
+    keys = existing_organization_keys(stack)
+    if not keys:
+        raise DevStackError("no registered organization key found to verify against; nothing was concluded")
+    existing = keys[0]
+    probe = f"org-{uuid.uuid4().hex}-row-integrity-v1"
+    custody, authority = onboarding["custody_token"], stack.custody["authority_vault_token"]
+    for key in keys:
+        stack.vault(f"vault read -format=json transit/keys/{key} >/dev/null", token=authority)
+    checks = {
+        "authority cannot create a key": vault_denied(stack, f"vault write transit/keys/{probe} type=hmac key_size=32", authority),
+        "authority cannot rotate a key": vault_denied(stack, f"vault write -f transit/keys/{existing}/rotate", authority),
+        "authority cannot reconfigure a key": vault_denied(stack, f"vault write transit/keys/{existing}/config deletion_allowed=true", authority),
+        "custody cannot read a key": vault_denied(stack, f"vault read transit/keys/{existing}", custody),
+        "custody cannot sign": vault_denied(stack, f"vault write transit/hmac/{existing}/sha2-256 input=AAAA", custody),
+        "custody cannot make a key exportable": vault_denied(stack, f"vault write transit/keys/{existing} exportable=true", custody),
+        "custody cannot create a non-HMAC key": vault_denied(stack, f"vault write transit/keys/{probe} type=aes256-gcm96", custody),
+        "custody cannot rotate a key": vault_denied(stack, f"vault write -f transit/keys/{existing}/rotate", custody),
+        "custody cannot reconfigure a key": vault_denied(stack, f"vault write transit/keys/{existing}/config deletion_allowed=true", custody),
+        "custody cannot export": vault_denied(stack, f"vault read transit/export/hmac-key/{existing}", custody),
+        "custody cannot write policies": vault_denied(stack, f"vault policy write {CUSTODY_POLICY} - <<'POLICY'\npath \"*\" {{ capabilities = [\"sudo\"] }}\nPOLICY", custody),
+    }
+    before = json.loads(stack.vault(f"vault read -format=json transit/keys/{existing}", token=authority).stdout)["data"]
+    stack.vault(f"vault write transit/keys/{existing} type=hmac key_size=32 >/dev/null", token=custody)  # re-create: must change nothing
+    after = json.loads(stack.vault(f"vault read -format=json transit/keys/{existing}", token=authority).stdout)["data"]
+    checks["custody re-creating an existing key changes nothing"] = (before["latest_version"], before["exportable"], before.get("deletion_allowed")) == (after["latest_version"], after["exportable"], after.get("deletion_allowed"))
+    failed = [name for name, ok in checks.items() if not ok]
+    if failed:
+        raise DevStackError("Vault isolation check failed: " + "; ".join(failed))
+    print(f"[onboarding] Vault isolation verified ({len(checks)} denials, {len(keys)} existing organization keys still readable by the Authority)")
+    return {"checks": sorted(checks), "existing_keys_readable": len(keys)}
+
+
+def cmd_onboarding(args) -> None:
+    stack = Stack(args.project, load_custody(args.project))
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    if args.action == "status":
+        onboarding = load_onboarding(args.project)
+        print(f"Onboarding   : {'configured (issuer ' + onboarding['identity_issuer'] + ')' if onboarding else 'not initialized (run `devstack.py onboarding init`)'}")
+        print(f"Migration    : {ONBOARDING_MIGRATION} {'applied' if onboarding_migration_applied(stack) else 'NOT applied'}")
+        if onboarding_migration_applied(stack):
+            print("Requests     :", authority_sql(stack, "SELECT coalesce(string_agg(onboarding_state_name || '=' || n, ', '), 'none') FROM (SELECT onboarding_state_name, count(*) n FROM authority.organization_onboarding_requests GROUP BY 1) s;"))
+        return
+
+    if args.action == "provision-key":
+        onboarding = load_onboarding(args.project)
+        if not onboarding:
+            raise DevStackError("onboarding is not initialized; run `devstack.py onboarding init` first")
+        if not args.request_id:
+            raise DevStackError("--request-id is required")
+        request_id = str(uuid.UUID(args.request_id))
+        stack.compose("build", "dev-seed", timeout=1800)
+        code, status = onboarding_tool(stack, {"action": "key-custody", "request_id": request_id})
+        if code != 0 or "error_code" in status:
+            raise DevStackError(f"key custody status refused: {status.get('error_code')} {status.get('detail') or ''}")
+        key = status["key_name"]
+        print(f"[onboarding] request {request_id}: state {status['state']}, key {key}, key status {status['key_status']}, custody deadline {status.get('key_custody_expires_on')}")
+        if not ONBOARDING_KEY_PATTERN.match(key):
+            raise DevStackError("the Authority named an unexpected key; nothing was created")
+        if status["key_status"] == "Ready":
+            print("[onboarding] the key is already provisioned; nothing to do")
+            return
+        if not status["provision_allowed"]:
+            raise DevStackError("this request does not allow key provisioning now (not approved, expired or closed); nothing was created")
+        if not args.execute:
+            print("[onboarding] dry run only. Re-run with --execute to create this one non-exportable HMAC key with the custody credential.")
+            return
+        stack.vault(f"vault write transit/keys/{key} type=hmac key_size=32 exportable=false allow_plaintext_backup=false >/dev/null", token=onboarding["custody_token"])
+        code, after = onboarding_tool(stack, {"action": "key-custody", "request_id": request_id})
+        if code != 0 or after.get("key_status") != "Ready":
+            raise DevStackError(f"the Authority does not see a usable key after provisioning: {after}")
+        write_evidence(args.project, "onboarding-provision-key", {"request_id": request_id, "key_name": key, "created_on": dt.datetime.now(dt.timezone.utc).isoformat(), "authority_key_status": after["key_status"]})
+        print("[onboarding] key provisioned by custody; the Authority reports it Ready. An operator can now initialize the organization in the Platform Console.")
+        return
+
+    if args.action == "personas":
+        if not args.request_id:
+            raise DevStackError("--request-id is required")
+        request_id = str(uuid.UUID(args.request_id))
+        rows = authority_sql(stack, "SELECT r.reserved_organization_id || '|' || replace(r.organization_display_name, '|', '/') || '|' || b.authority_user_id || '|' || b.identity_subject_identifier || '|' || replace(o.owner_display_name_hint, '|', '/') "
+                                    "FROM authority.organization_onboarding_requests r JOIN authority.identity_bindings b ON b.organization_onboarding_request_id = r.organization_onboarding_request_id "
+                                    "JOIN authority.organization_onboarding_owners o ON o.organization_onboarding_request_id = r.organization_onboarding_request_id AND o.reserved_authority_user_id = b.authority_user_id "
+                                    f"WHERE r.organization_onboarding_request_id = '{request_id}' AND r.onboarding_state_name = 'Initialized' ORDER BY o.owner_ordinal_number;")
+        owners = [r.split("|") for r in rows.splitlines() if r]
+        if not owners:
+            raise DevStackError("no initialized organization for this request (initialize it in the Platform Console first)")
+        stack.compose("build", "dev-seed", timeout=1800)
+        code, merged = onboarding_tool(stack, {"action": "personas", "organization_id": owners[0][0], "organization_display_name": owners[0][1],
+                                               "owners": [{"authority_user_id": o[2], "subject_identifier": o[3], "display_name": o[4]} for o in owners]})
+        if code != 0:
+            raise DevStackError(f"persona merge failed: {merged}")
+        print(f"[onboarding] {merged['added']} development login personas added for '{owners[0][1]}' (persona keys onb-<subject>); existing personas unchanged")
+        return
+
+    # ---- init (idempotent; never changes organization data) --------------------------------------------------------------
+    if not load_console(args.project):
+        raise DevStackError("the Platform Console is not initialized; run `devstack.py platform-console init --execute` first")
+    state = load_state(args.project)
+    record = state.get("onboarding") or {}
+    evidence: dict = {"project": args.project, "started_on": dt.datetime.now(dt.timezone.utc).isoformat(), "git_commit": run(["git", "rev-parse", "HEAD"], cwd=REPO).stdout.strip()}
+    migrated = onboarding_migration_applied(stack)
+    if not migrated or not record.get("backup"):
+        backups_before = set(backup_root(args.project).glob("*")) if backup_root(args.project).exists() else set()
+        cmd_backup(args)
+        created = sorted(set(backup_root(args.project).glob("*")) - backups_before)
+        if len(created) != 1:
+            raise DevStackError("could not identify the backup just taken; nothing was changed")
+        manifest = verify_backup(created[0])
+        if not args.skip_restore_test:
+            print("[onboarding] restoring the backup into a disposable project to prove it opens (restore-test) ...")
+            cmd_restore_test(argparse.Namespace(project=args.project, backup_dir=str(created[0]), keep=False))
+        record["backup"] = {"directory": str(created[0]), "volumes": len(manifest["volumes"]), "restore_tested": not args.skip_restore_test}
+        state["onboarding"] = record
+        save_state(args.project, state)
+        stack = Stack(args.project, load_custody(args.project))
+    else:
+        print(f"[onboarding] migration already applied and backup recorded ({record['backup']['directory']}); not taking another backup")
+    evidence["backup"] = record["backup"]
+
+    stack.compose("build", "authority", "api", "worker", "platform-console", "platform-console-web", "dev-seed", timeout=3600)
+    if not migrated:
+        stack.compose("up", "--no-deps", "--force-recreate", "--exit-code-from", "authority-migrate", "authority-migrate", timeout=900)
+        if not onboarding_migration_applied(stack):
+            raise DevStackError(f"migration {ONBOARDING_MIGRATION} is not recorded after authority-migrate; stopping")
+        print(f"[onboarding] AuthorityDb migration {ONBOARDING_MIGRATION} applied (additive; no existing row changed)")
+    evidence["migration"] = {"name": ONBOARDING_MIGRATION, "applied_now": not migrated}
+
+    onboarding_path = custody_dir(args.project) / ONBOARDING_FILE
+    onboarding = load_onboarding(args.project) or {
+        "purpose": "DEVELOPMENT ONLY organization key custody credential and onboarding settings (C8 onboarding, C-104). Never commit.",
+        "identity_issuer": stack.env_file_value("TEST_IDP_ISSUER"),
+        "custody_token": None,
+        "custody_accessor": None,
+    }
+    onboarding = ensure_custody_vault(stack, onboarding)
+    write_private_json(onboarding_path, onboarding)
+    evidence["vault"] = verify_custody_isolation(stack, onboarding)
+
+    # Authority (onboarding issuer from custody), business API/worker (team picker hint) and the console (BFF + web) recreated; data untouched.
+    stack = Stack(args.project, load_custody(args.project))
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "authority", timeout=900)
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "api", "worker", "platform-console", "platform-console-web", timeout=900)
+    wait_console(stack)
+    subject = CONSOLE_OPERATORS[0][0]
+    status, body, set_cookie = console_http(stack, "POST", "/console-api/v1/session/development-login", {"subjectIdentifier": subject})
+    if status != 200 or not set_cookie:
+        raise DevStackError(f"console sign-in of {subject} failed: {status} {body}")
+    cookie = set_cookie.split(";")[0]
+    status, page, _ = console_http(stack, "GET", "/console-api/v1/organization-onboarding", cookie=cookie)
+    console_http(stack, "POST", "/console-api/v1/session/sign-out", {}, cookie=cookie, csrf=body["csrfToken"])
+    if status != 200 or page.get("approvedIdentityIssuers") != [onboarding["identity_issuer"]]:
+        raise DevStackError(f"onboarding is not available through the console: {status} {page}")
+    evidence["console"] = {"approved_identity_issuers": page["approvedIdentityIssuers"], "requests": page["totalCount"]}
+    record.update({"activated_on": dt.datetime.now(dt.timezone.utc).isoformat(), "migration": ONBOARDING_MIGRATION})
+    state = load_state(args.project)
+    state["onboarding"] = record
+    save_state(args.project, state)
+    evidence["finished_on"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    write_evidence(args.project, "onboarding-init", evidence)
+    print(f"[onboarding] ready: http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_WEB_PORT', '8095')}/platform/onboarding (synthetic operators; owners from {onboarding['identity_issuer']})")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", default=os.environ.get("DEVSTACK_PROJECT", DEFAULT_PROJECT))
@@ -1651,6 +1901,12 @@ def main() -> int:
     console.add_argument("--execute", action="store_true", help="init: run the bootstrap ceremony after its dry run (otherwise dry run only)")
     console.add_argument("--skip-restore-test", action="store_true", help="init: verify the backup by checksums only (no disposable restore)")
     console.set_defaults(handler=cmd_platform_console)
+    onboarding = commands.add_parser("onboarding", help="C8 onboarding: activate (init), inspect (status), provision an approved request's organization key with the custody credential (provision-key), or add login personas for an initialized organization's owners (personas)")
+    onboarding.add_argument("action", choices=["init", "status", "provision-key", "personas"])
+    onboarding.add_argument("--request-id", help="provision-key / personas: the onboarding request id shown in the Platform Console")
+    onboarding.add_argument("--execute", action="store_true", help="provision-key: create the key after the dry run (otherwise dry run only)")
+    onboarding.add_argument("--skip-restore-test", action="store_true", help="init: verify the backup by checksums only (no disposable restore)")
+    onboarding.set_defaults(handler=cmd_onboarding)
     restore = commands.add_parser("restore-test")
     restore.add_argument("backup_dir")
     restore.add_argument("--keep", action="store_true", help="leave the disposable restore project running for inspection")

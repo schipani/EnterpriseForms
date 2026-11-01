@@ -43,6 +43,9 @@ public sealed class OrganizationAuthorizationState
     public byte[]? LatestAuditJournalDigest { get; set; }
 
     public DateTimeOffset StateModifiedOn { get; set; }
+
+    /// <summary>C8 onboarding: the request that created this organization through the Platform Console (null for legacy fixtures).</summary>
+    public Guid? OrganizationOnboardingRequestId { get; set; }
 }
 
 public static class CheckpointEnforcementModes

@@ -4,8 +4,8 @@
   "entries": [
     {
       "path": "CLAUDE-DESIGN.MD",
-      "sha256": "3848f79a59bb90153765153a7f2f1dea9b236984895bb2ec1d724a79b1dd333a",
-      "bytes": 168159
+      "sha256": "9225e9610fbb4c7e3b165de2b96f0687d94468ae21f93596ffba26a315f02284",
+      "bytes": 171306
     },
     {
       "path": "CLAUDE.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "1501bed72679f9bb005b662bfabfd26c24d9f72fb194a4194cf419369a2acee1",
-      "bytes": 69094
+      "sha256": "c6f73a6090833c950a84c7a4d463f45d1eb58707b05aefaa133833b909cd656d",
+      "bytes": 72220
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -134,13 +134,13 @@
     },
     {
       "path": "docs/architecture/ADR-ARCH-001-feature-vertical-slices.md",
-      "sha256": "c461d6e60c73350e6c7cda9e657ea1965f6d615c673c4ea463b1636288ce4dbb",
+      "sha256": "a822aabc02e73fac8248a251b68d0380e11b5692cf9aa038704eadbd2794c0c0",
       "bytes": 2649
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "142f17c569d1f1abe3eedef6188da0d28ace1141aae7a7f4a91b3343290e773c",
-      "bytes": 15600
+      "sha256": "73f11856ffd854684403f969dbef856e986051485d45f41ddacd8ca1f208f514",
+      "bytes": 17557
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -204,8 +204,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md",
-      "sha256": "86eeed8cdc0212df18814fe6bed221cae23cc0134caaf001b668ea5b66f6d9f2",
-      "bytes": 62621
+      "sha256": "477fa4a8d535fb4d4109ff1c80371ad96aaebb0a63494546c85da732f8df32a7",
+      "bytes": 77692
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -299,8 +299,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "96797b2d3c5c5ff97e4a2de862e35cb165d35e970e8c71a070f59905932b51eb",
-      "bytes": 159917
+      "sha256": "83f3364631d94136afb5082e37e43e0a4002f0225db82530fdcaffd784e1ab1a",
+      "bytes": 161771
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -619,8 +619,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "6d607d2420889c198c3314ad4dfd857ed305d6b790134500f378faf743bb9e3d",
-      "bytes": 102690
+      "sha256": "0423b64e2c152977fcf54283fcbd703c0a7aa26b9bb38a8df14631a9d1ba0e7a",
+      "bytes": 122587
     },
     {
       "path": "scripts/generate-spec-manifest.py",
@@ -669,8 +669,8 @@
     },
     {
       "path": "scripts/validate-specifications.py",
-      "sha256": "2c0d212086bdc532de7abc072d8e1e63d6c957a128b7666566c408bb79bcd04b",
-      "bytes": 2947
+      "sha256": "094489678266dacf09506e074a918be1b929bcdb96c6a8499eaa24a625ae5fdf",
+      "bytes": 2973
     },
     {
       "path": "security_hardening/SEARCH_CAPABILITY_MATRIX.csv",

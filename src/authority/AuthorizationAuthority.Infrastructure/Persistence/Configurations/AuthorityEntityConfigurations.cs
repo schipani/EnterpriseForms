@@ -4,6 +4,7 @@ using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,8 @@ public sealed class OrganizationAuthorizationStateConfiguration : IEntityTypeCon
         builder.Property(e => e.OrganizationDisplayName).HasMaxLength(200);
         builder.Property(e => e.CheckpointEnforcementModeName).HasMaxLength(30);
         builder.Property(e => e.IntegrityQuarantineReasonCode).HasMaxLength(100);
+        builder.HasIndex(e => e.OrganizationOnboardingRequestId).IsUnique().HasFilter("organization_onboarding_request_id IS NOT NULL").HasDatabaseName("uq_organization_onboarding_request");
+        builder.HasOne<OrganizationOnboardingRequest>().WithMany().HasForeignKey(e => e.OrganizationOnboardingRequestId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_organization_onboarding_request");
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_projection_never_ahead", "projection_applied_revision <= authorization_revision");
@@ -41,8 +44,14 @@ public sealed class IdentityBindingConfiguration : IEntityTypeConfiguration<Iden
         builder.HasIndex(e => new { e.OrganizationId, e.IdentityIssuerUri, e.IdentitySubjectIdentifier }).IsUnique().HasDatabaseName("uq_identity_subject");
         builder.HasIndex(e => new { e.OrganizationId, e.AuthorityUserId }).IsUnique().HasDatabaseName("uq_authority_user_per_org");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_identity_org");
-        // AC-7.2: a disabled membership always records when it was disabled; an enabled one never carries that time.
-        builder.ToTable(t => t.HasCheckConstraint("ck_identity_binding_disabled_state", "(identity_binding_enabled AND identity_disabled_on IS NULL) OR (NOT identity_binding_enabled AND identity_disabled_on IS NOT NULL)"));
+        builder.HasOne<OrganizationOnboardingRequest>().WithMany().HasForeignKey(e => e.OrganizationOnboardingRequestId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_identity_onboarding_request");
+        builder.ToTable(t =>
+        {
+            // AC-7.2: a disabled membership always records when it was disabled; an enabled one never carries that time.
+            t.HasCheckConstraint("ck_identity_binding_disabled_state", "(identity_binding_enabled AND identity_disabled_on IS NULL) OR (NOT identity_binding_enabled AND identity_disabled_on IS NOT NULL)");
+            // C8 onboarding: a binding has at most one provenance (membership request or onboarding request).
+            t.HasCheckConstraint("ck_identity_binding_single_provenance", "organization_membership_request_id IS NULL OR organization_onboarding_request_id IS NULL");
+        });
     }
 }
 

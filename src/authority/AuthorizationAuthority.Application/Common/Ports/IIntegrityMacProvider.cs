@@ -23,7 +23,17 @@ public interface IIntegrityMacProvider
     Task<int> ProvisionKeyAsync(Guid organizationId, string keyPurpose, string providerKeyName, CancellationToken cancellationToken);
 
     Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// C8 onboarding (C-104): read-only inspection of a key provisioned by the separate custody step. Never creates, rotates or
+    /// changes a key. <c>Exists=false</c> when the provider has no key under exactly this name; throws
+    /// <see cref="IntegrityProviderUnavailableException"/> when the provider cannot answer (callers fail closed).
+    /// </summary>
+    Task<IntegrityKeyInspection> InspectKeyAsync(string providerKeyName, CancellationToken cancellationToken);
 }
+
+/// <summary>What the provider reports about one key: present, usable for HMAC-SHA-256 and not exportable, current version.</summary>
+public sealed record IntegrityKeyInspection(bool Exists, bool Usable, int LatestVersion, string Detail);
 
 /// <summary>Thrown when the signer/verifier is unavailable; every caller fails closed (SIG-07).</summary>
 public sealed class IntegrityProviderUnavailableException(string detail, Exception? inner = null) : Exception(detail, inner);

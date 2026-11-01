@@ -24,6 +24,9 @@ public static class PlatformOperationKinds
     public const string PlatformOperatorChange = "PlatformOperatorChange";
     public const string PlatformOperatorSuspension = "PlatformOperatorSuspension";
     public const string PlatformOperatorBootstrap = "PlatformOperatorBootstrap";
+
+    /// <summary>C8 onboarding (C-104): approve, withdraw, reject, cancel and initialize decisions on one onboarding request.</summary>
+    public const string OrganizationOnboarding = "OrganizationOnboarding";
 }
 
 /// <summary>The four platform permissions (D8-34). V1: every active operator holds all four; checked by the Authority on every call.</summary>

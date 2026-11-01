@@ -101,6 +101,9 @@ services:
       Identity__OperatorAssertion__Issuer: ${DEVSTACK_OPERATOR_ASSERTION_ISSUER:-}
       Identity__OperatorAssertion__Audience: ${DEVSTACK_OPERATOR_ASSERTION_AUDIENCE:-}
       Identity__OperatorAssertion__SharedKeyBase64: ${DEVSTACK_OPERATOR_ASSERTION_KEY:-}
+      # C8 onboarding (C-104): enabled only by `devstack.py onboarding init` (the synthetic test identity provider's issuer). Unset =>
+      # onboarding unavailable. Organization keys are created by the separate custody credential (`devstack.py onboarding provision-key`).
+      OrganizationOnboarding__ApprovedIdentityIssuers__0: ${DEVSTACK_ONBOARDING_IDENTITY_ISSUER:-}
     networks: [authority-net, trust-edge, platform-edge]
 
   business-migrate:

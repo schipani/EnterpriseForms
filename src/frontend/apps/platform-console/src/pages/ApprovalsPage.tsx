@@ -12,7 +12,7 @@ export const PAGE_SIZE = 15;
 /** Below this width the queue is shown as cards instead of a table (no horizontal scrolling table on phones). */
 export const CARD_BREAKPOINT = 768;
 const narrowQuery = `(max-width: ${CARD_BREAKPOINT - 1}px)`;
-function useNarrowViewport(): boolean {
+export function useNarrowViewport(): boolean {
   return useSyncExternalStore(
     (notify) => {
       if (typeof window.matchMedia !== "function") return () => undefined;

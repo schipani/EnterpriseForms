@@ -26,4 +26,7 @@ public sealed class IdentityBinding
 
     /// <summary>AC-7.4: the operator-approved membership request that created this binding (null for bootstrap bindings).</summary>
     public Guid? OrganizationMembershipRequestId { get; set; }
+
+    /// <summary>C8 onboarding: the onboarding request that created this initial-owner binding (null otherwise).</summary>
+    public Guid? OrganizationOnboardingRequestId { get; set; }
 }

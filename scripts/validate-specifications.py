@@ -33,7 +33,7 @@ def main():
             failures.append("Decision not accepted in register: PB-%02d"%n)
     design=(ROOT/"CLAUDE-DESIGN.MD").read_text(encoding="utf-8")
     owner_ids=set(int(v) for v in re.findall(r"^\| PG-(\d{3}) \| `[^`]+` \|",design,re.M))
-    if owner_ids!=set(range(1,71)): failures.append("70-page owner matrix incomplete (PG-070 added C-99)")
+    if owner_ids!=set(range(1,75)): failures.append("74-page owner matrix incomplete (PG-071 reserved, PG-072..PG-074 added C-104)")
     paths=set()
     for name in ("CLAUDE.md","CLAUDE-DESIGN.MD"):
         txt=(ROOT/name).read_text(encoding="utf-8")

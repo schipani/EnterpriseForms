@@ -8,6 +8,14 @@ export type RequestItem = S["PlatformMembershipRequestItem"];
 export type RequestDetail = S["PlatformMembershipRequestDetail"];
 export type ApprovalView = S["PlatformApprovalView"];
 export type DecisionResponse = S["PlatformMembershipDecisionResponse"];
+export type DirectoryPage = S["OrganizationDirectoryPage"];
+export type DirectoryItem = S["OrganizationDirectoryItem"];
+export type DirectoryDetail = S["OrganizationDirectoryDetail"];
+export type OnboardingPage = S["OrganizationOnboardingPage"];
+export type OnboardingItem = S["OrganizationOnboardingListItem"];
+export type OnboardingDetail = S["OrganizationOnboardingDetail"];
+export type OnboardingCreateResponse = S["OrganizationOnboardingCreateResponse"];
+export type OnboardingDecisionResponse = S["OrganizationOnboardingDecisionResponse"];
 
 /** The only module that talks to the network: same-origin calls to the Platform Console BFF (cookie session + CSRF). */
 export const API_ROOT = "/console-api/v1";
@@ -84,6 +92,25 @@ export interface DecisionInput {
   justification: string;
 }
 
+export interface OnboardingOwnerInput {
+  issuerUri: string;
+  subjectIdentifier: string;
+  displayNameHint: string;
+  verificationMethod: string;
+  verificationReference: string;
+}
+
+export interface OnboardingCreateInput {
+  idempotencyKey: string;
+  organizationDisplayName: string;
+  initialOwners: OnboardingOwnerInput[];
+  justification: string;
+  dryRun: boolean;
+}
+
+export type OnboardingDecisionKind = "approve" | "withdraw" | "reject" | "cancel" | "initialize";
+const onboardingDecisionPath: Record<OnboardingDecisionKind, string> = { approve: "/approvals", withdraw: "/approvals/withdraw", reject: "/reject", cancel: "/cancel", initialize: "/initialize" };
+
 export type DecisionKind = "approve" | "withdraw" | "reject";
 const decisionPath: Record<DecisionKind, string> = { approve: "/approvals", withdraw: "/approvals/withdraw", reject: "/reject" };
 const requestPath = (organizationId: string, requestId: string) => `/organizations/${encodeURIComponent(organizationId)}/membership-requests/${encodeURIComponent(requestId)}`;
@@ -106,4 +133,29 @@ export const consoleApi = {
   detail: (organizationId: string, requestId: string) => request<RequestDetail>("GET", requestPath(organizationId, requestId)),
   decide: (kind: DecisionKind, organizationId: string, requestId: string, input: DecisionInput) =>
     request<DecisionResponse>("POST", requestPath(organizationId, requestId) + decisionPath[kind], { expectedStatementSha256: input.expectedStatementSha256, justification: input.justification }),
+  organizations: ({ q, filter, cursor, limit }: { q: string; filter: string; cursor?: string | undefined; limit: number }) => {
+    const params = new URLSearchParams({ filter, limit: String(limit) });
+    if (q.trim()) {
+      params.set("q", q.trim());
+    }
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+    return request<DirectoryPage>("GET", `/organizations?${params.toString()}`);
+  },
+  organization: (organizationId: string) => request<DirectoryDetail>("GET", `/organizations/${encodeURIComponent(organizationId)}`),
+  onboardingQueue: ({ q, status, cursor, limit }: QueueQuery) => {
+    const params = new URLSearchParams({ status, limit: String(limit) });
+    if (q.trim()) {
+      params.set("q", q.trim());
+    }
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+    return request<OnboardingPage>("GET", `/organization-onboarding?${params.toString()}`);
+  },
+  createOnboarding: (input: OnboardingCreateInput) => request<OnboardingCreateResponse>("POST", "/organization-onboarding", input),
+  onboardingDetail: (requestId: string) => request<OnboardingDetail>("GET", `/organization-onboarding/${encodeURIComponent(requestId)}`),
+  decideOnboarding: (kind: OnboardingDecisionKind, requestId: string, input: DecisionInput) =>
+    request<OnboardingDecisionResponse>("POST", `/organization-onboarding/${encodeURIComponent(requestId)}${onboardingDecisionPath[kind]}`, { expectedStatementSha256: input.expectedStatementSha256, justification: input.justification }),
 };

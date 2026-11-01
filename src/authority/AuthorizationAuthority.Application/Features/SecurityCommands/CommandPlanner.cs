@@ -174,10 +174,26 @@ public static partial class CommandPlanner
             throw AuthorityException.Forbidden("team membership changes require organization owner or system administrator");
         }
 
-        if (add && payload.MemberUserId == actor.AuthorityUserId && !graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
+        if (add && payload.MemberUserId == actor.AuthorityUserId)
         {
             // Security administration never becomes record access: a Security Administrator cannot join a team (which may own records) on their own authority.
-            throw AuthorityException.Forbidden("a Security Administrator cannot add themselves to a team");
+            // OB-F8 (C-104): neither can an organization owner. Team-owned records grant their members full owner access, and a team's records,
+            // shares and form grants can grow after someone joins, so every self-join is refused (not only teams that own records today).
+            // Another owner must add the owner (rule below), so joining always takes a second, independent person.
+            if (!graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
+            {
+                throw AuthorityException.Forbidden("a Security Administrator cannot add themselves to a team");
+            }
+
+            throw new AuthorityException(AuthorityErrorCodes.TeamJoinRequiresAnotherOwner, 403, false, "an organization owner cannot add themselves to a team; another organization owner must add them");
+        }
+
+        if (add && graph.HasOrganizationRole(organizationId, payload.MemberUserId, OrganizationRoleNames.OrganizationOwner)
+            && !graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
+        {
+            // OB-F8: adding an organization owner to a team needs a different organization owner (preferred independent authorizer), not a
+            // Security Administrator, so an owner's record access through teams always rests on a second owner's decision.
+            throw new AuthorityException(AuthorityErrorCodes.TeamJoinRequiresAnotherOwner, 403, false, "only a different organization owner can add an organization owner to a team");
         }
 
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, payload.TeamId, cancellationToken).ConfigureAwait(false);

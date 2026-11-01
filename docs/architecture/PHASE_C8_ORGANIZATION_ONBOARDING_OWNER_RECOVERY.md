@@ -1,8 +1,8 @@
 # Phase C8 — Organization onboarding and owner recovery (architecture and security assessment)
 
-- **Status:** **Proposal (C-103). Nothing is implemented.** No Authority command, migration, permission, console page or recovery
-  function exists for this design. Awaiting owner decisions D8-45…D8-61 (§14). Development/Testing only when implemented; production
-  stays closed. Not independently reviewed; work by Claude or the owner is never an independent review (C-85).
+- **Status:** Proposal C-103; **onboarding approved and implemented for Development/Testing (C-104, §16)** with the OB-F8 rule; owner
+  recovery approved in principle only and **not implemented**. Production stays closed. Not independently reviewed; work by Claude or the
+  owner is never an independent review (C-85).
 - **Date / branch:** 2026-11-01, `phase-c8/m2-user-management`, starting commit `c6105c2`.
 - **Audience:** the project owner (decisions), the future independent Authority reviewer (this joins the AC-7 / AC-9 / Platform
   Operator package), implementers.
@@ -639,3 +639,135 @@ team rules, the Platform Operator registry/approval/journal/evidence code, Secur
 sessions and the business user projection; focused Authority unit tests (F-18, 63/63). Not done: any implementation, migration,
 permission, page or command; no change to development data; no Stage B, SEC-P, Playwright or hosted CI run; nothing merged or deployed;
 no M3; the legacy CLI is unchanged.
+
+---
+
+## 16. Onboarding implemented for Development/Testing (C-104, 2026-11-01)
+
+Owner approval (C-104) of the onboarding architecture for Development/Testing, with decisions 1–11 below. Implemented: Stage A
+(Authority onboarding), Stage B (key custody), Stage C (Platform Console pages) and the OB-F8 rule. **Owner recovery is not
+implemented** (approved in principle only). Not merged, not deployed to production, not independently reviewed; the legacy CLI is
+retained; M3 not started.
+
+### 16.1 Decisions recorded and their status
+
+| Owner decision (C-104) | Maps to | Status |
+|---|---|---|
+| 1 Separate Platform Console | D8-58 (pages), C-99 | Implemented |
+| 2 Two distinct operators | D8-46 | Implemented |
+| 3 The initiator may give approval 1 with their own evidence | D8-46 | Implemented — creating grants nothing and needs no evidence; any active operator (the creator included) approves with evidence |
+| 4 Second distinct operator approves the exact immutable revision | D8-49 (see below) | Implemented with **immutable requests** (no revision/edit endpoint): a different organization or owner set is a new request |
+| 5 Minimum two owners, preferably three | D8-47 | Implemented (2–10; warning below 3) |
+| 6 Authority-generated organization and user ids | D8-47 | Implemented |
+| 7 Independently provisioned organization keys | D8-51 | Implemented (Stage B) |
+| 8 Inactive until initialization and journal verification | D8-45 | Implemented (organization gate closed until revision 1 is Effective) |
+| 9 Production requires verified control of each owner's identity | D8-48 | Recorded; production stays closed (onboarding refuses to start outside Development/Testing) |
+| 10 Legacy creation restricted to approved fixtures | D8-60 | Implemented (`OrganizationOnboarding:LegacyOrganizationBootstrapEnabled`, Development/Testing only; OB-F2 fixed) |
+| 11 PG-072…PG-075, PG-071 preserved | D8-58 | PG-072…PG-074 implemented; PG-071 registered as reserved; PG-075 not built (recovery out of scope) |
+
+Applied as proposed, not explicitly approved (implementation defaults, non-material): D8-50 exact normalized name uniqueness;
+D8-52 lifetimes (7 days pending, 72 h custody, 10 min evidence); D8-53 metadata limited to name, owners, verification data and
+justification; D8-61 operator visibility (metadata, owner identities, counts; directory detail views audited); single issuer per
+organization (required by F-7).
+
+**Materially unresolved (dependent functionality not built):** D8-49 request edits — not implemented; requests are immutable, which
+satisfies decision 4 without it. D8-48 detail for production — whether all owners or at least two must prove identity control before
+`Active`. D8-54…D8-56 owner recovery. D8-59 multi-organization architecture confirmation (onboarding already allows an owner who is a
+member elsewhere, as the existing model does). D8-51 table shape — one onboarding-specific approvals table was chosen instead of the
+proposed generic `platform_workflow_approvals` (simpler; recovery may reuse or generalize it later). D8-57 is superseded by the owner's
+OB-F8 direction (§16.5).
+
+### 16.2 Stage A — Authority onboarding
+
+| Area | Implementation |
+|---|---|
+| Lifecycle | `PendingApproval → AwaitingKeyCustody → Initialized`; display states Awaiting approval, Awaiting key provisioning, Activating, Active, Rejected, Cancelled, Expired. "Approved" is the transition to `AwaitingKeyCustody`; `Active` = revision-1 command Effective. Expiry is a time comparison; an expired open request is recorded `Expired` when its name is reused |
+| Create | `POST /internal/v1/platform/organization-onboarding` (dry run validates). Organization id, owner user ids and key name generated by the Authority; statement (`OrganizationOnboardingStatement` v1, canonical JSON stored as text) frozen at creation; timestamps truncated to microseconds so PostgreSQL reproduces the statement (found by the real-stack test) |
+| Validation | 2–10 owners, one approved issuer (`OrganizationOnboarding:ApprovedIdentityIssuers`), `IsValidSubject`, never an email, verification method + reference, distinct identities, **no registered Platform Operator identity (any status)**, organization name unique (normalized) among open requests and existing organizations |
+| Idempotency | Per operator `idempotency_key` bound to the SHA-256 of the canonical input: same input replays the same request, different input `IDEMPOTENCY_CONFLICT` |
+| Approvals | Per-operator evidence (operation kind `OrganizationOnboarding`, operation id = request id, organization = reserved id, statement and justification digests), single use; same operator twice `OPERATOR_ALREADY_APPROVED` (also a partial unique index); approval of a suspended/removed operator no longer counts and is closed at the next decision; owner registered as operator after creation blocks approval and initialization; withdraw own approval; reject (pending) and cancel (approved) by one operator with evidence |
+| Concurrency | Platform journal head lock → request row `FOR UPDATE`; unique reserved id, key name, open name, idempotency key and evidence |
+| Initialization | Verifies the key (exists, HMAC, not exportable, Authority can sign **and** verify a probe) — never creates it; then one AuthorityDb transaction: organization state (with request provenance), one binding per owner, key registration, organization resource, revision-1 command `InitializeOrganization` (owner edges only; both approving operators and the initializing operator in the payload), organization audit event `OrganizationInitialized`, request `Initialized`, platform journal event. SpiceDB cursor initialized before commit (idempotent). Retry after success replays; a failure before commit leaves nothing |
+| Fail closed | Archive probe at head+1 before every operation (`PLATFORM_JOURNAL_UNVERIFIABLE` / `BEHIND_ARCHIVE`); grant-direction decisions (approve, initialize) require every earlier platform event anchored (`PLATFORM_JOURNAL_ARCHIVE_PENDING`, retryable); provider outage `SIGNING_UNAVAILABLE`; SpiceDB outage `AUTHORITY_NOT_READY`; frozen statement mismatch refused and alerted |
+| Journal | Events `OrganizationOnboardingRequested`, `…ApprovalRecorded`, `…Approved`, `…ApprovalWithdrawn`, `…Rejected`, `…Cancelled`, `…InitializationRefused`, `…Initialized`, plus refusals; bodies carry the resulting request, owner and approval rows, so `ReplayPlatformJournal` restores onboarding after an AuthorityDb restore (unit-tested) |
+| Directory | `POST /internal/v1/platform/organizations/search`, `GET …/organizations/{id}` (lifecycle, owner/Security Administrator/member counts, owners, provenance); detail views audited on the organization's audit stream before disclosure |
+| Legacy | `POST /internal/v1/operator/organizations` refused `LEGACY_ORGANIZATION_BOOTSTRAP_DISABLED` unless enabled (Development/Testing only; enabled in the base compose for the seed and harnesses); an existing id now succeeds only for the identical original input (OB-F2), and an id reserved by onboarding is refused |
+| Migration | `20261101131420_OrganizationOnboarding` (AuthorityDb, additive): tables `organization_onboarding_requests`, `organization_onboarding_owners`, `organization_onboarding_approvals`; nullable FK columns `organization_authorization_states.organization_onboarding_request_id`, `identity_bindings.organization_onboarding_request_id`; check constraints, partial unique indexes, triggers keeping initialized/closed requests and closed approvals unchanged (SECURITY INVOKER, fixed `search_path`, EXECUTE revoked from PUBLIC); runtime grants `SELECT, INSERT, UPDATE`, no `DELETE` |
+
+### 16.3 Stage B — key custody
+
+- The Authority's signing provider gained a read-only `InspectKeyAsync`; initialization verifies, never provisions.
+- Dedicated custody credential (Vault policy `organization-key-custody`): Vault authorizes a Transit key create as `update`, so a
+  create-only grant is impossible; the policy grants `update` on exactly one path segment (`transit/keys/<name>` — never `/rotate`,
+  `/config`, `/trim`) with parameters pinned to a non-exportable 256-bit HMAC key, plus token self-lookup. Verified: it can create a key;
+  re-creating an existing key changes nothing; it cannot read, rotate, reconfigure, export, delete, make exportable, create another key
+  type or sign. **Residual:** a created key's name is not forced to start with `org-` (unusable without HMAC rights; documented).
+- Development: `devstack.py onboarding init` (backup + verification + restore-test, migration, custody policy and token in a separate
+  custody file `organization-key-custody.json`, Authority Vault policy switched from per-key pins to read/hmac/verify on `org-*` with
+  create/update/rotate/config denied, isolation checks, services recreated) and `devstack.py onboarding provision-key --request-id …
+  [--execute]` (reads the one key name from the Authority's read-only operator-plane status, creates it with the custody token, confirms
+  `Ready`). No manual Vault root widening; no browser route can provision. `devstack.py onboarding personas --request-id …` adds
+  development login personas for an initialized organization's owners (development convenience; existing personas unchanged).
+- Security-test stack: one-shot `vault-custody-init` (same policy, fixed synthetic token); harness and Playwright helper use it.
+- Production key custody (Managed HSM provisioning identity and per-key role assignment) stays open.
+
+### 16.4 Stage C — Platform Console pages
+
+BFF routes `/console-api/v1/organizations*` and `/console-api/v1/organization-onboarding*` (session, CSRF, origin, unknown members
+refused). Decisions reuse the existing dry run → fingerprint check → Vault signing → submit flow (`OperatorDecisionService`, now with the
+operation kind as a parameter; the organization id bound into the evidence comes from the Authority's dry run; nothing is signed when the
+dry run refuses). Pages in `apps/platform-console`: PG-072 Organizations (+ details), PG-073 New organization, PG-074 queue and details
+(lifecycle stepper, owners, approvals, fingerprint and statement, key custody panel, activation panel, decision dialogs with "I have
+reviewed…"). Approved issuers come from the Authority (`approvedIdentityIssuers`).
+
+### 16.5 OB-F8 — owner self-join (security defect)
+
+**Rule (Authority, `CommandPlanner.TeamMembershipAsync`):** nobody can add themself to a team (owner, Security Administrator, or both);
+adding an organization owner to a team requires a **different organization owner** (a Security Administrator cannot). Applies to every
+team, because a team's records, shares and form grants can grow after someone joins. Removing oneself is unchanged. No new contract was
+needed: the existing `AddTeamMember` command is narrowed; new error code `TEAM_JOIN_REQUIRES_ANOTHER_OWNER`. The business team picker no
+longer offers anyone themself (hint only).
+
+**Indirect paths assessed:** `AddTeamMember` is the only command that writes team member edges (planner, verified); team registration adds
+no members; the administrator ownership-transfer override cannot target the administrator or a team they belong to (unchanged, tested);
+owners cannot grant themselves roles (`RequireNotSelf`); organization roles confer no record permission in SpiceDB; field search is limited
+to discoverable records; shares need record management rights. **Residuals:** two colluding owners can add each other (two-person rule by
+design); an owner's second identity admitted through a membership request (operator review is the control); memberships created by
+self-join **before** C-104 are not revoked retroactively (owners should review existing teams).
+
+**Status: resolved for Development/Testing** — regression tests prove the path closed: unit `OwnerTeamJoinTests` (4) and the updated
+`SecurityAdministratorTests`; real stack `OwnerTeamJoinStackTests` (team-owned record unreadable by an owner; self-join and Security
+Administrator addition refused; record still unreadable; a second owner's addition grants access). Not independently reviewed.
+
+### 16.6 Tests executed (2026-11-01)
+
+| Suite | Result |
+|---|---|
+| Authority unit tests (19 new onboarding, 4 new OB-F8, 1 updated) | **282 / 282** |
+| Business + Authority contract tests | **488 / 488** |
+| Platform Console BFF tests | **23 / 23** |
+| Architecture tests (74-page ownership) | **75 / 75** |
+| Integrity tests | **34 / 34** |
+| Real stack — isolated security-test stack recreated from this tree (`down -v`, rebuilt, migration applied): `OrganizationOnboardingStackTests` (6 new), `OwnerTeamJoinStackTests` (1 new), plus regression `PlatformConsoleStackTests`, `PlatformOperatorApprovalTests`, `MembershipAdministrationTests`, `MembershipRequestEditCancelTests`, `AdministrationTests`, `SecurityAdministratorTests`, `SecurityAdministratorProvisioningTests` | **42 / 42** (after fixing two defects found by the first runs: statement timestamp precision and the custody policy) |
+| Frontend: Vitest workspace (14 new) / ESLint / tsc / build | **348 / 348**, clean |
+| Platform Console Playwright on the isolated stack (8 new: lifecycle with real key custody, keyboard-only creation, axe on every new page and dialog, 320/768/1440 px, 200 %/400 % zoom) | **23 / 23** |
+
+Covered: two independent approvals; same-operator second approval; operator self-appointment; duplicate organizations and names; stale
+fingerprints and evidence replay; concurrent approvals and initializations (exactly one organization); key not provisioned; provider
+and SpiceDB outage; archive outage; interrupted initialization and retry; owners and owner roles only; at least two owners; not usable
+before activation (gate closed, unit) and usable after (real stack); legacy bootstrap regression; OB-F8. Not run: the complete Stage B and
+SEC-P suites, the business-app Playwright suites, hosted CI, human screen-reader review.
+
+### 16.7 Development stack activation (2026-11-01)
+
+`devstack.py onboarding init`: backup `Documents\EnterpriseForms-dev-backups\enterpriseforms-dev\20261101-085519` (7 volumes, cold copy)
+verified and restore-tested (IDENTICAL); migration `20261101131420_OrganizationOnboarding` applied; custody policy and token created
+(separate custody file); Authority Vault policy switched to read/hmac/verify on `org-*`; 12 isolation denials verified, both existing
+organization keys still readable by the Authority; Authority, API, worker, console BFF and web recreated. Existing data unchanged: 2
+organizations, 13 identity bindings, 0 onboarding requests. Evidence: `artifacts/dev-persistent/enterpriseforms-dev-onboarding-init-20261101-085803.json`.
+
+### 16.8 Remaining production requirements
+
+Verified owner identity control (V3, PB-08) and its D8-48 detail; Entra operator sign-in and transaction-bound step-up; PIM; Managed HSM
+provisioning identity for organization keys; WORM archive; PB-10/PB-11/PB-12; executed G14 replay including onboarding; an independent
+security review. Owner recovery (D8-54…D8-56) awaits its own implementation approval.

@@ -109,6 +109,20 @@ public static class AuthorityErrorCodes
     public const string PlatformJournalUnverifiable = "PLATFORM_JOURNAL_UNVERIFIABLE";
     public const string PlatformJournalArchivePending = "PLATFORM_JOURNAL_ARCHIVE_PENDING";
     public const string PlatformJournalQuarantined = "PLATFORM_JOURNAL_QUARANTINED";
+
+    // C8 onboarding (C-104) and OB-F8.
+    public const string OrganizationOnboardingUnavailable = "ORGANIZATION_ONBOARDING_UNAVAILABLE";
+    public const string OrganizationNameConflict = "ORGANIZATION_NAME_CONFLICT";
+    public const string OrganizationOwnerIdentityInvalid = "ORGANIZATION_OWNER_IDENTITY_INVALID";
+    public const string OrganizationOwnersInsufficient = "ORGANIZATION_OWNERS_INSUFFICIENT";
+    public const string OrganizationOwnerIssuerMismatch = "ORGANIZATION_OWNER_ISSUER_MISMATCH";
+    public const string OrganizationOwnerIsOperator = "ORGANIZATION_OWNER_IS_OPERATOR";
+    public const string OrganizationOnboardingNotPending = "ORGANIZATION_ONBOARDING_NOT_PENDING";
+    public const string OrganizationOnboardingExpired = "ORGANIZATION_ONBOARDING_EXPIRED";
+    public const string OrganizationKeyNotProvisioned = "ORGANIZATION_KEY_NOT_PROVISIONED";
+    public const string OrganizationIdReserved = "ORGANIZATION_ID_RESERVED";
+    public const string LegacyOrganizationBootstrapDisabled = "LEGACY_ORGANIZATION_BOOTSTRAP_DISABLED";
+    public const string TeamJoinRequiresAnotherOwner = "TEAM_JOIN_REQUIRES_ANOTHER_OWNER";
     public const string CursorInvalid = "CURSOR_INVALID";
 }
 

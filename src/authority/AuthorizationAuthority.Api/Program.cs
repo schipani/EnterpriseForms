@@ -79,6 +79,10 @@ public sealed class Program
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorPolicy.Create(
             builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorOptions.SectionName).Get<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorOptions>(),
             builder.Environment.EnvironmentName));
+        // C8 onboarding (C-104): approved owner issuers and the legacy fixture bootstrap switch; both refused outside Development/Testing.
+        builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.OrganizationOnboarding.OrganizationOnboardingPolicy.Create(
+            builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.OrganizationOnboarding.OrganizationOnboardingOptions.SectionName).Get<AuthorizationAuthority.Application.Features.OrganizationOnboarding.OrganizationOnboardingOptions>(),
+            builder.Environment.EnvironmentName));
         // Phase C7 M1 (AC-5): provisional catalogue limits (section Catalogue, C-56 D4); a bad value fails at startup.
         var catalogueOptions = builder.Configuration.GetSection(AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions.SectionName).Get<AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions>() ?? new AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptions();
         AuthorizationAuthority.Application.Features.Catalogue.CatalogueOptionsValidation.Validate(catalogueOptions);
@@ -117,6 +121,7 @@ public sealed class Program
         app.MapCatalogueEndpoints();
         app.MapOperatorEndpoints();
         AuthorizationAuthority.Api.Features.PlatformOperators.PlatformEndpoints.MapPlatformEndpoints(app);
+        AuthorizationAuthority.Api.Features.PlatformOperators.OrganizationOnboardingEndpoints.MapOrganizationOnboardingEndpoints(app);
         app.MapSessionEndpoints();
         app.MapFieldSearchEndpoints();
         AuthorizationAuthority.Api.Features.Membership.MembershipEndpoints.MapMembershipEndpoints(app);

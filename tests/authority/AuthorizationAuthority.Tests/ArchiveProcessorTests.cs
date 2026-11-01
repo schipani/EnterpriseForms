@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using System.Security.Cryptography;
 using AuthorizationAuthority.Application.Common.Ports;
@@ -161,6 +162,36 @@ public sealed class ArchiveProcessorTests
         public void AddPlatformEvidenceUse(AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperatorEvidenceUse evidenceUse) => throw new NotSupportedException();
 
         public Task<PlatformRequestStorePage> SearchMembershipRequestsAsync(PlatformMembershipRequestQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOnboardingRequest?> FindOnboardingRequestAsync(Guid organizationOnboardingRequestId, bool lockForUpdate, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOnboardingRequest?> FindOnboardingRequestByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOnboardingRequest?> FindOnboardingRequestByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<OrganizationOnboardingRequest>> GetOpenOnboardingRequestsByNameAsync(string normalizedName, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddOnboardingRequest(OrganizationOnboardingRequest request) => throw new NotSupportedException();
+
+        public Task<List<OrganizationOnboardingOwner>> GetOnboardingOwnersAsync(Guid organizationOnboardingRequestId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOnboardingOwner?> FindOnboardingOwnerAsync(Guid organizationOnboardingOwnerId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddOnboardingOwner(OrganizationOnboardingOwner owner) => throw new NotSupportedException();
+
+        public Task<List<OrganizationOnboardingApproval>> GetOnboardingApprovalsAsync(Guid organizationOnboardingRequestId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<OrganizationOnboardingApproval>> GetOnboardingApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationOnboardingRequestIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOnboardingApproval?> FindOnboardingApprovalAsync(Guid organizationOnboardingApprovalId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddOnboardingApproval(OrganizationOnboardingApproval approval) => throw new NotSupportedException();
+
+        public Task<OnboardingRequestStorePage> SearchOnboardingRequestsAsync(OnboardingRequestQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<OrganizationDirectoryRow>> GetOrganizationDirectoryRowsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<int> CountOrganizationsBindingIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 

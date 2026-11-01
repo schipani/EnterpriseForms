@@ -262,6 +262,44 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>Cross-organization page of membership requests (read-only), newest first, keyset after the cursor, with the total.</summary>
     Task<PlatformRequestStorePage> SearchMembershipRequestsAsync(PlatformMembershipRequestQuery query, CancellationToken cancellationToken);
 
+    // ---- C8 onboarding (C-104). Lock order: platform journal head first, then the onboarding request row. ----
+
+    /// <summary>The request, optionally locked FOR UPDATE.</summary>
+    Task<OrganizationOnboardingRequest?> FindOnboardingRequestAsync(Guid organizationOnboardingRequestId, bool lockForUpdate, CancellationToken cancellationToken);
+
+    Task<OrganizationOnboardingRequest?> FindOnboardingRequestByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken);
+
+    /// <summary>Any request (any state) that reserved this organization id.</summary>
+    Task<OrganizationOnboardingRequest?> FindOnboardingRequestByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>Requests whose stored state is still open (PendingApproval or AwaitingKeyCustody) with this normalized name, tracked.</summary>
+    Task<List<OrganizationOnboardingRequest>> GetOpenOnboardingRequestsByNameAsync(string normalizedName, CancellationToken cancellationToken);
+
+    void AddOnboardingRequest(OrganizationOnboardingRequest request);
+
+    Task<List<OrganizationOnboardingOwner>> GetOnboardingOwnersAsync(Guid organizationOnboardingRequestId, CancellationToken cancellationToken);
+
+    Task<OrganizationOnboardingOwner?> FindOnboardingOwnerAsync(Guid organizationOnboardingOwnerId, CancellationToken cancellationToken);
+
+    void AddOnboardingOwner(OrganizationOnboardingOwner owner);
+
+    Task<List<OrganizationOnboardingApproval>> GetOnboardingApprovalsAsync(Guid organizationOnboardingRequestId, CancellationToken cancellationToken);
+
+    Task<List<OrganizationOnboardingApproval>> GetOnboardingApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationOnboardingRequestIds, CancellationToken cancellationToken);
+
+    Task<OrganizationOnboardingApproval?> FindOnboardingApprovalAsync(Guid organizationOnboardingApprovalId, CancellationToken cancellationToken);
+
+    void AddOnboardingApproval(OrganizationOnboardingApproval approval);
+
+    /// <summary>Newest first; text matches the organization name (case-insensitive).</summary>
+    Task<OnboardingRequestStorePage> SearchOnboardingRequestsAsync(OnboardingRequestQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Every organization with its enabled owner, Security Administrator and member counts (directory; metadata only).</summary>
+    Task<List<OrganizationDirectoryRow>> GetOrganizationDirectoryRowsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Number of organizations in which this exact identity has a binding (any state).</summary>
+    Task<int> CountOrganizationsBindingIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken);
+
     /// <summary>Writes staged changes inside the open transaction without committing (orders updates that free a unique value before inserts that take it).</summary>
     Task FlushAsync(CancellationToken cancellationToken);
 
@@ -274,3 +312,9 @@ public sealed record PlatformMembershipRequestQuery(string? Text, string Status,
 public sealed record PlatformRequestStoreRow(OrganizationMembershipRequest Request, string OrganizationDisplayName);
 
 public sealed record PlatformRequestStorePage(IReadOnlyList<PlatformRequestStoreRow> Rows, int TotalCount);
+
+public sealed record OnboardingRequestQuery(string? Text, string Status, DateTimeOffset Now, (DateTimeOffset CreatedOn, Guid RequestId)? After, int Limit);
+
+public sealed record OnboardingRequestStorePage(IReadOnlyList<OrganizationOnboardingRequest> Rows, int TotalCount);
+
+public sealed record OrganizationDirectoryRow(OrganizationAuthorizationState State, int EnabledOwnerCount, int SecurityAdministratorCount, int EnabledMemberCount);

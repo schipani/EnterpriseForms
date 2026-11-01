@@ -80,6 +80,12 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<PlatformJournalEntry> PlatformJournalEntries => Set<PlatformJournalEntry>();
 
+    public DbSet<OrganizationOnboardingRequest> OnboardingRequests => Set<OrganizationOnboardingRequest>();
+
+    public DbSet<OrganizationOnboardingOwner> OnboardingOwners => Set<OrganizationOnboardingOwner>();
+
+    public DbSet<OrganizationOnboardingApproval> OnboardingApprovals => Set<OrganizationOnboardingApproval>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

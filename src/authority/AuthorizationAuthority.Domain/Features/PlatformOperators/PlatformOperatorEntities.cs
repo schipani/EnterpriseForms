@@ -267,4 +267,7 @@ public static class PlatformDecisions
     public const string Suspend = "suspend";
     public const string View = "view";
     public const string Ceremony = "ceremony";
+    public const string Create = "create";
+    public const string Cancel = "cancel";
+    public const string Initialize = "initialize";
 }

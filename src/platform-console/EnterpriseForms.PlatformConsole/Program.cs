@@ -1,5 +1,6 @@
 using EnterpriseForms.PlatformConsole.Composition;
 using EnterpriseForms.PlatformConsole.Features.OperatorApprovals;
+using EnterpriseForms.PlatformConsole.Features.OrganizationOnboarding;
 using EnterpriseForms.PlatformConsole.Features.Session;
 using EnterpriseForms.PlatformConsole.Infrastructure;
 using Microsoft.Extensions.Options;
@@ -79,6 +80,7 @@ public sealed class Program
         app.MapConsoleHealth();
         app.MapSessionEndpoints();
         app.MapOperatorApprovalEndpoints();
+        app.MapOrganizationOnboardingEndpoints();
         app.Run();
         return 0;
     }

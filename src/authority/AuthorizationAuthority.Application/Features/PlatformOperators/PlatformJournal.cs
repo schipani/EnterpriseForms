@@ -17,10 +17,17 @@ public sealed record PlatformStateDelta(
     IReadOnlyList<PlatformOperator> Operators,
     IReadOnlyList<PlatformOperatorChangeProposal> Proposals,
     IReadOnlyList<PlatformOperatorApproval> Approvals,
-    IReadOnlyList<PlatformOperatorEvidenceUse> EvidenceUses)
+    IReadOnlyList<PlatformOperatorEvidenceUse> EvidenceUses,
+    IReadOnlyList<OrganizationOnboardingRequest>? OnboardingRequests = null,
+    IReadOnlyList<OrganizationOnboardingOwner>? OnboardingOwners = null,
+    IReadOnlyList<OrganizationOnboardingApproval>? OnboardingApprovals = null)
 {
     public static PlatformStateDelta Of(IEnumerable<PlatformOperator>? operators = null, IEnumerable<PlatformOperatorChangeProposal>? proposals = null, IEnumerable<PlatformOperatorApproval>? approvals = null, IEnumerable<PlatformOperatorEvidenceUse>? evidenceUses = null) =>
         new([.. operators ?? []], [.. proposals ?? []], [.. approvals ?? []], [.. evidenceUses ?? []]);
+
+    /// <summary>C8 onboarding (C-104): the request, owner and approval rows an onboarding event created or changed. Events written before C-104 carry none (null on replay).</summary>
+    public static PlatformStateDelta Onboarding(IEnumerable<OrganizationOnboardingRequest>? requests = null, IEnumerable<OrganizationOnboardingOwner>? owners = null, IEnumerable<OrganizationOnboardingApproval>? approvals = null, IEnumerable<PlatformOperatorEvidenceUse>? evidenceUses = null) =>
+        new([], [], [], [.. evidenceUses ?? []], [.. requests ?? []], [.. owners ?? []], [.. approvals ?? []]);
 }
 
 /// <summary>
@@ -319,6 +326,39 @@ public sealed class PlatformJournal(IAuthorityStore store, ISecurityEventArchive
             if (await scope.FindPlatformEvidenceUseAsync(row.PlatformOperatorEvidenceUseId, cancellationToken).ConfigureAwait(false) is null)
             {
                 scope.AddPlatformEvidenceUse(row);
+            }
+        }
+
+        // C8 onboarding: requests before their owners and approvals (foreign keys). Absent in events written before C-104.
+        foreach (var row in delta.OnboardingRequests ?? [])
+        {
+            if (await scope.FindOnboardingRequestAsync(row.OrganizationOnboardingRequestId, lockForUpdate: false, cancellationToken).ConfigureAwait(false) is { } existing)
+            {
+                CopyInto(row, existing);
+            }
+            else
+            {
+                scope.AddOnboardingRequest(row);
+            }
+        }
+
+        foreach (var row in delta.OnboardingOwners ?? [])
+        {
+            if (await scope.FindOnboardingOwnerAsync(row.OrganizationOnboardingOwnerId, cancellationToken).ConfigureAwait(false) is null)
+            {
+                scope.AddOnboardingOwner(row);
+            }
+        }
+
+        foreach (var row in delta.OnboardingApprovals ?? [])
+        {
+            if (await scope.FindOnboardingApprovalAsync(row.OrganizationOnboardingApprovalId, cancellationToken).ConfigureAwait(false) is { } existing)
+            {
+                CopyInto(row, existing);
+            }
+            else
+            {
+                scope.AddOnboardingApproval(row);
             }
         }
 
