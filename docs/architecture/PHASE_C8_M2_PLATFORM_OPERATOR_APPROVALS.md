@@ -2,7 +2,8 @@
 
 - **Status:** **D8-33…D8-44 approved by the owner for Development/Testing implementation (C-97, 2026-10-31), with the added
   condition of a separately protected rollback checkpoint; Stages 1 and 2 (Authority only) implemented for Development/Testing
-  (C-98) — see §16.** Stage 3 (Platform Console BFF and web UI) is not started. Production stays closed. Not independently
+  (C-98) — see §16. Stage 3 (Platform Console BFF, development sessions, Vault Transit signing, development-stack activation) approved
+  (C-99) and implemented for Development/Testing — see §17;** the web UI (PG-070 pages) is Stage 4. Production stays closed. Not independently
   reviewed; work by Claude or the owner is never an independent review (C-85). (Original status: proposal, C-96.)
 - **Date / branch:** 2026-10-31, `phase-c8/m2-user-management`, starting commit `18b471c`.
 - **Audience:** the project owner (decisions), the future independent Authority reviewer (this joins the AC-5/AC-6/AC-7/AC-9
@@ -660,3 +661,166 @@ T21, T22 — unit tests; T04, T05, T07, T08, T11, T15, T18, T21, T22 — real st
 3. Whether request-detail views stay journaled (PF-8).
 4. PG-070 catalog entry and feature ownership (`operator-approvals` in a new `platform-console` app).
 5. The point at which the legacy single-call approval is retired (D8-42: after the console's real-stack tests pass).
+
+---
+
+## 17. Stage 3 — Platform Console BFF, development sessions and Vault signing (C-99, 2026-10-31)
+
+Owner approval C-99 answered §16.7 for Development/Testing only: a separate Platform Console service (dev `http://127.0.0.1:8092`,
+Vite `:5174` reserved for Stage 4), 15-minute idle and 2-hour absolute sessions, dedicated console credentials, separate per-operator
+Vault Transit keys, activation of the platform plane on the development stack after a verified backup and the migration, three
+synthetic operators through the bootstrap ceremony, PG-070 "Operator approvals" under Platform administration (owner: Platform
+administration / Security), request-detail reads moved off the platform command journal (PF-8), legacy CLI retained. Stage 3 builds
+the BFF only; the web page is Stage 4. Not merged, not deployed, not independently reviewed.
+
+### 17.1 Architecture
+
+```mermaid
+flowchart LR
+    B[Operator browser<br/>own origin :8092] -- "cookie ef-platform-console<br/>(Secure, HttpOnly, SameSite=Strict, Path=/console-api)<br/>+ X-CSRF-Token + Origin" --> C[Platform Console BFF<br/>EnterpriseForms.PlatformConsole]
+    C -- "platform-console workload JWT<br/>+ X-Platform-Operator-Assertion (session's operator only)" --> A[Authorization Authority<br/>/internal/v1/platform/*]
+    C -- "token: update on 3 exact sign paths only" --> V[Vault Transit<br/>dev-platform-operator-key-*<br/>ECDSA P-256, non-exportable]
+    A --> J[(AuthorityDb: registry, approvals,<br/>platform journal, org audit stream)]
+    A --> R[(independent archive:<br/>rollback checkpoint)]
+    X[Business API / web] -. "no route, no credential,<br/>no shared cookie" .- C
+```
+
+| Concern | Implementation |
+|---|---|
+| Deployable | `src/platform-console/EnterpriseForms.PlatformConsole` (.NET 10 minimal API), `Dockerfile.platform-console` (chiseled, non-root), Compose service `platform-console` on its own networks: `platform-edge` (console ↔ Authority) and the internal `platform-signing` (console ↔ Vault). No business network, assembly, credential or database. References only `AuthorizationAuthority.Contracts` (architecture test). |
+| Startup guard | Refuses any environment other than Development/Testing, any mode other than `SyntheticDevelopment`, missing/short/shared console and assertion keys or issuers, a missing Vault token, idle > 15 min or absolute > 120 min, duplicate subjects or shared Vault keys, origins with paths. |
+| Development authentication | `GET /console-api/v1/session/development-operators` lists the configured synthetic operators; `POST …/development-login {subjectIdentifier}` accepts only a configured subject, ends any session this browser presented (fixation), asks the Authority (`/platform/operator/me`) whether that identity is an **active registered operator whose registered synthetic key is exactly the key configured for it**, and only then creates a session bound to `(platform_operator_id, issuer, subject, signing key)`. The response names the identity and carries the notice "approvals made here are synthetic and are not two-person evidence". No password, no organization membership. |
+| Sessions | Server-side store (random 256-bit id in the cookie, held under its SHA-256); idle 15 min and absolute 2 h enforced on every request; sign-out removes the session server-side (a copied cookie stops working); `PLATFORM_OPERATOR_NOT_ACTIVE`, an identity change or a key mismatch from the Authority ends **every** session of that operator (closes PF-9). In memory: a console restart ends all sessions (fail safe); a multi-instance deployment would need a shared store (production blocked on PB-08 anyway). Capacity bound 200 sessions. |
+| Cookie | Development/Testing `ef-platform-console`: Secure, HttpOnly, SameSite=Strict, `Path=/console-api` (cookies ignore ports, so the path keeps it away from the business app on other loopback ports), no Expires. Production name `__Host-ef-platform-console` (Path=/). Never the business cookie. |
+| CSRF and origin | Every non-GET needs `X-CSRF-Token` equal to the session's token (constant time) and an allowed `Origin`; any request naming another origin or marked `Sec-Fetch-Site: cross-site` is refused; no CORS policy exists. Unknown JSON members are refused (`INVALID_REQUEST`), so a browser cannot send an operator id, subject, key, evidence or `dryRun`. |
+| Authority credential | Per call: a 2-minute HS256 Platform Console workload token (role `platform-console`) and a 2-minute operator assertion whose subject is always the session's. A 401 from the Authority is reported as `PLATFORM_CONSOLE_CREDENTIAL_REJECTED` (502, deployment fault), never as a sign-out. |
+| Headers | `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, restrictive CSP, `Referrer-Policy: no-referrer`, COOP/CORP same-origin. Rate limits: 20 sign-ins/min per address, 30 decisions/min per session. |
+| Logging | Ids and codes only (operator id, request id, decision, outcome/refusal code, correlation id); never cookies, CSRF tokens, assertions, evidence, Vault tokens, justifications or request reasons. |
+
+### 17.2 Vault Transit signing (Development/Testing evidence)
+
+One non-exportable ECDSA P-256 Transit key per synthetic operator (`allow_plaintext_backup=false`). The console's token has the
+policy `platform-console-signing`: `update` on the three exact `transit/sign/<key>/sha2-256` paths and nothing else. The signer
+(`VaultTransitEvidenceSigner`) additionally refuses any key name that is not a configured operator key and forwards no Vault error
+body. A decision runs `OperatorDecisionService`:
+
+1. re-read the registry entry through the Authority: still the session's operator, active, synthetic evidence, registered key = the
+   session's key (else `OPERATOR_SIGNING_KEY_MISMATCH` and the session ends; nothing signed);
+2. Authority dry run of the same decision for that exact request: the console signs **only** if the Authority's current statement
+   SHA-256 equals the fingerprint the operator reviewed (`expectedStatementSha256`; else 409 `APPROVAL_STATEMENT_CHANGED`, nothing signed);
+3. build the JWS with fixed claims — issuer, audience, `sub`/`kid` = the session's key, fresh 128-bit `jti`, 5-minute lifetime,
+   `platform_operator_id` = the session's operator, `decision` from the route, `operation_kind=MembershipApproval`, operation and
+   organization from the route, the Authority's statement digest, SHA-256 of the (trimmed) justification — and sign it with
+   `marshaling_algorithm=jws` (raw r‖s);
+4. submit to the Authority, which verifies the evidence against its registry (Stage 2) and applies every rule.
+
+There is no signing endpoint, the evidence never leaves the BFF (not in responses or logs), and only `OperatorDecisionService`
+depends on the signer (architecture test). Evidence is labelled synthetic in every Authority record. PF-1/PF-2 still hold: the
+console holds all three keys' use and asserts operator identities; synthetic operators never provide real separation of duties.
+
+### 17.3 Browser API (`contracts/openapi/platform-console-v1.json`)
+
+| Method and path | Purpose |
+|---|---|
+| `GET /console-api/health/live`, `/ready` | Liveness; readiness of the Authority and Vault (no secrets) |
+| `GET /console-api/v1/session/development-operators` | Synthetic operators offered by this development console |
+| `POST /console-api/v1/session/development-login` | Sign in one configured operator (above) |
+| `GET /console-api/v1/session` | Current session (identity, permissions, CSRF token, idle/absolute expiry), re-validated with the Authority |
+| `POST /console-api/v1/session/sign-out` | End the session server-side, delete the cookie |
+| `GET /console-api/v1/operator/me` | Registry entry, permissions, journal state |
+| `GET /console-api/v1/membership-requests?q&status&cursor&limit` | Cross-organization queue (Authority search; 15 per page, max 50) |
+| `GET /console-api/v1/organizations/{org}/membership-requests/{id}` | Details, statement + fingerprint, approvals, eligibility (audited, see 17.4) |
+| `GET …/{id}/approval-status` | Approvals recorded of required and whether the signed-in operator can approve now (Authority dry run; records nothing) |
+| `POST …/{id}/approvals` | The operator's approval: first → `AwaitingSecondApproval`; a second, different operator → `Approved` (membership created by the Authority) |
+| `POST …/{id}/approvals/withdraw` | Withdraw the operator's own pending approval |
+| `POST …/{id}/reject` | Reject with justification |
+
+"Submit first approval" and "submit second approval" are the same operation: the Authority alone decides which one it is. Every
+decision body is exactly `{expectedStatementSha256, justification}`.
+
+### 17.4 Audit decision (PF-8)
+
+`GET` of a request detail no longer appends `PlatformMembershipRequestViewed` to the platform command journal. It is appended to the
+organization's **non-gating audit stream** (hash-chained, archived by the unchanged archive processor) under the organization row
+lock, with the operator, request, statement digest and the disclosed parts. **Fail-closed policy:** the audit event is committed in
+the same AuthorityDb transaction that reads the detail, before the detail is returned; if that commit fails, nothing is disclosed.
+The platform rollback check (archive probe at head + 1) still runs before the read, so a restored AuthorityDb still refuses it.
+Approvals, rejections, withdrawals, refusals and registry lifecycle changes stay on the platform journal (and their organization
+mirrors) exactly as in Stage 2. Queue pages and approval-status reads are not audited (metadata already in the list; no reason text).
+
+### 17.5 Development stack activation (`devstack.py platform-console init`)
+
+Steps and idempotency are described in `docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md` §4. Synthetic operators (issuer
+`https://platform-operators.dev.enterpriseforms.invalid/`): `dev-platform-operator-morgan` (Morgan Operator), `…-quinn` (Quinn
+Operator), `…-rowan` (Rowan Operator), keys `dev-platform-operator-key-{morgan,quinn,rowan}`. Results: §17.8.
+
+### 17.6 Security findings (Stage 3)
+
+| # | Finding | Status |
+|---|---|---|
+| PF-1, PF-2 | Synthetic operators: one console (and one Vault token) can sign as any of the three, and the console asserts operator identities. Synthetic approvals are never two-human evidence. | By design (Dev/Testing); production = Entra step-up (PB-08) |
+| PF-8 | Request-detail views journaled on the platform stream | **Resolved** (17.4) |
+| PF-9 | Suspension did not end console sessions | **Resolved**: Authority `PLATFORM_OPERATOR_NOT_ACTIVE` ends every session of the operator at its next call (tested) |
+| PF-10 | Intermittent failure of the AC-7.5 three-way race test | **Open**; the test now reports every racer's actor, status, code and body in every failure message |
+| PF-11 | Sessions are in process memory: a second console instance would not see them; a restart signs everyone out | Accepted for Dev/Testing (single instance); production needs a shared session store with PB-08 |
+| PF-12 | Development cookie relies on browsers accepting `Secure` cookies from `http://127.0.0.1` (Chromium and Firefox do); TLS is a production requirement | Accepted for Dev/Testing |
+| PF-13 | The console's Vault token is long-lived (10 years, dev) and in the custody file; it can sign with all three operator keys | Accepted for Dev/Testing; never production evidence |
+| PF-14 | Port 5174 (reserved for the Stage 4 console Vite server) was found occupied on the workstation by an existing Vite process from the main worktree | Note for Stage 4 |
+
+### 17.7 Tests executed (2026-10-31)
+
+| Suite | Result |
+|---|---|
+| Platform Console BFF tests (new project, real host pipeline; fake Authority uses the Authority's real `PlatformOperatorEvidenceVerifier`) | **23 / 23** |
+| Authority unit tests (PF-8 test updated) | **263 / 263** |
+| Business + Authority contract tests | **488 / 488** |
+| Architecture tests (3 new console boundary tests; PG-070 in the 70-page ownership check) | **75 / 75** |
+| Real stack — isolated security-test stack recreated from this branch with the console and Vault keys: `PlatformConsoleStackTests` (6 new) + `PlatformOperatorApprovalTests` (4) + `MembershipAdministrationTests` (3) + `MembershipRequestEditCancelTests` (5, includes the PF-10 race test) | **18 / 18** |
+
+Checklist coverage: session creation and binding, idle and absolute timeout, logout invalidation, rotation, CSRF, origin, unauthorized
+access, impersonation (smuggled identity/evidence/key fields, assertion subject always the session's), cross-organization and business
+isolation (console cookie refused by the business API; business cookie refused by the console; no record/member/document routes;
+operators bound in no organization), Vault signing identity isolation (registry key mismatch, signer key allow-list, real Vault
+policy: no organization key, no read/rotate/config/export/create), arbitrary-signing rejection (no endpoint; stale statement and
+malformed input sign nothing), expired/revoked operators (refused at sign-in; session ended mid-session; reinstatement needs two
+operators), first and second approval through separate sessions, duplicate approval and single-use evidence ids, withdrawal and
+rejection, archive outage (503 `PLATFORM_JOURNAL_UNVERIFIABLE`, nothing recorded, session kept) and rollback refusal (423
+`PLATFORM_JOURNAL_BEHIND_ARCHIVE` until replay), migration/initialization idempotency (§17.8), existing membership approval regression.
+Not run: the complete Stage B and SEC-P suites, Playwright, hosted CI, human review.
+
+### 17.8 Development stack activation — results (2026-10-31)
+
+| Step | Result |
+|---|---|
+| 1. Backup | `Documents\EnterpriseForms-dev-backups\enterpriseforms-dev\20261031-215850` — 7 volumes, cold copy (stack stopped and restarted) |
+| 2. Verification | every archive re-read: checksum = manifest, readable end to end, same entry count; **restore-test** into the disposable project: `IDENTICAL` (the restored copy verifies the backed-up record with the same signing key); evidence `artifacts/dev-persistent/enterpriseforms-dev-restore-test-20261031-220048.json` |
+| 3. Migration | `20261031091021_PlatformOperatorApprovals` applied to the development AuthorityDb by `authority-migrate` (additive; recorded in `authority.ef_migrations_history`) |
+| 4. Credentials | `platform-console.json` created in the custody folder (console credential, operator-assertion key, Vault token); never printed |
+| 5. Vault | three non-exportable ECDSA P-256 keys `dev-platform-operator-key-{morgan,quinn,rowan}`; policy `platform-console-signing`; isolation proven (console token signs with its three keys only; denied: key read, rotate, config, export, create, organization HMAC key, probe key, policy read; the Authority's token cannot sign with an operator key) |
+| 6. Ceremony | dry run then execution with the two DR-C7-3 synthetic custodian approvals, operation `01a194d8-6acf-7287-a5c3-304b14d546f9`, statement SHA-256 `652dc3ca…11fcc822`, archive state Anchored |
+| 7. Verification | mode SyntheticDevelopment, operational, 3 active operators, recovery ceremony no longer allowed, platform journal revision 1, 0 pending archive entries, not quarantined, no gate refusal |
+| 8. Console | `http://127.0.0.1:8092/console-api` ready (Authority and Vault ready); each operator signed in through it (identity bound to the registry entry and key), `/operator/me` confirmed, signed out, the old cookie refused afterwards; evidence `…-platform-console-init-20261031-220305.json` |
+
+Operators available for testing (development only, synthetic): **Morgan Operator** `dev-platform-operator-morgan`
+(`01a194d8-7599-75e4-936d-94caa17075d7`), **Quinn Operator** `dev-platform-operator-quinn` (`01a194d8-7599-7fcd-ae95-d9549ad5490a`),
+**Rowan Operator** `dev-platform-operator-rowan` (`01a194d8-759a-7ef8-8c3c-45955b6622b5`). The queue currently shows 8 pending
+requests across the two development organizations; none was decided during this stage.
+
+Idempotency: two further runs of `init` changed nothing (no backup, no key, no ceremony; journal still at revision 1). Defects found
+and fixed during activation, each before any state change of the affected step: the migration check read EF's history table with a
+snake_case column name (the run stopped after the verified backup; the migration itself had applied); the ceremony needs a UUIDv7
+operation id (refused at the dry run); the console token's policy lacked `lookup-self`, so a re-run treated the token as invalid and
+issued another — the policy now includes `lookup-self` and every superseded console token is revoked by accessor (one was).
+Preserved: the business data (64 records, 4 members in the main organization), the People page, the accepted acceptance organization,
+and the legacy CLI (`devstack.py membership list` still works; `membership approve` unchanged). Production functionality was not activated.
+
+### 17.9 Readiness for Stage 4
+
+Ready to build `apps/platform-console` (PG-070 list and Review details pages) against the committed `platform-console-v1` contract and
+the running development console. Stage 4 must: generate the TypeScript client from `contracts/openapi/platform-console-v1.json`; keep
+the CSRF token in memory (from the sign-in or `GET /session` response), send it on every POST, and never store it; serve the SPA from
+the console's origin (or the Vite proxy on 5174, already an allowed origin) with its own CSP; show the development notice on every page;
+use separate browser contexts for the two-operator Playwright flow on the isolated stack only (console `:5192`), never the dev stack.
+Port 5174 was occupied on this workstation by an existing Vite process (PF-14). Still open before any production use: PB-08 Entra
+operator sign-in and transaction-bound step-up, PIM, mTLS/workload identity, WORM archive, shared session store, PB-11/PB-12, PB-10,
+executed G14 recovery and an independent review.

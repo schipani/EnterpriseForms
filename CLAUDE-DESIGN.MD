@@ -1311,6 +1311,12 @@ Use current supported stable versions and pinned lockfiles; do not assume an old
 - **Actions:** Switch approved brand tokens, typography presets, color contrast/a11y overlays, 320/768/1440 px and 400% zoom previews; capture visual tests.
 - **Async/edge:** Strictly synthetic data. This gallery is not an access-control or form-preview bypass; screenshot and automated axe tests are required.
 
+#### PG-070 — Operator approvals (`/platform/approvals`, `/platform/approvals/:requestId`) · Platform administration (separate Platform Console)
+- **Audience/permission:** Registered, active Platform Operators only (`platform.membership_requests.review` / `.decide`, Authority-held registry, C8 M2 D8-34). Lives in the separately deployed Platform Console (`apps/platform-console`, BFF `EnterpriseForms.PlatformConsole`), never in the tenant SPA or the business API (D8-33 option A, C-99). Organization roles confer nothing here; operators gain no organization membership or record access.
+- **Sections:** Cross-organization membership-request queue (organization, requested person and verified identity, requested role, requester, requested/expires, approval status "0 of 2 / 1 of 2"), request details (owner's reason, consequences, recorded approvals with justifications, exact statement and fingerprint), decision panel (justification, Approve, Reject, Withdraw my approval).
+- **Actions:** Approve (first approval pending; a second, different operator's approval creates the membership), withdraw own pending approval, reject with justification. Evidence is produced by the console for the signed-in operator only (Development/Testing: per-operator Vault Transit keys; production: Entra transaction-bound step-up, PB-08, not implemented).
+- **Async/edge:** Server-side paging (15), stale statement → reload with explanation, archive outage / rollback refusal → fail-closed banner, suspended operator → session ends. Development banner: synthetic approvals are not two-person evidence. Feature owner: Platform administration / Security. Stage 3 delivered the BFF API only; the page itself is Stage 4.
+
 ### 16.9 Critical end-to-end UX journeys (must be implemented and tested)
 
 - **J-01 New user:** External sign-in → safe organization chooser/bootstrap → role-aware dashboard → permitted form catalog → create first record → become default owner → see only own record.
@@ -1330,7 +1336,7 @@ Use current supported stable versions and pinned lockfiles; do not assume an old
 
 Claude must create `docs/ui/SCREEN_IMPLEMENTATION_MATRIX.md` during implementation. Each `PG-###` requires a row with: route; owning feature/package; minimum privilege; related API/OpenAPI operation; independent async region query keys; mutation commands; loading/empty/error/denied and integrity states; keyboard/axe test ID; Playwright test ID; implemented/verified status. **Do not mark a page complete solely because the route exists or a static screenshot was built.**
 
-- Treat **PG-001 through PG-055**, **PG-060 through PG-066**, and **PG-068** as required functional screens for the complete enterprise application, with capability gating; **PG-056 through PG-059** and **PG-067** are controlled operational screens required for Level 2 deployment/readiness, but may live in a separate security-operator frontend rather than the ordinary tenant SPA. **PG-069** is an internal development-only tool, never a public production route.
+- Treat **PG-001 through PG-055**, **PG-060 through PG-066**, and **PG-068** as required functional screens for the complete enterprise application, with capability gating; **PG-056 through PG-059** and **PG-067** are controlled operational screens required for Level 2 deployment/readiness, but may live in a separate security-operator frontend rather than the ordinary tenant SPA. **PG-069** is an internal development-only tool, never a public production route. **PG-070** is a controlled platform-administration screen of the separate Platform Console (C8 M2), never part of the tenant SPA.
 - If two pages are implemented as tabs within one route, preserve distinct deep links, server permissions and acceptance tests. It is acceptable to consolidate presentation but **not** to omit capabilities or weaken access checks.
 - Every page containing one or more server-backed cards or sections must demonstrate *independent refresh* of those regions. Full-page-only refresh does not meet the requirement.
 - Before reporting completion, run end-to-end tests for J-01 through J-12, all page permission gates, responsive layouts, organization theme contrast, and background upload navigation. Tests for undeployed Level 2 infrastructure must be marked **pending**, never falsely declared passing.
@@ -1414,6 +1420,7 @@ Every screen in Section 16 belongs to **exactly one** frontend feature. `app/` m
 | PG-067 | `organizations` | Data retention and legal holds |
 | PG-068 | `exports` | Authorized export builder |
 | PG-069 | `support` | Design-system component gallery |
+| PG-070 | `operator-approvals` | Operator approvals (Platform Console) |
 
 ### 17.1 Feature-to-backend traceability and permitted dependencies
 
@@ -1427,7 +1434,7 @@ Every screen in Section 16 belongs to **exactly one** frontend feature. `app/` m
 
 For each implemented feature/use case, Claude must deliver a working route or endpoint as appropriate; authoritative permission integration, request/response validation, concurrency/idempotency, unit and integration tests, feature-local API client/hook, screen component and accessibility/Playwright verification, audit event traceability, and operational/error states. For asynchronous cards preserve each card's own data query and refresh. For uploads preserve the root upload manager and server durable workflow across SPA navigation. Do **not** mark a screen complete solely because its route exists or because its data comes from an unrestricted mock.
 
-**Architecture fitness functions (release-blocking):** Compile-time .NET assembly dependencies; domain/application namespace rules; cross-feature `Public`-only imports; browser feature-only API coordination; no forbidden direct Authority/SpiceDB/DB calls; shared UI package no business dependency; no duplicate table owners; no forbidden one-word database columns; all 69 routes mapped and tested; production Authority deployment isolated from API and Worker.
+**Architecture fitness functions (release-blocking):** Compile-time .NET assembly dependencies; domain/application namespace rules; cross-feature `Public`-only imports; browser feature-only API coordination; no forbidden direct Authority/SpiceDB/DB calls; shared UI package no business dependency; no duplicate table owners; no forbidden one-word database columns; all 70 routes mapped and tested; production Authority deployment isolated from API and Worker.
 
 
 

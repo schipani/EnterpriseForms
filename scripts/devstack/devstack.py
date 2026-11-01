@@ -25,6 +25,8 @@ passed on a command line or written into the working tree.
     python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "..."            # dry run
     python scripts/devstack/devstack.py security-admin appoint --persona owner --justification "..." --execute  # confirm
     python scripts/devstack/devstack.py protection-verifier status|enable  # Phase C7 M4: verifier credential (no data changes)
+    python scripts/devstack/devstack.py platform-console init [--execute]  # C8 M2 Stage 3: backup, migrate, keys, operators, console
+    python scripts/devstack/devstack.py platform-console status             # platform operators, journal and console health
 
 See docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md. Production signing uses Azure Managed HSM; nothing here is a
 production control or Level 2 evidence.
@@ -181,8 +183,14 @@ class Stack:
             env["DEVSTACK_PROTECTION_VERIFIER_ISSUER"] = verifier["issuer"]
             env["DEVSTACK_PROTECTION_VERIFIER_AUDIENCE"] = verifier["audience"]
             env["DEVSTACK_PROTECTION_VERIFIER_KEY"] = verifier["shared_key_base64"]
+        # C8 M2 Stage 3: the platform plane and the Platform Console, once `platform-console init` created their custody file.
+        env.update(console_env(self.project))
         env.update(self.overrides)
         return env
+
+    def long_running(self) -> list[str]:
+        """LONG_RUNNING plus the Platform Console when it has been initialized for this project."""
+        return [*LONG_RUNNING, "platform-console"] if load_console(self.project) else list(LONG_RUNNING)
 
     def compose(self, *args: str, input_text: str | None = None, check: bool = True, timeout: int | None = 900) -> subprocess.CompletedProcess:
         command = ["docker", "compose", "-p", self.project, "-f", "compose.yaml", "-f", "compose.dev-persistent.yaml", "--env-file", ".env", *args]
@@ -294,7 +302,7 @@ class Stack:
     def up(self, services: list[str] | None = None) -> None:
         self.compose("up", "-d", "--no-deps", "vault")
         self.unseal()
-        self.compose("up", "-d", "--wait", "--wait-timeout", "600", *(services or LONG_RUNNING), timeout=1200)
+        self.compose("up", "-d", "--wait", "--wait-timeout", "600", *(services or self.long_running()), timeout=1200)
 
     def seed(self) -> None:
         """Runs the one-shot dev-seed (idempotent: it reuses the persisted organization and persona ids) and checks its exit code."""
@@ -568,16 +576,18 @@ def cmd_unseal(args) -> None:
     print("[unseal] vault unsealed")
 
 
-APPLICATION_SERVICES = ("authority", "api", "worker", "web")
+APPLICATION_SERVICES = ("authority", "api", "worker", "web", "platform-console")
 
 
 def cmd_rebuild(args) -> None:
     """Rebuilds application images from the working tree and recreates only those containers (no dependencies): Vault,
     the databases, SpiceDB and their volumes are not restarted. The authority and api migrations run first (idempotent)."""
-    services = args.services or list(APPLICATION_SERVICES)
+    services = args.services or [s for s in APPLICATION_SERVICES if s != "platform-console" or load_console(args.project)]
     unknown = [s for s in services if s not in APPLICATION_SERVICES]
     if unknown:
         raise DevStackError(f"rebuild only recreates application services {APPLICATION_SERVICES}; refused: {unknown}")
+    if "platform-console" in services and not load_console(args.project):
+        raise DevStackError("the Platform Console is not initialized for this project; run `devstack.py platform-console init`")
     stack = Stack(args.project, load_custody(args.project))
     if stack.vault_status() != "unsealed":
         raise DevStackError("vault is not unsealed; run `devstack.py up` first")
@@ -788,7 +798,7 @@ def cmd_restore_test(args) -> None:
     work = Path(tempfile.mkdtemp(prefix="devstack-restore-"))
     restore_pg_hba(work, "172.29.0", "172.29.1")
     overrides = {"DEVSTACK_BUSINESS_SUBNET": "172.29.0.0/24", "DEVSTACK_AUTHORITY_SUBNET": "172.29.1.0/24", "DEVSTACK_PG_HBA_DIR": work.as_posix(),
-                 "DEVSTACK_API_PORT": "5281", "DEVSTACK_WEB_PORT": "8092"}
+                 "DEVSTACK_API_PORT": "5281", "DEVSTACK_WEB_PORT": "8093", "DEVSTACK_CONSOLE_PORT": "8094"}
     stack = Stack(project, custody, overrides)
     destroy_disposable(stack)
     result = {"source_project": source_project, "restore_project": project, "backup": str(backup), "started_on": dt.datetime.now(dt.timezone.utc).isoformat()}
@@ -1198,6 +1208,411 @@ def cmd_seed_acceptance(args) -> None:
     print(f"[seed-acceptance] Authority Vault policy re-pinned to {len(keys)} organization keys (config, rotate, create denied)")
 
 
+# --------------------------------------------------------------------------------------------------------------------
+# C8 M2 Stage 3 (C-99): Platform Console activation on the persistent development stack (development procedure)
+# --------------------------------------------------------------------------------------------------------------------
+
+CONSOLE_FILE = "platform-console.json"  # separate custody file (credentials + Vault token); never part of custody.json
+CONSOLE_POLICY = "platform-console-signing"
+CONSOLE_MIGRATION = "20261031091021_PlatformOperatorApprovals"
+CONSOLE_OPERATOR_ISSUER = "https://platform-operators.dev.enterpriseforms.invalid/"
+# The three synthetic development operators (subjects, display names and Vault Transit key names are not secret; they are also
+# listed in compose.dev-persistent.yaml). Each signs with its own non-exportable ECDSA P-256 key.
+CONSOLE_OPERATORS = (
+    ("dev-platform-operator-morgan", "Morgan Operator (synthetic)", "dev-platform-operator-key-morgan"),
+    ("dev-platform-operator-quinn", "Quinn Operator (synthetic)", "dev-platform-operator-key-quinn"),
+    ("dev-platform-operator-rowan", "Rowan Operator (synthetic)", "dev-platform-operator-key-rowan"),
+)
+
+
+def uuid7() -> uuid.UUID:
+    """RFC 9562 UUIDv7 (48-bit Unix milliseconds, version 7, variant 10, random rest); uuid.uuid7 where Python provides it."""
+    if hasattr(uuid, "uuid7"):
+        return uuid.uuid7()
+    value = (int(time.time() * 1000) & ((1 << 48) - 1)) << 80 | int.from_bytes(secrets.token_bytes(10), "big")
+    value = (value & ~(0xF << 76)) | (0x7 << 76)
+    value = (value & ~(0x3 << 62)) | (0x2 << 62)
+    return uuid.UUID(int=value)
+
+
+def load_console(project: str) -> dict | None:
+    path = custody_dir(project) / CONSOLE_FILE
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def console_env(project: str) -> dict:
+    """Compose variables for the Authority's platform plane and the console, once `platform-console init` created the custody file."""
+    console = load_console(project)
+    if not console:
+        return {}
+    env = {
+        "DEVSTACK_PLATFORM_OPERATORS_MODE": "SyntheticDevelopment",
+        "DEVSTACK_PLATFORM_CONSOLE_ISSUER": console["console_issuer"],
+        "DEVSTACK_PLATFORM_CONSOLE_AUDIENCE": console["console_audience"],
+        "DEVSTACK_PLATFORM_CONSOLE_KEY": console["console_key_base64"],
+        "DEVSTACK_OPERATOR_ASSERTION_ISSUER": console["assertion_issuer"],
+        "DEVSTACK_OPERATOR_ASSERTION_AUDIENCE": console["assertion_audience"],
+        "DEVSTACK_OPERATOR_ASSERTION_KEY": console["assertion_key_base64"],
+    }
+    if console.get("vault_token"):
+        env["DEVSTACK_PLATFORM_CONSOLE_VAULT_TOKEN"] = console["vault_token"]
+    return env
+
+
+def authority_sql(stack: "Stack", sql: str) -> str:
+    """Read-only query against AuthorityDb as its administrator (inside the container; the password comes from its environment)."""
+    return stack.compose("exec", "-T", "authority-db", "sh", "-c",
+                         'PGPASSWORD="$POSTGRES_PASSWORD" PGOPTIONS="-c default_transaction_read_only=on" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -At -f -',
+                         input_text=sql, timeout=60).stdout.strip()  # a SQL error fails the command (never read as "0")
+
+
+def console_migration_applied(stack: "Stack") -> bool:
+    # EF's history table keeps its default quoted column names ("MigrationId"), unlike the snake_case entity tables.
+    return authority_sql(stack, f"SELECT count(*) FROM authority.ef_migrations_history WHERE \"MigrationId\" = '{CONSOLE_MIGRATION}';") == "1"
+
+
+def platform_tool(stack: "Stack", request: dict) -> tuple[int, dict]:
+    """The dev-seed image's platform bootstrap mode. Custodian private keys travel on stdin only; output never contains them."""
+    result = stack.compose("run", "--rm", "--no-deps", "-T", "-e", "DEVSEED_MODE=operator-platform-bootstrap", "dev-seed",
+                           input_text=json.dumps(request), check=False, timeout=300)
+    text = result.stdout.strip()
+    start = text.find("{")
+    if start < 0:
+        raise DevStackError(f"platform bootstrap tool failed ({result.returncode}): {result.stderr.strip()[-1200:]}")
+    return result.returncode, json.loads(text[start:])
+
+
+def verify_backup(directory: Path) -> dict:
+    """Re-reads every archive of a backup: checksum equal to the manifest, archive readable end to end, same entry count."""
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    for entry in manifest["volumes"]:
+        archive = directory / entry["file"]
+        if sha256(archive) != entry["sha256"]:
+            raise DevStackError(f"backup verification failed: checksum mismatch for {entry['file']}")
+        with tarfile.open(archive, "r:gz") as handle:
+            count = sum(1 for _ in handle)
+        if count != entry["entries"]:
+            raise DevStackError(f"backup verification failed: {entry['file']} has {count} entries, manifest says {entry['entries']}")
+    print(f"[platform-console] backup verified: {len(manifest['volumes'])} archives, checksums and entry counts match ({directory})")
+    return manifest
+
+
+def vault_public_key_spki(stack: "Stack", key_name: str) -> str:
+    data = json.loads(stack.vault(f"vault read -format=json transit/keys/{key_name}", token=stack.custody["vault_root_token"]).stdout)["data"]
+    if data["type"] != "ecdsa-p256" or data["exportable"] or data.get("allow_plaintext_backup"):
+        raise DevStackError(f"Vault key {key_name} has unexpected properties (type {data['type']}, exportable {data['exportable']})")
+    pem = data["keys"]["1"]["public_key"]
+    return "".join(line for line in pem.strip().splitlines() if not line.startswith("-----"))
+
+
+def ensure_console_vault(stack: "Stack", console: dict) -> dict:
+    """Per-operator keys (created once, never replaced), the exact-path signing policy, and the console's token."""
+    root = stack.custody["vault_root_token"]
+    keys = {}
+    for _, _, key in CONSOLE_OPERATORS:
+        if stack.vault(f"vault read transit/keys/{key} >/dev/null 2>&1", token=root, check=False).returncode != 0:
+            stack.vault(f"vault write transit/keys/{key} type=ecdsa-p256 exportable=false allow_plaintext_backup=false >/dev/null", token=root)
+            print(f"[platform-console] created non-exportable ECDSA P-256 Transit key {key}")
+        keys[key] = vault_public_key_spki(stack, key)
+    policy = "\n".join([*(f'path "transit/sign/{key}/sha2-256" {{ capabilities = ["update"] }}' for _, _, key in CONSOLE_OPERATORS),
+                        'path "auth/token/lookup-self" { capabilities = ["read"] }'])
+    stack.vault(f"vault policy write {CONSOLE_POLICY} - <<'POLICY'\n" + policy + "\nPOLICY\n", token=root)  # idempotent
+    token = console.get("vault_token")
+    accessor = None
+    if token:
+        lookup = stack.vault("vault token lookup -format=json", token=token, check=False)
+        if lookup.returncode == 0:
+            accessor = json.loads(lookup.stdout)["data"]["accessor"]
+        else:
+            print("[platform-console] the console's Vault token in custody is no longer valid; issuing a new one (no operator or organization state changes)")
+            token = None
+    if not token:
+        created = json.loads(stack.vault(f"vault token create -orphan -no-default-policy -policy={CONSOLE_POLICY} -ttl=87600h "
+                                         "-display-name=platform-console-dev -format=json", token=root).stdout)
+        console["vault_token"] = created["auth"]["client_token"]
+        accessor = created["auth"]["accessor"]
+        write_private_json(custody_dir(stack.project) / CONSOLE_FILE, console)
+    revoke_superseded_console_tokens(stack, accessor)
+    verify_console_vault_isolation(stack, console)
+    return keys
+
+
+def revoke_superseded_console_tokens(stack: "Stack", current_accessor: str) -> None:
+    """Exactly one console token stays valid: any other token issued for the console (display name) is revoked by accessor."""
+    root = stack.custody["vault_root_token"]
+    listed = stack.vault("vault list -format=json auth/token/accessors", token=root, check=False)
+    accessors = json.loads(listed.stdout) if listed.returncode == 0 and listed.stdout.strip() else []
+    revoked = 0
+    for accessor in accessors:
+        if accessor == current_accessor:
+            continue
+        info = stack.vault(f"vault token lookup -format=json -accessor {accessor}", token=root, check=False)
+        if info.returncode != 0:
+            continue
+        data = json.loads(info.stdout)["data"]
+        if data.get("display_name") == "token-platform-console-dev" and CONSOLE_POLICY in (data.get("policies") or []):
+            stack.vault(f"vault token revoke -accessor {accessor} >/dev/null", token=root)
+            revoked += 1
+    if revoked:
+        print(f"[platform-console] revoked {revoked} superseded console Vault token(s); one console token remains valid")
+
+
+def verify_console_vault_isolation(stack: "Stack", console: dict) -> None:
+    """The console token signs with the three operator keys only; it cannot read or manage them or use any organization key; the
+    Authority's token cannot sign with an operator key."""
+    token = console["vault_token"]
+    probe = base64.b64encode(b"enterpriseforms platform console isolation probe").decode()
+    for _, _, key in CONSOLE_OPERATORS:
+        signed = json.loads(stack.vault(f"vault write -format=json transit/sign/{key}/sha2-256 input={probe} marshaling_algorithm=jws", token=token).stdout)
+        if not signed["data"]["signature"].startswith("vault:v1:"):
+            raise DevStackError(f"unexpected signature form from {key}")
+    state = load_state(stack.project)
+    organization_key = (state.get("organization_key") or {}).get("key_name", "org-00000000000000000000000000000000-row-integrity-v1")
+    denied = [
+        f"vault read transit/keys/{CONSOLE_OPERATORS[0][2]}",
+        f"vault write -f transit/keys/{CONSOLE_OPERATORS[0][2]}/rotate",
+        f"vault write transit/keys/{CONSOLE_OPERATORS[0][2]}/config deletion_allowed=true",
+        f"vault write transit/keys/console-new-key type=ecdsa-p256",
+        f"vault write transit/hmac/{organization_key}/sha2-256 input={probe}",
+        f"vault write transit/sign/{PROBE_KEY}/sha2-256 input={probe}",
+        f"vault read transit/export/signing-key/{CONSOLE_OPERATORS[0][2]}",
+        "vault policy read authority-transit",
+    ]
+    for command in denied:
+        if stack.vault(command + " >/dev/null 2>&1", token=token, check=False).returncode == 0:
+            raise DevStackError("the console's Vault token is allowed: " + command.split(" ")[2])
+    authority = stack.custody["authority_vault_token"]
+    if stack.vault(f"vault write transit/sign/{CONSOLE_OPERATORS[0][2]}/sha2-256 input={probe} >/dev/null 2>&1", token=authority, check=False).returncode == 0:
+        raise DevStackError("the Authority's Vault token can sign with an operator key")
+    print("[platform-console] Vault isolation verified: console token = sign with its 3 operator keys only; no read/rotate/config/export/create, no organization key; Authority token cannot sign with operator keys")
+
+
+def platform_status(stack: "Stack") -> dict:
+    code, status = platform_tool(stack, {"action": "status"})
+    if code != 0 or "error_code" in status:
+        raise DevStackError(f"platform status refused: {status.get('error_code')} {status.get('detail') or ''}")
+    return status
+
+
+def print_platform_status(status: dict) -> None:
+    journal = status["journal"]
+    print(f"Mode         : {status['mode']}  operational={status['operational']}  active operators={status['active_operator_count']}  recovery ceremony allowed={status['recovery_ceremony_allowed']}")
+    print(f"Journal      : revision {journal['revision']}  pending archive {journal['pending_archive_entries']}  quarantined={journal['quarantined']}  gate refusal={status.get('journal_gate_refusal') or 'none'}")
+    print(f"Assurance    : {status['evidence_assurance']}")
+    for o in status["operators"]:
+        print(f"  {o['status']:9} {o['subject_identifier']:32} {o['display_name']:30} key {o.get('synthetic_key_identifier') or '-':34} {o['platform_operator_id']}")
+
+
+def console_http(stack: "Stack", method: str, path: str, body: object | None = None, cookie: str | None = None, csrf: str | None = None) -> tuple[int, dict, str | None]:
+    """One request to the console as a browser on its own origin would send it (cookie handled by hand: it is Secure + path-scoped)."""
+    base = f"http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_PORT', '8092')}"
+    request = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None, method=method)
+    request.add_header("Accept", "application/json")
+    request.add_header("Origin", base)
+    if body is not None:
+        request.add_header("Content-Type", "application/json")
+    if cookie:
+        request.add_header("Cookie", cookie)
+    if csrf:
+        request.add_header("X-CSRF-Token", csrf)
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            text = response.read().decode("utf-8")
+            set_cookie = response.headers.get("Set-Cookie")
+            return response.status, (json.loads(text) if text else {}), set_cookie
+    except urllib.error.HTTPError as error:
+        text = error.read().decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(text) if text else {}
+        except json.JSONDecodeError:
+            parsed = {"raw": text[:300]}
+        return error.code, parsed, None
+
+
+def wait_console(stack: "Stack", seconds: int = 120) -> dict:
+    deadline = time.monotonic() + seconds
+    last: dict = {}
+    while time.monotonic() < deadline:
+        try:
+            status, body, _ = console_http(stack, "GET", "/console-api/health/ready")
+            last = body
+            if status == 200:
+                return body
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            pass
+        time.sleep(2)
+    raise DevStackError(f"the Platform Console did not become ready within {seconds}s: {last}")
+
+
+def verify_console_sessions(stack: "Stack", expected: dict) -> list[dict]:
+    """Signs in each synthetic operator through the console, checks the bound identity against the registry, and signs out."""
+    results = []
+    for subject, _, key in CONSOLE_OPERATORS:
+        status, body, set_cookie = console_http(stack, "POST", "/console-api/v1/session/development-login", {"subjectIdentifier": subject})
+        if status != 200 or not set_cookie:
+            raise DevStackError(f"console sign-in of {subject} failed: {status} {body}")
+        cookie = set_cookie.split(";")[0]
+        if body["subjectIdentifier"] != subject or body["platformOperatorId"] != expected[subject]:
+            raise DevStackError(f"console session of {subject} is bound to the wrong operator: {body.get('subjectIdentifier')} {body.get('platformOperatorId')}")
+        status, me, _ = console_http(stack, "GET", "/console-api/v1/operator/me", cookie=cookie)
+        if status != 200 or me["operator"]["syntheticKeyIdentifier"] != key or me["operator"]["status"] != "Active":
+            raise DevStackError(f"console /operator/me for {subject} failed: {status} {me}")
+        status, _, _ = console_http(stack, "POST", "/console-api/v1/session/sign-out", {}, cookie=cookie, csrf=body["csrfToken"])
+        if status != 204:
+            raise DevStackError(f"console sign-out of {subject} failed: {status}")
+        status, _, _ = console_http(stack, "GET", "/console-api/v1/operator/me", cookie=cookie)
+        if status != 401:
+            raise DevStackError(f"a signed-out console session of {subject} still works ({status})")
+        results.append({"subject": subject, "platform_operator_id": body["platformOperatorId"], "permissions": body["permissions"], "signed_out": True})
+        print(f"[platform-console] {subject}: signed in (operator {body['platformOperatorId']}), registry key {key} confirmed, signed out, session invalid afterwards")
+    return results
+
+
+def cmd_platform_console(args) -> None:
+    stack = Stack(args.project, load_custody(args.project))
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    if args.action == "status":
+        stack.compose("build", "dev-seed", timeout=1800)
+        print_platform_status(platform_status(stack))
+        console = load_console(args.project)
+        print(f"Console      : {'configured' if console else 'not initialized (run `devstack.py platform-console init`)'}; {stack.web_base().rsplit(':', 1)[0]}:{stack.overrides.get('DEVSTACK_CONSOLE_PORT', '8092')}")
+        if console:
+            try:
+                print("Health       :", json.dumps(wait_console(stack, 10)))
+            except DevStackError as error:
+                print("Health       :", error)
+        return
+
+    # ---- init (idempotent; never overwrites operator or organization state) ----------------------------------------------
+    state = load_state(args.project)
+    record = state.get("platform_console") or {}
+    if len(load_approvers(args.project)) < 2:
+        raise DevStackError("the recovery ceremony needs the DR-C7-3 synthetic custodian keys; run `devstack.py security-admin enable-approvals` first")
+    evidence: dict = {"project": args.project, "started_on": dt.datetime.now(dt.timezone.utc).isoformat(), "git_commit": run(["git", "rev-parse", "HEAD"], cwd=REPO).stdout.strip()}
+
+    migrated = console_migration_applied(stack)
+    if not migrated or not record.get("backup"):
+        # 1-2. Backup, then verify it, BEFORE any change.
+        backups_before = set(backup_root(args.project).glob("*")) if backup_root(args.project).exists() else set()
+        cmd_backup(args)
+        created = sorted(set(backup_root(args.project).glob("*")) - backups_before)
+        if len(created) != 1:
+            raise DevStackError("could not identify the backup just taken; nothing was changed")
+        manifest = verify_backup(created[0])
+        if not args.skip_restore_test:
+            print("[platform-console] restoring the backup into a disposable project to prove it opens (restore-test) ...")
+            cmd_restore_test(argparse.Namespace(project=args.project, backup_dir=str(created[0]), keep=False))
+        record["backup"] = {"directory": str(created[0]), "volumes": len(manifest["volumes"]), "restore_tested": not args.skip_restore_test}
+        state["platform_console"] = record
+        save_state(args.project, state)
+        stack = Stack(args.project, load_custody(args.project))
+    else:
+        print(f"[platform-console] migration already applied and backup recorded ({record['backup']['directory']}); not taking another backup")
+    evidence["backup"] = record["backup"]
+
+    # 3. Additive migration (idempotent EF migration run by the one-shot authority-migrate container).
+    stack.compose("build", "authority", "platform-console", "dev-seed", timeout=3600)
+    if not migrated:
+        stack.compose("up", "--no-deps", "--force-recreate", "--exit-code-from", "authority-migrate", "authority-migrate", timeout=900)
+        if not console_migration_applied(stack):
+            raise DevStackError(f"migration {CONSOLE_MIGRATION} is not recorded after authority-migrate; stopping")
+        print(f"[platform-console] AuthorityDb migration {CONSOLE_MIGRATION} applied (additive)")
+    evidence["migration"] = {"name": CONSOLE_MIGRATION, "applied_now": not migrated}
+
+    # 4. Isolated console credentials (own issuer, audience and 256-bit key each; never printed).
+    console_path = custody_dir(args.project) / CONSOLE_FILE
+    console = load_console(args.project)
+    if console is None:
+        console = {
+            "purpose": "DEVELOPMENT ONLY Platform Console credentials (C8 M2 Stage 3, C-99). Never commit.",
+            "console_issuer": "enterpriseforms-platform-console-dev",
+            "console_audience": "authorization-authority-platform",
+            "console_key_base64": base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
+            "assertion_issuer": CONSOLE_OPERATOR_ISSUER,
+            "assertion_audience": "authorization-authority-platform-operator",
+            "assertion_key_base64": base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
+            "vault_token": None,
+        }
+        write_private_json(console_path, console)
+        print(f"[platform-console] generated the console credential and operator-assertion key in {console_path} (owner-only ACL; never printed)")
+    else:
+        print(f"[platform-console] console credentials already in custody ({console_path}); reusing them")
+
+    # 5. Vault: one key per operator, exact-path signing policy, console token; isolation proven.
+    public_keys = ensure_console_vault(stack, console)
+    evidence["vault"] = {"keys": sorted(public_keys), "policy": CONSOLE_POLICY, "isolation_verified": True}
+
+    # Authority with the platform plane enabled (its credentials from custody; Vault, data and the business services untouched).
+    stack = Stack(args.project, load_custody(args.project))
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "authority", timeout=900)
+    print("[platform-console] authority recreated with the platform plane (SyntheticDevelopment) and the console credentials")
+
+    # 6. The approved bootstrap ceremony registers the three operators -- only when fewer than two are active.
+    status = platform_status(stack)
+    registered = {o["subject_identifier"]: o for o in status["operators"]}
+    wanted = {subject: (name, key) for subject, name, key in CONSOLE_OPERATORS}
+    present = [s for s in wanted if s in registered]
+    if len(present) == len(wanted):
+        for subject, (_, key) in wanted.items():
+            row = registered[subject]
+            if row["issuer_uri"] != CONSOLE_OPERATOR_ISSUER or row.get("synthetic_key_identifier") != key:
+                raise DevStackError(f"registered operator {subject} does not match the expected issuer/key; nothing changed")
+        print("[platform-console] the three synthetic operators are already registered; no ceremony needed")
+    elif present or status["active_operator_count"] >= 2:
+        raise DevStackError(f"the registry already holds other or partial operators ({sorted(registered)}); refusing to change it. "
+                            "Inspect with `devstack.py platform-console status`; nothing changed")
+    else:
+        operation_id = str(uuid7())  # the Authority requires a UUIDv7 chosen for this ceremony
+        request = {
+            "action": "bootstrap", "operation_id": operation_id,
+            "operators": [{"issuer_uri": CONSOLE_OPERATOR_ISSUER, "subject_identifier": subject, "display_name": name, "evidence_kind": "SyntheticDevelopmentJws",
+                           "synthetic_key_identifier": key, "synthetic_public_key_base64": public_keys[key]} for subject, name, key in CONSOLE_OPERATORS],
+            "justification": "C-99: first synthetic Platform Operators of the persistent development stack (Stage 3, Development/Testing only)",
+            "incident_reference": "DEV-C8-M2-STAGE3",
+        }
+        code, preview = platform_tool(stack, request)
+        if code != 0 or "error_code" in preview or not preview.get("eligible"):
+            raise DevStackError(f"bootstrap dry run refused: {preview.get('error_code') or preview.get('refusal_code')} {preview.get('detail') or preview.get('refusal_detail') or ''}")
+        print(f"[platform-console] ceremony dry run: {len(request['operators'])} operators, statement sha256 {preview['approval_statement_sha256']}, approvals {preview['required_approvals']} x {preview['approval_assurance']}")
+        if not args.execute:
+            print("[platform-console] dry run only. Re-run with --execute to register the operators (two synthetic custodian approvals).")
+            return
+        request["execute"] = True
+        request["approvers"] = [{"approver_id": a["approver_id"], "private_key_pkcs8_base64": a["private_key_pkcs8_base64"]} for a in load_approvers(args.project)[:2]]
+        code, outcome = platform_tool(stack, request)
+        if code != 0 or "error_code" in outcome:
+            raise DevStackError(f"bootstrap refused: {outcome.get('error_code')} {outcome.get('detail') or ''}; nothing changed")
+        print(f"[platform-console] ceremony executed (operation {operation_id}); journal archive state {outcome.get('journal_archive_state')}")
+        evidence["ceremony"] = {"operation_id": operation_id, "statement_sha256": preview["approval_statement_sha256"]}
+
+    # 7. Verify permissions and journal checkpoint integrity (archive probe at head+1 = no rollback; everything anchored).
+    deadline = time.monotonic() + 120
+    while True:
+        status = platform_status(stack)
+        if status["journal"]["pending_archive_entries"] == 0 or time.monotonic() > deadline:
+            break
+        time.sleep(3)
+    print_platform_status(status)
+    active = {o["subject_identifier"]: o["platform_operator_id"] for o in status["operators"] if o["status"] == "Active"}
+    if any(subject not in active for subject in wanted) or status["journal"]["quarantined"] or status.get("journal_gate_refusal") or status["journal"]["pending_archive_entries"] != 0 or not status["operational"]:
+        raise DevStackError("platform plane verification failed (operators not active, journal quarantined, gate refused or events not anchored)")
+    evidence["platform"] = {"active_operators": active, "journal_revision": status["journal"]["revision"], "pending_archive_entries": 0, "gate_refusal": None}
+
+    # 8. Start the console and prove sessions are bound to the registered operators.
+    stack = Stack(args.project, load_custody(args.project))
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "platform-console", timeout=900)
+    evidence["health"] = wait_console(stack)
+    evidence["sessions"] = verify_console_sessions(stack, active)
+    record.update({"activated_on": dt.datetime.now(dt.timezone.utc).isoformat(), "operators": active, "migration": CONSOLE_MIGRATION})
+    state = load_state(args.project)
+    state["platform_console"] = record
+    save_state(args.project, state)
+    evidence["finished_on"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    write_evidence(args.project, "platform-console-init", evidence)
+    print(f"[platform-console] ready: http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_PORT', '8092')}/console-api (synthetic development operators; not two-person evidence)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", default=os.environ.get("DEVSTACK_PROJECT", DEFAULT_PROJECT))
@@ -1229,6 +1644,11 @@ def main() -> int:
     verifier = commands.add_parser("protection-verifier", help="Phase C7 M4: development-only field-protection verifier credential (Authority + Worker)")
     verifier.add_argument("action", choices=["status", "enable"])
     verifier.set_defaults(handler=cmd_protection_verifier)
+    console = commands.add_parser("platform-console", help="C8 M2 Stage 3: activate (init) or inspect (status) the development Platform Console and platform plane")
+    console.add_argument("action", choices=["init", "status"])
+    console.add_argument("--execute", action="store_true", help="init: run the bootstrap ceremony after its dry run (otherwise dry run only)")
+    console.add_argument("--skip-restore-test", action="store_true", help="init: verify the backup by checksums only (no disposable restore)")
+    console.set_defaults(handler=cmd_platform_console)
     restore = commands.add_parser("restore-test")
     restore.add_argument("backup_dir")
     restore.add_argument("--keep", action="store_true", help="leave the disposable restore project running for inspection")

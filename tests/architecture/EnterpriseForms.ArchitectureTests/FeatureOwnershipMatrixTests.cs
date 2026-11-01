@@ -3,7 +3,7 @@ using Xunit;
 
 namespace EnterpriseForms.ArchitectureTests;
 
-/// <summary>Every PG-001..PG-069 screen has exactly one frontend owner and the ownership matrix agrees with CLAUDE-DESIGN.MD §17 (§4U.5 item 6).</summary>
+/// <summary>Every PG-001..PG-070 screen has exactly one frontend owner and the ownership matrix agrees with CLAUDE-DESIGN.MD §17 (§4U.5 item 6).</summary>
 public sealed partial class FeatureOwnershipMatrixTests
 {
     [GeneratedRegex(@"^\| PG-(\d{3}) \| `([a-z-]+)` \|", RegexOptions.Multiline)]
@@ -20,7 +20,7 @@ public sealed partial class FeatureOwnershipMatrixTests
     {
         var design = File.ReadAllText(RepositoryPaths.Combine("CLAUDE-DESIGN.MD"));
         var ids = DesignOwnerRow().Matches(design).Select(m => int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)).ToList();
-        Assert.Equal(Enumerable.Range(1, 69), ids.OrderBy(i => i));
+        Assert.Equal(Enumerable.Range(1, 70), ids.OrderBy(i => i));
         Assert.Equal(ids.Count, ids.Distinct().Count());
     }
 
@@ -42,7 +42,7 @@ public sealed partial class FeatureOwnershipMatrixTests
             }
         }
 
-        Assert.Equal(Enumerable.Range(1, 69), matrixOwners.Keys.OrderBy(k => k));
+        Assert.Equal(Enumerable.Range(1, 70), matrixOwners.Keys.OrderBy(k => k));
         foreach (var (page, owner) in designOwners)
         {
             Assert.True(matrixOwners.TryGetValue(page, out var matrixOwner) && matrixOwner == owner, $"PG-{page:000}: design says `{owner}`, matrix says `{matrixOwners.GetValueOrDefault(page)}`");

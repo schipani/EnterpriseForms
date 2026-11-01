@@ -9,6 +9,7 @@ using AuthorizationAuthority.Application.Features.OperatorPlane;
 using AuthorizationAuthority.Application.Features.PlatformOperators;
 using AuthorizationAuthority.Application.Features.SecurityCommands;
 using AuthorizationAuthority.Contracts.V1;
+using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
@@ -493,8 +494,15 @@ public sealed class PlatformOperatorTests : IDisposable
         Assert.Single(detail.Approvals, a => a.PlatformOperatorId == alice.Id && a.Justification == Justification);
         Assert.Equal(2, JsonDocument.Parse(detail.StatementJson).RootElement.GetProperty("statement_version").GetInt32());
         Assert.DoesNotContain("justification", detail.StatementJson, StringComparison.Ordinal);
-        Assert.Contains(store.PlatformJournal, j => j.JournalEventKind == "PlatformMembershipRequestViewed");
+        // PF-8 (C-99): the view is audited on the organization's audit stream, not as a platform command-journal event.
+        var platformEventsBefore = store.PlatformJournal.Count;
+        var viewed = Assert.Single(store.Journal, j => j.JournalEventKind == "PlatformMembershipRequestViewed");
+        Assert.Equal(JournalStreamNames.Audit, viewed.JournalStreamName);
+        Assert.Equal(Org, viewed.OrganizationId);
+        Assert.DoesNotContain(store.PlatformJournal, j => j.JournalEventKind == "PlatformMembershipRequestViewed");
         Assert.False((await service.GetDetailAsync(alice.Actor, Org, ids[0], Guid.CreateVersion7(), Ct)).MyEligibility.CanApprove);
+        Assert.Equal(2, store.Journal.Count(j => j.JournalEventKind == "PlatformMembershipRequestViewed"));
+        Assert.Equal(platformEventsBefore, store.PlatformJournal.Count);
     }
 
     // ---- registry: provision, reinstate, remove, suspend, recovery ----

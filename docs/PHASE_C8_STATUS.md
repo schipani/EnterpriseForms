@@ -449,3 +449,30 @@ The owner approved D8-33…D8-44 for Development/Testing (C-97) with an added co
 | Real stack (isolated stack rebuilt from this branch): `PlatformOperatorApprovalTests` (4) + `MembershipAdministrationTests` + `MembershipRequestEditCancelTests` | 11 / 12 on the first run; the failure was the existing AC-7.5 three-way owner race test (PF-10, body not captured); 21 / 21 on re-run |
 
 Not run: the complete Stage B and SEC-P suites, Playwright, hosted CI. The persistent development stack was not changed: activating the platform plane there (migration, credentials, three synthetic operators) needs owner approval with Stage 3. Production remains closed: `PlatformOperators:Mode=SyntheticDevelopment` is refused outside Development/Testing and the default `Unavailable` refuses every platform operation; Entra transaction-bound step-up evidence is a refusal stub until PB-08.
+
+## 21. Platform Console Stage 3 — BFF, development sessions, Vault signing, development-stack activation (2026-10-31, C-99) — Development/Testing, not merged, not independently reviewed
+
+The owner approved Stage 3 for Development/Testing (C-99). Built: the separately deployed Platform Console BFF
+(`src/platform-console/EnterpriseForms.PlatformConsole`, dev `http://127.0.0.1:8092/console-api`) with its own container, networks,
+cookie and Authority credential; development operator sign-in bound to one registered operator and its own key; server-side sessions
+(15 min idle, 2 h absolute, server-side sign-out, rotation, ending on suspension); CSRF and origin checks; evidence signed in Vault
+Transit with each operator's own non-exportable ECDSA P-256 key, only after the Authority confirms the reviewed statement, never
+returned to the browser; the PG-070 API (session, queue, details, approval status, approve, withdraw, reject) reusing the Stage 2
+Authority commands unchanged. Authority change: request-detail views audited on the organization audit stream instead of the platform
+journal (PF-8, fail closed). `devstack.py platform-console init|status`; `dev-seed` mode `operator-platform-bootstrap`. PG-070
+registered (owner Platform administration / Security). Details: `docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` §17.
+
+| Suite | Result (2026-10-31) |
+|---|---|
+| Platform Console BFF tests (new, 23) | 23 / 23 |
+| Authority unit tests | 263 / 263 |
+| Contract tests | 488 / 488 |
+| Architecture tests (3 new; 70-page ownership) | 75 / 75 |
+| Real stack, isolated security-test stack recreated with the console: `PlatformConsoleStackTests` (6 new) + `PlatformOperatorApprovalTests` (4) + `MembershipAdministrationTests` (3) + `MembershipRequestEditCancelTests` (5) | 18 / 18 |
+| Chromium cookie check (isolated console): Secure + HttpOnly cookie stored and sent over `http://127.0.0.1`, unreadable by script, sign-out without CSRF 403, after sign-out 401 | passed |
+| Development stack activation (backup verified + restore-test IDENTICAL, migration, Vault keys/policy/isolation, ceremony, verification, console sessions) and two idempotent re-runs | passed |
+
+PF-10 stays open; the race test now reports every racer's actor, status, code and body. Not run: the complete Stage B and SEC-P suites,
+Playwright UI tests (no UI yet), hosted CI. Production remains closed. The legacy CLI approval path is retained (D8-42: retire only
+after the Stage 4 console passes its real-stack tests). Next: Stage 4 (`apps/platform-console`), awaiting the owner's go-ahead.
+

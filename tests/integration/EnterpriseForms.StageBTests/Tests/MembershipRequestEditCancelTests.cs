@@ -205,15 +205,19 @@ public sealed class MembershipRequestEditCancelTests(StageBFixture fixture)
 
         // Two owners act on the same reading at once: exactly one wins, the other is told the request changed.
         var results = await Task.WhenAll(ReplaceAsync(s, s.Designer, id, digest, "Winner One"), ReplaceAsync(s, s.SecondOwner, id, digest, "Winner Two"), CancelAsync(s, s.ThirdOwner, id, digest));
-        Assert.Equal(1, results.Count(r => r.IsSuccess));
+        // PF-10 (C-99): every outcome of the race (actor, status, code, body) goes into each failure message, so an intermittent
+        // failure names the unexpected answer instead of only a count.
+        var actors = new[] { "replace by first owner", "replace by second owner", "cancel by third owner" };
+        var diagnostics = string.Join(" || ", results.Select((r, i) => $"{actors[i]}: {(int)r.Status} {r.ErrorCode ?? "-"} {(r.Body.Length > 600 ? r.Body[..600] : r.Body)}"));
+        Assert.True(results.Count(r => r.IsSuccess) == 1, "expected exactly one winner. " + diagnostics);
         // The loser is stopped either by the request digest (MEMBERSHIP_REQUEST_CHANGED) or, when the commands truly overlap, by the Authority's global revision check; both are 409s that change nothing.
-        Assert.All(results.Where(r => !r.IsSuccess), r => Assert.True(r.Status == HttpStatusCode.Conflict && r.ErrorCode is "MEMBERSHIP_REQUEST_CHANGED" or "STALE_AUTHORIZATION_REVISION", r.Body));
+        Assert.All(results.Where(r => !r.IsSuccess), r => Assert.True(r.Status == HttpStatusCode.Conflict && r.ErrorCode is "MEMBERSHIP_REQUEST_CHANGED" or "STALE_AUTHORIZATION_REVISION", "unexpected loser answer. " + diagnostics));
         var page = await fixture.Api.GetAsync("/api/v1/organization/membership-requests?pageSize=50", s.Token(s.Designer));
         var items = page.Root.GetProperty("items").EnumerateArray().ToList();
         var pending = items.Count(i => i.GetProperty("requestState").GetString() == "Pending");
         var replaced = items.Count(i => i.GetProperty("requestState").GetString() == "Replaced");
         var cancelled = items.Count(i => i.GetProperty("requestState").GetString() == "Cancelled");
-        Assert.True((pending, replaced, cancelled) is (1, 1, 0) or (0, 0, 1), $"pending {pending}, replaced {replaced}, cancelled {cancelled}"); // exactly one change happened, never two pending requests for one identity
+        Assert.True((pending, replaced, cancelled) is (1, 1, 0) or (0, 0, 1), $"pending {pending}, replaced {replaced}, cancelled {cancelled}. {diagnostics}"); // exactly one change happened, never two pending requests for one identity
     }
 
     [Fact]

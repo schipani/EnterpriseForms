@@ -24,5 +24,6 @@
     <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Infrastructure/AuthorizationAuthority.Infrastructure.csproj" />
     <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
     <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj" />
+    <ProjectReference Include="../../../src/platform-console/EnterpriseForms.PlatformConsole/EnterpriseForms.PlatformConsole.csproj" />
   </ItemGroup>
 </Project>

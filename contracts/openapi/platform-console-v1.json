@@ -1,0 +1,1299 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Enterprise Forms Platform Console (Development/Testing)",
+    "description": "Backend-for-frontend of the separately deployed Platform Console (PG-070 Operator approvals). Cookie session + CSRF; the signed-in Platform Operator is always the session's. Not part of the business API.",
+    "version": "v1"
+  },
+  "paths": {
+    "/console-api/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "ConsoleLive",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "ConsoleReady",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/console-api/v1/session/development-operators": {
+      "get": {
+        "tags": [
+          "Session"
+        ],
+        "summary": "The synthetic Platform Operators this development console can sign in (Development/Testing only).",
+        "operationId": "ListDevelopmentOperators",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevelopmentOperatorList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/session/development-login": {
+      "post": {
+        "tags": [
+          "Session"
+        ],
+        "summary": "Signs in one configured synthetic operator after the Authority confirms it is active and its registered key is its own configured key.",
+        "operationId": "DevelopmentLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevelopmentLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSessionView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/session": {
+      "get": {
+        "tags": [
+          "Session"
+        ],
+        "summary": "The current session, re-validated against the Authority registry (a suspended or removed operator's session ends here).",
+        "operationId": "GetConsoleSession",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSessionView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/session/sign-out": {
+      "post": {
+        "tags": [
+          "Session"
+        ],
+        "summary": "Ends the session on the server (a copied cookie stops working) and deletes the cookie.",
+        "operationId": "SignOut",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/console-api/v1/operator/me": {
+      "get": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "The signed-in operator's registry entry, platform permissions and the platform journal state.",
+        "operationId": "GetCurrentOperator",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorProfile"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/membership-requests": {
+      "get": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Cross-organization approval queue (15 per page by default, at most 50; opaque cursor bound to the operator and filter).",
+        "operationId": "SearchMembershipRequests",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipRequestPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}": {
+      "get": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Request details, the exact statement and its fingerprint, recorded approvals and eligibility. A sensitive disclosure: the Authority audits each view (fail closed).",
+        "operationId": "GetMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipRequestDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}/approval-status": {
+      "get": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Pending approval status (approvals recorded of required) and whether the signed-in operator can approve now.",
+        "operationId": "GetMembershipApprovalStatus",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}/approvals": {
+      "post": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "The signed-in operator's approval. First valid approval: AwaitingSecondApproval. A valid approval by a second, different operator: Approved (the Authority creates the membership).",
+        "operationId": "ApproveMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Withdraws the signed-in operator's own pending approval (never another operator's).",
+        "operationId": "WithdrawMembershipApproval",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Rejects the request with a justification; any pending approval is invalidated and nothing is granted.",
+        "operationId": "RejectMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApprovalStatusView": {
+        "required": [
+          "requestId",
+          "organizationId",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "canApprove",
+          "refusalCode",
+          "refusalDetail",
+          "statementSha256",
+          "evidenceAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "canApprove": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsoleSessionView": {
+        "required": [
+          "platformOperatorId",
+          "displayName",
+          "issuerUri",
+          "subjectIdentifier",
+          "operatorStatus",
+          "permissions",
+          "activeOperatorCount",
+          "authenticationMode",
+          "evidenceAssurance",
+          "environmentNotice",
+          "csrfToken",
+          "idleExpiresOn",
+          "absoluteExpiresOn"
+        ],
+        "type": "object",
+        "properties": {
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "operatorStatus": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "activeOperatorCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "authenticationMode": {
+            "type": "string"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "environmentNotice": {
+            "type": "string"
+          },
+          "csrfToken": {
+            "type": "string"
+          },
+          "idleExpiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "absoluteExpiresOn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DevelopmentLoginRequest": {
+        "required": [
+          "subjectIdentifier"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectIdentifier": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DevelopmentOperatorList": {
+        "required": [
+          "operators",
+          "authenticationMode",
+          "environmentNotice"
+        ],
+        "type": "object",
+        "properties": {
+          "operators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DevelopmentOperatorOption"
+            }
+          },
+          "authenticationMode": {
+            "type": "string"
+          },
+          "environmentNotice": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DevelopmentOperatorOption": {
+        "required": [
+          "subjectIdentifier",
+          "displayName",
+          "issuerUri"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "issuerUri": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "HealthView": {
+        "required": [
+          "status",
+          "dependencies"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "dependencies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperatorDecisionInput": {
+        "required": [
+          "expectedStatementSha256",
+          "justification"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedStatementSha256": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformApprovalStatus": {
+        "required": [
+          "recorded",
+          "required",
+          "approvedByMe",
+          "awaitingOtherOperator",
+          "pendingApprovalExpiresOn"
+        ],
+        "type": "object",
+        "properties": {
+          "recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvedByMe": {
+            "type": "boolean"
+          },
+          "awaitingOtherOperator": {
+            "type": "boolean"
+          },
+          "pendingApprovalExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformApprovalView": {
+        "required": [
+          "approvalId",
+          "platformOperatorId",
+          "operatorDisplayName",
+          "operatorIdentity",
+          "recordedOn",
+          "validUntil",
+          "justification",
+          "state",
+          "closureReason",
+          "isMine"
+        ],
+        "type": "object",
+        "properties": {
+          "approvalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operatorDisplayName": {
+            "type": "string"
+          },
+          "operatorIdentity": {
+            "$ref": "#/components/schemas/PlatformIdentity"
+          },
+          "recordedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isMine": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformEligibility": {
+        "required": [
+          "canApprove",
+          "canReject",
+          "canWithdraw",
+          "refusalCode",
+          "refusalDetail"
+        ],
+        "type": "object",
+        "properties": {
+          "canApprove": {
+            "type": "boolean"
+          },
+          "canReject": {
+            "type": "boolean"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformIdentity": {
+        "required": [
+          "issuerUri",
+          "subjectIdentifier"
+        ],
+        "type": "object",
+        "properties": {
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformJournalStatus": {
+        "required": [
+          "revision",
+          "pendingArchiveEntries",
+          "quarantined",
+          "quarantineReason"
+        ],
+        "type": "object",
+        "properties": {
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "pendingArchiveEntries": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantined": {
+            "type": "boolean"
+          },
+          "quarantineReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformMembershipDecisionResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "requestId",
+          "organizationId",
+          "decision",
+          "statementJson",
+          "statementSha256",
+          "outcome",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "myApprovalId",
+          "securityCommandId",
+          "commandStatus",
+          "authorizationRevision",
+          "journalRevision",
+          "journalArchiveState",
+          "evidenceAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "myApprovalId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "securityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "commandStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "journalRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "journalArchiveState": {
+            "type": "string"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformMembershipRequestDetail": {
+        "required": [
+          "request",
+          "requestReason",
+          "replacesRequestId",
+          "statementJson",
+          "statementSha256",
+          "consequences",
+          "approvals",
+          "myEligibility",
+          "evidenceAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/PlatformMembershipRequestItem"
+          },
+          "requestReason": {
+            "type": "string"
+          },
+          "replacesRequestId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformApprovalView"
+            }
+          },
+          "myEligibility": {
+            "$ref": "#/components/schemas/PlatformEligibility"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformMembershipRequestItem": {
+        "required": [
+          "requestId",
+          "organizationId",
+          "organizationDisplayName",
+          "displayNameHint",
+          "target",
+          "initialRoleName",
+          "requestedByAuthorityUserId",
+          "requestedBy",
+          "requestedOn",
+          "expiresOn",
+          "requestState",
+          "approvalStatus",
+          "availableActions"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/PlatformIdentity"
+          },
+          "initialRoleName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestedByAuthorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedBy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlatformIdentity"
+              }
+            ]
+          },
+          "requestedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestState": {
+            "type": "string"
+          },
+          "approvalStatus": {
+            "$ref": "#/components/schemas/PlatformApprovalStatus"
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformMembershipRequestPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "status",
+          "journal",
+          "evidenceAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformMembershipRequestItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformOperatorProfile": {
+        "required": [
+          "operator",
+          "mode",
+          "evidenceAssurance",
+          "permissions",
+          "activeOperatorCount",
+          "journal",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "operator": {
+            "$ref": "#/components/schemas/PlatformOperatorSummary"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "activeOperatorCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformOperatorSummary": {
+        "required": [
+          "platformOperatorId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayName",
+          "status",
+          "evidenceKind",
+          "syntheticKeyIdentifier",
+          "rowRevision",
+          "provisionedOn",
+          "statusChangedOn",
+          "statusReason"
+        ],
+        "type": "object",
+        "properties": {
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "evidenceKind": {
+            "type": "string"
+          },
+          "syntheticKeyIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rowRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "provisionedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statusChangedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statusReason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Session"
+    },
+    {
+      "name": "OperatorApprovals"
+    }
+  ]
+}

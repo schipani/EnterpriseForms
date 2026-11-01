@@ -24,6 +24,10 @@ networks:
   authority-net:
     ipam:
       config: [{ subnet: "${DEVSTACK_AUTHORITY_SUBNET:-172.31.1.0/24}" }]
+  # C8 M2 Stage 3: Platform Console <-> Authority, and Platform Console <-> Vault (internal; nothing else attached).
+  platform-edge: {}
+  platform-signing:
+    internal: true
 
 services:
   business-db:
@@ -55,6 +59,7 @@ services:
       - ./vault/vault-dev-persistent.hcl:/vault/config/vault.hcl:ro
       - ./vault/authority-transit-policy.hcl:/vault/policies/authority-transit.hcl:ro
       - vault-data:/vault/file
+    networks: [authority-net, platform-signing]
 
   vault-transit-init:
     # The transit engine, policy and Authority token are created once by `devstack.py init`. This gate only proves, before
@@ -86,6 +91,17 @@ services:
       Identity__Verifier__Issuer: ${DEVSTACK_PROTECTION_VERIFIER_ISSUER:-}
       Identity__Verifier__Audience: ${DEVSTACK_PROTECTION_VERIFIER_AUDIENCE:-}
       Identity__Verifier__SharedKeyBase64: ${DEVSTACK_PROTECTION_VERIFIER_KEY:-}
+      # C8 M2 Stage 3 (C-99): development-only Platform Operator plane, enabled only by `devstack.py platform-console init`
+      # (per-environment credentials in the custody directory). Unset => Unavailable and no console credential: every platform
+      # operation is refused. The Authority refuses SyntheticDevelopment outside Development/Testing.
+      PlatformOperators__Mode: ${DEVSTACK_PLATFORM_OPERATORS_MODE:-Unavailable}
+      Identity__PlatformConsole__Issuer: ${DEVSTACK_PLATFORM_CONSOLE_ISSUER:-}
+      Identity__PlatformConsole__Audience: ${DEVSTACK_PLATFORM_CONSOLE_AUDIENCE:-}
+      Identity__PlatformConsole__SharedKeyBase64: ${DEVSTACK_PLATFORM_CONSOLE_KEY:-}
+      Identity__OperatorAssertion__Issuer: ${DEVSTACK_OPERATOR_ASSERTION_ISSUER:-}
+      Identity__OperatorAssertion__Audience: ${DEVSTACK_OPERATOR_ASSERTION_AUDIENCE:-}
+      Identity__OperatorAssertion__SharedKeyBase64: ${DEVSTACK_OPERATOR_ASSERTION_KEY:-}
+    networks: [authority-net, trust-edge, platform-edge]
 
   business-migrate:
     image: enterpriseforms/api:dev
@@ -109,6 +125,51 @@ services:
     ports: ["127.0.0.1:${DEVSTACK_WEB_PORT:-8091}:8080"]
   dev-seed:
     image: enterpriseforms/dev-seed:dev
+  platform-console:
+    # C8 M2 Stage 3 (C-99): the separately deployed Platform Console BFF, DEVELOPMENT ONLY. Started only after
+    # `devstack.py platform-console init` created its custody file (credentials and Vault token); the console refuses to start
+    # without them and outside Development/Testing. Three synthetic operators, each signing with its own Vault Transit key.
+    image: enterpriseforms/platform-console:dev
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.platform-console
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      PlatformConsole__Mode: SyntheticDevelopment
+      PlatformConsole__AllowedOrigins__0: http://127.0.0.1:${DEVSTACK_CONSOLE_PORT:-8092}
+      PlatformConsole__AllowedOrigins__1: http://localhost:${DEVSTACK_CONSOLE_PORT:-8092}
+      PlatformConsole__AllowedOrigins__2: http://127.0.0.1:5174
+      PlatformConsole__AllowedOrigins__3: http://localhost:5174
+      PlatformConsole__Authority__BaseAddress: http://authority:8080
+      PlatformConsole__Authority__WorkloadName: platform-console-dev
+      PlatformConsole__Authority__ConsoleCredential__Issuer: ${DEVSTACK_PLATFORM_CONSOLE_ISSUER:-}
+      PlatformConsole__Authority__ConsoleCredential__Audience: ${DEVSTACK_PLATFORM_CONSOLE_AUDIENCE:-}
+      PlatformConsole__Authority__ConsoleCredential__SharedKeyBase64: ${DEVSTACK_PLATFORM_CONSOLE_KEY:-}
+      PlatformConsole__Authority__OperatorAssertion__Issuer: ${DEVSTACK_OPERATOR_ASSERTION_ISSUER:-}
+      PlatformConsole__Authority__OperatorAssertion__Audience: ${DEVSTACK_OPERATOR_ASSERTION_AUDIENCE:-}
+      PlatformConsole__Authority__OperatorAssertion__SharedKeyBase64: ${DEVSTACK_OPERATOR_ASSERTION_KEY:-}
+      PlatformConsole__Vault__Address: http://vault:8200
+      PlatformConsole__Vault__Token: ${DEVSTACK_PLATFORM_CONSOLE_VAULT_TOKEN:-}
+      PlatformConsole__Operators__0__SubjectIdentifier: dev-platform-operator-morgan
+      PlatformConsole__Operators__0__DisplayName: Morgan Operator (synthetic)
+      PlatformConsole__Operators__0__VaultKeyName: dev-platform-operator-key-morgan
+      PlatformConsole__Operators__1__SubjectIdentifier: dev-platform-operator-quinn
+      PlatformConsole__Operators__1__DisplayName: Quinn Operator (synthetic)
+      PlatformConsole__Operators__1__VaultKeyName: dev-platform-operator-key-quinn
+      PlatformConsole__Operators__2__SubjectIdentifier: dev-platform-operator-rowan
+      PlatformConsole__Operators__2__DisplayName: Rowan Operator (synthetic)
+      PlatformConsole__Operators__2__VaultKeyName: dev-platform-operator-key-rowan
+    depends_on:
+      authority:
+        condition: service_healthy
+    networks: [platform-edge, platform-signing]
+    ports: ["127.0.0.1:${DEVSTACK_CONSOLE_PORT:-8092}:8080"]
+    healthcheck:
+      test: ["CMD", "dotnet", "EnterpriseForms.PlatformConsole.dll", "--probe", "http://127.0.0.1:8080/console-api/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
 volumes:
   business-db-data: {}

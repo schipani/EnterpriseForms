@@ -30,6 +30,7 @@ public sealed class PlatformMembershipApprovalService(IAuthorityStore store, Pla
     public const int StatementVersion = 2;
     public const int DefaultPageSize = 15;
     public const int MaximumPageSize = 50;
+    private static readonly string[] DetailDisclosure = ["request_metadata", "request_reason", "statement", "approvals", "eligibility"];
     private static readonly byte[] CursorKey = RandomNumberGenerator.GetBytes(32); // per process: a cursor never outlives the process that issued it
 
     // ---- reads ----
@@ -78,17 +79,30 @@ public sealed class PlatformMembershipApprovalService(IAuthorityStore store, Pla
         return new Contracts.V1.PlatformMembershipRequestPage(items, page.TotalCount, next, limit, status, PlatformJournal.Status(head, await scope.CountPendingPlatformArchiveAsync(cancellationToken).ConfigureAwait(false)), policy.Assurance, correlationId);
     }
 
-    /// <summary>Request metadata, the exact statement, recorded approvals and the caller's eligibility. The view itself is journaled (operator access is auditable).</summary>
+    /// <summary>
+    /// Request metadata, the exact statement, recorded approvals and the caller's eligibility.
+    /// <para>
+    /// C8 M2 Stage 3 (PF-8, owner decision C-99): the view is a sensitive disclosure (the owner's reason, identities, other
+    /// operators' justifications), so it is audited, but on the organization's non-gating audit stream instead of the platform
+    /// command journal: a page view is not a platform command, must not serialize on the platform head lock, and must not add an
+    /// archive object to the platform stream. Fail closed: the audit event is committed in the same AuthorityDb transaction that
+    /// reads the detail, before the detail is returned; if the commit fails, nothing is disclosed. The audit stream is hash-chained
+    /// and archived by the unchanged archive processor (asynchronously). The platform rollback check (archive probe at head + 1)
+    /// still runs first, so a restored AuthorityDb still refuses the read.
+    /// </para>
+    /// </summary>
     public async Task<PlatformMembershipRequestDetail> GetDetailAsync(VerifiedActor actor, Guid organizationId, Guid requestId, Guid correlationId, CancellationToken cancellationToken)
     {
         policy.RequireOperational();
         PlatformMembershipRequestDetail detail;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
-            var head = await PlatformJournal.LockHeadAsync(scope, clock, cancellationToken).ConfigureAwait(false);
+            // The organization row lock orders this audit append with every other event on the organization's audit stream; the
+            // platform head is only read (no platform event is written by a view).
+            var head = await scope.ReadPlatformJournalAsync(cancellationToken).ConfigureAwait(false) ?? new PlatformJournalHead();
             await journal.EnsureCurrentAsync(scope, head, requireAnchored: false, correlationId, cancellationToken).ConfigureAwait(false);
             var me = await PlatformOperatorAccess.ResolveActiveAsync(scope, actor, cancellationToken).ConfigureAwait(false);
-            var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false) ?? throw NotFound();
+            var state = await scope.LockOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false) ?? throw NotFound();
             var request = await scope.FindMembershipRequestAsync(organizationId, requestId, cancellationToken).ConfigureAwait(false) ?? throw NotFound();
             var now = clock.GetUtcNow();
             var context = await ContextAsync(scope, state, request, me, now, cancellationToken).ConfigureAwait(false);
@@ -110,11 +124,19 @@ public sealed class PlatformMembershipApprovalService(IAuthorityStore store, Pla
                 eligibility,
                 policy.Assurance,
                 correlationId);
-            PlatformJournal.Append(scope, head, "PlatformMembershipRequestViewed", new { platform_operator_id = me.PlatformOperatorId, organization_id = organizationId, membership_request_id = requestId, correlation_id = correlationId }, PlatformStateDelta.Of(), now);
-            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            AuditJournal.Append(scope, state, "PlatformMembershipRequestViewed", new
+            {
+                platform_operator_id = me.PlatformOperatorId,
+                operator_issuer_uri = me.OperatorIssuerUri,
+                operator_subject_identifier = me.OperatorSubjectIdentifier,
+                membership_request_id = requestId,
+                statement_sha256 = context.StatementSha256,
+                disclosed = DetailDisclosure,
+                correlation_id = correlationId,
+            }, clock);
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false); // fail closed: no committed audit event, no detail
         }
 
-        await registry.TryDeliverAsync(cancellationToken).ConfigureAwait(false);
         return detail;
     }
 

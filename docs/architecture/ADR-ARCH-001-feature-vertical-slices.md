@@ -22,7 +22,7 @@ public entrypoints only.
 | Every routed endpoint has exactly one `FeatureOwnerMetadata`; business routes live under `/api/v1` | `tests/features/EndpointOwnershipTests.cs` |
 | OpenAPI generated from compiled endpoints; committed artifact must match | build-time generation + `OpenApiSnapshotTests.cs` + CI `git diff --exit-code contracts/openapi` |
 | One EF mapping owner per table; descriptive multiword snake_case columns; `<singular>_id` keys | `ModelNamingValidator` + `DatabaseNamingTests.cs` (model is empty in Phase 0; rule tests run) |
-| Every PG-001..PG-069 screen has exactly one frontend owner and the matrix agrees with the design document | `FeatureOwnershipMatrixTests.cs` |
+| Every PG-001..PG-070 screen has exactly one frontend owner and the matrix agrees with the design document | `FeatureOwnershipMatrixTests.cs` |
 | No raw `fetch`/`axios` in features or UI packages; features import only other features' `index.ts`; UI packages have no business/API dependency | `src/frontend/eslint.config.js` |
 | No locally pinned NuGet versions (central pinning only) | `ProjectReferenceGraphTests.NoProjectPinsPackageVersionsLocally` |
 
