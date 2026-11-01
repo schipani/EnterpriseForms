@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { signIn, signOut } from "./support";
 
 /**
@@ -12,6 +12,61 @@ import { signIn, signOut } from "./support";
 test.describe.configure({ mode: "serial" });
 
 const run = Date.now().toString(36);
+
+/**
+ * Deterministic fixture (Stage 5): the "owns records" assertion below needs a persona that really owns a record, which a freshly
+ * created isolated stack does not have (the earlier version relied on records left behind by other specs). Everything goes through
+ * the supported API as the personas themselves, so the Authority authorizes each step: the owner (a designer) publishes a form that
+ * Riley Reader may use, Riley creates a record and so becomes its owner. Riley is also re-enabled if an earlier aborted run left
+ * the membership disabled (a disabled member's session is refused, so the owner does it with a reason and the development step-up).
+ */
+async function personaApi(newContext: () => Promise<APIRequestContext>, persona: string) {
+  const request = await newContext(); // one cookie jar per persona: a second login on the same jar needs the first session's CSRF token
+  const login = await request.post("/api/v1/session/development-login", { data: { personaKey: persona } });
+  expect(login.ok(), `development login of ${persona}: ${login.status()} ${await login.text()}`).toBeTruthy();
+  const csrf = ((await login.json()) as { csrfToken: string }).csrfToken;
+  let counter = 0;
+  const send = async (method: "POST" | "PUT" | "GET", path: string, data?: unknown) => {
+    const response = await request.fetch(path, { method, ...(data !== undefined ? { data } : {}), headers: method === "GET" ? {} : { "X-CSRF-Token": csrf, "Idempotency-Key": `pa-${run}-${persona}-${Date.now()}-${counter++}` } });
+    const text = await response.text();
+    expect(response.ok(), `${method} ${path}: ${response.status()} ${text}`).toBeTruthy();
+    return (text ? JSON.parse(text) : {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  };
+  return send;
+}
+
+async function ensureRileyOwnsARecordAndIsEnabled(newContext: () => Promise<APIRequestContext>) {
+  const owner = await personaApi(newContext, "owner");
+  const users = (await owner("GET", "/api/v1/users")) as unknown as Array<{ userId: string; displayName: string }>;
+  const riley = users.find((u) => u.displayName.includes("Riley Reader"))!.userId;
+  const members = await owner("GET", "/api/v1/organization/members?pageSize=15&q=Riley");
+  const rileyRow = (members["members"] as Array<{ userId: string; membershipState: string }>).find((m) => m.userId === riley);
+  if (rileyRow?.membershipState === "Disabled") {
+    await owner("POST", `/api/v1/organization/members/${riley}/enable`, { reason: `browser test ${run} restores the shared membership`, useDevelopmentStepUp: true });
+  }
+  const name = `People fixture ${run}`;
+  const created = await owner("POST", "/api/v1/form-definitions/designer", { formDefinitionName: name, formDefinitionDescription: "synthetic fixture", formUserUserIds: [riley], formUserTeamIds: [] });
+  const formId = created["summary"].formDefinitionId as string;
+  const added = await owner("POST", `/api/v1/form-definitions/${formId}/fields`, { fieldKey: "case_title", fieldDisplayName: "Case title", fieldDescription: "", fieldDataType: "String", options: null, groupDefinitionId: null });
+  const element = { kind: "field", fieldDefinitionId: added["fieldDefinitionId"], control: "text", label: "Case title", required: true, layout: { columnSpan: 2, startOnNewRow: false }, validation: {} };
+  const detail = await owner("GET", `/api/v1/form-definitions/${formId}`);
+  const draftRevision = detail["draft"] ? Number(detail["draft"].draftRevision) : 0;
+  const layout = { layoutSchemaVersion: 2, title: name, sections: [{ sectionKey: "main", title: "Case", gridColumns: 4, elements: [element] }] };
+  const saved = await owner("PUT", `/api/v1/form-definitions/${formId}/draft`, { expectedDraftRevision: draftRevision, layoutJson: JSON.stringify(layout) });
+  await owner("POST", `/api/v1/form-definitions/${formId}/publish`, { expectedDraftRevision: Number(saved["draftRevision"]), expectedCurrentVersionNumber: 0, changeReason: "synthetic people-administration fixture" });
+  const reader = await personaApi(newContext, "reader");
+  await reader("POST", `/api/v1/form-definitions/${formId}/records`, { values: { case_title: `Owned by Riley ${run}` }, ownerTeamId: null, groups: [] });
+}
+
+test.beforeAll(async ({ playwright, baseURL }) => {
+  const contexts: APIRequestContext[] = [];
+  await ensureRileyOwnsARecordAndIsEnabled(async () => {
+    const context = await playwright.request.newContext({ baseURL: baseURL! });
+    contexts.push(context);
+    return context;
+  });
+  await Promise.all(contexts.map((context) => context.dispose()));
+});
 
 async function axe(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();

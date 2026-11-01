@@ -242,6 +242,38 @@ public sealed class PlatformConsoleStackTests(StageBFixture fixture)
     }
 
     [Fact]
+    public async Task ASuspendedOperatorsPendingApprovalIsInvalidAndTheyCannotDecideThroughTheConsoleOrComplete()
+    {
+        var ids = await PlatformConsoleHarness.EnsureConsoleOperatorsAsync(fixture);
+        var s = new StageBScenario(fixture, "pc-suspended-decides");
+        await s.BootstrapAsync();
+        var requestId = await RequestAsync(s, "Console Suspended " + Guid.NewGuid().ToString("N")[..6]);
+        using var frankie = await ConsoleSession.SignInAsync(ConsoleSubjects[2]);
+        using var dana = await ConsoleSession.SignInAsync(ConsoleSubjects[0]);
+        Assert.Equal("AwaitingSecondApproval", (await DecideAsync(frankie, s, requestId)).Body.GetProperty("outcome").GetString());
+
+        await PlatformConsoleHarness.SuspendAsync(fixture, ids[2]);
+        try
+        {
+            // Suspension invalidated Frankie's pending approval; Frankie's own session cannot approve or reject any more.
+            Assert.Equal("Invalidated|OperatorSuspended", Sql($"SELECT approval_state_name || '|' || approval_closure_reason_name FROM platform_operator_approvals WHERE organization_membership_request_id = '{requestId:D}';"));
+            var refusedApprove = await frankie.SendAsync(HttpMethod.Post, RequestPath(s, requestId, "/approvals"), new { expectedStatementSha256 = new string('a', 64), justification = Justification });
+            Assert.Equal(HttpStatusCode.Forbidden, refusedApprove.Status);
+            Assert.Equal("PLATFORM_OPERATOR_NOT_ACTIVE", refusedApprove.Code);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await frankie.SendAsync(HttpMethod.Post, RequestPath(s, requestId, "/reject"), new { expectedStatementSha256 = new string('a', 64), justification = Justification })).Status); // the session is gone
+            // A second operator's approval does not complete the membership with the suspended operator's invalid approval.
+            var second = await DecideAsync(dana, s, requestId);
+            Assert.True(second.Status == HttpStatusCode.OK, second.Text);
+            Assert.Equal("AwaitingSecondApproval", second.Body.GetProperty("outcome").GetString());
+            Assert.Equal(0, Bindings(requestId));
+        }
+        finally
+        {
+            await PlatformConsoleHarness.ReinstateAsync(fixture, ids[2]);
+        }
+    }
+
+    [Fact]
     public async Task ArchiveOutageAndADetectedRollbackFailClosedThroughTheConsoleAndReplayReopensIt()
     {
         await PlatformConsoleHarness.EnsureConsoleOperatorsAsync(fixture);

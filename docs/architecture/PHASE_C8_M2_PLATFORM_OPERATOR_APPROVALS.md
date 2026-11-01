@@ -845,3 +845,63 @@ executed G14 recovery and an independent review.
 Tests (2026-11-01): Vitest 18 new (327/327 in the workspace); ESLint, `tsc` and production build clean; Playwright `e2e-console` **15/15** on the isolated stack — sign-in/out, session end, paging and filtering (17 requests, 15 + 2), request details, first/second approval in two browser contexts with Vault-signed evidence, duplicate approval refusal, withdraw, reject, request cancelled while open, keyboard operation and focus, axe (WCAG 2.2 AA tags) on sign-in, queue, details and dialog, 320/768/1440 px and 200 %/400 % zoom without horizontal page scroll. The Playwright config refuses the persistent console ports (8092, 8095, 5195) and the global setup proves the target is the sectest console. Real-stack suspended-operator behaviour stays covered by Stage 3 (`PlatformConsoleStackTests`); no browser test suspends an operator.
 
 Limits: synthetic evidence (PF-1, PF-2); the queue is a scrolling table at narrow widths, not cards; no NVDA/VoiceOver review yet; sessions in memory (PF-11); no production authentication. The legacy CLI approval remains (D8-42).
+
+---
+
+## 19. Stage 5 — integration and security verification (C-102, 2026-11-01)
+
+Stage 4 was accepted by the owner (functionality, not an independent review). Stage 5 added verification, one test fix and no Authority or BFF change.
+
+### 19.1 Status vocabulary
+
+| Level | What it means here | State |
+|---|---|---|
+| Implemented | Code exists and its own tests pass (Stages 1–4, Refresh fix) | Yes, Development/Testing only |
+| Owner-accepted | The owner reviewed and accepted the behaviour | Stage 4 UI; Stages 1–3 approved for implementation |
+| Development security verification | Targeted real-stack, unit and browser tests of the controls below, executed by the implementer | Done in this stage (§19.3) |
+| Independent security review | A reviewer who is not Claude or the owner (C-85) | **Not done** |
+| Production readiness | PB-08, PB-10, PB-11, PB-12, G14, review | **Not ready; none of these is complete** |
+
+### 19.2 Test results (2026-11-01)
+
+| Area | Result |
+|---|---|
+| People Playwright `people-administration` ("makes and removes a designer…") | Root cause fixed (below). Spec 3/3, **7 consecutive full-spec runs passed** after one unexplained failure of its second test in the very first run after the fix (not reproduced; evidence not retained). |
+| Cross-application Playwright (`playwright.cross.config.ts`, `e2e-cross`) | **2/2**, repeated **6 times**, all passed. The accepted workflow is reproduced on the isolated stack with the real API, Authority, PostgreSQL, SpiceDB and Vault signing; it **fails against the pre-fix People page** ("Awaiting operators" after Refresh) and passes with the fix. |
+| Platform Console Playwright (`e2e-console`) | 15/15 (previous run, unchanged code) |
+| Real-stack operator suites (`PlatformConsoleStackTests` 7, `PlatformOperatorApprovalTests` 4) | **11/11** (one new test) |
+| PF-10 stress | **40/40 passed** (focused repetitions of the AC-7.5 three-way race test) |
+| Frontend | ESLint clean, `tsc` clean, Vitest 332/332 |
+
+### 19.3 People Playwright failure: root cause
+
+The spec asserted that disabling "Riley Reader" is refused with "The person still owns records". That depended on records left behind by other specs on a long-lived isolated stack; on a freshly created stack Riley owns none, so the first execution **succeeded in disabling Riley** and aborted at the assertion, leaving the shared membership Disabled. Every later run then failed earlier, with no "Make designer" action for a disabled member (state contamination from the first failed run). It was an application-correct behaviour and a fixture defect, not an application defect, and it predates the Refresh change. Fix: a deterministic fixture (`beforeAll`) that goes only through the supported API as the personas themselves (the owner publishes a form Riley may use; Riley creates a record and so owns it; the owner re-enables Riley, with a reason and the development step-up, if an earlier aborted run left Riley disabled). No Authority authorization is bypassed; no timeout or assertion was changed.
+
+### 19.4 Operator security verification (development; synthetic evidence)
+
+Existing tests already established each behaviour; Stage 5 executed them and added one real-stack test. Synthetic operators never give real separation of duties (PF-1, PF-2); nothing below is two-person assurance.
+
+| Control | Evidence (executed) |
+|---|---|
+| Same operator cannot approve twice (also with a second session, and with fresh evidence) | `TwoIndependentOperatorsCreateTheMembership…` (real stack), `…ConsoleOperatorsApproveInSeparateSessions…`, Authority unit `TheSameOperatorCannotGiveBothApprovals…`, Vitest, Playwright |
+| Two different authenticated operator identities required | same tests; membership appears only after the second distinct operator (real stack, Playwright cross test) |
+| No impersonation (another operator's evidence, key, assertion; browser-supplied identity) | real stack (`OPERATOR_EVIDENCE_IDENTITY_MISMATCH`), Authority unit `AnOperatorCannotImpersonate…`, console `TheBrowserCannotSupplyAnOperatorIdentity…`, `ASigningKeyThatIsNotTheSessionOperatorsOwn…` |
+| Suspended operators cannot approve or reject, lose their sessions, and their pending approvals become invalid | Authority unit `ASuspendedOperatorCannotAct…`; real stack `ASuspendedOperatorsConsoleSessionEnds…` and **new** `ASuspendedOperatorsPendingApprovalIsInvalid…` (approval row `Invalidated\|OperatorSuspended`, console 403 then session gone, a second operator's approval does not complete the membership); console unit `AnOperatorSuspendedDuringTheSession…` |
+| Operator belonging to the organization (member, requester or requested person) cannot decide | Authority unit `AnOperatorWhoBelongsToTheOrganization…`; not reproducible on the real stack because the operator issuer can never equal an organization identity issuer (assertion validation), which is itself the separation |
+| Expired requests / expired approvals cannot be approved | Authority unit `APendingApprovalExpiresAfter24Hours…`, `ReplayedExpiredAndMisboundEvidence…`; console Vitest (expired request disables decisions). No real-stack test (the request lifetime is 7 days) |
+| Cancelled or replaced requests cannot be approved; the first approval is invalidated | real stack `AReplacedRequestInvalidatesTheFirstApproval…`, Authority unit `ReplacingOrCancelling…`; Playwright (request cancelled while open is refused) |
+| A change invalidates a reviewed fingerprint | console `NothingIsSignedForAStatementTheOperatorDidNotReview…` (real Authority: `APPROVAL_STATEMENT_CHANGED`), Vitest/Playwright changed-request flows |
+| CSRF and origin | console `StateChangingRequestsNeedTheSessionCsrfTokenAndAnAllowedOrigin`; dev check: foreign origin 403, POST without CSRF 403 |
+| Archive unavailable fails closed; rollback detection blocks privileged operations until replay | real stack `ArchiveOutageAndADetectedRollback…`, `ARestoreFromBeforeASuspension…`; Authority unit `AnUnreachableArchive…`, `ARestoredDatabaseCannot…` |
+
+### 19.5 PF-10
+
+The AC-7.5 three-way owner race test (`StaleAndConcurrentChangesLoseCleanlyAndValidationHolds`) passed **40 of 40** focused repetitions on the isolated stack (plus 21 of 21 in Stage 2 and every later run). Failure messages now name each racer's actor, status, code and body. **PF-10 remains open**: it is not reproduced and not explained; the original single failure had no captured body.
+
+### 19.6 Development integration (persistent stack, read-only checks)
+
+Business `http://127.0.0.1:8091` and Platform Console `http://127.0.0.1:8095/platform/sign-in` both serve. Verified: separate cookies (`ef-platform-console`, Secure, HttpOnly, SameSite=Strict, Path=/console-api; business `ef-session`), each cookie refused by the other site (401), console has no business routes (404), the business API container holds no console or operator-assertion credential (0 variables), the Authority holds distinct workload, console and operator-assertion credentials with different issuers, foreign origin and missing CSRF refused. The business web nginx returns its own SPA shell for `/console-api/...` (HTML, no console data). The queue showed 7 pending requests and People 6 members, 64 records: the owner's own acceptance testing had approved a request since Stage 3 (8 pending, 4 members before); nothing was decided or changed by this stage.
+
+### 19.7 Remaining production requirements
+
+PB-08 (Entra operator sign-in and transaction-bound FIDO2 step-up), Entra PIM, mTLS / workload identity for the console credential, PB-10 residency evidence, PB-11 separate security pipeline, PB-12 release evidence, WORM archive storage, executed G14 recovery of the platform journal, shared session store, TLS for the console, and an **independent security review**. None is complete; PF-1, PF-2, PF-10 to PF-14 remain as recorded.

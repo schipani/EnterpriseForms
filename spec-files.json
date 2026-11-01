@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "5b065dddefe7b7d855c7c9c8bd0e969917fbf7f207a7d386a2a4c1af7b2a3213",
-      "bytes": 66083
+      "sha256": "7abf05fa7101862010968f66b3d2685195ff61f7f50269deddfe6e2deda74308",
+      "bytes": 67213
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -199,8 +199,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md",
-      "sha256": "e378d9933ba6e61d0cc31b6baa36edccb38cdc07fb88d96aa88938588089a9b2",
-      "bytes": 84121
+      "sha256": "592a553e838ae4b11f7f21630bf20885fac7c475b6ddb17479e698d01b2718e2",
+      "bytes": 92014
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -294,8 +294,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "d4f06e38029377157e49cf5a1b94884875b1874aac1e6e4f3f3bbbddae3e4ba5",
-      "bytes": 157862
+      "sha256": "6c6ea4b71b2889ac1fcdab529db6d0c3233d04bd2b733264cbfa95fa0308af81",
+      "bytes": 158818
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
