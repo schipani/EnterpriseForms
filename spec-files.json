@@ -4,8 +4,8 @@
   "entries": [
     {
       "path": "CLAUDE-DESIGN.MD",
-      "sha256": "76e8c1079aae3701b12625de66649d74707a0d934916e588204febaf9d61f5a8",
-      "bytes": 168053
+      "sha256": "3848f79a59bb90153765153a7f2f1dea9b236984895bb2ec1d724a79b1dd333a",
+      "bytes": 168159
     },
     {
       "path": "CLAUDE.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "8ffb90879fe0d43af5e8cda25477a47149284e54d2a55d5b707dcc0854fb476e",
-      "bytes": 64121
+      "sha256": "7172e48308520cf98196fc12ed8e26e61a40060b87d1c004839ec36c6b30e07f",
+      "bytes": 64834
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "3fddafb819df4a97061690fbafb71ba831603fe2cb9a43e35a8c84b975694c6e",
-      "bytes": 15519
+      "sha256": "142f17c569d1f1abe3eedef6188da0d28ace1141aae7a7f4a91b3343290e773c",
+      "bytes": 15600
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -199,8 +199,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md",
-      "sha256": "f1aeaeca304e707b9b69ced48651e5828a8b5e6e0d7b8f092e26bbbd231317ed",
-      "bytes": 79550
+      "sha256": "e378d9933ba6e61d0cc31b6baa36edccb38cdc07fb88d96aa88938588089a9b2",
+      "bytes": 84121
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -294,8 +294,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "0f23b8b8ae5ab15cbd6eb37d3d9bb43b48b0c898e98d23b08a23c0acca43c9d3",
-      "bytes": 156540
+      "sha256": "d4f06e38029377157e49cf5a1b94884875b1874aac1e6e4f3f3bbbddae3e4ba5",
+      "bytes": 157862
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -359,8 +359,8 @@
     },
     {
       "path": "docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md",
-      "sha256": "e2e0e8ffd2ed1a71512fc3495176d5456f4f589856d550198a4914c5a0ca9b1b",
-      "bytes": 15280
+      "sha256": "50154dbca6f6e6fe4b1e41b5632099687d3a18e620af46191105897a76c791e4",
+      "bytes": 15495
     },
     {
       "path": "docs/infrastructure/PB05_DEPLOYMENT_BLUEPRINT.md",
@@ -614,8 +614,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "eaf3013cd74e6e5d563e3e50ca45e1d62f6506b362c4992f594a1bf3b1bcdcca",
-      "bytes": 102362
+      "sha256": "6d607d2420889c198c3314ad4dfd857ed305d6b790134500f378faf743bb9e3d",
+      "bytes": 102690
     },
     {
       "path": "scripts/generate-spec-manifest.py",

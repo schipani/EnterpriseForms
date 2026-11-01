@@ -141,6 +141,11 @@ services:
       PlatformConsole__AllowedOrigins__1: http://localhost:${DEVSTACK_CONSOLE_PORT:-8092}
       PlatformConsole__AllowedOrigins__2: http://127.0.0.1:5174
       PlatformConsole__AllowedOrigins__3: http://localhost:5174
+      # Stage 4: the console web app (nginx container, DEVSTACK_CONSOLE_WEB_PORT) and its Vite dev server (PLATFORM_CONSOLE_PORT).
+      PlatformConsole__AllowedOrigins__4: http://127.0.0.1:${DEVSTACK_CONSOLE_WEB_PORT:-8095}
+      PlatformConsole__AllowedOrigins__5: http://localhost:${DEVSTACK_CONSOLE_WEB_PORT:-8095}
+      PlatformConsole__AllowedOrigins__6: http://127.0.0.1:5195
+      PlatformConsole__AllowedOrigins__7: http://localhost:5195
       PlatformConsole__Authority__BaseAddress: http://authority:8080
       PlatformConsole__Authority__WorkloadName: platform-console-dev
       PlatformConsole__Authority__ConsoleCredential__Issuer: ${DEVSTACK_PLATFORM_CONSOLE_ISSUER:-}
@@ -170,6 +175,19 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+
+  platform-console-web:
+    # C8 M2 Stage 4 (C-100): the Platform Console web app, DEVELOPMENT ONLY. A separate site from the business web app (own image,
+    # origin and port); nginx proxies /console-api to the BFF over platform-edge. Requires `devstack.py platform-console init`.
+    image: enterpriseforms/platform-console-web:dev
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.platform-console-web
+    depends_on:
+      platform-console:
+        condition: service_healthy
+    networks: [platform-edge]
+    ports: ["127.0.0.1:${DEVSTACK_CONSOLE_WEB_PORT:-8095}:8080"]
 
 volumes:
   business-db-data: {}

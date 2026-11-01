@@ -476,3 +476,6 @@ PF-10 stays open; the race test now reports every racer's actor, status, code an
 Playwright UI tests (no UI yet), hosted CI. Production remains closed. The legacy CLI approval path is retained (D8-42: retire only
 after the Stage 4 console passes its real-stack tests). Next: Stage 4 (`apps/platform-console`), awaiting the owner's go-ahead.
 
+## 22. Platform Console Stage 4 — web app (2026-11-01, C-100) — Development/Testing, not merged, not independently reviewed
+
+`apps/platform-console` is built and served by `platform-console-web` at `http://127.0.0.1:8095/platform/sign-in` (BFF `:8092`): operator sign-in, PG-070 Operator approvals queue, Review details, approve/withdraw/reject. Details and limits: `docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` §18. Tests: Vitest 18 new (327 total), ESLint/tsc/build clean, Playwright `e2e-console` 15/15 on the isolated stack; the dev queue was only read (no request opened, none decided). Not done: legacy CLI retirement, M3, merge, production authentication, human screen-reader review.

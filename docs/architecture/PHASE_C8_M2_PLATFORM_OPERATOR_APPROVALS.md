@@ -824,3 +824,24 @@ use separate browser contexts for the two-operator Playwright flow on the isolat
 Port 5174 was occupied on this workstation by an existing Vite process (PF-14). Still open before any production use: PB-08 Entra
 operator sign-in and transaction-bound step-up, PIM, mTLS/workload identity, WORM archive, shared session store, PB-11/PB-12, PB-10,
 executed G14 recovery and an independent review.
+
+---
+
+## 18. Stage 4 — Platform Console web app (C-100, 2026-11-01)
+
+`src/frontend/apps/platform-console` (React 19, TypeScript, Tailwind v4 with the shared `@enterpriseforms/ui` and design tokens; TanStack Query; no business package, enforced by ESLint). A **separate site**: own origin, own cookie, no shared session with the business app. It uses only the committed contract `contracts/openapi/platform-console-v1.json` (types generated into `src/api/generated`, checked for drift in CI); no new endpoints.
+
+| Area | Delivered |
+|---|---|
+| Sign-in `/platform/sign-in` | Lists the configured synthetic operators (dev: Morgan, Quinn, Rowan) from the BFF; one click signs in (the BFF verifies identity and key). Notice and banner "Development/Test operator — synthetic approval evidence"; never implies independent human approval. |
+| Shell | "Platform Console" header identity (near-black band, "PC" mark, no organization selector), development banner on every page, operator name and session info (idle expiry tracked locally from the last response, absolute expiry from the BFF), Sign out. |
+| Operator approvals `/platform/approvals` (PG-070) | Search (debounced), status filter, server-side cursor paging 15 per page with Previous/Next and "Showing a–b of N", newest first (the Authority's order), columns: organization, requested person with verified identity summary, role, requested, expires, approval progress chip, Review details. No requester identity in the list. |
+| Review details `/platform/approvals/{org}/{request}` | Organization, requested member and verified identity, role, requesting owner, owner's justification, submitted/expires, status, consequences, recorded approvals with justifications ("You" marked), Authority fingerprint (16 hex, full value and statement on expand), decision panel. |
+| Decisions | Approve, Reject, Withdraw my approval each need the operator's own justification (10–500) and a confirmation dialog repeating the request and fingerprint with an explicit "I have reviewed…" checkbox; the browser sends only `{expectedStatementSha256, justification}`; success text ("Approval recorded — 1 of 2", "Membership approved — 2 of 2", "Approval withdrawn", "Request rejected") appears only from the BFF's confirmed response and the request is then re-read from the Authority. Disabled actions say why (already approved, expired, not pending). No evidence, key or operator identity exists in the browser. |
+| Errors | 401 session ended (back to sign-in with notice), 403 operator no longer active, 409 changed/expired/not pending (nothing recorded, reload prompt, the current request is re-read), 423/503 fail-closed messages for the archive, 5xx/network "service unavailable"; CSRF/origin refusals ask for a reload. |
+| Session and storage | BFF cookie only; CSRF token in memory (from sign-in and `GET /session`); no local/session storage or readable cookie (tested). A client timer returns to sign-in at the idle/absolute deadline without polling (so it never keeps the session alive); the cache is cleared on sign-out. |
+| Hosting | Dev: `platform-console-web` (nginx; `/console-api` proxied to the BFF over `platform-edge`; SPA only under `/platform`) on `http://127.0.0.1:8095`; Vite dev server on 5195 (`PLATFORM_CONSOLE_PORT`) — the BFF's allowed origins now include both. The 5174 port conflict (an unrelated Vite process) was left alone. Isolated Playwright: Vite on 5198 proxying to the sectest console 5192 (allowed origin added). |
+
+Tests (2026-11-01): Vitest 18 new (327/327 in the workspace); ESLint, `tsc` and production build clean; Playwright `e2e-console` **15/15** on the isolated stack — sign-in/out, session end, paging and filtering (17 requests, 15 + 2), request details, first/second approval in two browser contexts with Vault-signed evidence, duplicate approval refusal, withdraw, reject, request cancelled while open, keyboard operation and focus, axe (WCAG 2.2 AA tags) on sign-in, queue, details and dialog, 320/768/1440 px and 200 %/400 % zoom without horizontal page scroll. The Playwright config refuses the persistent console ports (8092, 8095, 5195) and the global setup proves the target is the sectest console. Real-stack suspended-operator behaviour stays covered by Stage 3 (`PlatformConsoleStackTests`); no browser test suspends an operator.
+
+Limits: synthetic evidence (PF-1, PF-2); the queue is a scrolling table at narrow widths, not cards; no NVDA/VoiceOver review yet; sessions in memory (PF-11); no production authentication. The legacy CLI approval remains (D8-42).

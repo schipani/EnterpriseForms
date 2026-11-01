@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import "@enterpriseforms/design-tokens/tokens.css";
+
+/* Same Tailwind v4 bridge to the approved tokens as the business app; the Platform Console only adds its own header identity. */
+@theme {
+  --color-primary: var(--ui-primary-bg);
+  --color-primary-foreground: var(--ui-primary-fg);
+  --color-secondary: var(--ui-secondary-bg);
+  --color-secondary-foreground: var(--ui-secondary-fg);
+  --color-secondary-border: var(--ui-secondary-border);
+  --color-page: var(--ui-page);
+  --color-surface: var(--ui-surface);
+  --color-body: var(--ui-body-text);
+  --color-muted: var(--ui-muted-text);
+  --color-line: var(--ui-border);
+  --color-input: var(--ui-input-border);
+  --color-focus: var(--ui-focus);
+  --color-danger: var(--ui-danger-text);
+
+  --font-sans: var(--ui-font-family);
+  --spacing-control: var(--ui-control-height);
+  --spacing-control-compact: var(--ui-control-height-compact);
+  --radius-control: var(--ui-control-radius);
+  --radius-panel: var(--ui-panel-radius);
+  --text-control: var(--ui-text-control);
+  --text-control--line-height: 1.25rem;
+  --text-label: var(--ui-text-label);
+  --text-label--line-height: 1.25rem;
+  --text-help: var(--ui-text-help);
+  --text-help--line-height: 1.125rem;
+}
+
+@source "../../../../packages/ui/src";
+
+html {
+  font-size: calc(100% * var(--ui-font-scale));
+}
+
+body {
+  margin: 0;
+  background: var(--ui-page);
+  color: var(--ui-body-text);
+  font-family: var(--ui-font-family);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}

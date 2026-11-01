@@ -11,7 +11,7 @@ passed on a command line or written into the working tree.
     python scripts/devstack/devstack.py unseal               # unseal only (e.g. after `docker restart` of vault)
     python scripts/devstack/devstack.py status
     python scripts/devstack/devstack.py stop                 # stop containers; volumes are kept
-    python scripts/devstack/devstack.py rebuild [authority api worker web]  # new application images; Vault and data untouched
+    python scripts/devstack/devstack.py rebuild [authority api worker web platform-console platform-console-web]  # new application images; Vault and data untouched
     python scripts/devstack/devstack.py backup               # consistent cold backup of every volume of the project
     python scripts/devstack/devstack.py restore-test DIR     # restore a backup into a DISPOSABLE project and verify it
     python scripts/devstack/devstack.py verify-persistence   # restart/kill/stop-start proofs against the live stack
@@ -190,7 +190,7 @@ class Stack:
 
     def long_running(self) -> list[str]:
         """LONG_RUNNING plus the Platform Console when it has been initialized for this project."""
-        return [*LONG_RUNNING, "platform-console"] if load_console(self.project) else list(LONG_RUNNING)
+        return [*LONG_RUNNING, "platform-console", "platform-console-web"] if load_console(self.project) else list(LONG_RUNNING)
 
     def compose(self, *args: str, input_text: str | None = None, check: bool = True, timeout: int | None = 900) -> subprocess.CompletedProcess:
         command = ["docker", "compose", "-p", self.project, "-f", "compose.yaml", "-f", "compose.dev-persistent.yaml", "--env-file", ".env", *args]
@@ -576,17 +576,18 @@ def cmd_unseal(args) -> None:
     print("[unseal] vault unsealed")
 
 
-APPLICATION_SERVICES = ("authority", "api", "worker", "web", "platform-console")
+CONSOLE_SERVICES = ("platform-console", "platform-console-web")
+APPLICATION_SERVICES = ("authority", "api", "worker", "web", *CONSOLE_SERVICES)
 
 
 def cmd_rebuild(args) -> None:
     """Rebuilds application images from the working tree and recreates only those containers (no dependencies): Vault,
     the databases, SpiceDB and their volumes are not restarted. The authority and api migrations run first (idempotent)."""
-    services = args.services or [s for s in APPLICATION_SERVICES if s != "platform-console" or load_console(args.project)]
+    services = args.services or [s for s in APPLICATION_SERVICES if s not in CONSOLE_SERVICES or load_console(args.project)]
     unknown = [s for s in services if s not in APPLICATION_SERVICES]
     if unknown:
         raise DevStackError(f"rebuild only recreates application services {APPLICATION_SERVICES}; refused: {unknown}")
-    if "platform-console" in services and not load_console(args.project):
+    if any(s in CONSOLE_SERVICES for s in services) and not load_console(args.project):
         raise DevStackError("the Platform Console is not initialized for this project; run `devstack.py platform-console init`")
     stack = Stack(args.project, load_custody(args.project))
     if stack.vault_status() != "unsealed":
@@ -1512,7 +1513,7 @@ def cmd_platform_console(args) -> None:
     evidence["backup"] = record["backup"]
 
     # 3. Additive migration (idempotent EF migration run by the one-shot authority-migrate container).
-    stack.compose("build", "authority", "platform-console", "dev-seed", timeout=3600)
+    stack.compose("build", "authority", "platform-console", "platform-console-web", "dev-seed", timeout=3600)
     if not migrated:
         stack.compose("up", "--no-deps", "--force-recreate", "--exit-code-from", "authority-migrate", "authority-migrate", timeout=900)
         if not console_migration_applied(stack):
@@ -1601,7 +1602,7 @@ def cmd_platform_console(args) -> None:
 
     # 8. Start the console and prove sessions are bound to the registered operators.
     stack = Stack(args.project, load_custody(args.project))
-    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "platform-console", timeout=900)
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "platform-console", "platform-console-web", timeout=900)
     evidence["health"] = wait_console(stack)
     evidence["sessions"] = verify_console_sessions(stack, active)
     record.update({"activated_on": dt.datetime.now(dt.timezone.utc).isoformat(), "operators": active, "migration": CONSOLE_MIGRATION})
@@ -1610,7 +1611,8 @@ def cmd_platform_console(args) -> None:
     save_state(args.project, state)
     evidence["finished_on"] = dt.datetime.now(dt.timezone.utc).isoformat()
     write_evidence(args.project, "platform-console-init", evidence)
-    print(f"[platform-console] ready: http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_PORT', '8092')}/console-api (synthetic development operators; not two-person evidence)")
+    print(f"[platform-console] BFF ready: http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_PORT', '8092')}/console-api (synthetic development operators; not two-person evidence)")
+    print(f"[platform-console] web app: http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_WEB_PORT', '8095')}/platform/sign-in")
 
 
 def main() -> int:

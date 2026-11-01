@@ -107,6 +107,9 @@ services:
       PlatformConsole__Mode: SyntheticDevelopment
       PlatformConsole__AllowedOrigins__0: http://127.0.0.1:5192
       PlatformConsole__AllowedOrigins__1: http://localhost:5192
+      # Stage 4 Playwright: the Vite dev server Playwright starts for the console app proxies to this console (E2E_CONSOLE_PORT).
+      PlatformConsole__AllowedOrigins__2: http://127.0.0.1:5198
+      PlatformConsole__AllowedOrigins__3: http://localhost:5198
       PlatformConsole__Authority__BaseAddress: http://authority:8080
       PlatformConsole__Authority__WorkloadName: platform-console-sectest
       PlatformConsole__Authority__ConsoleCredential__Issuer: enterpriseforms-platform-console

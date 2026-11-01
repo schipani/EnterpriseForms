@@ -49,6 +49,27 @@ export default tseslint.config(
     },
   },
   {
+    // Platform Console (C8 M2 Stage 4): a separate website. It may use the shared UI and design tokens only; no business
+    // packages, no request coordinator, and network access exists in exactly one module (src/api/client.ts).
+    files: ["apps/platform-console/src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-globals": ["error", { name: "fetch", message: "Only apps/platform-console/src/api/client.ts talks to the network." }, { name: "XMLHttpRequest", message: transportMessage }, { name: "localStorage", message: "The console stores nothing in the browser (no tokens, CSRF secrets or evidence)." }, { name: "sessionStorage", message: "The console stores nothing in the browser (no tokens, CSRF secrets or evidence)." }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["axios", "ky", "got", "node-fetch", "undici"], message: transportMessage },
+            { group: ["@enterpriseforms/api-client", "@enterpriseforms/app-runtime", "@enterpriseforms/work-queue", "@enterpriseforms/upload-manager", "@enterpriseforms/form-designer", "@enterpriseforms/form-renderer", "**/apps/web/**"], message: "The Platform Console is a separate site: shared UI and design tokens only, never business packages." },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["apps/platform-console/src/api/client.ts"],
+    rules: { "no-restricted-globals": ["error", { name: "localStorage", message: "No browser storage." }, { name: "sessionStorage", message: "No browser storage." }] },
+  },
+  {
     // App shell composes feature public exports only.
     files: ["apps/web/src/app/**/*.{ts,tsx}"],
     rules: {
