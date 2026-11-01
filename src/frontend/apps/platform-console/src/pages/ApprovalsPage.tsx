@@ -1,6 +1,6 @@
-import { Badge, Button, DataTable, EmptyState, LoadingBlock, Pager, Select, StatusMessage, TextInput, useDebouncedValue, type DataTableColumn } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, EmptyState, LoadingBlock, Pager, Select, StatusMessage, TextInput, useDebouncedValue, type DataTableColumn } from "@enterpriseforms/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { consoleApi, type RequestItem } from "../api/client";
 import { describeError } from "../app/errors";
 import { approvalChip, formatDateTime, identitySummary, roleLabel, statusFilters } from "../app/format";
@@ -8,6 +8,57 @@ import { navigate, reviewPath } from "../app/router";
 import { useConsoleSession } from "../app/session";
 
 export const PAGE_SIZE = 15;
+
+/** Below this width the queue is shown as cards instead of a table (no horizontal scrolling table on phones). */
+export const CARD_BREAKPOINT = 768;
+const narrowQuery = `(max-width: ${CARD_BREAKPOINT - 1}px)`;
+function useNarrowViewport(): boolean {
+  return useSyncExternalStore(
+    (notify) => {
+      if (typeof window.matchMedia !== "function") return () => undefined;
+      const media = window.matchMedia(narrowQuery);
+      media.addEventListener("change", notify);
+      return () => media.removeEventListener("change", notify);
+    },
+    () => (typeof window.matchMedia === "function" ? window.matchMedia(narrowQuery).matches : false),
+    () => false,
+  );
+}
+
+/** One request as a card: the same facts and the same Review details action as a table row, in reading order. */
+function RequestCard({ r }: { r: RequestItem }) {
+  const identity = identitySummary(r.target);
+  const chip = approvalChip(r);
+  return (
+    <li>
+      <Card as="article" aria-label={`${r.displayNameHint}, ${r.organizationDisplayName}`}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="break-words font-semibold">{r.displayNameHint}</p>
+            <p className="break-words text-help text-muted">
+              {identity.subject}
+              {identity.issuer ? ` · ${identity.issuer}` : ""}
+            </p>
+          </div>
+          <Badge tone={chip.tone}>{chip.text}</Badge>
+        </div>
+        <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
+          <dt className="text-muted">Organization</dt>
+          <dd className="break-words">{r.organizationDisplayName}</dd>
+          <dt className="text-muted">Requested role</dt>
+          <dd>{roleLabel(r.initialRoleName)}</dd>
+          <dt className="text-muted">Requested</dt>
+          <dd>{formatDateTime(r.requestedOn)}</dd>
+          <dt className="text-muted">Expires</dt>
+          <dd>{formatDateTime(r.expiresOn)}</dd>
+        </dl>
+        <Button variant="secondary" size="sm" className="self-start" aria-label={`Review details for ${r.displayNameHint} in ${r.organizationDisplayName}`} onClick={() => navigate(reviewPath(r.organizationId, r.requestId))}>
+          Review details
+        </Button>
+      </Card>
+    </li>
+  );
+}
 
 /** PG-070 Operator approvals: the cross-organization membership-request queue. Paging, search and filtering are the Authority's (server-side, cursor-based, newest first). */
 export function ApprovalsPage() {
@@ -19,6 +70,7 @@ export function ApprovalsPage() {
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const q = useDebouncedValue(search.trim());
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const narrow = useNarrowViewport();
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -127,7 +179,15 @@ export function ApprovalsPage() {
               {status === "needs_decision" && !q ? "New membership requests appear here when an organization owner submits them." : "Change the search or status filter."}
             </EmptyState>
           ) : (
-            <DataTable caption="Membership requests" columns={columns} rows={page.items} rowKey={(r) => r.requestId} />
+            narrow ? (
+              <ul aria-label="Membership requests" className="flex list-none flex-col gap-3 p-0">
+                {page.items.map((r) => (
+                  <RequestCard key={r.requestId} r={r} />
+                ))}
+              </ul>
+            ) : (
+              <DataTable caption="Membership requests" columns={columns} rows={page.items} rowKey={(r) => r.requestId} />
+            )
           )}
           <Pager
             label="Membership request pages"

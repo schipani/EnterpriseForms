@@ -240,6 +240,28 @@ describe("Operator approvals queue", () => {
   });
 });
 
+describe("Queue on narrow screens", () => {
+  it("shows cards instead of a table below 768px, with the same facts and Review details action", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }));
+    installFetch((c) => (c.path === "/session" ? { status: 200, body: sessionBody() } : c.path.startsWith("/membership-requests") ? { status: 200, body: page([item(1), item(2, { approvalStatus: { recorded: 1, required: 2, approvedByMe: false, awaitingOtherOperator: true, pendingApprovalExpiresOn: null } })], { totalCount: 17, nextCursor: "c2" }) } : undefined));
+    render(<App />);
+    const list = await screen.findByRole("list", { name: "Membership requests" });
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    const cards = within(list).getAllByRole("article");
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toHaveTextContent("Person 1");
+    expect(cards[0]).toHaveTextContent("person-1 · test-idp.enterpriseforms.invalid");
+    expect(cards[0]).toHaveTextContent("Northwind Crown Office (synthetic)");
+    expect(cards[0]).toHaveTextContent("Designer");
+    expect(cards[1]).toHaveTextContent("1 of 2 · awaiting another operator");
+    expect(within(cards[0]!).getByRole("button", { name: /^Review details for Person 1/ })).toBeInTheDocument();
+    expect(screen.getByText(/Showing 1–2 of 17 requests/)).toBeInTheDocument(); // pagination is unchanged
+    expect(screen.getByRole("searchbox", { name: /Search/ })).toBeInTheDocument();
+    await userEvent.setup().click(within(cards[0]!).getByRole("button", { name: /^Review details/ }));
+    expect(window.location.pathname).toContain("/platform/approvals/");
+  });
+});
+
 describe("Review details and decisions", () => {
   const request = item(1);
   const path = `/platform/approvals/${ORG}/${request.requestId}`;

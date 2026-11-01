@@ -18,6 +18,14 @@ for (const width of widths) {
     await expect(page.getByRole("heading", { name: "Operator approvals", level: 1 })).toBeVisible();
     await filterQueue(page, person);
     await expect(page.getByRole("button", { name: /^Review details for/ })).toHaveCount(1);
+    // below 768px the queue is cards, from 768px a table
+    if (width < 768) {
+      await expect(page.getByRole("list", { name: "Membership requests" })).toBeVisible();
+      await expect(page.getByRole("table")).toHaveCount(0);
+      await expect(page.getByRole("article")).toHaveCount(1);
+    } else {
+      await expect(page.getByRole("table", { name: "Membership requests" })).toBeVisible();
+    }
     await expectNoHorizontalPageScroll(page);
     await expectNoAxeViolations(page, `queue ${width}`);
     await openReview(page, person);

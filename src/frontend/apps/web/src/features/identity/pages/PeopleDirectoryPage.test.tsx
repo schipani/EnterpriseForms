@@ -296,6 +296,90 @@ describe("PeopleDirectoryPage", () => {
     await waitFor(() => expect(api.organization.ownerProposals).toHaveBeenLastCalledWith({ pageSize: 5, q: "Target 3" }, expect.anything()));
   });
 
+  describe("Refresh (a request decided outside the app)", () => {
+    const pending = () => ({ ...directory([]).membershipRequests[0]!, requestId: "r-ext", displayNameHint: "Nia External" });
+    const approved = () => ({ ...pending(), requestState: "Approved", decidedOn: "2026-11-01T09:00:00Z", canChange: false });
+    const refreshButton = () => screen.getByRole("button", { name: "Refresh People" });
+
+    it("shows Approved, the new member and updated actions after Refresh, without navigating, keeping search, filter and page", async () => {
+      let decided = false;
+      api.organization.membershipRequests.mockImplementation((query: { continuationToken?: string }) =>
+        Promise.resolve(approvalPage([decided ? approved() : pending()], { totalCount: 6, pageStart: query.continuationToken ? 6 : 1, nextToken: query.continuationToken ? null : "next-r", previousToken: query.continuationToken ? "back-r" : null })),
+      );
+      api.organization.members.mockImplementation(() =>
+        Promise.resolve({ result: directory(decided ? [person(1), person(2, { displayName: "Nia External" })] : [person(1)], { totalCount: decided ? 2 : 1 }) }),
+      );
+      renderPage();
+      const row = async () => within(await screen.findByRole("table", { name: "Membership requests list" })).getByRole("row", { name: /Nia External/ });
+      expect(await row()).toHaveTextContent(/Awaiting operators/);
+      // a search on the requests list and a later page are in effect
+      fireEvent.change(screen.getByLabelText("Search requests"), { target: { value: "Nia" } });
+      await waitFor(() => expect(api.organization.membershipRequests).toHaveBeenLastCalledWith({ pageSize: 5, q: "Nia" }, expect.anything()));
+      fireEvent.click(within(await screen.findByRole("navigation", { name: "Membership requests pages" })).getByRole("button", { name: "Next" }));
+      await waitFor(() => expect(api.organization.membershipRequests).toHaveBeenLastCalledWith({ pageSize: 5, q: "Nia", continuationToken: "next-r" }, expect.anything()));
+
+      decided = true; // the Platform Console approves it
+      const before = { members: api.organization.members.mock.calls.length, proposals: api.organization.ownerProposals.mock.calls.length, requests: api.organization.membershipRequests.mock.calls.length };
+      fireEvent.click(refreshButton());
+      await waitFor(() => expect(within(screen.getByRole("table", { name: "Membership requests list" })).getByRole("row", { name: /Nia External/ })).toHaveTextContent(/Approved/));
+      // both approval lists and the directory were re-read, with the current parameters
+      expect(api.organization.members.mock.calls.length).toBeGreaterThan(before.members);
+      expect(api.organization.ownerProposals.mock.calls.length).toBeGreaterThan(before.proposals);
+      expect(api.organization.membershipRequests.mock.calls.length).toBeGreaterThan(before.requests);
+      expect(api.organization.membershipRequests).toHaveBeenLastCalledWith({ pageSize: 5, q: "Nia", continuationToken: "next-r" }, expect.anything());
+      expect(screen.getByLabelText("Search requests")).toHaveValue("Nia");
+      // actions follow the new status: an approved request no longer offers Edit or Cancel
+      await userEvent.setup().click(within(screen.getByRole("table", { name: "Membership requests list" })).getByRole("button", { name: "Actions for Nia External" }));
+      expect(await screen.findByRole("menuitem", { name: /View details/ })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: /Cancel request/ })).not.toBeInTheDocument();
+      // the newly approved member is listed
+      expect(await screen.findByText(/Updated /)).toBeInTheDocument();
+      expect(screen.getByText("People (2)")).toBeInTheDocument();
+    });
+
+    it("shows a busy Refresh button while it loads", async () => {
+      renderPage();
+      await screen.findByText("Person 01");
+      let release!: () => void;
+      api.organization.members.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ result: directory([person(1)]) }); }));
+      fireEvent.click(refreshButton());
+      await waitFor(() => expect(refreshButton()).toHaveAttribute("aria-busy", "true"));
+      await waitFor(() => expect(release).toBeTypeOf("function"));
+      release();
+      await waitFor(() => expect(refreshButton()).not.toHaveAttribute("aria-busy", "true"));
+    });
+
+    it("reports a failed refresh instead of presenting stale data as current", async () => {
+      renderPage();
+      await screen.findByText("Person 01");
+      api.organization.membershipRequests.mockRejectedValueOnce(new OperationError({ kind: "unavailable", message: "down", status: 503 } as never));
+      fireEvent.click(refreshButton());
+      expect(await screen.findByText("Refresh failed")).toBeInTheDocument();
+      expect(screen.getByText(/may be out of date/)).toBeInTheDocument();
+      expect(screen.queryByText(/Updated /)).not.toBeInTheDocument();
+      fireEvent.click(within(screen.getByText("Refresh failed").closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(screen.queryByText("Refresh failed")).not.toBeInTheDocument());
+    });
+
+    it("cannot start overlapping refreshes, and a slow response is applied only to its own query (an older response never overwrites a newer one)", async () => {
+      renderPage();
+      await screen.findByText("Person 01");
+      const resolvers: Array<(value: unknown) => void> = [];
+      api.organization.membershipRequests.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)));
+      fireEvent.click(refreshButton());
+      await waitFor(() => expect(resolvers.length).toBe(1));
+      expect(refreshButton()).toBeDisabled(); // a second click cannot supersede or duplicate the in-flight refresh
+      // while it is slow, the owner changes the filter: that is a different query, answered separately
+      fireEvent.change(screen.getByLabelText("Search requests"), { target: { value: "Nia" } });
+      await waitFor(() => expect(resolvers.length).toBe(2));
+      resolvers[1]!(approvalPage([approved()]));
+      await waitFor(() => expect(screen.getByRole("row", { name: /Nia External/ })).toHaveTextContent(/Approved/));
+      resolvers[0]!(approvalPage([pending()])); // the older, unfiltered response arrives last
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByRole("row", { name: /Nia External/ })).toHaveTextContent(/Approved/);
+    });
+  });
+
   it("shows empty states for the approval lists", async () => {
     api.organization.ownerProposals.mockResolvedValue(approvalPage([]));
     api.organization.membershipRequests.mockResolvedValue(approvalPage([]));

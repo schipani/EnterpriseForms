@@ -1,7 +1,7 @@
 import type { OrganizationMemberQuery } from "@enterpriseforms/api-client";
 import { presentError, useApi, usePresence, useSession } from "@enterpriseforms/app-runtime";
 import { ActionIcons, Button, Card, LoadingBlock, Pager, Select, StatusMessage, TextInput, useDebouncedValue } from "@enterpriseforms/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { OrganizationLayout } from "../../organizations";
 import { ErrorPanel } from "../../support";
@@ -31,6 +31,7 @@ const filterGrid = "grid items-start gap-x-3 gap-y-2 sm:grid-cols-3";
 export function PeopleDirectoryPage() {
   const api = useApi();
   const session = useSession();
+  const queryClient = useQueryClient();
   const allowed = session.hasCapability("organization.manage") || session.hasCapability("security.administer");
   const [text, setText] = useState("");
   const [role, setRole] = useState("all");
@@ -42,6 +43,9 @@ export function PeopleDirectoryPage() {
   const [newRequest, setNewRequest] = useState<{ subject: string; name: string; role: string | null } | undefined>(undefined);
   const [editing, setEditing] = useState<OrganizationMemberResponse | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const settled = useDebouncedValue(text);
   const query: OrganizationMemberQuery = {
     pageSize: PEOPLE_PAGE_SIZE,
@@ -56,6 +60,26 @@ export function PeopleDirectoryPage() {
     enabled: allowed,
     placeholderData: (previous) => previous,
   });
+  /**
+   * Refresh re-reads everything on this page from the backend, not just the directory: every active "organization" query
+   * (the People directory and both approval lists) is refetched with its current search, status filter and cursor. A request
+   * decided elsewhere (the Platform Console) therefore shows its new status and the new member appears. TanStack Query cancels
+   * a superseded in-flight fetch, so an older response can never overwrite a newer one. A failure is reported, and the data
+   * on screen is not presented as current.
+   */
+  const refreshAll = async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      await queryClient.refetchQueries({ queryKey: ["organization"], type: "active" }, { throwOnError: true });
+      setRefreshedAt(new Date());
+    } catch (error) {
+      const presented = presentError(error);
+      setRefreshError(`${presented.title}${presented.detail ? ` (${presented.detail})` : ""}.`);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const errorCode = directory.error ? presentError(directory.error).code : null;
   useEffect(() => {
     if (errorCode && RESTART_CODES.has(errorCode) && cursor) {
@@ -78,7 +102,12 @@ export function PeopleDirectoryPage() {
       lead="Everyone in this organization, as the Authorization Authority knows them."
       actions={
         <>
-          <Button size="sm" variant="ghost" icon={ActionIcons.refresh} busy={directory.isFetching} aria-label="Refresh People" onClick={() => void directory.refetch()}>
+          {refreshedAt && !refreshError ? (
+            <span className="self-center text-help text-muted" aria-live="polite">
+              Updated {refreshedAt.toLocaleTimeString()}
+            </span>
+          ) : null}
+          <Button size="sm" variant="ghost" icon={ActionIcons.refresh} busy={refreshing} aria-label="Refresh People" onClick={() => void refreshAll()}>
             Refresh
           </Button>
           {data?.canManageMembers ? (
@@ -89,6 +118,11 @@ export function PeopleDirectoryPage() {
         </>
       }
     >
+      {refreshError ? (
+        <StatusMessage tone="danger" title="Refresh failed" actions={<Button size="sm" variant="secondary" onClick={() => void refreshAll()}>Try again</Button>}>
+          {refreshError} What is shown below may be out of date.
+        </StatusMessage>
+      ) : null}
       {done !== null ? (
         <StatusMessage
           tone="success"
