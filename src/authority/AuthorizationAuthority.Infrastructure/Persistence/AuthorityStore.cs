@@ -482,6 +482,94 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<int> CountOrganizationsBindingIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) =>
             context.IdentityBindings.AsNoTracking().Where(b => b.IdentityIssuerUri == issuerUri && b.IdentitySubjectIdentifier == subjectIdentifier).Select(b => b.OrganizationId).Distinct().CountAsync(cancellationToken);
 
+        // ---- C8 owner recovery ----
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseAsync(Guid organizationOwnerRecoveryCaseId, bool lockForUpdate, CancellationToken cancellationToken) =>
+            lockForUpdate
+                ? context.OwnerRecoveryCases.FromSqlInterpolated($"SELECT * FROM authority.organization_owner_recovery_cases WHERE organization_owner_recovery_case_id = {organizationOwnerRecoveryCaseId} FOR UPDATE").AsTracking().FirstOrDefaultAsync(cancellationToken)
+                // Untracked: callers read the case only to find its organization before locking it; a tracked copy would make the later
+                // FOR UPDATE read return this stale instance instead of the row committed by a concurrent decision.
+                : context.OwnerRecoveryCases.AsNoTracking().FirstOrDefaultAsync(c => c.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId, cancellationToken);
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken) =>
+            context.OwnerRecoveryCases.AsTracking().FirstOrDefaultAsync(c => c.OpenedByPlatformOperatorId == platformOperatorId && c.CreateIdempotencyKey == idempotencyKey, cancellationToken);
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOpenOwnerRecoveryCaseAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            context.OwnerRecoveryCases.AsTracking().FirstOrDefaultAsync(c => c.OrganizationId == organizationId && c.RecoveryStateName == OwnerRecoveryStates.Open, cancellationToken);
+
+        public void AddOwnerRecoveryCase(OrganizationOwnerRecoveryCase recoveryCase) => context.OwnerRecoveryCases.Add(recoveryCase);
+
+        public Task<List<OrganizationOwnerRecoverySubject>> GetOwnerRecoverySubjectsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken) =>
+            context.OwnerRecoverySubjects.AsTracking().Where(s => s.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId).OrderBy(s => s.RecoverySubjectRoleName).ThenBy(s => s.SubjectOrdinalNumber).ToListAsync(cancellationToken);
+
+        public Task<OrganizationOwnerRecoverySubject?> FindOwnerRecoverySubjectAsync(Guid organizationOwnerRecoverySubjectId, CancellationToken cancellationToken) =>
+            context.OwnerRecoverySubjects.AsTracking().FirstOrDefaultAsync(s => s.OrganizationOwnerRecoverySubjectId == organizationOwnerRecoverySubjectId, cancellationToken);
+
+        public void AddOwnerRecoverySubject(OrganizationOwnerRecoverySubject subject) => context.OwnerRecoverySubjects.Add(subject);
+
+        public Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken) =>
+            context.OwnerRecoveryApprovals.AsTracking().Where(a => a.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId).OrderBy(a => a.ApprovalRecordedOn).ThenBy(a => a.OrganizationOwnerRecoveryApprovalId).ToListAsync(cancellationToken);
+
+        public async Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsForCasesAsync(IReadOnlyCollection<Guid> organizationOwnerRecoveryCaseIds, CancellationToken cancellationToken) =>
+            organizationOwnerRecoveryCaseIds.Count == 0
+                ? []
+                : await context.OwnerRecoveryApprovals.AsNoTracking().Where(a => organizationOwnerRecoveryCaseIds.Contains(a.OrganizationOwnerRecoveryCaseId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        public Task<OrganizationOwnerRecoveryApproval?> FindOwnerRecoveryApprovalAsync(Guid organizationOwnerRecoveryApprovalId, CancellationToken cancellationToken) =>
+            context.OwnerRecoveryApprovals.AsTracking().FirstOrDefaultAsync(a => a.OrganizationOwnerRecoveryApprovalId == organizationOwnerRecoveryApprovalId, cancellationToken);
+
+        public void AddOwnerRecoveryApproval(OrganizationOwnerRecoveryApproval approval) => context.OwnerRecoveryApprovals.Add(approval);
+
+        public async Task<OwnerRecoveryStorePage> SearchOwnerRecoveryCasesAsync(OwnerRecoveryQuery query, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            var now = query.Now;
+            var valid = context.OwnerRecoveryApprovals.AsNoTracking().Where(a => a.ApprovalStateName == OnboardingApprovalStates.Valid);
+            var rows = from c in context.OwnerRecoveryCases.AsNoTracking()
+                       join o in context.OrganizationStates.AsNoTracking() on c.OrganizationId equals o.OrganizationId
+                       select new { Case = c, OrganizationDisplayName = o.OrganizationDisplayName, Approvals = valid.Count(a => a.OrganizationOwnerRecoveryCaseId == c.OrganizationOwnerRecoveryCaseId) };
+            var open = rows.Where(x => x.Case.RecoveryStateName == OwnerRecoveryStates.Open && x.Case.CaseExpiresOn > now);
+            rows = query.Status switch
+            {
+                OwnerRecoveryFilters.Open => open,
+                OwnerRecoveryFilters.AwaitingApprovals => open.Where(x => x.Approvals < 3),
+                OwnerRecoveryFilters.WaitingPeriod => open.Where(x => x.Approvals >= 3 && x.Case.WaitingPeriodEndsOn > now),
+                OwnerRecoveryFilters.Ready => open.Where(x => x.Approvals >= 3 && x.Case.WaitingPeriodEndsOn <= now),
+                OwnerRecoveryFilters.Objected => rows.Where(x => x.Case.RecoveryStateName == OwnerRecoveryStates.Objected),
+                OwnerRecoveryFilters.Recovered => rows.Where(x => x.Case.RecoveryStateName == OwnerRecoveryStates.Recovered),
+                OwnerRecoveryFilters.Closed => rows.Where(x => x.Case.RecoveryStateName == OwnerRecoveryStates.Cancelled || x.Case.RecoveryStateName == OwnerRecoveryStates.Expired
+                    || x.Case.RecoveryStateName == OwnerRecoveryStates.Invalidated || (x.Case.RecoveryStateName == OwnerRecoveryStates.Open && x.Case.CaseExpiresOn <= now)),
+                _ => rows,
+            };
+            if (!string.IsNullOrWhiteSpace(query.Text))
+            {
+                var pattern = "%" + query.Text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+                var id = Guid.TryParse(query.Text, out var parsed) ? parsed : (Guid?)null;
+                rows = rows.Where(x => EF.Functions.ILike(x.OrganizationDisplayName, pattern, "\\") || EF.Functions.ILike(x.Case.IncidentReferenceText, pattern, "\\")
+                                       || (id != null && (x.Case.OrganizationOwnerRecoveryCaseId == id || x.Case.OrganizationId == id)));
+            }
+
+            var total = await rows.CountAsync(cancellationToken).ConfigureAwait(false);
+            if (query.After is { } after)
+            {
+                rows = rows.Where(x => x.Case.CaseOpenedOn < after.OpenedOn || (x.Case.CaseOpenedOn == after.OpenedOn && x.Case.OrganizationOwnerRecoveryCaseId.CompareTo(after.CaseId) < 0));
+            }
+
+            var page = await rows.OrderByDescending(x => x.Case.CaseOpenedOn).ThenByDescending(x => x.Case.OrganizationOwnerRecoveryCaseId).Take(query.Limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new OwnerRecoveryStorePage(page.Select(x => new OwnerRecoveryStoreRow(x.Case, x.OrganizationDisplayName, x.Approvals)).ToList(), total);
+        }
+
+        public Task<List<OrganizationRecoveredOwnerProbation>> GetActiveRecoveredOwnerProbationsAsync(Guid organizationId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            context.RecoveredOwnerProbations.AsNoTracking().Where(p => p.OrganizationId == organizationId && p.ProbationEndsOn > now).ToListAsync(cancellationToken);
+
+        public Task<OrganizationRecoveredOwnerProbation?> FindRecoveredOwnerProbationAsync(Guid organizationRecoveredOwnerProbationId, CancellationToken cancellationToken) =>
+            context.RecoveredOwnerProbations.AsTracking().FirstOrDefaultAsync(p => p.OrganizationRecoveredOwnerProbationId == organizationRecoveredOwnerProbationId, cancellationToken);
+
+        public void AddRecoveredOwnerProbation(OrganizationRecoveredOwnerProbation probation) => context.RecoveredOwnerProbations.Add(probation);
+
+        public Task<int> CountSessionsCreatedSinceAsync(Guid identityBindingId, DateTimeOffset since, CancellationToken cancellationToken) =>
+            context.Sessions.AsNoTracking().CountAsync(s => s.IdentityBindingId == identityBindingId && s.SessionCreatedOn >= since, cancellationToken);
+
         public Task FlushAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
 
         public async Task CommitAsync(CancellationToken cancellationToken)

@@ -4,8 +4,8 @@
   "entries": [
     {
       "path": "CLAUDE-DESIGN.MD",
-      "sha256": "9225e9610fbb4c7e3b165de2b96f0687d94468ae21f93596ffba26a315f02284",
-      "bytes": 171306
+      "sha256": "8e4ab5eccb54502c0e21196ea22a260771797c609dcb1277683cb376d176da82",
+      "bytes": 173114
     },
     {
       "path": "CLAUDE.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "c6f73a6090833c950a84c7a4d463f45d1eb58707b05aefaa133833b909cd656d",
-      "bytes": 72220
+      "sha256": "49b403d12958fa5f05f5dd18871d2e60fc1e8082989fdd65624a78660c8aa0b5",
+      "bytes": 76669
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "73f11856ffd854684403f969dbef856e986051485d45f41ddacd8ca1f208f514",
-      "bytes": 17557
+      "sha256": "69f5dc9f5db91d4c3a5f84c2d8c24ceb61c52262e3fc77825d061ff9ba3ae473",
+      "bytes": 18818
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -204,8 +204,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md",
-      "sha256": "477fa4a8d535fb4d4109ff1c80371ad96aaebb0a63494546c85da732f8df32a7",
-      "bytes": 77692
+      "sha256": "93231c517005492b8410cd7a4b087d1dd31f81ebdc7b6a78a7edf0d7eca38127",
+      "bytes": 90622
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -299,8 +299,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "83f3364631d94136afb5082e37e43e0a4002f0225db82530fdcaffd784e1ab1a",
-      "bytes": 161771
+      "sha256": "4fe84040664f0ee53239270473554697d5c0af8d281ec873571917c4362cbf5a",
+      "bytes": 164566
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -619,8 +619,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "0423b64e2c152977fcf54283fcbd703c0a7aa26b9bb38a8df14631a9d1ba0e7a",
-      "bytes": 122587
+      "sha256": "4889e114a89495ac1a49729f33a3f3713e1669171affc25f3b00923f964ea3b5",
+      "bytes": 130020
     },
     {
       "path": "scripts/generate-spec-manifest.py",
@@ -669,8 +669,8 @@
     },
     {
       "path": "scripts/validate-specifications.py",
-      "sha256": "094489678266dacf09506e074a918be1b929bcdb96c6a8499eaa24a625ae5fdf",
-      "bytes": 2973
+      "sha256": "4723da23ce7c84998b6039c98ede0c598da5beee329cbeb60b1fb59113c84544",
+      "bytes": 2993
     },
     {
       "path": "security_hardening/SEARCH_CAPABILITY_MATRIX.csv",

@@ -852,6 +852,291 @@
           }
         }
       }
+    },
+    "/console-api/v1/owner-recovery": {
+      "get": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "PG-075 queue: owner recovery cases, newest first (15 per page by default, at most 50), and this environment's waiting period.",
+        "operationId": "SearchOwnerRecovery",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "PG-075: open an immutable recovery case (dryRun validates only) for an organization with fewer than two eligible owners. Opening grants nothing.",
+        "operationId": "OpenOwnerRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryCreateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryCreateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}": {
+      "get": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "PG-075 case: frozen statement and fingerprint, owner status, evidence, approvals, waiting period, objection and the operator's eligibility. The Authority audits each view (fail closed).",
+        "operationId": "GetOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryCaseDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}/approvals": {
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "The signed-in operator's approval; three different operators are required.",
+        "operationId": "ApproveOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "Withdraws the signed-in operator's own approval.",
+        "operationId": "WithdrawOwnerRecoveryApproval",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}/cancel": {
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "Cancels an open case; nothing is changed in the organization.",
+        "operationId": "CancelOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}/execute": {
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "After three approvals, the waiting period and no objection: adds the replacement owners in one Authority transaction (nothing is removed or disabled).",
+        "operationId": "ExecuteOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2015,6 +2300,769 @@
         },
         "additionalProperties": false
       },
+      "OwnerRecoveryApprovalView": {
+        "required": [
+          "approvalId",
+          "platformOperatorId",
+          "operatorDisplayName",
+          "isMine",
+          "justification",
+          "recordedOn",
+          "state",
+          "closureReason"
+        ],
+        "type": "object",
+        "properties": {
+          "approvalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operatorDisplayName": {
+            "type": "string"
+          },
+          "isMine": {
+            "type": "boolean"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "recordedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryCaseDetail": {
+        "required": [
+          "caseId",
+          "organizationId",
+          "organizationDisplayName",
+          "state",
+          "displayState",
+          "incidentReference",
+          "justification",
+          "openedByPlatformOperatorId",
+          "openedByOperatorDisplayName",
+          "openedOn",
+          "waitingPeriodEndsOn",
+          "waitingPeriodRemainingSeconds",
+          "expiresOn",
+          "recoveredOn",
+          "closedOn",
+          "closureReason",
+          "closureJustification",
+          "lastExecutionFailureCode",
+          "lastExecutionFailureOn",
+          "eligibleOwnersBefore",
+          "eligibleOwnersAfter",
+          "currentOwners",
+          "subjects",
+          "approvals",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "objection",
+          "statementJson",
+          "statementSha256",
+          "activation",
+          "myEligibility",
+          "rowRevision",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "incidentReference": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "openedByPlatformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "openedByOperatorDisplayName": {
+            "type": "string"
+          },
+          "openedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waitingPeriodEndsOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waitingPeriodRemainingSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recoveredOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "closureJustification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastExecutionFailureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastExecutionFailureOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "eligibleOwnersBefore": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "eligibleOwnersAfter": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "currentOwners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryOwnerView"
+            }
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoverySubjectView"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryApprovalView"
+            }
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "objection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRecoveryObjectionView"
+              }
+            ]
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "activation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationActivation"
+              }
+            ]
+          },
+          "myEligibility": {
+            "$ref": "#/components/schemas/OwnerRecoveryEligibility"
+          },
+          "rowRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryCreateResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "warnings",
+          "case",
+          "replayed",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "case": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRecoveryCaseDetail"
+              }
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryDecisionResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "caseId",
+          "organizationId",
+          "decision",
+          "statementJson",
+          "statementSha256",
+          "outcome",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "state",
+          "displayState",
+          "securityCommandId",
+          "archiveState",
+          "replayed",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "securityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "archiveState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryEligibility": {
+        "required": [
+          "canApprove",
+          "canWithdraw",
+          "canCancel",
+          "canExecute",
+          "approveRefusalCode",
+          "approveRefusalDetail",
+          "executeRefusalCode",
+          "executeRefusalDetail"
+        ],
+        "type": "object",
+        "properties": {
+          "canApprove": {
+            "type": "boolean"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          },
+          "canCancel": {
+            "type": "boolean"
+          },
+          "canExecute": {
+            "type": "boolean"
+          },
+          "approveRefusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approveRefusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "executeRefusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "executeRefusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryListItem": {
+        "required": [
+          "caseId",
+          "organizationId",
+          "organizationDisplayName",
+          "incidentReference",
+          "state",
+          "displayState",
+          "openedOn",
+          "waitingPeriodEndsOn",
+          "expiresOn",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "approvedByMe",
+          "replacementCount",
+          "openedByOperatorDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "incidentReference": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "openedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waitingPeriodEndsOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvedByMe": {
+            "type": "boolean"
+          },
+          "replacementCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "openedByOperatorDisplayName": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryObjectionView": {
+        "required": [
+          "objectedOn",
+          "objectedByAuthorityUserId",
+          "objectedBySubjectIdentifier",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "objectedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "objectedByAuthorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objectedBySubjectIdentifier": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryOwnerView": {
+        "required": [
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "enabled",
+          "declaredUnavailable",
+          "activeSinceCaseOpened"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "declaredUnavailable": {
+            "type": "boolean"
+          },
+          "activeSinceCaseOpened": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "status",
+          "waitingPeriodSeconds",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryListItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "waitingPeriodSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoverySubjectView": {
+        "required": [
+          "role",
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "isNewIdentity",
+          "verificationMethod",
+          "verificationReference",
+          "unavailabilityReason",
+          "evidenceReference",
+          "evidenceSummary"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "isNewIdentity": {
+            "type": "boolean"
+          },
+          "verificationMethod": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verificationReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unavailabilityReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidenceReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidenceSummary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "PlatformApprovalStatus": {
         "required": [
           "recorded",
@@ -2628,6 +3676,122 @@
           }
         },
         "additionalProperties": false
+      },
+      "RecoveryCreateInput": {
+        "required": [
+          "idempotencyKey",
+          "organizationId",
+          "incidentReference",
+          "justification",
+          "declaredUnavailable",
+          "replacements"
+        ],
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incidentReference": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "declaredUnavailable": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RecoveryDeclaredInput"
+            }
+          },
+          "replacements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecoveryReplacementInput"
+            }
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryDeclaredInput": {
+        "required": [
+          "authorityUserId",
+          "reason",
+          "evidenceReference",
+          "evidenceSummary"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "evidenceReference": {
+            "type": "string"
+          },
+          "evidenceSummary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryReplacementInput": {
+        "required": [
+          "existingAuthorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "verificationMethod",
+          "verificationReference"
+        ],
+        "type": "object",
+        "properties": {
+          "existingAuthorityUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subjectIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayNameHint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verificationMethod": {
+            "type": "string"
+          },
+          "verificationReference": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       }
     }
   },
@@ -2643,6 +3807,9 @@
     },
     {
       "name": "OrganizationOnboarding"
+    },
+    {
+      "name": "OwnerRecovery"
     }
   ]
 }

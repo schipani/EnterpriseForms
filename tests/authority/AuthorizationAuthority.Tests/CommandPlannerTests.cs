@@ -598,6 +598,38 @@ public sealed class CommandPlannerTests
 
         public Task<int> CountOrganizationsBindingIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) => throw new NotSupportedException();
 
+        public Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseAsync(Guid organizationOwnerRecoveryCaseId, bool lockForUpdate, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOpenOwnerRecoveryCaseAsync(Guid organizationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddOwnerRecoveryCase(OrganizationOwnerRecoveryCase recoveryCase) => throw new NotSupportedException();
+
+        public Task<List<OrganizationOwnerRecoverySubject>> GetOwnerRecoverySubjectsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOwnerRecoverySubject?> FindOwnerRecoverySubjectAsync(Guid organizationOwnerRecoverySubjectId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddOwnerRecoverySubject(OrganizationOwnerRecoverySubject subject) => throw new NotSupportedException();
+
+        public Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsForCasesAsync(IReadOnlyCollection<Guid> organizationOwnerRecoveryCaseIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<OrganizationOwnerRecoveryApproval?> FindOwnerRecoveryApprovalAsync(Guid organizationOwnerRecoveryApprovalId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddOwnerRecoveryApproval(OrganizationOwnerRecoveryApproval approval) => throw new NotSupportedException();
+
+        public Task<OwnerRecoveryStorePage> SearchOwnerRecoveryCasesAsync(OwnerRecoveryQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<List<OrganizationRecoveredOwnerProbation>> GetActiveRecoveredOwnerProbationsAsync(Guid organizationId, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(new List<OrganizationRecoveredOwnerProbation>());
+
+        public Task<OrganizationRecoveredOwnerProbation?> FindRecoveredOwnerProbationAsync(Guid organizationRecoveredOwnerProbationId, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddRecoveredOwnerProbation(OrganizationRecoveredOwnerProbation probation) => throw new NotSupportedException();
+
+        public Task<int> CountSessionsCreatedSinceAsync(Guid identityBindingId, DateTimeOffset since, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task CommitAsync(CancellationToken ct) => throw new NotSupportedException();

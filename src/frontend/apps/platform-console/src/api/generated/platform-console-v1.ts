@@ -377,6 +377,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/console-api/v1/owner-recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-075 queue: owner recovery cases, newest first (15 per page by default, at most 50), and this environment's waiting period. */
+        get: operations["SearchOwnerRecovery"];
+        put?: never;
+        /** PG-075: open an immutable recovery case (dryRun validates only) for an organization with fewer than two eligible owners. Opening grants nothing. */
+        post: operations["OpenOwnerRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/owner-recovery/{caseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-075 case: frozen statement and fingerprint, owner status, evidence, approvals, waiting period, objection and the operator's eligibility. The Authority audits each view (fail closed). */
+        get: operations["GetOwnerRecovery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/owner-recovery/{caseId}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The signed-in operator's approval; three different operators are required. */
+        post: operations["ApproveOwnerRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/owner-recovery/{caseId}/approvals/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraws the signed-in operator's own approval. */
+        post: operations["WithdrawOwnerRecoveryApproval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/owner-recovery/{caseId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels an open case; nothing is changed in the organization. */
+        post: operations["CancelOwnerRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-api/v1/owner-recovery/{caseId}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** After three approvals, the waiting period and no objection: adds the replacement owners in one Authority transaction (nothing is removed or disabled). */
+        post: operations["ExecuteOwnerRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -664,6 +767,188 @@ export interface components {
             /** Format: uuid */
             correlationId: string;
         };
+        OwnerRecoveryApprovalView: {
+            /** Format: uuid */
+            approvalId: string;
+            /** Format: uuid */
+            platformOperatorId: string;
+            operatorDisplayName: string;
+            isMine: boolean;
+            justification: string;
+            /** Format: date-time */
+            recordedOn: string;
+            state: string;
+            closureReason: null | string;
+        };
+        OwnerRecoveryCaseDetail: {
+            /** Format: uuid */
+            caseId: string;
+            /** Format: uuid */
+            organizationId: string;
+            organizationDisplayName: string;
+            state: string;
+            displayState: string;
+            incidentReference: string;
+            justification: string;
+            /** Format: uuid */
+            openedByPlatformOperatorId: string;
+            openedByOperatorDisplayName: string;
+            /** Format: date-time */
+            openedOn: string;
+            /** Format: date-time */
+            waitingPeriodEndsOn: string;
+            /** Format: int64 */
+            waitingPeriodRemainingSeconds: number | string;
+            /** Format: date-time */
+            expiresOn: string;
+            /** Format: date-time */
+            recoveredOn: null | string;
+            /** Format: date-time */
+            closedOn: null | string;
+            closureReason: null | string;
+            closureJustification: null | string;
+            lastExecutionFailureCode: null | string;
+            /** Format: date-time */
+            lastExecutionFailureOn: null | string;
+            /** Format: int32 */
+            eligibleOwnersBefore: number | string;
+            /** Format: int32 */
+            eligibleOwnersAfter: number | string;
+            currentOwners: components["schemas"]["OwnerRecoveryOwnerView"][];
+            subjects: components["schemas"]["OwnerRecoverySubjectView"][];
+            approvals: components["schemas"]["OwnerRecoveryApprovalView"][];
+            /** Format: int32 */
+            approvalsRecorded: number | string;
+            /** Format: int32 */
+            approvalsRequired: number | string;
+            objection: null | components["schemas"]["OwnerRecoveryObjectionView"];
+            statementJson: string;
+            statementSha256: string;
+            activation: null | components["schemas"]["OrganizationActivation"];
+            myEligibility: components["schemas"]["OwnerRecoveryEligibility"];
+            /** Format: int64 */
+            rowRevision: number | string;
+            approvalAssurance: string;
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OwnerRecoveryCreateResponse: {
+            dryRun: boolean;
+            eligible: boolean;
+            refusalCode: null | string;
+            refusalDetail: null | string;
+            warnings: string[];
+            case: null | components["schemas"]["OwnerRecoveryCaseDetail"];
+            replayed: boolean;
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OwnerRecoveryDecisionResponse: {
+            dryRun: boolean;
+            eligible: boolean;
+            refusalCode: null | string;
+            refusalDetail: null | string;
+            /** Format: uuid */
+            caseId: string;
+            /** Format: uuid */
+            organizationId: string;
+            decision: string;
+            statementJson: string;
+            statementSha256: string;
+            outcome: string;
+            /** Format: int32 */
+            approvalsRecorded: number | string;
+            /** Format: int32 */
+            approvalsRequired: number | string;
+            state: string;
+            displayState: string;
+            /** Format: uuid */
+            securityCommandId: null | string;
+            archiveState: null | string;
+            replayed: boolean;
+            approvalAssurance: string;
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OwnerRecoveryEligibility: {
+            canApprove: boolean;
+            canWithdraw: boolean;
+            canCancel: boolean;
+            canExecute: boolean;
+            approveRefusalCode: null | string;
+            approveRefusalDetail: null | string;
+            executeRefusalCode: null | string;
+            executeRefusalDetail: null | string;
+        };
+        OwnerRecoveryListItem: {
+            /** Format: uuid */
+            caseId: string;
+            /** Format: uuid */
+            organizationId: string;
+            organizationDisplayName: string;
+            incidentReference: string;
+            state: string;
+            displayState: string;
+            /** Format: date-time */
+            openedOn: string;
+            /** Format: date-time */
+            waitingPeriodEndsOn: string;
+            /** Format: date-time */
+            expiresOn: string;
+            /** Format: int32 */
+            approvalsRecorded: number | string;
+            /** Format: int32 */
+            approvalsRequired: number | string;
+            approvedByMe: boolean;
+            /** Format: int32 */
+            replacementCount: number | string;
+            openedByOperatorDisplayName: string;
+        };
+        OwnerRecoveryObjectionView: {
+            /** Format: date-time */
+            objectedOn: string;
+            /** Format: uuid */
+            objectedByAuthorityUserId: string;
+            objectedBySubjectIdentifier: string;
+            reason: string;
+        };
+        OwnerRecoveryOwnerView: {
+            /** Format: uuid */
+            authorityUserId: string;
+            issuerUri: string;
+            subjectIdentifier: string;
+            enabled: boolean;
+            declaredUnavailable: boolean;
+            activeSinceCaseOpened: boolean;
+        };
+        OwnerRecoveryPage: {
+            items: components["schemas"]["OwnerRecoveryListItem"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            nextCursor: null | string;
+            /** Format: int32 */
+            limit: number | string;
+            status: string;
+            /** Format: int64 */
+            waitingPeriodSeconds: number | string;
+            approvalAssurance: string;
+            /** Format: uuid */
+            correlationId: string;
+        };
+        OwnerRecoverySubjectView: {
+            role: string;
+            /** Format: uuid */
+            authorityUserId: string;
+            issuerUri: string;
+            subjectIdentifier: string;
+            displayNameHint: string;
+            isNewIdentity: boolean;
+            verificationMethod: null | string;
+            verificationReference: null | string;
+            unavailabilityReason: null | string;
+            evidenceReference: null | string;
+            evidenceSummary: null | string;
+        };
         PlatformApprovalStatus: {
             /** Format: int32 */
             recorded: number | string;
@@ -814,6 +1099,33 @@ export interface components {
             /** Format: date-time */
             statusChangedOn: string;
             statusReason: string;
+        };
+        RecoveryCreateInput: {
+            idempotencyKey: string;
+            /** Format: uuid */
+            organizationId: string;
+            incidentReference: string;
+            justification: string;
+            declaredUnavailable: null | components["schemas"]["RecoveryDeclaredInput"][];
+            replacements: components["schemas"]["RecoveryReplacementInput"][];
+            /** @default false */
+            dryRun: boolean;
+        };
+        RecoveryDeclaredInput: {
+            /** Format: uuid */
+            authorityUserId: string;
+            reason: string;
+            evidenceReference: string;
+            evidenceSummary: string;
+        };
+        RecoveryReplacementInput: {
+            /** Format: uuid */
+            existingAuthorityUserId: null | string;
+            issuerUri: null | string;
+            subjectIdentifier: null | string;
+            displayNameHint: null | string;
+            verificationMethod: string;
+            verificationReference: string;
         };
     };
     responses: never;
@@ -1360,6 +1672,181 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationOnboardingDecisionResponse"];
+                };
+            };
+        };
+    };
+    SearchOwnerRecovery: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: string;
+                cursor?: string;
+                limit?: number | string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryPage"];
+                };
+            };
+        };
+    };
+    OpenOwnerRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryCreateInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryCreateResponse"];
+                };
+            };
+        };
+    };
+    GetOwnerRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryCaseDetail"];
+                };
+            };
+        };
+    };
+    ApproveOwnerRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryDecisionResponse"];
+                };
+            };
+        };
+    };
+    WithdrawOwnerRecoveryApproval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryDecisionResponse"];
+                };
+            };
+        };
+    };
+    CancelOwnerRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryDecisionResponse"];
+                };
+            };
+        };
+    };
+    ExecuteOwnerRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryDecisionResponse"];
                 };
             };
         };

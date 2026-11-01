@@ -62,6 +62,8 @@ services:
       Identity__OperatorAssertion__SharedKeyBase64: cGxhdGZvcm0tb3BlcmF0b3ItYXNzZXJ0aW9uLXNlY3Rlc3Qtb25seS1rMDE=
       # C8 onboarding (C-104): Platform Console onboarding on this isolated stack, owners from the synthetic test identity provider only.
       OrganizationOnboarding__ApprovedIdentityIssuers__0: ${TEST_IDP_ISSUER}
+      # C-105: accelerated owner recovery waiting period for the isolated test stack (production target 72 hours; Development/Testing minimum 10 s).
+      OrganizationOnboarding__RecoveryWaitingPeriodSeconds: "20"
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
     # C8 M2 Stage 3: the Platform Console reaches the Authority over its own network (never trust-edge, which the business shares).

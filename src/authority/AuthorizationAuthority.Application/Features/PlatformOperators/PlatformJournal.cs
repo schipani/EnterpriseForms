@@ -20,7 +20,11 @@ public sealed record PlatformStateDelta(
     IReadOnlyList<PlatformOperatorEvidenceUse> EvidenceUses,
     IReadOnlyList<OrganizationOnboardingRequest>? OnboardingRequests = null,
     IReadOnlyList<OrganizationOnboardingOwner>? OnboardingOwners = null,
-    IReadOnlyList<OrganizationOnboardingApproval>? OnboardingApprovals = null)
+    IReadOnlyList<OrganizationOnboardingApproval>? OnboardingApprovals = null,
+    IReadOnlyList<OrganizationOwnerRecoveryCase>? RecoveryCases = null,
+    IReadOnlyList<OrganizationOwnerRecoverySubject>? RecoverySubjects = null,
+    IReadOnlyList<OrganizationOwnerRecoveryApproval>? RecoveryApprovals = null,
+    IReadOnlyList<OrganizationRecoveredOwnerProbation>? RecoveryProbations = null)
 {
     public static PlatformStateDelta Of(IEnumerable<PlatformOperator>? operators = null, IEnumerable<PlatformOperatorChangeProposal>? proposals = null, IEnumerable<PlatformOperatorApproval>? approvals = null, IEnumerable<PlatformOperatorEvidenceUse>? evidenceUses = null) =>
         new([.. operators ?? []], [.. proposals ?? []], [.. approvals ?? []], [.. evidenceUses ?? []]);
@@ -28,6 +32,11 @@ public sealed record PlatformStateDelta(
     /// <summary>C8 onboarding (C-104): the request, owner and approval rows an onboarding event created or changed. Events written before C-104 carry none (null on replay).</summary>
     public static PlatformStateDelta Onboarding(IEnumerable<OrganizationOnboardingRequest>? requests = null, IEnumerable<OrganizationOnboardingOwner>? owners = null, IEnumerable<OrganizationOnboardingApproval>? approvals = null, IEnumerable<PlatformOperatorEvidenceUse>? evidenceUses = null) =>
         new([], [], [], [.. evidenceUses ?? []], [.. requests ?? []], [.. owners ?? []], [.. approvals ?? []]);
+
+    /// <summary>C8 owner recovery (C-105): the case, subject, approval and probation rows a recovery event created or changed.</summary>
+    public static PlatformStateDelta Recovery(IEnumerable<OrganizationOwnerRecoveryCase>? cases = null, IEnumerable<OrganizationOwnerRecoverySubject>? subjects = null, IEnumerable<OrganizationOwnerRecoveryApproval>? approvals = null,
+        IEnumerable<OrganizationRecoveredOwnerProbation>? probations = null, IEnumerable<PlatformOperatorEvidenceUse>? evidenceUses = null) =>
+        new([], [], [], [.. evidenceUses ?? []], null, null, null, [.. cases ?? []], [.. subjects ?? []], [.. approvals ?? []], [.. probations ?? []]);
 }
 
 /// <summary>
@@ -359,6 +368,47 @@ public sealed class PlatformJournal(IAuthorityStore store, ISecurityEventArchive
             else
             {
                 scope.AddOnboardingApproval(row);
+            }
+        }
+
+        // C8 owner recovery: cases before their subjects, approvals and probations. Absent in events written before C-105.
+        foreach (var row in delta.RecoveryCases ?? [])
+        {
+            if (await scope.FindOwnerRecoveryCaseAsync(row.OrganizationOwnerRecoveryCaseId, lockForUpdate: false, cancellationToken).ConfigureAwait(false) is { } existing)
+            {
+                CopyInto(row, existing);
+            }
+            else
+            {
+                scope.AddOwnerRecoveryCase(row);
+            }
+        }
+
+        foreach (var row in delta.RecoverySubjects ?? [])
+        {
+            if (await scope.FindOwnerRecoverySubjectAsync(row.OrganizationOwnerRecoverySubjectId, cancellationToken).ConfigureAwait(false) is null)
+            {
+                scope.AddOwnerRecoverySubject(row);
+            }
+        }
+
+        foreach (var row in delta.RecoveryApprovals ?? [])
+        {
+            if (await scope.FindOwnerRecoveryApprovalAsync(row.OrganizationOwnerRecoveryApprovalId, cancellationToken).ConfigureAwait(false) is { } existing)
+            {
+                CopyInto(row, existing);
+            }
+            else
+            {
+                scope.AddOwnerRecoveryApproval(row);
+            }
+        }
+
+        foreach (var row in delta.RecoveryProbations ?? [])
+        {
+            if (await scope.FindRecoveredOwnerProbationAsync(row.OrganizationRecoveredOwnerProbationId, cancellationToken).ConfigureAwait(false) is null)
+            {
+                scope.AddRecoveredOwnerProbation(row);
             }
         }
 

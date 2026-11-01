@@ -139,6 +139,52 @@ public sealed partial class OperatorDecisionService(
         }).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// C8 owner recovery (C-105): the same four steps for one recovery case (approve, withdraw, cancel or execute). The organization id
+    /// bound into the evidence comes from the Authority's dry run for this case, never from the browser, and nothing is signed for a
+    /// decision the dry run already refuses. The signing key stays in Vault; the browser never sees it or the evidence.
+    /// </summary>
+    public async Task<OwnerRecoveryDecisionResponse> DecideRecoveryAsync(HttpContext http, OperatorSession session, Guid caseId, string decision, OperatorDecisionInput input, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(input);
+        var (expected, justification) = ValidateInput(input);
+        var correlation = SessionEndpoints.Correlation(http);
+        return await OperatorSessionGuard.RunAsync(http, session, store, environment, async () =>
+        {
+            try
+            {
+                var profile = await OperatorProfiles.CurrentAsync(http, session, authority, store, options.Value, environment, cancellationToken).ConfigureAwait(false);
+                var preview = await authority.DecideRecoveryAsync(session.SubjectIdentifier, caseId, decision, new OwnerRecoveryDecisionRequest(expected, justification, null, null, DryRun: true), correlation, cancellationToken).ConfigureAwait(false);
+                if (preview.CaseId != caseId || preview.OrganizationId == Guid.Empty || !Sha256Hex().IsMatch(preview.StatementSha256))
+                {
+                    throw new ConsoleException(ConsoleErrorCodes.AuthorityUnavailable, 502, "the Authority's preview does not describe this case", correlationId: correlation);
+                }
+
+                if (!string.Equals(preview.StatementSha256, expected, StringComparison.Ordinal))
+                {
+                    throw new ConsoleException(ConsoleErrorCodes.ApprovalStatementChanged, 409, "the case changed since it was reviewed; review it again", correlationId: correlation);
+                }
+
+                if (!preview.Eligible)
+                {
+                    throw new ConsoleException(preview.RefusalCode ?? ConsoleErrorCodes.InvalidRequest, preview.RefusalCode == "SIGNING_UNAVAILABLE" ? 503 : 409, preview.RefusalDetail ?? "the Authority refuses this decision", correlationId: correlation);
+                }
+
+                var evidence = await SignEvidenceAsync(session, profile.Operator, PlatformOperationKinds.OrganizationOwnerRecovery, decision, preview.OrganizationId, caseId, preview.StatementSha256, justification, cancellationToken).ConfigureAwait(false);
+                var outcome = await authority.DecideRecoveryAsync(session.SubjectIdentifier, caseId, decision,
+                    new OwnerRecoveryDecisionRequest(preview.StatementSha256, justification, EvidenceKind, evidence, DryRun: false), correlation, cancellationToken).ConfigureAwait(false);
+                ConsoleLog.Decided(logger, session.PlatformOperatorId, decision, caseId, outcome.Outcome, correlation);
+                return outcome;
+            }
+            catch (ConsoleException ex)
+            {
+                ConsoleLog.DecisionRefused(logger, session.PlatformOperatorId, decision, caseId, ex.ErrorCode, correlation);
+                throw;
+            }
+        }).ConfigureAwait(false);
+    }
+
     private static (string Expected, string Justification) ValidateInput(OperatorDecisionInput input)
     {
         var expected = input.ExpectedStatementSha256?.Trim().ToLowerInvariant() ?? string.Empty;

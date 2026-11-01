@@ -1674,6 +1674,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/owner-recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The organization's open owner recovery case (reference, justification, proposed and declared-unavailable owners, waiting period, approval progress) for enabled owners and Security Administrators; no case for anyone else. */
+        get: operations["GetOwnerRecoveryNotice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/owner-recovery/{caseId}/objections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Objects to the open owner recovery case (explanation, fresh step-up). Returns only after the Authority recorded it; the case then cannot be executed. 404 for anyone who is not an enabled owner or Security Administrator. */
+        post: operations["ObjectToOwnerRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -3011,6 +3045,44 @@ export interface components {
             expiresOn: string;
             proposalState: string;
             canApprove: boolean;
+        };
+        OwnerRecoveryNoticeCaseResponse: {
+            /** Format: uuid */
+            caseId: string;
+            incidentReference: string;
+            justification: string;
+            /** Format: date-time */
+            openedOn: string;
+            /** Format: date-time */
+            waitingPeriodEndsOn: string;
+            /** Format: int32 */
+            approvalsRecorded: number | string;
+            /** Format: int32 */
+            approvalsRequired: number | string;
+            subjects: components["schemas"]["OwnerRecoveryNoticeSubjectResponse"][];
+        };
+        OwnerRecoveryNoticeResponse: {
+            case: null | components["schemas"]["OwnerRecoveryNoticeCaseResponse"];
+            canObject: boolean;
+        };
+        OwnerRecoveryNoticeSubjectResponse: {
+            role: string;
+            /** Format: uuid */
+            authorityUserId: string;
+            displayName: string;
+            isNewIdentity: boolean;
+            unavailabilityReason: null | string;
+        };
+        OwnerRecoveryObjectionRequest: {
+            reason: string;
+            useDevelopmentStepUp: boolean;
+        };
+        OwnerRecoveryObjectionResponse: {
+            /** Format: uuid */
+            caseId: string;
+            state: string;
+            /** Format: date-time */
+            objectedOn: string;
         };
         PresenceHeartbeatRequest: {
             /** Format: int32 */
@@ -6877,6 +6949,70 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetOwnerRecoveryNotice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryNoticeResponse"];
+                };
+            };
+        };
+    };
+    ObjectToOwnerRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerRecoveryObjectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryObjectionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -3,6 +3,7 @@ import { LoadingBlock } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorPanel } from "../../support";
 import { OrganizationLayout } from "../components/OrganizationLayout";
+import { OwnerRecoveryNotice } from "../components/OwnerRecoveryNotice";
 import { DataProtectionOverviewCard, OverviewAggregateCards, SecurityAdministratorsOverviewCard } from "../components/OverviewCards";
 
 export const overviewKey = ["organization", "overview"];
@@ -23,6 +24,7 @@ export function OverviewPage() {
 
   return (
     <OrganizationLayout title="Organization overview" lead="What this organization is, who administers it and how its data is protected. Every number is decided or projected server-side; nothing here opens a record.">
+      {allowed ? <OwnerRecoveryNotice /> : null}
       {overview.isPending ? <LoadingBlock label="Loading the organization overview" /> : null}
       {overview.isError ? <ErrorPanel error={overview.error} onRetry={() => void overview.refetch()} /> : null}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

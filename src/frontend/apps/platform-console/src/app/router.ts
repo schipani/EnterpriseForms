@@ -10,6 +10,9 @@ export type Route =
   | { name: "onboarding" }
   | { name: "onboarding-new" }
   | { name: "onboarding-detail"; requestId: string }
+  | { name: "recovery" }
+  | { name: "recovery-new" }
+  | { name: "recovery-detail"; caseId: string }
   | { name: "not-found" };
 
 export function parseRoute(pathname: string): Route {
@@ -28,6 +31,16 @@ export function parseRoute(pathname: string): Route {
   }
   if (clean === "/platform/onboarding/new") {
     return { name: "onboarding-new" };
+  }
+  if (clean === "/platform/recovery") {
+    return { name: "recovery" };
+  }
+  if (clean === "/platform/recovery/new") {
+    return { name: "recovery-new" };
+  }
+  const recovery = /^\/platform\/recovery\/([0-9a-f-]{36})$/i.exec(clean);
+  if (recovery) {
+    return { name: "recovery-detail", caseId: recovery[1]! };
   }
   const organization = /^\/platform\/organizations\/([0-9a-f-]{36})$/i.exec(clean);
   if (organization) {
@@ -48,6 +61,8 @@ export const reviewPath = (organizationId: string, requestId: string) => `/platf
 
 export const organizationPath = (organizationId: string) => `/platform/organizations/${organizationId}`;
 export const onboardingPath = (requestId: string) => `/platform/onboarding/${requestId}`;
+
+export const recoveryPath = (caseId: string) => `/platform/recovery/${caseId}`;
 
 export function navigate(to: string, replace = false): void {
   if (replace) {

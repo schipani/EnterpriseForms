@@ -22,6 +22,18 @@ public sealed class OrganizationOnboardingOptions
 
     /// <summary>D8-52: hours between approval and initialization for the key custody step (1..168, default 72).</summary>
     public int KeyCustodyHours { get; set; } = 72;
+
+    /// <summary>
+    /// C-105 owner recovery: seconds between opening a case and the earliest execution (production target 72 hours = 259200).
+    /// Development/Testing may accelerate it down to 10 seconds; outside them anything below 72 hours refuses to start.
+    /// </summary>
+    public int RecoveryWaitingPeriodSeconds { get; set; } = 259200;
+
+    /// <summary>C-105: days a case stays executable after its waiting period ends (1..30, default 7).</summary>
+    public int RecoveryCaseDays { get; set; } = 7;
+
+    /// <summary>C-105: days during which owners recovered by the same case cannot add one another to teams or grant one another designer (1..90, default 14).</summary>
+    public int RecoveredOwnerProbationDays { get; set; } = 14;
 }
 
 /// <summary>
@@ -36,8 +48,14 @@ public sealed class OrganizationOnboardingPolicy
     public const int MaximumOwners = 10;
     public const int RequiredApprovals = 2;
 
-    private OrganizationOnboardingPolicy(IReadOnlyList<string> issuers, bool legacy, TimeSpan pending, TimeSpan custody)
+    public const int ProductionRecoveryWaitingPeriodSeconds = 259200;
+    public const int MinimumDevelopmentRecoveryWaitingPeriodSeconds = 10;
+
+    private OrganizationOnboardingPolicy(IReadOnlyList<string> issuers, bool legacy, TimeSpan pending, TimeSpan custody, TimeSpan recoveryWaiting, TimeSpan recoveryCase, TimeSpan probation)
     {
+        RecoveryWaitingPeriod = recoveryWaiting;
+        RecoveryCaseLifetime = recoveryCase;
+        RecoveredOwnerProbation = probation;
         ApprovedIdentityIssuers = issuers;
         LegacyOrganizationBootstrapEnabled = legacy;
         PendingApprovalWindow = pending;
@@ -52,6 +70,16 @@ public sealed class OrganizationOnboardingPolicy
 
     public TimeSpan KeyCustodyWindow { get; }
 
+    /// <summary>C-105: trusted-clock waiting period before a recovery case may be executed.</summary>
+    public TimeSpan RecoveryWaitingPeriod { get; }
+
+    /// <summary>C-105: how long a case stays executable after its waiting period.</summary>
+    public TimeSpan RecoveryCaseLifetime { get; }
+
+    /// <summary>C-105: the recovered-owner safeguard period (in addition to the permanent OB-F8 rule).</summary>
+    public TimeSpan RecoveredOwnerProbation { get; }
+
+    /// <summary>Onboarding and owner recovery need an approved issuer list, which only Development/Testing accepts (PB-08 outstanding).</summary>
     public bool Operational => ApprovedIdentityIssuers.Count > 0;
 
     public static OrganizationOnboardingPolicy Create(OrganizationOnboardingOptions? options, string environmentName)
@@ -77,7 +105,14 @@ public sealed class OrganizationOnboardingPolicy
             throw new InvalidOperationException($"{OrganizationOnboardingOptions.SectionName}: PendingApprovalDays must be 1..30 and KeyCustodyHours 1..168.");
         }
 
-        return new OrganizationOnboardingPolicy(issuers, options.LegacyOrganizationBootstrapEnabled, TimeSpan.FromDays(options.PendingApprovalDays), TimeSpan.FromHours(options.KeyCustodyHours));
+        var minimumWaiting = development ? MinimumDevelopmentRecoveryWaitingPeriodSeconds : ProductionRecoveryWaitingPeriodSeconds;
+        if (options.RecoveryWaitingPeriodSeconds < minimumWaiting || options.RecoveryWaitingPeriodSeconds > 30 * 86400 || options.RecoveryCaseDays is < 1 or > 30 || options.RecoveredOwnerProbationDays is < 1 or > 90)
+        {
+            throw new InvalidOperationException($"{OrganizationOnboardingOptions.SectionName}: RecoveryWaitingPeriodSeconds must be {minimumWaiting}..2592000 in {environmentName}, RecoveryCaseDays 1..30 and RecoveredOwnerProbationDays 1..90.");
+        }
+
+        return new OrganizationOnboardingPolicy(issuers, options.LegacyOrganizationBootstrapEnabled, TimeSpan.FromDays(options.PendingApprovalDays), TimeSpan.FromHours(options.KeyCustodyHours),
+            TimeSpan.FromSeconds(options.RecoveryWaitingPeriodSeconds), TimeSpan.FromDays(options.RecoveryCaseDays), TimeSpan.FromDays(options.RecoveredOwnerProbationDays));
     }
 
     public void RequireOperational()

@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, ITestStackIdentityAuthority
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -119,6 +119,12 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
     public Task<AuthorityOrganizationRoster> GetRosterAsync(DelegatedUserContext user, OrganizationRosterQuery query, CancellationToken cancellationToken) =>
         SendAsync<AuthorityOrganizationRoster>(HttpMethod.Post, "internal/v1/organizations/roster", user, query, null, cancellationToken);
+
+    public Task<AuthorityOwnerRecoveryNotice> GetOwnerRecoveryNoticeAsync(DelegatedUserContext user, OwnerRecoveryNoticeQuery query, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityOwnerRecoveryNotice>(HttpMethod.Post, "internal/v1/organizations/owner-recovery/notice", user, query, null, cancellationToken);
+
+    public Task<AuthorityOwnerRecoveryObjection> ObjectToOwnerRecoveryAsync(DelegatedUserContext user, OwnerRecoveryObjectionCommand command, CancellationToken cancellationToken) =>
+        SendAsync<AuthorityOwnerRecoveryObjection>(HttpMethod.Post, "internal/v1/organizations/owner-recovery/objections", user, command, null, cancellationToken);
 
     public Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken) =>
         SendAsync<AuthorityFieldSearchAdministration>(HttpMethod.Post, "internal/v1/field-search/administration", user, query, null, cancellationToken);

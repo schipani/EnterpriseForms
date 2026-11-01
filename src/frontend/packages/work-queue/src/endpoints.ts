@@ -40,6 +40,8 @@ export const ENDPOINTS = {
   "forms.fieldSearch": { method: "GET", path: "/api/v1/form-definitions/{formDefinitionId}/field-search" },
   "organization.searchApprovals": { method: "GET", path: "/api/v1/organization/search-approvals" },
   "organization.securityAdministrators": { method: "GET", path: "/api/v1/organization/security-administrators" },
+  "organization.ownerRecoveryNotice": { method: "GET", path: "/api/v1/organization/owner-recovery" },
+  "organization.objectToOwnerRecovery": { method: "POST", path: "/api/v1/organization/owner-recovery/{caseId}/objections" },
   "organization.appointSecurityAdministrator": { method: "POST", path: "/api/v1/organization/security-administrators" },
   "organization.removeSecurityAdministrator": { method: "POST", path: "/api/v1/organization/security-administrators/{userId}/remove" },
   "forms.approveFieldSearch": { method: "POST", path: "/api/v1/form-definitions/{formDefinitionId}/fields/{fieldDefinitionId}/search-approval" },

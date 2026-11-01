@@ -114,3 +114,19 @@ public sealed record TeamMembershipChangeResponse(CommandOutcome Command, TeamMe
 
 /// <summary>Display-only rename of the team projection (D8-8); <c>ExpectedModifiedOn</c> is the detail's <c>modifiedOn</c> (409 TEAM_MODIFIED_CONCURRENTLY when stale).</summary>
 public sealed record RenameTeamRequest(string TeamName, DateTimeOffset ExpectedModifiedOn);
+
+// ---- C8 owner recovery (C-105): the organization's notice and objection ----
+
+/// <summary>A person named in the open recovery case: <c>Role</c> is <c>Replacement</c> (proposed new owner) or <c>DeclaredUnavailable</c> (an owner the case declares unavailable).</summary>
+public sealed record OwnerRecoveryNoticeSubjectResponse(string Role, Guid AuthorityUserId, string DisplayName, bool IsNewIdentity, string? UnavailabilityReason);
+
+public sealed record OwnerRecoveryNoticeCaseResponse(Guid CaseId, string IncidentReference, string Justification, DateTimeOffset OpenedOn, DateTimeOffset WaitingPeriodEndsOn, int ApprovalsRecorded, int ApprovalsRequired,
+    IReadOnlyList<OwnerRecoveryNoticeSubjectResponse> Subjects);
+
+/// <summary>The open owner recovery case, if any. <c>Case</c> is null when there is none, and also for anyone who is not an enabled owner or Security Administrator (nothing is disclosed).</summary>
+public sealed record OwnerRecoveryNoticeResponse(OwnerRecoveryNoticeCaseResponse? Case, bool CanObject);
+
+public sealed record OwnerRecoveryObjectionRequest(string Reason, bool UseDevelopmentStepUp);
+
+/// <summary>Returned only after the Authority has recorded the objection; the case is then ended and cannot be executed.</summary>
+public sealed record OwnerRecoveryObjectionResponse(Guid CaseId, string State, DateTimeOffset ObjectedOn);

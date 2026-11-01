@@ -302,6 +302,32 @@ public interface IOrganizationRosterAuthority
     Task<AuthorityOrganizationRoster> GetRosterAsync(DelegatedUserContext user, OrganizationRosterQuery query, CancellationToken cancellationToken);
 }
 
+// ---- C8 owner recovery (C-105): the organization's in-app notice and objection (mirrors AuthorizationAuthority.Contracts.V1 OwnerRecoveryNotice) ----
+
+public sealed record OwnerRecoveryNoticeQuery(Guid OrganizationId);
+
+public sealed record AuthorityOwnerRecoveryNoticeSubject(string Role, Guid AuthorityUserId, string SubjectIdentifier, string DisplayNameHint, bool IsNewIdentity, string? UnavailabilityReason);
+
+public sealed record AuthorityOwnerRecoveryNoticeCase(Guid CaseId, string IncidentReference, string Justification, DateTimeOffset OpenedOn, DateTimeOffset WaitingPeriodEndsOn, int ApprovalsRecorded, int ApprovalsRequired,
+    IReadOnlyList<AuthorityOwnerRecoveryNoticeSubject> Subjects);
+
+public sealed record AuthorityOwnerRecoveryNotice(AuthorityOwnerRecoveryNoticeCase? Case, bool CanObject, Guid CorrelationId);
+
+public sealed record OwnerRecoveryObjectionCommand(Guid OrganizationId, Guid CaseId, string Reason, string? StepUpEvidence);
+
+public sealed record AuthorityOwnerRecoveryObjection(Guid CaseId, string State, DateTimeOffset ObjectedOn, Guid CorrelationId);
+
+/// <summary>
+/// C-105: the only owner-recovery capability of the business plane: read the open case (enabled owners and Security Administrators;
+/// not found for everyone else) and object to it. There is no business route that opens, approves or executes a case.
+/// </summary>
+public interface IOwnerRecoveryNoticeAuthority
+{
+    Task<AuthorityOwnerRecoveryNotice> GetOwnerRecoveryNoticeAsync(DelegatedUserContext user, OwnerRecoveryNoticeQuery query, CancellationToken cancellationToken);
+
+    Task<AuthorityOwnerRecoveryObjection> ObjectToOwnerRecoveryAsync(DelegatedUserContext user, OwnerRecoveryObjectionCommand command, CancellationToken cancellationToken);
+}
+
 /// <summary>Owner message 7: the Authority's Security Administrator roster (narrow port; used by Organizations, and read-only by SecurityOperations to list and validate incident investigators).</summary>
 public interface ISecurityAdministratorAuthority
 {

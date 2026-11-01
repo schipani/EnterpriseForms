@@ -70,6 +70,29 @@ public sealed class AuthorityPlatformClient(HttpClient http, IOptions<PlatformCo
         return SendAsync<OrganizationOnboardingDecisionResponse>(HttpMethod.Post, $"internal/v1/platform/organization-onboarding/{requestId:D}{action}", subject, request, correlationId, cancellationToken);
     }
 
+    public Task<OwnerRecoveryCreateResponse> CreateRecoveryAsync(string subject, OwnerRecoveryCreateRequest request, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OwnerRecoveryCreateResponse>(HttpMethod.Post, "internal/v1/platform/owner-recovery", subject, request, correlationId, cancellationToken);
+
+    public Task<OwnerRecoveryPage> SearchRecoveryAsync(string subject, OwnerRecoverySearchRequest request, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OwnerRecoveryPage>(HttpMethod.Post, "internal/v1/platform/owner-recovery/search", subject, request, correlationId, cancellationToken);
+
+    public Task<OwnerRecoveryCaseDetail> GetRecoveryAsync(string subject, Guid caseId, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OwnerRecoveryCaseDetail>(HttpMethod.Get, $"internal/v1/platform/owner-recovery/{caseId:D}", subject, null, correlationId, cancellationToken);
+
+    /// <summary>C-105: <paramref name="decision"/> selects the endpoint: approve, withdraw, cancel or execute.</summary>
+    public Task<OwnerRecoveryDecisionResponse> DecideRecoveryAsync(string subject, Guid caseId, string decision, OwnerRecoveryDecisionRequest request, Guid correlationId, CancellationToken cancellationToken)
+    {
+        var action = decision switch
+        {
+            OperatorDecisions.Approve => "/approvals",
+            OperatorDecisions.Withdraw => "/approvals/withdraw",
+            OperatorDecisions.Cancel => "/cancel",
+            OperatorDecisions.Execute => "/execute",
+            _ => throw new ArgumentOutOfRangeException(nameof(decision)),
+        };
+        return SendAsync<OwnerRecoveryDecisionResponse>(HttpMethod.Post, $"internal/v1/platform/owner-recovery/{caseId:D}{action}", subject, request, correlationId, cancellationToken);
+    }
+
     public Task<OrganizationDirectoryPage> SearchOrganizationsAsync(string subject, OrganizationDirectorySearchRequest request, Guid correlationId, CancellationToken cancellationToken) =>
         SendAsync<OrganizationDirectoryPage>(HttpMethod.Post, "internal/v1/platform/organizations/search", subject, request, correlationId, cancellationToken);
 
@@ -167,4 +190,7 @@ public static class OperatorDecisions
 
     /// <summary>C8 onboarding (C-104): create the organization from an approved request whose key custody is complete.</summary>
     public const string Initialize = "initialize";
+
+    /// <summary>C-105: execute an approved owner recovery case after its waiting period.</summary>
+    public const string Execute = "execute";
 }

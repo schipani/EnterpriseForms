@@ -58,6 +58,11 @@ public static partial class CommandPlanner
             throw new AuthorityException(AuthorityErrorCodes.RoleAlreadyHeld, 409, false, "the person already holds this role");
         }
 
+        if (grant && payload.RoleName == OrganizationRoleNames.Designer)
+        {
+            await RequireNotSameRecoveryAsync(scope, organizationId, actor.AuthorityUserId, target.AuthorityUserId, now, cancellationToken).ConfigureAwait(false);
+        }
+
         if (!grant && !holds)
         {
             throw new AuthorityException(AuthorityErrorCodes.RoleNotHeld, 409, false, "the person does not hold this role");
@@ -384,7 +389,29 @@ public static partial class CommandPlanner
             throw new AuthorityException(AuthorityErrorCodes.OwnerApprovalRequired, 403, false, "the proposing owner is no longer an enabled owner; propose the change again");
         }
 
+        await RequireNotSameRecoveryAsync(scope, organizationId, actor.AuthorityUserId, proposal.ProposedByAuthorityUserId, now, cancellationToken).ConfigureAwait(false);
         return proposal;
+    }
+
+    /// <summary>
+    /// C-105 recovered-owner safeguard (D8-57): for the probation period, two owners added by the same recovery case cannot act as each
+    /// other's second person — no owner change one proposes and the other executes, no team addition and no designer grant between them.
+    /// It supplements, never replaces, the permanent OB-F8 rule (no self-join; another owner adds an owner to a team).
+    /// </summary>
+    private static async Task RequireNotSameRecoveryAsync(IAuthorityScope scope, Guid organizationId, Guid actorUserId, Guid otherUserId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (actorUserId == otherUserId)
+        {
+            return;
+        }
+
+        var probations = await scope.GetActiveRecoveredOwnerProbationsAsync(organizationId, now, cancellationToken).ConfigureAwait(false);
+        var actorCases = probations.Where(p => p.AuthorityUserId == actorUserId).Select(p => p.OrganizationOwnerRecoveryCaseId).ToHashSet();
+        if (actorCases.Count > 0 && probations.Any(p => p.AuthorityUserId == otherUserId && actorCases.Contains(p.OrganizationOwnerRecoveryCaseId)))
+        {
+            throw new AuthorityException(AuthorityErrorCodes.OwnerRecoveryProbation, 403, false,
+                "owners added by the same recovery case cannot act as each other's second owner, add each other to teams or grant each other designer during the recovery safeguard period; another owner must do it");
+        }
     }
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")]

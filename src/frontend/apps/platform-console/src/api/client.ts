@@ -16,6 +16,11 @@ export type OnboardingItem = S["OrganizationOnboardingListItem"];
 export type OnboardingDetail = S["OrganizationOnboardingDetail"];
 export type OnboardingCreateResponse = S["OrganizationOnboardingCreateResponse"];
 export type OnboardingDecisionResponse = S["OrganizationOnboardingDecisionResponse"];
+export type RecoveryPage = S["OwnerRecoveryPage"];
+export type RecoveryItem = S["OwnerRecoveryListItem"];
+export type RecoveryDetail = S["OwnerRecoveryCaseDetail"];
+export type RecoveryCreateResponse = S["OwnerRecoveryCreateResponse"];
+export type RecoveryDecisionResponse = S["OwnerRecoveryDecisionResponse"];
 
 /** The only module that talks to the network: same-origin calls to the Platform Console BFF (cookie session + CSRF). */
 export const API_ROOT = "/console-api/v1";
@@ -108,6 +113,10 @@ export interface OnboardingCreateInput {
   dryRun: boolean;
 }
 
+export type RecoveryCreateInput = S["RecoveryCreateInput"];
+export type RecoveryDecisionKind = "approve" | "withdraw" | "cancel" | "execute";
+const recoveryDecisionPath: Record<RecoveryDecisionKind, string> = { approve: "/approvals", withdraw: "/approvals/withdraw", cancel: "/cancel", execute: "/execute" };
+
 export type OnboardingDecisionKind = "approve" | "withdraw" | "reject" | "cancel" | "initialize";
 const onboardingDecisionPath: Record<OnboardingDecisionKind, string> = { approve: "/approvals", withdraw: "/approvals/withdraw", reject: "/reject", cancel: "/cancel", initialize: "/initialize" };
 
@@ -158,4 +167,18 @@ export const consoleApi = {
   onboardingDetail: (requestId: string) => request<OnboardingDetail>("GET", `/organization-onboarding/${encodeURIComponent(requestId)}`),
   decideOnboarding: (kind: OnboardingDecisionKind, requestId: string, input: DecisionInput) =>
     request<OnboardingDecisionResponse>("POST", `/organization-onboarding/${encodeURIComponent(requestId)}${onboardingDecisionPath[kind]}`, { expectedStatementSha256: input.expectedStatementSha256, justification: input.justification }),
+  recoveryQueue: ({ q, status, cursor, limit }: QueueQuery) => {
+    const params = new URLSearchParams({ status, limit: String(limit) });
+    if (q.trim()) {
+      params.set("q", q.trim());
+    }
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+    return request<RecoveryPage>("GET", `/owner-recovery?${params.toString()}`);
+  },
+  createRecovery: (input: RecoveryCreateInput) => request<RecoveryCreateResponse>("POST", "/owner-recovery", input),
+  recoveryDetail: (caseId: string) => request<RecoveryDetail>("GET", `/owner-recovery/${encodeURIComponent(caseId)}`),
+  decideRecovery: (kind: RecoveryDecisionKind, caseId: string, input: DecisionInput) =>
+    request<RecoveryDecisionResponse>("POST", `/owner-recovery/${encodeURIComponent(caseId)}${recoveryDecisionPath[kind]}`, { expectedStatementSha256: input.expectedStatementSha256, justification: input.justification }),
 };

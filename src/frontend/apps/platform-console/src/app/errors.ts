@@ -52,6 +52,28 @@ export function describeError(error: unknown): ErrorView {
       return { title: "Organization name already in use", message: "Another organization or pending request already uses this name. Choose a different name.", tone: "warning", reload: false, retryable: false, reference };
     case "ORGANIZATION_OWNER_IS_OPERATOR":
       return { title: "An owner is a Platform Operator", message: "A Platform Operator cannot be an initial owner of an organization they onboard. Choose a different owner.", tone: "danger", reload: false, retryable: false, reference };
+    case "OWNER_RECOVERY_WAITING_PERIOD":
+      return { title: "The waiting period has not ended", message: "Recovery cannot run until the waiting period ends, so the organization's owners can object. Nothing was changed. Reload and try again after it ends.", tone: "warning", reload: true, retryable: false, reference };
+    case "OWNER_RECOVERY_OBJECTED":
+      return { title: "An owner objected", message: "An owner of the organization objected to this recovery, so it is blocked. Cancel the case and investigate before opening a new one.", tone: "danger", reload: true, retryable: false, reference };
+    case "OWNER_RECOVERY_APPROVALS_INCOMPLETE":
+      return { title: "Not enough approvals", message: "Recovery needs approvals from three different operators. Nothing was changed. Reload to see the current approvals.", tone: "warning", reload: true, retryable: false, reference };
+    case "OWNER_RECOVERY_CASE_EXISTS":
+      return { title: "A recovery case is already open", message: "This organization already has an open recovery case. Open that case instead of creating another.", tone: "warning", reload: false, retryable: false, reference };
+    case "OWNER_RECOVERY_NOT_APPLICABLE":
+      return { title: "Recovery is not needed", message: "The organization still has enough enabled owners, so recovery does not apply. Nothing was changed.", tone: "warning", reload: false, retryable: false, reference };
+    case "OWNER_RECOVERY_EVIDENCE_REQUIRED":
+      return { title: "Evidence is required", message: "Each owner declared unavailable needs a reason, an evidence reference and an evidence summary.", tone: "danger", reload: false, retryable: false, reference };
+    case "OWNER_RECOVERY_IDENTITY_CONFLICT":
+      return { title: "A replacement identity is not allowed", message: "A replacement owner is already linked to another person, is a Platform Operator, or is the same as a declared owner. Choose a different replacement.", tone: "danger", reload: false, retryable: false, reference };
+    case "OWNER_RECOVERY_OWNER_SET_CHANGED":
+      return { title: "The owners changed", message: "The organization's owners changed since the case was opened. Nothing was changed. Cancel the case and open a new one.", tone: "warning", reload: true, retryable: false, reference };
+    case "OWNER_RECOVERY_DECLARED_OWNER_ACTIVE":
+      return { title: "A declared owner is active", message: "An owner declared unavailable has signed in since the case was opened. Cancel the case and review it.", tone: "warning", reload: true, retryable: false, reference };
+    case "OWNER_RECOVERY_EXPIRED":
+      return { title: "The case expired", message: "This recovery case expired, so it can no longer be decided. Reload to see its current status.", tone: "warning", reload: true, retryable: false, reference };
+    case "OWNER_RECOVERY_NOT_OPEN":
+      return { title: "The case does not allow this now", message: "It was already recovered, cancelled or expired. Reload to see its current status.", tone: "warning", reload: true, retryable: false, reference };
     case "SIGNING_UNAVAILABLE":
       return { title: "Service unavailable", message: "Signing is not available right now. Nothing was recorded. Try again shortly.", tone: "warning", reload: false, retryable: true, reference };
     case "INVALID_REQUEST":

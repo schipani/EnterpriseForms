@@ -1280,9 +1280,15 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_onboarding_request_id");
 
+                    b.Property<Guid?>("OrganizationOwnerRecoveryCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_owner_recovery_case_id");
+
                     b.HasKey("IdentityBindingId");
 
                     b.HasIndex("OrganizationOnboardingRequestId");
+
+                    b.HasIndex("OrganizationOwnerRecoveryCaseId");
 
                     b.HasIndex("OrganizationId", "AuthorityUserId")
                         .IsUnique()
@@ -1296,7 +1302,7 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_identity_binding_disabled_state", "(identity_binding_enabled AND identity_disabled_on IS NULL) OR (NOT identity_binding_enabled AND identity_disabled_on IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_identity_binding_single_provenance", "organization_membership_request_id IS NULL OR organization_onboarding_request_id IS NULL");
+                            t.HasCheckConstraint("ck_identity_binding_single_provenance", "num_nonnulls(organization_membership_request_id, organization_onboarding_request_id, organization_owner_recovery_case_id) <= 1");
                         });
                 });
 
@@ -1998,6 +2004,394 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_onboarding_state", "onboarding_state_name IN ('PendingApproval','AwaitingKeyCustody','Initialized','Rejected','Cancelled','Expired')");
 
                             t.HasCheckConstraint("ck_onboarding_statement", "octet_length(onboarding_statement_sha256) = 32 AND octet_length(create_request_digest) = 32");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoveryApproval", b =>
+                {
+                    b.Property<Guid>("OrganizationOwnerRecoveryApprovalId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_owner_recovery_approval_id");
+
+                    b.Property<DateTimeOffset?>("ApprovalClosedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approval_closed_on");
+
+                    b.Property<string>("ApprovalClosureReasonName")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("approval_closure_reason_name");
+
+                    b.Property<string>("ApprovalEvidenceIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("approval_evidence_identifier");
+
+                    b.Property<string>("ApprovalEvidenceKindName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("approval_evidence_kind_name");
+
+                    b.Property<byte[]>("ApprovalEvidenceSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("approval_evidence_sha256");
+
+                    b.Property<string>("ApprovalJustificationText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("approval_justification_text");
+
+                    b.Property<DateTimeOffset>("ApprovalRecordedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approval_recorded_on");
+
+                    b.Property<string>("ApprovalStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("approval_state_name");
+
+                    b.Property<byte[]>("ApprovalStatementSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("approval_statement_sha256");
+
+                    b.Property<Guid>("OrganizationOwnerRecoveryCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_owner_recovery_case_id");
+
+                    b.Property<Guid>("PlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_operator_id");
+
+                    b.HasKey("OrganizationOwnerRecoveryApprovalId");
+
+                    b.HasIndex("ApprovalEvidenceIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("uq_owner_recovery_approval_evidence_id");
+
+                    b.HasIndex("ApprovalEvidenceSha256")
+                        .IsUnique()
+                        .HasDatabaseName("uq_owner_recovery_approval_evidence");
+
+                    b.HasIndex("PlatformOperatorId");
+
+                    b.HasIndex("OrganizationOwnerRecoveryCaseId", "PlatformOperatorId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_owner_recovery_approval_operator")
+                        .HasFilter("approval_state_name IN ('Valid','Consumed')");
+
+                    b.ToTable("organization_owner_recovery_approvals", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_owner_recovery_approval_closed", "(approval_state_name IN ('Withdrawn','Invalidated')) = (approval_closed_on IS NOT NULL AND approval_closure_reason_name IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_owner_recovery_approval_digests", "octet_length(approval_statement_sha256) = 32 AND octet_length(approval_evidence_sha256) = 32");
+
+                            t.HasCheckConstraint("ck_owner_recovery_approval_state", "approval_state_name IN ('Valid','Consumed','Withdrawn','Invalidated')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoveryCase", b =>
+                {
+                    b.Property<Guid>("OrganizationOwnerRecoveryCaseId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_owner_recovery_case_id");
+
+                    b.Property<DateTimeOffset?>("CaseClosedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("case_closed_on");
+
+                    b.Property<string>("CaseClosureReasonName")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("case_closure_reason_name");
+
+                    b.Property<DateTimeOffset>("CaseExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("case_expires_on");
+
+                    b.Property<DateTimeOffset>("CaseOpenedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("case_opened_on");
+
+                    b.Property<long>("CaseRowRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("case_row_revision");
+
+                    b.Property<Guid?>("ClosedByPlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closed_by_platform_operator_id");
+
+                    b.Property<string>("ClosureJustificationText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("closure_justification_text");
+
+                    b.Property<string>("CreateIdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("create_idempotency_key");
+
+                    b.Property<byte[]>("CreateRequestDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("create_request_digest");
+
+                    b.Property<Guid?>("ExecutedByPlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("executed_by_platform_operator_id");
+
+                    b.Property<Guid?>("ExecutedBySecurityCommandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("executed_by_security_command_id");
+
+                    b.Property<string>("IncidentReferenceText")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("incident_reference_text");
+
+                    b.Property<string>("LastExecutionFailureCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("last_execution_failure_code");
+
+                    b.Property<DateTimeOffset?>("LastExecutionFailureOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_execution_failure_on");
+
+                    b.Property<Guid?>("ObjectedByAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("objected_by_authority_user_id");
+
+                    b.Property<DateTimeOffset?>("ObjectedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("objected_on");
+
+                    b.Property<string>("ObjectionReasonText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("objection_reason_text");
+
+                    b.Property<Guid>("OpenedByPlatformOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("opened_by_platform_operator_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<byte[]>("OwnerSetSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("owner_set_sha256");
+
+                    b.Property<DateTimeOffset?>("RecoveredOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recovered_on");
+
+                    b.Property<string>("RecoveryReasonText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("recovery_reason_text");
+
+                    b.Property<string>("RecoveryStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("recovery_state_name");
+
+                    b.Property<string>("RecoveryStatementJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("recovery_statement_json");
+
+                    b.Property<byte[]>("RecoveryStatementSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("recovery_statement_sha256");
+
+                    b.Property<DateTimeOffset>("WaitingPeriodEndsOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("waiting_period_ends_on");
+
+                    b.HasKey("OrganizationOwnerRecoveryCaseId");
+
+                    b.HasIndex("ClosedByPlatformOperatorId");
+
+                    b.HasIndex("ExecutedByPlatformOperatorId");
+
+                    b.HasIndex("OrganizationId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_owner_recovery_open_case")
+                        .HasFilter("recovery_state_name = 'Open'");
+
+                    b.HasIndex("CaseOpenedOn", "OrganizationOwnerRecoveryCaseId")
+                        .HasDatabaseName("ix_owner_recovery_cases_recent");
+
+                    b.HasIndex("OpenedByPlatformOperatorId", "CreateIdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_owner_recovery_create_idempotency");
+
+                    b.ToTable("organization_owner_recovery_cases", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_owner_recovery_closed", "(recovery_state_name = 'Open') = (case_closed_on IS NULL)");
+
+                            t.HasCheckConstraint("ck_owner_recovery_digests", "octet_length(recovery_statement_sha256) = 32 AND octet_length(create_request_digest) = 32 AND octet_length(owner_set_sha256) = 32");
+
+                            t.HasCheckConstraint("ck_owner_recovery_objected", "(recovery_state_name = 'Objected') = (objected_on IS NOT NULL AND objected_by_authority_user_id IS NOT NULL AND objection_reason_text IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_owner_recovery_recovered", "(recovery_state_name = 'Recovered') = (recovered_on IS NOT NULL AND executed_by_platform_operator_id IS NOT NULL AND executed_by_security_command_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_owner_recovery_revision", "case_row_revision > 0");
+
+                            t.HasCheckConstraint("ck_owner_recovery_state", "recovery_state_name IN ('Open','Objected','Recovered','Cancelled','Expired','Invalidated')");
+
+                            t.HasCheckConstraint("ck_owner_recovery_times", "waiting_period_ends_on > case_opened_on AND case_expires_on > waiting_period_ends_on");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoverySubject", b =>
+                {
+                    b.Property<Guid>("OrganizationOwnerRecoverySubjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_owner_recovery_subject_id");
+
+                    b.Property<string>("EvidenceReferenceText")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("evidence_reference_text");
+
+                    b.Property<string>("EvidenceSummaryText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("evidence_summary_text");
+
+                    b.Property<bool>("IsNewIdentity")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_new_identity");
+
+                    b.Property<Guid>("OrganizationOwnerRecoveryCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_owner_recovery_case_id");
+
+                    b.Property<string>("RecoverySubjectRoleName")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("recovery_subject_role_name");
+
+                    b.Property<Guid>("SubjectAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_authority_user_id");
+
+                    b.Property<string>("SubjectDisplayNameHint")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject_display_name_hint");
+
+                    b.Property<string>("SubjectIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("subject_identifier");
+
+                    b.Property<string>("SubjectIssuerUri")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("subject_issuer_uri");
+
+                    b.Property<int>("SubjectOrdinalNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject_ordinal_number");
+
+                    b.Property<string>("UnavailabilityReasonName")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("unavailability_reason_name");
+
+                    b.Property<string>("VerificationMethodName")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("verification_method_name");
+
+                    b.Property<string>("VerificationReferenceText")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("verification_reference_text");
+
+                    b.HasKey("OrganizationOwnerRecoverySubjectId");
+
+                    b.HasIndex("OrganizationOwnerRecoveryCaseId", "RecoverySubjectRoleName", "SubjectAuthorityUserId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_owner_recovery_subject_user");
+
+                    b.HasIndex("OrganizationOwnerRecoveryCaseId", "SubjectIssuerUri", "SubjectIdentifier")
+                        .IsUnique()
+                        .HasDatabaseName("uq_owner_recovery_subject_identity");
+
+                    b.ToTable("organization_owner_recovery_subjects", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_owner_recovery_subject_declared", "recovery_subject_role_name <> 'DeclaredUnavailable' OR (NOT is_new_identity AND unavailability_reason_name IS NOT NULL AND evidence_reference_text IS NOT NULL AND evidence_summary_text IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_owner_recovery_subject_replacement", "recovery_subject_role_name <> 'Replacement' OR (verification_method_name IS NOT NULL AND verification_reference_text IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_owner_recovery_subject_role", "recovery_subject_role_name IN ('Replacement','DeclaredUnavailable')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationRecoveredOwnerProbation", b =>
+                {
+                    b.Property<Guid>("OrganizationRecoveredOwnerProbationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_recovered_owner_probation_id");
+
+                    b.Property<Guid>("AuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authority_user_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("OrganizationOwnerRecoveryCaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_owner_recovery_case_id");
+
+                    b.Property<DateTimeOffset>("ProbationCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("probation_created_on");
+
+                    b.Property<DateTimeOffset>("ProbationEndsOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("probation_ends_on");
+
+                    b.HasKey("OrganizationRecoveredOwnerProbationId");
+
+                    b.HasIndex("OrganizationOwnerRecoveryCaseId");
+
+                    b.HasIndex("OrganizationId", "ProbationEndsOn")
+                        .HasDatabaseName("ix_recovered_owner_probations_active");
+
+                    b.HasIndex("OrganizationId", "AuthorityUserId", "OrganizationOwnerRecoveryCaseId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_recovered_owner_probation");
+
+                    b.ToTable("organization_recovered_owner_probations", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_recovered_owner_probation_period", "probation_ends_on > probation_created_on");
                         });
                 });
 
@@ -3024,6 +3418,12 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasForeignKey("OrganizationOnboardingRequestId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_identity_onboarding_request");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoveryCase", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationOwnerRecoveryCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_identity_owner_recovery_case");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", b =>
@@ -3149,6 +3549,73 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasForeignKey("InitializedByPlatformOperatorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_onboarding_initializer");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoveryApproval", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoveryCase", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationOwnerRecoveryCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_owner_recovery_approval_case");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("PlatformOperatorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_owner_recovery_approval_operator");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoveryCase", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("ClosedByPlatformOperatorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_owner_recovery_closer");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("ExecutedByPlatformOperatorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_owner_recovery_executor");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", null)
+                        .WithMany()
+                        .HasForeignKey("OpenedByPlatformOperatorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_owner_recovery_opener");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_owner_recovery_organization");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoverySubject", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoveryCase", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationOwnerRecoveryCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_owner_recovery_subject_case");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationRecoveredOwnerProbation", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.PlatformOperators.OrganizationOwnerRecoveryCase", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationOwnerRecoveryCaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_recovered_owner_probation_case");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.PlatformOperators.PlatformOperator", b =>

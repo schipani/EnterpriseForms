@@ -86,6 +86,14 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<OrganizationOnboardingApproval> OnboardingApprovals => Set<OrganizationOnboardingApproval>();
 
+    public DbSet<OrganizationOwnerRecoveryCase> OwnerRecoveryCases => Set<OrganizationOwnerRecoveryCase>();
+
+    public DbSet<OrganizationOwnerRecoverySubject> OwnerRecoverySubjects => Set<OrganizationOwnerRecoverySubject>();
+
+    public DbSet<OrganizationOwnerRecoveryApproval> OwnerRecoveryApprovals => Set<OrganizationOwnerRecoveryApproval>();
+
+    public DbSet<OrganizationRecoveredOwnerProbation> RecoveredOwnerProbations => Set<OrganizationRecoveredOwnerProbation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

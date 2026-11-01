@@ -29,4 +29,7 @@ public sealed class IdentityBinding
 
     /// <summary>C8 onboarding: the onboarding request that created this initial-owner binding (null otherwise).</summary>
     public Guid? OrganizationOnboardingRequestId { get; set; }
+
+    /// <summary>C8 owner recovery: the recovery case that created this binding for a new replacement owner (null otherwise).</summary>
+    public Guid? OrganizationOwnerRecoveryCaseId { get; set; }
 }

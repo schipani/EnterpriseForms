@@ -70,6 +70,11 @@ export type UpdateFieldSearchersRequest = S["UpdateFieldSearchersRequest"];
 export type FieldSearchAdministrationResponse = S["FieldSearchAdministrationResponse"];
 export type FieldSearchAdministrationFormResponse = S["FieldSearchAdministrationFormResponse"];
 export type SecurityAdministratorsResponse = S["SecurityAdministratorsResponse"];
+export type OwnerRecoveryNoticeResponse = S["OwnerRecoveryNoticeResponse"];
+export type OwnerRecoveryNoticeCaseResponse = S["OwnerRecoveryNoticeCaseResponse"];
+export type OwnerRecoveryNoticeSubjectResponse = S["OwnerRecoveryNoticeSubjectResponse"];
+export type OwnerRecoveryObjectionRequest = S["OwnerRecoveryObjectionRequest"];
+export type OwnerRecoveryObjectionResponse = S["OwnerRecoveryObjectionResponse"];
 export type SecurityAdministratorResponse = S["SecurityAdministratorResponse"];
 export type AppointSecurityAdministratorRequest = S["AppointSecurityAdministratorRequest"];
 export type RemoveSecurityAdministratorRequest = S["RemoveSecurityAdministratorRequest"];
@@ -355,6 +360,9 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       securityAdministrators: (signal?: AbortSignal) => read<SecurityAdministratorsResponse>("organization.securityAdministrators", undefined, undefined, "interactive-read", signal),
       appointSecurityAdministrator: (request: AppointSecurityAdministratorRequest) => write<void>("POST", "organization.appointSecurityAdministrator", undefined, request, { lane: "security", resourceKey: "organization:security-administrators" }),
       removeSecurityAdministrator: (userId: string, request: RemoveSecurityAdministratorRequest) => write<void>("POST", "organization.removeSecurityAdministrator", { userId }, request, { lane: "security", resourceKey: "organization:security-administrators" }),
+      /** C8 owner recovery (C-105): the open case, if the caller may see it; case is null otherwise. */
+      ownerRecoveryNotice: (signal?: AbortSignal) => read<OwnerRecoveryNoticeResponse>("organization.ownerRecoveryNotice", undefined, undefined, "interactive-read", signal),
+      objectToOwnerRecovery: (caseId: string, request: OwnerRecoveryObjectionRequest) => write<OwnerRecoveryObjectionResponse>("POST", "organization.objectToOwnerRecovery", { caseId }, request, { lane: "security", resourceKey: "organization:owner-recovery" }),
       securityPolicy: (signal?: AbortSignal) => read<OrganizationSecurityPolicyResponse>("organization.securityPolicy", undefined, undefined, "interactive-read", signal),
       updateSecurityPolicy: (request: UpdateOrganizationSecurityPolicyRequest) => write<OrganizationSecurityPolicyResponse>("PUT", "organization.updateSecurityPolicy", undefined, request, { resourceKey: "security-policy" }),
       /** Phase C8 M1 (PG-041): independently computed parts; owners and Security Administrators only. */

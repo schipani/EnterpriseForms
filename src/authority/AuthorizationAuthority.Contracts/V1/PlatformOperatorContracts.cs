@@ -27,6 +27,9 @@ public static class PlatformOperationKinds
 
     /// <summary>C8 onboarding (C-104): approve, withdraw, reject, cancel and initialize decisions on one onboarding request.</summary>
     public const string OrganizationOnboarding = "OrganizationOnboarding";
+
+    /// <summary>C8 owner recovery (C-105): approve, withdraw, cancel and execute decisions on one recovery case.</summary>
+    public const string OrganizationOwnerRecovery = "OrganizationOwnerRecovery";
 }
 
 /// <summary>The four platform permissions (D8-34). V1: every active operator holds all four; checked by the Authority on every call.</summary>

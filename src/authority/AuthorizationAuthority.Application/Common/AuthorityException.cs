@@ -123,6 +123,21 @@ public static class AuthorityErrorCodes
     public const string OrganizationIdReserved = "ORGANIZATION_ID_RESERVED";
     public const string LegacyOrganizationBootstrapDisabled = "LEGACY_ORGANIZATION_BOOTSTRAP_DISABLED";
     public const string TeamJoinRequiresAnotherOwner = "TEAM_JOIN_REQUIRES_ANOTHER_OWNER";
+
+    // C8 owner recovery (C-105).
+    public const string OwnerRecoveryUnavailable = "OWNER_RECOVERY_UNAVAILABLE";
+    public const string OwnerRecoveryNotApplicable = "OWNER_RECOVERY_NOT_APPLICABLE";
+    public const string OwnerRecoveryCaseExists = "OWNER_RECOVERY_CASE_EXISTS";
+    public const string OwnerRecoveryNotOpen = "OWNER_RECOVERY_NOT_OPEN";
+    public const string OwnerRecoveryExpired = "OWNER_RECOVERY_EXPIRED";
+    public const string OwnerRecoveryApprovalsIncomplete = "OWNER_RECOVERY_APPROVALS_INCOMPLETE";
+    public const string OwnerRecoveryWaitingPeriod = "OWNER_RECOVERY_WAITING_PERIOD";
+    public const string OwnerRecoveryObjected = "OWNER_RECOVERY_OBJECTED";
+    public const string OwnerRecoveryOwnerSetChanged = "OWNER_RECOVERY_OWNER_SET_CHANGED";
+    public const string OwnerRecoveryDeclaredOwnerActive = "OWNER_RECOVERY_DECLARED_OWNER_ACTIVE";
+    public const string OwnerRecoveryIdentityConflict = "OWNER_RECOVERY_IDENTITY_CONFLICT";
+    public const string OwnerRecoveryEvidenceRequired = "OWNER_RECOVERY_EVIDENCE_REQUIRED";
+    public const string OwnerRecoveryProbation = "OWNER_RECOVERY_PROBATION";
     public const string CursorInvalid = "CURSOR_INVALID";
 }
 

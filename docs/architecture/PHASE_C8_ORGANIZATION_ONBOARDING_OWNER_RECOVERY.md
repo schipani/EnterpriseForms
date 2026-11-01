@@ -771,3 +771,71 @@ organizations, 13 identity bindings, 0 onboarding requests. Evidence: `artifacts
 Verified owner identity control (V3, PB-08) and its D8-48 detail; Entra operator sign-in and transaction-bound step-up; PIM; Managed HSM
 provisioning identity for organization keys; WORM archive; PB-10/PB-11/PB-12; executed G14 replay including onboarding; an independent
 security review. Owner recovery (D8-54…D8-56) awaits its own implementation approval.
+
+## 17. Owner recovery implemented for Development/Testing (C-105, 2026-11-01)
+
+Owner direction (C-105): implement owner recovery for Development/Testing with strong separation of duties and no implicit access to
+confidential records, applying the approved direction to the D8-54…D8-57 proposals. Implemented in the Authority, the business API
+(notice and objection only), the Platform Console BFF and PG-075. Not merged, not deployed to production, not independently reviewed;
+the legacy CLI is retained; M3 not started. **No recovery case was opened against any development organization** (the single-owner
+main development organization needs a separate explicit approval).
+
+### 17.1 D8-54…D8-57 reviewed against the owner's direction
+
+| Proposal | Owner direction (C-105) | Implemented | Material conflict? |
+|---|---|---|---|
+| D8-54 initiator + two operators (opening = approval 1) | Three distinct active operators, each authenticating, reviewing, giving an individual justification and signing the exact Authority statement | Opening a case grants nothing and needs no evidence; **three approvals** by three distinct active operators, each with their own evidence over the identical statement (the opener may be one of the three). Execution by any eligible operator after that | No — stricter reading of D8-54 |
+| D8-54 cooling-off 72 h production, ≥ 5 min Development/Testing | 72 h production target; configurable accelerated period in Development/Testing; Authority trusted time; not bypassable by a browser parameter | `OrganizationOnboarding:RecoveryWaitingPeriodSeconds`: default 259 200 (72 h); outside Development/Testing anything below 72 h refuses to start; Development/Testing minimum 10 s (security-test stack 20 s, development stack 10 min). Measured from opening on the Authority clock; no request field influences it | Minor: the Development/Testing floor is 10 s instead of 5 min so the real-stack tests can run (owner asked for a configurable accelerated period) |
+| D8-54 objection by any enabled owner or Security Administrator ends the case | Objection blocks immediately, needs an explanation, is auditable; operators cannot delete or disregard it; a disputed case needs a separately authorized resolution | Business-plane objection (step-up, 10–500-character explanation) moves the case to the terminal `Objected` state in one transaction and invalidates its approvals; no operator route can reopen, approve, cancel or execute an objected case. Resolution = a new case (the separately authorized process); no override exists | No. Deviation from §4.7: the objection is a platform journal event plus an organization audit event, **not** an organization security command (it changes no authorization revision) |
+| D8-55 enabled owners − declared unavailable < 2; declared owners keep their role | Recovery only below two eligible, available owners; verify owner status in the Authority; distinguish disabled from declared unavailable; documented evidence, not an operator's assertion; recheck before execution; never automatically disable or remove an owner | As proposed. A disabled owner is ineligible by state (declaring them is refused). Each declared-unavailable owner needs a reason, an evidence reference and an evidence summary (frozen in the signed statement; summary as SHA-256 in the statement, text in the case). Execution is refused and the case invalidated if a declared owner has **signed in since the case opened** (an Authority session record) | No |
+| D8-56 add-only, 1–3 replacements, ≥ 2 eligible after (3 recommended) | May establish verified replacement identities, add memberships where permitted and grant Owner; must not remove owners, disable users, change teams, record ownership or sharing, read or modify confidential records, or rewrite history; atomic | As proposed. Execution is one AuthorityDb transaction: bindings for new identities (Authority-generated user ids, provenance `organization_owner_recovery_case_id`), one security command `RecoverOrganizationOwners` whose plan holds **only** owner-edge additions, probations, case `Recovered`, organization audit event and platform journal event | No |
+| D8-57 14-day probation as the OB-F8 mitigation | Preserve OB-F8 (permanent); apply the 14-day safeguard where meaningful, not in place of OB-F8 | OB-F8 stays the permanent rule (no self-join; a different owner adds an owner to a team). The safeguard now covers what OB-F8 does not: for 14 days two owners recovered by the **same case** cannot act as each other's second person — no team addition between them, no designer grant between them, and no two-owner change (grant/revoke/disable/enable owner) proposed by one and executed by the other (`OWNER_RECOVERY_PROBATION`) | Extension (owner-change proposals added; without it two colluding recovered owners could remove the original owner the day after recovery). Not shown on the People page yet |
+
+Other review points: the platform-plane conflict rule now also excludes operators named in the case; operators bound in the
+organization can neither open nor decide; production execution is unavailable (`OWNER_RECOVERY_UNAVAILABLE`) because the approved
+issuer list — and therefore recovery — exists only in Development/Testing until PB-08 and an independent security review.
+
+### 17.2 Authority
+
+| Area | Implementation |
+|---|---|
+| Lifecycle | `Open → Recovered`, or `Objected`, `Cancelled`, `Expired`, `Invalidated` (all terminal). Display states Awaiting approvals, Waiting period, Ready for recovery, Recovering (command not yet Effective), Recovered, Blocked by objection, Cancelled, Expired, Invalidated. One open case per organization (partial unique index); a case expires 7 days after its waiting period (`RecoveryCaseDays`) |
+| Open | `POST /internal/v1/platform/owner-recovery` (dry run validates): incident reference, justification, declared-unavailable owners with evidence, 1–3 replacements (existing enabled non-owner members or new identities from the organization's single owner issuer, which must be an approved issuer; never an email; never a Platform Operator identity; not already bound). Statement `OwnerRecoveryStatement` v1 frozen (canonical JSON as text, microsecond timestamps) including the owner snapshot; owner-set digest stored. Per-operator idempotency key bound to the canonical input |
+| Decisions | Approve, withdraw own approval, cancel, execute — each with that operator's evidence (operation kind `OrganizationOwnerRecovery`, operation id = case id, organization, statement and justification digests; single use). Same operator twice `OPERATOR_ALREADY_APPROVED` (also a partial unique index); approvals of suspended/removed operators stop counting and are closed at the next decision; stale or replayed evidence refused |
+| Rechecks at every decision | Archive probe and rollback check; organization not quarantined; no conflict of interest; owner set unchanged (else the case is invalidated); still below two eligible owners (else invalidated). At execution additionally: three valid approvals of active operators, waiting period elapsed, no declared owner active since opening, every replacement identity still as recorded (else invalidated) and still not an operator identity |
+| Execution | Add-only atomic transaction (§17.1). Retried execution returns `Replayed` with the same command id; concurrent executions produce one command (real stack). Activation = the recovery command Effective (projected and anchored) |
+| Objection and notice | Business plane (workload credential + delegated user): `POST /internal/v1/organizations/owner-recovery/notice` and `…/objections`, for enabled owners and Security Administrators only (everyone else, including other organizations, gets not found). Notification: an organization audit event at opening plus the in-app notice; **no out-of-band delivery exists and none is claimed** |
+| Journal | Platform journal events `OwnerRecoveryOpened`, `…ApprovalRecorded`, `…ApprovalsComplete`, `…ApprovalWithdrawn`, `…Cancelled`, `…Objected`, `…Invalidated`, `…ExecutionRefused`, `…Executed` (plus refusals) carry the resulting case, subject, approval and probation rows, so `ReplayPlatformJournal` restores recovery after an AuthorityDb restore (unit-tested). Organization audit stream: opened, approvals, objected, cancelled, invalidated, executed, each detail view (`PlatformOwnerRecoveryCaseViewed`, committed before disclosure). Critical alerts at opening, objection and execution |
+| Locking | Organization row, then platform journal head, then the case row `FOR UPDATE`. The unlocked case lookup used to find the organization is untracked, so the locked read always sees a concurrent commit (defect found by the concurrent-execution stack test: the stale tracked copy reported `OWNER_RECOVERY_OWNER_SET_CHANGED` instead of `Replayed`; the database trigger had kept the case `Recovered`) |
+| Migration | `20261101221445_OwnerRecovery` (AuthorityDb, additive): `organization_owner_recovery_cases`, `…_subjects`, `…_approvals`, `organization_recovered_owner_probations`; nullable `identity_bindings.organization_owner_recovery_case_id` (single-provenance check widened to three columns); checks, partial unique indexes; triggers keep closed cases and closed approvals unchanged and subjects/probations immutable (SECURITY INVOKER, fixed `search_path`, EXECUTE revoked from PUBLIC); runtime grants `SELECT, INSERT, UPDATE`, no `DELETE` |
+| G14 | Recovery inherits the platform journal's archive-first semantics (head+1 probe, anchored grant-direction decisions, replay). Executed G14 recovery of the whole platform remains open |
+
+### 17.3 Business API and Platform Console
+
+- Business `Organizations` feature: `GET /api/v1/organization/owner-recovery` (no case for anyone the Authority does not authorize;
+  nothing disclosed) and `POST /api/v1/organization/owner-recovery/{caseId}/objections` (explanation, development step-up; 200 only after
+  the Authority recorded it). Port `IOwnerRecoveryNoticeAuthority`; no route opens, approves or executes; no operator credential or
+  signature reaches the business plane.
+- Console BFF `Features/OwnerRecovery`: `/console-api/v1/owner-recovery*`; decisions reuse dry run → fingerprint check → Vault signing →
+  submit (operation kind `OrganizationOwnerRecovery`, organization id from the dry run). Signing keys stay in Vault.
+- PG-075 in `apps/platform-console`: queue (organizations requiring recovery, filters, search, 15 per page), new case (current owners,
+  declare unavailable with evidence, replacements, Validate, Create), case details (owner status, proposed owners, evidence, n of 3,
+  waiting-period countdown from the Authority time, objection, statement and fingerprint, decisions with confirmation dialog). Existing
+  8 px controls, 12 px cards, 40 px inputs and 14 px control text reused (no new CSS). Business PG-041 Overview shows the notice and
+  objection form only to authorized people.
+- Known UI limitation: an existing member is chosen as a replacement by pasting the user id (the PG-072 detail has no member list).
+
+### 17.4 Tests (2026-11-01)
+
+Authority 301/301 (19 new), contract 488/488, BFF 23/23, architecture 75/75, integrity 34/34, real stack 4 new + 54 regression (57/58 in the combined run; the one failure, RC27 rate-limit throughput, passes alone), Vitest 365/365 (two workers; the default parallel run shows 2–4 load-related 5 s timeouts in existing tests that pass alone), console Playwright 26/32 then 6/6 after a spec race fix (owner-recovery spec 9/9), business Playwright 5/5 objection + 5/5 organization administration. Details and the defects found are in `docs/PHASE_C8_STATUS.md` §27.
+
+### 17.5 Development stack activation
+
+`devstack.py owner-recovery init` (2026-11-01): backup `Documents\EnterpriseForms-dev-backups\enterpriseforms-dev\20261101-185205` (7 volumes, cold copy) verified (checksums, entry counts) and restore-tested (IDENTICAL); migration `20261101221445_OwnerRecovery` applied; Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated; data unchanged before/after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records); PG-075 at `http://127.0.0.1:8095/platform/recovery` (waiting period 600 s). No recovery case was opened. Evidence: `artifacts/dev-persistent/enterpriseforms-dev-owner-recovery-init-20261101-185506.json`.
+
+### 17.6 Remaining production requirements
+
+Verified control of replacement identities (V3, PB-08) before activation; Entra operator sign-in and transaction-bound step-up (operators
+and objectors); out-of-band notification of affected parties with confirmed delivery; probation shown on People; PIM; WORM archive;
+executed G14 replay including recovery; an independent security review. Production execution remains unavailable until then.
+

@@ -122,6 +122,7 @@ public sealed class Program
         app.MapOperatorEndpoints();
         AuthorizationAuthority.Api.Features.PlatformOperators.PlatformEndpoints.MapPlatformEndpoints(app);
         AuthorizationAuthority.Api.Features.PlatformOperators.OrganizationOnboardingEndpoints.MapOrganizationOnboardingEndpoints(app);
+        AuthorizationAuthority.Api.Features.PlatformOperators.OwnerRecoveryEndpoints.MapOwnerRecoveryEndpoints(app);
         app.MapSessionEndpoints();
         app.MapFieldSearchEndpoints();
         AuthorizationAuthority.Api.Features.Membership.MembershipEndpoints.MapMembershipEndpoints(app);

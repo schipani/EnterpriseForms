@@ -54,6 +54,10 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<OrganizationOnboardingRequest> OnboardingRequests { get; } = [];
     public List<OrganizationOnboardingOwner> OnboardingOwners { get; } = [];
     public List<OrganizationOnboardingApproval> OnboardingApprovals { get; } = [];
+    public List<OrganizationOwnerRecoveryCase> RecoveryCases { get; } = [];
+    public List<OrganizationOwnerRecoverySubject> RecoverySubjects { get; } = [];
+    public List<OrganizationOwnerRecoveryApproval> RecoveryApprovals { get; } = [];
+    public List<OrganizationRecoveredOwnerProbation> RecoveryProbations { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
@@ -458,6 +462,94 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public Task<int> CountOrganizationsBindingIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) =>
             Task.FromResult(s.Bindings.Where(b => b.IdentityIssuerUri == issuerUri && b.IdentitySubjectIdentifier == subjectIdentifier).Select(b => b.OrganizationId).Distinct().Count());
+
+        // ---- C8 owner recovery ----
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseAsync(Guid organizationOwnerRecoveryCaseId, bool lockForUpdate, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoveryCases.FirstOrDefault(c => c.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId));
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoveryCases.FirstOrDefault(c => c.OpenedByPlatformOperatorId == platformOperatorId && c.CreateIdempotencyKey == idempotencyKey));
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOpenOwnerRecoveryCaseAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoveryCases.FirstOrDefault(c => c.OrganizationId == organizationId && c.RecoveryStateName == OwnerRecoveryStates.Open));
+
+        public void AddOwnerRecoveryCase(OrganizationOwnerRecoveryCase recoveryCase)
+        {
+            if (s.RecoveryCases.Any(c => (c.OrganizationId == recoveryCase.OrganizationId && c.RecoveryStateName == OwnerRecoveryStates.Open && recoveryCase.RecoveryStateName == OwnerRecoveryStates.Open)
+                                         || (c.OpenedByPlatformOperatorId == recoveryCase.OpenedByPlatformOperatorId && c.CreateIdempotencyKey == recoveryCase.CreateIdempotencyKey)))
+            {
+                throw new InvalidOperationException("unique index violation (owner recovery case)");
+            }
+
+            s.RecoveryCases.Add(recoveryCase);
+        }
+
+        public Task<List<OrganizationOwnerRecoverySubject>> GetOwnerRecoverySubjectsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoverySubjects.Where(x => x.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId).OrderBy(x => x.RecoverySubjectRoleName, StringComparer.Ordinal).ThenBy(x => x.SubjectOrdinalNumber).ToList());
+
+        public Task<OrganizationOwnerRecoverySubject?> FindOwnerRecoverySubjectAsync(Guid organizationOwnerRecoverySubjectId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoverySubjects.FirstOrDefault(x => x.OrganizationOwnerRecoverySubjectId == organizationOwnerRecoverySubjectId));
+
+        public void AddOwnerRecoverySubject(OrganizationOwnerRecoverySubject subject) => s.RecoverySubjects.Add(subject);
+
+        public Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoveryApprovals.Where(a => a.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId).OrderBy(a => a.ApprovalRecordedOn).ThenBy(a => a.OrganizationOwnerRecoveryApprovalId).ToList());
+
+        public Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsForCasesAsync(IReadOnlyCollection<Guid> organizationOwnerRecoveryCaseIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoveryApprovals.Where(a => organizationOwnerRecoveryCaseIds.Contains(a.OrganizationOwnerRecoveryCaseId)).ToList());
+
+        public Task<OrganizationOwnerRecoveryApproval?> FindOwnerRecoveryApprovalAsync(Guid organizationOwnerRecoveryApprovalId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoveryApprovals.FirstOrDefault(a => a.OrganizationOwnerRecoveryApprovalId == organizationOwnerRecoveryApprovalId));
+
+        public void AddOwnerRecoveryApproval(OrganizationOwnerRecoveryApproval approval)
+        {
+            if (s.RecoveryApprovals.Any(a => a.ApprovalEvidenceSha256.AsSpan().SequenceEqual(approval.ApprovalEvidenceSha256) || a.ApprovalEvidenceIdentifier == approval.ApprovalEvidenceIdentifier
+                                             || (a.OrganizationOwnerRecoveryCaseId == approval.OrganizationOwnerRecoveryCaseId && a.PlatformOperatorId == approval.PlatformOperatorId
+                                                 && a.ApprovalStateName is OnboardingApprovalStates.Valid or OnboardingApprovalStates.Consumed)))
+            {
+                throw new InvalidOperationException("unique index violation (owner recovery approval)");
+            }
+
+            s.RecoveryApprovals.Add(approval);
+        }
+
+        public Task<OwnerRecoveryStorePage> SearchOwnerRecoveryCasesAsync(OwnerRecoveryQuery query, CancellationToken cancellationToken)
+        {
+            var now = query.Now;
+            int Valid(OrganizationOwnerRecoveryCase c) => s.RecoveryApprovals.Count(a => a.OrganizationOwnerRecoveryCaseId == c.OrganizationOwnerRecoveryCaseId && a.ApprovalStateName == OnboardingApprovalStates.Valid);
+            bool Open(OrganizationOwnerRecoveryCase c) => c.RecoveryStateName == OwnerRecoveryStates.Open && c.CaseExpiresOn > now;
+            var all = s.RecoveryCases.Where(c => query.Status switch
+            {
+                OwnerRecoveryFilters.Open => Open(c),
+                OwnerRecoveryFilters.AwaitingApprovals => Open(c) && Valid(c) < 3,
+                OwnerRecoveryFilters.WaitingPeriod => Open(c) && Valid(c) >= 3 && c.WaitingPeriodEndsOn > now,
+                OwnerRecoveryFilters.Ready => Open(c) && Valid(c) >= 3 && c.WaitingPeriodEndsOn <= now,
+                OwnerRecoveryFilters.Objected => c.RecoveryStateName == OwnerRecoveryStates.Objected,
+                OwnerRecoveryFilters.Recovered => c.RecoveryStateName == OwnerRecoveryStates.Recovered,
+                OwnerRecoveryFilters.Closed => c.RecoveryStateName is OwnerRecoveryStates.Cancelled or OwnerRecoveryStates.Expired or OwnerRecoveryStates.Invalidated || (c.RecoveryStateName == OwnerRecoveryStates.Open && c.CaseExpiresOn <= now),
+                _ => true,
+            }).Select(c => new OwnerRecoveryStoreRow(c, s.Organizations.Single(o => o.OrganizationId == c.OrganizationId).OrganizationDisplayName, Valid(c)))
+              .Where(r => string.IsNullOrWhiteSpace(query.Text) || r.OrganizationDisplayName.Contains(query.Text, StringComparison.OrdinalIgnoreCase) || r.Case.IncidentReferenceText.Contains(query.Text, StringComparison.OrdinalIgnoreCase)).ToList();
+            var ordered = all.OrderByDescending(r => r.Case.CaseOpenedOn).ThenByDescending(r => r.Case.OrganizationOwnerRecoveryCaseId).AsEnumerable();
+            if (query.After is { } after)
+            {
+                ordered = ordered.Where(r => r.Case.CaseOpenedOn < after.OpenedOn || (r.Case.CaseOpenedOn == after.OpenedOn && r.Case.OrganizationOwnerRecoveryCaseId.CompareTo(after.CaseId) < 0));
+            }
+
+            return Task.FromResult(new OwnerRecoveryStorePage(ordered.Take(query.Limit).ToList(), all.Count));
+        }
+
+        public Task<List<OrganizationRecoveredOwnerProbation>> GetActiveRecoveredOwnerProbationsAsync(Guid organizationId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoveryProbations.Where(p => p.OrganizationId == organizationId && p.ProbationEndsOn > now).ToList());
+
+        public Task<OrganizationRecoveredOwnerProbation?> FindRecoveredOwnerProbationAsync(Guid organizationRecoveredOwnerProbationId, CancellationToken cancellationToken) =>
+            Task.FromResult(s.RecoveryProbations.FirstOrDefault(p => p.OrganizationRecoveredOwnerProbationId == organizationRecoveredOwnerProbationId));
+
+        public void AddRecoveredOwnerProbation(OrganizationRecoveredOwnerProbation probation) => s.RecoveryProbations.Add(probation);
+
+        public Task<int> CountSessionsCreatedSinceAsync(Guid identityBindingId, DateTimeOffset since, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Sessions.Count(x => x.IdentityBindingId == identityBindingId && x.SessionCreatedOn >= since));
 
         public Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 

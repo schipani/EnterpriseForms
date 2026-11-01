@@ -98,8 +98,8 @@ public static partial class CommandPlanner
         var plan = request.CommandKind switch
         {
             SecurityCommandKind.RegisterTeam => await RegisterTeamAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.AddTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: true, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.RemoveTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: false, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.AddTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: true, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RemoveTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: false, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterFormDefinition => await RegisterFormDefinitionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateFormUsers => await UpdateFormUsersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterRecord => await RegisterRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -165,7 +165,7 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> TeamMembershipAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, bool add, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> TeamMembershipAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, bool add, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<TeamMemberPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.Team, payload.TeamId);
@@ -194,6 +194,11 @@ public static partial class CommandPlanner
             // OB-F8: adding an organization owner to a team needs a different organization owner (preferred independent authorizer), not a
             // Security Administrator, so an owner's record access through teams always rests on a second owner's decision.
             throw new AuthorityException(AuthorityErrorCodes.TeamJoinRequiresAnotherOwner, 403, false, "only a different organization owner can add an organization owner to a team");
+        }
+
+        if (add)
+        {
+            await RequireNotSameRecoveryAsync(scope, organizationId, actor.AuthorityUserId, payload.MemberUserId, now, cancellationToken).ConfigureAwait(false);
         }
 
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, payload.TeamId, cancellationToken).ConfigureAwait(false);

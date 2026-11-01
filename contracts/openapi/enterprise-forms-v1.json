@@ -4699,6 +4699,89 @@
         }
       }
     },
+    "/api/v1/organization/owner-recovery": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "The organization's open owner recovery case (reference, justification, proposed and declared-unavailable owners, waiting period, approval progress) for enabled owners and Security Administrators; no case for anyone else.",
+        "operationId": "GetOwnerRecoveryNotice",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryNoticeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/owner-recovery/{caseId}/objections": {
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Objects to the open owner recovery case (explanation, fresh step-up). Returns only after the Authority recorded it; the case then cannot be executed. 404 for anyone who is not an enabled owner or Security Administrator.",
+        "operationId": "ObjectToOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryObjectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryObjectionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users": {
       "get": {
         "tags": [
@@ -9705,6 +9788,150 @@
           },
           "canApprove": {
             "type": "boolean"
+          }
+        }
+      },
+      "OwnerRecoveryNoticeCaseResponse": {
+        "required": [
+          "caseId",
+          "incidentReference",
+          "justification",
+          "openedOn",
+          "waitingPeriodEndsOn",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "subjects"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incidentReference": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "openedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waitingPeriodEndsOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryNoticeSubjectResponse"
+            }
+          }
+        }
+      },
+      "OwnerRecoveryNoticeResponse": {
+        "required": [
+          "case",
+          "canObject"
+        ],
+        "type": "object",
+        "properties": {
+          "case": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRecoveryNoticeCaseResponse"
+              }
+            ]
+          },
+          "canObject": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OwnerRecoveryNoticeSubjectResponse": {
+        "required": [
+          "role",
+          "authorityUserId",
+          "displayName",
+          "isNewIdentity",
+          "unavailabilityReason"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "isNewIdentity": {
+            "type": "boolean"
+          },
+          "unavailabilityReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OwnerRecoveryObjectionRequest": {
+        "required": [
+          "reason",
+          "useDevelopmentStepUp"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OwnerRecoveryObjectionResponse": {
+        "required": [
+          "caseId",
+          "state",
+          "objectedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "objectedOn": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

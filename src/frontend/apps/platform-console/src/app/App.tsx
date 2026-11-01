@@ -5,6 +5,9 @@ import { ApprovalsPage } from "../pages/ApprovalsPage";
 import { OnboardingDetailPage } from "../pages/OnboardingDetailPage";
 import { OnboardingNewPage } from "../pages/OnboardingNewPage";
 import { OnboardingQueuePage } from "../pages/OnboardingQueuePage";
+import { RecoveryDetailPage } from "../pages/RecoveryDetailPage";
+import { RecoveryNewPage } from "../pages/RecoveryNewPage";
+import { RecoveryQueuePage } from "../pages/RecoveryQueuePage";
 import { OrganizationDetailPage, OrganizationsPage } from "../pages/OrganizationsPage";
 import { ReviewPage } from "../pages/ReviewPage";
 import { SignInPage } from "../pages/SignInPage";
@@ -22,6 +25,9 @@ const pageTitles: Record<string, string> = {
   onboarding: "Organization onboarding",
   "onboarding-new": "New organization",
   "onboarding-detail": "Onboarding request",
+  recovery: "Owner recovery",
+  "recovery-new": "New recovery case",
+  "recovery-detail": "Recovery case",
 };
 
 const navLinkClass = "flex min-h-11 items-center rounded-control px-3 text-control font-medium underline-offset-4 hover:underline aria-[current=page]:underline";
@@ -76,6 +82,7 @@ function Shell() {
                 {[
                   { href: "/platform/organizations", label: "Organizations", current: route.name === "organizations" || route.name === "organization" },
                   { href: "/platform/onboarding", label: "Onboarding", current: route.name === "onboarding" || route.name === "onboarding-new" || route.name === "onboarding-detail" },
+                  { href: "/platform/recovery", label: "Owner recovery", current: route.name === "recovery" || route.name === "recovery-new" || route.name === "recovery-detail" },
                   { href: "/platform/approvals", label: "Operator approvals", current: route.name === "approvals" || route.name === "review" },
                 ].map((link) => (
                   <a
@@ -131,6 +138,9 @@ function Shell() {
         {signedIn && route.name === "onboarding" ? <OnboardingQueuePage /> : null}
         {signedIn && route.name === "onboarding-new" ? <OnboardingNewPage /> : null}
         {signedIn && route.name === "onboarding-detail" ? <OnboardingDetailPage key={route.requestId} requestId={route.requestId} /> : null}
+        {signedIn && route.name === "recovery" ? <RecoveryQueuePage /> : null}
+        {signedIn && route.name === "recovery-new" ? <RecoveryNewPage /> : null}
+        {signedIn && route.name === "recovery-detail" ? <RecoveryDetailPage key={route.caseId} caseId={route.caseId} /> : null}
         {signedIn && route.name === "not-found" ? (
           <div className="flex flex-col items-start gap-3">
             <h1 className="text-2xl font-semibold">Page not found</h1>

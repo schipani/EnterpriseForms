@@ -45,12 +45,13 @@ public sealed class IdentityBindingConfiguration : IEntityTypeConfiguration<Iden
         builder.HasIndex(e => new { e.OrganizationId, e.AuthorityUserId }).IsUnique().HasDatabaseName("uq_authority_user_per_org");
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_identity_org");
         builder.HasOne<OrganizationOnboardingRequest>().WithMany().HasForeignKey(e => e.OrganizationOnboardingRequestId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_identity_onboarding_request");
+        builder.HasOne<OrganizationOwnerRecoveryCase>().WithMany().HasForeignKey(e => e.OrganizationOwnerRecoveryCaseId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_identity_owner_recovery_case");
         builder.ToTable(t =>
         {
             // AC-7.2: a disabled membership always records when it was disabled; an enabled one never carries that time.
             t.HasCheckConstraint("ck_identity_binding_disabled_state", "(identity_binding_enabled AND identity_disabled_on IS NULL) OR (NOT identity_binding_enabled AND identity_disabled_on IS NOT NULL)");
             // C8 onboarding: a binding has at most one provenance (membership request or onboarding request).
-            t.HasCheckConstraint("ck_identity_binding_single_provenance", "organization_membership_request_id IS NULL OR organization_onboarding_request_id IS NULL");
+            t.HasCheckConstraint("ck_identity_binding_single_provenance", "num_nonnulls(organization_membership_request_id, organization_onboarding_request_id, organization_owner_recovery_case_id) <= 1");
         });
     }
 }

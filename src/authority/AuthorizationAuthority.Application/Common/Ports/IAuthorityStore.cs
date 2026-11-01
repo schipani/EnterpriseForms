@@ -300,6 +300,45 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>Number of organizations in which this exact identity has a binding (any state).</summary>
     Task<int> CountOrganizationsBindingIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken);
 
+    // ---- C8 owner recovery (C-105). Lock order: organization row, then the platform journal head, then the case row. ----
+
+    /// <summary>With <paramref name="lockForUpdate"/> false: an untracked snapshot (used to find the organization before locking it).</summary>
+    Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseAsync(Guid organizationOwnerRecoveryCaseId, bool lockForUpdate, CancellationToken cancellationToken);
+
+    Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken);
+
+    /// <summary>The organization's case whose stored state is Open (at most one), tracked.</summary>
+    Task<OrganizationOwnerRecoveryCase?> FindOpenOwnerRecoveryCaseAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    void AddOwnerRecoveryCase(OrganizationOwnerRecoveryCase recoveryCase);
+
+    Task<List<OrganizationOwnerRecoverySubject>> GetOwnerRecoverySubjectsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken);
+
+    Task<OrganizationOwnerRecoverySubject?> FindOwnerRecoverySubjectAsync(Guid organizationOwnerRecoverySubjectId, CancellationToken cancellationToken);
+
+    void AddOwnerRecoverySubject(OrganizationOwnerRecoverySubject subject);
+
+    Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken);
+
+    Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsForCasesAsync(IReadOnlyCollection<Guid> organizationOwnerRecoveryCaseIds, CancellationToken cancellationToken);
+
+    Task<OrganizationOwnerRecoveryApproval?> FindOwnerRecoveryApprovalAsync(Guid organizationOwnerRecoveryApprovalId, CancellationToken cancellationToken);
+
+    void AddOwnerRecoveryApproval(OrganizationOwnerRecoveryApproval approval);
+
+    /// <summary>Newest first; text matches the organization name or incident reference (case-insensitive).</summary>
+    Task<OwnerRecoveryStorePage> SearchOwnerRecoveryCasesAsync(OwnerRecoveryQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Probations of the organization that end after <paramref name="now"/>.</summary>
+    Task<List<OrganizationRecoveredOwnerProbation>> GetActiveRecoveredOwnerProbationsAsync(Guid organizationId, DateTimeOffset now, CancellationToken cancellationToken);
+
+    Task<OrganizationRecoveredOwnerProbation?> FindRecoveredOwnerProbationAsync(Guid organizationRecoveredOwnerProbationId, CancellationToken cancellationToken);
+
+    void AddRecoveredOwnerProbation(OrganizationRecoveredOwnerProbation probation);
+
+    /// <summary>Authenticated sessions of this binding created at or after <paramref name="since"/> (evidence that a declared-unavailable owner is active).</summary>
+    Task<int> CountSessionsCreatedSinceAsync(Guid identityBindingId, DateTimeOffset since, CancellationToken cancellationToken);
+
     /// <summary>Writes staged changes inside the open transaction without committing (orders updates that free a unique value before inserts that take it).</summary>
     Task FlushAsync(CancellationToken cancellationToken);
 
@@ -318,3 +357,9 @@ public sealed record OnboardingRequestQuery(string? Text, string Status, DateTim
 public sealed record OnboardingRequestStorePage(IReadOnlyList<OrganizationOnboardingRequest> Rows, int TotalCount);
 
 public sealed record OrganizationDirectoryRow(OrganizationAuthorizationState State, int EnabledOwnerCount, int SecurityAdministratorCount, int EnabledMemberCount);
+
+public sealed record OwnerRecoveryQuery(string? Text, string Status, DateTimeOffset Now, (DateTimeOffset OpenedOn, Guid CaseId)? After, int Limit);
+
+public sealed record OwnerRecoveryStoreRow(OrganizationOwnerRecoveryCase Case, string OrganizationDisplayName, int ValidApprovals);
+
+public sealed record OwnerRecoveryStorePage(IReadOnlyList<OwnerRecoveryStoreRow> Rows, int TotalCount);

@@ -27,6 +27,7 @@ passed on a command line or written into the working tree.
     python scripts/devstack/devstack.py protection-verifier status|enable  # Phase C7 M4: verifier credential (no data changes)
     python scripts/devstack/devstack.py platform-console init [--execute]  # C8 M2 Stage 3: backup, migrate, keys, operators, console
     python scripts/devstack/devstack.py platform-console status             # platform operators, journal and console health
+    python scripts/devstack/devstack.py owner-recovery init|status          # C8 owner recovery (C-105): backup, migrate, rebuild; no case opened
 
 See docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md. Production signing uses Azure Managed HSM; nothing here is a
 production control or Level 2 evidence.
@@ -1865,6 +1866,100 @@ def cmd_onboarding(args) -> None:
     print(f"[onboarding] ready: http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_WEB_PORT', '8095')}/platform/onboarding (synthetic operators; owners from {onboarding['identity_issuer']})")
 
 
+OWNER_RECOVERY_MIGRATION = "20261101221445_OwnerRecovery"
+
+
+def owner_recovery_migration_applied(stack: "Stack") -> bool:
+    return authority_sql(stack, f"SELECT count(*) FROM authority.ef_migrations_history WHERE \"MigrationId\" = '{OWNER_RECOVERY_MIGRATION}';") == "1"
+
+
+def organization_census(stack: "Stack") -> dict:
+    """Counts that owner-recovery activation must leave unchanged (organizations, memberships, role edges, operators, records)."""
+    return {
+        "organizations": authority_sql(stack, "SELECT count(*) FROM authority.organization_authorization_states;"),
+        "identity_bindings": authority_sql(stack, "SELECT count(*) FROM authority.identity_bindings;"),
+        "active_edges": authority_sql(stack, "SELECT count(*) FROM authority.authority_relationship_edges WHERE relationship_removed_on IS NULL;"),
+        "owner_edges": authority_sql(stack, "SELECT count(*) FROM authority.authority_relationship_edges WHERE relationship_removed_on IS NULL AND relationship_name = 'organization_owner';"),
+        "platform_operators": authority_sql(stack, "SELECT count(*) FROM authority.platform_operators;"),
+        "registered_records": authority_sql(stack, "SELECT count(*) FROM authority.authority_resources WHERE resource_type_name = 'form_record';"),
+    }
+
+
+def cmd_owner_recovery(args) -> None:
+    """C8 owner recovery (C-105), Development/Testing only. `init` backs up and verifies the stack, applies the additive AuthorityDb
+    migration, rebuilds the affected services and checks PG-075 through the console. It never opens a recovery case (recovering the
+    existing single-owner development organization needs a separate explicit owner approval)."""
+    stack = Stack(args.project, load_custody(args.project))
+    if stack.vault_status() != "unsealed":
+        raise DevStackError("vault is not unsealed; run `devstack.py up` first")
+    if args.action == "status":
+        applied = owner_recovery_migration_applied(stack)
+        print(f"Migration    : {OWNER_RECOVERY_MIGRATION} {'applied' if applied else 'NOT applied'}")
+        if applied:
+            print("Cases        :", authority_sql(stack, "SELECT coalesce(string_agg(recovery_state_name || '=' || n, ', '), 'none') FROM (SELECT recovery_state_name, count(*) n FROM authority.organization_owner_recovery_cases GROUP BY 1) s;"))
+        return
+
+    if not load_onboarding(args.project):
+        raise DevStackError("onboarding is not initialized; run `devstack.py onboarding init` first (owner recovery uses its approved issuer)")
+    state = load_state(args.project)
+    record = state.get("owner_recovery") or {}
+    evidence: dict = {"project": args.project, "started_on": dt.datetime.now(dt.timezone.utc).isoformat(), "git_commit": run(["git", "rev-parse", "HEAD"], cwd=REPO).stdout.strip()}
+    migrated = owner_recovery_migration_applied(stack)
+    before = organization_census(stack)
+    evidence["census_before"] = before
+    if not migrated or not record.get("backup"):
+        backups_before = set(backup_root(args.project).glob("*")) if backup_root(args.project).exists() else set()
+        cmd_backup(args)
+        created = sorted(set(backup_root(args.project).glob("*")) - backups_before)
+        if len(created) != 1:
+            raise DevStackError("could not identify the backup just taken; nothing was changed")
+        manifest = verify_backup(created[0])
+        if not args.skip_restore_test:
+            print("[owner-recovery] restoring the backup into a disposable project to prove it opens (restore-test) ...")
+            cmd_restore_test(argparse.Namespace(project=args.project, backup_dir=str(created[0]), keep=False))
+        record["backup"] = {"directory": str(created[0]), "volumes": len(manifest["volumes"]), "restore_tested": not args.skip_restore_test}
+        state["owner_recovery"] = record
+        save_state(args.project, state)
+        stack = Stack(args.project, load_custody(args.project))
+    else:
+        print(f"[owner-recovery] migration already applied and backup recorded ({record['backup']['directory']}); not taking another backup")
+    evidence["backup"] = record["backup"]
+
+    stack.compose("build", "authority", "api", "worker", "web", "platform-console", "platform-console-web", timeout=3600)
+    if not migrated:
+        stack.compose("up", "--no-deps", "--force-recreate", "--exit-code-from", "authority-migrate", "authority-migrate", timeout=900)
+        if not owner_recovery_migration_applied(stack):
+            raise DevStackError(f"migration {OWNER_RECOVERY_MIGRATION} is not recorded after authority-migrate; stopping")
+        print(f"[owner-recovery] AuthorityDb migration {OWNER_RECOVERY_MIGRATION} applied (additive; no existing row changed)")
+    evidence["migration"] = {"name": OWNER_RECOVERY_MIGRATION, "applied_now": not migrated}
+
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "authority", timeout=900)
+    stack.compose("up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "300", "api", "worker", "web", "platform-console", "platform-console-web", timeout=900)
+    wait_console(stack)
+    subject = CONSOLE_OPERATORS[0][0]
+    status, body, set_cookie = console_http(stack, "POST", "/console-api/v1/session/development-login", {"subjectIdentifier": subject})
+    if status != 200 or not set_cookie:
+        raise DevStackError(f"console sign-in of {subject} failed: {status} {body}")
+    cookie = set_cookie.split(";")[0]
+    status, page, _ = console_http(stack, "GET", "/console-api/v1/owner-recovery", cookie=cookie)
+    console_http(stack, "POST", "/console-api/v1/session/sign-out", {}, cookie=cookie, csrf=body["csrfToken"])
+    if status != 200 or "waitingPeriodSeconds" not in page:
+        raise DevStackError(f"owner recovery is not available through the console: {status} {page}")
+    after = organization_census(stack)
+    evidence["census_after"] = after
+    if after != before:
+        raise DevStackError(f"organization data changed during activation (before {before}, after {after}); investigate before using the stack")
+    evidence["console"] = {"waiting_period_seconds": page["waitingPeriodSeconds"], "cases": page["totalCount"]}
+    record.update({"activated_on": dt.datetime.now(dt.timezone.utc).isoformat(), "migration": OWNER_RECOVERY_MIGRATION})
+    state = load_state(args.project)
+    state["owner_recovery"] = record
+    save_state(args.project, state)
+    evidence["finished_on"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    write_evidence(args.project, "owner-recovery-init", evidence)
+    print(f"[owner-recovery] data unchanged: {after}")
+    print(f"[owner-recovery] ready: http://127.0.0.1:{stack.overrides.get('DEVSTACK_CONSOLE_WEB_PORT', '8095')}/platform/recovery (waiting period {page['waitingPeriodSeconds']} s; synthetic operators; no case opened)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", default=os.environ.get("DEVSTACK_PROJECT", DEFAULT_PROJECT))
@@ -1907,6 +2002,10 @@ def main() -> int:
     onboarding.add_argument("--execute", action="store_true", help="provision-key: create the key after the dry run (otherwise dry run only)")
     onboarding.add_argument("--skip-restore-test", action="store_true", help="init: verify the backup by checksums only (no disposable restore)")
     onboarding.set_defaults(handler=cmd_onboarding)
+    recovery = commands.add_parser("owner-recovery", help="C8 owner recovery (C-105): activate (init: backup, verify, migrate, rebuild; never opens a case) or inspect (status)")
+    recovery.add_argument("action", choices=["init", "status"])
+    recovery.add_argument("--skip-restore-test", action="store_true", help="init: verify the backup by checksums only (no disposable restore)")
+    recovery.set_defaults(handler=cmd_owner_recovery)
     restore = commands.add_parser("restore-test")
     restore.add_argument("backup_dir")
     restore.add_argument("--keep", action="store_true", help="leave the disposable restore project running for inspection")

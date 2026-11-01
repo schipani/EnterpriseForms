@@ -24,6 +24,7 @@ public static class AuthorityRuntimeGrants
         "organization_role_change_proposals", "organization_membership_requests",
         "platform_operators", "platform_operator_change_proposals", "platform_operator_approvals", "platform_journal_heads",
         "organization_onboarding_requests", "organization_onboarding_owners", "organization_onboarding_approvals",
+        "organization_owner_recovery_cases", "organization_owner_recovery_subjects", "organization_owner_recovery_approvals", "organization_recovered_owner_probations",
     ];
 
     /// <summary>Every table the runtime role may touch; a model table missing here is a startup defect caught by the unit test, not in Docker.</summary>

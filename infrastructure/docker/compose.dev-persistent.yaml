@@ -104,6 +104,8 @@ services:
       # C8 onboarding (C-104): enabled only by `devstack.py onboarding init` (the synthetic test identity provider's issuer). Unset =>
       # onboarding unavailable. Organization keys are created by the separate custody credential (`devstack.py onboarding provision-key`).
       OrganizationOnboarding__ApprovedIdentityIssuers__0: ${DEVSTACK_ONBOARDING_IDENTITY_ISSUER:-}
+      # C-105: accelerated owner recovery waiting period for the persistent development stack (production target 72 hours).
+      OrganizationOnboarding__RecoveryWaitingPeriodSeconds: ${DEVSTACK_OWNER_RECOVERY_WAITING_SECONDS:-600}
     networks: [authority-net, trust-edge, platform-edge]
 
   business-migrate:
