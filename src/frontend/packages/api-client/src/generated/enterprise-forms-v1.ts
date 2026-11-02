@@ -1195,6 +1195,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/record-statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status counts and created/submitted activity over the caller's complete Authority-discoverable top-level records (listing metadata, unverified). periodDays 7, 30 or 90; timeZone is an IANA id (UTC otherwise). */
+        get: operations["GetDashboardRecordStatistics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/upload-statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own upload sessions in the period, by outcome group. */
+        get: operations["GetDashboardUploadStatistics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A page of the caller's own upload sessions, newest first. q matches the file name (literal, case-insensitive); status is InProgress, Completed, Failed or Cancelled. */
+        get: operations["ListDashboardUploads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A page of the caller's own audit events, newest first, filtered by category, outcome and time range. */
+        get: operations["ListDashboardActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A page of the forms the caller may use or design (Authority decisions), by name. access is create or design; status is published or unpublished. */
+        get: operations["ListDashboardForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/my-activity": {
         parameters: {
             query?: never;
@@ -1500,6 +1585,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/security/incidents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A page of the organization's security incidents, most recently detected first. q is an incident reference (INC-…), a record reference (REC-…, discoverable records only) or a full identifier. */
+        get: operations["ListSecurityIncidents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/security/incidents/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Incident counts by status, severity and detection date. Zero incidents is not evidence that data was verified. */
+        get: operations["GetSecurityIncidentSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/security/incidents/{securityIncidentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Incident metadata, detection history, notes and audit trail (audited: SECURITY_INCIDENT_VIEWED). No record content. */
+        get: operations["GetSecurityIncident"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change status or investigator (audited). 409 INCIDENT_MODIFIED_CONCURRENTLY when expectedIncidentRevision is stale. Closing never restores record visibility. */
+        patch: operations["UpdateSecurityIncident"];
+        trace?: never;
+    };
+    "/api/v1/security/incidents/{securityIncidentId}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Append an investigation note (audited without its text). */
+        post: operations["AddSecurityIncidentNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1517,6 +1671,9 @@ export interface components {
             optionListId?: null | string;
             /** Format: uuid */
             groupDefinitionId?: null | string;
+        };
+        AddSecurityIncidentNoteRequest: {
+            investigationNote: string;
         };
         AppointSecurityAdministratorRequest: {
             /** Format: uuid */
@@ -1689,6 +1846,18 @@ export interface components {
             subjectIdentifier: string;
             displayName: string;
         };
+        DashboardActivityPageResponse: {
+            items: components["schemas"]["AuditEventResponse"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            /** Format: int32 */
+            pageStart: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            nextToken: null | string;
+            previousToken: null | string;
+            availableCategories: string[];
+        };
         DashboardCountResponse: {
             widgetIdentifier: string;
             /** Format: int64 */
@@ -1697,9 +1866,82 @@ export interface components {
             computedOn: string;
             scope: string;
         };
+        DashboardFormPageResponse: {
+            items: components["schemas"]["FormDefinitionSummaryResponse"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            /** Format: int32 */
+            pageStart: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            nextToken: null | string;
+            previousToken: null | string;
+        };
+        DashboardRecordStatisticsResponse: {
+            /** Format: int32 */
+            accessibleRecordCount: number | string;
+            /** Format: int32 */
+            draftRecordCount: number | string;
+            /** Format: int32 */
+            submittedRecordCount: number | string;
+            /** Format: int32 */
+            archivedRecordCount: number | string;
+            /** Format: int32 */
+            otherStatusRecordCount: number | string;
+            /** Format: int32 */
+            unavailableRecordCount: number | string;
+            /** Format: int32 */
+            periodDays: number | string;
+            timeZoneId: string;
+            activity: components["schemas"]["RecordActivityBucketResponse"][];
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            scopeStatement: string;
+        };
         DashboardResponse: {
             widgets: components["schemas"]["DashboardWidgetDefinitionResponse"][];
             capabilities: string[];
+        };
+        DashboardUploadItemResponse: {
+            /** Format: uuid */
+            uploadSessionId: string;
+            /** Format: uuid */
+            formRecordId: string;
+            originalFileName: string;
+            sessionState: string;
+            statusGroup: string;
+            /** Format: date-time */
+            sessionCreatedOn: string;
+            /** Format: int64 */
+            declaredSizeBytes: number | string;
+            failureReasonCode: null | string;
+        };
+        DashboardUploadPageResponse: {
+            items: components["schemas"]["DashboardUploadItemResponse"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            /** Format: int32 */
+            pageStart: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            nextToken: null | string;
+            previousToken: null | string;
+        };
+        DashboardUploadStatisticsResponse: {
+            /** Format: int32 */
+            periodDays: number | string;
+            timeZoneId: string;
+            /** Format: int32 */
+            totalUploadCount: number | string;
+            /** Format: int32 */
+            inProgressUploadCount: number | string;
+            /** Format: int32 */
+            completedUploadCount: number | string;
+            /** Format: int32 */
+            failedUploadCount: number | string;
+            /** Format: int32 */
+            cancelledUploadCount: number | string;
+            activity: components["schemas"]["UploadActivityBucketResponse"][];
         };
         DashboardWidgetDefinitionResponse: {
             widgetIdentifier: string;
@@ -2391,6 +2633,15 @@ export interface components {
             approvalReference: string;
             changeReason: string;
         };
+        RecordActivityBucketResponse: {
+            bucketStartDate: string;
+            /** Format: int32 */
+            bucketDayCount: number | string;
+            /** Format: int32 */
+            createdRecordCount: number | string;
+            /** Format: int32 */
+            submittedRecordCount: number | string;
+        };
         RecordActivityResponse: {
             /** Format: uuid */
             formRecordId: string;
@@ -2748,6 +2999,120 @@ export interface components {
             administrators: components["schemas"]["SecurityAdministratorResponse"][];
             candidates: components["schemas"]["SecurityAdministratorCandidateResponse"][];
         };
+        SecurityIncidentBucketResponse: {
+            bucketStartDate: string;
+            /** Format: int32 */
+            bucketDayCount: number | string;
+            /** Format: int32 */
+            integrityIncidentCount: number | string;
+            /** Format: int32 */
+            operationalIncidentCount: number | string;
+        };
+        SecurityIncidentDetailResponse: {
+            incident: components["schemas"]["SecurityIncidentListItemResponse"];
+            detectionSourceName: string;
+            verificationErrorCode: string;
+            /** Format: uuid */
+            firstCorrelationIdentifier: string;
+            resolutionExplanationText: null | string;
+            /** Format: date-time */
+            resolvedOn: null | string;
+            resolvedByDisplayName: null | string;
+            /** Format: int64 */
+            incidentRevision: number | string;
+            occurrences: components["schemas"]["SecurityIncidentOccurrenceResponse"][];
+            notes: components["schemas"]["SecurityIncidentNoteResponse"][];
+            auditTrail: components["schemas"]["AuditEventResponse"][];
+            assignableInvestigators: components["schemas"]["SecurityIncidentInvestigatorResponse"][];
+            evidenceStatement: string;
+        };
+        SecurityIncidentInvestigatorResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+        };
+        SecurityIncidentListItemResponse: {
+            /** Format: uuid */
+            securityIncidentId: string;
+            incidentReference: string;
+            incidentTypeName: string;
+            incidentSeverityName: string;
+            incidentStatusName: string;
+            /** Format: date-time */
+            firstDetectedOn: string;
+            /** Format: date-time */
+            lastDetectedOn: string;
+            /** Format: int32 */
+            occurrenceCount: number | string;
+            recordScoped: boolean;
+            recordWithheld: boolean;
+            /** Format: uuid */
+            formRecordId: null | string;
+            recordReference: null | string;
+            /** Format: uuid */
+            assignedToUserId: null | string;
+            assignedToDisplayName: null | string;
+        };
+        SecurityIncidentNoteResponse: {
+            /** Format: uuid */
+            securityIncidentNoteId: string;
+            /** Format: date-time */
+            noteCreatedOn: string;
+            authorDisplayName: string;
+            investigationNoteText: string;
+        };
+        SecurityIncidentOccurrenceResponse: {
+            /** Format: uuid */
+            securityIncidentOccurrenceId: string;
+            /** Format: date-time */
+            occurrenceDetectedOn: string;
+            observedIncidentTypeName: string;
+            detectionSourceName: string;
+            verificationErrorCode: string;
+            observedByDisplayName: null | string;
+            /** Format: uuid */
+            requestCorrelationIdentifier: string;
+            /** Format: int64 */
+            committedContentRevision: null | number | string;
+        };
+        SecurityIncidentPageResponse: {
+            items: components["schemas"]["SecurityIncidentListItemResponse"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            /** Format: int32 */
+            pageStart: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            nextToken: null | string;
+            previousToken: null | string;
+        };
+        SecurityIncidentSummaryResponse: {
+            /** Format: int32 */
+            openIncidentCount: number | string;
+            /** Format: int32 */
+            investigatingIncidentCount: number | string;
+            /** Format: int32 */
+            resolvedIncidentCount: number | string;
+            /** Format: int32 */
+            falsePositiveIncidentCount: number | string;
+            /** Format: int32 */
+            confirmedIntegrityFailureCount: number | string;
+            /** Format: int32 */
+            criticalIncidentCount: number | string;
+            /** Format: int32 */
+            highIncidentCount: number | string;
+            /** Format: int32 */
+            mediumIncidentCount: number | string;
+            /** Format: int32 */
+            lowIncidentCount: number | string;
+            /** Format: int32 */
+            recentIncidentCount: number | string;
+            /** Format: int32 */
+            periodDays: number | string;
+            timeZoneId: string;
+            detections: components["schemas"]["SecurityIncidentBucketResponse"][];
+            coverageStatement: string;
+        };
         SessionResponse: {
             authenticated: boolean;
             /** Format: uuid */
@@ -2950,10 +3315,33 @@ export interface components {
             /** @default false */
             plaintextSearchPermitted: boolean;
         };
+        UpdateSecurityIncidentRequest: {
+            /** Format: int64 */
+            expectedIncidentRevision: number | string;
+            incidentStatusName?: null | string;
+            /** Format: uuid */
+            assignedToUserId?: null | string;
+            /** @default false */
+            clearAssignment: boolean;
+            resolutionExplanation?: null | string;
+        };
         UpdateUiPreferenceRequest: {
             textScalePreferenceMode: string;
             /** Format: double */
             explicitTextScalePercent: null | number | string;
+        };
+        UploadActivityBucketResponse: {
+            bucketStartDate: string;
+            /** Format: int32 */
+            bucketDayCount: number | string;
+            /** Format: int32 */
+            inProgressUploadCount: number | string;
+            /** Format: int32 */
+            completedUploadCount: number | string;
+            /** Format: int32 */
+            failedUploadCount: number | string;
+            /** Format: int32 */
+            cancelledUploadCount: number | string;
         };
         UploadChunkReceiptResponse: {
             /** Format: uuid */
@@ -5047,6 +5435,132 @@ export interface operations {
             };
         };
     };
+    GetDashboardRecordStatistics: {
+        parameters: {
+            query?: {
+                periodDays?: number | string;
+                timeZone?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardRecordStatisticsResponse"];
+                };
+            };
+        };
+    };
+    GetDashboardUploadStatistics: {
+        parameters: {
+            query?: {
+                periodDays?: number | string;
+                timeZone?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardUploadStatisticsResponse"];
+                };
+            };
+        };
+    };
+    ListDashboardUploads: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: string;
+                from?: string;
+                before?: string;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardUploadPageResponse"];
+                };
+            };
+        };
+    };
+    ListDashboardActivity: {
+        parameters: {
+            query?: {
+                category?: string;
+                outcome?: string;
+                from?: string;
+                before?: string;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardActivityPageResponse"];
+                };
+            };
+        };
+    };
+    ListDashboardForms: {
+        parameters: {
+            query?: {
+                q?: string;
+                access?: string;
+                status?: string;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardFormPageResponse"];
+                };
+            };
+        };
+    };
     GetMyActivity: {
         parameters: {
             query?: {
@@ -5703,6 +6217,132 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSecurityIncidents: {
+        parameters: {
+            query?: {
+                q?: string;
+                type?: string;
+                severity?: string;
+                status?: string;
+                from?: string;
+                before?: string;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityIncidentPageResponse"];
+                };
+            };
+        };
+    };
+    GetSecurityIncidentSummary: {
+        parameters: {
+            query?: {
+                periodDays?: number | string;
+                timeZone?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityIncidentSummaryResponse"];
+                };
+            };
+        };
+    };
+    GetSecurityIncident: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                securityIncidentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityIncidentDetailResponse"];
+                };
+            };
+        };
+    };
+    UpdateSecurityIncident: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                securityIncidentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSecurityIncidentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityIncidentDetailResponse"];
+                };
+            };
+        };
+    };
+    AddSecurityIncidentNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                securityIncidentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddSecurityIncidentNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityIncidentDetailResponse"];
                 };
             };
         };

@@ -3170,6 +3170,297 @@
         }
       }
     },
+    "/api/v1/dashboard/record-statistics": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Status counts and created/submitted activity over the caller's complete Authority-discoverable top-level records (listing metadata, unverified). periodDays 7, 30 or 90; timeZone is an IANA id (UTC otherwise).",
+        "operationId": "GetDashboardRecordStatistics",
+        "parameters": [
+          {
+            "name": "periodDays",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "timeZone",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardRecordStatisticsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/upload-statistics": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "The caller's own upload sessions in the period, by outcome group.",
+        "operationId": "GetDashboardUploadStatistics",
+        "parameters": [
+          {
+            "name": "periodDays",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "timeZone",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardUploadStatisticsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/uploads": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "A page of the caller's own upload sessions, newest first. q matches the file name (literal, case-insensitive); status is InProgress, Completed, Failed or Cancelled.",
+        "operationId": "ListDashboardUploads",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardUploadPageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/activity": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "A page of the caller's own audit events, newest first, filtered by category, outcome and time range.",
+        "operationId": "ListDashboardActivity",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardActivityPageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/forms": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "A page of the forms the caller may use or design (Authority decisions), by name. access is create or design; status is published or unpublished.",
+        "operationId": "ListDashboardForms",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardFormPageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/my-activity": {
       "get": {
         "tags": [
@@ -4005,6 +4296,248 @@
           }
         }
       }
+    },
+    "/api/v1/security/incidents": {
+      "get": {
+        "tags": [
+          "SecurityOperations"
+        ],
+        "summary": "A page of the organization's security incidents, most recently detected first. q is an incident reference (INC-…), a record reference (REC-…, discoverable records only) or a full identifier.",
+        "operationId": "ListSecurityIncidents",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityIncidentPageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/security/incidents/summary": {
+      "get": {
+        "tags": [
+          "SecurityOperations"
+        ],
+        "summary": "Incident counts by status, severity and detection date. Zero incidents is not evidence that data was verified.",
+        "operationId": "GetSecurityIncidentSummary",
+        "parameters": [
+          {
+            "name": "periodDays",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "timeZone",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityIncidentSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/security/incidents/{securityIncidentId}": {
+      "get": {
+        "tags": [
+          "SecurityOperations"
+        ],
+        "summary": "Incident metadata, detection history, notes and audit trail (audited: SECURITY_INCIDENT_VIEWED). No record content.",
+        "operationId": "GetSecurityIncident",
+        "parameters": [
+          {
+            "name": "securityIncidentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityIncidentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "SecurityOperations"
+        ],
+        "summary": "Change status or investigator (audited). 409 INCIDENT_MODIFIED_CONCURRENTLY when expectedIncidentRevision is stale. Closing never restores record visibility.",
+        "operationId": "UpdateSecurityIncident",
+        "parameters": [
+          {
+            "name": "securityIncidentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSecurityIncidentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityIncidentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/security/incidents/{securityIncidentId}/notes": {
+      "post": {
+        "tags": [
+          "SecurityOperations"
+        ],
+        "summary": "Append an investigation note (audited without its text).",
+        "operationId": "AddSecurityIncidentNote",
+        "parameters": [
+          {
+            "name": "securityIncidentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddSecurityIncidentNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityIncidentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4071,6 +4604,17 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "AddSecurityIncidentNoteRequest": {
+        "required": [
+          "investigationNote"
+        ],
+        "type": "object",
+        "properties": {
+          "investigationNote": {
+            "type": "string"
           }
         }
       },
@@ -4754,6 +5298,68 @@
           }
         }
       },
+      "DashboardActivityPageResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "pageStart",
+          "pageSize",
+          "nextToken",
+          "previousToken",
+          "availableCategories"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEventResponse"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "availableCategories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "DashboardCountResponse": {
         "required": [
           "widgetIdentifier",
@@ -4783,6 +5389,155 @@
           }
         }
       },
+      "DashboardFormPageResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "pageStart",
+          "pageSize",
+          "nextToken",
+          "previousToken"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FormDefinitionSummaryResponse"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DashboardRecordStatisticsResponse": {
+        "required": [
+          "accessibleRecordCount",
+          "draftRecordCount",
+          "submittedRecordCount",
+          "archivedRecordCount",
+          "otherStatusRecordCount",
+          "unavailableRecordCount",
+          "periodDays",
+          "timeZoneId",
+          "activity",
+          "authorizationRevision",
+          "scopeStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "accessibleRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "draftRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "submittedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "archivedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "otherStatusRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unavailableRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "periodDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timeZoneId": {
+            "type": "string"
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordActivityBucketResponse"
+            }
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "scopeStatement": {
+            "type": "string"
+          }
+        }
+      },
       "DashboardResponse": {
         "required": [
           "widgets",
@@ -4800,6 +5555,183 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          }
+        }
+      },
+      "DashboardUploadItemResponse": {
+        "required": [
+          "uploadSessionId",
+          "formRecordId",
+          "originalFileName",
+          "sessionState",
+          "statusGroup",
+          "sessionCreatedOn",
+          "declaredSizeBytes",
+          "failureReasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "uploadSessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "formRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalFileName": {
+            "type": "string"
+          },
+          "sessionState": {
+            "type": "string"
+          },
+          "statusGroup": {
+            "type": "string"
+          },
+          "sessionCreatedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "declaredSizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "failureReasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DashboardUploadPageResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "pageStart",
+          "pageSize",
+          "nextToken",
+          "previousToken"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardUploadItemResponse"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "DashboardUploadStatisticsResponse": {
+        "required": [
+          "periodDays",
+          "timeZoneId",
+          "totalUploadCount",
+          "inProgressUploadCount",
+          "completedUploadCount",
+          "failedUploadCount",
+          "cancelledUploadCount",
+          "activity"
+        ],
+        "type": "object",
+        "properties": {
+          "periodDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timeZoneId": {
+            "type": "string"
+          },
+          "totalUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "inProgressUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completedUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failedUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cancelledUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UploadActivityBucketResponse"
             }
           }
         }
@@ -7504,6 +8436,44 @@
           }
         }
       },
+      "RecordActivityBucketResponse": {
+        "required": [
+          "bucketStartDate",
+          "bucketDayCount",
+          "createdRecordCount",
+          "submittedRecordCount"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketStartDate": {
+            "type": "string"
+          },
+          "bucketDayCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "createdRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "submittedRecordCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "RecordActivityResponse": {
         "required": [
           "formRecordId",
@@ -8891,6 +9861,484 @@
           }
         }
       },
+      "SecurityIncidentBucketResponse": {
+        "required": [
+          "bucketStartDate",
+          "bucketDayCount",
+          "integrityIncidentCount",
+          "operationalIncidentCount"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketStartDate": {
+            "type": "string"
+          },
+          "bucketDayCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "integrityIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "operationalIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SecurityIncidentDetailResponse": {
+        "required": [
+          "incident",
+          "detectionSourceName",
+          "verificationErrorCode",
+          "firstCorrelationIdentifier",
+          "resolutionExplanationText",
+          "resolvedOn",
+          "resolvedByDisplayName",
+          "incidentRevision",
+          "occurrences",
+          "notes",
+          "auditTrail",
+          "assignableInvestigators",
+          "evidenceStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "incident": {
+            "$ref": "#/components/schemas/SecurityIncidentListItemResponse"
+          },
+          "detectionSourceName": {
+            "type": "string"
+          },
+          "verificationErrorCode": {
+            "type": "string"
+          },
+          "firstCorrelationIdentifier": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resolutionExplanationText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "resolvedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "resolvedByDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "incidentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityIncidentOccurrenceResponse"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityIncidentNoteResponse"
+            }
+          },
+          "auditTrail": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEventResponse"
+            }
+          },
+          "assignableInvestigators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityIncidentInvestigatorResponse"
+            }
+          },
+          "evidenceStatement": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityIncidentInvestigatorResponse": {
+        "required": [
+          "userId",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityIncidentListItemResponse": {
+        "required": [
+          "securityIncidentId",
+          "incidentReference",
+          "incidentTypeName",
+          "incidentSeverityName",
+          "incidentStatusName",
+          "firstDetectedOn",
+          "lastDetectedOn",
+          "occurrenceCount",
+          "recordScoped",
+          "recordWithheld",
+          "formRecordId",
+          "recordReference",
+          "assignedToUserId",
+          "assignedToDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "securityIncidentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incidentReference": {
+            "type": "string"
+          },
+          "incidentTypeName": {
+            "type": "string"
+          },
+          "incidentSeverityName": {
+            "type": "string"
+          },
+          "incidentStatusName": {
+            "type": "string"
+          },
+          "firstDetectedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastDetectedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "occurrenceCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "recordScoped": {
+            "type": "boolean"
+          },
+          "recordWithheld": {
+            "type": "boolean"
+          },
+          "formRecordId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "recordReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assignedToUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "assignedToDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SecurityIncidentNoteResponse": {
+        "required": [
+          "securityIncidentNoteId",
+          "noteCreatedOn",
+          "authorDisplayName",
+          "investigationNoteText"
+        ],
+        "type": "object",
+        "properties": {
+          "securityIncidentNoteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "noteCreatedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authorDisplayName": {
+            "type": "string"
+          },
+          "investigationNoteText": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityIncidentOccurrenceResponse": {
+        "required": [
+          "securityIncidentOccurrenceId",
+          "occurrenceDetectedOn",
+          "observedIncidentTypeName",
+          "detectionSourceName",
+          "verificationErrorCode",
+          "observedByDisplayName",
+          "requestCorrelationIdentifier",
+          "committedContentRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "securityIncidentOccurrenceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurrenceDetectedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedIncidentTypeName": {
+            "type": "string"
+          },
+          "detectionSourceName": {
+            "type": "string"
+          },
+          "verificationErrorCode": {
+            "type": "string"
+          },
+          "observedByDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestCorrelationIdentifier": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "committedContentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "SecurityIncidentPageResponse": {
+        "required": [
+          "items",
+          "totalCount",
+          "pageStart",
+          "pageSize",
+          "nextToken",
+          "previousToken"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityIncidentListItemResponse"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageStart": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pageSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "previousToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SecurityIncidentSummaryResponse": {
+        "required": [
+          "openIncidentCount",
+          "investigatingIncidentCount",
+          "resolvedIncidentCount",
+          "falsePositiveIncidentCount",
+          "confirmedIntegrityFailureCount",
+          "criticalIncidentCount",
+          "highIncidentCount",
+          "mediumIncidentCount",
+          "lowIncidentCount",
+          "recentIncidentCount",
+          "periodDays",
+          "timeZoneId",
+          "detections",
+          "coverageStatement"
+        ],
+        "type": "object",
+        "properties": {
+          "openIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "investigatingIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "resolvedIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "falsePositiveIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "confirmedIntegrityFailureCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "criticalIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "highIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "mediumIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lowIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "recentIncidentCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "periodDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timeZoneId": {
+            "type": "string"
+          },
+          "detections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityIncidentBucketResponse"
+            }
+          },
+          "coverageStatement": {
+            "type": "string"
+          }
+        }
+      },
       "SessionResponse": {
         "required": [
           "authenticated",
@@ -9737,6 +11185,45 @@
           }
         }
       },
+      "UpdateSecurityIncidentRequest": {
+        "required": [
+          "expectedIncidentRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedIncidentRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "incidentStatusName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assignedToUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "clearAssignment": {
+            "type": "boolean",
+            "default": false
+          },
+          "resolutionExplanation": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "UpdateUiPreferenceRequest": {
         "required": [
           "textScalePreferenceMode",
@@ -9755,6 +11242,62 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "UploadActivityBucketResponse": {
+        "required": [
+          "bucketStartDate",
+          "bucketDayCount",
+          "inProgressUploadCount",
+          "completedUploadCount",
+          "failedUploadCount",
+          "cancelledUploadCount"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketStartDate": {
+            "type": "string"
+          },
+          "bucketDayCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "inProgressUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completedUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failedUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cancelledUploadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -9981,6 +11524,9 @@
     },
     {
       "name": "Search"
+    },
+    {
+      "name": "SecurityOperations"
     }
   ]
 }

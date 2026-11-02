@@ -25,9 +25,9 @@ describe("organizationNavigation", () => {
 
   it("gives an owner every page except Search approvals, and a Security Administrator everything except Branding", () => {
     const owner = organizationNavigation((c) => c === "organization.manage").map((i) => i.label);
-    expect(owner).toEqual(["Overview", "People", "Teams", "Branding", "Data protection", "Security Administrators"]);
+    expect(owner).toEqual(["Overview", "People", "Teams", "Branding", "Data protection", "Security administrators"]);
     const security = organizationNavigation((c) => c === "security.administer").map((i) => i.label);
-    expect(security).toEqual(["Overview", "People", "Teams", "Data protection", "Security Administrators", "Search approvals"]);
+    expect(security).toEqual(["Overview", "People", "Teams", "Data protection", "Security administrators", "Search approvals"]);
   });
 });
 

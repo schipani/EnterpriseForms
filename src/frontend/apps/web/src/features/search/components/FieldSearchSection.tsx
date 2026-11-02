@@ -1,6 +1,6 @@
 import type { FieldSearchConfigurationResponse, FieldSearchStatusResponse } from "@enterpriseforms/api-client";
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Checkbox, LoadingBlock, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Checkbox, helpTextClass, legendClass, LoadingBlock, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -154,9 +154,9 @@ function ApprovalControls({ formDefinitionId, data, status }: { formDefinitionId
   return (
     <div className="flex flex-col gap-4 border-t border-line pt-4">
       {active ? (
-        <fieldset className="flex flex-col gap-3 rounded border border-line p-3">
-          <legend className="px-1 text-sm font-medium">Withdraw approval</legend>
-          <p className="m-0 text-sm text-muted">Withdrawing takes effect immediately for every searcher. It does not change the field or its values.</p>
+        <fieldset className="flex flex-col gap-3 rounded-control border border-line p-3">
+          <legend className={`px-1 ${legendClass}`}>Withdraw approval</legend>
+          <p className={`m-0 ${helpTextClass}`}>Withdrawing takes effect immediately for every searcher. It does not change the field or its values.</p>
           <TextInput label="Reason" value={withdrawReason} required maxLength={500} onChange={(event) => setWithdrawReason(event.target.value)} helpText="Recorded with the change (1 to 500 characters)." />
           {withdraw.error ? <ErrorPanel error={withdraw.error} /> : null}
           <div>
@@ -167,8 +167,8 @@ function ApprovalControls({ formDefinitionId, data, status }: { formDefinitionId
         </fieldset>
       ) : null}
       {!active && eligible ? (
-        <fieldset className="flex flex-col gap-3 rounded border border-line p-3" aria-describedby={data.approvalOperational ? undefined : "field-search-approval-unavailable"}>
-          <legend className="px-1 text-sm font-medium">Approve for search</legend>
+        <fieldset className="flex flex-col gap-3 rounded-control border border-line p-3" aria-describedby={data.approvalOperational ? undefined : "field-search-approval-unavailable"}>
+          <legend className={`px-1 ${legendClass}`}>Approve for search</legend>
           {!data.approvalOperational ? (
             <div id="field-search-approval-unavailable">
               <StatusMessage tone="info" title="Approval is not available in this environment">
@@ -177,7 +177,7 @@ function ApprovalControls({ formDefinitionId, data, status }: { formDefinitionId
             </div>
           ) : null}
           <fieldset className="flex flex-col gap-2" disabled={!data.approvalOperational}>
-            <legend className="text-sm font-medium">Allowed conditions</legend>
+            <legend className={legendClass}>Allowed conditions</legend>
             {status.permittedOperators.map((operator) => (
               <Checkbox
                 key={operator}

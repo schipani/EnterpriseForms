@@ -300,7 +300,7 @@ export function EditRecordPage() {
               {unresolved.length > 0 ? (
                 <ul className="mt-2 flex flex-col gap-2">
                   {unresolved.map((item) => (
-                    <li key={item.fieldKey} className="rounded border border-line bg-surface p-2">
+                    <li key={item.fieldKey} className="rounded-control border border-line bg-surface p-2">
                       <p className="font-medium">{labelForKey(layout, fields, item.fieldKey)}</p>
                       <p>Your value: {shown(layout, fields, item.fieldKey, item.mine)}</p>
                       <p>Their saved value: {shown(layout, fields, item.fieldKey, item.theirs)}</p>

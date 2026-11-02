@@ -34,6 +34,18 @@ export type UpdateUiPreferenceRequest = S["UpdateUiPreferenceRequest"];
 export type DevelopmentPersonaResponse = S["DevelopmentPersonaResponse"];
 export type DashboardResponse = S["DashboardResponse"];
 export type DashboardCountResponse = S["DashboardCountResponse"];
+export type DashboardRecordStatisticsResponse = S["DashboardRecordStatisticsResponse"];
+export type DashboardUploadStatisticsResponse = S["DashboardUploadStatisticsResponse"];
+export type DashboardUploadPageResponse = S["DashboardUploadPageResponse"];
+export type DashboardUploadItemResponse = S["DashboardUploadItemResponse"];
+export type DashboardActivityPageResponse = S["DashboardActivityPageResponse"];
+export type DashboardFormPageResponse = S["DashboardFormPageResponse"];
+export type SecurityIncidentPageResponse = S["SecurityIncidentPageResponse"];
+export type SecurityIncidentListItemResponse = S["SecurityIncidentListItemResponse"];
+export type SecurityIncidentSummaryResponse = S["SecurityIncidentSummaryResponse"];
+export type SecurityIncidentDetailResponse = S["SecurityIncidentDetailResponse"];
+export type UpdateSecurityIncidentRequest = S["UpdateSecurityIncidentRequest"];
+export type AddSecurityIncidentNoteRequest = S["AddSecurityIncidentNoteRequest"];
 export type AuditEventResponse = S["AuditEventResponse"];
 export type RecordActivityResponse = S["RecordActivityResponse"];
 export type FormDefinitionSummaryResponse = S["FormDefinitionSummaryResponse"];
@@ -150,6 +162,20 @@ export type RecordShareSummaryResponse = S["RecordShareSummaryResponse"];
 
 export type ApiResult<T> = { result: T; etag?: string; status: number };
 
+/** Chart period and the viewer's IANA zone (calendar buckets are computed by the server in that zone). */
+export type DashboardPeriodQuery = { periodDays: 7 | 30 | 90; timeZone?: string };
+
+/** Shared shape of the dashboard section queries: every list is paged on the server (default 15 rows, opaque cursor). */
+export type DashboardPageQuery = { pageSize?: number; continuationToken?: string };
+
+export type DashboardUploadQuery = DashboardPageQuery & { q?: string; status?: "InProgress" | "Completed" | "Failed" | "Cancelled"; from?: string; before?: string };
+
+export type DashboardActivityQuery = DashboardPageQuery & { category?: string; outcome?: string; from?: string; before?: string };
+
+export type DashboardFormQuery = DashboardPageQuery & { q?: string; access?: "create" | "design"; status?: "published" | "unpublished" };
+
+export type SecurityIncidentQuery = DashboardPageQuery & { q?: string; type?: string; severity?: string; status?: string; from?: string; before?: string };
+
 function idempotencyKey(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -182,6 +208,18 @@ export function createApiClient(coordinator: IRequestCoordinator) {
     dashboard: {
       get: (signal?: AbortSignal) => read<DashboardResponse>("dashboard.get", undefined, undefined, "interactive-read", signal),
       count: (widgetIdentifier: string, signal?: AbortSignal) => read<DashboardCountResponse>("dashboard.count", { widgetIdentifier }, undefined, "background-read", signal),
+      recordStatistics: (query: DashboardPeriodQuery, signal?: AbortSignal) => read<DashboardRecordStatisticsResponse>("dashboard.recordStatistics", undefined, query, "interactive-read", signal),
+      uploadStatistics: (query: DashboardPeriodQuery, signal?: AbortSignal) => read<DashboardUploadStatisticsResponse>("dashboard.uploadStatistics", undefined, query, "interactive-read", signal),
+      uploads: (query: DashboardUploadQuery, signal?: AbortSignal) => read<DashboardUploadPageResponse>("dashboard.uploads", undefined, query, "interactive-read", signal),
+      activity: (query: DashboardActivityQuery, signal?: AbortSignal) => read<DashboardActivityPageResponse>("dashboard.activity", undefined, query, "interactive-read", signal),
+      forms: (query: DashboardFormQuery, signal?: AbortSignal) => read<DashboardFormPageResponse>("dashboard.forms", undefined, query, "interactive-read", signal),
+    },
+    security: {
+      incidents: (query: SecurityIncidentQuery, signal?: AbortSignal) => read<SecurityIncidentPageResponse>("security.incidents", undefined, query, "interactive-read", signal),
+      incidentSummary: (query: DashboardPeriodQuery, signal?: AbortSignal) => read<SecurityIncidentSummaryResponse>("security.incidentSummary", undefined, query, "interactive-read", signal),
+      incident: (securityIncidentId: string, signal?: AbortSignal) => read<SecurityIncidentDetailResponse>("security.incident", { securityIncidentId }, undefined, "interactive-read", signal),
+      updateIncident: (securityIncidentId: string, request: UpdateSecurityIncidentRequest) => write<SecurityIncidentDetailResponse>("PATCH", "security.updateIncident", { securityIncidentId }, request, { lane: "security", resourceKey: `security-incident:${securityIncidentId}` }),
+      addIncidentNote: (securityIncidentId: string, request: AddSecurityIncidentNoteRequest) => write<SecurityIncidentDetailResponse>("POST", "security.addIncidentNote", { securityIncidentId }, request, { lane: "security", resourceKey: `security-incident:${securityIncidentId}` }),
     },
     audit: {
       mine: (limit = 25, signal?: AbortSignal) => read<AuditEventResponse[]>("audit.mine", undefined, { limit }, "background-read", signal),

@@ -43,6 +43,11 @@
       "bytes": 45279
     },
     {
+      "path": "docs/DASHBOARD_SECURITY_MONITORING_STATUS.md",
+      "sha256": "b35f1d3bd023598693da1b3dd6e9aba3db6afd988237a73c62d91e01f632b83a",
+      "bytes": 13863
+    },
+    {
       "path": "docs/PHASE0_STATUS.md",
       "sha256": "d013f5cc90a1d88854de0ff9579483361f28349cedd63c061b3caa83b15477df",
       "bytes": 25771
@@ -129,8 +134,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "46b41239ef1fc2e3d1574184114a264ca3fac33a36b2df826834a0eb3a3b7ce6",
-      "bytes": 11302
+      "sha256": "0735a7970cf2e92912631ad88224de40e67c2af56622c662c1345c7d4e6584a4",
+      "bytes": 12182
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -269,8 +274,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "0db424a3bdaed42535ea474207ebecb837dca46bf20016583165a82dfb13c5b8",
-      "bytes": 139296
+      "sha256": "15689fe0f208e17eff9f1dc296160ef282699f91d7c648b49f2c1221968807e5",
+      "bytes": 141675
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -459,8 +464,8 @@
     },
     {
       "path": "docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md",
-      "sha256": "3beac00d1001fa49d871f9414e2dd4e839c3ea81b30bf14d4310740fc15c30b8",
-      "bytes": 5420
+      "sha256": "1c21f028f1d61d80ca893e5ff1f92742cc86a7a92a1e8c0083aca49c50672a12",
+      "bytes": 7284
     },
     {
       "path": "docs/ui/PB14_COLOR_CONTRAST.reference.ts",
@@ -491,6 +496,11 @@
       "path": "docs/ui/SCREEN_IMPLEMENTATION_MATRIX.md",
       "sha256": "b9df949a16445a9a7a4ef87727a69b84f5360f27789e7de86243093f36610469",
       "bytes": 7825
+    },
+    {
+      "path": "docs/ui/UI_CONSISTENCY_STANDARD.md",
+      "sha256": "b7436e4ce49f8828b4f5c4f3eb770658d44a5fb98041f1c7c1a2ba63da01b1fc",
+      "bytes": 14146
     },
     {
       "path": "docs/ui/c1-designer-rebuild/ACCEPTANCE_TEST_MATRIX.md",

@@ -4,3 +4,4 @@ export { RecordPage } from "./pages/RecordPage";
 export { EditRecordPage } from "./pages/EditRecordPage";
 export { RecordVersionPage } from "./pages/RecordVersionPage";
 export { layoutValues, toGroupInfos, toGroups, toRendererFields, toValueMap } from "./components/recordModel";
+export { RECORD_STATUSES, parseLookupInput, recordStatusLabel } from "./components/recordList";

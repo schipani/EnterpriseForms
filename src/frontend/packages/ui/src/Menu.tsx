@@ -2,7 +2,10 @@ import * as RadixDropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { ReactNode } from "react";
 import { Button } from "./Button";
 
-const itemClass = "flex min-h-10 w-full cursor-default items-center rounded px-3 text-left text-base outline-none data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground";
+/** Shared dropdown-menu styling (row actions, the account menu, the designer's menus): one look for every menu. */
+export const menuContentClass = "z-50 min-w-48 rounded-control border border-input bg-surface p-1 shadow-lg";
+export const menuItemClass = "flex min-h-10 w-full cursor-default items-center rounded-control px-3 text-left text-control outline-none data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground";
+const itemClass = menuItemClass;
 
 export interface OverflowMenuItem {
   key: string;
@@ -28,7 +31,7 @@ export function OverflowMenu({ label, items, trigger }: { label: string; items: 
         )}
       </RadixDropdownMenu.Trigger>
       <RadixDropdownMenu.Portal>
-        <RadixDropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-48 rounded border border-input bg-surface p-1 shadow-lg">
+        <RadixDropdownMenu.Content align="end" sideOffset={6} className={menuContentClass}>
           {items.map((item) => (
             <RadixDropdownMenu.Item key={item.key} asChild className={itemClass}>
               {item.content}

@@ -126,7 +126,7 @@ export function OptionsEditor({ formDefinitionId, field, element, canDesign, onE
   const emptyLabel = rows.some((row) => row.label.trim() === "");
 
   return (
-    <section aria-label={`Options of ${field.fieldDisplayName}`} className="flex flex-col gap-3 rounded border border-line bg-page p-3">
+    <section aria-label={`Options of ${field.fieldDisplayName}`} className="flex flex-col gap-3 rounded-control border border-line bg-page p-3">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold">Options</h3>
         <Badge tone="neutral">{multiple ? "Multi-select" : "Choose one"}</Badge>
@@ -146,7 +146,7 @@ export function OptionsEditor({ formDefinitionId, field, element, canDesign, onE
       {rows.length === 0 ? <p className="text-sm text-muted">No options yet.</p> : null}
       <ol className="flex flex-col gap-2" aria-label="Option list">
         {rows.map((row, index) => (
-          <li key={row.optionKey} className="flex flex-col gap-1 rounded border border-line bg-surface p-2" data-option-key={row.optionKey}>
+          <li key={row.optionKey} className="flex flex-col gap-1 rounded-control border border-line bg-surface p-2" data-option-key={row.optionKey}>
             <TextInput label={`Label of option ${index + 1}`} value={row.label} maxLength={200} disabled={!canDesign || row.fromList} error={row.label.trim() === "" ? "Enter a label" : undefined} onChange={(event) => update(index, { label: event.target.value.replace(/[<>]/g, "") })} />
             <p className="text-xs text-muted">
               Key <code>{row.optionKey}</code>

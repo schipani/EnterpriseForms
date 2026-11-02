@@ -7,6 +7,7 @@ using EnterpriseForms.Domain.Features.FormRecords;
 using EnterpriseForms.Domain.Features.Identity;
 using EnterpriseForms.Domain.Features.Organizations;
 using EnterpriseForms.Domain.Features.RelatedForms;
+using EnterpriseForms.Domain.Features.SecurityOperations;
 using EnterpriseForms.Domain.Features.Sharing;
 using EnterpriseForms.Domain.Features.Teams;
 using EnterpriseForms.Domain.Features.UserPreferences;
@@ -251,6 +252,35 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
         public Task<List<UploadSession>> GetUploadSessionsForUserAsync(Guid tenantId, Guid ownerUserId, IReadOnlyCollection<string> states, CancellationToken cancellationToken) =>
             context.UploadSessions.AsNoTracking().Where(s => s.TenantId == tenantId && s.OwnerUserId == ownerUserId && states.Contains(s.SessionState)).OrderByDescending(s => s.SessionCreatedOn).Take(100).ToListAsync(cancellationToken);
 
+        public async Task<StorePage<UploadSession>> QueryUploadSessionsForUserAsync(Guid tenantId, Guid ownerUserId, UploadSessionFilter filter, int offset, int limit, CancellationToken cancellationToken)
+        {
+            var states = filter.States.ToList();
+            var query = context.UploadSessions.AsNoTracking().Where(s => s.TenantId == tenantId && s.OwnerUserId == ownerUserId && states.Contains(s.SessionState));
+            if (!string.IsNullOrEmpty(filter.FileNameContains))
+            {
+                var pattern = "%" + LikeEscape(filter.FileNameContains) + "%";
+                query = query.Where(s => EF.Functions.ILike(s.OriginalFileName, pattern, "\\"));
+            }
+
+            if (filter.CreatedFrom is { } from)
+            {
+                query = query.Where(s => s.SessionCreatedOn >= from);
+            }
+
+            if (filter.CreatedBefore is { } before)
+            {
+                query = query.Where(s => s.SessionCreatedOn < before);
+            }
+
+            var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+            var items = await query.OrderByDescending(s => s.SessionCreatedOn).ThenByDescending(s => s.UploadSessionId).Skip(offset).Take(limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new StorePage<UploadSession>(items, total);
+        }
+
+        public Task<List<UploadSessionStatistic>> GetUploadSessionStatisticsAsync(Guid tenantId, Guid ownerUserId, DateTimeOffset createdFrom, CancellationToken cancellationToken) =>
+            context.UploadSessions.AsNoTracking().Where(s => s.TenantId == tenantId && s.OwnerUserId == ownerUserId && s.SessionCreatedOn >= createdFrom)
+                .Select(s => new UploadSessionStatistic(s.SessionState, s.SessionCreatedOn)).ToListAsync(cancellationToken);
+
         public Task<List<UploadSession>> GetSessionsDueForStagingPurgeAsync(DateTimeOffset now, DateTimeOffset terminalBefore, int limit, CancellationToken cancellationToken) =>
             context.UploadSessions
                 .Where(s => s.StagingObjectPurgedOn == null
@@ -342,6 +372,41 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public Task<List<AuditEvent>> GetActorAuditEventsAsync(Guid tenantId, Guid actorUserId, int limit, CancellationToken cancellationToken) =>
             context.AuditEvents.AsNoTracking().Where(e => e.TenantId == tenantId && e.ActorUserId == actorUserId).OrderByDescending(e => e.EventOccurredOn).ThenByDescending(e => e.AuditSequence).Take(limit).ToListAsync(cancellationToken);
+
+        public async Task<StorePage<AuditEvent>> QueryActorAuditEventsAsync(Guid tenantId, Guid actorUserId, ActorAuditEventFilter filter, int offset, int limit, CancellationToken cancellationToken)
+        {
+            var query = context.AuditEvents.AsNoTracking().Where(e => e.TenantId == tenantId && e.ActorUserId == actorUserId);
+            if (!string.IsNullOrEmpty(filter.EventCategory))
+            {
+                query = query.Where(e => e.EventCategory == filter.EventCategory);
+            }
+
+            if (!string.IsNullOrEmpty(filter.EventOutcome))
+            {
+                query = query.Where(e => e.EventOutcome == filter.EventOutcome);
+            }
+
+            if (filter.OccurredFrom is { } from)
+            {
+                query = query.Where(e => e.EventOccurredOn >= from);
+            }
+
+            if (filter.OccurredBefore is { } before)
+            {
+                query = query.Where(e => e.EventOccurredOn < before);
+            }
+
+            var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+            var items = await query.OrderByDescending(e => e.EventOccurredOn).ThenByDescending(e => e.AuditSequence).Skip(offset).Take(limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new StorePage<AuditEvent>(items, total);
+        }
+
+        public Task<List<string>> GetActorAuditCategoriesAsync(Guid tenantId, Guid actorUserId, CancellationToken cancellationToken) =>
+            context.AuditEvents.AsNoTracking().Where(e => e.TenantId == tenantId && e.ActorUserId == actorUserId).Select(e => e.EventCategory).Distinct().OrderBy(c => c).ToListAsync(cancellationToken);
+
+        public Task<List<AuditEvent>> GetTargetAuditEventsAsync(Guid tenantId, string targetEntityType, Guid targetEntityId, int limit, CancellationToken cancellationToken) =>
+            context.AuditEvents.AsNoTracking().Where(e => e.TenantId == tenantId && e.TargetEntityType == targetEntityType && e.TargetEntityId == targetEntityId)
+                .OrderBy(e => e.EventOccurredOn).ThenBy(e => e.AuditSequence).Take(limit).ToListAsync(cancellationToken);
 
         public Task<OrganizationBranding?> FindBrandingAsync(Guid tenantId, CancellationToken cancellationToken) =>
             context.OrganizationBrandings.FirstOrDefaultAsync(b => b.TenantId == tenantId, cancellationToken);
@@ -598,10 +663,103 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
                 .AsTracking().FirstAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task<SecurityIncident?> LockLatestSecurityIncidentAsync(Guid tenantId, string deduplicationKey, CancellationToken cancellationToken)
+        {
+            // Transaction-scoped advisory lock on (tenant, key): concurrent detections of the same problem serialize here even
+            // when no row exists yet, so a burst of failing reads yields one incident. Released at commit or rollback.
+            var lockKey = tenantId.ToString("D") + "|" + deduplicationKey;
+            await context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))", cancellationToken).ConfigureAwait(false);
+            return await context.SecurityIncidents
+                .FromSqlInterpolated($"SELECT * FROM security_incidents WHERE tenant_id = {tenantId} AND incident_deduplication_key = {deduplicationKey} ORDER BY first_detected_on DESC, security_incident_id DESC LIMIT 1 FOR UPDATE")
+                .AsTracking().FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        public Task<SecurityIncident?> FindSecurityIncidentAsync(Guid tenantId, Guid securityIncidentId, bool lockForUpdate, CancellationToken cancellationToken) =>
+            lockForUpdate
+                ? context.SecurityIncidents.FromSqlInterpolated($"SELECT * FROM security_incidents WHERE tenant_id = {tenantId} AND security_incident_id = {securityIncidentId} FOR UPDATE").AsTracking().FirstOrDefaultAsync(cancellationToken)
+                : context.SecurityIncidents.AsNoTracking().FirstOrDefaultAsync(i => i.TenantId == tenantId && i.SecurityIncidentId == securityIncidentId, cancellationToken);
+
+        public void AddSecurityIncident(SecurityIncident incident) => context.SecurityIncidents.Add(incident);
+
+        public void AddSecurityIncidentOccurrence(SecurityIncidentOccurrence occurrence) => context.SecurityIncidentOccurrences.Add(occurrence);
+
+        public void AddSecurityIncidentNote(SecurityIncidentNote note) => context.SecurityIncidentNotes.Add(note);
+
+        public async Task<DateTimeOffset?> GetLatestSecurityIncidentOccurrenceOnAsync(Guid securityIncidentId, CancellationToken cancellationToken) =>
+            await context.SecurityIncidentOccurrences.AsNoTracking().Where(o => o.SecurityIncidentId == securityIncidentId)
+                .OrderByDescending(o => o.OccurrenceDetectedOn).Select(o => (DateTimeOffset?)o.OccurrenceDetectedOn).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+
+        public async Task<StorePage<SecurityIncident>> QuerySecurityIncidentsAsync(Guid tenantId, SecurityIncidentFilter filter, int offset, int limit, CancellationToken cancellationToken)
+        {
+            var query = context.SecurityIncidents.AsNoTracking().Where(i => i.TenantId == tenantId);
+            if (!string.IsNullOrEmpty(filter.IncidentTypeName))
+            {
+                query = query.Where(i => i.IncidentTypeName == filter.IncidentTypeName);
+            }
+
+            if (!string.IsNullOrEmpty(filter.IncidentSeverityName))
+            {
+                query = query.Where(i => i.IncidentSeverityName == filter.IncidentSeverityName);
+            }
+
+            if (!string.IsNullOrEmpty(filter.IncidentStatusName))
+            {
+                query = query.Where(i => i.IncidentStatusName == filter.IncidentStatusName);
+            }
+
+            if (filter.DetectedFrom is { } from)
+            {
+                query = query.Where(i => i.LastDetectedOn >= from);
+            }
+
+            if (filter.DetectedBefore is { } before)
+            {
+                query = query.Where(i => i.FirstDetectedOn < before);
+            }
+
+            if (!string.IsNullOrEmpty(filter.IncidentIdSuffix))
+            {
+                var suffix = "%" + filter.IncidentIdSuffix;
+                query = query.Where(i => EF.Functions.Like(i.SecurityIncidentId.ToString(), suffix));
+            }
+
+            if (filter.FormRecordIds is { } recordIds)
+            {
+                var ids = recordIds.ToList();
+                query = query.Where(i => i.FormRecordId != null && ids.Contains(i.FormRecordId.Value));
+            }
+
+            var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+            var items = await query.OrderByDescending(i => i.LastDetectedOn).ThenByDescending(i => i.SecurityIncidentId).Skip(offset).Take(limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new StorePage<SecurityIncident>(items, total);
+        }
+
+        public Task<List<SecurityIncident>> FindSecurityIncidentsByRecordSuffixAsync(Guid tenantId, string recordIdSuffix, int limit, CancellationToken cancellationToken)
+        {
+            var suffix = "%" + recordIdSuffix;
+            return context.SecurityIncidents.AsNoTracking().Where(i => i.TenantId == tenantId && i.FormRecordId != null && EF.Functions.Like(i.FormRecordId.Value.ToString(), suffix))
+                .OrderByDescending(i => i.LastDetectedOn).ThenByDescending(i => i.SecurityIncidentId).Take(limit).ToListAsync(cancellationToken);
+        }
+
+        public Task<List<SecurityIncidentStatistic>> GetSecurityIncidentStatisticsAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            context.SecurityIncidents.AsNoTracking().Where(i => i.TenantId == tenantId)
+                .Select(i => new SecurityIncidentStatistic(i.IncidentStatusName, i.IncidentSeverityName, i.IncidentTypeName, i.FirstDetectedOn, i.LastDetectedOn)).ToListAsync(cancellationToken);
+
+        public Task<List<SecurityIncidentOccurrence>> GetSecurityIncidentOccurrencesAsync(Guid securityIncidentId, int limit, CancellationToken cancellationToken) =>
+            context.SecurityIncidentOccurrences.AsNoTracking().Where(o => o.SecurityIncidentId == securityIncidentId)
+                .OrderByDescending(o => o.OccurrenceDetectedOn).ThenByDescending(o => o.SecurityIncidentOccurrenceId).Take(limit).ToListAsync(cancellationToken);
+
+        public Task<List<SecurityIncidentNote>> GetSecurityIncidentNotesAsync(Guid securityIncidentId, CancellationToken cancellationToken) =>
+            context.SecurityIncidentNotes.AsNoTracking().Where(n => n.SecurityIncidentId == securityIncidentId)
+                .OrderBy(n => n.NoteCreatedOn).ThenBy(n => n.SecurityIncidentNoteId).ToListAsync(cancellationToken);
+
         public Task<UserUiPreference?> FindUiPreferenceAsync(Guid userId, CancellationToken cancellationToken) =>
             context.UserUiPreferences.FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
 
         public void AddUiPreference(UserUiPreference preference) => context.UserUiPreferences.Add(preference);
+
+        /// <summary>Escapes LIKE wildcards so user text is matched literally (escape character backslash).</summary>
+        private static string LikeEscape(string text) => text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 
         public async Task CommitAsync(CancellationToken cancellationToken)
         {
