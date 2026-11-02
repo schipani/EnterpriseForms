@@ -144,6 +144,18 @@ public sealed class OwnerRecoveryStackTests(StageBFixture fixture)
 
             Assert.Equal(1, Count($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{s.OrganizationId:D}' AND journal_event_kind = 'OwnerRecoveryExecuted';"));
 
+            // The selected member's immutable user id is what the case recorded, and the People directory shows the Authority's own expiry.
+            Assert.Equal(1, Count($"SELECT count(*) FROM organization_owner_recovery_subjects WHERE organization_owner_recovery_case_id = '{caseId:D}' AND recovery_subject_role_name = 'Replacement' AND is_new_identity = false AND subject_authority_user_id = '{s.Reader.AuthorityUserId:D}';"));
+            var probationEnds = Sql($"SELECT to_char(probation_ends_on AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US') FROM organization_recovered_owner_probations WHERE organization_owner_recovery_case_id = '{caseId:D}' AND authority_user_id = '{s.Reader.AuthorityUserId:D}';");
+            await s.WaitGateReadyAsync(TimeSpan.FromSeconds(40));
+            var people = await fixture.Api.GetAsync("/api/v1/organization/members", s.Token(s.Designer));
+            Assert.True(people.IsSuccess, people.Body);
+            var readerRow = people.Root.GetProperty("members").EnumerateArray().Single(m => m.GetProperty("userId").GetGuid() == s.Reader.AuthorityUserId);
+            Assert.Equal(DateTimeOffset.Parse(probationEnds + "Z", CultureInfo.InvariantCulture), readerRow.GetProperty("recoveryRestrictionsUntil").GetDateTimeOffset()); // the Authority timestamp, not a computed one
+            var designerRow = people.Root.GetProperty("members").EnumerateArray().Single(m => m.GetProperty("userId").GetGuid() == s.Designer.AuthorityUserId);
+            Assert.True(!designerRow.TryGetProperty("recoveryRestrictionsUntil", out var none) || none.ValueKind == JsonValueKind.Null); // the original owner has none
+            Assert.Equal(2, people.Root.GetProperty("members").EnumerateArray().Count(m => m.TryGetProperty("recoveryRestrictionsUntil", out var v) && v.ValueKind != JsonValueKind.Null));
+
             // The recovered owner is an owner (organization administration) but has no record access through the recovery.
             var newOwner = recovered with { AuthorityUserId = recoveredId };
             var signedIn = await fixture.Api.GetAsync("/api/v1/users/me", TestIdentity.UserToken(newOwner, s.OrganizationId)); // first sign-in, as the SPA does
@@ -179,6 +191,54 @@ public sealed class OwnerRecoveryStackTests(StageBFixture fixture)
                 session.Dispose();
             }
         }
+    }
+
+    [Fact]
+    public async Task TheMemberPickerOffersOnlyEligibleMembersOfTheSelectedOrganizationAndIsAudited()
+    {
+        await PlatformConsoleHarness.EnsureConsoleOperatorsAsync(fixture);
+        using var dana = await ConsoleSession.SignInAsync(ConsoleSubjects[0]);
+        var s = new StageBScenario(fixture, "rec-pick-" + Suffix());
+        await s.BootstrapAsync(withNeverSignedInMember: true);
+        var other = new StageBScenario(fixture, "rec-pick-other-" + Suffix());
+        await other.BootstrapAsync();
+        string Members(Guid organizationId, string query = "") => $"/console-api/v1/owner-recovery/organizations/{organizationId:D}/members{query}";
+
+        var listed = await dana.SendAsync(HttpMethod.Get, Members(s.OrganizationId));
+        Assert.True(listed.Status == HttpStatusCode.OK, listed.Text);
+        var ids = listed.Body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("authorityUserId").GetGuid()).ToList();
+        // Members only (never the owner), from this organization only, each exactly once.
+        var expected = new[] { s.Clerk, s.Reader, s.Administrator, s.DesignerOnly, s.Newcomer }.Select(u => u.AuthorityUserId).Order().ToArray();
+        Assert.Equal(expected, ids.Order().ToArray());
+        Assert.DoesNotContain(s.Designer.AuthorityUserId, ids); // existing owner
+        Assert.DoesNotContain(other.Designer.AuthorityUserId, ids); // another organization
+        Assert.Equal(expected.Length, listed.Body.GetProperty("totalCount").GetInt32());
+        // Minimum metadata: exactly these members, no roles, teams, records or documents.
+        var names = listed.Body.GetProperty("items")[0].EnumerateObject().Select(p => p.Name).Order().ToArray();
+        Assert.Equal(["authorityUserId", "displayName", "issuerUri", "memberSince", "subjectIdentifier"], names);
+
+        // Server-side search and cursor paging (opaque, operator bound).
+        var clerk = await dana.SendAsync(HttpMethod.Get, Members(s.OrganizationId, "?q=" + Uri.EscapeDataString(s.Clerk.Subject)));
+        Assert.Equal(s.Clerk.AuthorityUserId, Assert.Single(clerk.Body.GetProperty("items").EnumerateArray()).GetProperty("authorityUserId").GetGuid());
+        var first = await dana.SendAsync(HttpMethod.Get, Members(s.OrganizationId, "?limit=2"));
+        var cursor = first.Body.GetProperty("nextCursor").GetString()!;
+        var second = await dana.SendAsync(HttpMethod.Get, Members(s.OrganizationId, "?limit=2&cursor=" + Uri.EscapeDataString(cursor)));
+        Assert.Equal(2, second.Body.GetProperty("items").GetArrayLength());
+        Assert.Empty(first.Body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("authorityUserId").GetGuid()).Intersect(second.Body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("authorityUserId").GetGuid())));
+        using var ellis = await ConsoleSession.SignInAsync(ConsoleSubjects[1]);
+        Assert.Equal("CURSOR_INVALID", (await ellis.SendAsync(HttpMethod.Get, Members(s.OrganizationId, "?limit=2&cursor=" + Uri.EscapeDataString(cursor)))).Code);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await dana.SendAsync(HttpMethod.Get, Members(s.OrganizationId, "?limit=500"))).Status);
+        Assert.Equal("NOT_FOUND", (await dana.SendAsync(HttpMethod.Get, Members(Guid.CreateVersion7()))).Code);
+
+        // Every successful search is audited on the organization stream.
+        Assert.True(Count($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{s.OrganizationId:D}' AND journal_event_kind = 'PlatformOwnerRecoveryMembersViewed';") == 4); // one per successful search; refusals disclose nothing and write nothing
+        Assert.Equal(0, Count($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{other.OrganizationId:D}' AND journal_event_kind = 'PlatformOwnerRecoveryMembersViewed';"));
+
+        // Unauthorized enumeration: no session, a business token, and a business owner of the same organization all see nothing.
+        using var anonymous = new ConsoleSession(); // no cookie
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(HttpMethod.Get, Members(s.OrganizationId))).Status);
+        var businessRoute = await fixture.Api.GetAsync($"/api/v1/organization/owner-recovery/organizations/{s.OrganizationId:D}/members", s.Token(s.Designer));
+        Assert.False(businessRoute.IsSuccess); // there is no such business route
     }
 
     [Fact]

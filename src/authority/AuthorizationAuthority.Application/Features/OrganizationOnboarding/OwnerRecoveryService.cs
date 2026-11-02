@@ -50,6 +50,7 @@ public sealed partial class OwnerRecoveryService(
     public const int MaximumReplacements = 3;
     public const string RecoverCommandKind = "RecoverOrganizationOwners";
     private static readonly string[] DetailDisclosure = ["recovery_case", "owner_identities", "unavailability_evidence", "approvals"];
+    private static readonly string[] MemberDisclosure = ["member_identities"];
 
     // ---- open ----
 
@@ -754,6 +755,86 @@ public sealed partial class OwnerRecoveryService(
         }
 
         return bound.Binding;
+    }
+
+    // ---- replacement-owner member picker (C-106) ----
+
+    /// <summary>
+    /// The organization members who could be proposed as replacement owners: enabled, not already an owner, not a registered Platform
+    /// Operator identity, and never reachable by a caller who is bound in the organization (refused, as for cases). Filtering, ordering and
+    /// paging happen here; the browser never receives the rest. Discloses member identities, so each search is audited on the
+    /// organization audit stream and committed before it is returned (fail closed). No roles, teams, records or documents.
+    /// </summary>
+    public async Task<OwnerRecoveryMemberPage> SearchMembersAsync(VerifiedActor actor, Guid organizationId, OwnerRecoveryMemberSearchRequest input, Guid correlationId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        RequireAvailable();
+        var text = input.Query?.Trim();
+        if (text is { Length: > 200 })
+        {
+            throw AuthorityException.Invalid("the search text is at most 200 characters");
+        }
+
+        var limit = input.Limit ?? OrganizationOnboardingService.DefaultPageSize;
+        if (limit is < 1 or > OrganizationOnboardingService.MaximumPageSize)
+        {
+            throw AuthorityException.Invalid($"limit must be 1..{OrganizationOnboardingService.MaximumPageSize}");
+        }
+
+        OwnerRecoveryMemberPage page;
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var state = await scope.LockOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
+                        ?? throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false, "no such organization");
+            var head = await scope.ReadPlatformJournalAsync(cancellationToken).ConfigureAwait(false) ?? new PlatformJournalHead();
+            await journal.EnsureCurrentAsync(scope, head, requireAnchored: false, correlationId, cancellationToken).ConfigureAwait(false);
+            var me = await PlatformOperatorAccess.ResolveActiveAsync(scope, actor, cancellationToken).ConfigureAwait(false);
+            var org = await OrganizationViewAsync(scope, state, cancellationToken).ConfigureAwait(false);
+            RequireNoConflict(me, org.Bindings);
+            var operators = await scope.GetPlatformOperatorsAsync(cancellationToken).ConfigureAwait(false);
+            var requests = await scope.GetMembershipRequestsAsync(state.OrganizationId, DateTimeOffset.MinValue, cancellationToken).ConfigureAwait(false);
+            var hints = requests.Where(r => r.RequestStateName == MembershipRequestStates.Approved).GroupBy(r => r.RequestedAuthorityUserId).ToDictionary(g => g.Key, g => g.First().RequestedDisplayNameHint);
+            if (state.OrganizationOnboardingRequestId is { } onboardingId)
+            {
+                foreach (var owner in await scope.GetOnboardingOwnersAsync(onboardingId, cancellationToken).ConfigureAwait(false))
+                {
+                    hints.TryAdd(owner.ReservedAuthorityUserId, owner.OwnerDisplayNameHint);
+                }
+            }
+
+            var binding = OrganizationOnboardingService.Binding("recovery-members:" + organizationId.ToString("N"), me, string.Empty, text, limit);
+            var candidates = org.Bindings
+                .Where(b => b.IdentityBindingEnabled && !org.Owners.Contains(b.AuthorityUserId))
+                .Where(b => !operators.Any(o => o.OperatorIssuerUri == b.IdentityIssuerUri && o.OperatorSubjectIdentifier == b.IdentitySubjectIdentifier))
+                .Select(b => (Binding: b, Name: hints.TryGetValue(b.AuthorityUserId, out var hint) && !string.IsNullOrWhiteSpace(hint) ? hint : b.IdentitySubjectIdentifier))
+                .Where(x => string.IsNullOrEmpty(text) || x.Name.Contains(text, StringComparison.OrdinalIgnoreCase) || x.Binding.IdentitySubjectIdentifier.Contains(text, StringComparison.OrdinalIgnoreCase))
+                .Select(x => (x.Binding, x.Name, Key: x.Name.ToLowerInvariant()))
+                .OrderBy(x => x.Key, StringComparer.Ordinal).ThenBy(x => x.Binding.AuthorityUserId)
+                .ToList();
+            var total = candidates.Count;
+            if (input.Cursor is { Length: > 0 } cursor)
+            {
+                var (key, id) = OrganizationOnboardingService.ReadCursorParts(cursor, binding);
+                candidates = candidates.Where(x => string.CompareOrdinal(x.Key, key) > 0 || (x.Key == key && x.Binding.AuthorityUserId.CompareTo(id) > 0)).ToList();
+            }
+
+            var slice = candidates.Take(limit).ToList();
+            var next = candidates.Count > limit ? OrganizationOnboardingService.WriteCursor(slice[^1].Key, slice[^1].Binding.AuthorityUserId, binding) : null;
+            page = new OwnerRecoveryMemberPage(slice.Select(x => new OwnerRecoveryMemberItem(x.Binding.AuthorityUserId, x.Binding.IdentityIssuerUri, x.Binding.IdentitySubjectIdentifier, x.Name, x.Binding.IdentityCreatedOn)).ToList(),
+                total, next, limit, correlationId);
+            AuditJournal.Append(scope, state, "PlatformOwnerRecoveryMembersViewed", new
+            {
+                platform_operator_id = me.PlatformOperatorId,
+                operator_issuer_uri = me.OperatorIssuerUri,
+                operator_subject_identifier = me.OperatorSubjectIdentifier,
+                disclosed = MemberDisclosure,
+                returned_count = slice.Count,
+                correlation_id = correlationId,
+            }, clock);
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false); // fail closed: no committed audit event, no member list
+        }
+
+        return page;
     }
 
     // ---- reads ----

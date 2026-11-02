@@ -1,12 +1,13 @@
 import { Button, Card, Checkbox, LoadingBlock, Select, StatusMessage, TextArea, TextInput } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { consoleApi, ConsoleApiError, type RecoveryCreateInput, type RecoveryCreateResponse } from "../api/client";
+import { consoleApi, ConsoleApiError, type RecoveryCreateInput, type RecoveryCreateResponse, type RecoveryMemberItem } from "../api/client";
 import { describeError } from "../app/errors";
 import { identitySummary } from "../app/format";
 import { navigate, recoveryPath } from "../app/router";
 import { useConsoleSession } from "../app/session";
 import { verificationMethods } from "./OnboardingNewPage";
+import { RecoveryMemberPicker } from "./RecoveryMemberPicker";
 
 export const MIN_REPLACEMENTS = 1;
 export const MAX_REPLACEMENTS = 3;
@@ -26,11 +27,6 @@ export const unavailabilityReasons: Array<{ value: string; label: string }> = [
   { value: "Unresponsive", label: "Unresponsive" },
 ];
 
-const sourceOptions = [
-  { value: "existing", label: "Existing member (by user ID)" },
-  { value: "new", label: "New identity" },
-];
-
 interface DeclaredRow {
   declared: boolean;
   reason: string;
@@ -41,6 +37,8 @@ interface ReplacementRow {
   rowKey: number;
   source: "existing" | "new";
   existingAuthorityUserId: string;
+  /** Display name of a picked member (existing rows only). */
+  memberName: string;
   issuerUri: string;
   subjectIdentifier: string;
   displayNameHint: string;
@@ -52,12 +50,15 @@ const blankReplacement = (rowKey: number, issuerUri: string): ReplacementRow => 
   rowKey,
   source: "new",
   existingAuthorityUserId: "",
+  memberName: "",
   issuerUri,
   subjectIdentifier: "",
   displayNameHint: "",
   verificationMethod: "",
   verificationReference: "",
 });
+const identityKey = (r: { issuerUri: string; subjectIdentifier: string }) => r.issuerUri.trim() + "|" + r.subjectIdentifier.trim();
+const isPristine = (r: ReplacementRow) => r.source === "new" && !r.subjectIdentifier && !r.displayNameHint && !r.verificationMethod && !r.verificationReference;
 const blankDeclared = (): DeclaredRow => ({ declared: false, reason: "", evidenceReference: "", evidenceSummary: "" });
 const newKey = () => `rec-${crypto.randomUUID()}`;
 
@@ -135,10 +136,48 @@ export function RecoveryNewPage() {
       ? { reason: d.reason ? undefined : "Choose a reason.", reference: lengthError(d.evidenceReference, REFERENCE_MIN, REFERENCE_MAX), summary: lengthError(d.evidenceSummary, SUMMARY_MIN, SUMMARY_MAX) }
       : {};
   });
+  const identityCounts = new Map<string, number>();
+  for (const r of replacements) {
+    if (r.subjectIdentifier.trim()) {
+      identityCounts.set(identityKey(r), (identityCounts.get(identityKey(r)) ?? 0) + 1);
+    }
+  }
+  const selectedUserIds = useMemo(() => new Set(replacements.filter((r) => r.source === "existing").map((r) => r.existingAuthorityUserId)), [replacements]);
+  const proposedIdentities = useMemo(() => new Set(replacements.filter((r) => r.subjectIdentifier.trim()).map((r) => identityKey(r))), [replacements]);
+  const pickMember = (member: RecoveryMemberItem) => {
+    changed();
+    setReplacements((rows) => {
+      if (rows.length >= MAX_REPLACEMENTS || rows.some((r) => r.source === "existing" && r.existingAuthorityUserId === member.authorityUserId)) {
+        return rows;
+      }
+      const kept = rows.filter((r) => !isPristine(r));
+      const row: ReplacementRow = {
+        rowKey: nextRow.current++,
+        source: "existing",
+        existingAuthorityUserId: member.authorityUserId,
+        memberName: member.displayName,
+        issuerUri: member.issuerUri,
+        subjectIdentifier: member.subjectIdentifier,
+        displayNameHint: "",
+        verificationMethod: "",
+        verificationReference: "",
+      };
+      return [...kept, row].slice(0, MAX_REPLACEMENTS);
+    });
+  };
   const replacementErrors = replacements.map((r) => ({
-    user: r.source === "existing" ? (UUID.test(r.existingAuthorityUserId.trim()) ? undefined : "Enter the member's user ID.") : undefined,
+    user: undefined as string | undefined,
     issuer: r.source === "new" ? (r.issuerUri.trim() ? undefined : "Enter the identity issuer.") : undefined,
-    subject: r.source === "new" ? (r.subjectIdentifier.trim() ? (r.subjectIdentifier.includes("@") ? "Enter the stable subject, never an email address." : undefined) : "Enter the subject identifier.") : undefined,
+    subject:
+      r.source === "new"
+        ? r.subjectIdentifier.trim()
+          ? r.subjectIdentifier.includes("@")
+            ? "Enter the stable subject, never an email address."
+            : (identityCounts.get(identityKey(r)) ?? 0) > 1
+              ? "This identity is already proposed as another replacement."
+              : undefined
+          : "Enter the subject identifier."
+        : undefined,
     display: r.source === "new" ? (r.displayNameHint.trim() ? undefined : "Enter a display name.") : undefined,
     method: r.verificationMethod ? undefined : "Choose how the owner was verified.",
     reference: lengthError(r.verificationReference, REFERENCE_MIN, REFERENCE_MAX),
@@ -347,8 +386,9 @@ export function RecoveryNewPage() {
         </Card>
         <Card title="Replacement owners">
           <p className="text-sm text-muted">
-            Enter between {MIN_REPLACEMENTS} and {MAX_REPLACEMENTS} replacement owners, each confirmed to you by the organization. A new identity is an owner that signs in for the first time.
+            Propose between {MIN_REPLACEMENTS} and {MAX_REPLACEMENTS} replacement owners, each confirmed to you by the organization. Choose an existing member, or propose a new identity for an owner that signs in for the first time.
           </p>
+          {validId ? <RecoveryMemberPicker organizationId={organizationId} selectedUserIds={selectedUserIds} proposedIdentities={proposedIdentities} full={replacements.length >= MAX_REPLACEMENTS} onPick={pickMember} /> : null}
           <ol className="flex list-none flex-col gap-4 p-0">
             {replacements.map((row, index) => {
               const errors = replacementErrors[index]!;
@@ -356,28 +396,15 @@ export function RecoveryNewPage() {
               return (
                 <li key={row.rowKey}>
                   <fieldset className="flex flex-col gap-3 rounded-control border border-line p-4">
-                    <legend className="px-1 text-sm font-semibold">Replacement {n}</legend>
+                    <legend className="px-1 text-sm font-semibold">{row.source === "existing" ? `Replacement ${n} (existing member)` : `Replacement ${n} (new identity)`}</legend>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <Select
-                        label={`Source (replacement ${n})`}
-                        required
-                        value={row.source}
-                        onValueChange={(value) => updateReplacement(row.rowKey, { source: value === "existing" ? "existing" : "new" })}
-                        options={sourceOptions}
-                        disabled={disabled}
-                      />
                       {row.source === "existing" ? (
-                        <TextInput
-                          label={`User ID (replacement ${n})`}
-                          required
-                          value={row.existingAuthorityUserId}
-                          onChange={(event) => updateReplacement(row.rowKey, { existingAuthorityUserId: event.target.value })}
-                          error={showErrors ? errors.user : undefined}
-                          helpText="The member's Authority user ID."
-                          disabled={disabled}
-                          autoComplete="off"
-                          className="sm:col-span-2"
-                        />
+                        <div className="sm:col-span-2 min-w-0">
+                          <p className="break-words font-medium">{row.memberName}</p>
+                          <p className="break-words text-help text-muted">
+                            {identitySummary(row).subject} · {identitySummary(row).issuer} · Active member
+                          </p>
+                        </div>
                       ) : (
                         <>
                           {issuerList.length > 0 ? (
@@ -474,7 +501,7 @@ export function RecoveryNewPage() {
               setReplacements((rows) => [...rows, blankReplacement(nextRow.current++, issuerList.length === 1 ? issuerList[0]! : "")]);
             }}
           >
-            Add replacement
+            Add new identity
           </Button>
         </Card>
         <div aria-live="polite" className="flex flex-col gap-3">

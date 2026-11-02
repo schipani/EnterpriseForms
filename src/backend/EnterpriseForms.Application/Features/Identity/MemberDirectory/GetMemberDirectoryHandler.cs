@@ -108,7 +108,8 @@ public sealed class GetMemberDirectoryHandler(IBusinessStore store, IAuthorizati
                 var roles = m.OrganizationRoles.Select(r => RoleNames.GetValueOrDefault(r, r)).ToList();
                 return new OrganizationMemberResponse(m.AuthorityUserId, user is { DisplayName.Length: > 0 } ? user.DisplayName : m.DisplayNameHint ?? string.Empty, m.IssuerUri, m.SubjectIdentifier, user?.CreatedOn, roles,
                     teamsOfUser.GetValueOrDefault(m.AuthorityUserId) ?? [], m.AuthorityUserId == me, user?.LastSignedInOn, user is null ? "NeverSignedIn" : user.LastSignedInOn is null ? "NotRecorded" : "SignedIn",
-                    ActionsFor(authorityRoster, m, roles, me, pending, enabledAdministrators, user is not null), m.MembershipEnabled ? "Enabled" : "Disabled", m.DisabledOn);
+                    ActionsFor(authorityRoster, m, roles, me, pending, enabledAdministrators, user is not null), m.MembershipEnabled ? "Enabled" : "Disabled", m.DisabledOn,
+                    m.RecoveryRestrictionsUntil);
             }).ToList();
             proposals = authorityRoster.OwnerProposals.Select(p => new OwnerProposalResponse(p.ProposalId, p.TargetAuthorityUserId, NameOf(p.TargetAuthorityUserId), p.ProposedChange, p.ProposedByAuthorityUserId, NameOf(p.ProposedByAuthorityUserId),
                 p.Reason, p.ProposedOn, p.ExpiresOn, p.ProposalState, authorityRoster.CanManageMembers && p.ProposalState == "Pending" && p.ProposedByAuthorityUserId != me && p.TargetAuthorityUserId != me)).ToList();

@@ -38,6 +38,15 @@ public static class OwnerRecoveryEndpoints
             .WithName("SearchOwnerRecovery")
             .WithSummary("PG-075 queue: owner recovery cases, newest first (15 per page by default, at most 50), and this environment's waiting period.");
 
+        group.MapGet("/owner-recovery/organizations/{organizationId:guid}/members", static async Task<Ok<OwnerRecoveryMemberPage>> (Guid organizationId, string? q, string? cursor, int? limit, HttpContext http, AuthorityPlatformClient authority, OperatorSessionStore store, IHostEnvironment environment, CancellationToken cancellationToken) =>
+            {
+                var session = RequireOperatorSession.Current(http);
+                return TypedResults.Ok(await OperatorSessionGuard.RunAsync(http, session, store, environment, () =>
+                    authority.SearchRecoveryMembersAsync(session.SubjectIdentifier, organizationId, new OwnerRecoveryMemberSearchRequest(q, cursor, limit), SessionEndpoints.Correlation(http), cancellationToken)).ConfigureAwait(false));
+            })
+            .WithName("SearchOwnerRecoveryMembers")
+            .WithSummary("PG-075 member picker: members who may be proposed as replacement owners (enabled, not owners, not operator identities), 15 per page by default. Minimum metadata; the Authority audits each search before disclosure.");
+
         group.MapPost("/owner-recovery", static async Task<Ok<OwnerRecoveryCreateResponse>> (RecoveryCreateInput input, HttpContext http, AuthorityPlatformClient authority, OperatorSessionStore store, IHostEnvironment environment, CancellationToken cancellationToken) =>
             {
                 var session = RequireOperatorSession.Current(http);

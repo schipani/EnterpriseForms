@@ -839,3 +839,63 @@ Verified control of replacement identities (V3, PB-08) before activation; Entra 
 and objectors); out-of-band notification of affected parties with confirmed delivery; probation shown on People; PIM; WORM archive;
 executed G14 replay including recovery; an independent security review. Production execution remains unavailable until then.
 
+
+## 18. Owner recovery refinements: member picker, recovery-restriction display, test stabilization (C-106, 2026-11-01)
+
+Owner-approved refinements to the Development/Testing owner recovery of §17. **The security model is unchanged**: three distinct
+operators with signed evidence, eligibility checks, waiting period, objections, add-only execution, no record/share/team change,
+permanent OB-F8 and the 14-day recovered-owner safeguard, journal and rollback protection, Development/Testing only. No new path
+bypasses Authority validation.
+
+### 18.1 Replacement-owner member picker (PG-075)
+
+| Area | Implementation |
+|---|---|
+| Authority | `POST /internal/v1/platform/owner-recovery/organizations/{organizationId}/members/search` (platform plane: Platform Console credential + the operator assertion). Returns only members who may be proposed: **enabled, not already owners, not a registered Platform Operator identity**, and never to an operator who is bound in the organization (`OPERATOR_CONFLICT_OF_INTEREST`). Server-side filter (name hint or subject, case-insensitive), ordering (name, user id), cursor paging (15 by default, at most 50; opaque HMAC cursor bound to operator, organization and query), `OWNER_RECOVERY_UNAVAILABLE` outside Development/Testing, the platform journal archive check (fail closed) |
+| Minimum metadata | `authorityUserId`, `issuerUri`, `subjectIdentifier`, `displayName`, `memberSince` — nothing else: no roles, teams, records, shares, documents or sessions. The name is the best the Authority knows (the hint recorded by an approved membership request or the onboarding owner list; the identity subject when none exists — the Authority has no profile table, and the business directory is deliberately not consulted) |
+| Audit | Every successful search is an organization audit event `PlatformOwnerRecoveryMembersViewed` (operator, count; identities are not copied into the body) committed before the list is returned (fail closed), like the case and directory detail views |
+| BFF | `GET /console-api/v1/owner-recovery/organizations/{organizationId}/members?q=&cursor=&limit=` (session + operator guard; the browser sends no identity). The Platform Console holds no business credential and the business API has no such route |
+| UI | `RecoveryMemberPicker` in the new-case page: debounced "Search members", member list (name, subject and provider, "Active member since"), "Load more" through the server cursor, `aria-live` result count, loading / empty / error states, "Add" / "Added" (a member, or an identity already proposed as a new identity, cannot be added twice), at most three replacements, removable rows. The internal user id is used as `existingAuthorityUserId` and is never typed. The "propose a verified new identity" mode is unchanged. Verification method and reference remain required for every replacement |
+| Eligibility is enforced twice | The picker only filters. The create call and execution still validate every replacement again (enabled non-owner member, not an operator identity, identity unchanged since opening) |
+
+### 18.2 Recovery restrictions on the People page (PG-050)
+
+- The Authority roster member now carries `recoveryRestrictionsUntil`: the **expiry of the member's active recovered-owner probation, exactly as stored by the Authority** (absent when none or expired; it is read from `GetActiveRecoveredOwnerProbations` at the Authority clock on every roster read). The business People response passes it through (`OrganizationMemberResponse.recoveryRestrictionsUntil`); no start date is computed anywhere.
+- `MemberTable`: beside the Owner role, a small "Recovery restrictions" button (`aria-expanded`/`aria-controls`) discloses an inline region (hidden, so no extra height, until opened) with the exact expiry (local date and time), the remaining time, what is temporarily restricted (adding owners recovered by the same case to teams, granting them Designer, acting as their second owner for owner changes), that adding oneself to a team is never allowed for owners, and that this is separate from membership status, sign-in and presence. The indicator also disappears when the timestamp has passed in the browser and when the server stops returning it.
+- A refused action shows its reason: `OWNER_RECOVERY_PROBATION` and `TEAM_JOIN_REQUIRES_ANOTHER_OWNER` have messages in the shared error map.
+- Permissions and server-side enforcement are unchanged (the rule lives in the command planner).
+
+### 18.3 Contract changes (all additive)
+
+Authority: new route and `OwnerRecoveryMemberSearchRequest`/`Item`/`Page`; `OrganizationRosterMember.RecoveryRestrictionsUntil` (optional, default null). Business API: `OrganizationMemberResponse.recoveryRestrictionsUntil`. Console BFF: the members route. Semantic comparison against the committed OpenAPI documents: no path or schema removed or changed, only added.
+
+### 18.4 Test stabilization — root causes
+
+| Problem | Root cause | Fix |
+|---|---|---|
+| Real-stack `RC27TheLiveRateLimitAnswers429WithRetryAfterAndNeverFails` failed intermittently (all 80 lookups answered 200) | **Not load, not shared state, not a missing limit — a limiter characteristic the test did not account for.** Measured with 120 parallel lookups after idle periods: the first burst after an idle period is admitted up to **twice** the configured burst (80 = 2 × 40); later bursts admit about 40–49. .NET's partitioned limiter evicts idle partitions, so a burst that starts on an evicted partition can briefly see a fresh full bucket. The old test sent exactly 80 and demanded a 429, which a first-after-idle burst legitimately never produces | Test rewritten to prove the limiter contract independent of machine speed: demand continues in waves of 120 until the first 429; 429 carries Retry-After and the safe `RATE_LIMITED` body; no failure statuses; admissions never exceed 2 × burst plus one refill per elapsed tick (+5). No expectation weakened and no timeout lengthened. 5/5 consecutive passes. **Residual (recorded, not changed):** after an idle period the reconciler lookup limit admits up to 2 × burst once; the bound is unchanged otherwise (burst ≤ 100 by configuration). Replacing the evicting partition by a never-evicted limiter is a possible product hardening, not done here |
+| Vitest: occasional 5 s timeouts with default workers in `PeopleDirectoryPage`, `OrganizationOnboarding`, `App` tests | CPU oversubscription: the default is one jsdom worker per logical core minus one (15 on this 16-core machine); each imports React, Radix and TanStack Query, so import/transform phases and the heavier user-event suites compete. Each file passes alone | `vitest.config.ts` bounds workers to a quarter of the cores (2–4; `VITEST_MAX_WORKERS` overrides, documented in the file). Assertions and timeouts unchanged. 3/3 consecutive full default runs green (371 tests) |
+| Console Playwright: 6 failures in the first full run | The new-case spec read the case id from the URL before the SPA navigation completed | `page.waitForURL` before reading it (already fixed in C-105); this round the **complete** console suite was run as one run |
+
+### 18.5 Tests (2026-11-01)
+
+| Suite | Result (2026-11-01) |
+|---|---|
+| Authority unit tests (5 new: picker eligibility, paging, isolation, id binding, restriction expiry) | 306 / 306 |
+| Contract / BFF / architecture / integrity | 488 / 488, 23 / 23, 75 / 75, 34 / 34 |
+| Real stack, one combined run (recovery incl. 1 new picker test, onboarding, team join, console, membership, reconciliation incl. RC27, people) | 59 / 59 |
+| RC27 rate-limit test, repeated in isolation | 5 / 5 |
+| Vitest workspace (default command, three consecutive full runs; 6 new tests) | 371 / 371 each |
+| ESLint, tsc, build | clean |
+| Platform Console Playwright, complete suite as one run (4 new picker tests, results listed at 320/768/1440 px with axe and no horizontal scroll) | 36 / 36 (first run of the round 35 / 36: a wrong heading name in the new spec, fixed) |
+| Business Playwright: People recovery restrictions (new; 320/768/1440 px, axe, expiry hidden; server response patched in the browser), objection notice, People layout and administration | all passed |
+
+Two harness defects found and fixed: console sign-ins from many test classes in one run cross the console deliberate 20-per-minute login limit, so the console test session now waits out the window (tests of the limiter itself are unchanged); and killing a test run midway can leave the stack worker stopped, which the next run reports as a fixture failure (restore the stack before rerunning).
+
+### 18.6 Development stack
+
+`devstack.py owner-recovery init` re-run (2026-11-01): migration `20261101221445_OwnerRecovery` already applied and backup `20261101-185205` already recorded (no new backup, no migration); Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated only; Vault, databases, SpiceDB and Azurite untouched. Data unchanged before and after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records). No recovery case was opened and the single-owner main organization was not touched. Evidence: `artifacts/dev-persistent/enterpriseforms-dev-owner-recovery-init-20261101-201341.json`. PG-075 `http://127.0.0.1:8095/platform/recovery`; People `http://127.0.0.1:8091/app/organization/users`.
+
+### 18.7 Limitations
+
+The Authority knows a person's name only through a membership-request or onboarding hint, so members who joined another way appear by their identity subject. Restriction expiry is verified by unit test (clock advance) and by browser tests with the server response patched; a real 14-day expiry cannot be waited for in the stack. Production items of §17.6 remain open.

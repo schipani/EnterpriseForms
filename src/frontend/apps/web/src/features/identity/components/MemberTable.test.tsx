@@ -132,6 +132,39 @@ describe("MemberTable", () => {
   });
 });
 
+describe("Recovery restrictions", () => {
+  const ends = new Date(Date.now() + 12 * 86_400_000 + 3_600_000).toISOString();
+  const owner = (extra: Partial<OrganizationMemberResponse>): OrganizationMemberResponse => ({ ...members[0]!, isCurrentUser: false, ...extra });
+
+  it("shows a collapsed indicator with the exact timestamp and the restrictions when opened", async () => {
+    const user = userEvent.setup();
+    render(<MemberTable members={[owner({ recoveryRestrictionsUntil: ends })]} rolesAvailable />);
+    const button = screen.getByRole("button", { name: "Recovery restrictions" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    const region = document.getElementById(button.getAttribute("aria-controls")!)!;
+    expect(region).toBeInTheDocument();
+    expect(region).not.toBeVisible();
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    expect(region).toBeVisible();
+    expect(region).toHaveTextContent(`Recovery restrictions end ${new Date(ends).toLocaleString()} (about 12 days).`);
+    expect(region).toHaveTextContent("add other owners recovered by the same case to teams");
+    expect(region).toHaveTextContent("grant them the Designer role");
+    expect(region).toHaveTextContent("act as their second owner for owner changes");
+    expect(region).toHaveTextContent("Adding oneself to a team is never allowed for owners");
+    expect(region).toHaveTextContent("separate from membership status, sign-in and presence");
+    expect(region).toHaveTextContent("Nothing else is restricted");
+    await user.click(button);
+    expect(region).not.toBeVisible();
+  });
+
+  it("is hidden when the field is absent, null or expired, and for people who are not owners", () => {
+    const past = new Date(Date.now() - 60_000).toISOString();
+    render(<MemberTable members={[owner({ userId: "a" }), owner({ userId: "b", recoveryRestrictionsUntil: null }), owner({ userId: "c", recoveryRestrictionsUntil: past }), { ...members[1]!, recoveryRestrictionsUntil: ends }]} rolesAvailable />);
+    expect(screen.queryByRole("button", { name: "Recovery restrictions" })).toBeNull();
+  });
+});
+
 describe("providerName", () => {
   it("shortens issuers to a provider name", () => {
     expect(providerName("https://login.microsoftonline.com/11111111-2222-3333-4444-555555555555/v2.0")).toBe("Microsoft Entra ID");

@@ -938,6 +938,64 @@
         }
       }
     },
+    "/console-api/v1/owner-recovery/organizations/{organizationId}/members": {
+      "get": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "PG-075 member picker: members who may be proposed as replacement owners (enabled, not owners, not operator identities), 15 per page by default. Minimum metadata; the Authority audits each search before disclosure.",
+        "operationId": "SearchOwnerRecoveryMembers",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryMemberPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/console-api/v1/owner-recovery/{caseId}": {
       "get": {
         "tags": [
@@ -2870,6 +2928,81 @@
           },
           "openedByOperatorDisplayName": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryMemberItem": {
+        "required": [
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayName",
+          "memberSince"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "memberSince": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryMemberPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryMemberItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false

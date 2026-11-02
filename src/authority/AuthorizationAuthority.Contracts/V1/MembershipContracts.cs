@@ -42,7 +42,7 @@ public sealed record OrganizationRosterRequest(Guid OrganizationId);
 /// while <c>MembershipEnabled</c> is false. <c>DisplayNameHint</c> comes from the approved membership request, if any.
 /// </summary>
 public sealed record OrganizationRosterMember(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, bool MembershipEnabled, DateTimeOffset BoundOn, DateTimeOffset? DisabledOn,
-    IReadOnlyList<string> OrganizationRoles, string? DisplayNameHint);
+    IReadOnlyList<string> OrganizationRoles, string? DisplayNameHint, DateTimeOffset? RecoveryRestrictionsUntil = null);
 
 /// <summary><c>ProposalState</c>: Pending, Expired or Consumed (computed against the Authority clock).</summary>
 public sealed record OrganizationOwnerProposal(Guid ProposalId, Guid TargetAuthorityUserId, string ProposedChange, Guid ProposedByAuthorityUserId, string Reason, DateTimeOffset ProposedOn, DateTimeOffset ExpiresOn,

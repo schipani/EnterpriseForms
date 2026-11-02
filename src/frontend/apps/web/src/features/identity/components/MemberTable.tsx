@@ -1,5 +1,6 @@
 import type { OrganizationMemberResponse, PresenceState } from "@enterpriseforms/api-client";
 import { Badge, Button, OverflowMenu, PresenceIndicator } from "@enterpriseforms/ui";
+import { useId, useState } from "react";
 
 const ROLE_LABELS: Record<string, string> = { OrganizationOwner: "Owner", Designer: "Designer", SecurityAdministrator: "Security administrator" };
 
@@ -49,6 +50,46 @@ export function providerName(issuer: string): string {
   } catch {
     return issuer;
   }
+}
+
+/** "about 12 days", "about 5 hours", "less than a minute": a rounded countdown for display only (the server decides when the safeguard ends). */
+export function describeRemaining(untilMilliseconds: number, nowMilliseconds: number): string {
+  const minutes = Math.max(0, Math.round((untilMilliseconds - nowMilliseconds) / 60_000));
+  if (minutes < 1) return "less than a minute";
+  if (minutes < 60) return "about " + minutes + (minutes === 1 ? " minute" : " minutes");
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return "about " + hours + (hours === 1 ? " hour" : " hours");
+  const days = Math.round(hours / 24);
+  return "about " + days + " days";
+}
+
+/** Compact disclosure beside the Owner badge while the recovered-owner safeguard is active; hidden regions add no height. */
+function RecoveryRestrictions({ until }: { until: string }) {
+  const [open, setOpen] = useState(false);
+  const regionId = useId();
+  const end = Date.parse(until);
+  if (Number.isNaN(end) || end <= Date.now()) {
+    return null;
+  }
+  return (
+    <span className="inline-flex flex-col items-start gap-1 whitespace-normal">
+      <Button type="button" size="sm" variant="secondary" aria-expanded={open} aria-controls={regionId} onClick={() => setOpen((value) => !value)}>
+        Recovery restrictions
+      </Button>
+      <span id={regionId} hidden={!open} className="block max-w-prose rounded-control border border-line bg-page p-3 text-help">
+        <span className="block">
+          Recovery restrictions end {new Date(end).toLocaleString()} ({describeRemaining(end, Date.now())}).
+        </span>
+        <span className="mt-1 block">Until then this owner cannot:</span>
+        <ul className="list-disc pl-5">
+          <li>add other owners recovered by the same case to teams</li>
+          <li>grant them the Designer role</li>
+          <li>act as their second owner for owner changes</li>
+        </ul>
+        <span className="mt-1 block">Adding oneself to a team is never allowed for owners. These restrictions are separate from membership status, sign-in and presence. Nothing else is restricted.</span>
+      </span>
+    </span>
+  );
 }
 
 /** Desktop column widths (container query); below that each person is a compact card with labelled fields. */
@@ -130,6 +171,7 @@ export function MemberTable({
                             {ROLE_LABELS[role] ?? role}
                           </Badge>
                         ))}
+                        {row.authorityRoles.includes("OrganizationOwner") && row.recoveryRestrictionsUntil ? <RecoveryRestrictions until={row.recoveryRestrictionsUntil} /> : null}
                       </span>
                     )}
                   </div>

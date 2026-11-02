@@ -4,8 +4,8 @@
   "entries": [
     {
       "path": "CLAUDE-DESIGN.MD",
-      "sha256": "8e4ab5eccb54502c0e21196ea22a260771797c609dcb1277683cb376d176da82",
-      "bytes": 173114
+      "sha256": "a67f84bd292badb9b453cf4ae042905648c4fe1052509039dcc31aab9314d49c",
+      "bytes": 173236
     },
     {
       "path": "CLAUDE.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "49b403d12958fa5f05f5dd18871d2e60fc1e8082989fdd65624a78660c8aa0b5",
-      "bytes": 76669
+      "sha256": "bb5e016c91f1f2ab36dae02c590f7e69b12fa60ed193467697d7000dcfcc6439",
+      "bytes": 79652
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "69f5dc9f5db91d4c3a5f84c2d8c24ceb61c52262e3fc77825d061ff9ba3ae473",
-      "bytes": 18818
+      "sha256": "561a06903999b8ce5dfcac6cafca983b38109b14aa21bc7171367718d03d11b8",
+      "bytes": 18867
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -204,8 +204,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md",
-      "sha256": "93231c517005492b8410cd7a4b087d1dd31f81ebdc7b6a78a7edf0d7eca38127",
-      "bytes": 90622
+      "sha256": "91673ebf994ebb3170566ae58bf23936c1aa6d549f42dccea569d7b0f75f13d8",
+      "bytes": 100422
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -299,8 +299,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "4fe84040664f0ee53239270473554697d5c0af8d281ec873571917c4362cbf5a",
-      "bytes": 164566
+      "sha256": "b4e7b86d75e219a67f0cf0346e897376a3a024c2f47493bbf9ba5e9b53021c7a",
+      "bytes": 165862
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

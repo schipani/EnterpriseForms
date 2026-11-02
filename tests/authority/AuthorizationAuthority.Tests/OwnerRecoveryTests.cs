@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Application.Features.Membership;
+using AuthorizationAuthority.Application.Features.OperatorPlane;
 using AuthorizationAuthority.Application.Features.OrganizationOnboarding;
 using AuthorizationAuthority.Application.Features.PlatformOperators;
 using AuthorizationAuthority.Application.Features.SecurityCommands;
@@ -547,6 +549,128 @@ public sealed class OwnerRecoveryTests : IDisposable
         Assert.Equal(AuthorityErrorCodes.OwnerRecoveryUnavailable, await RefusedAsync(() => production.CreateAsync(alice.Actor, new OwnerRecoveryCreateRequest("recovery-prod-0001", org, "INC-1", Justification, [], [NewOwner("p-1"), NewOwner("p-2")], false), Guid.CreateVersion7(), Ct)));
         Assert.Throws<InvalidOperationException>(() => Policy("Production", 3600)); // the 72-hour floor outside Development/Testing
         Assert.Throws<InvalidOperationException>(() => Policy("Testing", 5));
+    }
+
+    // ---- replacement-owner member picker (C-106) ----
+
+    /// <summary>The Authority records a name hint only when a member joined through an approved membership request.</summary>
+    private void Hint(Guid user, string name) => store.MembershipRequests.Add(new OrganizationMembershipRequest
+    {
+        OrganizationMembershipRequestId = Guid.CreateVersion7(), OrganizationId = org, RequestedAuthorityUserId = user, RequestedDisplayNameHint = name, RequestStateName = MembershipRequestStates.Approved,
+        RequestCreatedOn = clock.GetUtcNow(), RequestExpiresOn = clock.GetUtcNow().AddDays(7),
+    });
+
+    private Task<OwnerRecoveryMemberPage> MembersAsync(Op op, Guid? organizationId = null, string? query = null, string? cursor = null, int? limit = null, OwnerRecoveryService? service = null) =>
+        (service ?? Service).SearchMembersAsync(op.Actor, organizationId ?? org, new OwnerRecoveryMemberSearchRequest(query, cursor, limit), Guid.CreateVersion7(), Ct);
+
+    [Fact]
+    public async Task ThePickerListsOnlyEnabledNonOwnerNonOperatorMembersWithMinimumMetadata()
+    {
+        var disabled = Guid.CreateVersion7();
+        Bind(org, disabled).IdentityBindingEnabled = false;
+        var operatorLike = Seed("Pat Operator", OwnerIssuer, "pat-as-member");
+        Bind(org, Guid.CreateVersion7(), "pat-as-member");
+        Hint(member, "Morgan Member");
+        var page = await MembersAsync(alice);
+        Assert.Equal(new[] { member, administrator }.Order().ToArray(), page.Items.Select(i => i.AuthorityUserId).Order().ToArray()); // not the owner, not the disabled member, not the operator identity
+        Assert.Equal(2, page.TotalCount);
+        var named = page.Items.Single(i => i.AuthorityUserId == member);
+        Assert.Equal("Morgan Member", named.DisplayName); // the Authority's recorded hint
+        Assert.Equal(OwnerIssuer, named.IssuerUri);
+        Assert.Equal(store.Bindings.Single(b => b.AuthorityUserId == administrator).IdentitySubjectIdentifier, page.Items.Single(i => i.AuthorityUserId == administrator).DisplayName); // no hint: the subject
+        Assert.DoesNotContain(page.Items, i => i.AuthorityUserId == soleOwner || i.AuthorityUserId == disabled || i.SubjectIdentifier == operatorLike.Subject);
+        Assert.Single(store.Journal, j => j.OrganizationId == org && j.JournalEventKind == "PlatformOwnerRecoveryMembersViewed"); // audited before disclosure
+        Assert.DoesNotContain("Morgan", store.Journal.Single(j => j.JournalEventKind == "PlatformOwnerRecoveryMembersViewed").JournalEventBodyJson, StringComparison.Ordinal); // identities are not copied into the audit body
+    }
+
+    [Fact]
+    public async Task ThePickerSearchesAndPagesOnTheServerWithAnOperatorBoundCursor()
+    {
+        foreach (var name in new[] { "Avery", "Blair", "Casey", "Devon" })
+        {
+            var id = Guid.CreateVersion7();
+            Bind(org, id);
+            Hint(id, name + " Person");
+        }
+
+        var first = await MembersAsync(alice, limit: 2);
+        Assert.Equal(2, first.Items.Count);
+        Assert.Equal(6, first.TotalCount);
+        Assert.NotNull(first.NextCursor);
+        var second = await MembersAsync(alice, limit: 2, cursor: first.NextCursor);
+        var third = await MembersAsync(alice, limit: 2, cursor: second.NextCursor);
+        Assert.Null(third.NextCursor);
+        var all = first.Items.Concat(second.Items).Concat(third.Items).Select(i => i.AuthorityUserId).ToList();
+        Assert.Equal(6, all.Distinct().Count()); // every candidate exactly once
+        Assert.Equal(AuthorityErrorCodes.CursorInvalid, await RefusedAsync(() => MembersAsync(blake, limit: 2, cursor: first.NextCursor))); // another operator cannot use it
+        Assert.Equal(AuthorityErrorCodes.CursorInvalid, await RefusedAsync(() => MembersAsync(alice, query: "Avery", limit: 2, cursor: first.NextCursor))); // nor under another filter
+        var found = await MembersAsync(alice, query: "casey");
+        Assert.Equal("Casey Person", Assert.Single(found.Items).DisplayName);
+        Assert.Empty((await MembersAsync(alice, query: "nobody-matches-this")).Items);
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => MembersAsync(alice, limit: 500)));
+    }
+
+    [Fact]
+    public async Task ThePickerIsIsolatedPerOrganizationAndRefusesOperatorsOfTheOrganization()
+    {
+        var elsewhere = otherOrg;
+        var stranger = Guid.CreateVersion7();
+        Bind(elsewhere, stranger);
+        var here = await MembersAsync(alice);
+        Assert.DoesNotContain(here.Items, i => i.AuthorityUserId == stranger || i.AuthorityUserId == otherOwner);
+        Assert.Equal(AuthorityErrorCodes.NotFound, await RefusedAsync(() => MembersAsync(alice, organizationId: Guid.CreateVersion7())));
+        var insider = Seed("Insider Operator", OwnerIssuer, store.Bindings.Single(b => b.AuthorityUserId == member).IdentitySubjectIdentifier);
+        Assert.Equal(AuthorityErrorCodes.OperatorConflictOfInterest, await RefusedAsync(() => MembersAsync(insider)));
+        var production = ServiceWith(Policy("Production", OrganizationOnboardingPolicy.ProductionRecoveryWaitingPeriodSeconds));
+        Assert.Equal(AuthorityErrorCodes.OwnerRecoveryUnavailable, await RefusedAsync(() => MembersAsync(alice, service: production)));
+        store.PlatformOperators.Single(o => o.PlatformOperatorId == dana.Id).OperatorStatusName = PlatformOperatorStates.Suspended;
+        await Assert.ThrowsAsync<AuthorityException>(() => MembersAsync(dana)); // a suspended operator sees nothing
+        archive.Available = false;
+        Assert.Equal(AuthorityErrorCodes.PlatformJournalUnverifiable, await RefusedAsync(() => MembersAsync(alice))); // fail closed on an unverifiable journal
+    }
+
+    [Fact]
+    public async Task ASelectedMemberIsBoundByUserIdIntoTheCaseAndExecution()
+    {
+        var picked = (await MembersAsync(alice)).Items.Single(i => i.AuthorityUserId == member);
+        var recoveryCase = (await OpenAsync(alice, replacements: [ExistingOwner(member), NewOwner("brand-new")])).Case!;
+        Assert.Contains(recoveryCase.Subjects, s => s.Role == OwnerRecoverySubjectRoles.Replacement && s.AuthorityUserId == picked.AuthorityUserId && !s.IsNewIdentity);
+        await DecideAsync(alice, recoveryCase, PlatformDecisions.Approve);
+        await DecideAsync(blake, recoveryCase, PlatformDecisions.Approve);
+        await DecideAsync(casey, recoveryCase, PlatformDecisions.Approve);
+        clock.Advance(Waiting);
+        await DecideAsync(dana, recoveryCase, PlatformDecisions.Execute);
+        Assert.Contains(member, Owners(org));
+        Assert.DoesNotContain(store.Bindings.Where(b => b.OrganizationId == org), b => b.AuthorityUserId == member && b.OrganizationOwnerRecoveryCaseId is not null); // an existing member keeps its own binding
+        // Once an owner, the member is no longer offered, and a second case cannot name them again.
+        Assert.DoesNotContain((await MembersAsync(alice)).Items, i => i.AuthorityUserId == member);
+    }
+
+    // ---- recovered-owner restriction visibility (C-106) ----
+
+    [Fact]
+    public async Task TheRosterShowsTheAuthorityExpiryOfTheRestrictionAndDropsItWhenItEnds()
+    {
+        var recoveryCase = await ApprovedAsync();
+        clock.Advance(Waiting);
+        await DecideAsync(dana, recoveryCase, PlatformDecisions.Execute);
+        var state = store.Organizations.Single(o => o.OrganizationId == org);
+        state.ProjectionAppliedRevision = state.AuthorizationRevision; // the projection catches up (the gate itself is tested elsewhere)
+        state.ProjectionZedToken = "zed-token";
+        state.CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous;
+        var roster = new OrganizationRosterService(store, StepUp, OperatorApprovalVerifier.Unavailable, clock);
+        var view = await roster.GetAsync(UserActor(soleOwner), new OrganizationRosterRequest(org), Guid.CreateVersion7(), Ct);
+        var recovered = store.RecoveryProbations.ToDictionary(p => p.AuthorityUserId, p => p.ProbationEndsOn);
+        Assert.Equal(2, recovered.Count);
+        foreach (var m in view.Members)
+        {
+            Assert.Equal(recovered.TryGetValue(m.AuthorityUserId, out var ends) ? ends : null, m.RecoveryRestrictionsUntil); // exactly the Authority timestamp, others none
+        }
+
+        Assert.Null(view.Members.Single(m => m.AuthorityUserId == soleOwner).RecoveryRestrictionsUntil);
+        clock.Advance(TimeSpan.FromDays(15));
+        var later = await roster.GetAsync(UserActor(soleOwner), new OrganizationRosterRequest(org), Guid.CreateVersion7(), Ct);
+        Assert.All(later.Members, m => Assert.Null(m.RecoveryRestrictionsUntil));
     }
 
     private async Task<CommandPlan> PlanAsync(Guid user, SecurityCommandKind kind, ResourceKind resourceKind, Guid resourceId, object payload)

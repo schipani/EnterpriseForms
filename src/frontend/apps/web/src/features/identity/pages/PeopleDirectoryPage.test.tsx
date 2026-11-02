@@ -198,6 +198,18 @@ describe("PeopleDirectoryPage", () => {
     expect(await screen.findByText("Person 03 is now a designer.")).toBeInTheDocument();
   });
 
+  it("explains a refusal caused by the recovered-owner safeguard", async () => {
+    api.organization.grantMemberRole.mockRejectedValueOnce(new OperationError({ type: "failed", operationId: "op-9", status: 403, errorCode: "OWNER_RECOVERY_PROBATION", retryable: false }));
+    renderPage();
+    await screen.findByText("Person 01");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Actions for Person 03" }));
+    await user.click(screen.getByRole("menuitem", { name: "Make designer: Person 03" }));
+    await confirmChange(/Make Person 03 a designer/, "Make designer");
+    const dialog = screen.getByRole("dialog", { name: /Make Person 03 a designer/ });
+    expect(await within(dialog).findByText(/recovery safeguard period/)).toBeInTheDocument();
+  });
+
   it("lets a second owner approve a pending owner proposal", async () => {
     renderPage();
     await screen.findByText("Person 01");

@@ -395,6 +395,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/console-api/v1/owner-recovery/organizations/{organizationId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PG-075 member picker: members who may be proposed as replacement owners (enabled, not owners, not operator identities), 15 per page by default. Minimum metadata; the Authority audits each search before disclosure. */
+        get: operations["SearchOwnerRecoveryMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/console-api/v1/owner-recovery/{caseId}": {
         parameters: {
             query?: never;
@@ -903,6 +920,25 @@ export interface components {
             /** Format: int32 */
             replacementCount: number | string;
             openedByOperatorDisplayName: string;
+        };
+        OwnerRecoveryMemberItem: {
+            /** Format: uuid */
+            authorityUserId: string;
+            issuerUri: string;
+            subjectIdentifier: string;
+            displayName: string;
+            /** Format: date-time */
+            memberSince: string;
+        };
+        OwnerRecoveryMemberPage: {
+            items: components["schemas"]["OwnerRecoveryMemberItem"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            nextCursor: null | string;
+            /** Format: int32 */
+            limit: number | string;
+            /** Format: uuid */
+            correlationId: string;
         };
         OwnerRecoveryObjectionView: {
             /** Format: date-time */
@@ -1721,6 +1757,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OwnerRecoveryCreateResponse"];
+                };
+            };
+        };
+    };
+    SearchOwnerRecoveryMembers: {
+        parameters: {
+            query?: {
+                q?: string;
+                cursor?: string;
+                limit?: number | string;
+            };
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryMemberPage"];
                 };
             };
         };

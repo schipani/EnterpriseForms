@@ -28,7 +28,8 @@ public sealed record OrganizationOverviewResponse(bool CanManageConfiguration, b
 /// <c>RemoveSecurityAdministrator</c>.
 /// </summary>
 public sealed record OrganizationMemberResponse(Guid UserId, string DisplayName, string IdentityIssuer, string IdentitySubject, DateTimeOffset? FirstSeenOn, IReadOnlyList<string> AuthorityRoles, IReadOnlyList<DirectoryTeamResponse> Teams, bool IsCurrentUser,
-    DateTimeOffset? LastSignedInOn = null, string SignInStatus = "NotRecorded", IReadOnlyList<string>? AvailableActions = null, string MembershipState = "Enabled", DateTimeOffset? DisabledOn = null);
+    DateTimeOffset? LastSignedInOn = null, string SignInStatus = "NotRecorded", IReadOnlyList<string>? AvailableActions = null, string MembershipState = "Enabled", DateTimeOffset? DisabledOn = null,
+    DateTimeOffset? RecoveryRestrictionsUntil = null);
 
 /// <summary>
 /// C8 M2 (AC-7): the first half of a two-owner change. <c>ProposedChange</c>: GrantOwner, RevokeOwner, DisableOwner,

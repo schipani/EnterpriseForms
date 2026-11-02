@@ -2210,6 +2210,48 @@
         }
       }
     },
+    "/internal/v1/platform/owner-recovery/organizations/{organizationId}/members/search": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Members who may be proposed as replacement owners (enabled, not owners, not operator identities): minimum metadata, server-side filter and paging; audited before disclosure.",
+        "operationId": "SearchOwnerRecoveryMembers",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryMemberSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryMemberPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/platform/owner-recovery/{caseId}/approvals": {
       "post": {
         "tags": [
@@ -5638,6 +5680,13 @@
               "null",
               "string"
             ]
+          },
+          "recovery_restrictions_until": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -6416,6 +6465,110 @@
           },
           "opened_by_operator_display_name": {
             "type": "string"
+          }
+        }
+      },
+      "OwnerRecoveryMemberItem": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "display_name",
+          "member_since"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "member_since": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OwnerRecoveryMemberPage": {
+        "required": [
+          "items",
+          "total_count",
+          "next_cursor",
+          "limit",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryMemberItem"
+            }
+          },
+          "total_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "next_cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryMemberSearchRequest": {
+        "required": [
+          "query",
+          "cursor",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

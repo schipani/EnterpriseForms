@@ -2945,6 +2945,8 @@ export interface components {
             membershipState: string;
             /** Format: date-time */
             disabledOn?: null | string;
+            /** Format: date-time */
+            recoveryRestrictionsUntil?: null | string;
         };
         OrganizationOverviewAuthentication: {
             authenticationRequirementName: string;

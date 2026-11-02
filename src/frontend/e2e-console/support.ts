@@ -45,7 +45,8 @@ export interface Org {
   cancel: (requestId: string) => Promise<void>;
 }
 
-export async function createOrganization(label: string): Promise<Org> {
+/** `extraMembers` enabled members without roles are bound at creation (names Member 01…), e.g. for the owner recovery member picker. */
+export async function createOrganization(label: string, extraMembers = 0): Promise<Org> {
   const organizationId = uuidV7();
   const owner = { id: uuidV7(), subject: `pce-owner-${randomUUID().slice(0, 8)}`, name: "Console E2E Owner" };
   const name = `Console E2E ${label} ${randomUUID().slice(0, 6)}`;
@@ -55,7 +56,10 @@ export async function createOrganization(label: string): Promise<Org> {
     body: JSON.stringify({
       organization_id: organizationId,
       organization_display_name: name,
-      identities: [{ authority_user_id: owner.id, issuer_uri: IDP_ISSUER, subject_identifier: owner.subject, organization_roles: ["organization_owner", "designer"] }],
+      identities: [
+        { authority_user_id: owner.id, issuer_uri: IDP_ISSUER, subject_identifier: owner.subject, organization_roles: ["organization_owner", "designer"] },
+        ...Array.from({ length: extraMembers }, (_, i) => ({ authority_user_id: uuidV7(), issuer_uri: IDP_ISSUER, subject_identifier: `pce-member-${String(i + 1).padStart(2, "0")}-${randomUUID().slice(0, 6)}`, organization_roles: [] as string[] })),
+      ],
     }),
   });
   if (created.status >= 300) {

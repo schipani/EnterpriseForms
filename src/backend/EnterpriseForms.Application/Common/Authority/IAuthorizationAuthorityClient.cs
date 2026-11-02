@@ -285,7 +285,7 @@ public sealed record AuthoritySecurityAdministratorRoster(bool CanManage, bool A
 
 public sealed record OrganizationRosterQuery(Guid OrganizationId);
 
-public sealed record AuthorityRosterMember(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, bool MembershipEnabled, DateTimeOffset BoundOn, DateTimeOffset? DisabledOn, IReadOnlyList<string> OrganizationRoles, string? DisplayNameHint);
+public sealed record AuthorityRosterMember(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, bool MembershipEnabled, DateTimeOffset BoundOn, DateTimeOffset? DisabledOn, IReadOnlyList<string> OrganizationRoles, string? DisplayNameHint, DateTimeOffset? RecoveryRestrictionsUntil = null);
 
 public sealed record AuthorityOwnerProposal(Guid ProposalId, Guid TargetAuthorityUserId, string ProposedChange, Guid ProposedByAuthorityUserId, string Reason, DateTimeOffset ProposedOn, DateTimeOffset ExpiresOn, string ProposalState, Guid? ConsumedBySecurityCommandId);
 

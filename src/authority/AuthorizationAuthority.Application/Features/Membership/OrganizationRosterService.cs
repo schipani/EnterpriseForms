@@ -43,9 +43,13 @@ public sealed class OrganizationRosterService(IAuthorityStore store, FieldSearch
         var bindings = await scope.GetIdentityBindingsAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
         var requests = await scope.GetMembershipRequestsAsync(state.OrganizationId, DateTimeOffset.MinValue, cancellationToken).ConfigureAwait(false);
         var hints = requests.Where(r => r.RequestStateName == MembershipRequestStates.Approved).ToDictionary(r => r.RequestedAuthorityUserId, r => r.RequestedDisplayNameHint);
+        // C-106: the recovered-owner safeguard's own expiry (an active probation only; an expired one is simply absent).
+        var restricted = (await scope.GetActiveRecoveredOwnerProbationsAsync(state.OrganizationId, now, cancellationToken).ConfigureAwait(false))
+            .GroupBy(p => p.AuthorityUserId).ToDictionary(g => g.Key, g => g.Max(p => p.ProbationEndsOn));
         var members = bindings
             .Select(b => new OrganizationRosterMember(b.AuthorityUserId, b.IdentityIssuerUri, b.IdentitySubjectIdentifier, b.IdentityBindingEnabled, b.IdentityCreatedOn, b.IdentityDisabledOn,
-                RoleOrder.Where(role => graph.HasOrganizationRole(state.OrganizationId, b.AuthorityUserId, role)).ToList(), hints.GetValueOrDefault(b.AuthorityUserId)))
+                RoleOrder.Where(role => graph.HasOrganizationRole(state.OrganizationId, b.AuthorityUserId, role)).ToList(), hints.GetValueOrDefault(b.AuthorityUserId),
+                restricted.TryGetValue(b.AuthorityUserId, out var until) ? until : null))
             .OrderBy(m => m.SubjectIdentifier, StringComparer.Ordinal).ToList();
         var proposals = (await scope.GetRoleChangeProposalsAsync(state.OrganizationId, since, cancellationToken).ConfigureAwait(false))
             .Select(p => new OrganizationOwnerProposal(p.OrganizationRoleChangeProposalId, p.TargetAuthorityUserId, p.ProposedChangeName, p.ProposedByAuthorityUserId, p.ProposalReasonText, p.ProposalCreatedOn, p.ProposalExpiresOn,

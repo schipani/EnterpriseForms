@@ -196,6 +196,74 @@ for (const [label, width] of viewports) {
   });
 }
 
+test.describe("Member picker", () => {
+  test("search, paging, duplicate prevention and choosing members creates a case bound to the chosen people", async ({ browser }) => {
+    test.setTimeout(180_000);
+    const org = await createOrganization("recovery-picker", 17); // 17 members: more than one page of 15
+    const { context, page } = await operatorPage(browser, "dana");
+    await page.goto(`/platform/recovery/new?organizationId=${org.organizationId}`);
+    await expect(page.getByRole("heading", { name: "New recovery case", level: 1 })).toBeVisible();
+    const list = page.getByRole("list", { name: "Members" });
+    await expect(list.getByRole("listitem")).toHaveCount(15); // server-side page size
+    await expect(page.getByText("Showing 15 of 17 active members.")).toBeVisible();
+    await expect(list.getByText("Console E2E Owner")).toHaveCount(0); // the existing owner is never offered
+    await page.getByRole("button", { name: "Load more" }).click();
+    await expect(list.getByRole("listitem")).toHaveCount(17);
+    await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
+
+    // Server-side search narrows the list; an unknown term shows the empty state.
+    const search = page.getByRole("searchbox", { name: "Search members" });
+    await search.fill("pce-member-03");
+    await expect(page.getByText("Showing 1 of 1 active member.")).toBeVisible();
+    await search.fill("zz-no-such-member");
+    await expect(page.getByText("No members found.")).toBeVisible();
+    await search.fill("");
+    await expect(list.getByRole("listitem")).toHaveCount(15);
+
+    // Choose two members; a chosen member cannot be added again.
+    const add = page.getByRole("button", { name: /^Add pce-member-0[12]-/ });
+    await add.nth(0).click();
+    await expect(page.getByRole("group", { name: "Replacement 1 (existing member)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /already added/ })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /already added/ })).toBeDisabled();
+    await page.getByRole("button", { name: /^Add pce-member-0[1-9]-/ }).first().click();
+    await expect(page.getByRole("group", { name: /Replacement \d \(existing member\)/ })).toHaveCount(2);
+    for (const n of [1, 2]) {
+      await page.getByRole("combobox", { name: new RegExp(`Verification method \\(replacement ${n}\\)`) }).click();
+      await page.getByRole("option", { name: "Support call-back" }).click();
+      await page.getByRole("textbox", { name: new RegExp(`Verification reference \\(replacement ${n}\\)`) }).fill(`TICKET-${RUN}-pick${n}`);
+    }
+    await page.getByRole("textbox", { name: /Incident reference/ }).fill(`INC-${RUN}-pick`);
+    await page.getByRole("textbox", { name: /Your justification/ }).fill("The only owner left; two existing members are confirmed as the new owners.");
+    await page.getByRole("button", { name: "Validate" }).click();
+    await expect(page.getByText("Check passed — nothing was created")).toBeVisible();
+    await page.getByRole("button", { name: "Create case" }).click();
+    await page.waitForURL(/\/platform\/recovery\/[0-9a-f-]{36}$/i);
+    await expect(page.getByRole("heading", { name: "Recovery case", level: 1 })).toBeVisible();
+    const proposed = page.getByRole("heading", { name: "Proposed owners" });
+    await expect(proposed).toBeVisible();
+    await expect(page.getByText(/pce-member-0[1-9]-/).first()).toBeVisible(); // the chosen members, shown by their verified identity
+    await expect(page.getByTestId("approval-progress")).toHaveText("0 of 3");
+    await context.close();
+  });
+
+  for (const [label, width] of [["320px", 320], ["768px", 768], ["1440px", 1440]] as const) {
+    test(`the picker with results listed fits ${label} and passes axe`, async ({ browser }) => {
+      const org = await createOrganization(`recovery-picker-${width}`, 6);
+      const context = await browser.newContext({ viewport: { width, height: 900 } });
+      const page = await context.newPage();
+      await signInAs(page, "ellis");
+      await page.goto(`/platform/recovery/new?organizationId=${org.organizationId}`);
+      await expect(page.getByRole("list", { name: "Members" }).getByRole("listitem")).toHaveCount(6);
+      await page.getByRole("button", { name: /^Add pce-member-/ }).first().click();
+      await expect(page.getByRole("group", { name: "Replacement 1 (existing member)" })).toBeVisible();
+      await expectNoHorizontalPageScroll(page);
+      await expectNoAxeViolations(page, `member picker with results at ${label}`);
+      await context.close();
+    });
+  }
+});
+
 test("the browser tab title and navigation entry identify Owner recovery", async ({ browser }) => {
   const { context, page } = await operatorPage(browser, "dana");
   await page.goto("/platform/recovery");

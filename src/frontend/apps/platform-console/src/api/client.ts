@@ -19,6 +19,8 @@ export type OnboardingDecisionResponse = S["OrganizationOnboardingDecisionRespon
 export type RecoveryPage = S["OwnerRecoveryPage"];
 export type RecoveryItem = S["OwnerRecoveryListItem"];
 export type RecoveryDetail = S["OwnerRecoveryCaseDetail"];
+export type RecoveryMemberPage = S["OwnerRecoveryMemberPage"];
+export type RecoveryMemberItem = S["OwnerRecoveryMemberItem"];
 export type RecoveryCreateResponse = S["OwnerRecoveryCreateResponse"];
 export type RecoveryDecisionResponse = S["OwnerRecoveryDecisionResponse"];
 
@@ -176,6 +178,16 @@ export const consoleApi = {
       params.set("cursor", cursor);
     }
     return request<RecoveryPage>("GET", `/owner-recovery?${params.toString()}`);
+  },
+  recoveryMembers: (organizationId: string, { q, cursor, limit }: { q: string; cursor?: string | undefined; limit: number }) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (q.trim()) {
+      params.set("q", q.trim());
+    }
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+    return request<RecoveryMemberPage>("GET", `/owner-recovery/organizations/${encodeURIComponent(organizationId)}/members?${params.toString()}`);
   },
   createRecovery: (input: RecoveryCreateInput) => request<RecoveryCreateResponse>("POST", "/owner-recovery", input),
   recoveryDetail: (caseId: string) => request<RecoveryDetail>("GET", `/owner-recovery/${encodeURIComponent(caseId)}`),

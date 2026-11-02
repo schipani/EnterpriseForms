@@ -352,9 +352,21 @@ public sealed class ConsoleSession : IDisposable
 
     public string LastCode { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Signs in, waiting out the console's deliberate login limit (20 per minute, fixed window) when many test classes run back to back in
+    /// one run: the limiter is shared state across the whole run, and a refusal here is the limiter working, not a defect. Tests that
+    /// assert the limiter itself use <see cref="TrySignInAsync"/> and are unaffected.
+    /// </summary>
     public static async Task<ConsoleSession> SignInAsync(string subject)
     {
         var session = await TrySignInAsync(subject);
+        for (var attempt = 1; session.Cookie is null && session.LastCode == "RATE_LIMITED" && attempt <= 4; attempt++)
+        {
+            session.Dispose();
+            await Task.Delay(TimeSpan.FromSeconds(16), TestContext.Current.CancellationToken); // the window is one minute
+            session = await TrySignInAsync(subject);
+        }
+
         Assert.True(session.Cookie is not null, "console sign-in failed: " + session.LastCode);
         return session;
     }

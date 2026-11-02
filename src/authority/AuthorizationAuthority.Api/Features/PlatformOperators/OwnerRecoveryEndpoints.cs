@@ -32,6 +32,11 @@ public static class OwnerRecoveryEndpoints
             .WithName("GetOwnerRecoveryCase")
             .WithSummary("The case, its frozen statement and SHA-256, owners, evidence, approvals, waiting period, objection and the caller's eligibility. Audited on the organization's audit stream before it is returned.");
 
+        group.MapPost("/owner-recovery/organizations/{organizationId:guid}/members/search", static async Task<Ok<OwnerRecoveryMemberPage>> (Guid organizationId, OwnerRecoveryMemberSearchRequest request, HttpContext context, PlatformOperatorAssertionValidator assertions, OwnerRecoveryService recovery, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await recovery.SearchMembersAsync(InternalAuthentication.RequireOperator(context, assertions), organizationId, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false)))
+            .WithName("SearchOwnerRecoveryMembers")
+            .WithSummary("Members who may be proposed as replacement owners (enabled, not owners, not operator identities): minimum metadata, server-side filter and paging; audited before disclosure.");
+
         MapDecision(group, "/owner-recovery/{caseId:guid}/approvals", "ApproveOwnerRecoveryCase", static (s, a, id, r, c, t) => s.ApproveAsync(a, id, r, c, t));
         MapDecision(group, "/owner-recovery/{caseId:guid}/approvals/withdraw", "WithdrawOwnerRecoveryApproval", static (s, a, id, r, c, t) => s.WithdrawAsync(a, id, r, c, t));
         MapDecision(group, "/owner-recovery/{caseId:guid}/cancel", "CancelOwnerRecoveryCase", static (s, a, id, r, c, t) => s.CancelAsync(a, id, r, c, t));

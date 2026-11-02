@@ -345,6 +345,96 @@ describe("PG-075 New recovery case", () => {
   }, 40_000);
 });
 
+describe("PG-075 Member picker", () => {
+  const orgDetail = {
+    summary: dirItem(1, { organizationId: ORG, organizationDisplayName: "Harbour Legal", enabledOwnerCount: 1 }),
+    authorizationRevision: 5,
+    projectionAppliedRevision: 5,
+    owners: [{ authorityUserId: OWNER, issuerUri: ISSUER, subjectIdentifier: "owner-old", enabled: true }],
+    onboardingApprovedBy: [],
+    correlationId: "x",
+  };
+  const member = (n: number) => ({ authorityUserId: `01a194d8-0000-7000-8000-0000000001${String(n).padStart(2, "0")}`, issuerUri: ISSUER, subjectIdentifier: `member-${n}`, displayName: `Member ${n}`, memberSince: "2026-09-01T12:00:00Z" });
+  const memberPage = (items: ReturnType<typeof member>[], over: Record<string, unknown> = {}) => ({ items, totalCount: items.length, nextCursor: null, limit: 15, correlationId: "x", ...over });
+  const membersPath = `/owner-recovery/organizations/${ORG}/members`;
+
+  it("searches, pages by cursor, prevents duplicates and sends the picked member as existingAuthorityUserId", async () => {
+    window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
+    const calls = installFetch((c) => {
+      if (c.path === `/organizations/${ORG}`) return { status: 200, body: orgDetail };
+      if (c.path.startsWith(membersPath)) {
+        const params = new URL("http://x" + c.path).searchParams;
+        if (params.get("q") === "zed") return { status: 200, body: memberPage([member(9)]) };
+        if (params.get("cursor") === "m2") return { status: 200, body: memberPage([member(3)], { totalCount: 3 }) };
+        return { status: 200, body: memberPage([member(1), member(2)], { totalCount: 3, nextCursor: "m2" }) };
+      }
+      if (c.path === "/owner-recovery" && c.method === "POST") return { status: 200, body: { dryRun: true, eligible: true, refusalCode: null, refusalDetail: null, warnings: [], case: null, replayed: false, correlationId: "x" } };
+      return undefined;
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const list = await screen.findByRole("list", { name: "Members" });
+    expect(within(list).getByText("Member 1")).toBeInTheDocument();
+    expect(within(list).getAllByText(/Active member since/)).toHaveLength(2);
+    expect(screen.getByText("Showing 2 of 3 active members.")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /User ID/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await screen.findByText("Member 3")).toBeInTheDocument();
+    expect(calls.some((c) => c.path.includes("cursor=m2"))).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Add Member 1" }));
+    expect(screen.getByRole("button", { name: "Member 1 already added" })).toBeDisabled();
+    expect(screen.getByText("Replacement 1 (existing member)")).toBeInTheDocument();
+    expect(screen.queryByText("Replacement 2 (new identity)")).not.toBeInTheDocument();
+
+    // A new identity identical to the picked member cannot be proposed twice.
+    await user.click(screen.getByRole("button", { name: "Add new identity" }));
+    await user.type(screen.getByRole("textbox", { name: /Subject identifier \(replacement 2\)/ }), "member-1");
+    await user.click(screen.getByRole("button", { name: "Validate" }));
+    expect(await screen.findByText("This identity is already proposed as another replacement.")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Remove replacement 2" }));
+
+    await user.type(screen.getByRole("textbox", { name: /Incident reference/ }), "INC-4411");
+    await user.type(screen.getByRole("textbox", { name: /Your justification/ }), "The only owner left the company.");
+    await user.click(screen.getByRole("combobox", { name: /Verification method \(replacement 1\)/ }));
+    await user.click(await screen.findByRole("option", { name: "Support call-back" }));
+    await user.type(screen.getByRole("textbox", { name: /Verification reference \(replacement 1\)/ }), "TICKET-9");
+    await user.click(screen.getByRole("button", { name: "Validate" }));
+    expect(await screen.findByText("Check passed — nothing was created")).toBeInTheDocument();
+    const post = calls.find((c) => c.method === "POST")!;
+    expect(post.body).toMatchObject({ replacements: [{ existingAuthorityUserId: member(1).authorityUserId, issuerUri: null, subjectIdentifier: null, verificationMethod: "SupportCallback", verificationReference: "TICKET-9" }] });
+
+    await user.type(screen.getByRole("searchbox", { name: /Search members/ }), "zed");
+    expect(await screen.findByText("Member 9")).toBeInTheDocument();
+    expect(calls.some((c) => c.path.includes("q=zed"))).toBe(true);
+    expect(screen.queryByText("Member 3")).not.toBeInTheDocument();
+  }, 40_000);
+
+  it("shows the empty state", async () => {
+    window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
+    installFetch((c) => (c.path === `/organizations/${ORG}` ? { status: 200, body: orgDetail } : c.path.startsWith(membersPath) ? { status: 200, body: memberPage([]) } : undefined));
+    render(<App />);
+    expect(await screen.findByText("This organization has no other active members who can become owners.")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Members" })).not.toBeInTheDocument();
+  });
+
+  it("shows a friendly error with retry", async () => {
+    window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
+    let attempt = 0;
+    installFetch((c) => {
+      if (c.path === `/organizations/${ORG}`) return { status: 200, body: orgDetail };
+      if (c.path.startsWith(membersPath)) return attempt++ === 0 ? problem(403, "OPERATOR_CONFLICT_OF_INTEREST") : { status: 200, body: memberPage([member(1)]) };
+      return undefined;
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText("Conflict of interest")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Member 1")).toBeInTheDocument();
+  });
+});
+
 describe("PG-075 Recovery case details and decisions", () => {
   const path = `/platform/recovery/${CASE}`;
   function open(detail: RecoveryDetail, extra: Handler = () => undefined) {

@@ -73,6 +73,9 @@ public sealed class AuthorityPlatformClient(HttpClient http, IOptions<PlatformCo
     public Task<OwnerRecoveryCreateResponse> CreateRecoveryAsync(string subject, OwnerRecoveryCreateRequest request, Guid correlationId, CancellationToken cancellationToken) =>
         SendAsync<OwnerRecoveryCreateResponse>(HttpMethod.Post, "internal/v1/platform/owner-recovery", subject, request, correlationId, cancellationToken);
 
+    public Task<OwnerRecoveryMemberPage> SearchRecoveryMembersAsync(string subject, Guid organizationId, OwnerRecoveryMemberSearchRequest request, Guid correlationId, CancellationToken cancellationToken) =>
+        SendAsync<OwnerRecoveryMemberPage>(HttpMethod.Post, $"internal/v1/platform/owner-recovery/organizations/{organizationId:D}/members/search", subject, request, correlationId, cancellationToken);
+
     public Task<OwnerRecoveryPage> SearchRecoveryAsync(string subject, OwnerRecoverySearchRequest request, Guid correlationId, CancellationToken cancellationToken) =>
         SendAsync<OwnerRecoveryPage>(HttpMethod.Post, "internal/v1/platform/owner-recovery/search", subject, request, correlationId, cancellationToken);
 

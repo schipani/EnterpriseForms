@@ -22,6 +22,8 @@ const titles: Record<string, string> = {
   FORM_DEFINITION_MODIFIED_CONCURRENTLY: "Someone else renamed this form",
   SELF_CHANGE_FORBIDDEN: "You cannot change your own roles or membership",
   OWNER_APPROVAL_REQUIRED: "A second organization owner must approve this change",
+  OWNER_RECOVERY_PROBATION: "Owners added by the same recovery case cannot do this for each other during the recovery safeguard period; another owner must",
+  TEAM_JOIN_REQUIRES_ANOTHER_OWNER: "An owner cannot add themselves to a team; another organization owner must add them",
   PROPOSAL_NOT_PENDING: "This proposal was already used",
   PROPOSAL_EXPIRED: "This proposal expired; propose the change again",
   PROPOSAL_MISMATCH: "This proposal is for a different person or change",
