@@ -133,7 +133,7 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
       await expect(page.getByText(/Source: Authorization Authority/)).toBeVisible();
       await scan(page, `${viewport.id} designer form permissions @${viewport.name}`);
       await page.getByRole("tab", { name: /^Fields/ }).click();
-      await page.getByRole("button", { name: /^Edit / }).first().click();
+      await page.getByRole("button", { name: /^Edit (?!name of )/ }).first().click();
       const editDialog = page.getByRole("dialog", { name: /^Edit / });
       await expect(editDialog).toBeVisible();
       await scan(page, `${viewport.id} edit field dialog general tab @${viewport.name}`);
