@@ -162,6 +162,10 @@ services:
         condition: service_healthy
       vault-console-init:
         condition: service_completed_successfully
+      # The custody init is a one-shot with no other dependent; as a completed dependency it keeps `up --wait` from treating its
+      # normal exit (0) as a failure. The console does not use the custody token.
+      vault-custody-init:
+        condition: service_completed_successfully
     networks: [platform-edge, platform-signing]
     ports: ["127.0.0.1:5192:8080"]
     healthcheck:
