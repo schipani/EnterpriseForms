@@ -1280,6 +1280,12 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("form_definition_name");
 
+                    b.Property<long>("FormDefinitionRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L)
+                        .HasColumnName("form_definition_revision");
+
                     b.Property<string>("LifecycleStatus")
                         .IsRequired()
                         .HasMaxLength(20)

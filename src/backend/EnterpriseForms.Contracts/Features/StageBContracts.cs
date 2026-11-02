@@ -25,7 +25,10 @@ public sealed record DirectoryUserResponse(Guid UserId, string DisplayName);
 
 // ---- Form definitions / designer (B-03) ----
 
-public sealed record FormDefinitionSummaryResponse(Guid FormDefinitionId, string FormDefinitionName, string FormDefinitionDescription, string LifecycleStatus, int? CurrentVersionNumber, Guid? CurrentFormVersionId, bool HasDraft, bool CanDesign, bool CanCreateRecord, DateTimeOffset ModifiedOn);
+public sealed record FormDefinitionSummaryResponse(Guid FormDefinitionId, string FormDefinitionName, string FormDefinitionDescription, string LifecycleStatus, int? CurrentVersionNumber, Guid? CurrentFormVersionId, bool HasDraft, bool CanDesign, bool CanCreateRecord, DateTimeOffset ModifiedOn, long FormDefinitionRevision);
+
+/// <summary>Display-name change of a form (no new version). ExpectedFormDefinitionRevision is the revision the editor saw.</summary>
+public sealed record RenameFormDefinitionRequest(string FormDefinitionName, long ExpectedFormDefinitionRevision);
 
 public sealed record FieldDefinitionResponse(Guid FieldDefinitionId, string FieldKey, string FieldDisplayName, string FieldDescription, string FieldDataType, string FieldClassification, string LifecycleStatus, IReadOnlyList<FieldOptionResponse> Options, long FieldDefinitionRevision = 1, string FieldProtectionMode = "Standard", long ProtectionPolicyRevision = 1, string OptionSelectionMode = "Single", Guid? OptionListId = null, Guid? GroupDefinitionId = null);
 

@@ -5,6 +5,7 @@ public static class AuditActions
     public const string FormCreated = "FORM_CREATED";
     public const string FormDraftUpdated = "FORM_DRAFT_UPDATED";
     public const string FormVersionPublished = "FORM_VERSION_PUBLISHED";
+    public const string FormRenamed = "FORM_RENAMED";
     public const string FieldConfigurationChanged = "FIELD_CONFIGURATION_CHANGED";
     public const string FieldOptionsChanged = "FIELD_OPTIONS_CHANGED";
     public const string OptionListChanged = "OPTION_LIST_CHANGED";

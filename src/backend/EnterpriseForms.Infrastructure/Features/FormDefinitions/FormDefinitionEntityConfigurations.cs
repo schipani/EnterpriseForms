@@ -16,6 +16,7 @@ public sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<FormD
         builder.Property(f => f.FormDefinitionDescription).HasMaxLength(2000);
         builder.Property(f => f.VersionBehavior).HasMaxLength(20);
         builder.Property(f => f.LifecycleStatus).HasMaxLength(20);
+        builder.Property(f => f.FormDefinitionRevision).HasDefaultValue(1L);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(f => f.TenantId).HasConstraintName("fk_form_definitions_tenant");
         builder.HasIndex(f => new { f.TenantId, f.FormDefinitionName }).HasDatabaseName("ix_form_definitions_tenant_name");
         builder.ToTable(t =>
