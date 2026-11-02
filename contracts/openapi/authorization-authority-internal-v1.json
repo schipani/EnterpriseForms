@@ -6503,6 +6503,8 @@
           "total_count",
           "next_cursor",
           "limit",
+          "active_owner_count",
+          "maximum_owners",
           "correlation_id"
         ],
         "type": "object",
@@ -6528,6 +6530,22 @@
             ]
           },
           "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "active_owner_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maximum_owners": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "integer",
@@ -6569,6 +6587,16 @@
               "string"
             ],
             "format": "int32"
+          },
+          "exclude_authority_user_ids": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },

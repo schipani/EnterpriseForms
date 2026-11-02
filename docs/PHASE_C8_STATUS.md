@@ -546,3 +546,20 @@ Delivered on the owner's approval (details `docs/architecture/PHASE_C8_ORGANIZAT
 Two harness defects found and fixed: console sign-ins from many test classes in one run cross the console deliberate 20-per-minute login limit, so the console test session now waits out the window (tests of the limiter itself are unchanged); and killing a test run midway can leave the stack worker stopped, which the next run reports as a fixture failure (restore the stack before rerunning).
 
 Development stack: `devstack.py owner-recovery init` re-run (2026-11-01): migration `20261101221445_OwnerRecovery` already applied and backup `20261101-185205` already recorded (no new backup, no migration); Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated only; Vault, databases, SpiceDB and Azurite untouched. Data unchanged before and after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records). No recovery case was opened and the single-owner main organization was not touched. Evidence: `artifacts/dev-persistent/enterpriseforms-dev-owner-recovery-init-20261101-201341.json`. PG-075 `http://127.0.0.1:8095/platform/recovery`; People `http://127.0.0.1:8091/app/organization/users`.
+
+
+## 29. Multi-owner selection and the ten-owner limit (2026-11-01, C-107) — not merged, not independently reviewed
+
+Delivered per the owner's direction (details `docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md` §19): one selection mechanism for every replacement owner (selected list, one searchable server-paged picker of 10, collapsed new-identity form, remove, duplicate and limit messages, owner capacity), server-side duplicate and three-replacement rules, and a single Authority-enforced limit of ten active owners across onboarding, owner grants, owner re-enablement, recovery and the fixture bootstrap, checked at the final operation inside the organization lock. The recovery security model is unchanged.
+
+| Suite | Result (2026-11-01) |
+|---|---|
+| Authority unit tests (7 new: owner limit in the command service incl. re-enable and disabled owners, recovery at the limit, server-side duplicate and three-replacement rules, 10-per-page picker with exclusion and capacity) | 312 / 312 |
+| Contract / BFF / architecture / integrity | 488 / 488, 23 / 23, 75 / 75, 34 / 34 |
+| Real stack, one combined run (recovery incl. 2 new tests, onboarding, team join, console, membership, reconciliation, people) | 61 / 61 |
+| Concurrent owner grants at the limit, repeated | 3 / 3 |
+| Vitest workspace (default command; 5 new) | 376 / 376 |
+| ESLint, tsc, build | clean |
+| Platform Console Playwright, complete suite as one run (selection model, three members one after another, blocked fourth, remove and replace, 320/768/1440 px with the picker, selected list and new-identity form open) | 36 / 36 (two earlier runs of this round failed one new spec on over-broad locators, fixed in the spec) |
+
+Development stack: `devstack.py owner-recovery init` re-run (2026-11-01): migration and backup unchanged (no new backup, no migration); Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated only; Vault, databases, SpiceDB and Azurite untouched. Data unchanged before and after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records; no development organization is near the limit — the largest has fewer than 10 owners). No recovery case was opened. PG-075 `http://127.0.0.1:8095/platform/recovery`.

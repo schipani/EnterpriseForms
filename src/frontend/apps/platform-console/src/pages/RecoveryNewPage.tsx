@@ -7,7 +7,7 @@ import { identitySummary } from "../app/format";
 import { navigate, recoveryPath } from "../app/router";
 import { useConsoleSession } from "../app/session";
 import { verificationMethods } from "./OnboardingNewPage";
-import { RecoveryMemberPicker } from "./RecoveryMemberPicker";
+import { memberIdentityKey, RecoveryMemberPicker } from "./RecoveryMemberPicker";
 
 export const MIN_REPLACEMENTS = 1;
 export const MAX_REPLACEMENTS = 3;
@@ -37,7 +37,7 @@ interface ReplacementRow {
   rowKey: number;
   source: "existing" | "new";
   existingAuthorityUserId: string;
-  /** Display name of a picked member (existing rows only). */
+  /** Display name of the member or the proposed new identity. */
   memberName: string;
   issuerUri: string;
   subjectIdentifier: string;
@@ -46,19 +46,7 @@ interface ReplacementRow {
   verificationReference: string;
 }
 
-const blankReplacement = (rowKey: number, issuerUri: string): ReplacementRow => ({
-  rowKey,
-  source: "new",
-  existingAuthorityUserId: "",
-  memberName: "",
-  issuerUri,
-  subjectIdentifier: "",
-  displayNameHint: "",
-  verificationMethod: "",
-  verificationReference: "",
-});
-const identityKey = (r: { issuerUri: string; subjectIdentifier: string }) => r.issuerUri.trim() + "|" + r.subjectIdentifier.trim();
-const isPristine = (r: ReplacementRow) => r.source === "new" && !r.subjectIdentifier && !r.displayNameHint && !r.verificationMethod && !r.verificationReference;
+const identityKey = (r: { issuerUri: string; subjectIdentifier: string }) => memberIdentityKey(r.issuerUri, r.subjectIdentifier);
 const blankDeclared = (): DeclaredRow => ({ declared: false, reason: "", evidenceReference: "", evidenceSummary: "" });
 const newKey = () => `rec-${crypto.randomUUID()}`;
 
@@ -86,7 +74,12 @@ export function RecoveryNewPage() {
   const [incident, setIncident] = useState("");
   const [justification, setJustification] = useState("");
   const [declared, setDeclared] = useState<Record<string, DeclaredRow>>({});
-  const [replacements, setReplacements] = useState<ReplacementRow[]>(() => [blankReplacement(0, "")]);
+  const [replacements, setReplacements] = useState<ReplacementRow[]>([]);
+  const [capacity, setCapacity] = useState<{ active: number; maximum: number } | null>(null);
+  const [listedKeys, setListedKeys] = useState<ReadonlySet<string>>(new Set());
+  const [proposeOpen, setProposeOpen] = useState(false);
+  const [proposal, setProposal] = useState({ issuerUri: "", subjectIdentifier: "", displayName: "" });
+  const [proposalError, setProposalError] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [busy, setBusy] = useState<"check" | "create" | null>(null);
   const [check, setCheck] = useState<RecoveryCreateResponse | null>(null);
@@ -106,10 +99,10 @@ export function RecoveryNewPage() {
       handleError(organization.error);
     }
   }, [organization.isError, organization.error, handleError]);
-  // A single issuer is the obvious default for every new-identity row that has none yet.
+  // A single issuer is the obvious default for a proposed new identity.
   useEffect(() => {
     if (issuerList.length === 1) {
-      setReplacements((rows) => (rows.every((r) => r.issuerUri) ? rows : rows.map((r) => (r.issuerUri ? r : { ...r, issuerUri: issuerList[0]! }))));
+      setProposal((p) => (p.issuerUri ? p : { ...p, issuerUri: issuerList[0]! }));
     }
   }, [issuerList]);
 
@@ -136,49 +129,65 @@ export function RecoveryNewPage() {
       ? { reason: d.reason ? undefined : "Choose a reason.", reference: lengthError(d.evidenceReference, REFERENCE_MIN, REFERENCE_MAX), summary: lengthError(d.evidenceSummary, SUMMARY_MIN, SUMMARY_MAX) }
       : {};
   });
-  const identityCounts = new Map<string, number>();
-  for (const r of replacements) {
-    if (r.subjectIdentifier.trim()) {
-      identityCounts.set(identityKey(r), (identityCounts.get(identityKey(r)) ?? 0) + 1);
-    }
-  }
-  const selectedUserIds = useMemo(() => new Set(replacements.filter((r) => r.source === "existing").map((r) => r.existingAuthorityUserId)), [replacements]);
-  const proposedIdentities = useMemo(() => new Set(replacements.filter((r) => r.subjectIdentifier.trim()).map((r) => identityKey(r))), [replacements]);
+  const selectedUserIds = useMemo(() => replacements.filter((r) => r.source === "existing").map((r) => r.existingAuthorityUserId), [replacements]);
+  const proposedIdentities = useMemo(() => new Set(replacements.map((r) => identityKey(r))), [replacements]);
+  const full = replacements.length >= MAX_REPLACEMENTS;
+  const overCapacity = capacity !== null && capacity.active + replacements.length > capacity.maximum;
   const pickMember = (member: RecoveryMemberItem) => {
     changed();
     setReplacements((rows) => {
-      if (rows.length >= MAX_REPLACEMENTS || rows.some((r) => r.source === "existing" && r.existingAuthorityUserId === member.authorityUserId)) {
+      if (rows.length >= MAX_REPLACEMENTS || rows.some((r) => identityKey(r) === memberIdentityKey(member.issuerUri, member.subjectIdentifier))) {
         return rows;
       }
-      const kept = rows.filter((r) => !isPristine(r));
-      const row: ReplacementRow = {
-        rowKey: nextRow.current++,
-        source: "existing",
-        existingAuthorityUserId: member.authorityUserId,
-        memberName: member.displayName,
-        issuerUri: member.issuerUri,
-        subjectIdentifier: member.subjectIdentifier,
-        displayNameHint: "",
-        verificationMethod: "",
-        verificationReference: "",
-      };
-      return [...kept, row].slice(0, MAX_REPLACEMENTS);
+      return [
+        ...rows,
+        {
+          rowKey: nextRow.current++,
+          source: "existing",
+          existingAuthorityUserId: member.authorityUserId,
+          memberName: member.displayName,
+          issuerUri: member.issuerUri,
+          subjectIdentifier: member.subjectIdentifier,
+          displayNameHint: "",
+          verificationMethod: "",
+          verificationReference: "",
+        },
+      ];
     });
   };
+  const addIdentity = () => {
+    const issuerUri = proposal.issuerUri.trim();
+    const subjectIdentifier = proposal.subjectIdentifier.trim();
+    const displayName = proposal.displayName.trim();
+    const key = memberIdentityKey(issuerUri, subjectIdentifier);
+    const problemText = !issuerUri
+      ? "Enter the identity issuer."
+      : !subjectIdentifier
+        ? "Enter the subject identifier."
+        : subjectIdentifier.includes("@")
+          ? "Enter the stable subject, never an email address."
+          : !displayName
+            ? "Enter a display name."
+            : proposedIdentities.has(key)
+              ? "This identity is already selected as a replacement owner."
+              : listedKeys.has(key)
+                ? "This identity is an existing member: choose it from the member list."
+                : full
+                  ? "Maximum of three replacement owners reached."
+                  : null;
+    setProposalError(problemText);
+    if (problemText) {
+      return;
+    }
+    changed();
+    setReplacements((rows) => [
+      ...rows,
+      { rowKey: nextRow.current++, source: "new", existingAuthorityUserId: "", memberName: displayName, issuerUri, subjectIdentifier, displayNameHint: displayName, verificationMethod: "", verificationReference: "" },
+    ]);
+    setProposal((p) => ({ issuerUri: p.issuerUri, subjectIdentifier: "", displayName: "" }));
+    setProposeOpen(false);
+  };
   const replacementErrors = replacements.map((r) => ({
-    user: undefined as string | undefined,
-    issuer: r.source === "new" ? (r.issuerUri.trim() ? undefined : "Enter the identity issuer.") : undefined,
-    subject:
-      r.source === "new"
-        ? r.subjectIdentifier.trim()
-          ? r.subjectIdentifier.includes("@")
-            ? "Enter the stable subject, never an email address."
-            : (identityCounts.get(identityKey(r)) ?? 0) > 1
-              ? "This identity is already proposed as another replacement."
-              : undefined
-          : "Enter the subject identifier."
-        : undefined,
-    display: r.source === "new" ? (r.displayNameHint.trim() ? undefined : "Enter a display name.") : undefined,
     method: r.verificationMethod ? undefined : "Choose how the owner was verified.",
     reference: lengthError(r.verificationReference, REFERENCE_MIN, REFERENCE_MAX),
   }));
@@ -188,6 +197,7 @@ export function RecoveryNewPage() {
     !justificationError &&
     replacements.length >= MIN_REPLACEMENTS &&
     declaredErrors.every((e) => Object.values(e).every((v) => !v)) &&
+    !overCapacity &&
     replacementErrors.every((e) => Object.values(e).every((v) => !v));
 
   const send = async (dryRun: boolean) => {
@@ -384,72 +394,39 @@ export function RecoveryNewPage() {
             })}
           </ul>
         </Card>
-        <Card title="Replacement owners">
+        <Card title={`Replacement owners (${replacements.length} of ${MAX_REPLACEMENTS})`}>
           <p className="text-sm text-muted">
-            Propose between {MIN_REPLACEMENTS} and {MAX_REPLACEMENTS} replacement owners, each confirmed to you by the organization. Choose an existing member, or propose a new identity for an owner that signs in for the first time.
+            Propose between {MIN_REPLACEMENTS} and {MAX_REPLACEMENTS} replacement owners, each confirmed to you by the organization. Choose existing members, or propose a new verified identity for an owner who signs in for the first time.
           </p>
-          {validId ? <RecoveryMemberPicker organizationId={organizationId} selectedUserIds={selectedUserIds} proposedIdentities={proposedIdentities} full={replacements.length >= MAX_REPLACEMENTS} onPick={pickMember} /> : null}
-          <ol className="flex list-none flex-col gap-4 p-0">
-            {replacements.map((row, index) => {
-              const errors = replacementErrors[index]!;
-              const n = index + 1;
-              return (
-                <li key={row.rowKey}>
-                  <fieldset className="flex flex-col gap-3 rounded-control border border-line p-4">
-                    <legend className="px-1 text-sm font-semibold">{row.source === "existing" ? `Replacement ${n} (existing member)` : `Replacement ${n} (new identity)`}</legend>
+          <p aria-live="polite" className="text-sm">
+            <strong>
+              {replacements.length} of {MAX_REPLACEMENTS} selected
+            </strong>
+            {capacity ? ` · Organization owners: ${capacity.active} of ${capacity.maximum} · this case adds ${replacements.length} → ${capacity.active + replacements.length} of ${capacity.maximum}` : ""}
+          </p>
+          {overCapacity ? (
+            <StatusMessage tone="danger" title="Too many owners">
+              This would exceed the organization maximum of {capacity!.maximum} active owners.
+            </StatusMessage>
+          ) : null}
+          {replacements.length > 0 ? (
+            <ul aria-label="Selected replacement owners" className="flex list-none flex-col gap-3 p-0">
+              {replacements.map((row, index) => {
+                const errors = replacementErrors[index]!;
+                const n = index + 1;
+                const identity = identitySummary(row);
+                return (
+                  <li key={row.rowKey} className="flex flex-col gap-3 rounded-control border border-line p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="break-words font-medium">{row.memberName}</p>
+                        <p className="break-words text-help text-muted">
+                          {identity.subject} · {identity.issuer}
+                        </p>
+                      </div>
+                      <span className="text-help">{row.source === "existing" ? "Existing member" : "New identity"}</span>
+                    </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {row.source === "existing" ? (
-                        <div className="sm:col-span-2 min-w-0">
-                          <p className="break-words font-medium">{row.memberName}</p>
-                          <p className="break-words text-help text-muted">
-                            {identitySummary(row).subject} · {identitySummary(row).issuer} · Active member
-                          </p>
-                        </div>
-                      ) : (
-                        <>
-                          {issuerList.length > 0 ? (
-                            <Select
-                              label={`Identity issuer (replacement ${n})`}
-                              required
-                              value={row.issuerUri || undefined}
-                              onValueChange={(value) => value && updateReplacement(row.rowKey, { issuerUri: value })}
-                              options={issuerList.map((i) => ({ value: i, label: i }))}
-                              error={showErrors ? errors.issuer : undefined}
-                              disabled={disabled}
-                            />
-                          ) : (
-                            <TextInput
-                              label={`Identity issuer (replacement ${n})`}
-                              required
-                              value={row.issuerUri}
-                              onChange={(event) => updateReplacement(row.rowKey, { issuerUri: event.target.value })}
-                              error={showErrors ? errors.issuer : undefined}
-                              disabled={disabled}
-                              autoComplete="off"
-                            />
-                          )}
-                          <TextInput
-                            label={`Subject identifier (replacement ${n})`}
-                            required
-                            value={row.subjectIdentifier}
-                            onChange={(event) => updateReplacement(row.rowKey, { subjectIdentifier: event.target.value })}
-                            error={showErrors || row.subjectIdentifier.includes("@") ? errors.subject : undefined}
-                            helpText="The identity provider's stable subject, never an email address."
-                            disabled={disabled}
-                            autoComplete="off"
-                          />
-                          <TextInput
-                            label={`Display name (replacement ${n})`}
-                            required
-                            value={row.displayNameHint}
-                            maxLength={200}
-                            onChange={(event) => updateReplacement(row.rowKey, { displayNameHint: event.target.value })}
-                            error={showErrors ? errors.display : undefined}
-                            disabled={disabled}
-                            autoComplete="off"
-                          />
-                        </>
-                      )}
                       <Select
                         label={`Verification method (replacement ${n})`}
                         required
@@ -471,38 +448,105 @@ export function RecoveryNewPage() {
                         autoComplete="off"
                       />
                     </div>
-                    {replacements.length > MIN_REPLACEMENTS ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="self-start"
-                        onClick={() => {
-                          changed();
-                          setReplacements((rows) => rows.filter((r) => r.rowKey !== row.rowKey));
-                        }}
-                      >
-                        Remove replacement {n}
-                      </Button>
-                    ) : null}
-                  </fieldset>
-                </li>
-              );
-            })}
-          </ol>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="self-start"
-            disabled={replacements.length >= MAX_REPLACEMENTS || disabled}
-            onClick={() => {
-              changed();
-              setReplacements((rows) => [...rows, blankReplacement(nextRow.current++, issuerList.length === 1 ? issuerList[0]! : "")]);
-            }}
-          >
-            Add new identity
-          </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="self-start"
+                      onClick={() => {
+                        changed();
+                        setReplacements((rows) => rows.filter((r) => r.rowKey !== row.rowKey));
+                      }}
+                    >
+                      Remove replacement {n}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted">No replacement owner selected yet.</p>
+          )}
+          {validId ? (
+            <RecoveryMemberPicker
+              organizationId={organizationId}
+              selectedUserIds={selectedUserIds}
+              proposedIdentities={proposedIdentities}
+              full={full}
+              onPick={pickMember}
+              onCapacity={setCapacity}
+              onListed={setListedKeys}
+            />
+          ) : null}
+          <div className="flex flex-col gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="self-start"
+              aria-expanded={proposeOpen}
+              aria-controls="propose-identity"
+              disabled={full || disabled}
+              onClick={() => {
+                setProposeOpen((open) => !open);
+                setProposalError(null);
+              }}
+            >
+              Propose a new verified identity
+            </Button>
+            {proposeOpen && !full ? (
+              <div
+                id="propose-identity"
+                role="group"
+                aria-label="New verified identity"
+                className="flex flex-col gap-3 rounded-control border border-line p-3"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") {
+                    event.preventDefault();
+                    addIdentity();
+                  }
+                }}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {issuerList.length > 0 ? (
+                    <Select
+                      label="Identity issuer"
+                      required
+                      value={proposal.issuerUri || undefined}
+                      onValueChange={(value) => value && setProposal((p) => ({ ...p, issuerUri: value }))}
+                      options={issuerList.map((i) => ({ value: i, label: i }))}
+                    />
+                  ) : (
+                    <TextInput label="Identity issuer" required value={proposal.issuerUri} onChange={(event) => setProposal((p) => ({ ...p, issuerUri: event.target.value }))} autoComplete="off" />
+                  )}
+                  <TextInput
+                    label="Subject identifier"
+                    required
+                    value={proposal.subjectIdentifier}
+                    onChange={(event) => setProposal((p) => ({ ...p, subjectIdentifier: event.target.value }))}
+                    helpText="The identity provider's stable subject, never an email address."
+                    autoComplete="off"
+                  />
+                  <TextInput
+                    label="Display name"
+                    required
+                    value={proposal.displayName}
+                    maxLength={200}
+                    onChange={(event) => setProposal((p) => ({ ...p, displayName: event.target.value }))}
+                    autoComplete="off"
+                  />
+                </div>
+                {proposalError ? (
+                  <StatusMessage tone="danger" title="This identity cannot be added">
+                    {proposalError}
+                  </StatusMessage>
+                ) : null}
+                <Button type="button" variant="secondary" size="sm" className="self-start" onClick={addIdentity}>
+                  Add identity
+                </Button>
+              </div>
+            ) : null}
+          </div>
         </Card>
         <div aria-live="polite" className="flex flex-col gap-3">
           {check && check.eligible ? (

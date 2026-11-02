@@ -48,6 +48,9 @@ public sealed partial class OwnerRecoveryService(
     public const int StatementVersion = 1;
     public const int RequiredApprovals = 3;
     public const int MaximumReplacements = 3;
+
+    /// <summary>C-107: the member picker serves at most (and by default) this many members per page.</summary>
+    public const int MemberPageSize = 10;
     public const string RecoverCommandKind = "RecoverOrganizationOwners";
     private static readonly string[] DetailDisclosure = ["recovery_case", "owner_identities", "unavailability_evidence", "approvals"];
     private static readonly string[] MemberDisclosure = ["member_identities"];
@@ -442,6 +445,12 @@ public sealed partial class OwnerRecoveryService(
             return (new AuthorityException(AuthorityErrorCodes.OwnerRecoveryApprovalsIncomplete, 409, false, $"{valid} of {RequiredApprovals} approvals by distinct active operators"), null);
         }
 
+        var adding = c.Subjects.Count(s => s.RecoverySubjectRoleName == OwnerRecoverySubjectRoles.Replacement);
+        if (c.Org.EnabledOwners.Count + adding > OrganizationOwnerLimits.MaximumActiveOwners)
+        {
+            return (OwnerLimit(c.Org.EnabledOwners.Count, adding), null); // rechecked at the final operation; the case stays open and nothing changes
+        }
+
         if (c.Now < c.Case.WaitingPeriodEndsOn)
         {
             return (new AuthorityException(AuthorityErrorCodes.OwnerRecoveryWaitingPeriod, 409, false, $"the waiting period ends at {c.Case.WaitingPeriodEndsOn:O} (Authority clock); recovery cannot be executed before then"), null);
@@ -775,10 +784,16 @@ public sealed partial class OwnerRecoveryService(
             throw AuthorityException.Invalid("the search text is at most 200 characters");
         }
 
-        var limit = input.Limit ?? OrganizationOnboardingService.DefaultPageSize;
-        if (limit is < 1 or > OrganizationOnboardingService.MaximumPageSize)
+        var limit = input.Limit ?? MemberPageSize;
+        if (limit is < 1 or > MemberPageSize)
         {
-            throw AuthorityException.Invalid($"limit must be 1..{OrganizationOnboardingService.MaximumPageSize}");
+            throw AuthorityException.Invalid($"limit must be 1..{MemberPageSize}");
+        }
+
+        var excluded = (input.ExcludeAuthorityUserIds ?? []).Distinct().ToHashSet();
+        if (excluded.Count > MaximumReplacements)
+        {
+            throw AuthorityException.Invalid($"at most {MaximumReplacements} already selected members can be excluded");
         }
 
         OwnerRecoveryMemberPage page;
@@ -804,7 +819,7 @@ public sealed partial class OwnerRecoveryService(
 
             var binding = OrganizationOnboardingService.Binding("recovery-members:" + organizationId.ToString("N"), me, string.Empty, text, limit);
             var candidates = org.Bindings
-                .Where(b => b.IdentityBindingEnabled && !org.Owners.Contains(b.AuthorityUserId))
+                .Where(b => b.IdentityBindingEnabled && !org.Owners.Contains(b.AuthorityUserId) && !excluded.Contains(b.AuthorityUserId))
                 .Where(b => !operators.Any(o => o.OperatorIssuerUri == b.IdentityIssuerUri && o.OperatorSubjectIdentifier == b.IdentitySubjectIdentifier))
                 .Select(b => (Binding: b, Name: hints.TryGetValue(b.AuthorityUserId, out var hint) && !string.IsNullOrWhiteSpace(hint) ? hint : b.IdentitySubjectIdentifier))
                 .Where(x => string.IsNullOrEmpty(text) || x.Name.Contains(text, StringComparison.OrdinalIgnoreCase) || x.Binding.IdentitySubjectIdentifier.Contains(text, StringComparison.OrdinalIgnoreCase))
@@ -821,7 +836,7 @@ public sealed partial class OwnerRecoveryService(
             var slice = candidates.Take(limit).ToList();
             var next = candidates.Count > limit ? OrganizationOnboardingService.WriteCursor(slice[^1].Key, slice[^1].Binding.AuthorityUserId, binding) : null;
             page = new OwnerRecoveryMemberPage(slice.Select(x => new OwnerRecoveryMemberItem(x.Binding.AuthorityUserId, x.Binding.IdentityIssuerUri, x.Binding.IdentitySubjectIdentifier, x.Name, x.Binding.IdentityCreatedOn)).ToList(),
-                total, next, limit, correlationId);
+                total, next, limit, org.EnabledOwners.Count, OrganizationOwnerLimits.MaximumActiveOwners, correlationId);
             AuditJournal.Append(scope, state, "PlatformOwnerRecoveryMembersViewed", new
             {
                 platform_operator_id = me.PlatformOperatorId,
@@ -1091,7 +1106,7 @@ public sealed partial class OwnerRecoveryService(
                 throw new AuthorityException(AuthorityErrorCodes.OrganizationOwnerIdentityInvalid, 400, false, "a new replacement owner needs the identity provider's stable subject (never an email address) and a display name");
             }
 
-            if (org.Bindings.Any(b => b.IdentityIssuerUri == issuer && b.IdentitySubjectIdentifier == subject))
+            if (org.Bindings.Any(b => b.IdentityIssuerUri == issuer && string.Equals(b.IdentitySubjectIdentifier, subject, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new AuthorityException(AuthorityErrorCodes.OwnerRecoveryIdentityConflict, 409, false, "this identity is already bound in the organization; name the existing member instead");
             }
@@ -1099,9 +1114,12 @@ public sealed partial class OwnerRecoveryService(
             replacements.Add(new ReplacementDraft(null, issuer, subject, hint, method, reference));
         }
 
-        if (replacements.Select(r => (r.IssuerUri, r.SubjectIdentifier)).Distinct().Count() != replacements.Count)
+        // Server-side duplicate rules (C-107): one verified identity once per case, whether it arrives as an existing member (by its
+        // immutable user id) or as a proposed new identity; the same member twice, or an existing member's identity typed as a new one, is refused.
+        if (replacements.Where(r => r.ExistingUserId is not null).Select(r => r.ExistingUserId).Distinct().Count() != replacements.Count(r => r.ExistingUserId is not null)
+            || replacements.Select(r => (r.IssuerUri, r.SubjectIdentifier.ToUpperInvariant())).Distinct().Count() != replacements.Count)
         {
-            throw AuthorityException.Invalid("each replacement owner must be a different identity");
+            throw AuthorityException.Invalid("each replacement owner must be a different identity (a person can be chosen once, as an existing member or as a new identity)");
         }
 
         foreach (var r in replacements)
@@ -1113,6 +1131,13 @@ public sealed partial class OwnerRecoveryService(
             }
         }
 
+        // C-107: the organization owner limit counts ACTIVE owners (enabled), declared-unavailable owners included (they keep their role and
+        // stay enabled); every replacement adds one. Nobody is removed to make room.
+        if (org.EnabledOwners.Count + replacements.Count > OrganizationOwnerLimits.MaximumActiveOwners)
+        {
+            throw OwnerLimit(org.EnabledOwners.Count, replacements.Count);
+        }
+
         var eligibleAfter = eligibleBefore + replacements.Count;
         if (eligibleAfter < 2)
         {
@@ -1121,6 +1146,10 @@ public sealed partial class OwnerRecoveryService(
 
         return new Draft(input.OrganizationId, incident, justification, declared, replacements, eligibleBefore, eligibleAfter);
     }
+
+    private static AuthorityException OwnerLimit(int active, int adding) =>
+        new(AuthorityErrorCodes.OrganizationOwnerLimit, 409, false,
+            $"the organization has {active} active owners and the maximum is {OrganizationOwnerLimits.MaximumActiveOwners}; this case adds {adding}. Propose fewer replacement owners, or remove or disable an owner through the normal two-owner change first (nobody is removed automatically)");
 
     private static void RequireNotQuarantined(OrganizationAuthorizationState state)
     {

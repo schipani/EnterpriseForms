@@ -138,6 +138,9 @@ public static class AuthorityErrorCodes
     public const string OwnerRecoveryIdentityConflict = "OWNER_RECOVERY_IDENTITY_CONFLICT";
     public const string OwnerRecoveryEvidenceRequired = "OWNER_RECOVERY_EVIDENCE_REQUIRED";
     public const string OwnerRecoveryProbation = "OWNER_RECOVERY_PROBATION";
+
+    /// <summary>C-107: the organization already has (or would exceed) the maximum number of active owners.</summary>
+    public const string OrganizationOwnerLimit = "ORGANIZATION_OWNER_LIMIT";
     public const string CursorInvalid = "CURSOR_INVALID";
 }
 

@@ -38,6 +38,11 @@ public sealed class OrganizationBootstrapService(IAuthorityStore store, IIntegri
             throw AuthorityException.Invalid("at least one organization_owner identity is required");
         }
 
+        if (owners.Count > OrganizationOwnerLimits.MaximumActiveOwners)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.OrganizationOwnerLimit, 409, false, $"an organization has at most {OrganizationOwnerLimits.MaximumActiveOwners} owners");
+        }
+
         foreach (var identity in request.Identities)
         {
             if (identity.AuthorityUserId == Guid.Empty || string.IsNullOrWhiteSpace(identity.IssuerUri) || string.IsNullOrWhiteSpace(identity.SubjectIdentifier)

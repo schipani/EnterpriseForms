@@ -16,8 +16,12 @@ async function fillCase(page: Page, org: Org, label: string): Promise<void> {
   await expect(page.getByRole("list", { name: "Current owners" }).getByRole("listitem")).toHaveCount(1);
   await page.getByRole("textbox", { name: /Incident reference/ }).fill(`INC-${RUN}-${label}`);
   await page.getByRole("textbox", { name: /Your justification/ }).fill("The only owner left the company; the customer asked for recovery.");
-  await page.getByRole("textbox", { name: /Subject identifier \(replacement 1\)/ }).fill(replacementSubject(label));
-  await page.getByRole("textbox", { name: /Display name \(replacement 1\)/ }).fill(`Replacement ${label} ${RUN}`);
+  // The fixture organization has no other member, so the replacement is a new verified identity added to the one selected list.
+  await page.getByRole("button", { name: "Propose a new verified identity" }).click();
+  await page.getByRole("textbox", { name: "Subject identifier" }).fill(replacementSubject(label));
+  await page.getByRole("textbox", { name: "Display name" }).fill(`Replacement ${label} ${RUN}`);
+  await page.getByRole("button", { name: "Add identity" }).click();
+  await expect(page.getByRole("list", { name: "Selected replacement owners" }).getByRole("listitem")).toHaveCount(1);
   await page.getByRole("combobox", { name: /Verification method \(replacement 1\)/ }).click();
   await page.getByRole("option", { name: "Support call-back" }).click();
   await page.getByRole("textbox", { name: /Verification reference \(replacement 1\)/ }).fill(`TICKET-${RUN}-${label}`);
@@ -197,15 +201,16 @@ for (const [label, width] of viewports) {
 }
 
 test.describe("Member picker", () => {
-  test("search, paging, duplicate prevention and choosing members creates a case bound to the chosen people", async ({ browser }) => {
-    test.setTimeout(180_000);
-    const org = await createOrganization("recovery-picker", 17); // 17 members: more than one page of 15
+  test("search, paging, duplicate prevention and choosing three members creates a case bound to the chosen people", async ({ browser }) => {
+    test.setTimeout(240_000);
+    const org = await createOrganization("recovery-picker", 17); // 17 members: more than one page of 10
     const { context, page } = await operatorPage(browser, "dana");
     await page.goto(`/platform/recovery/new?organizationId=${org.organizationId}`);
     await expect(page.getByRole("heading", { name: "New recovery case", level: 1 })).toBeVisible();
     const list = page.getByRole("list", { name: "Members" });
-    await expect(list.getByRole("listitem")).toHaveCount(15); // server-side page size
-    await expect(page.getByText("Showing 15 of 17 active members.")).toBeVisible();
+    const selected = page.getByRole("list", { name: "Selected replacement owners" });
+    await expect(list.getByRole("listitem")).toHaveCount(10); // server-side page size
+    await expect(page.getByText("Showing 10 of 17 active members.")).toBeVisible();
     await expect(list.getByText("Console E2E Owner")).toHaveCount(0); // the existing owner is never offered
     await page.getByRole("button", { name: "Load more" }).click();
     await expect(list.getByRole("listitem")).toHaveCount(17);
@@ -218,37 +223,53 @@ test.describe("Member picker", () => {
     await search.fill("zz-no-such-member");
     await expect(page.getByText("No members found.")).toBeVisible();
     await search.fill("");
-    await expect(list.getByRole("listitem")).toHaveCount(15);
+    await expect(list.getByRole("listitem")).toHaveCount(10);
 
-    // Choose two members; a chosen member cannot be added again.
-    const add = page.getByRole("button", { name: /^Add pce-member-0[12]-/ });
-    await add.nth(0).click();
-    await expect(page.getByRole("group", { name: "Replacement 1 (existing member)" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /already added/ })).toHaveCount(1);
-    await expect(page.getByRole("button", { name: /already added/ })).toBeDisabled();
-    await page.getByRole("button", { name: /^Add pce-member-0[1-9]-/ }).first().click();
-    await expect(page.getByRole("group", { name: /Replacement \d \(existing member\)/ })).toHaveCount(2);
-    for (const n of [1, 2]) {
+    // Pick three members one after another: each appears in the selected list and the picker excludes it.
+    const names: string[] = [];
+    for (let n = 1; n <= 3; n++) {
+      const add = page.getByRole("button", { name: /^Add pce-member-/ }).first();
+      const label = (await add.getAttribute("aria-label")) ?? "";
+      names.push(label.replace(/^Add /, ""));
+      await add.click();
+      await expect(selected.getByRole("listitem")).toHaveCount(n);
+      await expect(selected.getByText(names[n - 1]!, { exact: true })).toBeVisible();
+      await expect(list.getByText(names[n - 1]!)).toHaveCount(0);
+    }
+    await expect(page.getByText("Maximum of three replacement owners reached")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Add pce-member-/ }).first()).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Propose a new verified identity" })).toBeDisabled();
+
+    // Remove one and pick another.
+    await page.getByRole("button", { name: "Remove replacement 2" }).click();
+    await expect(selected.getByRole("listitem")).toHaveCount(2);
+    await expect(selected.getByText(names[1]!)).toHaveCount(0);
+    await page.getByRole("button", { name: /^Add pce-member-/ }).first().click();
+    await expect(selected.getByRole("listitem")).toHaveCount(3);
+
+    for (const n of [1, 2, 3]) {
       await page.getByRole("combobox", { name: new RegExp(`Verification method \\(replacement ${n}\\)`) }).click();
       await page.getByRole("option", { name: "Support call-back" }).click();
       await page.getByRole("textbox", { name: new RegExp(`Verification reference \\(replacement ${n}\\)`) }).fill(`TICKET-${RUN}-pick${n}`);
     }
     await page.getByRole("textbox", { name: /Incident reference/ }).fill(`INC-${RUN}-pick`);
-    await page.getByRole("textbox", { name: /Your justification/ }).fill("The only owner left; two existing members are confirmed as the new owners.");
+    await page.getByRole("textbox", { name: /Your justification/ }).fill("The only owner left; three existing members are confirmed as the new owners.");
     await page.getByRole("button", { name: "Validate" }).click();
     await expect(page.getByText("Check passed — nothing was created")).toBeVisible();
     await page.getByRole("button", { name: "Create case" }).click();
     await page.waitForURL(/\/platform\/recovery\/[0-9a-f-]{36}$/i);
     await expect(page.getByRole("heading", { name: "Recovery case", level: 1 })).toBeVisible();
-    const proposed = page.getByRole("heading", { name: "Proposed owners" });
-    await expect(proposed).toBeVisible();
-    await expect(page.getByText(/pce-member-0[1-9]-/).first()).toBeVisible(); // the chosen members, shown by their verified identity
+    await expect(page.getByRole("heading", { name: "Proposed owners" })).toBeVisible();
+    const proposedList = page.getByRole("list", { name: "Proposed owners" }).getByRole("listitem");
+    await expect(proposedList).toHaveCount(3); // the three chosen members
+    await expect(proposedList.filter({ hasText: "Existing member" })).toHaveCount(3);
+    await expect(proposedList.filter({ hasText: /pce-member-\d+-/ })).toHaveCount(3); // shown by their verified identity
     await expect(page.getByTestId("approval-progress")).toHaveText("0 of 3");
     await context.close();
   });
 
   for (const [label, width] of [["320px", 320], ["768px", 768], ["1440px", 1440]] as const) {
-    test(`the picker with results listed fits ${label} and passes axe`, async ({ browser }) => {
+    test(`the picker, selected list and new-identity form fit ${label} and pass axe`, async ({ browser }) => {
       const org = await createOrganization(`recovery-picker-${width}`, 6);
       const context = await browser.newContext({ viewport: { width, height: 900 } });
       const page = await context.newPage();
@@ -256,9 +277,11 @@ test.describe("Member picker", () => {
       await page.goto(`/platform/recovery/new?organizationId=${org.organizationId}`);
       await expect(page.getByRole("list", { name: "Members" }).getByRole("listitem")).toHaveCount(6);
       await page.getByRole("button", { name: /^Add pce-member-/ }).first().click();
-      await expect(page.getByRole("group", { name: "Replacement 1 (existing member)" })).toBeVisible();
+      await expect(page.getByRole("list", { name: "Selected replacement owners" }).getByRole("listitem")).toHaveCount(1);
+      await page.getByRole("button", { name: "Propose a new verified identity" }).click();
+      await expect(page.getByRole("button", { name: "Add identity" })).toBeVisible();
       await expectNoHorizontalPageScroll(page);
-      await expectNoAxeViolations(page, `member picker with results at ${label}`);
+      await expectNoAxeViolations(page, `member picker, selected list and new-identity form at ${label}`);
       await context.close();
     });
   }

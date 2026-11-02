@@ -402,7 +402,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** PG-075 member picker: members who may be proposed as replacement owners (enabled, not owners, not operator identities), 15 per page by default. Minimum metadata; the Authority audits each search before disclosure. */
+        /** PG-075 member picker: members who may be proposed as replacement owners (enabled, not owners, not operator identities), at most 10 per page; `exclude` (repeatable) lists already selected members. Minimum metadata; the Authority audits each search before disclosure. */
         get: operations["SearchOwnerRecoveryMembers"];
         put?: never;
         post?: never;
@@ -937,6 +937,10 @@ export interface components {
             nextCursor: null | string;
             /** Format: int32 */
             limit: number | string;
+            /** Format: int32 */
+            activeOwnerCount: number | string;
+            /** Format: int32 */
+            maximumOwners: number | string;
             /** Format: uuid */
             correlationId: string;
         };
@@ -1767,6 +1771,7 @@ export interface operations {
                 q?: string;
                 cursor?: string;
                 limit?: number | string;
+                exclude?: string[];
             };
             header?: never;
             path: {

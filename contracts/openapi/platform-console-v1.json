@@ -943,7 +943,7 @@
         "tags": [
           "OwnerRecovery"
         ],
-        "summary": "PG-075 member picker: members who may be proposed as replacement owners (enabled, not owners, not operator identities), 15 per page by default. Minimum metadata; the Authority audits each search before disclosure.",
+        "summary": "PG-075 member picker: members who may be proposed as replacement owners (enabled, not owners, not operator identities), at most 10 per page; `exclude` (repeatable) lists already selected members. Minimum metadata; the Authority audits each search before disclosure.",
         "operationId": "SearchOwnerRecoveryMembers",
         "parameters": [
           {
@@ -979,6 +979,17 @@
                 "string"
               ],
               "format": "int32"
+            }
+          },
+          {
+            "name": "exclude",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
             }
           }
         ],
@@ -2968,6 +2979,8 @@
           "totalCount",
           "nextCursor",
           "limit",
+          "activeOwnerCount",
+          "maximumOwners",
           "correlationId"
         ],
         "type": "object",
@@ -2993,6 +3006,22 @@
             ]
           },
           "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "activeOwnerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maximumOwners": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "integer",

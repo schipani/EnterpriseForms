@@ -204,6 +204,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+async function addNewIdentity(user: ReturnType<typeof userEvent.setup>, subject: string, displayName: string) {
+  const toggle = screen.getByRole("button", { name: "Propose a new verified identity" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await user.type(screen.getByRole("textbox", { name: /Subject identifier/ }), subject);
+  await user.type(screen.getByRole("textbox", { name: /Display name/ }), displayName);
+  await user.click(screen.getByRole("button", { name: "Add identity" }));
+}
+
 describe("formatCountdown", () => {
   it("renders seconds, minutes, hours and days", () => {
     expect(formatCountdown(7)).toBe("7 s");
@@ -295,8 +305,7 @@ describe("PG-075 New recovery case", () => {
     await user.click(await screen.findByRole("option", { name: "Left the organization" }));
     await user.type(screen.getByRole("textbox", { name: /Evidence reference \(owner-old\)/ }), "HR-77");
     await user.type(screen.getByRole("textbox", { name: /Evidence summary \(owner-old\)/ }), "HR confirmed departure.");
-    await user.type(screen.getByRole("textbox", { name: /Subject identifier \(replacement 1\)/ }), "owner-new");
-    await user.type(screen.getByRole("textbox", { name: /Display name \(replacement 1\)/ }), "Robin Replacement");
+    await addNewIdentity(user, "owner-new", "Robin Replacement");
     await user.click(screen.getByRole("combobox", { name: /Verification method \(replacement 1\)/ }));
     await user.click(await screen.findByRole("option", { name: "Support call-back" }));
     await user.type(screen.getByRole("textbox", { name: /Verification reference \(replacement 1\)/ }), "TICKET-9");
@@ -335,8 +344,7 @@ describe("PG-075 New recovery case", () => {
     await screen.findByText("owner-old");
     await user.type(screen.getByRole("textbox", { name: /Incident reference/ }), "INC-4411");
     await user.type(screen.getByRole("textbox", { name: /Your justification/ }), "The only owner left the company.");
-    await user.type(screen.getByRole("textbox", { name: /Subject identifier \(replacement 1\)/ }), "owner-new");
-    await user.type(screen.getByRole("textbox", { name: /Display name \(replacement 1\)/ }), "Robin Replacement");
+    await addNewIdentity(user, "owner-new", "Robin Replacement");
     await user.click(screen.getByRole("combobox", { name: /Verification method \(replacement 1\)/ }));
     await user.click(await screen.findByRole("option", { name: "Support call-back" }));
     await user.type(screen.getByRole("textbox", { name: /Verification reference \(replacement 1\)/ }), "TICKET-9");
@@ -355,61 +363,199 @@ describe("PG-075 Member picker", () => {
     correlationId: "x",
   };
   const member = (n: number) => ({ authorityUserId: `01a194d8-0000-7000-8000-0000000001${String(n).padStart(2, "0")}`, issuerUri: ISSUER, subjectIdentifier: `member-${n}`, displayName: `Member ${n}`, memberSince: "2026-09-01T12:00:00Z" });
-  const memberPage = (items: ReturnType<typeof member>[], over: Record<string, unknown> = {}) => ({ items, totalCount: items.length, nextCursor: null, limit: 15, correlationId: "x", ...over });
+  const memberPage = (items: ReturnType<typeof member>[], over: Record<string, unknown> = {}) => ({ items, totalCount: items.length, nextCursor: null, limit: 10, activeOwnerCount: 1, maximumOwners: 10, correlationId: "x", ...over });
   const membersPath = `/owner-recovery/organizations/${ORG}/members`;
+  const all = [1, 2, 3, 4, 5].map(member);
+  type User = ReturnType<typeof userEvent.setup>;
+  /** A server that honours `exclude` like the BFF does. */
+  const serve = (c: Call, over: Record<string, unknown> = {}) => {
+    if (c.path === `/organizations/${ORG}`) return { status: 200, body: orgDetail };
+    if (c.path.startsWith(membersPath)) {
+      const params = new URL("http://x" + c.path).searchParams;
+      const excluded = params.getAll("exclude");
+      const q = params.get("q");
+      const rest = all.filter((m) => !excluded.includes(m.authorityUserId) && (!q || m.subjectIdentifier.includes(q)));
+      return { status: 200, body: memberPage(rest, { totalCount: rest.length, ...over }) };
+    }
+    if (c.path === "/owner-recovery" && c.method === "POST") return { status: 200, body: { dryRun: true, eligible: true, refusalCode: null, refusalDetail: null, warnings: [], case: null, replayed: false, correlationId: "x" } };
+    return undefined;
+  };
+  const pick = async (user: User, n: number) => {
+    await user.click(await screen.findByRole("button", { name: `Add Member ${n}` }));
+  };
+  const selected = () => screen.getByRole("list", { name: "Selected replacement owners" });
+  const fillCommon = async (user: User, count: number) => {
+    await user.type(screen.getByRole("textbox", { name: /Incident reference/ }), "INC-4411");
+    await user.type(screen.getByRole("textbox", { name: /Your justification/ }), "The only owner left the company.");
+    for (let n = 1; n <= count; n++) {
+      await user.click(screen.getByRole("combobox", { name: new RegExp(`Verification method \\(replacement ${n}\\)`) }));
+      await user.click(await screen.findByRole("option", { name: "Support call-back" }));
+      await user.type(screen.getByRole("textbox", { name: new RegExp(`Verification reference \\(replacement ${n}\\)`) }), `TICKET-${n}`);
+    }
+  };
 
-  it("searches, pages by cursor, prevents duplicates and sends the picked member as existingAuthorityUserId", async () => {
+  it("selects one, two and three members through the one picker, with limit 10 and exclude of the selected ids; no manual id fields", async () => {
+    window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
+    const calls = installFetch((c) => serve(c));
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByRole("list", { name: "Members" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Selected replacement owners" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /User ID|Subject identifier/ })).not.toBeInTheDocument();
+    expect(screen.getByText("0 of 3 selected", { exact: false })).toBeInTheDocument();
+    const first = calls.find((c) => c.path.startsWith(membersPath))!;
+    expect(new URL("http://x" + first.path).searchParams.get("limit")).toBe("10");
+
+    await pick(user, 1);
+    expect(within(selected()).getByText("Member 1")).toBeInTheDocument();
+    expect(within(selected()).getByText("Existing member")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Add Member 1" })).not.toBeInTheDocument());
+    await pick(user, 2);
+    await pick(user, 3);
+    expect(within(selected()).getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getByText("Replacement owners (3 of 3)")).toBeInTheDocument();
+    expect(screen.getByText(/Organization owners: 1 of 10 · this case adds 3 → 4 of 10/)).toBeInTheDocument();
+    await waitFor(() => {
+      const last = [...calls].reverse().find((c) => c.path.startsWith(membersPath))!;
+      const excluded = new URL("http://x" + last.path).searchParams.getAll("exclude");
+      expect(excluded.sort()).toEqual([member(1), member(2), member(3)].map((m) => m.authorityUserId).sort());
+    });
+
+    // The fourth pick is blocked.
+    expect(screen.getByText("Maximum of three replacement owners reached")).toBeInTheDocument();
+    for (const b of screen.queryAllByRole("button", { name: /^Add Member/ })) expect(b).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Propose a new verified identity" })).toBeDisabled();
+
+    await fillCommon(user, 3);
+    await user.click(screen.getByRole("button", { name: "Validate" }));
+    expect(await screen.findByText("Check passed — nothing was created")).toBeInTheDocument();
+    const post = calls.find((c) => c.method === "POST")!;
+    expect(post.body).toMatchObject({
+      replacements: [member(1), member(2), member(3)].map((m) => ({ existingAuthorityUserId: m.authorityUserId, issuerUri: null, subjectIdentifier: null, displayNameHint: null, verificationMethod: "SupportCallback" })),
+    });
+  }, 60_000);
+
+  it("removes a selection to free the slot and replaces it", async () => {
+    window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
+    installFetch((c) => serve(c));
+    const user = userEvent.setup();
+    render(<App />);
+    await pick(user, 1);
+    await pick(user, 2);
+    await pick(user, 3);
+    await user.click(screen.getByRole("button", { name: "Remove replacement 2" }));
+    expect(within(selected()).queryByText("Member 2")).not.toBeInTheDocument();
+    expect(within(selected()).getAllByRole("listitem")).toHaveLength(2);
+    await pick(user, 4);
+    expect(within(selected()).getByText("Member 4")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove replacement 1" }));
+    // The removed members are offered again.
+    expect(await screen.findByRole("button", { name: "Add Member 1" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Add Member 2" })).toBeEnabled();
+  }, 40_000);
+
+  it("pages by cursor and searches", async () => {
     window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
     const calls = installFetch((c) => {
-      if (c.path === `/organizations/${ORG}`) return { status: 200, body: orgDetail };
       if (c.path.startsWith(membersPath)) {
         const params = new URL("http://x" + c.path).searchParams;
         if (params.get("q") === "zed") return { status: 200, body: memberPage([member(9)]) };
         if (params.get("cursor") === "m2") return { status: 200, body: memberPage([member(3)], { totalCount: 3 }) };
         return { status: 200, body: memberPage([member(1), member(2)], { totalCount: 3, nextCursor: "m2" }) };
       }
-      if (c.path === "/owner-recovery" && c.method === "POST") return { status: 200, body: { dryRun: true, eligible: true, refusalCode: null, refusalDetail: null, warnings: [], case: null, replayed: false, correlationId: "x" } };
-      return undefined;
+      return serve(c);
     });
     const user = userEvent.setup();
     render(<App />);
     const list = await screen.findByRole("list", { name: "Members" });
-    expect(within(list).getByText("Member 1")).toBeInTheDocument();
     expect(within(list).getAllByText(/Active member since/)).toHaveLength(2);
     expect(screen.getByText("Showing 2 of 3 active members.")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /User ID/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Load more" }));
     expect(await screen.findByText("Member 3")).toBeInTheDocument();
     expect(calls.some((c) => c.path.includes("cursor=m2"))).toBe(true);
-
-    await user.click(screen.getByRole("button", { name: "Add Member 1" }));
-    expect(screen.getByRole("button", { name: "Member 1 already added" })).toBeDisabled();
-    expect(screen.getByText("Replacement 1 (existing member)")).toBeInTheDocument();
-    expect(screen.queryByText("Replacement 2 (new identity)")).not.toBeInTheDocument();
-
-    // A new identity identical to the picked member cannot be proposed twice.
-    await user.click(screen.getByRole("button", { name: "Add new identity" }));
-    await user.type(screen.getByRole("textbox", { name: /Subject identifier \(replacement 2\)/ }), "member-1");
-    await user.click(screen.getByRole("button", { name: "Validate" }));
-    expect(await screen.findByText("This identity is already proposed as another replacement.")).toBeInTheDocument();
-    expect(calls.some((c) => c.method === "POST")).toBe(false);
-    await user.click(screen.getByRole("button", { name: "Remove replacement 2" }));
-
-    await user.type(screen.getByRole("textbox", { name: /Incident reference/ }), "INC-4411");
-    await user.type(screen.getByRole("textbox", { name: /Your justification/ }), "The only owner left the company.");
-    await user.click(screen.getByRole("combobox", { name: /Verification method \(replacement 1\)/ }));
-    await user.click(await screen.findByRole("option", { name: "Support call-back" }));
-    await user.type(screen.getByRole("textbox", { name: /Verification reference \(replacement 1\)/ }), "TICKET-9");
-    await user.click(screen.getByRole("button", { name: "Validate" }));
-    expect(await screen.findByText("Check passed — nothing was created")).toBeInTheDocument();
-    const post = calls.find((c) => c.method === "POST")!;
-    expect(post.body).toMatchObject({ replacements: [{ existingAuthorityUserId: member(1).authorityUserId, issuerUri: null, subjectIdentifier: null, verificationMethod: "SupportCallback", verificationReference: "TICKET-9" }] });
-
     await user.type(screen.getByRole("searchbox", { name: /Search members/ }), "zed");
     expect(await screen.findByText("Member 9")).toBeInTheDocument();
     expect(calls.some((c) => c.path.includes("q=zed"))).toBe(true);
     expect(screen.queryByText("Member 3")).not.toBeInTheDocument();
   }, 40_000);
+
+  it("keeps the new-identity disclosure collapsed, keyboard operable, and refuses duplicates", async () => {
+    window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
+    installFetch((c) => serve(c));
+    const user = userEvent.setup();
+    render(<App />);
+    await pick(user, 1);
+    const toggle = screen.getByRole("button", { name: "Propose a new verified identity" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Add identity" })).not.toBeInTheDocument();
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    // Equal to a selected member (case-insensitive subject).
+    await user.type(screen.getByRole("textbox", { name: /Subject identifier/ }), "MEMBER-1");
+    await user.type(screen.getByRole("textbox", { name: /Display name/ }), "Someone");
+    await user.click(screen.getByRole("button", { name: "Add identity" }));
+    expect(await screen.findByText("This identity is already selected as a replacement owner.")).toBeInTheDocument();
+    expect(within(selected()).getAllByRole("listitem")).toHaveLength(1);
+
+    // Equal to a member currently listed in the picker.
+    await user.clear(screen.getByRole("textbox", { name: /Subject identifier/ }));
+    await user.type(screen.getByRole("textbox", { name: /Subject identifier/ }), "member-2");
+    await user.click(screen.getByRole("button", { name: "Add identity" }));
+    expect(await screen.findByText("This identity is an existing member: choose it from the member list.")).toBeInTheDocument();
+
+    // A genuinely new identity is added to the same list.
+    await user.clear(screen.getByRole("textbox", { name: /Subject identifier/ }));
+    await user.type(screen.getByRole("textbox", { name: /Subject identifier/ }), "brand-new");
+    await user.click(screen.getByRole("button", { name: "Add identity" }));
+    expect(within(selected()).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(selected()).getByText("New identity")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Propose a new verified identity" })).toHaveAttribute("aria-expanded", "false");
+    // The same new identity again is a duplicate.
+    await user.click(screen.getByRole("button", { name: "Propose a new verified identity" }));
+    await user.type(screen.getByRole("textbox", { name: /Subject identifier/ }), "BRAND-NEW");
+    await user.type(screen.getByRole("textbox", { name: /Display name/ }), "Someone");
+    await user.click(screen.getByRole("button", { name: "Add identity" }));
+    expect(await screen.findByText("This identity is already selected as a replacement owner.")).toBeInTheDocument();
+  }, 60_000);
+
+  it("sends a mixed selection of two members and one new identity", async () => {
+    window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
+    const calls = installFetch((c) => serve(c));
+    const user = userEvent.setup();
+    render(<App />);
+    await pick(user, 1);
+    await pick(user, 2);
+    await addNewIdentity(user, "brand-new", "Robin New");
+    expect(within(selected()).getAllByRole("listitem")).toHaveLength(3);
+    await fillCommon(user, 3);
+    await user.click(screen.getByRole("button", { name: "Validate" }));
+    expect(await screen.findByText("Check passed — nothing was created")).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({
+      replacements: [
+        { existingAuthorityUserId: member(1).authorityUserId, issuerUri: null },
+        { existingAuthorityUserId: member(2).authorityUserId, issuerUri: null },
+        { existingAuthorityUserId: null, issuerUri: ISSUER, subjectIdentifier: "brand-new", displayNameHint: "Robin New", verificationMethod: "SupportCallback" },
+      ],
+    });
+  }, 60_000);
+
+  it("blocks Validate and Create when the selection would exceed the owner maximum", async () => {
+    window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);
+    const calls = installFetch((c) => serve(c, { activeOwnerCount: 9, maximumOwners: 10 }));
+    const user = userEvent.setup();
+    render(<App />);
+    await pick(user, 1);
+    expect(screen.queryByText(/This would exceed the organization maximum/)).not.toBeInTheDocument();
+    await pick(user, 2);
+    expect(await screen.findByText("This would exceed the organization maximum of 10 active owners.")).toBeInTheDocument();
+    expect(screen.getByText(/Organization owners: 9 of 10 · this case adds 2 → 11 of 10/)).toBeInTheDocument();
+    await fillCommon(user, 2);
+    await user.click(screen.getByRole("button", { name: "Validate" }));
+    await user.click(screen.getByRole("button", { name: "Create case" }));
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  }, 60_000);
 
   it("shows the empty state", async () => {
     window.history.replaceState(null, "", `/platform/recovery/new?organizationId=${ORG}`);

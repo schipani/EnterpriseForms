@@ -673,6 +673,99 @@ public sealed class OwnerRecoveryTests : IDisposable
         Assert.All(later.Members, m => Assert.Null(m.RecoveryRestrictionsUntil));
     }
 
+    // ---- C-107: unified selection rules and the owner limit ----
+
+    private List<Guid> AddOwners(int count, bool enabled = true)
+    {
+        var added = new List<Guid>();
+        for (var i = 0; i < count; i++)
+        {
+            var id = Guid.CreateVersion7();
+            Bind(org, id).IdentityBindingEnabled = enabled;
+            store.Edges.Add(Edge(org, ResourceTypeNames.Organization, org, OrganizationRoleNames.OrganizationOwner, ResourceTypeNames.User, id));
+            added.Add(id);
+        }
+
+        return added;
+    }
+
+    [Fact]
+    public async Task RecoveryNeverExceedsTenActiveOwnersAndCountsDeclaredUnavailableOwnersButNotDisabledOnes()
+    {
+        // Nine active owners, eight of them declared unavailable (they keep their role and stay enabled, so they count): one eligible owner.
+        var extra = AddOwners(8);
+        var declared = extra.Take(7).Append(soleOwner).Select(id => Declared(id)).ToList();
+        var refused = await Assert.ThrowsAsync<AuthorityException>(() => OpenAsync(alice, declared: declared, replacements: [NewOwner("cap-a"), NewOwner("cap-b")]));
+        Assert.Equal(AuthorityErrorCodes.OrganizationOwnerLimit, refused.ErrorCode);
+        Assert.Contains("9 active owners", refused.Detail, StringComparison.Ordinal);
+        Assert.Contains("maximum is 10", refused.Detail, StringComparison.Ordinal);
+        Assert.Empty(store.RecoveryCases); // nothing opened, nobody removed
+        var exactlyTen = await OpenAsync(alice, declared: declared, replacements: [NewOwner("cap-c")]);
+        Assert.Equal(2, exactlyTen.Case!.EligibleOwnersAfter);
+        Assert.Equal(9, Owners(org).Count);
+
+        // Disabled owners are not active: eight disabled owners leave one active owner, so three replacements fit.
+        store.RecoveryCases.Clear();
+        store.RecoverySubjects.Clear();
+        foreach (var id in extra)
+        {
+            store.Bindings.Single(b => b.AuthorityUserId == id).IdentityBindingEnabled = false;
+        }
+
+        Assert.Equal(3, (await OpenAsync(alice, replacements: [NewOwner("fit-a"), NewOwner("fit-b"), NewOwner("fit-c")])).Case!.Subjects.Count(x => x.Role == OwnerRecoverySubjectRoles.Replacement));
+    }
+
+    [Fact]
+    public async Task ServerSideRulesRefuseDuplicateIdentitiesAndMoreThanThreeReplacements()
+    {
+        var memberSubject = store.Bindings.Single(b => b.AuthorityUserId == member).IdentitySubjectIdentifier;
+        // The same existing member twice.
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => OpenAsync(alice, replacements: [ExistingOwner(member), ExistingOwner(member)])));
+        // An existing member chosen once and the same verified identity proposed as a new one (any casing).
+        Assert.Equal(AuthorityErrorCodes.OwnerRecoveryIdentityConflict, await RefusedAsync(() => OpenAsync(alice, replacements: [ExistingOwner(member), NewOwner(memberSubject.ToUpperInvariant())])));
+        Assert.Equal(AuthorityErrorCodes.OwnerRecoveryIdentityConflict, await RefusedAsync(() => OpenAsync(alice, replacements: [NewOwner(memberSubject)])));
+        // Two proposed identities that differ only in casing.
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => OpenAsync(alice, replacements: [NewOwner("dup-case-x"), NewOwner("DUP-CASE-X")])));
+        // More than three.
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => OpenAsync(alice, replacements: [NewOwner("m-1"), NewOwner("m-2"), NewOwner("m-3"), NewOwner("m-4")])));
+        Assert.Empty(store.RecoveryCases);
+        // Mixed existing members and new identities, up to three, are accepted.
+        var other = Guid.CreateVersion7();
+        Bind(org, other);
+        var mixed = await OpenAsync(alice, replacements: [ExistingOwner(member), ExistingOwner(other), NewOwner("mixed-new")]);
+        Assert.Equal(3, mixed.Case!.Subjects.Count(x => x.Role == OwnerRecoverySubjectRoles.Replacement));
+        Assert.Equal(2, mixed.Case.Subjects.Count(x => x.Role == OwnerRecoverySubjectRoles.Replacement && !x.IsNewIdentity));
+        Assert.Equal(4, mixed.Case.EligibleOwnersAfter); // one owner plus three replacements
+    }
+
+    [Fact]
+    public async Task ThePickerServesTenPerPageExcludesSelectedMembersAndReportsOwnerCapacity()
+    {
+        for (var i = 0; i < 12; i++)
+        {
+            var id = Guid.CreateVersion7();
+            Bind(org, id);
+            Hint(id, $"Person {i:00}");
+        }
+
+        var first = await MembersAsync(alice);
+        Assert.Equal(10, first.Items.Count); // the default and the maximum
+        Assert.Equal(14, first.TotalCount); // 12 + the two seeded members
+        Assert.NotNull(first.NextCursor);
+        Assert.Equal(1, first.ActiveOwnerCount);
+        Assert.Equal(OrganizationOwnerLimits.MaximumActiveOwners, first.MaximumOwners);
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => MembersAsync(alice, limit: 11)));
+        var second = await MembersAsync(alice, cursor: first.NextCursor);
+        Assert.Equal(4, second.Items.Count);
+        Assert.Empty(first.Items.Select(i => i.AuthorityUserId).Intersect(second.Items.Select(i => i.AuthorityUserId)));
+        // Already selected members are excluded server-side, so counts and paging stay accurate.
+        var chosen = first.Items.Take(2).Select(i => i.AuthorityUserId).ToList();
+        var narrowed = await Service.SearchMembersAsync(alice.Actor, org, new OwnerRecoveryMemberSearchRequest(null, null, null, chosen), Guid.CreateVersion7(), Ct);
+        Assert.Equal(12, narrowed.TotalCount);
+        Assert.DoesNotContain(narrowed.Items, i => chosen.Contains(i.AuthorityUserId));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => Service.SearchMembersAsync(alice.Actor, org, new OwnerRecoveryMemberSearchRequest(null, null, null, first.Items.Take(4).Select(i => i.AuthorityUserId).ToList()), Guid.CreateVersion7(), Ct)));
+    }
+
     private async Task<CommandPlan> PlanAsync(Guid user, SecurityCommandKind kind, ResourceKind resourceKind, Guid resourceId, object payload)
     {
         await using var scope = await store.BeginScopeAsync(Ct);

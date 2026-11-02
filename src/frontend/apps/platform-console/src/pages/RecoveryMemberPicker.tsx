@@ -1,32 +1,40 @@
 import { Button, StatusMessage, TextInput, useDebouncedValue } from "@enterpriseforms/ui";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { consoleApi, type RecoveryMemberItem } from "../api/client";
 import { describeError } from "../app/errors";
 import { formatDateTime, identitySummary } from "../app/format";
 import { useConsoleSession } from "../app/session";
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
+
+/** Case-insensitive identity comparison key: issuer plus subject. */
+export const memberIdentityKey = (issuerUri: string, subjectIdentifier: string) => `${issuerUri.trim()}|${subjectIdentifier.trim().toLowerCase()}`;
 
 export interface RecoveryMemberPickerProps {
   organizationId: string;
   /** Authority user ids already chosen as replacements. */
-  selectedUserIds: ReadonlySet<string>;
+  selectedUserIds: readonly string[];
   /** `issuer|subject` of every identity already proposed (members or new identities). */
   proposedIdentities: ReadonlySet<string>;
   /** True when no further replacement can be added. */
   full: boolean;
   onPick: (member: RecoveryMemberItem) => void;
+  /** Organization owner capacity from the Authority (active owners and the maximum). */
+  onCapacity?: (capacity: { active: number; maximum: number }) => void;
+  /** Identity keys of the members currently listed. */
+  onListed?: (keys: ReadonlySet<string>) => void;
 }
 
 /** Searchable list of the organization's enabled non-owner members (the Authority filters and pages it); the user id is used internally and never typed. */
-export function RecoveryMemberPicker({ organizationId, selectedUserIds, proposedIdentities, full, onPick }: RecoveryMemberPickerProps) {
+export function RecoveryMemberPicker({ organizationId, selectedUserIds, proposedIdentities, full, onPick, onCapacity, onListed }: RecoveryMemberPickerProps) {
   const { touch, handleError } = useConsoleSession();
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim(), 350);
+  const exclude = useMemo(() => [...selectedUserIds].sort(), [selectedUserIds]);
   const query = useInfiniteQuery({
-    queryKey: ["recovery-members", organizationId, q],
-    queryFn: ({ pageParam }) => consoleApi.recoveryMembers(organizationId, { q, cursor: pageParam, limit: PAGE_SIZE }),
+    queryKey: ["recovery-members", organizationId, q, exclude],
+    queryFn: ({ pageParam }) => consoleApi.recoveryMembers(organizationId, { q, cursor: pageParam, limit: PAGE_SIZE, exclude }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     gcTime: 0,
@@ -43,7 +51,18 @@ export function RecoveryMemberPicker({ organizationId, selectedUserIds, proposed
     }
   }, [query.isError, query.error, handleError]);
 
-  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
+  const firstPage = query.data?.pages[0];
+  const activeOwners = firstPage ? Number(firstPage.activeOwnerCount) : null;
+  const maximumOwners = firstPage ? Number(firstPage.maximumOwners) : null;
+  useEffect(() => {
+    if (activeOwners !== null && maximumOwners !== null) {
+      onCapacity?.({ active: activeOwners, maximum: maximumOwners });
+    }
+  }, [activeOwners, maximumOwners, onCapacity]);
+  useEffect(() => {
+    onListed?.(new Set(items.map((m) => memberIdentityKey(m.issuerUri, m.subjectIdentifier))));
+  }, [items, onListed]);
   const total = Number(query.data?.pages[0]?.totalCount ?? 0);
   const failure = query.isError ? describeError(query.error) : null;
   const settled = query.isSuccess && !query.isFetching;
@@ -65,6 +84,7 @@ export function RecoveryMemberPicker({ organizationId, selectedUserIds, proposed
       <p aria-live="polite" className="text-help text-muted">
         {failure ? "" : summary}
       </p>
+      {full ? <p className="text-sm font-medium">Maximum of three replacement owners reached</p> : null}
       {failure ? (
         <StatusMessage tone={failure.tone} title={failure.title}>
           {failure.message}
@@ -83,8 +103,8 @@ export function RecoveryMemberPicker({ organizationId, selectedUserIds, proposed
         <ul aria-label="Members" className="flex list-none flex-col gap-2 p-0">
           {items.map((member) => {
             const identity = identitySummary(member);
-            const chosen = selectedUserIds.has(member.authorityUserId);
-            const duplicate = !chosen && proposedIdentities.has(`${member.issuerUri}|${member.subjectIdentifier}`);
+            const chosen = selectedUserIds.includes(member.authorityUserId);
+            const duplicate = !chosen && proposedIdentities.has(memberIdentityKey(member.issuerUri, member.subjectIdentifier));
             return (
               <li key={member.authorityUserId} className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line p-3">
                 <div className="min-w-0">

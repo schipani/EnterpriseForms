@@ -64,6 +64,8 @@ export function describeError(error: unknown): ErrorView {
       return { title: "Recovery is not needed", message: "The organization still has enough enabled owners, so recovery does not apply. Nothing was changed.", tone: "warning", reload: false, retryable: false, reference };
     case "OWNER_RECOVERY_EVIDENCE_REQUIRED":
       return { title: "Evidence is required", message: "Each owner declared unavailable needs a reason, an evidence reference and an evidence summary.", tone: "danger", reload: false, retryable: false, reference };
+    case "ORGANIZATION_OWNER_LIMIT":
+      return { title: "Too many owners", message: "The organization already has the maximum number of active owners; propose fewer replacements or remove an owner first.", tone: "danger", reload: false, retryable: false, reference };
     case "OWNER_RECOVERY_IDENTITY_CONFLICT":
       return { title: "A replacement identity is not allowed", message: "A replacement owner is already linked to another person, is a Platform Operator, or is the same as a declared owner. Choose a different replacement.", tone: "danger", reload: false, retryable: false, reference };
     case "OWNER_RECOVERY_OWNER_SET_CHANGED":

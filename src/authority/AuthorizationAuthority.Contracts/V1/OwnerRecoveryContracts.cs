@@ -157,7 +157,7 @@ public sealed record OwnerRecoveryPage(IReadOnlyList<OwnerRecoveryListItem> Item
 // ---- platform plane: replacement-owner member picker (C-106) ----
 
 /// <summary>Search the organization's members who may be proposed as replacement owners (server-side filter and paging).</summary>
-public sealed record OwnerRecoveryMemberSearchRequest(string? Query, string? Cursor, int? Limit);
+public sealed record OwnerRecoveryMemberSearchRequest(string? Query, string? Cursor, int? Limit, IReadOnlyList<Guid>? ExcludeAuthorityUserIds = null);
 
 /// <summary>
 /// The minimum member metadata for choosing a replacement: the immutable user id, the verified identity and the best known name
@@ -166,7 +166,8 @@ public sealed record OwnerRecoveryMemberSearchRequest(string? Query, string? Cur
 /// </summary>
 public sealed record OwnerRecoveryMemberItem(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, string DisplayName, DateTimeOffset MemberSince);
 
-public sealed record OwnerRecoveryMemberPage(IReadOnlyList<OwnerRecoveryMemberItem> Items, int TotalCount, string? NextCursor, int Limit, Guid CorrelationId);
+/// <summary><c>ActiveOwnerCount</c> counts enabled owners (declared-unavailable owners included); <c>MaximumOwners</c> is the organization limit.</summary>
+public sealed record OwnerRecoveryMemberPage(IReadOnlyList<OwnerRecoveryMemberItem> Items, int TotalCount, string? NextCursor, int Limit, int ActiveOwnerCount, int MaximumOwners, Guid CorrelationId);
 
 // ---- business plane (enabled owners and Security Administrators of the organization) ----
 

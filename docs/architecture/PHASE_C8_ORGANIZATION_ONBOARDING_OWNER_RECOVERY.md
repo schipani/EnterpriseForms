@@ -899,3 +899,52 @@ Two harness defects found and fixed: console sign-ins from many test classes in 
 ### 18.7 Limitations
 
 The Authority knows a person's name only through a membership-request or onboarding hint, so members who joined another way appear by their identity subject. Restriction expiry is verified by unit test (clock advance) and by browser tests with the server response patched; a real 14-day expiry cannot be waited for in the stack. Production items of §17.6 remain open.
+
+
+## 19. Unified replacement-owner selection and the ten-owner limit (C-107, 2026-11-01)
+
+Owner-directed correction of the owner recovery page and a consistent organization owner cap. **The recovery security model is unchanged** (three operators with signed evidence, eligibility, waiting period, objections, add-only execution, OB-F8 and the 14-day safeguard, journal and rollback protection, Development/Testing only).
+
+### 19.1 One selection mechanism for every replacement owner (PG-075)
+
+- The new-case page has one "Replacement owners (n of 3)" section: a compact **selected list** (name, verified identity, "Existing member" / "New identity", the verification method and reference of that replacement, "Remove"), **one searchable member picker** and a collapsed "Propose a new verified identity" form that appends to the same list. There is no initial blank row and no per-owner input style. Existing members are submitted only by their immutable user id and never typed. Mixed selections are supported; three at most.
+- Picker: server-side search, **10 per page** (the Authority serves at most 10), "Load more" with the server cursor, loading/empty/error states, keyboard operable. Already selected members are sent as `exclude` (repeatable, at most three) so server paging and counts stay accurate; the browser never receives the directory. Owners, disabled members, operator identities and (for operators bound in the organization) everything else remain excluded by the Authority.
+- Capacity: the page shows "Organization owners: A of 10 · this case adds n → A+n of 10" from the picker response (`activeOwnerCount`, `maximumOwners`) and blocks Validate/Create when it would exceed the limit; clear duplicate and limit messages.
+
+### 19.2 Server-side duplicate and size rules (Authority)
+
+One verified identity once per case: the same existing member twice, an existing member's identity proposed as a new identity (any casing — also refused as already bound), or two proposed identities differing only in casing are refused; 1–3 replacements; existing members only if enabled non-owners; never an operator identity. The React checks are convenience only.
+
+### 19.3 The organization owner limit — ten ACTIVE owners (approval note)
+
+`OrganizationOwnerLimits.MaximumActiveOwners = 10` (Contracts) is the single constant. **Active owner = owner role held and membership enabled.** Counting rules, stated explicitly: disabled owners keep the role but do not count (re-enabling one is an addition and is refused at the limit); owners declared unavailable by a recovery case stay enabled and **count**; recovered owners count like any other; nobody is ever removed or disabled to make room.
+
+| Operation | Enforcement (all inside the organization-locked Authority transaction) |
+|---|---|
+| Onboarding | already 2–10 owners (same constant now) |
+| Owner-role grant | proposal refused up front; the executing grant re-checks at the final operation (`ORGANIZATION_OWNER_LIMIT`, 409) |
+| Owner re-enablement | executing command re-checks |
+| Owner recovery | at open (and dry run): active owners + replacements ≤ 10, with an actionable message; re-checked at execution |
+| Legacy fixture bootstrap | refused above 10 owners |
+
+Concurrency: grants serialize on the organization row and the revision compare-and-swap; two grants racing at nine owners produced exactly one tenth owner, the loser refused (`STALE_AUTHORIZATION_REVISION` or `ORGANIZATION_OWNER_LIMIT`) and, retried, `ORGANIZATION_OWNER_LIMIT` (real stack, repeated). **No conflict found, so no separate approval was needed**: onboarding already capped at 10, no development or test organization exceeds eight owners, and the change only refuses additions (no existing owner or edge changes). If a production organization already exceeds ten owners it is not touched; it simply cannot add more until below the limit (to be confirmed before production use).
+
+### 19.4 Contract changes (additive)
+
+Authority: `OwnerRecoveryMemberSearchRequest.ExcludeAuthorityUserIds`; `OwnerRecoveryMemberPage.ActiveOwnerCount` and `MaximumOwners`; error code `ORGANIZATION_OWNER_LIMIT`; member page size 10. Console BFF: `exclude` query parameter. Business API: unchanged (the error message map gained the new code).
+
+### 19.5 Tests (2026-11-01)
+
+| Suite | Result (2026-11-01) |
+|---|---|
+| Authority unit tests (7 new: owner limit in the command service incl. re-enable and disabled owners, recovery at the limit, server-side duplicate and three-replacement rules, 10-per-page picker with exclusion and capacity) | 312 / 312 |
+| Contract / BFF / architecture / integrity | 488 / 488, 23 / 23, 75 / 75, 34 / 34 |
+| Real stack, one combined run (recovery incl. 2 new tests, onboarding, team join, console, membership, reconciliation, people) | 61 / 61 |
+| Concurrent owner grants at the limit, repeated | 3 / 3 |
+| Vitest workspace (default command; 5 new) | 376 / 376 |
+| ESLint, tsc, build | clean |
+| Platform Console Playwright, complete suite as one run (selection model, three members one after another, blocked fourth, remove and replace, 320/768/1440 px with the picker, selected list and new-identity form open) | 36 / 36 (two earlier runs of this round failed one new spec on over-broad locators, fixed in the spec) |
+
+### 19.6 Development stack
+
+`devstack.py owner-recovery init` re-run (2026-11-01): migration and backup unchanged (no new backup, no migration); Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated only; Vault, databases, SpiceDB and Azurite untouched. Data unchanged before and after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records; no development organization is near the limit — the largest has fewer than 10 owners). No recovery case was opened. PG-075 `http://127.0.0.1:8095/platform/recovery`.

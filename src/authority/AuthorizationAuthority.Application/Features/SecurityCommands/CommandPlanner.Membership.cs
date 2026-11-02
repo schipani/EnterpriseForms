@@ -73,6 +73,11 @@ public static partial class CommandPlanner
         {
             var bindings = await EnabledUsersAsync(scope, organizationId, cancellationToken).ConfigureAwait(false);
             plan.ConsumedProposal = await RequireProposalAsync(scope, organizationId, actor, payload.ProposalId, grant ? OwnerChangeKinds.GrantOwner : OwnerChangeKinds.RevokeOwner, target.AuthorityUserId, graph, bindings, now, cancellationToken).ConfigureAwait(false);
+            if (grant)
+            {
+                RequireOwnerCapacity(graph, organizationId, bindings);
+            }
+
             if (!grant)
             {
                 RequireAnotherEnabledOwner(graph, organizationId, bindings, target.AuthorityUserId);
@@ -120,6 +125,9 @@ public static partial class CommandPlanner
                 throw new AuthorityException(AuthorityErrorCodes.MembershipStateConflict, 409, false, "a disabled member cannot become an owner");
             case OwnerChangeKinds.GrantOwner when isOwner:
                 throw new AuthorityException(AuthorityErrorCodes.RoleAlreadyHeld, 409, false, "the person is already an organization owner");
+            case OwnerChangeKinds.GrantOwner:
+                RequireOwnerCapacity(graph, organizationId, bindings);
+                break;
             case OwnerChangeKinds.RevokeOwner or OwnerChangeKinds.DisableOwner or OwnerChangeKinds.EnableOwner when !isOwner:
                 throw new AuthorityException(AuthorityErrorCodes.RoleNotHeld, 409, false, "the person is not an organization owner; this change needs no second owner");
             case OwnerChangeKinds.RevokeOwner:
@@ -179,6 +187,11 @@ public static partial class CommandPlanner
         if (graph.HasOrganizationRole(organizationId, binding.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
         {
             plan.ConsumedProposal = await RequireProposalAsync(scope, organizationId, actor, payload.ProposalId, enable ? OwnerChangeKinds.EnableOwner : OwnerChangeKinds.DisableOwner, binding.AuthorityUserId, graph, bindings, now, cancellationToken).ConfigureAwait(false);
+            if (enable)
+            {
+                RequireOwnerCapacity(graph, organizationId, bindings); // re-enabling adds an active owner
+            }
+
             if (!enable)
             {
                 RequireAnotherEnabledOwner(graph, organizationId, bindings, binding.AuthorityUserId);
@@ -318,6 +331,21 @@ public static partial class CommandPlanner
 
     private static async Task<Dictionary<Guid, IdentityBinding>> EnabledUsersAsync(IAuthorityScope scope, Guid organizationId, CancellationToken cancellationToken) =>
         (await scope.GetIdentityBindingsAsync(organizationId, cancellationToken).ConfigureAwait(false)).Where(b => b.IdentityBindingEnabled).ToDictionary(b => b.AuthorityUserId);
+
+    /// <summary>
+    /// C-107: at most <see cref="OrganizationOwnerLimits.MaximumActiveOwners"/> active owners (owner role held, membership enabled).
+    /// Runs inside the organization-locked command transaction, so concurrent grants cannot both pass; a refused command changes nothing
+    /// and nobody is removed to make room.
+    /// </summary>
+    internal static void RequireOwnerCapacity(DesiredStateGraph graph, Guid organizationId, Dictionary<Guid, IdentityBinding> enabled, int adding = 1)
+    {
+        var active = enabled.Keys.Count(user => graph.HasOrganizationRole(organizationId, user, OrganizationRoleNames.OrganizationOwner));
+        if (active + adding > OrganizationOwnerLimits.MaximumActiveOwners)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.OrganizationOwnerLimit, 409, false,
+                $"the organization has {active} active owners and the maximum is {OrganizationOwnerLimits.MaximumActiveOwners}; adding {adding} more is refused. Remove or disable an owner through the normal two-owner change first");
+        }
+    }
 
     private static void RequireAnotherEnabledOwner(DesiredStateGraph graph, Guid organizationId, Dictionary<Guid, IdentityBinding> enabled, Guid target)
     {

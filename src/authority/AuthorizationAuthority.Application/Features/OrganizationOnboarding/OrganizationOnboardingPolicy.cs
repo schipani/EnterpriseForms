@@ -1,4 +1,5 @@
 using AuthorizationAuthority.Application.Common;
+using AuthorizationAuthority.Contracts.V1;
 
 namespace AuthorizationAuthority.Application.Features.OrganizationOnboarding;
 
@@ -45,7 +46,7 @@ public sealed class OrganizationOnboardingPolicy
 {
     public const int MinimumOwners = 2;
     public const int RecommendedOwners = 3;
-    public const int MaximumOwners = 10;
+    public const int MaximumOwners = OrganizationOwnerLimits.MaximumActiveOwners;
     public const int RequiredApprovals = 2;
 
     public const int ProductionRecoveryWaitingPeriodSeconds = 259200;

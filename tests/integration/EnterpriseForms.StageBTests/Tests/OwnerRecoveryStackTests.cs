@@ -241,6 +241,121 @@ public sealed class OwnerRecoveryStackTests(StageBFixture fixture)
         Assert.False(businessRoute.IsSuccess); // there is no such business route
     }
 
+    /// <summary>An organization with <paramref name="ownerCount"/> owners and <paramref name="memberCount"/> plain members, created through the approved fixture path.</summary>
+    private async Task<(Guid OrganizationId, List<TestUser> Owners, List<TestUser> Members)> CrowdedOrganizationAsync(int ownerCount, int memberCount)
+    {
+        var organizationId = Guid.CreateVersion7();
+        var owners = Enumerable.Range(1, ownerCount).Select(i => TestUser.New("CrowdOwner" + i)).ToList();
+        var members = Enumerable.Range(1, memberCount).Select(i => TestUser.New("CrowdMember" + i)).ToList();
+        var bootstrap = await fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/organizations", new
+        {
+            organization_id = organizationId,
+            organization_display_name = "Crowded " + Suffix(),
+            identities = owners.Select(o => (object)new { authority_user_id = o.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = o.Subject, organization_roles = new[] { "organization_owner" } })
+                .Concat(members.Select(m => (object)new { authority_user_id = m.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = m.Subject, organization_roles = Array.Empty<string>() })).ToArray(),
+        });
+        Assert.True(bootstrap.IsSuccess, bootstrap.Body);
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            if ((await fixture.Authority.GateAsync(organizationId)).GetProperty("projection_gate_state").GetString() == "Ready")
+            {
+                break;
+            }
+
+            await Task.Delay(300);
+        }
+
+        foreach (var owner in owners.Take(3))
+        {
+            Assert.True((await fixture.Api.GetAsync("/api/v1/users/me", TestIdentity.UserToken(owner, organizationId))).IsSuccess);
+        }
+
+        return (organizationId, owners, members);
+    }
+
+    private static object Unavailable(TestUser owner) =>
+        new { authorityUserId = owner.AuthorityUserId, reason = "LeftOrganization", evidenceReference = "HR-LEAVER-" + owner.Subject[..Math.Min(8, owner.Subject.Length)], evidenceSummary = "HR confirms this owner left the organization" };
+
+    [Fact]
+    public async Task TheTenOwnerLimitAndTheServerSideSelectionRulesHoldThroughTheConsole()
+    {
+        await PlatformConsoleHarness.EnsureConsoleOperatorsAsync(fixture);
+        using var dana = await ConsoleSession.SignInAsync(ConsoleSubjects[0]);
+        var (organizationId, owners, members) = await CrowdedOrganizationAsync(9, 3);
+
+        // The picker reports the organization's capacity and never offers owners.
+        var picker = await dana.SendAsync(HttpMethod.Get, $"/console-api/v1/owner-recovery/organizations/{organizationId:D}/members");
+        Assert.True(picker.Status == HttpStatusCode.OK, picker.Text);
+        Assert.Equal(9, picker.Body.GetProperty("activeOwnerCount").GetInt32());
+        Assert.Equal(10, picker.Body.GetProperty("maximumOwners").GetInt32());
+        Assert.Equal(3, picker.Body.GetProperty("items").GetArrayLength());
+        // The picker's `exclude` keeps selected members out and the count accurate.
+        var excluded = await dana.SendAsync(HttpMethod.Get, $"/console-api/v1/owner-recovery/organizations/{organizationId:D}/members?exclude={members[0].AuthorityUserId:D}&exclude={members[1].AuthorityUserId:D}");
+        Assert.Equal(members[2].AuthorityUserId, Assert.Single(excluded.Body.GetProperty("items").EnumerateArray()).GetProperty("authorityUserId").GetGuid());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await dana.SendAsync(HttpMethod.Get, $"/console-api/v1/owner-recovery/organizations/{organizationId:D}/members?limit=11")).Status);
+
+        // Eight owners declared unavailable (with evidence) leave one eligible owner, but all nine stay active: two replacements would make eleven.
+        var declared = owners.Skip(1).Select(Unavailable).ToArray();
+        var tooMany = await OpenAsync(dana, organizationId, [NewOwner(TestUser.New("CapA")), NewOwner(TestUser.New("CapB"))], declared);
+        Assert.Equal("ORGANIZATION_OWNER_LIMIT", tooMany.Code);
+        Assert.Equal(HttpStatusCode.Conflict, tooMany.Status);
+        Assert.Equal(0, Count($"SELECT count(*) FROM organization_owner_recovery_cases WHERE organization_id = '{organizationId:D}';"));
+        var fits = await OpenAsync(dana, organizationId, [ExistingOwner(members[0])], declared);
+        Assert.True(fits.Status == HttpStatusCode.OK, fits.Text); // exactly ten active owners: allowed
+        var caseId = fits.Body.GetProperty("case").GetProperty("caseId").GetGuid();
+        Assert.Equal(9, Count($"SELECT count(*) FROM authority_relationship_edges WHERE organization_id = '{organizationId:D}' AND relationship_name = 'organization_owner' AND relationship_removed_on IS NULL;")); // opening grants nothing
+
+        // Selection rules are enforced by the Authority, not only the page: one member once, an existing identity is not a new one, three at most.
+        await dana.SendAsync(HttpMethod.Post, $"/console-api/v1/owner-recovery/{caseId:D}/cancel", new { expectedStatementSha256 = fits.Body.GetProperty("case").GetProperty("statementSha256").GetString(), justification = Justification });
+        var healthy = await CrowdedOrganizationAsync(1, 5);
+        var twice = await OpenAsync(dana, healthy.OrganizationId, [ExistingOwner(healthy.Members[0]), ExistingOwner(healthy.Members[0])]);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, twice.Status);
+        var asNew = await OpenAsync(dana, healthy.OrganizationId, [ExistingOwner(healthy.Members[1]), NewOwner(healthy.Members[1])]);
+        Assert.Equal("OWNER_RECOVERY_IDENTITY_CONFLICT", asNew.Code);
+        var four = await OpenAsync(dana, healthy.OrganizationId, healthy.Members.Take(4).Select(m => ExistingOwner(m)).ToArray());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, four.Status);
+        var mixed = await OpenAsync(dana, healthy.OrganizationId, [ExistingOwner(healthy.Members[0]), ExistingOwner(healthy.Members[1]), NewOwner(TestUser.New("MixedNew"))]);
+        Assert.True(mixed.Status == HttpStatusCode.OK, mixed.Text);
+        Assert.Equal(3, mixed.Body.GetProperty("case").GetProperty("subjects").EnumerateArray().Count(x => x.GetProperty("role").GetString() == "Replacement"));
+        Assert.Equal(1, Count($"SELECT count(*) FROM organization_owner_recovery_cases WHERE organization_id = '{healthy.OrganizationId:D}';"));
+    }
+
+    [Fact]
+    public async Task ConcurrentOwnerGrantsAtTheLimitProduceExactlyOneTenthOwner()
+    {
+        var (organizationId, owners, members) = await CrowdedOrganizationAsync(9, 2);
+        string Token(TestUser user) => TestIdentity.UserToken(user, organizationId);
+        async Task<Guid> ProposeAsync(TestUser target)
+        {
+            var proposal = await fixture.Api.PostAsync($"/api/v1/organization/members/{target.AuthorityUserId:D}/owner-proposals", Token(owners[0]), new { change = "GrantOwner", reason = "board decision", useDevelopmentStepUp = true });
+            Assert.True(proposal.IsSuccess, proposal.Body);
+            return proposal.Root.GetProperty("proposalId").GetGuid();
+        }
+
+        var first = await ProposeAsync(members[0]);
+        var second = await ProposeAsync(members[1]); // both proposed while there is room for one
+        Assert.True((await fixture.Api.GetAsync("/api/v1/users/me", Token(owners[1]))).IsSuccess);
+        Assert.True((await fixture.Api.GetAsync("/api/v1/users/me", Token(owners[2]))).IsSuccess);
+        var approvals = await Task.WhenAll(
+            fixture.Api.PostAsync($"/api/v1/organization/owner-proposals/{first:D}/approve", Token(owners[1]), new { reason = "second owner agrees", useDevelopmentStepUp = true }),
+            fixture.Api.PostAsync($"/api/v1/organization/owner-proposals/{second:D}/approve", Token(owners[2]), new { reason = "second owner agrees", useDevelopmentStepUp = true }));
+        Assert.Equal(1, approvals.Count(a => a.IsSuccess));
+        var refused = approvals.Single(a => !a.IsSuccess);
+        // The loser either meets the limit directly or loses the Authority's revision compare-and-swap (both refuse; neither adds an owner);
+        // retried after the winner, it must then meet the limit.
+        Assert.Contains(refused.ErrorCode, new[] { "ORGANIZATION_OWNER_LIMIT", "STALE_AUTHORIZATION_REVISION" });
+        var loserProposal = approvals[0].IsSuccess ? second : first;
+        var loserApprover = approvals[0].IsSuccess ? owners[2] : owners[1];
+        var retried = await fixture.Api.PostAsync($"/api/v1/organization/owner-proposals/{loserProposal:D}/approve", Token(loserApprover), new { reason = "retry after the other grant", useDevelopmentStepUp = true });
+        Assert.False(retried.IsSuccess, retried.Body);
+        Assert.Equal("ORGANIZATION_OWNER_LIMIT", retried.ErrorCode);
+        Assert.Equal(10, Count($"SELECT count(*) FROM authority_relationship_edges WHERE organization_id = '{organizationId:D}' AND relationship_name = 'organization_owner' AND relationship_removed_on IS NULL;"));
+        // Nobody was removed to make room, and a further proposal is refused up front.
+        Assert.Equal(9, owners.Count(o => Count($"SELECT count(*) FROM identity_bindings WHERE organization_id = '{organizationId:D}' AND authority_user_id = '{o.AuthorityUserId:D}' AND identity_binding_enabled;") == 1));
+        var more = await fixture.Api.PostAsync($"/api/v1/organization/members/{members[1].AuthorityUserId:D}/owner-proposals", Token(owners[0]), new { change = "GrantOwner", reason = "try again", useDevelopmentStepUp = true });
+        Assert.False(more.IsSuccess, more.Body);
+    }
+
     [Fact]
     public async Task OwnersAndSecurityAdministratorsSeeTheNoticeAndAnObjectionBlocksExecution()
     {

@@ -179,13 +179,16 @@ export const consoleApi = {
     }
     return request<RecoveryPage>("GET", `/owner-recovery?${params.toString()}`);
   },
-  recoveryMembers: (organizationId: string, { q, cursor, limit }: { q: string; cursor?: string | undefined; limit: number }) => {
+  recoveryMembers: (organizationId: string, { q, cursor, limit, exclude = [] }: { q: string; cursor?: string | undefined; limit: number; exclude?: readonly string[] }) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (q.trim()) {
       params.set("q", q.trim());
     }
     if (cursor) {
       params.set("cursor", cursor);
+    }
+    for (const id of exclude) {
+      params.append("exclude", id);
     }
     return request<RecoveryMemberPage>("GET", `/owner-recovery/organizations/${encodeURIComponent(organizationId)}/members?${params.toString()}`);
   },
