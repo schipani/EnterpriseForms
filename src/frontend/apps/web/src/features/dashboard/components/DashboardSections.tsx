@@ -377,7 +377,7 @@ export function FormsSection() {
               render: (row) => (
                 <span className="flex justify-end gap-3">
                   {row.canCreateRecord && row.currentVersionNumber !== null && row.currentVersionNumber !== undefined ? (
-                    <Link to="/app/forms/$formDefinitionId/records/new" params={{ formDefinitionId: row.formDefinitionId }} className="underline underline-offset-4" aria-label={`New ${row.formDefinitionName} record`}>
+                    <Link to="/app/forms/$formDefinitionId/records/new" params={{ formDefinitionId: row.formDefinitionId }} className="underline underline-offset-4" aria-label={`New record for ${row.formDefinitionName}`}>
                       New record
                     </Link>
                   ) : null}
