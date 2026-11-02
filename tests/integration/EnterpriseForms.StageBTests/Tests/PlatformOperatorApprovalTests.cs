@@ -135,7 +135,8 @@ public sealed class PlatformOperatorApprovalTests(StageBFixture fixture)
         Refused(await DecideAsync(ops[2], s, requestId), "MEMBERSHIP_REQUEST_NOT_PENDING");
 
         // The events are in the independent archive, and the closed approvals are immutable even to a direct UPDATE (trigger).
-        Assert.Equal("0", Sql("SELECT count(*) FROM platform_journal_entries WHERE archive_delivery_state <> 'Anchored';"));
+        // Anchoring is asynchronous and the query is stack-wide (other tests' entries count): wait, bounded, for the same condition.
+        await PlatformConsoleHarness.WaitAnchoredAsync(fixture);
         fixture.Stack.AuthorityRestoreSimulationSql($"UPDATE platform_operator_approvals SET approval_state_name = 'Pending', approval_closed_on = NULL, approval_closure_reason_name = NULL WHERE organization_membership_request_id = '{requestId:D}';");
         Assert.Equal("2", Sql($"SELECT count(*) FROM platform_operator_approvals WHERE organization_membership_request_id = '{requestId:D}' AND approval_state_name = 'Consumed';"));
 
