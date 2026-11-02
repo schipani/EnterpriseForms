@@ -15,6 +15,12 @@ public interface ISecurityEventArchive
     Task<ArchiveReceipt> AppendAsync(Guid organizationId, string streamName, long streamRevision, ReadOnlyMemory<byte> eventBody, byte[] expectedDigest, CancellationToken cancellationToken);
 
     Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// C8 M2 (platform journal rollback detection): the archived body at a key, or null when nothing was archived there. Never
+    /// creates anything; an unreachable archive throws <see cref="ArchiveUnavailableException"/> (callers fail closed).
+    /// </summary>
+    Task<byte[]?> ReadAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken);
 }
 
 public sealed class ArchiveUnavailableException(string detail, Exception? inner = null) : Exception(detail, inner);

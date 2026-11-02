@@ -111,6 +111,23 @@ public static class OrganizationEndpoints
             .WithSummary("Organization overview (PG-041): organization identity, member and Security Administrator counts, teams, data-protection floor and authentication status as independently computed parts (an unavailable part never fails the page). Organization owners and Security Administrators only; 403 for everyone else, without counts.")
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
+        // C-105: the organization's notice of an open owner recovery case and its objection (owners and Security Administrators; the Authority decides).
+        var recovery = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/owner-recovery").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        recovery.MapGet("/", static async Task<Ok<OwnerRecoveryNoticeResponse>> (HttpContext http, OwnerRecoveryNoticeHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handlers.GetAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("GetOwnerRecoveryNotice")
+            .WithSummary("The organization's open owner recovery case (reference, justification, proposed and declared-unavailable owners, waiting period, approval progress) for enabled owners and Security Administrators; no case for anyone else.");
+
+        recovery.MapPost("/{caseId:guid}/objections", static async Task<Ok<OwnerRecoveryObjectionResponse>> (Guid caseId, OwnerRecoveryObjectionRequest request, HttpContext http, OwnerRecoveryNoticeHandlers handlers, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await handlers.ObjectAsync(BusinessAuthentication.RequireContext(http), caseId, request, cancellationToken).ConfigureAwait(false)))
+            .WithName("ObjectToOwnerRecovery")
+            .WithSummary("Objects to the open owner recovery case (explanation, fresh step-up). Returns only after the Authority recorded it; the case then cannot be executed. 404 for anyone who is not an enabled owner or Security Administrator.")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         var users = endpoints.MapGroup(ApiVersions.V1Prefix + "/users").WithTags("Identity").WithFeatureOwner("Identity").RequireAuthorization(BusinessAuthentication.Policy);
         users.MapGet("/", static async Task<Ok<IReadOnlyList<DirectoryUserResponse>>> (HttpContext http, IBusinessStore store, CancellationToken cancellationToken) =>
             {

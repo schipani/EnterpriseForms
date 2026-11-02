@@ -4,6 +4,7 @@ using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,10 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<OrganizationAuthorizationState> OrganizationStates => Set<OrganizationAuthorizationState>();
 
     public DbSet<IdentityBinding> IdentityBindings => Set<IdentityBinding>();
+
+    public DbSet<OrganizationRoleChangeProposal> RoleChangeProposals => Set<OrganizationRoleChangeProposal>();
+
+    public DbSet<OrganizationMembershipRequest> MembershipRequests => Set<OrganizationMembershipRequest>();
 
     public DbSet<AuthorityResource> Resources => Set<AuthorityResource>();
 
@@ -62,6 +67,32 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<ProtectionCensusResult> ProtectionCensusResults => Set<ProtectionCensusResult>();
 
     public DbSet<ProtectionReconciliationAttestation> ProtectionAttestations => Set<ProtectionReconciliationAttestation>();
+
+    public DbSet<PlatformOperator> PlatformOperators => Set<PlatformOperator>();
+
+    public DbSet<PlatformOperatorChangeProposal> PlatformOperatorProposals => Set<PlatformOperatorChangeProposal>();
+
+    public DbSet<PlatformOperatorApproval> PlatformOperatorApprovals => Set<PlatformOperatorApproval>();
+
+    public DbSet<PlatformOperatorEvidenceUse> PlatformEvidenceUses => Set<PlatformOperatorEvidenceUse>();
+
+    public DbSet<PlatformJournalHead> PlatformJournalHeads => Set<PlatformJournalHead>();
+
+    public DbSet<PlatformJournalEntry> PlatformJournalEntries => Set<PlatformJournalEntry>();
+
+    public DbSet<OrganizationOnboardingRequest> OnboardingRequests => Set<OrganizationOnboardingRequest>();
+
+    public DbSet<OrganizationOnboardingOwner> OnboardingOwners => Set<OrganizationOnboardingOwner>();
+
+    public DbSet<OrganizationOnboardingApproval> OnboardingApprovals => Set<OrganizationOnboardingApproval>();
+
+    public DbSet<OrganizationOwnerRecoveryCase> OwnerRecoveryCases => Set<OrganizationOwnerRecoveryCase>();
+
+    public DbSet<OrganizationOwnerRecoverySubject> OwnerRecoverySubjects => Set<OrganizationOwnerRecoverySubject>();
+
+    public DbSet<OrganizationOwnerRecoveryApproval> OwnerRecoveryApprovals => Set<OrganizationOwnerRecoveryApproval>();
+
+    public DbSet<OrganizationRecoveredOwnerProbation> RecoveredOwnerProbations => Set<OrganizationRecoveredOwnerProbation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

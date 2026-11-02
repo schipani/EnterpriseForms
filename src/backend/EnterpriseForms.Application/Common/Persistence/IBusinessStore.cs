@@ -67,7 +67,22 @@ public interface IBusinessScope : IAsyncDisposable
     // Identity projections
     Task EnsureTenantAndUserProjectionAsync(Guid tenantId, Guid userId, string issuerUri, string subjectIdentifier, string displayName, CancellationToken cancellationToken);
 
+    /// <summary>Stamps the user's last sign-in (display only). Call after <see cref="EnsureTenantAndUserProjectionAsync"/> in the same scope.</summary>
+    Task RecordUserSignInAsync(Guid tenantId, Guid userId, DateTimeOffset signedInOn, CancellationToken cancellationToken);
+
     Task<List<User>> GetUsersAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked user of this organization (profile edits); null when the person has no business directory row yet.</summary>
+    Task<User?> FindUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Records an authenticated heartbeat atomically (insert or update); interaction time only moves forward. Informational only.</summary>
+    Task TouchPresenceAsync(Guid tenantId, Guid userId, DateTimeOffset heartbeatOn, DateTimeOffset interactionOn, CancellationToken cancellationToken);
+
+    /// <summary>Explicit sign-out: clears the heartbeat (the next heartbeat of another live session restores it).</summary>
+    Task ClearPresenceAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Presence rows of the requested users of this organization (users without a row come back with null times; other organizations' users are never returned).</summary>
+    Task<List<UserPresenceSnapshot>> GetPresenceAsync(Guid tenantId, IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 
     // FormDefinitions / FormDesigner
     /// <summary>Version may be null for a designer-created form that is not published yet (B-03).</summary>
@@ -400,3 +415,5 @@ public interface IBusinessScope : IAsyncDisposable
 
     Task CommitAsync(CancellationToken cancellationToken);
 }
+
+public sealed record UserPresenceSnapshot(Guid UserId, DateTimeOffset? LastHeartbeatOn, DateTimeOffset? LastInteractionOn);

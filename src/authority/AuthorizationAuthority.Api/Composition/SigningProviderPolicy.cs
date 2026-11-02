@@ -113,6 +113,8 @@ public sealed class UnavailableMacProvider(string reason) : IIntegrityMacProvide
     public Task<int> ProvisionKeyAsync(Guid organizationId, string keyPurpose, string providerKeyName, CancellationToken cancellationToken) => throw new IntegrityProviderUnavailableException(reason);
 
     public Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken) => Task.FromResult((false, reason));
+
+    public Task<IntegrityKeyInspection> InspectKeyAsync(string providerKeyName, CancellationToken cancellationToken) => throw new IntegrityProviderUnavailableException(reason);
 }
 
 /// <summary>Readiness = provider usable AND authority store reachable AND SpiceDB schema present AND archive reachable.</summary>

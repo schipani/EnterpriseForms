@@ -26,7 +26,7 @@ public static class BusinessRuntimeGrants
 
     private static readonly string[] ProjectionTables =
     [
-        "tenants", "users", "teams", "team_memberships", "form_definitions", "form_records", "record_shares", "record_share_fields",
+        "tenants", "users", "user_presences", "teams", "team_memberships", "form_definitions", "form_records", "record_shares", "record_share_fields",
         "form_drafts", "field_options", "option_lists", "option_list_items", "form_relationship_definitions", "form_record_relationships",
         "upload_sessions", "file_attachments", "document_processing_jobs",
         "organization_brandings", "user_ui_preferences", "organization_security_policies",

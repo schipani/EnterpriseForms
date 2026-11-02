@@ -91,6 +91,8 @@ jobs:
         run: |
           npm run generate:api-client
           git diff --exit-code -- packages/api-client/src/generated
+          npm run generate -w apps/platform-console
+          git diff --exit-code -- apps/platform-console/src/api/generated
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test

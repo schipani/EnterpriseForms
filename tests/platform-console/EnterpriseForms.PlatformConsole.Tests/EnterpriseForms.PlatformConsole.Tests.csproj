@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    C8 M2 Stage 3: Platform Console BFF tests on the real host pipeline (WebApplicationFactory). The Authority and Vault are replaced
+    by in-process fakes at the HTTP boundary; operator evidence produced by the console is verified with the Authority's own
+    PlatformOperatorEvidenceVerifier, so the wire format is checked against the real verifier. Real-stack tests (real Authority,
+    PostgreSQL, SpiceDB, Vault Transit) live in EnterpriseForms.StageBTests.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/platform-console/EnterpriseForms.PlatformConsole/EnterpriseForms.PlatformConsole.csproj" />
+    <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Application/AuthorizationAuthority.Application.csproj" />
+  </ItemGroup>
+</Project>

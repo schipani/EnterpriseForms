@@ -15,6 +15,9 @@
     <Project Path="src/authority/AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
     <Project Path="src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj" />
   </Folder>
+  <Folder Name="/src/platform-console/">
+    <Project Path="src/platform-console/EnterpriseForms.PlatformConsole/EnterpriseForms.PlatformConsole.csproj" />
+  </Folder>
   <Folder Name="/src/tools/">
     <Project Path="src/tools/EnterpriseForms.DevSeed/EnterpriseForms.DevSeed.csproj" />
   </Folder>
@@ -26,5 +29,6 @@
     <Project Path="tests/integrity/EnterpriseForms.Integrity.Tests/EnterpriseForms.Integrity.Tests.csproj" />
     <Project Path="tests/features/EnterpriseForms.Api.ContractTests/EnterpriseForms.Api.ContractTests.csproj" />
     <Project Path="tests/authority/AuthorizationAuthority.Tests/AuthorizationAuthority.Tests.csproj" />
+    <Project Path="tests/platform-console/EnterpriseForms.PlatformConsole.Tests/EnterpriseForms.PlatformConsole.Tests.csproj" />
   </Folder>
 </Solution>

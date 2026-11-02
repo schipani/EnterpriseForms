@@ -3,7 +3,9 @@ using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.FieldSearch;
+using AuthorizationAuthority.Application.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using EnterpriseForms.Integrity.Merkle;
 
@@ -39,6 +41,37 @@ public sealed class CommandPlan
     /// <summary>The policy whose search_policy_revision advances because field search policy changed under this command.</summary>
     public OrganizationProtectionPolicy? SearchPolicyToAdvance { get; set; }
 
+    /// <summary>C8 M2 (AC-7): a new two-owner proposal (its id becomes the command id) or a tracked proposal this command consumes.</summary>
+    public OrganizationRoleChangeProposal? NewProposal { get; set; }
+
+    public OrganizationRoleChangeProposal? ConsumedProposal { get; set; }
+
+    /// <summary>C8 M2 (AC-7.2): tracked bindings whose membership this command disables or re-enables, and sessions it revokes.</summary>
+    public IdentityBinding? BindingToDisable { get; set; }
+
+    public IdentityBinding? BindingToEnable { get; set; }
+
+    public List<Domain.Features.Sessions.AuthenticatedSession> SessionsToRevoke { get; } = [];
+
+    /// <summary>C8 M2 (AC-7.4): a new membership request (its id becomes the command id), stale pending ones recorded as expired, and an operator-approved request with its new binding.</summary>
+    public OrganizationMembershipRequest? NewMembershipRequest { get; set; }
+
+    public List<OrganizationMembershipRequest> ExpiredMembershipRequests { get; } = [];
+
+    /// <summary>C8 M2 (AC-7.5): the Pending request this command cancels (alone) or replaces (together with <see cref="NewMembershipRequest"/>), with who and why.</summary>
+    public OrganizationMembershipRequest? CancelledMembershipRequest { get; set; }
+
+    public Guid CancelledByAuthorityUserId { get; set; }
+
+    public string CancellationReason { get; set; } = string.Empty;
+
+    public OrganizationMembershipRequest? ApprovedMembershipRequest { get; set; }
+
+    /// <summary>C8 M2 Stage 2: pending Platform Operator approvals of a request this command moves out of Pending, closed (Invalidated) in the same transaction.</summary>
+    public List<(PlatformOperatorApproval Approval, string Reason)> InvalidatedPlatformApprovals { get; } = [];
+
+    public IdentityBinding? NewBinding { get; set; }
+
     public string NormalizedPayloadJson { get; set; } = "{}";
 }
 
@@ -56,14 +89,17 @@ public static partial class CommandPlanner
         SecurityCommandRequest request,
         DesiredStateGraph graph,
         CancellationToken cancellationToken,
-        FieldSearchApprovalGate? approvalGate = null)
+        FieldSearchApprovalGate? approvalGate = null,
+        DateTimeOffset? now = null)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return request.CommandKind switch
+        var at = now ?? DateTimeOffset.UtcNow;
+        var gate = approvalGate ?? FieldSearchApprovalGate.Unavailable;
+        var plan = request.CommandKind switch
         {
             SecurityCommandKind.RegisterTeam => await RegisterTeamAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.AddTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: true, cancellationToken).ConfigureAwait(false),
-            SecurityCommandKind.RemoveTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: false, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.AddTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: true, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RemoveTeamMember => await TeamMembershipAsync(scope, organizationId, actor, request, graph, add: false, at, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterFormDefinition => await RegisterFormDefinitionAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.UpdateFormUsers => await UpdateFormUsersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RegisterRecord => await RegisterRecordAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
@@ -80,8 +116,30 @@ public static partial class CommandPlanner
             SecurityCommandKind.UpdateFieldSearchers => await UpdateFieldSearchersAsync(scope, organizationId, actor, request, graph, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.GrantSystemRole => await SecurityAdministratorAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, appoint: true, cancellationToken).ConfigureAwait(false),
             SecurityCommandKind.RevokeSystemRole => await SecurityAdministratorAsync(scope, organizationId, actor, request, graph, approvalGate ?? FieldSearchApprovalGate.Unavailable, appoint: false, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.GrantOrganizationRole => await OrganizationRoleAsync(scope, organizationId, actor, request, graph, gate, at, grant: true, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RevokeOrganizationRole => await OrganizationRoleAsync(scope, organizationId, actor, request, graph, gate, at, grant: false, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.ProposeOrganizationOwnerChange => await ProposeOwnerChangeAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.DisableIdentityBinding => await MembershipStateAsync(scope, organizationId, actor, request, graph, gate, at, enable: false, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.EnableIdentityBinding => await MembershipStateAsync(scope, organizationId, actor, request, graph, gate, at, enable: true, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.RequestOrganizationMembership => await RequestMembershipAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.CancelOrganizationMembershipRequest => await CancelMembershipRequestAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
+            SecurityCommandKind.ReplaceOrganizationMembershipRequest => await ReplaceMembershipRequestAsync(scope, organizationId, actor, request, graph, gate, at, cancellationToken).ConfigureAwait(false),
             _ => throw new AuthorityException(AuthorityErrorCodes.CommandKindNotImplemented, 422, false, $"command kind {request.CommandKind} is not implemented in Stage A"),
         };
+
+        // C8 M2 Stage 2: a request leaving Pending (owner cancel or replace, recorded expiry) closes its pending operator approval in the same transaction.
+        if (plan.CancelledMembershipRequest is { } cancelled)
+        {
+            var reason = plan.NewMembershipRequest is null ? PlatformApprovalClosureReasons.RequestCancelled : PlatformApprovalClosureReasons.RequestReplaced;
+            plan.InvalidatedPlatformApprovals.AddRange((await PlatformApprovalLedger.PendingForRequestAsync(scope, cancelled.OrganizationMembershipRequestId, cancellationToken).ConfigureAwait(false)).Select(a => (a, reason)));
+        }
+
+        foreach (var expired in plan.ExpiredMembershipRequests)
+        {
+            plan.InvalidatedPlatformApprovals.AddRange((await PlatformApprovalLedger.PendingForRequestAsync(scope, expired.OrganizationMembershipRequestId, cancellationToken).ConfigureAwait(false)).Select(a => (a, PlatformApprovalClosureReasons.RequestExpired)));
+        }
+
+        return plan;
     }
 
     private static bool IsOrganizationAdministrator(DesiredStateGraph graph, Guid organizationId, Guid userId) =>
@@ -107,7 +165,7 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    private static async Task<CommandPlan> TeamMembershipAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, bool add, CancellationToken cancellationToken)
+    private static async Task<CommandPlan> TeamMembershipAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, bool add, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var payload = CanonicalJson.Deserialize<TeamMemberPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.Team, payload.TeamId);
@@ -116,10 +174,31 @@ public static partial class CommandPlanner
             throw AuthorityException.Forbidden("team membership changes require organization owner or system administrator");
         }
 
-        if (add && payload.MemberUserId == actor.AuthorityUserId && !graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
+        if (add && payload.MemberUserId == actor.AuthorityUserId)
         {
             // Security administration never becomes record access: a Security Administrator cannot join a team (which may own records) on their own authority.
-            throw AuthorityException.Forbidden("a Security Administrator cannot add themselves to a team");
+            // OB-F8 (C-104): neither can an organization owner. Team-owned records grant their members full owner access, and a team's records,
+            // shares and form grants can grow after someone joins, so every self-join is refused (not only teams that own records today).
+            // Another owner must add the owner (rule below), so joining always takes a second, independent person.
+            if (!graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
+            {
+                throw AuthorityException.Forbidden("a Security Administrator cannot add themselves to a team");
+            }
+
+            throw new AuthorityException(AuthorityErrorCodes.TeamJoinRequiresAnotherOwner, 403, false, "an organization owner cannot add themselves to a team; another organization owner must add them");
+        }
+
+        if (add && graph.HasOrganizationRole(organizationId, payload.MemberUserId, OrganizationRoleNames.OrganizationOwner)
+            && !graph.HasOrganizationRole(organizationId, actor.AuthorityUserId, OrganizationRoleNames.OrganizationOwner))
+        {
+            // OB-F8: adding an organization owner to a team needs a different organization owner (preferred independent authorizer), not a
+            // Security Administrator, so an owner's record access through teams always rests on a second owner's decision.
+            throw new AuthorityException(AuthorityErrorCodes.TeamJoinRequiresAnotherOwner, 403, false, "only a different organization owner can add an organization owner to a team");
+        }
+
+        if (add)
+        {
+            await RequireNotSameRecoveryAsync(scope, organizationId, actor.AuthorityUserId, payload.MemberUserId, now, cancellationToken).ConfigureAwait(false);
         }
 
         await RequireActiveResourceAsync(scope, organizationId, ResourceTypeNames.Team, payload.TeamId, cancellationToken).ConfigureAwait(false);

@@ -49,3 +49,4 @@ Not run: complete Stage B and SEC-P suites; hosted CI (runs on the pull request)
 
 FR-OBS-1: signing out of the Form Designer while it has unsaved changes leaves a blank page (the designer's navigation
 guard blocks the post-sign-out navigation). Reproduced without any rename. Not fixed here; proposed as a small follow-up.
+**Still open (C-95, 2026-10-31):** the owner asked that it be recorded as open and not fixed in C8 M2.

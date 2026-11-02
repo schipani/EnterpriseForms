@@ -55,6 +55,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My profile: display name, preferred name and job title with the revision token; verified identity shown read-only. */
+        get: operations["GetMyProfile"];
+        /** Edit my display name, preferred name and job title (revision-checked, audited). Identity, membership and roles are never writable here. */
+        put: operations["UpdateMyProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organization/members": {
         parameters: {
             query?: never;
@@ -62,10 +80,233 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** People directory (PG-050, read-only): identities the Authority has bound that have signed in (business projection, labelled), their teams, and Security Administrator badges from the Authority roster. Organization owners and Security Administrators only; 403 otherwise. Never an email key; never record content. */
+        /** People directory (PG-050, C8 M2): one server page (default 15) of the organization's people, searchable (q: name, identity, team) and filterable (role: SecurityAdministrator|None; signInStatus: SignedIn|NotRecorded|NeverSignedIn), with an opaque cursor bound to the caller and filters. Rows: business directory plus the Authority's Security Administrator roster; for Security Administrators also every enabled Authority binding (including people who never signed in). Last sign-in, teams, Security Administrator badges and per-row Security Administrator action hints. Organization owners and Security Administrators only; 403 otherwise. Never an email key; never record content. */
         get: operations["ListOrganizationMembers"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.1: grant the Designer role (one organization owner, step-up, never oneself). The Organization Owner role is granted only by approving another owner's proposal. */
+        post: operations["GrantMemberRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/roles/{roleName}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.1: revoke the Designer role (one organization owner). The Organization Owner role is revoked only through a proposal approved by another owner. */
+        post: operations["RevokeMemberRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/owner-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.1/7.2: propose GrantOwner, RevokeOwner, DisableOwner or EnableOwner. Grants nothing; another owner (not the proposer, not the person) approves within 24 hours. */
+        post: operations["ProposeOwnerChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.2: disable a member who is not an owner (one owner). Sessions are revoked at once; roles, teams and shares are kept but unusable. Refused (OWNS_RECORDS, with a count) while the person directly owns active records, and for the last enabled Security Administrator. */
+        post: operations["DisableMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.2: re-enable a disabled member who is not an owner (one owner). The kept roles, teams and shares become usable again; nothing new is granted. */
+        post: operations["EnableMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/members/{userId}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A person's directory profile (the person themselves or an organization owner of the same organization). */
+        get: operations["GetMemberProfile"];
+        /** Edit a person's display name, preferred name and job title (organization owner or the person; revision-checked, audited). Verified identity, membership and roles cannot be changed. */
+        put: operations["UpdateMemberProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presence/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Authenticated heartbeat for the signed-in user only (the identity comes from the session, never from the request). interactionAgeSeconds is how long ago the person last interacted. */
+        post: operations["PresenceHeartbeat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Presence (Available, Away, Offline, Unknown) of up to 100 people of the caller's own organization. Informational only. */
+        get: operations["QueryPresence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/membership-requests/{requestId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.5: an owner cancels a pending membership request (reason, development step-up, the digest the list showed). A cancelled request can never be approved; 409 MEMBERSHIP_REQUEST_CHANGED if it changed meanwhile. */
+        post: operations["CancelMembershipRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/membership-requests/{requestId}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.5: an owner edits a pending request (display name, initial role, reason) by replacing it: the original becomes Replaced, a new request with a new id, a fresh seven-day expiry and no carried-over approval is created. Identity cannot be changed; the response requestId is the replacement. */
+        post: operations["ReplaceMembershipRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/owner-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One server page (default 5, newest first) of owner proposals, searchable (q) and filterable by status (Pending, Approved, Rejected, Expired); opaque cursor. Owners and Security Administrators only. */
+        get: operations["ListOwnerProposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/membership-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One server page (default 5, newest first) of membership requests, searchable (q) and filterable by status; opaque cursor. Owners and Security Administrators only. */
+        get: operations["ListMembershipRequests"];
+        put?: never;
+        /** AC-7.4: an owner asks to add a person of the organization's identity provider tenant (immutable subject id, never an email). Grants nothing: two operator approvals (Development/Testing only) create the membership; the request expires after 7 days. Membership is not sign-in readiness. */
+        post: operations["RequestMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/owner-proposals/{proposalId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** AC-7.1/7.2: a second owner executes a pending proposal. The Authority re-checks the proposal (pending, unexpired, single use), that the proposer is still an enabled owner, and every role, membership, last-owner and record-ownership rule at this moment. */
+        post: operations["ApproveOwnerProposal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1433,6 +1674,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/owner-recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The organization's open owner recovery case (reference, justification, proposed and declared-unavailable owners, waiting period, approval progress) for enabled owners and Security Administrators; no case for anyone else. */
+        get: operations["GetOwnerRecoveryNotice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/owner-recovery/{caseId}/objections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Objects to the open owner recovery case (explanation, fresh step-up). Returns only after the Authority recorded it; the case then cannot be executed. 404 for anyone who is not an enabled owner or Security Administrator. */
+        post: operations["ObjectToOwnerRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -1745,6 +2020,12 @@ export interface components {
         CancelFieldProtectionDowngradeRequest: {
             changeReason: string;
         };
+        CancelMembershipRequestRequest: {
+            expectedRequestDigest: string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
         ChildRecordListResponse: {
             relationship: components["schemas"]["RelationshipDefinitionResponse"];
             items: components["schemas"]["ChildRecordSummaryResponse"][];
@@ -1813,6 +2094,14 @@ export interface components {
         CreateGroupDefinitionRequest: {
             groupKey: string;
             groupDisplayName: string;
+        };
+        CreateMembershipRequestRequest: {
+            subjectIdentifier: string;
+            displayNameHint: string;
+            initialRoleName: null | string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
         };
         CreateOptionListRequest: {
             optionListName: string;
@@ -2496,6 +2785,73 @@ export interface components {
             groupDisplayName: string;
             lifecycleStatus: string;
         };
+        MemberCommandRequest: {
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        MemberCommandResponse: {
+            /** Format: uuid */
+            commandId: string;
+            commandStatus: string;
+            /** Format: int64 */
+            authorizationRevision: number | string;
+            /** Format: uuid */
+            proposalId?: null | string;
+            /** Format: uuid */
+            requestId?: null | string;
+            /** Format: date-time */
+            expiresOn?: null | string;
+        };
+        MemberRoleChangeRequest: {
+            roleName: string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        MembershipRequestPageResponse: {
+            items: components["schemas"]["MembershipRequestResponse"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            /** Format: int32 */
+            pageStart: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            nextToken: null | string;
+            previousToken: null | string;
+        };
+        MembershipRequestResponse: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            requestedUserId: string;
+            issuerUri: string;
+            subjectIdentifier: string;
+            displayNameHint: string;
+            initialRoleName: null | string;
+            /** Format: uuid */
+            requestedByUserId: string;
+            requestedByDisplayName: string;
+            reason: string;
+            /** Format: date-time */
+            requestedOn: string;
+            /** Format: date-time */
+            expiresOn: string;
+            requestState: string;
+            /** Format: date-time */
+            decidedOn: null | string;
+            decisionReason: null | string;
+            /** @default  */
+            requestDigest: string;
+            /** Format: uuid */
+            replacesRequestId?: null | string;
+            /** Format: uuid */
+            replacedByRequestId?: null | string;
+            /** Format: date-time */
+            cancelledOn?: null | string;
+            /** @default false */
+            canChange: boolean;
+        };
         OptionListItemChange: {
             /** Format: uuid */
             optionListItemId: null | string;
@@ -2534,6 +2890,40 @@ export interface components {
             members: components["schemas"]["OrganizationMemberResponse"][];
             rolesAvailable: boolean;
             rolesUnavailableReason: null | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            totalCount: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            pageStart: number | string;
+            /**
+             * Format: int32
+             * @default 0
+             */
+            pageSize: number | string;
+            nextToken?: null | string;
+            previousToken?: null | string;
+            /** @default false */
+            includesMembersWhoNeverSignedIn: boolean;
+            /** @default  */
+            coverageStatement: string;
+            /** @default false */
+            securityAdministratorChangesOperational: boolean;
+            securityAdministratorChangesUnavailableReason?: null | string;
+            /** @default false */
+            canManageMembers: boolean;
+            /** @default false */
+            membershipCommandsOperational: boolean;
+            membershipCommandsUnavailableReason?: null | string;
+            /** @default false */
+            operatorApprovalOperational: boolean;
+            organizationIdentityIssuer?: null | string;
+            ownerProposals?: null | components["schemas"]["OwnerProposalResponse"][];
+            membershipRequests?: null | components["schemas"]["MembershipRequestResponse"][];
         };
         OrganizationMemberResponse: {
             /** Format: uuid */
@@ -2542,10 +2932,21 @@ export interface components {
             identityIssuer: string;
             identitySubject: string;
             /** Format: date-time */
-            firstSeenOn: string;
+            firstSeenOn: null | string;
             authorityRoles: string[];
             teams: components["schemas"]["DirectoryTeamResponse"][];
             isCurrentUser: boolean;
+            /** Format: date-time */
+            lastSignedInOn?: null | string;
+            /** @default NotRecorded */
+            signInStatus: string;
+            availableActions?: null | string[];
+            /** @default Enabled */
+            membershipState: string;
+            /** Format: date-time */
+            disabledOn?: null | string;
+            /** Format: date-time */
+            recoveryRestrictionsUntil?: null | string;
         };
         OrganizationOverviewAuthentication: {
             authenticationRequirementName: string;
@@ -2611,6 +3012,91 @@ export interface components {
         OverviewPartStatus: {
             available: boolean;
             unavailableReason: null | string;
+        };
+        OwnerProposalPageResponse: {
+            items: components["schemas"]["OwnerProposalResponse"][];
+            /** Format: int32 */
+            totalCount: number | string;
+            /** Format: int32 */
+            pageStart: number | string;
+            /** Format: int32 */
+            pageSize: number | string;
+            nextToken: null | string;
+            previousToken: null | string;
+        };
+        OwnerProposalRequest: {
+            change: string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        OwnerProposalResponse: {
+            /** Format: uuid */
+            proposalId: string;
+            /** Format: uuid */
+            targetUserId: string;
+            targetDisplayName: string;
+            proposedChange: string;
+            /** Format: uuid */
+            proposedByUserId: string;
+            proposedByDisplayName: string;
+            reason: string;
+            /** Format: date-time */
+            proposedOn: string;
+            /** Format: date-time */
+            expiresOn: string;
+            proposalState: string;
+            canApprove: boolean;
+        };
+        OwnerRecoveryNoticeCaseResponse: {
+            /** Format: uuid */
+            caseId: string;
+            incidentReference: string;
+            justification: string;
+            /** Format: date-time */
+            openedOn: string;
+            /** Format: date-time */
+            waitingPeriodEndsOn: string;
+            /** Format: int32 */
+            approvalsRecorded: number | string;
+            /** Format: int32 */
+            approvalsRequired: number | string;
+            subjects: components["schemas"]["OwnerRecoveryNoticeSubjectResponse"][];
+        };
+        OwnerRecoveryNoticeResponse: {
+            case: null | components["schemas"]["OwnerRecoveryNoticeCaseResponse"];
+            canObject: boolean;
+        };
+        OwnerRecoveryNoticeSubjectResponse: {
+            role: string;
+            /** Format: uuid */
+            authorityUserId: string;
+            displayName: string;
+            isNewIdentity: boolean;
+            unavailabilityReason: null | string;
+        };
+        OwnerRecoveryObjectionRequest: {
+            reason: string;
+            useDevelopmentStepUp: boolean;
+        };
+        OwnerRecoveryObjectionResponse: {
+            /** Format: uuid */
+            caseId: string;
+            state: string;
+            /** Format: date-time */
+            objectedOn: string;
+        };
+        PresenceHeartbeatRequest: {
+            /** Format: int32 */
+            interactionAgeSeconds: number | string;
+        };
+        PresenceQueryResponse: {
+            presence: components["schemas"]["UserPresenceResponse"][];
+            available: boolean;
+            /** Format: date-time */
+            asOf: string;
+            /** Format: int32 */
+            refreshAfterSeconds: number | string;
         };
         ProbeResponse: {
             probeStatus: string;
@@ -2916,6 +3402,14 @@ export interface components {
             teamName: string;
             /** Format: date-time */
             expectedModifiedOn: string;
+        };
+        ReplaceMembershipRequestRequest: {
+            expectedRequestDigest: string;
+            displayNameHint: string;
+            initialRoleName: null | string;
+            reason: string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
         };
         RequestFieldProtectionReconciliationRequest: {
             requestReason: string;
@@ -3338,6 +3832,15 @@ export interface components {
             /** Format: double */
             explicitTextScalePercent: null | number | string;
         };
+        UpdateUserProfileRequest: {
+            displayName: null | string;
+            preferredName: null | string;
+            jobTitle: null | string;
+            /** Format: int64 */
+            expectedRevision: number | string;
+            /** @default false */
+            resetDisplayName: boolean;
+        };
         UploadActivityBucketResponse: {
             bucketStartDate: string;
             /** Format: int32 */
@@ -3388,6 +3891,28 @@ export interface components {
             /** Format: int32 */
             versionNumber: null | number | string;
             scanVerdict: null | string;
+        };
+        UserPresenceResponse: {
+            /** Format: uuid */
+            userId: string;
+            state: string;
+        };
+        UserProfileResponse: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            identityDisplayName: string;
+            displayNameOverridden: boolean;
+            preferredName: null | string;
+            jobTitle: null | string;
+            /** Format: int64 */
+            profileRevision: number | string;
+            /** Format: date-time */
+            profileModifiedOn: null | string;
+            identityIssuer: string;
+            identitySubject: string;
+            isCurrentUser: boolean;
+            canEdit: boolean;
         };
         WithdrawFieldSearchRequest: {
             reason: null | string;
@@ -3461,9 +3986,69 @@ export interface operations {
             };
         };
     };
-    ListOrganizationMembers: {
+    GetMyProfile: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfileResponse"];
+                };
+            };
+        };
+    };
+    UpdateMyProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfileResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListOrganizationMembers: {
+        parameters: {
+            query?: {
+                q?: string;
+                role?: string;
+                signInStatus?: string;
+                membershipState?: string;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3486,6 +4071,426 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GrantMemberRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberRoleChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    RevokeMemberRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+                roleName: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    ProposeOwnerChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    DisableMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    EnableMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    GetMemberProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfileResponse"];
+                };
+            };
+        };
+    };
+    UpdateMemberProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfileResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PresenceHeartbeat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresenceHeartbeatRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    QueryPresence: {
+        parameters: {
+            query?: {
+                userIds?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresenceQueryResponse"];
+                };
+            };
+        };
+    };
+    CancelMembershipRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelMembershipRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReplaceMembershipRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceMembershipRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListOwnerProposals: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: string;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerProposalPageResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListMembershipRequests: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: string;
+                pageSize?: number | string;
+                continuationToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipRequestPageResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RequestMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMembershipRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
+                };
+            };
+        };
+    };
+    ApproveOwnerProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberCommandResponse"];
                 };
             };
         };
@@ -5946,6 +6951,70 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetOwnerRecoveryNotice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryNoticeResponse"];
+                };
+            };
+        };
+    };
+    ObjectToOwnerRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerRecoveryObjectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerRecoveryObjectionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

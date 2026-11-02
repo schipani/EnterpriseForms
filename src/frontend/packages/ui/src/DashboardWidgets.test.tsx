@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ColumnChart, DonutChart } from "./Charts";
+import { ColumnChart, DonutChart, axisLabelIndices } from "./Charts";
 import { KpiTile, Pager } from "./Collections";
 import { formatCalendarDate, localDateRange } from "./dates";
 
@@ -122,5 +122,28 @@ describe("date helpers", () => {
   it("formats a calendar date without shifting it across time zones", () => {
     expect(formatCalendarDate("2026-01-01", "long")).toMatch(/2026/);
     expect(formatCalendarDate("2026-01-01")).toMatch(/1/);
+  });
+});
+
+describe("axisLabelIndices", () => {
+  const days = Array.from({ length: 30 }, (_, i) => `Oct ${i + 1}`);
+
+  it("always labels the first and the last period and never places two labels closer than one step", () => {
+    for (const width of [200, 320, 600, 1200]) {
+      const indices = axisLabelIndices(days, width);
+      expect(indices[0]).toBe(0);
+      expect(indices.at(-1)).toBe(29);
+      const step = Math.ceil((6 * 7 + 16) / (width / 30));
+      for (let i = 1; i < indices.length; i++) {
+        expect(indices[i]! - indices[i - 1]!).toBeGreaterThanOrEqual(Math.min(step, 29));
+      }
+    }
+  });
+
+  it("labels every period when there is room, and about seven without a measurement", () => {
+    expect(axisLabelIndices(days.slice(0, 7), 1200)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(axisLabelIndices(days, null).length).toBeLessThanOrEqual(8);
+    expect(axisLabelIndices(["Oct 1"], 100)).toEqual([0]);
+    expect(axisLabelIndices([], 100)).toEqual([]);
   });
 });

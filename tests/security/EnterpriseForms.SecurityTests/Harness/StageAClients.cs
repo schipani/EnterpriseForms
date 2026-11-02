@@ -108,6 +108,36 @@ public sealed class AuthorityClient(string baseAddress)
 
     public Task<HttpResult> OperatorAsync(HttpMethod method, string path, object? body) => SendAsync(method, path, TestIdentity.OperatorToken(), body);
 
+    /// <summary>C8 M2: a platform-plane call with the Platform Console credential and the signed-in operator's assertion (null: no assertion).</summary>
+    public async Task<HttpResult> PlatformAsync(HttpMethod method, string path, string? operatorAssertion, object? body, string? bearer = null)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer ?? TestIdentity.PlatformConsoleToken());
+        if (operatorAssertion is not null)
+        {
+            request.Headers.Add("X-Platform-Operator-Assertion", operatorAssertion);
+        }
+
+        request.Headers.Add("X-Correlation-Id", Guid.CreateVersion7().ToString("D"));
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body, options: Json);
+        }
+
+        using var response = await http.SendAsync(request).ConfigureAwait(false);
+        var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        JsonDocument? document = null;
+        try
+        {
+            document = text.Length > 0 ? JsonDocument.Parse(text) : null;
+        }
+        catch (JsonException)
+        {
+        }
+
+        return new HttpResult(response.StatusCode, text, document);
+    }
+
     public async Task<JsonElement> GateAsync(Guid organizationId)
     {
         var result = await OperatorAsync(HttpMethod.Get, $"/internal/v1/operator/organizations/{organizationId:D}/gate", null).ConfigureAwait(false);

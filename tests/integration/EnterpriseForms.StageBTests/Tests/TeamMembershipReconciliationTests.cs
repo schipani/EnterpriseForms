@@ -1070,13 +1070,37 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
         Assert.Contains("TeamMembershipReconciler__SharedKeyBase64", ComposeStack.Run("docker", $"inspect --format \"{{{{json .Config.Env}}}}\" {worker}", 60), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The lookup limiter is a per-issuer token bucket (burst 40, refill 20/s, one bucket shared with the worker's own lookups).
+    /// Root cause of the earlier intermittent failure (C-106, measured with 120 parallel lookups after an idle period): the FIRST burst
+    /// after an idle period is admitted up to twice the burst (80), later bursts about 40 — .NET's partitioned limiter evicts idle
+    /// partitions, so a burst that starts on an evicted partition can briefly see a fresh full bucket. The old form fired exactly 80
+    /// requests and demanded a 429, which a first-after-idle burst legitimately never produces; it was neither load nor a defect that
+    /// lets requests through unboundedly. The contract proven here: (1) demand beyond the bound is answered 429 with Retry-After and a
+    /// safe body, never a failure; (2) admissions stay within 2 × burst plus the refill of the elapsed ticks (no unbounded
+    /// over-admission). Demand continues in waves of 120 until the first 429 or a deadline, so a slow machine cannot hide the limiter.
+    /// </summary>
     [Fact]
     public async Task RC27TheLiveRateLimitAnswers429WithRetryAfterAndNeverFails()
     {
+        const int burst = 40;
+        const int refillPerSecond = 20;
         var organization = Guid.CreateVersion7();
-        var results = await Task.WhenAll(Enumerable.Range(0, 80).Select(_ => LookupAsync(TestIdentity.ReconcilerToken(), organization, "team-add:" + NewKey("rc27"))));
-        Assert.Contains(results, r => r.Status == HttpStatusCode.TooManyRequests);
+        await Task.Delay(2500, Ct); // start from a refilled bucket: earlier tests and the worker share this issuer's partition
+        var results = new List<(HttpStatusCode Status, string Body, HttpResponseMessage Response)>();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var deadline = TimeSpan.FromSeconds(40);
+        while (clock.Elapsed < deadline && !results.Any(r => r.Status == HttpStatusCode.TooManyRequests))
+        {
+            results.AddRange(await Task.WhenAll(Enumerable.Range(0, 120).Select(_ => LookupAsync(TestIdentity.ReconcilerToken(), organization, "team-add:" + NewKey("rc27")))));
+        }
+
+        var elapsed = clock.Elapsed;
         Assert.All(results, r => Assert.Contains(r.Status, new[] { HttpStatusCode.OK, HttpStatusCode.TooManyRequests }));
+        var accepted = results.Count(r => r.Status == HttpStatusCode.OK);
+        var allowance = (2 * burst) + (((int)Math.Floor(elapsed.TotalSeconds) + 1) * refillPerSecond) + 5; // twice the burst, one refill per elapsed tick (+1 for a tick inside the window), five tokens for the worker
+        Assert.True(accepted <= allowance, $"the limiter admitted {accepted} lookups in {elapsed.TotalSeconds:F1}s; at most {allowance} are allowed");
+        Assert.Contains(results, r => r.Status == HttpStatusCode.TooManyRequests);
         var limited = results.First(r => r.Status == HttpStatusCode.TooManyRequests);
         Assert.True(limited.Response.Headers.RetryAfter?.Delta >= TimeSpan.FromSeconds(1));
         Assert.Contains("RATE_LIMITED", limited.Body, StringComparison.Ordinal);

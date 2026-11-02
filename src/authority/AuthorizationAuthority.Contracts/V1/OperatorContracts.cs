@@ -5,6 +5,18 @@ namespace AuthorizationAuthority.Contracts.V1;
 
 public sealed record BootstrapIdentity(Guid AuthorityUserId, string IssuerUri, string SubjectIdentifier, IReadOnlyList<string> OrganizationRoles);
 
+/// <summary>
+/// C-107: the one organization owner limit. An organization has at most this many <b>active</b> owners: holders of the owner role whose
+/// membership is enabled. Disabled owners keep their role but do not count until re-enabled (re-enabling is itself refused at the limit);
+/// owners declared unavailable by a recovery case stay enabled and therefore count; recovered owners count like any other.
+/// Enforced by the Authority inside the organization-locked transaction of every operation that adds an active owner: onboarding,
+/// the owner-role grant, owner re-enablement, owner recovery and the legacy fixture bootstrap. Nobody is ever removed to make room.
+/// </summary>
+public static class OrganizationOwnerLimits
+{
+    public const int MaximumActiveOwners = 10;
+}
+
 public static class OrganizationRoleNames
 {
     public const string OrganizationOwner = "organization_owner";

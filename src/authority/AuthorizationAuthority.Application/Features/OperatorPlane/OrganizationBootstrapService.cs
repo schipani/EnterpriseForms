@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Application.Features.OrganizationOnboarding;
 using AuthorizationAuthority.Application.Features.SecurityCommands;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Keys;
@@ -12,12 +13,20 @@ namespace AuthorizationAuthority.Application.Features.OperatorPlane;
 /// Operator-plane provisioning: organization state, independent identity bindings, organization roles and the
 /// organization's integrity key (provisioned in the provider, never exported). Stage A stands in for the production
 /// PIM/dual-control workflow; it is reachable only with the operator credential.
+/// <para>
+/// C8 onboarding (C-104, D8-60): restricted to the approved development seed and test-harness fixtures
+/// (<c>OrganizationOnboarding:LegacyOrganizationBootstrapEnabled</c>, Development/Testing only). New organizations are created through
+/// Platform Console onboarding. A repeated call for an existing organization succeeds only when it repeats the original bootstrap
+/// exactly (display name, identities and their bootstrap roles); any other input is refused <c>IDEMPOTENCY_CONFLICT</c> instead of the
+/// former false success (OB-F2). An organization id reserved by an onboarding request is refused.
+/// </para>
 /// </summary>
-public sealed class OrganizationBootstrapService(IAuthorityStore store, IIntegrityMacProvider macProvider, ISpiceDbProjection spiceDb, TimeProvider clock)
+public sealed class OrganizationBootstrapService(IAuthorityStore store, IIntegrityMacProvider macProvider, ISpiceDbProjection spiceDb, OrganizationOnboardingPolicy onboardingPolicy, TimeProvider clock)
 {
     public async Task<BootstrapOrganizationResponse> BootstrapAsync(BootstrapOrganizationRequest request, string operatorName, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        onboardingPolicy.RequireLegacyBootstrap();
         if (request.OrganizationId == Guid.Empty || request.Identities.Count == 0 || request.Identities.Count > 100)
         {
             throw AuthorityException.Invalid("organization id and 1..100 identities are required");
@@ -27,6 +36,11 @@ public sealed class OrganizationBootstrapService(IAuthorityStore store, IIntegri
         if (owners.Count == 0)
         {
             throw AuthorityException.Invalid("at least one organization_owner identity is required");
+        }
+
+        if (owners.Count > OrganizationOwnerLimits.MaximumActiveOwners)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.OrganizationOwnerLimit, 409, false, $"an organization has at most {OrganizationOwnerLimits.MaximumActiveOwners} owners");
         }
 
         foreach (var identity in request.Identities)
@@ -42,8 +56,14 @@ public sealed class OrganizationBootstrapService(IAuthorityStore store, IIntegri
         var existing = await scope.ReadOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false);
         if (existing is not null)
         {
+            await RequireSameBootstrapAsync(scope, existing, request, cancellationToken).ConfigureAwait(false);
             var key = await scope.FindKeyRegistrationAsync(request.OrganizationId, IntegrityKeyPurposes.RowIntegrityV1, cancellationToken).ConfigureAwait(false);
             return new BootstrapOrganizationResponse(existing.OrganizationId, existing.AuthorizationRevision, Guid.Empty, key?.ProviderKeyName ?? string.Empty, key?.CurrentSigningKeyVersion ?? 0, correlationId);
+        }
+
+        if (await scope.FindOnboardingRequestByOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false) is not null)
+        {
+            throw new AuthorityException(AuthorityErrorCodes.OrganizationIdReserved, 409, false, "this organization id is reserved by an onboarding request");
         }
 
         var now = clock.GetUtcNow();
@@ -167,6 +187,39 @@ public sealed class OrganizationBootstrapService(IAuthorityStore store, IIntegri
         var pending = await scope.CountPendingArchiveAsync(organizationId, Domain.Features.Journal.JournalStreamNames.Authorization, cancellationToken).ConfigureAwait(false)
                       + await scope.CountPendingArchiveAsync(organizationId, Domain.Features.Journal.JournalStreamNames.Content, cancellationToken).ConfigureAwait(false);
         return new OrganizationGateStatus(organizationId, state.AuthorizationRevision, state.ProjectionAppliedRevision, state.ContentIntegrityRevision, gate, pending, state.IntegrityQuarantineEnabled);
+    }
+
+    /// <summary>
+    /// OB-F2: an existing organization answers success only for the original bootstrap input. Compared against the Authority's own
+    /// records: the display name, the identities bound by the bootstrap and the roles recorded in the bootstrap command (later role or
+    /// membership changes by owners do not matter; the operator workload name is not part of the comparison).
+    /// </summary>
+    private static async Task RequireSameBootstrapAsync(IAuthorityScope scope, OrganizationAuthorizationState existing, BootstrapOrganizationRequest request, CancellationToken cancellationToken)
+    {
+        static AuthorityException Conflict() => new(AuthorityErrorCodes.IdempotencyConflict, 409, false, "an organization with this id already exists and was created from different input");
+        if (!string.Equals(existing.OrganizationDisplayName, request.OrganizationDisplayName, StringComparison.Ordinal) || existing.OrganizationOnboardingRequestId is not null)
+        {
+            throw Conflict();
+        }
+
+        var command = await scope.FindCommandByIdempotencyKeyAsync(existing.OrganizationId, "bootstrap:" + existing.OrganizationId.ToString("N"), cancellationToken).ConfigureAwait(false) ?? throw Conflict();
+        var recorded = CanonicalJson.Deserialize<BootstrapPayload>(System.Text.Json.JsonDocument.Parse(command.CommandPayloadJson).RootElement);
+        static string Roles(IEnumerable<string> roles) => string.Join(',', roles.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
+        var expected = recorded.Roles.ToDictionary(r => r.AuthorityUserId, r => Roles(r.OrganizationRoles));
+        if (expected.Count != request.Identities.Count)
+        {
+            throw Conflict();
+        }
+
+        foreach (var identity in request.Identities)
+        {
+            var binding = await scope.FindIdentityBindingByUserAsync(existing.OrganizationId, identity.AuthorityUserId, cancellationToken).ConfigureAwait(false);
+            if (!expected.TryGetValue(identity.AuthorityUserId, out var roles) || roles != Roles(identity.OrganizationRoles) || binding is null
+                || binding.IdentityIssuerUri != identity.IssuerUri || binding.IdentitySubjectIdentifier != identity.SubjectIdentifier)
+            {
+                throw Conflict();
+            }
+        }
     }
 
     private sealed record BootstrapRole(Guid AuthorityUserId, IReadOnlyList<string> OrganizationRoles);

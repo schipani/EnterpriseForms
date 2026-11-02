@@ -124,7 +124,7 @@ internal static class OperatorSecurityAdministratorTool
         return outcome["error_code"] is null ? 0 : 3;
     }
 
-    private static string Sign(string approverId, string privateKeyBase64, JsonObject preview)
+    internal static string Sign(string approverId, string privateKeyBase64, JsonObject preview)
     {
         using var key = ECDsa.Create();
         key.ImportPkcs8PrivateKey(Convert.FromBase64String(privateKeyBase64), out _);

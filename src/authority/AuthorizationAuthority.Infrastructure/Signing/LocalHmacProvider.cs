@@ -55,6 +55,14 @@ public sealed class LocalHmacProvider : IIntegrityMacProvider
 
     public Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken) => Task.FromResult((true, "LocalDevelopment provider (TEST ONLY; not a key custodian)"));
 
+    public Task<IntegrityKeyInspection> InspectKeyAsync(string providerKeyName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(keys.ContainsKey(providerKeyName + ":1")
+            ? new IntegrityKeyInspection(true, true, 1, "local test key")
+            : new IntegrityKeyInspection(false, false, 0, "no key under this name"));
+    }
+
     private byte[]? ResolveKey(IntegrityKeyReference reference)
     {
         if (reference.OrganizationId == Guid.Empty || !IntegrityKeyPurposes.IsAllowed(reference.KeyPurpose) || reference.KeyVersion <= 0)

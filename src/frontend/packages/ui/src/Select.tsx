@@ -6,6 +6,8 @@ export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean | undefined;
+  /** Extra content after the label in the open list only (for example a presence indicator); the closed control shows the plain label. */
+  trailing?: ReactNode;
 }
 
 export interface SelectProps {
@@ -49,6 +51,7 @@ export function Select({ label, value, onValueChange, options, placeholder = "Se
                 {options.map((option) => (
                   <RadixSelect.Item key={option.value} value={option.value} {...(option.disabled !== undefined ? { disabled: option.disabled } : {})} className="flex min-h-10 cursor-default select-none items-center rounded-control px-3 py-2 text-control text-body outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground">
                     <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
+                    {option.trailing ? <span className="ml-3">{option.trailing}</span> : null}
                     <RadixSelect.ItemIndicator className="ml-auto pl-2" aria-hidden="true">
                       <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3">
                         <path d="M3 8.5l3.2 3L13 4.5" />

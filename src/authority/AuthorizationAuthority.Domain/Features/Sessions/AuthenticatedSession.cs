@@ -38,6 +38,9 @@ public static class SessionRevocationReasons
 {
     public const string Logout = "LOGOUT";
     public const string Replaced = "REPLACED_BY_NEW_SIGN_IN";
+
+    /// <summary>AC-7.2: the identity's membership was disabled by an owner command.</summary>
+    public const string MembershipDisabled = "MEMBERSHIP_DISABLED";
 }
 
 /// <summary>Why a session does not authenticate (returned to the trusted business API only).</summary>

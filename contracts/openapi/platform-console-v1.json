@@ -1,0 +1,3977 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Enterprise Forms Platform Console (Development/Testing)",
+    "description": "Backend-for-frontend of the separately deployed Platform Console (PG-070 Operator approvals). Cookie session + CSRF; the signed-in Platform Operator is always the session's. Not part of the business API.",
+    "version": "v1"
+  },
+  "paths": {
+    "/console-api/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "ConsoleLive",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "ConsoleReady",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/console-api/v1/session/development-operators": {
+      "get": {
+        "tags": [
+          "Session"
+        ],
+        "summary": "The synthetic Platform Operators this development console can sign in (Development/Testing only).",
+        "operationId": "ListDevelopmentOperators",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevelopmentOperatorList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/session/development-login": {
+      "post": {
+        "tags": [
+          "Session"
+        ],
+        "summary": "Signs in one configured synthetic operator after the Authority confirms it is active and its registered key is its own configured key.",
+        "operationId": "DevelopmentLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevelopmentLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSessionView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/session": {
+      "get": {
+        "tags": [
+          "Session"
+        ],
+        "summary": "The current session, re-validated against the Authority registry (a suspended or removed operator's session ends here).",
+        "operationId": "GetConsoleSession",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSessionView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/session/sign-out": {
+      "post": {
+        "tags": [
+          "Session"
+        ],
+        "summary": "Ends the session on the server (a copied cookie stops working) and deletes the cookie.",
+        "operationId": "SignOut",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/console-api/v1/operator/me": {
+      "get": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "The signed-in operator's registry entry, platform permissions and the platform journal state.",
+        "operationId": "GetCurrentOperator",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorProfile"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/membership-requests": {
+      "get": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Cross-organization approval queue (15 per page by default, at most 50; opaque cursor bound to the operator and filter).",
+        "operationId": "SearchMembershipRequests",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipRequestPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}": {
+      "get": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Request details, the exact statement and its fingerprint, recorded approvals and eligibility. A sensitive disclosure: the Authority audits each view (fail closed).",
+        "operationId": "GetMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipRequestDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}/approval-status": {
+      "get": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Pending approval status (approvals recorded of required) and whether the signed-in operator can approve now.",
+        "operationId": "GetMembershipApprovalStatus",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}/approvals": {
+      "post": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "The signed-in operator's approval. First valid approval: AwaitingSecondApproval. A valid approval by a second, different operator: Approved (the Authority creates the membership).",
+        "operationId": "ApproveMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Withdraws the signed-in operator's own pending approval (never another operator's).",
+        "operationId": "WithdrawMembershipApproval",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}/membership-requests/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "OperatorApprovals"
+        ],
+        "summary": "Rejects the request with a justification; any pending approval is invalidated and nothing is granted.",
+        "operationId": "RejectMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations": {
+      "get": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-072: organizations with lifecycle and owner, Security Administrator and member counts (15 per page by default, at most 50).",
+        "operationId": "SearchOrganizations",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDirectoryPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organizations/{organizationId}": {
+      "get": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-072 details: owner identities, counts and onboarding provenance. The Authority audits each view (fail closed).",
+        "operationId": "GetOrganization",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDirectoryDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding": {
+      "get": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-074 queue: onboarding requests, newest first (15 per page by default), and the owner issuers this environment accepts.",
+        "operationId": "SearchOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-073: create an immutable onboarding request (dryRun validates only). Creating grants nothing; approvals carry each operator's own evidence.",
+        "operationId": "CreateOrganizationOnboarding",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingCreateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingCreateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}": {
+      "get": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "PG-074: the request, its frozen statement and fingerprint, owners, approvals, key custody status, activation and the operator's eligibility.",
+        "operationId": "GetOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/approvals": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "The signed-in operator's approval. The second valid approval by a different operator approves the request (key custody follows).",
+        "operationId": "ApproveOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "Withdraws the signed-in operator's own approval.",
+        "operationId": "WithdrawOrganizationOnboardingApproval",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "Rejects a request awaiting approval; nothing is created.",
+        "operationId": "RejectOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/cancel": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "Cancels an approved request before initialization; nothing is created.",
+        "operationId": "CancelOrganizationOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/organization-onboarding/{requestId}/initialize": {
+      "post": {
+        "tags": [
+          "OrganizationOnboarding"
+        ],
+        "summary": "Creates the organization, its initial owners and owner roles in one Authority transaction after verifying the custody key; usable once the first change is projected and anchored.",
+        "operationId": "InitializeOrganization",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery": {
+      "get": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "PG-075 queue: owner recovery cases, newest first (15 per page by default, at most 50), and this environment's waiting period.",
+        "operationId": "SearchOwnerRecovery",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "PG-075: open an immutable recovery case (dryRun validates only) for an organization with fewer than two eligible owners. Opening grants nothing.",
+        "operationId": "OpenOwnerRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryCreateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryCreateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/organizations/{organizationId}/members": {
+      "get": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "PG-075 member picker: members who may be proposed as replacement owners (enabled, not owners, not operator identities), at most 10 per page; `exclude` (repeatable) lists already selected members. Minimum metadata; the Authority audits each search before disclosure.",
+        "operationId": "SearchOwnerRecoveryMembers",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "exclude",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryMemberPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}": {
+      "get": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "PG-075 case: frozen statement and fingerprint, owner status, evidence, approvals, waiting period, objection and the operator's eligibility. The Authority audits each view (fail closed).",
+        "operationId": "GetOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryCaseDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}/approvals": {
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "The signed-in operator's approval; three different operators are required.",
+        "operationId": "ApproveOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "Withdraws the signed-in operator's own approval.",
+        "operationId": "WithdrawOwnerRecoveryApproval",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}/cancel": {
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "Cancels an open case; nothing is changed in the organization.",
+        "operationId": "CancelOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/console-api/v1/owner-recovery/{caseId}/execute": {
+      "post": {
+        "tags": [
+          "OwnerRecovery"
+        ],
+        "summary": "After three approvals, the waiting period and no objection: adds the replacement owners in one Authority transaction (nothing is removed or disabled).",
+        "operationId": "ExecuteOwnerRecovery",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorDecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApprovalStatusView": {
+        "required": [
+          "requestId",
+          "organizationId",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "canApprove",
+          "refusalCode",
+          "refusalDetail",
+          "statementSha256",
+          "evidenceAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "canApprove": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsoleSessionView": {
+        "required": [
+          "platformOperatorId",
+          "displayName",
+          "issuerUri",
+          "subjectIdentifier",
+          "operatorStatus",
+          "permissions",
+          "activeOperatorCount",
+          "authenticationMode",
+          "evidenceAssurance",
+          "environmentNotice",
+          "csrfToken",
+          "idleExpiresOn",
+          "absoluteExpiresOn"
+        ],
+        "type": "object",
+        "properties": {
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "operatorStatus": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "activeOperatorCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "authenticationMode": {
+            "type": "string"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "environmentNotice": {
+            "type": "string"
+          },
+          "csrfToken": {
+            "type": "string"
+          },
+          "idleExpiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "absoluteExpiresOn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DevelopmentLoginRequest": {
+        "required": [
+          "subjectIdentifier"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectIdentifier": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DevelopmentOperatorList": {
+        "required": [
+          "operators",
+          "authenticationMode",
+          "environmentNotice"
+        ],
+        "type": "object",
+        "properties": {
+          "operators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DevelopmentOperatorOption"
+            }
+          },
+          "authenticationMode": {
+            "type": "string"
+          },
+          "environmentNotice": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DevelopmentOperatorOption": {
+        "required": [
+          "subjectIdentifier",
+          "displayName",
+          "issuerUri"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "issuerUri": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "HealthView": {
+        "required": [
+          "status",
+          "dependencies"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "dependencies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "OnboardingCreateInput": {
+        "required": [
+          "idempotencyKey",
+          "organizationDisplayName",
+          "initialOwners",
+          "justification"
+        ],
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "initialOwners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnboardingOwnerInput"
+            }
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "OnboardingOwnerInput": {
+        "required": [
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "verificationMethod",
+          "verificationReference"
+        ],
+        "type": "object",
+        "properties": {
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "verificationMethod": {
+            "type": "string"
+          },
+          "verificationReference": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperatorDecisionInput": {
+        "required": [
+          "expectedStatementSha256",
+          "justification"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedStatementSha256": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationActivation": {
+        "required": [
+          "status",
+          "authorizationRevision",
+          "projectionAppliedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projectionAppliedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationDirectoryDetail": {
+        "required": [
+          "summary",
+          "authorizationRevision",
+          "projectionAppliedRevision",
+          "owners",
+          "onboardingApprovedBy",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/OrganizationDirectoryItem"
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projectionAppliedRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationDirectoryOwner"
+            }
+          },
+          "onboardingApprovedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationDirectoryItem": {
+        "required": [
+          "organizationId",
+          "organizationDisplayName",
+          "lifecycle",
+          "enabledOwnerCount",
+          "securityAdministratorCount",
+          "memberCount",
+          "needsOwners",
+          "onboardingRequestId"
+        ],
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string"
+          },
+          "enabledOwnerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "securityAdministratorCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "memberCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "needsOwners": {
+            "type": "boolean"
+          },
+          "onboardingRequestId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationDirectoryOwner": {
+        "required": [
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationDirectoryPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "filter",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationDirectoryItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "filter": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingApprovalView": {
+        "required": [
+          "approvalId",
+          "platformOperatorId",
+          "operatorDisplayName",
+          "isMine",
+          "justification",
+          "recordedOn",
+          "state",
+          "closureReason"
+        ],
+        "type": "object",
+        "properties": {
+          "approvalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operatorDisplayName": {
+            "type": "string"
+          },
+          "isMine": {
+            "type": "boolean"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "recordedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingCreateResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "warnings",
+          "request",
+          "replayed",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "request": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationOnboardingDetail"
+              }
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingDecisionResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "requestId",
+          "organizationId",
+          "decision",
+          "statementJson",
+          "statementSha256",
+          "outcome",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "state",
+          "displayState",
+          "securityCommandId",
+          "archiveState",
+          "replayed",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "securityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "archiveState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingDetail": {
+        "required": [
+          "requestId",
+          "organizationId",
+          "organizationDisplayName",
+          "identityIssuerUri",
+          "state",
+          "displayState",
+          "justification",
+          "createdByPlatformOperatorId",
+          "createdByOperatorDisplayName",
+          "createdOn",
+          "expiresOn",
+          "approvedOn",
+          "keyCustodyExpiresOn",
+          "initializedOn",
+          "closedOn",
+          "closureReason",
+          "closureJustification",
+          "lastInitializationFailureCode",
+          "lastInitializationFailureOn",
+          "owners",
+          "approvals",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "statementJson",
+          "statementSha256",
+          "keyCustody",
+          "activation",
+          "myEligibility",
+          "rowRevision",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "identityIssuerUri": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "createdByPlatformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdByOperatorDisplayName": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "keyCustodyExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "initializedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "closureJustification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastInitializationFailureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastInitializationFailureOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingOwnerView"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingApprovalView"
+            }
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "keyCustody": {
+            "$ref": "#/components/schemas/OrganizationOnboardingKeyCustody"
+          },
+          "activation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationActivation"
+              }
+            ]
+          },
+          "myEligibility": {
+            "$ref": "#/components/schemas/OrganizationOnboardingEligibility"
+          },
+          "rowRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingEligibility": {
+        "required": [
+          "canApprove",
+          "canWithdraw",
+          "canReject",
+          "canCancel",
+          "canInitialize",
+          "approveRefusalCode",
+          "approveRefusalDetail",
+          "initializeRefusalCode",
+          "initializeRefusalDetail"
+        ],
+        "type": "object",
+        "properties": {
+          "canApprove": {
+            "type": "boolean"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          },
+          "canReject": {
+            "type": "boolean"
+          },
+          "canCancel": {
+            "type": "boolean"
+          },
+          "canInitialize": {
+            "type": "boolean"
+          },
+          "approveRefusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approveRefusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initializeRefusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initializeRefusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingKeyCustody": {
+        "required": [
+          "keyName",
+          "status",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "keyName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingListItem": {
+        "required": [
+          "requestId",
+          "organizationId",
+          "organizationDisplayName",
+          "ownerCount",
+          "state",
+          "displayState",
+          "createdOn",
+          "expiresOn",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "approvedByMe",
+          "createdByOperatorDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "ownerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvedByMe": {
+            "type": "boolean"
+          },
+          "createdByOperatorDisplayName": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingOwnerView": {
+        "required": [
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "verificationMethod",
+          "verificationReference",
+          "memberOfOtherOrganizations"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "verificationMethod": {
+            "type": "string"
+          },
+          "verificationReference": {
+            "type": "string"
+          },
+          "memberOfOtherOrganizations": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrganizationOnboardingPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "status",
+          "approvedIdentityIssuers",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingListItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "approvedIdentityIssuers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryApprovalView": {
+        "required": [
+          "approvalId",
+          "platformOperatorId",
+          "operatorDisplayName",
+          "isMine",
+          "justification",
+          "recordedOn",
+          "state",
+          "closureReason"
+        ],
+        "type": "object",
+        "properties": {
+          "approvalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operatorDisplayName": {
+            "type": "string"
+          },
+          "isMine": {
+            "type": "boolean"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "recordedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryCaseDetail": {
+        "required": [
+          "caseId",
+          "organizationId",
+          "organizationDisplayName",
+          "state",
+          "displayState",
+          "incidentReference",
+          "justification",
+          "openedByPlatformOperatorId",
+          "openedByOperatorDisplayName",
+          "openedOn",
+          "waitingPeriodEndsOn",
+          "waitingPeriodRemainingSeconds",
+          "expiresOn",
+          "recoveredOn",
+          "closedOn",
+          "closureReason",
+          "closureJustification",
+          "lastExecutionFailureCode",
+          "lastExecutionFailureOn",
+          "eligibleOwnersBefore",
+          "eligibleOwnersAfter",
+          "currentOwners",
+          "subjects",
+          "approvals",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "objection",
+          "statementJson",
+          "statementSha256",
+          "activation",
+          "myEligibility",
+          "rowRevision",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "incidentReference": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "openedByPlatformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "openedByOperatorDisplayName": {
+            "type": "string"
+          },
+          "openedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waitingPeriodEndsOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waitingPeriodRemainingSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recoveredOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "closureJustification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastExecutionFailureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastExecutionFailureOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "eligibleOwnersBefore": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "eligibleOwnersAfter": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "currentOwners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryOwnerView"
+            }
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoverySubjectView"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryApprovalView"
+            }
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "objection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRecoveryObjectionView"
+              }
+            ]
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "activation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationActivation"
+              }
+            ]
+          },
+          "myEligibility": {
+            "$ref": "#/components/schemas/OwnerRecoveryEligibility"
+          },
+          "rowRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryCreateResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "warnings",
+          "case",
+          "replayed",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "case": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRecoveryCaseDetail"
+              }
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryDecisionResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "caseId",
+          "organizationId",
+          "decision",
+          "statementJson",
+          "statementSha256",
+          "outcome",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "state",
+          "displayState",
+          "securityCommandId",
+          "archiveState",
+          "replayed",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "securityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "archiveState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryEligibility": {
+        "required": [
+          "canApprove",
+          "canWithdraw",
+          "canCancel",
+          "canExecute",
+          "approveRefusalCode",
+          "approveRefusalDetail",
+          "executeRefusalCode",
+          "executeRefusalDetail"
+        ],
+        "type": "object",
+        "properties": {
+          "canApprove": {
+            "type": "boolean"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          },
+          "canCancel": {
+            "type": "boolean"
+          },
+          "canExecute": {
+            "type": "boolean"
+          },
+          "approveRefusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approveRefusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "executeRefusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "executeRefusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryListItem": {
+        "required": [
+          "caseId",
+          "organizationId",
+          "organizationDisplayName",
+          "incidentReference",
+          "state",
+          "displayState",
+          "openedOn",
+          "waitingPeriodEndsOn",
+          "expiresOn",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "approvedByMe",
+          "replacementCount",
+          "openedByOperatorDisplayName"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "incidentReference": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "displayState": {
+            "type": "string"
+          },
+          "openedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waitingPeriodEndsOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvedByMe": {
+            "type": "boolean"
+          },
+          "replacementCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "openedByOperatorDisplayName": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryMemberItem": {
+        "required": [
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayName",
+          "memberSince"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "memberSince": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryMemberPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "activeOwnerCount",
+          "maximumOwners",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryMemberItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "activeOwnerCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maximumOwners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryObjectionView": {
+        "required": [
+          "objectedOn",
+          "objectedByAuthorityUserId",
+          "objectedBySubjectIdentifier",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "objectedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "objectedByAuthorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objectedBySubjectIdentifier": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryOwnerView": {
+        "required": [
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "enabled",
+          "declaredUnavailable",
+          "activeSinceCaseOpened"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "declaredUnavailable": {
+            "type": "boolean"
+          },
+          "activeSinceCaseOpened": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoveryPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "status",
+          "waitingPeriodSeconds",
+          "approvalAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryListItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "waitingPeriodSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approvalAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnerRecoverySubjectView": {
+        "required": [
+          "role",
+          "authorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "isNewIdentity",
+          "verificationMethod",
+          "verificationReference",
+          "unavailabilityReason",
+          "evidenceReference",
+          "evidenceSummary"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "isNewIdentity": {
+            "type": "boolean"
+          },
+          "verificationMethod": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verificationReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unavailabilityReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidenceReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidenceSummary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformApprovalStatus": {
+        "required": [
+          "recorded",
+          "required",
+          "approvedByMe",
+          "awaitingOtherOperator",
+          "pendingApprovalExpiresOn"
+        ],
+        "type": "object",
+        "properties": {
+          "recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvedByMe": {
+            "type": "boolean"
+          },
+          "awaitingOtherOperator": {
+            "type": "boolean"
+          },
+          "pendingApprovalExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformApprovalView": {
+        "required": [
+          "approvalId",
+          "platformOperatorId",
+          "operatorDisplayName",
+          "operatorIdentity",
+          "recordedOn",
+          "validUntil",
+          "justification",
+          "state",
+          "closureReason",
+          "isMine"
+        ],
+        "type": "object",
+        "properties": {
+          "approvalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operatorDisplayName": {
+            "type": "string"
+          },
+          "operatorIdentity": {
+            "$ref": "#/components/schemas/PlatformIdentity"
+          },
+          "recordedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isMine": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformEligibility": {
+        "required": [
+          "canApprove",
+          "canReject",
+          "canWithdraw",
+          "refusalCode",
+          "refusalDetail"
+        ],
+        "type": "object",
+        "properties": {
+          "canApprove": {
+            "type": "boolean"
+          },
+          "canReject": {
+            "type": "boolean"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformIdentity": {
+        "required": [
+          "issuerUri",
+          "subjectIdentifier"
+        ],
+        "type": "object",
+        "properties": {
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformJournalStatus": {
+        "required": [
+          "revision",
+          "pendingArchiveEntries",
+          "quarantined",
+          "quarantineReason"
+        ],
+        "type": "object",
+        "properties": {
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "pendingArchiveEntries": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantined": {
+            "type": "boolean"
+          },
+          "quarantineReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformMembershipDecisionResponse": {
+        "required": [
+          "dryRun",
+          "eligible",
+          "refusalCode",
+          "refusalDetail",
+          "requestId",
+          "organizationId",
+          "decision",
+          "statementJson",
+          "statementSha256",
+          "outcome",
+          "approvalsRecorded",
+          "approvalsRequired",
+          "myApprovalId",
+          "securityCommandId",
+          "commandStatus",
+          "authorizationRevision",
+          "journalRevision",
+          "journalArchiveState",
+          "evidenceAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalDetail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvalsRecorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvalsRequired": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "myApprovalId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "securityCommandId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "commandStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorizationRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "journalRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "journalArchiveState": {
+            "type": "string"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformMembershipRequestDetail": {
+        "required": [
+          "request",
+          "requestReason",
+          "replacesRequestId",
+          "statementJson",
+          "statementSha256",
+          "consequences",
+          "approvals",
+          "myEligibility",
+          "evidenceAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/PlatformMembershipRequestItem"
+          },
+          "requestReason": {
+            "type": "string"
+          },
+          "replacesRequestId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "statementJson": {
+            "type": "string"
+          },
+          "statementSha256": {
+            "type": "string"
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformApprovalView"
+            }
+          },
+          "myEligibility": {
+            "$ref": "#/components/schemas/PlatformEligibility"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformMembershipRequestItem": {
+        "required": [
+          "requestId",
+          "organizationId",
+          "organizationDisplayName",
+          "displayNameHint",
+          "target",
+          "initialRoleName",
+          "requestedByAuthorityUserId",
+          "requestedBy",
+          "requestedOn",
+          "expiresOn",
+          "requestState",
+          "approvalStatus",
+          "availableActions"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationDisplayName": {
+            "type": "string"
+          },
+          "displayNameHint": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/PlatformIdentity"
+          },
+          "initialRoleName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requestedByAuthorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedBy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlatformIdentity"
+              }
+            ]
+          },
+          "requestedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestState": {
+            "type": "string"
+          },
+          "approvalStatus": {
+            "$ref": "#/components/schemas/PlatformApprovalStatus"
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformMembershipRequestPage": {
+        "required": [
+          "items",
+          "totalCount",
+          "nextCursor",
+          "limit",
+          "status",
+          "journal",
+          "evidenceAssurance",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformMembershipRequestItem"
+            }
+          },
+          "totalCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformOperatorProfile": {
+        "required": [
+          "operator",
+          "mode",
+          "evidenceAssurance",
+          "permissions",
+          "activeOperatorCount",
+          "journal",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "operator": {
+            "$ref": "#/components/schemas/PlatformOperatorSummary"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "evidenceAssurance": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "activeOperatorCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformOperatorSummary": {
+        "required": [
+          "platformOperatorId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayName",
+          "status",
+          "evidenceKind",
+          "syntheticKeyIdentifier",
+          "rowRevision",
+          "provisionedOn",
+          "statusChangedOn",
+          "statusReason"
+        ],
+        "type": "object",
+        "properties": {
+          "platformOperatorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "subjectIdentifier": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "evidenceKind": {
+            "type": "string"
+          },
+          "syntheticKeyIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rowRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "provisionedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statusChangedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statusReason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryCreateInput": {
+        "required": [
+          "idempotencyKey",
+          "organizationId",
+          "incidentReference",
+          "justification",
+          "declaredUnavailable",
+          "replacements"
+        ],
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incidentReference": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "declaredUnavailable": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RecoveryDeclaredInput"
+            }
+          },
+          "replacements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecoveryReplacementInput"
+            }
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryDeclaredInput": {
+        "required": [
+          "authorityUserId",
+          "reason",
+          "evidenceReference",
+          "evidenceSummary"
+        ],
+        "type": "object",
+        "properties": {
+          "authorityUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "evidenceReference": {
+            "type": "string"
+          },
+          "evidenceSummary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryReplacementInput": {
+        "required": [
+          "existingAuthorityUserId",
+          "issuerUri",
+          "subjectIdentifier",
+          "displayNameHint",
+          "verificationMethod",
+          "verificationReference"
+        ],
+        "type": "object",
+        "properties": {
+          "existingAuthorityUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "issuerUri": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subjectIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayNameHint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verificationMethod": {
+            "type": "string"
+          },
+          "verificationReference": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Session"
+    },
+    {
+      "name": "OperatorApprovals"
+    },
+    {
+      "name": "OrganizationOnboarding"
+    },
+    {
+      "name": "OwnerRecovery"
+    }
+  ]
+}
