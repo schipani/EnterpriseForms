@@ -43,7 +43,7 @@ test.describe("Security Administrators", () => {
     await expect(nav(page, "Organization")).toBeVisible();
     await nav(page, "Organization").click();
     await expect(page.getByRole("heading", { level: 1, name: "Organization overview" })).toBeVisible();
-    await page.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Security Administrators", exact: true }).click();
+    await page.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Security administrators", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Security Administrators" })).toBeVisible();
     await expect(table(page).getByRole("row", { name: /Sam Security.*\(you\)/ })).toBeVisible();
 
@@ -74,7 +74,7 @@ test.describe("Security Administrators", () => {
     await nav(page, "Search approvals").click();
     await expect(page.getByRole("heading", { name: /Search approvals/ }).first()).toBeVisible();
     await nav(page, "Organization").click();
-    await page.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Security Administrators", exact: true }).click();
+    await page.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Security administrators", exact: true }).click();
     await expect(table(page).getByRole("row", { name: /Casey Clerk.*\(you\)/ })).toBeVisible();
     await signOut(page);
 

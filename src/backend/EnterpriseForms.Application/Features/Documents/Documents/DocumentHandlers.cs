@@ -11,10 +11,12 @@ using EnterpriseForms.Domain.Features.Audit;
 using EnterpriseForms.Domain.Features.Documents;
 using EnterpriseForms.Domain.Features.FormRecords;
 
+using EnterpriseForms.Application.Features.SecurityOperations.Incidents;
+using EnterpriseForms.Domain.Features.SecurityOperations;
 namespace EnterpriseForms.Application.Features.Documents.Documents;
 
 /// <summary>Authorized document projection, version history, download (server-side decrypt) and removal (new content revision without the leaf).</summary>
-public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock)
+public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock, ISecurityIncidentRecorder incidents)
 {
     public async Task<IReadOnlyList<DocumentSummaryResponse>> ListAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)
     {
@@ -97,7 +99,22 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
 
         var operationId = candidateOperations[0];
         var snapshot = await stager.ReadStagedAsync(formRecordId, operationId, cancellationToken).ConfigureAwait(false);
-        var verification = await authority.VerifyRecordProjectionAsync(context.ToDelegatedUser(), new VerifyRecordProjectionRequest(context.OrganizationId, formRecordId, ProtectedAction.Read, snapshot.Items, operationId), cancellationToken).ConfigureAwait(false);
+        VerifyRecordProjectionResult verification;
+        try
+        {
+            verification = await authority.VerifyRecordProjectionAsync(context.ToDelegatedUser(), new VerifyRecordProjectionRequest(context.OrganizationId, formRecordId, ProtectedAction.Read, snapshot.Items, operationId), cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityClientException ex) when (SecurityIncidentClassifier.FromAuthorityError(ex) is not null)
+        {
+            await incidents.RecordAsync(SecurityIncidentObservation.For(context, SecurityIncidentClassifier.FromAuthorityError(ex)!, formRecordId, SecurityIncidentDetectionSources.DocumentVersionDownload, ex.ErrorCode), cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
+        if (!verification.Verified && SecurityIncidentClassifier.FromVerificationFailure(verification.FailureReasonCode) is { } incidentType)
+        {
+            await incidents.RecordAsync(SecurityIncidentObservation.For(context, incidentType, formRecordId, SecurityIncidentDetectionSources.DocumentVersionDownload, verification.FailureReasonCode ?? string.Empty, verification.CommittedContentRevision), cancellationToken).ConfigureAwait(false);
+        }
+
         if (!verification.Verified || !verification.IsCompleteProjection || verification.CommittedOperationId != operationId)
         {
             throw new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423, "historic document version failed integrity verification: " + verification.FailureReasonCode);

@@ -1,6 +1,6 @@
 import type { FieldDefinitionResponse, FieldProtectionMigrationResponse, FieldProtectionReconciliationResponse, FieldProtectionVerificationResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Checkbox, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Checkbox, legendClass, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -48,8 +48,8 @@ export function FieldSecuritySection({ dataType, classification, encryptChoice, 
   const security = resolveEncryption(dataType, classification, encryptChoice, policy);
   const encrypted = security.protectionMode === "ApplicationEncrypted";
   return (
-    <fieldset className="flex flex-col gap-3 rounded border border-line p-3">
-      <legend className="px-1 text-sm font-medium">Security &amp; Encryption</legend>
+    <fieldset className="flex flex-col gap-3 rounded-control border border-line p-3">
+      <legend className={`px-1 ${legendClass}`}>Security &amp; Encryption</legend>
       <Select label="Classification" value={classification} required options={CLASSIFICATIONS.map((value) => ({ value, label: value }))} onValueChange={onClassificationChange} helpText={dataType === "File" ? "Documents are always application-encrypted." : "Confidential and Restricted require application-level encryption. New free text defaults to Confidential."} />
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">Application-level encryption</span>
@@ -185,7 +185,7 @@ function ReconciliationSummary({ reconciliation, decrypting, canRequest, onReque
   const active = reconciliation !== null && ACTIVE_RECONCILIATION.includes(reconciliation.state);
   const reasonCode = attestation?.incompleteReason ?? reconciliation?.lastErrorCode ?? null;
   return (
-    <div className="flex flex-col gap-2 rounded border border-line bg-page p-3" role="group" aria-label="Completeness reconciliation">
+    <div className="flex flex-col gap-2 rounded-control border border-line bg-page p-3" role="group" aria-label="Completeness reconciliation">
       <div className="flex flex-wrap items-center gap-2">
         {label ? <Badge tone={label.tone}>{label.label}</Badge> : <span className="text-sm">No reconciliation yet</span>}
         {reconciliation ? <span className="text-xs text-muted">{reconciliation.mode === "VerifyOnly" ? "verify only" : "migration completion"} · requested {new Date(reconciliation.requestedOn).toLocaleString()}</span> : null}
@@ -269,14 +269,14 @@ function MigrationProgress({ migration, legacyRecords, canRetry, onRetry, retryi
   const completedRecords = Number(migration.completedRecordCount);
   const percent = Math.round((completedRecords / Math.max(totalRecords, 1)) * 100);
   return (
-    <div className="flex flex-col gap-2 rounded border border-line bg-page p-3" role="group" aria-label={`${noun} migration progress`}>
+    <div className="flex flex-col gap-2 rounded-control border border-line bg-page p-3" role="group" aria-label={`${noun} migration progress`}>
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={label.tone}>{`${noun} ${label.label}`}</Badge>
         <span className="text-xs text-muted">
           {migration.completedRecordCount} of {migration.totalRecordCount} record(s) {verb} · {migration.pendingRecordCount} pending · {migration.failedRecordCount} failed
         </span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={totalRecords} aria-valuenow={completedRecords} aria-label={`Records ${verb}`}>
+      <div className="h-2 w-full overflow-hidden rounded-control bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={totalRecords} aria-valuenow={completedRecords} aria-label={`Records ${verb}`}>
         <div className="h-2 bg-primary" style={{ width: `${percent}%` }} />
       </div>
       <p className="text-xs text-muted">
@@ -376,8 +376,8 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
   const sensitive = requiresEncryption(field.fieldClassification);
   const governanceAvailable = administrator && encrypted && !isDocuments && !migrationActive;
   return (
-    <fieldset className="flex flex-col gap-3 rounded border border-line p-3">
-      <legend className="px-1 text-sm font-medium">Security &amp; Encryption</legend>
+    <fieldset className="flex flex-col gap-3 rounded-control border border-line p-3">
+      <legend className={`px-1 ${legendClass}`}>Security &amp; Encryption</legend>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span>Classification</span>
         <Badge tone="neutral">{field.fieldClassification}</Badge>
@@ -402,7 +402,7 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         <MigrationProgress migration={migration} legacyRecords={Number(migration.migrationDirection === "Decrypt" ? status.data?.legacyEncryptedRecordCount : status.data?.legacyPlaintextRecordCount)} canRetry={migration.migrationDirection === "Decrypt" ? administrator : canEdit} onRetry={() => retry.mutate()} retrying={retry.isPending} retryError={retry.error} />
       ) : null}
       {decryptInProgress && administrator ? (
-        <div className="flex flex-col gap-2 rounded border border-line bg-page p-3" role="group" aria-label="Cancel removal of encryption">
+        <div className="flex flex-col gap-2 rounded-control border border-line bg-page p-3" role="group" aria-label="Cancel removal of encryption">
           <p className="text-xs text-muted">Cancelling re-requires encryption: values already decrypted are re-encrypted by a rollback migration. Plaintext held in historical revisions, logs, write-ahead logs or backups during the exposure window is not reversible.</p>
           <TextInput label="Reason for cancelling" value={governanceReason} required maxLength={500} onChange={(event) => setGovernanceReason(event.target.value)} />
           <div>
@@ -429,7 +429,7 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         </div>
       ) : null}
       {open ? (
-        <div className="flex flex-col gap-3 rounded border border-line bg-page p-3">
+        <div className="flex flex-col gap-3 rounded-control border border-line bg-page p-3">
           <Select label="New classification" value={target} options={higher.map((value) => ({ value, label: value }))} onValueChange={setTarget} />
           {!encrypted && !mandatory ? <Checkbox label="Switch to application-level encryption" checked={encrypt} onCheckedChange={(checked) => setEncrypt(checked === true)} /> : null}
           {!encrypted ? <p className="text-xs text-muted">Future saves are encrypted immediately. An audited background migration then re-seals the current version of every existing record; until it finishes the Edit field dialog reports how many remain. {HISTORY_NOT_MIGRATED}</p> : null}
@@ -454,7 +454,7 @@ export function CurrentProtectionSection({ formDefinitionId, field, canEdit, onS
         </div>
       ) : null}
       {governanceOpen ? (
-        <div className="flex flex-col gap-3 rounded border border-line bg-page p-3" role="group" aria-label={sensitive ? "Declassify field" : "Remove encryption"}>
+        <div className="flex flex-col gap-3 rounded-control border border-line bg-page p-3" role="group" aria-label={sensitive ? "Declassify field" : "Remove encryption"}>
           <StatusMessage tone="warning" title={sensitive ? "Step 1 of 2 — declassification" : "Governed removal of encryption"}>
             {sensitive ? `This field is ${field.fieldClassification}. One administrator declassifies it with a governance approval reference; a different administrator then removes the encryption within 24 hours. The field stays encrypted until then.` : EXPOSURE_WARNING}
           </StatusMessage>

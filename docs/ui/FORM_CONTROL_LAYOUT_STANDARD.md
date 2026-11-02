@@ -1,8 +1,8 @@
 # Form control layout standard
 
-Status: adopted for development in Phase C6 (decision C-52). It extends the ADR-PB-014 design validation standard and changes no color, token or theme rule.
+Status: adopted for development in Phase C6 (decision C-52). It extends the ADR-PB-014 design validation standard and changes no color, token or theme rule. Sizes and type scale updated by the application-wide UI consistency standard (`docs/ui/UI_CONSISTENCY_STANDARD.md`, 2026-10-30), which made the approved My Records / Advanced Search styling the default for every screen.
 
-Every labelled control in EnterpriseForms is built from the shared components in `src/frontend/packages/ui` (`TextInput`, `TextArea`, `Select`, `Checkbox`, and `FieldShell` for anything else). **Do not hand-write label, help or error markup in a feature.** A feature that needs a new kind of control wraps it in `FieldShell`.
+Every labelled control in EnterpriseForms is built from the shared components in `src/frontend/packages/ui` (`TextInput`, `TextArea`, `Select`, `Checkbox`, `RadioGroup`, and `FieldShell` for anything else). **Do not hand-write label, help or error markup in a feature.** A feature that needs a new kind of control wraps it in `FieldShell`.
 
 ## 1. The order
 
@@ -24,10 +24,25 @@ Help text is never placed between the label and the control. There is no per-scr
 
 ## 3. Sizes and spacing
 
-* Text inputs, selects and medium buttons share one height (`min-h-11`, 44 px). A small button (`size="sm"`) is for table rows and dense toolbars, **not** next to a field.
-* Label to control: `gap-1.5`. Control to its supporting text: `gap-1`. Supporting text is `text-sm`; help and notes are muted, errors are bold red.
+The values are design tokens (`packages/design-tokens/src/tokens.css`), exposed as Tailwind utilities by `apps/web/src/app/styles.css`. Use the utilities, never raw pixel values or copies of the classes.
+
+| Token / utility | Value | Used by |
+|---|---|---|
+| `--ui-control-height` / `min-h-control` | 2.5rem (40 px) | text inputs, selects, medium buttons, choice rows |
+| `--ui-control-height-compact` / `min-h-control-compact` | 2.25rem (36 px) | small buttons (table rows, dense toolbars) |
+| `--ui-control-radius` / `rounded-control` | 0.5rem (8 px) | inputs, selects, buttons, menus, tables, status messages |
+| `--ui-panel-radius` / `rounded-panel` | 0.75rem (12 px) | cards, dialogs, panels, form sections |
+| `--ui-text-control` / `text-control` | 0.875rem (14 px) | control values, button and menu labels |
+| `--ui-text-label` / `text-label` | 0.8125rem (13 px), medium | field labels, legends, checkbox and radio labels, table headers |
+| `--ui-text-help` / `text-help` | 0.75rem (12 px) | help text, notes, validation messages |
+| `--ui-danger-text` / `text-danger` | #991b1b | errors, required marker, destructive buttons |
+
+* Text inputs, selects and medium buttons share one height (`min-h-control`). A small button (`size="sm"`) is for table rows and dense toolbars, **not** next to a field. Icon-only buttons use `IconButton` (40 px, or 32 px with `size="sm"`).
+* Label to control: `gap-1.5`. Control to its supporting text: `gap-1`. Help and notes are muted `text-help`; errors are `text-help` medium in `text-danger`. A hand-written legend, help or error uses the exported `legendClass`, `helpTextClass` and `errorTextClass`; a required marker is `RequiredMarker`.
+* Cards have 20 px padding (`p-5`), 16 px between their parts (`gap-4`) and a 16 px semibold title.
 * Fields in one row share a grid with `items-start`, so labels and controls line up on one baseline each. Never use `items-end` to align a field with a button: a help text or error would push the button.
 * No arbitrary margins, negative offsets or absolute positioning to compensate for misalignment.
+* All sizes are rem-based, so the user's text-size preference (`--ui-font-scale`) and browser zoom scale them. 40 px exceeds the WCAG 2.2 AA target size (2.5.8, 24 px).
 
 ## 4. Buttons that belong to a control
 

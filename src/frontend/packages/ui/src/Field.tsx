@@ -46,14 +46,9 @@ export function FieldShell({ label, helpText, note, error, required, actions, ch
   const control = children({ inputId, describedBy, invalid: Boolean(error) });
   return (
     <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
-      <Label.Root htmlFor={inputId} className="text-sm font-medium leading-5 text-body">
+      <Label.Root htmlFor={inputId} className={fieldLabelClass}>
         {label}
-        {required ? (
-          <span className="ml-1 text-[#991b1b]" aria-hidden="true">
-            *
-          </span>
-        ) : null}
-        {required ? <span className="sr-only"> (required)</span> : null}
+        {required ? <RequiredMarker /> : null}
       </Label.Root>
       {actions ? (
         <div className="flex flex-wrap items-start gap-2">
@@ -66,17 +61,17 @@ export function FieldShell({ label, helpText, note, error, required, actions, ch
       {helpText || note || error ? (
         <div className="flex flex-col gap-1">
           {helpText ? (
-            <p id={helpId} className="text-sm text-muted">
+            <p id={helpId} className={helpTextClass}>
               {helpText}
             </p>
           ) : null}
           {note ? (
-            <p id={noteId} className="text-sm text-muted">
+            <p id={noteId} className={helpTextClass}>
               {note}
             </p>
           ) : null}
           {error ? (
-            <p id={errorId} role="alert" className="text-sm font-medium text-[#991b1b]">
+            <p id={errorId} role="alert" className={errorTextClass}>
               {error}
             </p>
           ) : null}
@@ -86,7 +81,31 @@ export function FieldShell({ label, helpText, note, error, required, actions, ch
   );
 }
 
-export const inputClass = "min-h-11 w-full rounded border border-input bg-surface px-3 py-2 text-base text-body placeholder:text-muted read-only:bg-page disabled:bg-page disabled:text-muted aria-[invalid=true]:border-[#991b1b]";
+/**
+ * Shared text styles of the field standard (docs/ui/FORM_CONTROL_LAYOUT_STANDARD.md §3). Use these for any label, legend,
+ * help text or validation message a feature cannot get from FieldShell (for example a fieldset legend), never ad-hoc sizes.
+ */
+export const fieldLabelClass = "text-label font-medium text-body";
+export const legendClass = "text-label font-medium text-body";
+export const helpTextClass = "text-help text-muted";
+export const errorTextClass = "text-help font-medium text-danger";
+
+/** The required-field marker: a decorative asterisk plus "(required)" for screen readers. */
+export function RequiredMarker() {
+  return (
+    <>
+      <span className="ml-1 text-danger" aria-hidden="true">
+        *
+      </span>
+      <span className="sr-only"> (required)</span>
+    </>
+  );
+}
+
+/** Text inputs, text areas and select triggers: one height, border, radius, type size and state treatment everywhere. */
+const controlSurfaceClass = "w-full rounded-control border border-input bg-surface px-3 py-2 text-control text-body placeholder:text-muted read-only:bg-page disabled:cursor-not-allowed disabled:bg-page disabled:text-muted aria-[invalid=true]:border-danger";
+export const inputClass = `min-h-control ${controlSurfaceClass}`;
+const textAreaClass = `min-h-24 ${controlSurfaceClass}`;
 
 export interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
   label: string;
@@ -115,7 +134,7 @@ export interface TextAreaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea({ label, helpText, note, error, required, className = "", rows = 4, ...rest }, ref) {
   return (
     <FieldShell label={label} helpText={helpText} note={note} error={error} required={required} className={className}>
-      {({ inputId, describedBy, invalid }) => <textarea ref={ref} id={inputId} rows={rows} aria-describedby={describedBy} aria-invalid={invalid || undefined} aria-required={required || undefined} className={`${inputClass} min-h-24`} {...rest} />}
+      {({ inputId, describedBy, invalid }) => <textarea ref={ref} id={inputId} rows={rows} aria-describedby={describedBy} aria-invalid={invalid || undefined} aria-required={required || undefined} className={textAreaClass} {...rest} />}
     </FieldShell>
   );
 });

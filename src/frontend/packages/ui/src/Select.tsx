@@ -34,7 +34,7 @@ export function Select({ label, value, onValueChange, options, placeholder = "Se
             id={inputId}
             aria-describedby={describedBy}
             aria-invalid={invalid || undefined}
-            className="flex min-h-11 w-full items-center justify-between gap-2 rounded border border-input bg-surface px-3 py-2 text-left text-base text-body data-[placeholder]:text-muted disabled:bg-page disabled:text-muted aria-[invalid=true]:border-[#991b1b]"
+            className="flex min-h-control w-full items-center justify-between gap-2 rounded-control border border-input bg-surface px-3 py-2 text-left text-control text-body data-[placeholder]:text-muted disabled:cursor-not-allowed disabled:bg-page disabled:text-muted aria-[invalid=true]:border-danger"
           >
             <RadixSelect.Value placeholder={placeholder} />
             <RadixSelect.Icon aria-hidden="true">
@@ -44,10 +44,10 @@ export function Select({ label, value, onValueChange, options, placeholder = "Se
             </RadixSelect.Icon>
           </RadixSelect.Trigger>
           <RadixSelect.Portal>
-            <RadixSelect.Content position="popper" sideOffset={4} className="z-50 max-h-96 min-w-[var(--radix-select-trigger-width)] overflow-auto rounded border border-input bg-surface p-1 shadow-lg">
+            <RadixSelect.Content position="popper" sideOffset={4} className="z-50 max-h-96 min-w-[var(--radix-select-trigger-width)] overflow-auto rounded-control border border-input bg-surface p-1 shadow-lg">
               <RadixSelect.Viewport>
                 {options.map((option) => (
-                  <RadixSelect.Item key={option.value} value={option.value} {...(option.disabled !== undefined ? { disabled: option.disabled } : {})} className="flex min-h-10 cursor-default select-none items-center rounded px-3 py-2 text-base text-body outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground">
+                  <RadixSelect.Item key={option.value} value={option.value} {...(option.disabled !== undefined ? { disabled: option.disabled } : {})} className="flex min-h-10 cursor-default select-none items-center rounded-control px-3 py-2 text-control text-body outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-primary data-[highlighted]:text-primary-foreground">
                     <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
                     <RadixSelect.ItemIndicator className="ml-auto pl-2" aria-hidden="true">
                       <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3">

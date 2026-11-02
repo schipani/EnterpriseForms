@@ -212,7 +212,7 @@ function RecordSummary({ data }: { data: RecordProjectionResponse }) {
 /** Stands in the Details form where the designer placed a related list or document collection; the content lives in its own section. */
 function SectionPointer({ label, detail, target, onOpen }: { label: string; detail?: string; target: string; onOpen: () => void }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-line bg-page px-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-line bg-page px-3 py-2">
       <span>
         <span className="font-medium">{label}</span>
         {detail ? <span className="text-sm text-muted"> · {detail}</span> : null}

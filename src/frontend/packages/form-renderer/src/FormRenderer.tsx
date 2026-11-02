@@ -1,4 +1,4 @@
-import { Button, Checkbox, Select, TextArea, TextInput } from "@enterpriseforms/ui";
+import { Button, Checkbox, RequiredMarker, Select, TextArea, TextInput, errorTextClass, helpTextClass, legendClass } from "@enterpriseforms/ui";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { changeInOccurrence, changeTopLevel, groupKeyFor, initialGroups, moveOccurrence, newOccurrence, occurrenceErrorKey, occurrenceRuleStates, occurrenceScopeValues, type GroupInfo, type GroupValueMap, type RepeatingSection } from "./groups";
 import type { DocumentElement, FieldElement, FormLayout, LayoutElement, LayoutSection, RelatedElement } from "./layout";
@@ -138,7 +138,7 @@ export function FormRenderer({ layout, fields, values, errors = {}, onChange, re
         }
         const cells = packElements(visible, active);
         return (
-          <fieldset key={section.sectionKey} className="min-w-0 rounded-lg border border-line bg-surface p-4">
+          <fieldset key={section.sectionKey} className="min-w-0 rounded-panel border border-line bg-surface p-5">
             <legend className="px-1 text-lg font-semibold">{section.title ?? section.sectionKey}</legend>
             {section.description ? <p className="mb-3 text-sm text-muted">{section.description}</p> : null}
             <div className={`grid ${gapClass[section.layout?.columnGap ?? "medium"]}`} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
@@ -222,7 +222,7 @@ function RepeatingSectionView({
   const canReorder = !readOnly && repeat.allowReorder && entries.length > 1;
   const sectionError = errors[groupKey];
   return (
-    <fieldset className="min-w-0 rounded-lg border border-line bg-surface p-4" data-repeating-section={groupKey} aria-describedby={sectionError ? `${headingId}-error` : undefined}>
+    <fieldset className="min-w-0 rounded-panel border border-line bg-surface p-5" data-repeating-section={groupKey} aria-describedby={sectionError ? `${headingId}-error` : undefined}>
       <legend className="px-1 text-lg font-semibold">{title}</legend>
       {section.description ? <p className="mb-3 text-sm text-muted">{section.description}</p> : null}
       {!readOnly ? (
@@ -232,7 +232,7 @@ function RepeatingSectionView({
         </p>
       ) : null}
       {sectionError ? (
-        <p id={`${headingId}-error`} role="alert" className="mb-3 text-sm font-medium text-[#991b1b]">
+        <p id={`${headingId}-error`} role="alert" className={`mb-3 ${errorTextClass}`}>
           {sectionError}
         </p>
       ) : null}
@@ -256,7 +256,7 @@ function RepeatingSectionView({
                 tabIndex={-1}
                 aria-label={`${title}, ${position}`}
                 data-entry-index={index + 1}
-                className="rounded-md border border-line p-3 focus:outline focus:outline-2 focus:outline-offset-2"
+                className="rounded-control border border-line p-3 focus:outline focus:outline-2 focus:outline-offset-2"
               >
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="m-0 text-base font-semibold">
@@ -440,27 +440,26 @@ function MultiSelectControl({ element, field, value, label, helpText, note, erro
   const describedBy = [helpText ? `${id}-help` : null, note ? `${id}-note` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   return (
     <fieldset aria-describedby={describedBy} aria-invalid={error ? true : undefined} className="flex min-w-0 flex-col gap-1 border-0 p-0">
-      <legend className="text-sm font-medium text-body">
+      <legend className={legendClass}>
         {label}
-        {required ? <span className="ml-1 text-[#991b1b]" aria-hidden="true">*</span> : null}
-        {required ? <span className="sr-only"> (required)</span> : null}
+        {required ? <RequiredMarker /> : null}
       </legend>
       {choices.length === 0 ? <p className="text-sm text-muted">No options are available.</p> : null}
       {choices.map((choice) => (
         <Checkbox key={choice.optionKey} label={choiceLabel(choice, parentLabel)} checked={selected.includes(choice.optionKey)} onCheckedChange={(checked) => toggle(choice.optionKey, checked)} />
       ))}
       {helpText ? (
-        <p id={`${id}-help`} className="text-sm text-muted">
+        <p id={`${id}-help`} className={helpTextClass}>
           {helpText}
         </p>
       ) : null}
       {note ? (
-        <p id={`${id}-note`} className="text-sm text-muted">
+        <p id={`${id}-note`} className={helpTextClass}>
           {note}
         </p>
       ) : null}
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-sm font-medium text-[#991b1b]">
+        <p id={`${id}-error`} role="alert" className={errorTextClass}>
           {error}
         </p>
       ) : null}
@@ -529,8 +528,8 @@ export function ReadOnlyValue({ label, value, helpText, encrypted, locked }: { l
     <div className="flex min-w-0 flex-col gap-1" data-readonly-field={locked ? "true" : undefined}>
       <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted">
         <span>{label}</span>
-        {locked ? <span className="rounded border border-line px-1.5 py-0.5 text-xs font-normal" title="The designer made this field read-only; its value cannot be changed here.">Read-only</span> : null}
-        {encrypted ? <span className="rounded border border-line px-1.5 py-0.5 text-xs font-normal" title="Stored application-encrypted; decrypted for you after authorization. Not searchable.">Encrypted</span> : null}
+        {locked ? <span className="rounded-control border border-line px-1.5 py-0.5 text-xs font-normal" title="The designer made this field read-only; its value cannot be changed here.">Read-only</span> : null}
+        {encrypted ? <span className="rounded-control border border-line px-1.5 py-0.5 text-xs font-normal" title="Stored application-encrypted; decrypted for you after authorization. Not searchable.">Encrypted</span> : null}
       </span>
       <span className="min-h-6 break-words text-base text-body">{value === "" ? <span className="text-muted">Not provided</span> : value}</span>
       {helpText ? <span className="text-xs text-muted">{helpText}</span> : null}

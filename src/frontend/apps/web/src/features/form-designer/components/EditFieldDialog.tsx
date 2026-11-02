@@ -21,7 +21,7 @@ function tabLabel(text: string, hasErrors: boolean) {
   return hasErrors ? (
     <span className="inline-flex items-center gap-1.5">
       {text}
-      <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-[#991b1b]" />
+      <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-danger" />
       <span className="sr-only">(has errors)</span>
     </span>
   ) : (

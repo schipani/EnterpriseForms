@@ -45,6 +45,11 @@ jobs:
           python-version: "3.12"
       - name: Build the Stage B integration test project (zero tests must never pass silently)
         run: dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release
+      # RC19 runs `dotnet ef migrations script` against the Infrastructure project in a subprocess. dotnet-ef builds with
+      # --no-restore, and the test project does not reference Infrastructure, so its project.assets.json would not exist on a
+      # fresh runner (NETSDK1004). Restore it here, with the same pinned package versions; no test or assertion is changed.
+      - name: Restore the Infrastructure project for the dotnet-ef subprocess used by RC19
+        run: dotnet restore src/backend/EnterpriseForms.Infrastructure/EnterpriseForms.Infrastructure.csproj
       - name: Start the disposable stack with Stage B services (synthetic credentials)
         uses: ./.github/actions/start-stack
         with:

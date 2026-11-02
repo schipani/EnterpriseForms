@@ -9,6 +9,7 @@ using EnterpriseForms.Api.Features.Organizations;
 using EnterpriseForms.Api.Features.Platform;
 using EnterpriseForms.Api.Features.RelatedForms;
 using EnterpriseForms.Api.Features.Search;
+using EnterpriseForms.Api.Features.SecurityOperations;
 using EnterpriseForms.Api.Features.Sharing;
 using EnterpriseForms.Api.Features.Teams;
 using EnterpriseForms.Infrastructure;
@@ -71,6 +72,9 @@ public sealed class Program
         // My Records cursors (C-29) use the host's Data Protection key ring, like the session cookie; only the API serves lists.
         builder.Services.AddSingleton<EnterpriseForms.Application.Common.IOpaqueCursorProtector, DataProtectionCursorProtector>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.ListRecords.ListRecordsHandler>();
+        // Dashboard sections and security incident lists page with the same opaque cursors (API only; the Worker serves no lists).
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Dashboard.DashboardSectionHandlers>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.SecurityOperations.Incidents.SecurityIncidentHandlers>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordHistoryHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.History.RecordRestoreHandler>();
         // Phase C7 D4: provisional field-search limits (configuration FieldSearch); a bad value fails at startup.
@@ -114,6 +118,7 @@ public sealed class Program
         app.MapDashboardEndpoints();
         app.MapOrganizationEndpoints();
         app.MapSearchEndpoints();
+        app.MapSecurityIncidentEndpoints();
         if (app.Environment.IsEnvironment("Testing"))
         {
             // Phase C7 M1: real-stack proof of the AC-5 verification path. Never mapped outside the isolated Testing stack.

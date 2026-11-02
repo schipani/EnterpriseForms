@@ -64,6 +64,14 @@ public static class AuditActions
     public const string TeamMembershipProjectionDrift = "TEAM_MEMBERSHIP_PROJECTION_DRIFT";
     public const string TeamMembershipOperationRechecked = "TEAM_MEMBERSHIP_OPERATION_RECHECKED";
     public const string TeamMembershipOperationReviewed = "TEAM_MEMBERSHIP_OPERATION_REVIEWED";
+
+    // Security monitoring (PG-056): incident triage store. Detection is recorded with the observing request's actor;
+    // investigation changes with the investigator. Never record content, values, file names or keys.
+    public const string SecurityIncidentDetected = "SECURITY_INCIDENT_DETECTED";
+    public const string SecurityIncidentViewed = "SECURITY_INCIDENT_VIEWED";
+    public const string SecurityIncidentStatusChanged = "SECURITY_INCIDENT_STATUS_CHANGED";
+    public const string SecurityIncidentAssigned = "SECURITY_INCIDENT_ASSIGNED";
+    public const string SecurityIncidentNoteAdded = "SECURITY_INCIDENT_NOTE_ADDED";
 }
 
 /// <summary>

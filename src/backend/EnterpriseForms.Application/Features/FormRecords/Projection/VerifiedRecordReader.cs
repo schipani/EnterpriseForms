@@ -9,6 +9,8 @@ using EnterpriseForms.Domain.Features.Documents;
 using EnterpriseForms.Domain.Features.FormDefinitions;
 using EnterpriseForms.Domain.Features.FormRecords;
 
+using EnterpriseForms.Application.Features.SecurityOperations.Incidents;
+using EnterpriseForms.Domain.Features.SecurityOperations;
 namespace EnterpriseForms.Application.Features.FormRecords.Projection;
 
 /// <summary>Result of a verified read: the accepted head, the authority's verification, and the exact staged rows.</summary>
@@ -87,7 +89,7 @@ public static class RecordGroupProjection
 /// authority VerifyRecordProjection (complete leaf index, every signature, root, gate, archive receipt) → release only
 /// the authorized subset. Local candidate_state, owner columns, share and link rows are never consulted.
 /// </summary>
-public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAuthorityClient authority, RecordCandidateStager stager, Encryption.IFieldEncryptionService encryption)
+public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAuthorityClient authority, RecordCandidateStager stager, Encryption.IFieldEncryptionService encryption, SecurityOperations.Incidents.ISecurityIncidentRecorder incidents)
 {
     public Task<VerifiedRecord> ReadAsync(RequestContext context, Guid formRecordId, ProtectedAction action, CancellationToken cancellationToken) =>
         ReadCoreAsync(context, formRecordId, action, null, cancellationToken);
@@ -105,7 +107,18 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
     {
         ArgumentNullException.ThrowIfNull(context);
         var user = context.ToDelegatedUser();
-        var head = await authority.GetCommittedContentRevisionAsync(user, context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+        var source = historicOperationId is null ? SecurityIncidentDetectionSources.RecordRead : SecurityIncidentDetectionSources.RecordVersionRead;
+        AcceptedContentRevision head;
+        try
+        {
+            head = await authority.GetCommittedContentRevisionAsync(user, context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityClientException ex) when (SecurityIncidentClassifier.FromAuthorityError(ex) is not null)
+        {
+            await incidents.RecordAsync(SecurityIncidentObservation.For(context, SecurityIncidentClassifier.FromAuthorityError(ex)!, formRecordId, source, ex.ErrorCode), cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
         if (head.CommittedContentRevision == 0 || head.CommittedOperationId is null)
         {
             throw new BusinessException("NO_COMMITTED_CONTENT", 404, "record has no accepted content");
@@ -113,15 +126,32 @@ public sealed class VerifiedRecordReader(IBusinessStore store, IAuthorizationAut
 
         var historic = historicOperationId is { } requested && requested != head.CommittedOperationId ? historicOperationId : null;
         var staged = await stager.ReadStagedAsync(formRecordId, historic ?? head.CommittedOperationId.Value, cancellationToken).ConfigureAwait(false);
-        var verification = await authority.VerifyRecordProjectionAsync(user, new VerifyRecordProjectionRequest(context.OrganizationId, formRecordId, action, staged.Items, historic), cancellationToken).ConfigureAwait(false);
+        VerifyRecordProjectionResult verification;
+        try
+        {
+            verification = await authority.VerifyRecordProjectionAsync(user, new VerifyRecordProjectionRequest(context.OrganizationId, formRecordId, action, staged.Items, historic), cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityClientException ex) when (SecurityIncidentClassifier.FromAuthorityError(ex) is not null)
+        {
+            await incidents.RecordAsync(SecurityIncidentObservation.For(context, SecurityIncidentClassifier.FromAuthorityError(ex)!, formRecordId, source, ex.ErrorCode, head.CommittedContentRevision), cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
         if (!verification.Verified)
         {
-            // Fail closed: nothing from the record is released (MRK-01/02/04/18). The authority has quarantined the head and journaled an incident.
+            // Fail closed: nothing from the record is released (MRK-01/02/04/18). The authority has quarantined the head and journaled an incident;
+            // the business-side triage record is written first and never changes this outcome (the recorder cannot throw).
+            if (SecurityIncidentClassifier.FromVerificationFailure(verification.FailureReasonCode) is { } incidentType)
+            {
+                await incidents.RecordAsync(SecurityIncidentObservation.For(context, incidentType, formRecordId, source, verification.FailureReasonCode ?? string.Empty, verification.CommittedContentRevision), cancellationToken).ConfigureAwait(false);
+            }
+
             throw new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423, "record content failed integrity verification: " + verification.FailureReasonCode);
         }
 
         if (staged.Header is null)
         {
+            await incidents.RecordAsync(SecurityIncidentObservation.For(context, SecurityIncidentTypes.OperationalVerificationFailure, formRecordId, source, "COMMITTED_HEADER_MISSING", verification.CommittedContentRevision), cancellationToken).ConfigureAwait(false);
             throw new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423, "committed header missing after verification");
         }
 
