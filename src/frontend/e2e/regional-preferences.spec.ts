@@ -30,7 +30,6 @@ test.describe("browser in America/Toronto", () => {
     await page.getByRole("option", { name: /Germany/ }).click();
     await expect(page.getByTestId("preview-zone")).toContainText("America/Winnipeg");
     await expect(page.getByTestId("preview-numbers")).toContainText("1.234.567,89");
-    await page.getByRole("textbox", { name: /Reason for the change/ }).fill("Head office moved to Winnipeg");
     await page.getByRole("button", { name: "Save regional defaults" }).click();
     await expect(page.getByText("Regional defaults saved")).toBeVisible();
 
@@ -57,7 +56,6 @@ test.describe("browser in America/Toronto", () => {
     await page.getByRole("option", { name: /America\/Toronto/ }).click();
     await page.getByRole("combobox", { name: /Default number format/ }).click();
     await page.getByRole("option", { name: /Canada, English/ }).click();
-    await page.getByRole("textbox", { name: /Reason for the change/ }).fill("Restore Canadian defaults");
     await page.getByRole("button", { name: "Save regional defaults" }).click();
     await expect(page.getByText("Regional defaults saved")).toBeVisible();
   });

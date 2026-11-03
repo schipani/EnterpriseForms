@@ -63,18 +63,17 @@ describe("RegionalSettingsCard", () => {
     expect(screen.getByText(/never translated automatically/)).toBeInTheDocument();
   });
 
-  it("requires a reason, then saves the five values with the revision that was read", async () => {
+  it("saves the five values with the revision that was read, without asking for a reason", async () => {
     const user = userEvent.setup();
     regional.updateSettings.mockResolvedValue({ result: { defaultCountryCode: "CA", defaultIanaTimeZoneId: "America/Toronto", defaultLanguageCode: "en", defaultDateFormatPresetKey: "iso-24h", defaultNumberFormatPresetKey: "en-ca", organizationSettingRevision: 1, isSystemDefault: false, catalogVersion: "t" } });
     renderCard();
     const save = await screen.findByRole("button", { name: "Save regional defaults" });
-    expect(save).toBeDisabled();
-    await user.type(screen.getByRole("textbox", { name: /Reason for the change/ }), "Confirm head office zone");
+    expect(screen.queryByRole("textbox", { name: /Reason/ })).not.toBeInTheDocument();
     expect(save).toBeEnabled();
     await user.click(save);
     await waitFor(() => expect(regional.updateSettings).toHaveBeenCalled());
     expect(regional.updateSettings).toHaveBeenCalledWith(
-      { defaultCountryCode: "CA", defaultIanaTimeZoneId: "America/Toronto", defaultLanguageCode: "en", defaultDateFormatPresetKey: "iso-24h", defaultNumberFormatPresetKey: "en-ca", changeReason: "Confirm head office zone" },
+      { defaultCountryCode: "CA", defaultIanaTimeZoneId: "America/Toronto", defaultLanguageCode: "en", defaultDateFormatPresetKey: "iso-24h", defaultNumberFormatPresetKey: "en-ca" },
       0,
     );
     expect(await screen.findByText("Regional defaults saved")).toBeInTheDocument();

@@ -250,7 +250,7 @@ Manual NVDA/VoiceOver review remains outstanding, as for every earlier page.
   * Catalogs (supported countries, IANA zones and their country affinity, presets, ten languages) are a **typed, versioned, server-validated code catalog** in M3 (§4E allows this). Relational catalog tables arrive with §4G in a later phase.
   * The existing `user_ui_preferences` (text scale) is kept and not merged.
 - **API:**
-  * `GET/PUT /api/v1/organization/settings` (ETag/`If-Match`, reason, `organization.manage`);
+  * `GET/PUT /api/v1/organization/settings` (ETag/`If-Match`, `organization.manage`; no reason is required for these presentation settings, owner decision 2026-11-03);
   * `GET/PUT /api/v1/me/preferences`;
   * `GET /api/v1/catalog/time-zones?organizationContext=true` (Canadian zones first, then persisted order), plus presets and languages.
 - **Authorization:** settings writes check Authority `manage_configuration`; preferences are the caller's own row only. Neither affects authorization, encryption, audit truth, search or stored values.

@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "ac95d42b1aded82cceafb86cb6541fc5eef1f985aa29439c9575c2838b9ae222",
-      "bytes": 88958
+      "sha256": "76cd63f64048a21409e5b5afa452652e91b63c29f2755c93944475cc17649822",
+      "bytes": 89248
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -179,8 +179,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
-      "sha256": "345df1cb4ce1f37a08ff3d5a3b6ba4db4b352caaa2bc824c889ca559d85817ea",
-      "bytes": 44391
+      "sha256": "f85125e002633753713ce8e0e49ec1730d5dccc607edb0d17704c85d090cf7e1",
+      "bytes": 44465
     },
     {
       "path": "docs/architecture/PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md",

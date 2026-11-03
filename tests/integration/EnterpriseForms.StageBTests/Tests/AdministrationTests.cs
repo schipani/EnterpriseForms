@@ -209,15 +209,11 @@ public sealed class AdministrationTests(StageBFixture fixture)
     public async Task LogoUploadAndReplacementAreAudited()
     {
         var s = await ScenarioAsync("c8-logo-audit");
-        var missing = await fixture.SendBytesAsync(HttpMethod.Post, "/api/v1/organization/branding/logo", s.Token(s.Designer), OnePixelPng, "image/png");
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, missing.Status); // no reason: refused before anything is stored
-        var tooShort = await fixture.SendBytesAsync(HttpMethod.Post, "/api/v1/organization/branding/logo?changeReason=ab", s.Token(s.Designer), OnePixelPng, "image/png");
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, tooShort.Status);
-        var uploaded = await fixture.SendBytesAsync(HttpMethod.Post, "/api/v1/organization/branding/logo?changeReason=First%20logo%20for%20the%20intake%20office", s.Token(s.Designer), OnePixelPng, "image/png");
+        var uploaded = await fixture.SendBytesAsync(HttpMethod.Post, "/api/v1/organization/branding/logo", s.Token(s.Designer), OnePixelPng, "image/png");
         AssertOk(uploaded);
-        var replaced = await fixture.SendBytesAsync(HttpMethod.Post, "/api/v1/organization/branding/logo?changeReason=Replace%20with%20the%20new%20mark", s.Token(s.Designer), TwoPixelPng, "image/png");
+        var replaced = await fixture.SendBytesAsync(HttpMethod.Post, "/api/v1/organization/branding/logo", s.Token(s.Designer), TwoPixelPng, "image/png");
         AssertOk(replaced);
-        var refused = await fixture.SendBytesAsync(HttpMethod.Post, "/api/v1/organization/branding/logo?changeReason=Not%20allowed", s.Token(s.Clerk), OnePixelPng, "image/png");
+        var refused = await fixture.SendBytesAsync(HttpMethod.Post, "/api/v1/organization/branding/logo", s.Token(s.Clerk), OnePixelPng, "image/png");
         Assert.Equal(HttpStatusCode.Forbidden, refused.Status);
 
         var events = fixture.Stack.AttackerSql($"SELECT event_action || '|' || actor_user_id || '|' || event_metadata_json::text FROM audit_events WHERE tenant_id = '{s.OrganizationId:D}' AND event_action IN ('ORGANIZATION_LOGO_UPLOADED', 'ORGANIZATION_LOGO_REPLACED') ORDER BY audit_sequence;")
@@ -227,8 +223,6 @@ public sealed class AdministrationTests(StageBFixture fixture)
         Assert.StartsWith("ORGANIZATION_LOGO_REPLACED|" + s.Designer.AuthorityUserId.ToString("D"), events[1], StringComparison.Ordinal);
         Assert.Contains("\"logoSizeBytes\":" + OnePixelPng.Length.ToString(CultureInfo.InvariantCulture), events[0].Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
         Assert.Contains("\"logoSha256\":\"" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(TwoPixelPng)), events[1].Replace(" ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
-        Assert.Contains("First logo for the intake office", events[0], StringComparison.Ordinal); // the reason is stored with the event
-        Assert.Contains("Replace with the new mark", events[1], StringComparison.Ordinal);
         // The refused upload wrote no logo event for the clerk and the served logo is the replacement.
         Assert.DoesNotContain(s.Clerk.AuthorityUserId.ToString("D"), string.Join('\n', events), StringComparison.Ordinal);
         var served = await fixture.DownloadAsync("/api/v1/organization/branding/logo", s.Token(s.Clerk));

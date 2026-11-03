@@ -1,5 +1,5 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, FormattingPreview, LoadingBlock, Select, StatusMessage, TextInput, SearchableSelect, resolveFormatting, type FormattingSettings } from "@enterpriseforms/ui";
+import { Badge, Button, Card, FormattingPreview, LoadingBlock, Select, StatusMessage, SearchableSelect, resolveFormatting, type FormattingSettings } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -24,7 +24,6 @@ export function RegionalSettingsCard() {
   const dates = useQuery({ queryKey: ["catalog", "date-formats"], queryFn: () => api.regional.dateFormats().then((r) => r.result), staleTime: Infinity });
   const numbers = useQuery({ queryKey: ["catalog", "number-formats"], queryFn: () => api.regional.numberFormats().then((r) => r.result), staleTime: Infinity });
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [reason, setReason] = useState("");
   const [saved, setSaved] = useState(false);
   useEffect(() => {
     if (settings.data && !draft) {
@@ -35,11 +34,10 @@ export function RegionalSettingsCard() {
   const save = useMutation({
     mutationFn: () =>
       api.regional
-        .updateSettings({ defaultCountryCode: draft!.country, defaultIanaTimeZoneId: draft!.zone, defaultLanguageCode: draft!.language, defaultDateFormatPresetKey: draft!.date, defaultNumberFormatPresetKey: draft!.number, changeReason: reason.trim() }, Number(settings.data!.organizationSettingRevision))
+        .updateSettings({ defaultCountryCode: draft!.country, defaultIanaTimeZoneId: draft!.zone, defaultLanguageCode: draft!.language, defaultDateFormatPresetKey: draft!.date, defaultNumberFormatPresetKey: draft!.number }, Number(settings.data!.organizationSettingRevision))
         .then((r) => r.result),
     onSuccess: async () => {
       setSaved(true);
-      setReason("");
       setDraft(null);
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["organization", "settings"] }), queryClient.invalidateQueries({ queryKey: ["regional-preferences"] })]);
     },
@@ -78,7 +76,7 @@ export function RegionalSettingsCard() {
   if (queries.some((q) => q.isPending) || !draft || !preview || !settings.data || !countryList || !languageList || !dateList || !numberList) {
     return <LoadingBlock label="Loading regional settings" />;
   }
-  const valid = draft.country && draft.zone && draft.language && draft.date && draft.number && reason.trim().length >= 3;
+  const valid = draft.country && draft.zone && draft.language && draft.date && draft.number;
   const set = (patch: Partial<Draft>) => {
     setSaved(false);
     setDraft({ ...draft, ...patch });
@@ -128,7 +126,6 @@ export function RegionalSettingsCard() {
           <Select label="Default number format" value={draft.number} disabled={readOnly} onValueChange={(number) => set({ number })} options={numberList.presets.map((p) => ({ value: p.numberFormatPresetKey, label: p.presetDisplayName }))} />
           {readOnly ? null : (
             <>
-              <TextInput label="Reason for the change" value={reason} maxLength={500} required helpText="Recorded in the audit history (3 to 500 characters)." onChange={(event) => setReason(event.target.value)} />
               {save.isError ? <ErrorPanel error={save.error} /> : null}
               {saved ? <StatusMessage tone="success" title="Regional defaults saved" /> : null}
               <div>

@@ -15,7 +15,6 @@ export function BrandingPage() {
   const queryClient = useQueryClient();
   const branding = useQuery({ queryKey: ["organization", "branding"], queryFn: () => api.organization.branding().then((r) => r.result) });
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [reason, setReason] = useState("");
   const logoInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (branding.data && !draft) {
@@ -25,18 +24,16 @@ export function BrandingPage() {
 
   const save = useMutation({
     mutationFn: (current: Draft) =>
-      api.organization.updateBranding({ expectedBrandingRevision: branding.data!.brandingRevision, organizationDisplayName: current.organizationDisplayName, logoAlternativeText: current.logoAlternativeText || null, primaryButtonBackgroundColor: current.primary, primaryButtonForegroundColor: current.primaryText, secondaryButtonBackgroundColor: current.secondary, secondaryButtonForegroundColor: current.secondaryText, secondaryButtonBorderColor: current.secondaryBorder, organizationDefaultTextScalePercent: Number(current.textScale), organizationColorMode: current.colorMode, changeReason: reason.trim() }).then((r) => r.result),
+      api.organization.updateBranding({ expectedBrandingRevision: branding.data!.brandingRevision, organizationDisplayName: current.organizationDisplayName, logoAlternativeText: current.logoAlternativeText || null, primaryButtonBackgroundColor: current.primary, primaryButtonForegroundColor: current.primaryText, secondaryButtonBackgroundColor: current.secondary, secondaryButtonForegroundColor: current.secondaryText, secondaryButtonBorderColor: current.secondaryBorder, organizationDefaultTextScalePercent: Number(current.textScale), organizationColorMode: current.colorMode }).then((r) => r.result),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["organization", "branding"] });
       setDraft(null);
-      setReason("");
       await session.refresh();
     },
   });
   const uploadLogo = useMutation({
-    mutationFn: (file: File) => file.arrayBuffer().then((bytes) => api.organization.uploadLogo(bytes, reason.trim())).then((r) => r.result),
+    mutationFn: (file: File) => file.arrayBuffer().then((bytes) => api.organization.uploadLogo(bytes)).then((r) => r.result),
     onSuccess: async () => {
-      setReason("");
       await queryClient.invalidateQueries({ queryKey: ["organization", "branding"] });
       await session.refresh();
     },
@@ -57,29 +54,22 @@ export function BrandingPage() {
   if (!current || !draft) {
     return <OrganizationLayout title="Organization branding">{branding.isError ? <ErrorPanel error={branding.error} onRetry={() => void branding.refetch()} /> : <LoadingBlock label="Loading branding" />}</OrganizationLayout>;
   }
-  const reasonLength = reason.trim().length;
-  const reasonValid = reasonLength >= 3 && reasonLength <= 500;
   const hex = (value: string): OpaqueHex => (/^#[0-9a-fA-F]{6}$/.test(value) ? (value.toLowerCase() as OpaqueHex) : "#000000");
   const failures = validateThemePairs({ ...defaultTheme, primaryBackground: hex(draft.primary), primaryForeground: hex(draft.primaryText), secondaryBackground: hex(draft.secondary), secondaryForeground: hex(draft.secondaryText), secondaryBorder: hex(draft.secondaryBorder) });
   const colorField = (label: string, key: keyof Draft) => <TextInput label={label} value={draft[key]} pattern="#[0-9a-fA-F]{6}" helpText="Opaque #RRGGBB" onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />;
 
   return (
     <OrganizationLayout title="Organization branding" lead="Branding can only override validated colour pairs; anything below the accessibility floor is refused by the server and never applied.">
-      <div className="mb-6">
-        <Card title="Reason for change">
-          <TextInput label="Reason for change" value={reason} maxLength={500} required helpText="Required to save branding and to upload or replace the logo (3 to 500 characters). Recorded in the audit history." onChange={(event) => setReason(event.target.value)} />
-        </Card>
-      </div>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card title="Identity">
           <TextInput label="Organization display name" value={draft.organizationDisplayName} maxLength={200} onChange={(event) => setDraft({ ...draft, organizationDisplayName: event.target.value })} />
           <TextInput label="Logo alternative text" value={draft.logoAlternativeText} maxLength={200} onChange={(event) => setDraft({ ...draft, logoAlternativeText: event.target.value })} />
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="secondary" busy={uploadLogo.isPending} disabled={!reasonValid} onClick={() => logoInput.current?.click()}>
+            <Button variant="secondary" busy={uploadLogo.isPending} onClick={() => logoInput.current?.click()}>
               {current.hasLogo ? "Replace logo (PNG)" : "Upload logo (PNG)"}
             </Button>
             <input ref={logoInput} type="file" accept="image/png" className="sr-only" aria-label="Choose a PNG logo" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) { uploadLogo.mutate(file); } }} />
-            <span className="text-sm text-muted">{current.hasLogo ? "A logo is set (shown top-left)." : "No logo yet; the organization initials are shown instead."}{reasonValid ? "" : " Enter a reason for change above to upload or replace the logo."}</span>
+            <span className="text-sm text-muted">{current.hasLogo ? "A logo is set (shown top-left)." : "No logo yet; the organization initials are shown instead."}</span>
           </div>
           {uploadLogo.isError ? <ErrorPanel error={uploadLogo.error} /> : null}
           <Select label="Organization default text size" value={draft.textScale} options={[{ value: "100", label: "100% (default)" }, { value: "112.5", label: "112.5%" }, { value: "125", label: "125%" }, { value: "150", label: "150%" }]} onValueChange={(value) => setDraft({ ...draft, textScale: value })} />
@@ -119,7 +109,7 @@ export function BrandingPage() {
       {save.isError ? <div className="mt-4"><ErrorPanel error={save.error} /></div> : null}
       {save.isSuccess ? <div className="mt-4"><StatusMessage tone="success" title="Branding saved" /></div> : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button busy={save.isPending} disabled={failures.length > 0 || !reasonValid} onClick={() => save.mutate(draft)}>
+        <Button busy={save.isPending} disabled={failures.length > 0} onClick={() => save.mutate(draft)}>
           Save branding
         </Button>
         <Button variant="secondary" onClick={() => setDraft(null)}>

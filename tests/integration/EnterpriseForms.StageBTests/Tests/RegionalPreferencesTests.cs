@@ -12,8 +12,8 @@ namespace EnterpriseForms.StageBTests.Tests;
 [Collection(StageBStackCollectionDefinition.Name)]
 public sealed class RegionalPreferencesTests(StageBFixture fixture)
 {
-    private static object Settings(string country = "CA", string zone = "America/Winnipeg", string language = "fr", string date = "dmy-24h", string number = "fr-ca", string reason = "Head office moved to Winnipeg") =>
-        new { defaultCountryCode = country, defaultIanaTimeZoneId = zone, defaultLanguageCode = language, defaultDateFormatPresetKey = date, defaultNumberFormatPresetKey = number, changeReason = reason };
+    private static object Settings(string country = "CA", string zone = "America/Winnipeg", string language = "fr", string date = "dmy-24h", string number = "fr-ca") =>
+        new { defaultCountryCode = country, defaultIanaTimeZoneId = zone, defaultLanguageCode = language, defaultDateFormatPresetKey = date, defaultNumberFormatPresetKey = number };
 
     private static object Prefs(string tz = "OrganizationDefault", string? zone = null, string date = "OrganizationDefault", string? datePreset = null, string number = "OrganizationDefault", string? numberPreset = null, string language = "OrganizationDefault", string? languageCode = null) =>
         new { timeZonePreferenceMode = tz, ianaTimeZoneId = zone, dateFormatPreferenceMode = date, dateFormatPresetKey = datePreset, numberFormatPreferenceMode = number, numberFormatPresetKey = numberPreset, languagePreferenceMode = language, languageCode };
@@ -51,7 +51,6 @@ public sealed class RegionalPreferencesTests(StageBFixture fixture)
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PutSettings(s, s.Designer, Settings(language: "xx"), "\"0\"")).Status);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PutSettings(s, s.Designer, Settings(date: "yyyy-MM-dd"), "\"0\"")).Status);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PutSettings(s, s.Designer, Settings(number: "1,234.56"), "\"0\"")).Status);
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PutSettings(s, s.Designer, Settings(reason: " "), "\"0\"")).Status);
 
         var saved = await PutSettings(s, s.Designer, Settings(), "\"0\"");
         Assert.True(saved.IsSuccess, saved.Body);
@@ -65,9 +64,9 @@ public sealed class RegionalPreferencesTests(StageBFixture fixture)
         Assert.True(second.IsSuccess, second.Body);
         Assert.Equal(2, second.Root.GetProperty("organizationSettingRevision").GetInt64());
 
-        // Every successful change is audited with the reason (not the stored data of anyone).
-        var audit = fixture.Stack.AttackerSql($"SELECT count(*) FROM audit_events WHERE tenant_id = '{s.OrganizationId:D}' AND event_action = 'ORGANIZATION_SETTINGS_UPDATED' AND event_metadata_json::text LIKE '%Head office moved%';").Trim();
-        Assert.Equal("2", audit); // both saves carry the reason
+        // Every successful change is audited with the actor, the revision and the previous and new values (and no invented reason).
+        var audit = fixture.Stack.AttackerSql($"SELECT count(*) FROM audit_events WHERE tenant_id = '{s.OrganizationId:D}' AND event_action = 'ORGANIZATION_SETTINGS_UPDATED' AND event_metadata_json::text LIKE '%America/Winnipeg%' AND event_metadata_json::text NOT LIKE '%reason%';").Trim();
+        Assert.Equal("2", audit); // both saves record their values, neither carries a reason
         Assert.Equal("2", fixture.Stack.AttackerSql($"SELECT organization_setting_revision FROM organization_settings WHERE tenant_id = '{s.OrganizationId:D}';").Trim());
     }
 

@@ -16,8 +16,7 @@ public sealed record UpdateOrganizationSettingsRequest(
     string DefaultIanaTimeZoneId,
     string DefaultLanguageCode,
     string DefaultDateFormatPresetKey,
-    string DefaultNumberFormatPresetKey,
-    string ChangeReason);
+    string DefaultNumberFormatPresetKey);
 
 /// <summary>Personal preferences (C8 M3, PG-007). Each mode is OrganizationDefault | BrowserDefault | Explicit; the value is present exactly when Explicit.</summary>
 public sealed record UserPreferencesResponse(

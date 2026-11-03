@@ -11,7 +11,7 @@ namespace EnterpriseForms.Application.Features.Organizations;
 
 /// <summary>
 /// Organization regional defaults (C8 M3, PG-043). Reading is open to every member (the personal preferences page needs the
-/// defaults); writing needs the Authority's manage_configuration decision on every call, a reason, and the current revision
+/// defaults); writing needs the Authority's manage_configuration decision on every call and the current revision
 /// (If-Match). The values are presentation configuration: they never touch stored instants, authorization, encryption or search.
 /// </summary>
 public sealed class RegionalSettingsHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, TimeProvider clock)
@@ -54,7 +54,7 @@ public sealed class RegionalSettingsHandlers(IBusinessStore store, IAuthorizatio
         setting.SettingModifiedOn = now;
         setting.SettingModifiedByUserId = context.LocalUserId;
         AuditRecorder.Record(scope, context, clock, "Organization", AuditActions.OrganizationSettingsUpdated, "organization regional defaults updated", targetEntityType: "organization_settings", targetEntityId: setting.OrganizationSettingId,
-            metadata: new { revision = setting.OrganizationSettingRevision, previous, current = new { setting.DefaultCountryCode, setting.DefaultIanaTimeZoneId, setting.DefaultLanguageCode, setting.DefaultDateFormatPresetKey, setting.DefaultNumberFormatPresetKey }, reason = request.ChangeReason.Trim() });
+            metadata: new { revision = setting.OrganizationSettingRevision, previous, current = new { setting.DefaultCountryCode, setting.DefaultIanaTimeZoneId, setting.DefaultLanguageCode, setting.DefaultDateFormatPresetKey, setting.DefaultNumberFormatPresetKey } });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToResponse(setting);
     }
@@ -66,7 +66,6 @@ public sealed class RegionalSettingsHandlers(IBusinessStore store, IAuthorizatio
 
     private static void Validate(UpdateOrganizationSettingsRequest request)
     {
-        _ = ChangeReasons.Require(request.ChangeReason);
         if (!RegionalCatalog.IsCountry(request.DefaultCountryCode))
         {
             throw new BusinessException("INVALID_COUNTRY", 422, "the default country is not in the catalog (Europe is a region: choose a country)");

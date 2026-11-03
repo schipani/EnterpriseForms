@@ -44,41 +44,35 @@ beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
 });
 
-describe("BrandingPage change reason", () => {
-  it("cannot save or upload a logo until a reason of at least three characters is entered", async () => {
-    const user = userEvent.setup();
+describe("BrandingPage", () => {
+  it("asks for no reason: saving and uploading are available straight away", async () => {
     renderPage();
     const save = await screen.findByRole("button", { name: "Save branding" });
-    const upload = screen.getByRole("button", { name: "Upload logo (PNG)" });
-    expect(save).toBeDisabled();
-    expect(upload).toBeDisabled();
-    expect(screen.getByText(/Enter a reason for change above to upload or replace the logo/)).toBeInTheDocument();
-    await user.type(screen.getByRole("textbox", { name: /Reason for change/ }), "ab");
-    expect(save).toBeDisabled();
-    await user.type(screen.getByRole("textbox", { name: /Reason for change/ }), "c");
+    expect(screen.queryByRole("textbox", { name: /Reason/ })).not.toBeInTheDocument();
     expect(save).toBeEnabled();
-    expect(upload).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Upload logo (PNG)" })).toBeEnabled();
   });
 
-  it("sends the trimmed reason with the branding update and the revision that was read", async () => {
+  it("saves with the revision that was read and sends no reason", async () => {
     const user = userEvent.setup();
     organization.updateBranding.mockResolvedValue({ result: branding });
     renderPage();
-    await user.type(await screen.findByRole("textbox", { name: /Reason for change/ }), "  New brand colours  ");
-    await user.click(screen.getByRole("button", { name: "Save branding" }));
+    await user.click(await screen.findByRole("button", { name: "Save branding" }));
     await waitFor(() => expect(organization.updateBranding).toHaveBeenCalled());
-    expect(organization.updateBranding).toHaveBeenCalledWith(expect.objectContaining({ expectedBrandingRevision: 3, organizationDisplayName: "Northwind", changeReason: "New brand colours" }));
+    const request = organization.updateBranding.mock.calls[0]![0] as Record<string, unknown>;
+    expect(request).toMatchObject({ expectedBrandingRevision: 3, organizationDisplayName: "Northwind" });
+    expect(request).not.toHaveProperty("changeReason");
   });
 
-  it("sends the reason with a logo upload", async () => {
+  it("uploads a logo without a reason", async () => {
     const user = userEvent.setup();
     organization.uploadLogo.mockResolvedValue({ result: { ...branding, hasLogo: true } });
     renderPage();
-    await user.type(await screen.findByRole("textbox", { name: /Reason for change/ }), "Add the office logo");
+    await screen.findByRole("button", { name: "Save branding" });
     const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "logo.png", { type: "image/png" });
     Object.defineProperty(file, "arrayBuffer", { value: () => Promise.resolve(new ArrayBuffer(4)) });
     await user.upload(screen.getByLabelText("Choose a PNG logo"), file);
     await waitFor(() => expect(organization.uploadLogo).toHaveBeenCalled());
-    expect(organization.uploadLogo).toHaveBeenCalledWith(expect.any(ArrayBuffer), "Add the office logo");
+    expect(organization.uploadLogo).toHaveBeenCalledWith(expect.any(ArrayBuffer));
   });
 });
