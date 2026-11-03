@@ -162,7 +162,7 @@ test.describe("User area", () => {
       ["/app/settings/preferences/text-size", "/app/user/text-size"],
     ] as const) {
       await page.goto(from);
-      await expect(page, from).toHaveURL(new RegExp(`${to.replace(/\//g, "\\/")}$`));
+      await expect(page, from).toHaveURL((url) => url.pathname === to); // compared as a path, not built into a pattern
     }
     await page.goto("/app/me/preferences?from=menu");
     await expect(page).toHaveURL(/\/app\/user\/regional\?from=menu$/);
