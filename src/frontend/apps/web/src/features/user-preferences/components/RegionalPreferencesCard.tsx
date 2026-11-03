@@ -110,7 +110,7 @@ export function RegionalPreferencesCard() {
   const browserLocale = browser.languages[0] ?? "not available";
 
   return (
-    <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,13fr)_minmax(0,7fr)]">
+    <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_28rem]">
       <Card title={<span id="regional-preferences-heading">Time zone, date, number and language</span>} aria-labelledby="regional-preferences-heading">
         <p className="text-sm text-muted">
           These choices change only how dates, times and numbers are shown to you. Stored values, permissions and the audit history are never changed. Each setting is independent.

@@ -51,12 +51,12 @@ describe("RegionalSettingsCard", () => {
     expect(screen.getByTestId("preview-numbers")).toHaveTextContent("1,234,567.89");
   });
 
-  it("lays the form (about 65%) and the preview (about 35%) side by side on wide screens and stacks them on narrow ones, with a language note that says translation is not available yet", async () => {
+  it("lays the form and a fixed-width (28rem) preview side by side on wide screens and stacks them on narrow ones, with a language note that says translation is not available yet", async () => {
     renderCard();
     const form = await screen.findByRole("region", { name: "Regional defaults" });
     const grid = form.parentElement!;
     expect(grid.className).toContain("grid-cols-1");
-    expect(grid.className).toContain("xl:grid-cols-[minmax(0,13fr)_minmax(0,7fr)]");
+    expect(grid.className).toContain("xl:grid-cols-[minmax(0,1fr)_28rem]");
     expect(grid.className).toContain("items-start");
     expect(screen.getByRole("region", { name: "Preview" }).parentElement).toBe(grid);
     expect(screen.getByText(/Translation of the application is planned but not available yet/)).toBeInTheDocument();

@@ -84,7 +84,7 @@ export function RegionalSettingsCard() {
   const readOnly = !canManage;
 
   return (
-    <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,13fr)_minmax(0,7fr)]">
+    <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_28rem]">
       <Card title={<span id="regional-defaults-heading">Regional defaults</span>} aria-labelledby="regional-defaults-heading">
         <p className="text-sm text-muted">
           These defaults apply to every member who has not chosen their own. They change only how dates, times and numbers are shown; stored values, permissions and audit history are not affected.{" "}

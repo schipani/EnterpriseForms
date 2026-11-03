@@ -77,7 +77,7 @@ describe("RegionalPreferencesCard", () => {
     const form = await screen.findByRole("region", { name: "Time zone, date, number and language" });
     const grid = form.parentElement!;
     expect(grid.className).toContain("grid-cols-1");
-    expect(grid.className).toContain("lg:grid-cols-[minmax(0,13fr)_minmax(0,7fr)]");
+    expect(grid.className).toContain("lg:grid-cols-[minmax(0,1fr)_28rem]");
     expect(screen.getByRole("region", { name: "Preview" }).parentElement).toBe(grid);
     expect(screen.getByText(/Translation of the application \(menus, buttons, messages and form text\) is planned but not available yet/)).toBeInTheDocument();
     expect(screen.getByText(/English remains the fallback/)).toBeInTheDocument();
