@@ -39,6 +39,12 @@ describe("OrganizationLayout navigation", () => {
     expect(within(nav).queryByRole("link", { name: "Appearance & Localization" })).not.toBeInTheDocument();
   });
 
+  it("gives the navigation a wide column (18rem) so the longest label fits on one line", () => {
+    const { container } = renderLayout();
+    const grid = container.querySelector("nav")!.parentElement!;
+    expect(grid.className).toContain("lg:grid-cols-[18rem_minmax(0,1fr)]");
+  });
+
   it("hides the icons from assistive technology and sizes group icons 18px and item icons 16px", () => {
     renderLayout();
     const nav = screen.getByRole("navigation", { name: "Organization" });

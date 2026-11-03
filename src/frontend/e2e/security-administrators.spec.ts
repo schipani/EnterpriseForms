@@ -70,11 +70,20 @@ test.describe("Security Administrators", () => {
 
     // The appointee has Search approvals and the section, on a fresh sign-in, with no other change.
     await signIn(page, "clerk");
-    await expect(nav(page, "Search approvals")).toBeVisible();
-    await nav(page, "Search approvals").click();
-    await expect(page.getByRole("heading", { name: /Search approvals/ }).first()).toBeVisible();
+    const primary = page.getByRole("navigation", { name: "Primary" });
+    await expect(primary.getByRole("link", { name: /search approvals/i })).toHaveCount(0); // it lives under Organization, not in the primary navigation
     await nav(page, "Organization").click();
-    await page.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Security Administrators", exact: true }).click();
+    const orgNav = page.getByRole("navigation", { name: "Organization" });
+    await expect(orgNav.getByRole("link", { name: "Search Approvals", exact: true })).toBeVisible();
+    await orgNav.getByRole("link", { name: "Search Approvals", exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/organization\/search-approvals$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Search approvals" })).toBeVisible();
+    // Only Organization is highlighted in the primary navigation, and only Search Approvals in the Organization navigation.
+    await expect(primary.locator('a[aria-current="page"]')).toHaveCount(1);
+    await expect(primary.getByRole("link", { name: "Organization", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(orgNav.locator('a[aria-current="page"]')).toHaveCount(1);
+    await expect(orgNav.getByRole("link", { name: "Search Approvals", exact: true })).toHaveAttribute("aria-current", "page");
+    await orgNav.getByRole("link", { name: "Security Administrators", exact: true }).click();
     await expect(table(page).getByRole("row", { name: /Casey Clerk.*\(you\)/ })).toBeVisible();
     await signOut(page);
 

@@ -108,7 +108,8 @@ test.describe("Phase C7 M3 verified field search", () => {
 
   test("1. a security administrator approves a field from Search approvals without Designer or record access", async ({ page }) => {
     await signIn(page, "security");
-    await page.getByRole("link", { name: "Search approvals" }).click();
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Organization", exact: true }).click();
+    await page.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Search Approvals", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Search approvals" })).toBeVisible();
     const forms = page.getByRole("table", { name: "Published forms registered with the Authorization Authority" });
     await forms.getByRole("button", { name: `Review fields of ${formName}` }).click();

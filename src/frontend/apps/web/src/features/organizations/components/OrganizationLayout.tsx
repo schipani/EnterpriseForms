@@ -85,7 +85,7 @@ export function OrganizationLayout({ title, lead, actions, children }: PropsWith
   return (
     <>
       <PageHeader title={title} lead={lead} actions={actions} />
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
         <nav aria-label="Organization" className="min-w-0 rounded-panel border border-line bg-surface p-3 lg:sticky lg:top-4">
           {groups.map((group, index) => {
             const GroupIcon = group.icon;

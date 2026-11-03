@@ -57,7 +57,6 @@ function PrimaryNav({ wide }: { wide: boolean }) {
     { to: "/app/uploads", label: "Uploads", show: true },
     { to: "/app/activity", label: "My activity", show: true },
     { to: "/app/organization", label: "Organization", show: session.hasCapability("organization.manage") || session.hasCapability("security.administer") },
-    { to: "/app/organization/search-approvals", label: "Search approvals", show: session.hasCapability("security.administer") },
     { to: "/app/security/incidents", label: "Security incidents", show: session.hasCapability("security.administer") },
   ];
   return (
