@@ -22,11 +22,11 @@ vi.mock("@enterpriseforms/app-runtime", async (importOriginal) => ({
 
 const { RegionalSettingsCard } = await import("./RegionalSettingsCard");
 
-function renderCard() {
+function renderCard(area: "regional" | "language" = "regional") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <RegionalSettingsCard />
+      <RegionalSettingsCard area={area} />
     </QueryClientProvider>,
   );
 }
@@ -51,7 +51,7 @@ describe("RegionalSettingsCard", () => {
     expect(screen.getByTestId("preview-numbers")).toHaveTextContent("1,234,567.89");
   });
 
-  it("lays the form and a fixed-width (28rem) preview side by side on wide screens and stacks them on narrow ones, with a language note that says translation is not available yet", async () => {
+  it("lays the form and a fixed-width (28rem) preview side by side on wide screens and stacks them on narrow ones, and has no language field", async () => {
     renderCard();
     const form = await screen.findByRole("region", { name: "Regional defaults" });
     const grid = form.parentElement!;
@@ -59,8 +59,25 @@ describe("RegionalSettingsCard", () => {
     expect(grid.className).toContain("xl:grid-cols-[minmax(0,1fr)_28rem]");
     expect(grid.className).toContain("items-start");
     expect(screen.getByRole("region", { name: "Preview" }).parentElement).toBe(grid);
+    expect(screen.queryByRole("combobox", { name: /Default language/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the default language on its own tab with the honest note, and saves only the language", async () => {
+    const user = userEvent.setup();
+    regional.settings.mockResolvedValue({ result: { defaultCountryCode: "IT", defaultIanaTimeZoneId: "Europe/Rome", defaultLanguageCode: "en", defaultDateFormatPresetKey: "iso-24h", defaultNumberFormatPresetKey: "en-ca", organizationSettingRevision: 4, isSystemDefault: false, catalogVersion: "t" } });
+    regional.updateSettings.mockResolvedValue({ result: { defaultCountryCode: "IT", defaultIanaTimeZoneId: "Europe/Rome", defaultLanguageCode: "en", defaultDateFormatPresetKey: "iso-24h", defaultNumberFormatPresetKey: "en-ca", organizationSettingRevision: 5, isSystemDefault: false, catalogVersion: "t" } });
+    renderCard("language");
+    expect(await screen.findByRole("region", { name: "Default language" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Default language/ })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /Default country/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Preview" })).not.toBeInTheDocument();
     expect(screen.getByText(/Translation of the application is planned but not available yet/)).toBeInTheDocument();
     expect(screen.getByText(/never translated automatically/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save default language" }));
+    await waitFor(() => expect(regional.updateSettings).toHaveBeenCalled());
+    // The regional values are sent exactly as last saved, with the revision that was read.
+    expect(regional.updateSettings).toHaveBeenCalledWith({ defaultCountryCode: "IT", defaultIanaTimeZoneId: "Europe/Rome", defaultLanguageCode: "en", defaultDateFormatPresetKey: "iso-24h", defaultNumberFormatPresetKey: "en-ca" }, 4);
+    expect(await screen.findByText("Default language saved")).toBeInTheDocument();
   });
 
   it("saves the five values with the revision that was read, without asking for a reason", async () => {

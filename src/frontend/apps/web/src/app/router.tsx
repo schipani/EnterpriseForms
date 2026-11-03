@@ -44,6 +44,8 @@ const brandingRoute = createRoute({ getParentRoute: () => appRoute, path: "/orga
 // Phase C8 M1: administration shell (PG-041 overview, PG-050 people, PG-048/049 teams, PG-046 data protection, Security Administrators).
 const organizationOverviewRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization", component: lazyRouteComponent(() => import("../features/organizations"), "OverviewPage") });
 const organizationRegionalRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/regional", component: lazyRouteComponent(() => import("../features/organizations"), "RegionalSettingsPage") });
+const organizationLanguageRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/language", component: lazyRouteComponent(() => import("../features/organizations"), "LanguageSettingsPage") });
+const organizationTextSizeRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/text-size", component: lazyRouteComponent(() => import("../features/organizations"), "TextSizeSettingsPage") });
 const organizationDataProtectionRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/data-protection", component: lazyRouteComponent(() => import("../features/organizations"), "DataProtectionPage") });
 const organizationSecurityAdministratorsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/security-administrators", component: lazyRouteComponent(() => import("../features/organizations"), "SecurityAdministratorsPage") });
 const organizationPeopleRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/users", component: lazyRouteComponent(() => import("../features/identity"), "PeopleDirectoryPage") });
@@ -71,7 +73,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, profileRoute, preferencesRoute, settingsPreferencesRoute, languagePreferenceRoute, textSizePreferenceRoute, ...developmentRoutes, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationLanguageRoute, organizationTextSizeRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, profileRoute, preferencesRoute, settingsPreferencesRoute, languagePreferenceRoute, textSizePreferenceRoute, ...developmentRoutes, noPermissionRoute]),
 ]);
 
 export function createAppRouter() {

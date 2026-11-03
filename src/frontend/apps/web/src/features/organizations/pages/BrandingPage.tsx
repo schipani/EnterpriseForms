@@ -8,7 +8,7 @@ import { OrganizationLayout } from "../components/OrganizationLayout";
 
 type Draft = { organizationDisplayName: string; logoAlternativeText: string; primary: string; primaryText: string; secondary: string; secondaryText: string; secondaryBorder: string; textScale: string; colorMode: string };
 
-/** PG-04x organization branding: logo, button colours (validated against the WCAG floor on both client and server), default text size. */
+/** PG-04x organization branding: logo, button colours (validated against the WCAG floor on both client and server). The default text size has its own page. */
 export function BrandingPage() {
   const api = useApi();
   const session = useSession();
@@ -72,7 +72,6 @@ export function BrandingPage() {
             <span className="text-sm text-muted">{current.hasLogo ? "A logo is set (shown top-left)." : "No logo yet; the organization initials are shown instead."}</span>
           </div>
           {uploadLogo.isError ? <ErrorPanel error={uploadLogo.error} /> : null}
-          <Select label="Organization default text size" value={draft.textScale} options={[{ value: "100", label: "100% (default)" }, { value: "112.5", label: "112.5%" }, { value: "125", label: "125%" }, { value: "150", label: "150%" }]} onValueChange={(value) => setDraft({ ...draft, textScale: value })} />
           <Select label="Colour mode" value={draft.colorMode} options={[{ value: "Light", label: "Light (white/neutral)" }]} onValueChange={(value) => setDraft({ ...draft, colorMode: value })} />
         </Card>
         <Card title="Button colours">

@@ -82,6 +82,44 @@ test.describe("browser in America/Toronto", () => {
     await expect(page.getByRole("combobox", { name: "Text size preference" })).toBeVisible();
   });
 
+  test("owner: Language and Text size are their own Organization tabs below Regional settings, and Branding no longer has the text size", async ({ page }) => {
+    await signIn(page, "owner");
+    await page.goto("/app/organization/regional");
+    const nav = page.getByRole("navigation", { name: "Organization" });
+    await expect(nav.getByRole("link")).toHaveText(["Overview", "People", "Teams", "Branding", "Regional settings", "Language", "Text size", "Data protection", "Security administrators"]);
+    await expect(page.getByRole("combobox", { name: /Default language/ })).toHaveCount(0);
+
+    // Language tab: its own save; restores English afterwards.
+    await nav.getByRole("link", { name: "Language" }).click();
+    await expect(page).toHaveURL(/\/app\/organization\/language$/);
+    await expect(nav.getByRole("link", { name: "Language" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText(/planned but not available yet/)).toBeVisible();
+    await page.getByRole("combobox", { name: /Default language/ }).click();
+    await page.getByRole("option", { name: /French/ }).click();
+    await page.getByRole("button", { name: "Save default language" }).click();
+    await expect(page.getByText("Default language saved")).toBeVisible();
+    await page.getByRole("combobox", { name: /Default language/ }).click();
+    await page.getByRole("option", { name: /^English/ }).click();
+    await page.getByRole("button", { name: "Save default language" }).click();
+    await expect(page.getByText("Default language saved")).toBeVisible();
+
+    // Text size tab: stored with the branding; restores 100% afterwards.
+    await nav.getByRole("link", { name: "Text size" }).click();
+    await expect(page).toHaveURL(/\/app\/organization\/text-size$/);
+    await page.getByRole("combobox", { name: "Organization default text size" }).click();
+    await page.getByRole("option", { name: "125%" }).click();
+    await page.getByRole("button", { name: "Save default text size" }).click();
+    await expect(page.getByText("Default text size saved")).toBeVisible();
+    await page.getByRole("combobox", { name: "Organization default text size" }).click();
+    await page.getByRole("option", { name: /^100%/ }).click();
+    await page.getByRole("button", { name: "Save default text size" }).click();
+    await expect(page.getByText("Default text size saved")).toBeVisible();
+
+    await nav.getByRole("link", { name: "Branding" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Organization branding" })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Organization default text size" })).toHaveCount(0);
+  });
+
   test("a member without the owner role reads the regional settings but cannot change them", async ({ page }) => {
     await signIn(page, "clerk");
     await page.goto("/app/organization/regional");

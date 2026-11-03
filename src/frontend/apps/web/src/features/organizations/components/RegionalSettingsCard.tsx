@@ -12,7 +12,7 @@ type Draft = { country: string; zone: string; language: string; date: string; nu
  * encryption or search. The Authority decides who may save (manage_configuration); Security Administrators and others read.
  * The list of zones puts the selected country's zones first, then the persisted order; every zone appears once.
  */
-export function RegionalSettingsCard() {
+export function RegionalSettingsCard({ area = "regional" }: { area?: "regional" | "language" }) {
   const api = useApi();
   const session = useSession();
   const queryClient = useQueryClient();
@@ -32,10 +32,16 @@ export function RegionalSettingsCard() {
   }, [settings.data, draft]);
 
   const save = useMutation({
-    mutationFn: () =>
-      api.regional
-        .updateSettings({ defaultCountryCode: draft!.country, defaultIanaTimeZoneId: draft!.zone, defaultLanguageCode: draft!.language, defaultDateFormatPresetKey: draft!.date, defaultNumberFormatPresetKey: draft!.number }, Number(settings.data!.organizationSettingRevision))
-        .then((r) => r.result),
+    // Each area saves on its own: this area's choices come from the form, the other area's from what was last saved.
+    mutationFn: () => {
+      const s = settings.data!;
+      const d = draft!;
+      const request =
+        area === "regional"
+          ? { defaultCountryCode: d.country, defaultIanaTimeZoneId: d.zone, defaultLanguageCode: s.defaultLanguageCode, defaultDateFormatPresetKey: d.date, defaultNumberFormatPresetKey: d.number }
+          : { defaultCountryCode: s.defaultCountryCode, defaultIanaTimeZoneId: s.defaultIanaTimeZoneId, defaultLanguageCode: d.language, defaultDateFormatPresetKey: s.defaultDateFormatPresetKey, defaultNumberFormatPresetKey: s.defaultNumberFormatPresetKey };
+      return api.regional.updateSettings(request, Number(s.organizationSettingRevision)).then((r) => r.result);
+    },
     onSuccess: async () => {
       setSaved(true);
       setDraft(null);
@@ -82,17 +88,20 @@ export function RegionalSettingsCard() {
     setDraft({ ...draft, ...patch });
   };
   const readOnly = !canManage;
+  const regional = area === "regional";
 
   return (
-    <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_28rem]">
-      <Card title={<span id="regional-defaults-heading">Regional defaults</span>} aria-labelledby="regional-defaults-heading">
+    <div className={regional ? "grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_28rem]" : "grid min-w-0 grid-cols-1 items-start gap-4"}>
+      <Card title={<span id="regional-defaults-heading">{regional ? "Regional defaults" : "Default language"}</span>} aria-labelledby="regional-defaults-heading">
         <p className="text-sm text-muted">
-          These defaults apply to every member who has not chosen their own. They change only how dates, times and numbers are shown; stored values, permissions and audit history are not affected.{" "}
+          {regional
+            ? "These defaults apply to every member who has not chosen their own. They change only how dates, times and numbers are shown; stored values, permissions and audit history are not affected."
+            : "The language members use unless they choose their own on their Preferences page. It changes nothing that is stored."}{" "}
           {settings.data.isSystemDefault ? <Badge tone="warning">Not yet saved — showing the Canadian default</Badge> : <Badge tone="success">{`Revision ${settings.data.organizationSettingRevision}`}</Badge>}
         </p>
         {readOnly ? (
           <StatusMessage tone="info" title="Read only">
-            Only an organization owner can change the regional defaults.
+            Only an organization owner can change {regional ? "the regional defaults" : "the default language"}.
           </StatusMessage>
         ) : null}
         <form
@@ -104,43 +113,50 @@ export function RegionalSettingsCard() {
             }
           }}
         >
-          <Select
-            label="Default country"
-            value={draft.country}
-            disabled={readOnly}
-            helpText="Europe is a region: choose the country. The country puts its time zones first in the list."
-            onValueChange={(country) => set({ country })}
-            options={countryList.countries.map((c) => ({ value: c.countryCode, label: c.geographicRegionCode === "Europe" ? `${c.countryDisplayName} (Europe)` : c.countryDisplayName }))}
-          />
-          <SearchableSelect
-            label="Default time zone"
-            filterLabel="Filter time zones"
-            value={draft.zone}
-            disabled={readOnly}
-            helpText="An IANA time zone such as America/Toronto. Canada spans several zones; confirm the one that fits your head office."
-            onValueChange={(zone) => set({ zone })}
-            options={orderedZones.map((z) => ({ value: z.ianaTimeZoneId, label: `${z.timeZoneDisplayName} · ${z.ianaTimeZoneId}` }))}
-          />
-          <Select label="Default language" helpText="Saved as the organization's default language. Translation of the application is planned but not available yet, so the application is shown in English for now. Values people enter and uploaded documents are never translated automatically." value={draft.language} disabled={readOnly} onValueChange={(language) => set({ language })} options={languageList.languages.map((l) => ({ value: l.languageCode, label: `${l.languageDisplayName} — ${l.nativeLanguageName}` }))} />
-          <Select label="Default date format" value={draft.date} disabled={readOnly} onValueChange={(date) => set({ date })} options={dateList.presets.map((p) => ({ value: p.dateFormatPresetKey, label: p.presetDisplayName }))} />
-          <Select label="Default number format" value={draft.number} disabled={readOnly} onValueChange={(number) => set({ number })} options={numberList.presets.map((p) => ({ value: p.numberFormatPresetKey, label: p.presetDisplayName }))} />
+          {regional ? (
+            <>
+            <Select
+              label="Default country"
+              value={draft.country}
+              disabled={readOnly}
+              helpText="Europe is a region: choose the country. The country puts its time zones first in the list."
+              onValueChange={(country) => set({ country })}
+              options={countryList.countries.map((c) => ({ value: c.countryCode, label: c.geographicRegionCode === "Europe" ? `${c.countryDisplayName} (Europe)` : c.countryDisplayName }))}
+            />
+            <SearchableSelect
+              label="Default time zone"
+              filterLabel="Filter time zones"
+              value={draft.zone}
+              disabled={readOnly}
+              helpText="An IANA time zone such as America/Toronto. Canada spans several zones; confirm the one that fits your head office."
+              onValueChange={(zone) => set({ zone })}
+              options={orderedZones.map((z) => ({ value: z.ianaTimeZoneId, label: `${z.timeZoneDisplayName} · ${z.ianaTimeZoneId}` }))}
+            />
+            <Select label="Default date format" value={draft.date} disabled={readOnly} onValueChange={(date) => set({ date })} options={dateList.presets.map((p) => ({ value: p.dateFormatPresetKey, label: p.presetDisplayName }))} />
+            <Select label="Default number format" value={draft.number} disabled={readOnly} onValueChange={(number) => set({ number })} options={numberList.presets.map((p) => ({ value: p.numberFormatPresetKey, label: p.presetDisplayName }))} />
+            </>
+          ) : (
+            <Select label="Default language" helpText="Saved as the organization's default language. Translation of the application is planned but not available yet, so the application is shown in English for now. Values people enter and uploaded documents are never translated automatically." value={draft.language} disabled={readOnly} onValueChange={(language) => set({ language })} options={languageList.languages.map((l) => ({ value: l.languageCode, label: `${l.languageDisplayName} — ${l.nativeLanguageName}` }))} />
+          )}
           {readOnly ? null : (
             <>
               {save.isError ? <ErrorPanel error={save.error} /> : null}
-              {saved ? <StatusMessage tone="success" title="Regional defaults saved" /> : null}
+              {saved ? <StatusMessage tone="success" title={regional ? "Regional defaults saved" : "Default language saved"} /> : null}
               <div>
                 <Button type="submit" busy={save.isPending} disabled={!valid}>
-                  Save regional defaults
+                  {regional ? "Save regional defaults" : "Save default language"}
                 </Button>
               </div>
             </>
           )}
         </form>
       </Card>
-      <Card title={<span id="regional-preview-heading">Preview</span>} aria-labelledby="regional-preview-heading">
-        <p className="text-sm text-muted">How a member who uses the organization defaults will see a fixed sample just after the March daylight-saving change.</p>
-        <FormattingPreview settings={preview} />
-      </Card>
+      {regional ? (
+        <Card title={<span id="regional-preview-heading">Preview</span>} aria-labelledby="regional-preview-heading">
+          <p className="text-sm text-muted">How a member who uses the organization defaults will see a fixed sample just after the March daylight-saving change.</p>
+          <FormattingPreview settings={preview} />
+        </Card>
+      ) : null}
     </div>
   );
 }

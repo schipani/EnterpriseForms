@@ -20,6 +20,8 @@ export function organizationNavigation(hasCapability: (capability: string) => bo
     { to: "/app/organization/teams", label: "Teams", show: administrator },
     { to: "/app/organization/branding", label: "Branding", show: manage },
     { to: "/app/organization/regional", label: "Regional settings", show: manage },
+    { to: "/app/organization/language", label: "Language", show: manage },
+    { to: "/app/organization/text-size", label: "Text size", show: manage },
     { to: "/app/organization/data-protection", label: "Data protection", show: administrator },
     { to: "/app/organization/security-administrators", label: "Security administrators", show: administrator },
     { to: "/app/organization/search-approvals", label: "Search approvals", show: security },
