@@ -71,6 +71,10 @@ public static class AuditActions
     public const string OrganizationLogoReplaced = "ORGANIZATION_LOGO_REPLACED";
     public const string TeamRenamed = "TEAM_RENAMED";
 
+    // Phase C8 M3: regional defaults and personal presentation preferences (never authorization, encryption or stored data).
+    public const string OrganizationSettingsUpdated = "ORGANIZATION_SETTINGS_UPDATED";
+    public const string UserPreferencesUpdated = "USER_PREFERENCES_UPDATED";
+
     // Phase C8 (C8-M1-01, D8-17): reconciler failures and operator actions. Service actor; the initiator is in metadata only.
     public const string TeamMembershipReconciliationFailed = "TEAM_MEMBERSHIP_RECONCILIATION_FAILED";
     public const string TeamMembershipProjectionDrift = "TEAM_MEMBERSHIP_PROJECTION_DRIFT";

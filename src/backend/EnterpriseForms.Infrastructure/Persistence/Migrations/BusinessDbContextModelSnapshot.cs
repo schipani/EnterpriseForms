@@ -3149,6 +3149,80 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Organizations.OrganizationSetting", b =>
+                {
+                    b.Property<Guid>("OrganizationSettingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_setting_id");
+
+                    b.Property<string>("DefaultCountryCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("default_country_code")
+                        .IsFixedLength();
+
+                    b.Property<string>("DefaultDateFormatPresetKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("default_date_format_preset_key");
+
+                    b.Property<string>("DefaultIanaTimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("default_iana_time_zone_id");
+
+                    b.Property<string>("DefaultLanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("default_language_code");
+
+                    b.Property<string>("DefaultNumberFormatPresetKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("default_number_format_preset_key");
+
+                    b.Property<long>("OrganizationSettingRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("organization_setting_revision");
+
+                    b.Property<Guid>("SettingCreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("setting_created_by_user_id");
+
+                    b.Property<DateTimeOffset>("SettingCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("setting_created_on");
+
+                    b.Property<Guid>("SettingModifiedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("setting_modified_by_user_id");
+
+                    b.Property<DateTimeOffset>("SettingModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("setting_modified_on");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("OrganizationSettingId");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_organization_settings_tenant");
+
+                    b.ToTable("organization_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_organization_settings_revision", "organization_setting_revision >= 1");
+                        });
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.RelatedForms.FormRecordRelationship", b =>
                 {
                     b.Property<Guid>("FormRecordRelationshipId")
@@ -3997,6 +4071,99 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.UserPreferences.UserPreference", b =>
+                {
+                    b.Property<Guid>("UserPreferenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_preference_id");
+
+                    b.Property<string>("DateFormatPreferenceMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("date_format_preference_mode");
+
+                    b.Property<string>("DateFormatPresetKey")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("date_format_preset_key");
+
+                    b.Property<string>("IanaTimeZoneId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("iana_time_zone_id");
+
+                    b.Property<string>("LanguageCode")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("language_code");
+
+                    b.Property<string>("LanguagePreferenceMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("language_preference_mode");
+
+                    b.Property<string>("NumberFormatPreferenceMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("number_format_preference_mode");
+
+                    b.Property<string>("NumberFormatPresetKey")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("number_format_preset_key");
+
+                    b.Property<DateTimeOffset>("PreferenceCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("preference_created_on");
+
+                    b.Property<DateTimeOffset>("PreferenceModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("preference_modified_on");
+
+                    b.Property<long>("PreferenceRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("preference_revision");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TimeZonePreferenceMode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("time_zone_preference_mode");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("UserPreferenceId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_user_preferences_tenant_user");
+
+                    b.ToTable("user_preferences", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_user_preferences_date_format", "date_format_preference_mode IN ('OrganizationDefault','BrowserDefault','Explicit') AND (date_format_preference_mode = 'Explicit') = (date_format_preset_key IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_user_preferences_language", "language_preference_mode IN ('OrganizationDefault','BrowserDefault','Explicit') AND (language_preference_mode = 'Explicit') = (language_code IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_user_preferences_number_format", "number_format_preference_mode IN ('OrganizationDefault','BrowserDefault','Explicit') AND (number_format_preference_mode = 'Explicit') = (number_format_preset_key IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_user_preferences_revision", "preference_revision >= 1");
+
+                            t.HasCheckConstraint("ck_user_preferences_time_zone", "time_zone_preference_mode IN ('OrganizationDefault','BrowserDefault','Explicit') AND (time_zone_preference_mode = 'Explicit') = (iana_time_zone_id IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.UserPreferences.UserUiPreference", b =>
                 {
                     b.Property<Guid>("UserUiPreferenceId")
@@ -4684,6 +4851,16 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_organization_security_policies_tenant");
                 });
 
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.Organizations.OrganizationSetting", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_organization_settings_tenant");
+                });
+
             modelBuilder.Entity("EnterpriseForms.Domain.Features.RelatedForms.FormRecordRelationship", b =>
                 {
                     b.HasOne("EnterpriseForms.Domain.Features.FormRecords.FormRecord", null)
@@ -4915,6 +5092,23 @@ namespace EnterpriseForms.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_team_membership_projection_states_tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseForms.Domain.Features.UserPreferences.UserPreference", b =>
+                {
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_preferences_tenant");
+
+                    b.HasOne("EnterpriseForms.Domain.Features.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_preferences_user");
                 });
 
             modelBuilder.Entity("EnterpriseForms.Domain.Features.UserPreferences.UserUiPreference", b =>

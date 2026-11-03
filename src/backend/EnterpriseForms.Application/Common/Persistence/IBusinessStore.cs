@@ -413,6 +413,14 @@ public interface IBusinessScope : IAsyncDisposable
 
     void AddUiPreference(UserUiPreference preference);
 
+    Task<OrganizationSetting?> FindOrganizationSettingAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    void AddOrganizationSetting(OrganizationSetting setting);
+
+    Task<UserPreference?> FindUserPreferenceAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
+
+    void AddUserPreference(UserPreference preference);
+
     Task CommitAsync(CancellationToken cancellationToken);
 }
 

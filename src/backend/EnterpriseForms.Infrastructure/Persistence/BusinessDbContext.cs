@@ -113,6 +113,10 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
 
     public DbSet<UserUiPreference> UserUiPreferences => Set<UserUiPreference>();
 
+    public DbSet<OrganizationSetting> OrganizationSettings => Set<OrganizationSetting>();
+
+    public DbSet<UserPreference> UserPreferences => Set<UserPreference>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

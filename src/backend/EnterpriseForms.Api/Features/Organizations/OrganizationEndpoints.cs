@@ -1,6 +1,7 @@
 using EnterpriseForms.Api.Composition;
 using EnterpriseForms.Application.Common.Persistence;
 using EnterpriseForms.Application.Features.Organizations;
+using EnterpriseForms.Application.Features.UserPreferences;
 using EnterpriseForms.Contracts.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -58,6 +59,68 @@ public static class OrganizationEndpoints
         preferences.MapPut("/", static async Task<Ok<UiPreferenceResponse>> (UpdateUiPreferenceRequest request, HttpContext http, BrandingHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.UpdatePreferenceAsync(BusinessAuthentication.RequireContext(http), request, cancellationToken).ConfigureAwait(false)))
             .WithName("UpdateUiPreferences");
+
+        // Phase C8 M3: regional defaults (PG-043), personal regional preferences (PG-007) and the typed regional catalog.
+        var settings = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/settings").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        settings.MapGet("/", static async Task<Ok<OrganizationSettingsResponse>> (HttpContext http, RegionalSettingsHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                var response = await handlers.GetAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.ETag = RevisionEtag(response.OrganizationSettingRevision);
+                return TypedResults.Ok(response);
+            })
+            .WithName("GetOrganizationSettings")
+            .WithSummary("Organization regional defaults (country, IANA time zone, language, date and number presets). Any member may read; ETag carries the revision (0 = system default, never saved).");
+        settings.MapPut("/", static async Task<Ok<OrganizationSettingsResponse>> (UpdateOrganizationSettingsRequest request, HttpContext http, RegionalSettingsHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                var response = await handlers.UpdateAsync(BusinessAuthentication.RequireContext(http), request, RequireIfMatch(http), cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.ETag = RevisionEtag(response.OrganizationSettingRevision);
+                return TypedResults.Ok(response);
+            })
+            .WithName("UpdateOrganizationSettings")
+            .WithSummary("Organization owner only (Authority manage_configuration); reason required; If-Match required (428 missing, 412 stale); values validated against the typed catalog; audited as ORGANIZATION_SETTINGS_UPDATED.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
+        var regional = endpoints.MapGroup(ApiVersions.V1Prefix + "/me/preferences").WithTags("UserPreferences").WithFeatureOwner("UserPreferences").RequireAuthorization(BusinessAuthentication.Policy);
+        regional.MapGet("/", static async Task<Ok<UserPreferencesResponse>> (HttpContext http, PreferenceHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                var response = await handlers.GetAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.ETag = RevisionEtag(response.PreferenceRevision);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(response);
+            })
+            .WithName("GetRegionalPreferences")
+            .WithSummary("The caller's own regional preferences plus the organization defaults needed to resolve them. A missing row means OrganizationDefault for all four.");
+        regional.MapPut("/", static async Task<Ok<UserPreferencesResponse>> (UpdateUserPreferencesRequest request, HttpContext http, PreferenceHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                var response = await handlers.UpdateAsync(BusinessAuthentication.RequireContext(http), request, OptionalIfMatch(http), cancellationToken).ConfigureAwait(false);
+                http.Response.Headers.ETag = RevisionEtag(response.PreferenceRevision);
+                return TypedResults.Ok(response);
+            })
+            .WithName("UpdateRegionalPreferences")
+            .WithSummary("Updates only the caller's own preferences (no user id is accepted). Each mode is OrganizationDefault, BrowserDefault or Explicit; the value is allowed exactly when Explicit and must be in the catalog. If-Match is honored when sent (412 stale).")
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        var catalog = endpoints.MapGroup(ApiVersions.V1Prefix + "/catalog").WithTags("UserPreferences").WithFeatureOwner("UserPreferences").RequireAuthorization(BusinessAuthentication.Policy);
+        catalog.MapGet("/countries", static Ok<CountryCatalogResponse> () => TypedResults.Ok(CatalogHandlers.Countries())).WithName("GetCountryCatalog");
+        catalog.MapGet("/time-zones", static async Task<Ok<TimeZoneCatalogResponse>> (HttpContext http, bool? organizationContext, RegionalSettingsHandlers settings, CancellationToken cancellationToken) =>
+            {
+                string? country = null;
+                if (organizationContext == true)
+                {
+                    country = (await settings.GetAsync(BusinessAuthentication.RequireContext(http), cancellationToken).ConfigureAwait(false)).DefaultCountryCode;
+                }
+
+                return TypedResults.Ok(CatalogHandlers.TimeZones(country));
+            })
+            .WithName("GetTimeZoneCatalog")
+            .WithSummary("IANA zones, each once, ordered (organization-country zones first when organizationContext=true, then the persisted order).");
+        catalog.MapGet("/languages", static Ok<LanguageCatalogResponse> () => TypedResults.Ok(CatalogHandlers.Languages())).WithName("GetLanguageCatalog");
+        catalog.MapGet("/date-formats", static Ok<DateFormatCatalogResponse> () => TypedResults.Ok(CatalogHandlers.DateFormats())).WithName("GetDateFormatCatalog");
+        catalog.MapGet("/number-formats", static Ok<NumberFormatCatalogResponse> () => TypedResults.Ok(CatalogHandlers.NumberFormats())).WithName("GetNumberFormatCatalog");
 
         var policy = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/security-policy").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
         policy.MapGet("/", static async Task<Ok<OrganizationSecurityPolicyResponse>> (HttpContext http, SecurityPolicyHandlers handlers, CancellationToken cancellationToken) =>
@@ -141,4 +204,22 @@ public static class OrganizationEndpoints
 
         return endpoints;
     }
+
+    private static string RevisionEtag(long revision) => "\"" + revision.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\"";
+
+    private static long? OptionalIfMatch(HttpContext http)
+    {
+        var header = http.Request.Headers.IfMatch.ToString().Trim().Trim('"');
+        if (header.Length == 0)
+        {
+            return null;
+        }
+
+        return long.TryParse(header, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? value
+            : throw new Application.Common.BusinessException("PRECONDITION_FAILED", 412, "If-Match must carry the current revision ETag");
+    }
+
+    private static long RequireIfMatch(HttpContext http) =>
+        OptionalIfMatch(http) ?? throw new Application.Common.BusinessException("PRECONDITION_REQUIRED", 428, "If-Match with the current revision ETag is required");
 }
