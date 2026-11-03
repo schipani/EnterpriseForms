@@ -1,0 +1,583 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { OperationError } from "@enterpriseforms/work-queue";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * People page (C8 M2): 15-row server pages; owners can add users (a request, never a member), change designers, disable
+ * and re-enable, propose owner changes and approve another owner's proposal — each with a reason and the development
+ * step-up, each through the Authority. Pending proposals and requests are shown with their state; nothing claims that a
+ * requested person can sign in.
+ */
+
+const person = (n: number, extra: Record<string, unknown> = {}) => ({
+  userId: `u-${n}`,
+  displayName: `Person ${String(n).padStart(2, "0")}`,
+  identityIssuer: "https://idp.test",
+  identitySubject: `sub-${n}`,
+  firstSeenOn: "2026-10-01T10:00:00Z",
+  authorityRoles: [],
+  teams: [],
+  isCurrentUser: false,
+  lastSignedInOn: null,
+  signInStatus: "NotRecorded",
+  availableActions: ["GrantDesigner", "ProposeOwnerGrant", "DisableMembership"],
+  membershipState: "Enabled",
+  disabledOn: null,
+  ...extra,
+});
+
+const directory = (members: unknown[], extra: Record<string, unknown> = {}) => ({
+  source: "Authorization Authority roster",
+  members,
+  rolesAvailable: true,
+  rolesUnavailableReason: null,
+  totalCount: members.length,
+  pageStart: members.length ? 1 : 0,
+  pageSize: 15,
+  nextToken: null,
+  previousToken: null,
+  includesMembersWhoNeverSignedIn: true,
+  coverageStatement: "Lists every identity the Authorization Authority has bound to this organization, enabled or disabled, with its organization roles.",
+  securityAdministratorChangesOperational: false,
+  securityAdministratorChangesUnavailableReason: null,
+  canManageMembers: true,
+  membershipCommandsOperational: true,
+  membershipCommandsUnavailableReason: null,
+  operatorApprovalOperational: true,
+  organizationIdentityIssuer: "https://idp.test",
+  ownerProposals: [
+    {
+      proposalId: "p-1",
+      targetUserId: "u-9",
+      targetDisplayName: "Person 09",
+      proposedChange: "GrantOwner",
+      proposedByUserId: "u-8",
+      proposedByDisplayName: "Person 08",
+      reason: "board",
+      proposedOn: "2026-10-31T08:00:00Z",
+      expiresOn: "2026-11-01T08:00:00Z",
+      proposalState: "Pending",
+      canApprove: true,
+    },
+  ],
+  membershipRequests: [
+    {
+      requestId: "r-1",
+      requestedUserId: "u-new",
+      issuerUri: "https://idp.test",
+      subjectIdentifier: "dev-nia",
+      displayNameHint: "Nia Newcomer",
+      initialRoleName: "Designer",
+      requestedByUserId: "u-8",
+      requestedByDisplayName: "Person 08",
+      reason: "joins",
+      requestedOn: "2026-10-31T08:00:00Z",
+      expiresOn: "2026-11-07T08:00:00Z",
+      requestState: "Pending",
+      decidedOn: null,
+      decisionReason: null,
+      requestDigest: "digest-r1",
+      replacesRequestId: null,
+      replacedByRequestId: null,
+      cancelledOn: null,
+      canChange: true,
+    },
+  ],
+  ...extra,
+});
+
+const api = {
+  organization: {
+    members: vi.fn(),
+    grantMemberRole: vi.fn(),
+    revokeMemberRole: vi.fn(),
+    proposeOwnerChange: vi.fn(),
+    approveOwnerProposal: vi.fn(),
+    disableMember: vi.fn(),
+    enableMember: vi.fn(),
+    requestMembership: vi.fn(),
+    cancelMembershipRequest: vi.fn(),
+    replaceMembershipRequest: vi.fn(),
+    appointSecurityAdministrator: vi.fn(),
+    removeSecurityAdministrator: vi.fn(),
+    ownerProposals: vi.fn(),
+    membershipRequests: vi.fn(),
+    memberProfile: vi.fn(),
+    updateMemberProfile: vi.fn(),
+  },
+};
+const refresh = vi.fn();
+
+vi.mock("@enterpriseforms/app-runtime", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@enterpriseforms/app-runtime")>()),
+  useApi: () => api,
+  usePresence: (ids: string[]) => Object.fromEntries(ids.map((id, index) => [id, index === 0 ? "Available" : index === 1 ? "Away" : "Offline"])),
+  useSession: () => ({ hasCapability: (capability: string) => capability === "organization.manage", refresh }),
+}));
+
+vi.mock("../../organizations", () => ({
+  OrganizationLayout: ({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) => (
+    <main>
+      <h1>{title}</h1>
+      {actions}
+      {children}
+    </main>
+  ),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
+}));
+
+const { PeopleDirectoryPage } = await import("./PeopleDirectoryPage");
+
+function renderPage() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <PeopleDirectoryPage />
+    </QueryClientProvider>,
+  );
+}
+
+async function confirmChange(dialogName: RegExp, button: string) {
+  const dialog = await screen.findByRole("dialog", { name: dialogName });
+  const confirm = within(dialog).getByRole("button", { name: button });
+  expect(confirm).toBeDisabled();
+  fireEvent.change(within(dialog).getByLabelText(/Reason/), { target: { value: "unit decision" } });
+  expect(confirm).toBeDisabled();
+  fireEvent.click(within(dialog).getByRole("checkbox", { name: /development-only step-up/ }));
+  fireEvent.click(confirm);
+}
+
+const approvalPage = (items: unknown[], extra: Record<string, unknown> = {}) => ({
+  result: { items, totalCount: items.length, pageStart: items.length ? 1 : 0, pageSize: 5, nextToken: null, previousToken: null, ...extra },
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  api.organization.ownerProposals.mockImplementation(() => Promise.resolve(approvalPage(directory([]).ownerProposals)));
+  api.organization.membershipRequests.mockImplementation(() => Promise.resolve(approvalPage(directory([]).membershipRequests)));
+  api.organization.members.mockImplementation((query: { continuationToken?: string }) =>
+    Promise.resolve({
+      result: query.continuationToken
+        ? directory([person(16)], { totalCount: 16, pageStart: 16, previousToken: "back" })
+        : directory(
+            Array.from({ length: 15 }, (_, i) => person(i + 1)),
+            { totalCount: 16, nextToken: "page-2" },
+          ),
+    }),
+  );
+  for (const fn of [api.organization.grantMemberRole, api.organization.disableMember, api.organization.approveOwnerProposal]) {
+    fn.mockResolvedValue({ result: { commandId: "c", commandStatus: "Effective", authorizationRevision: 4 } });
+  }
+  api.organization.proposeOwnerChange.mockResolvedValue({ result: { commandId: "c", commandStatus: "Effective", authorizationRevision: 4, proposalId: "p-2", expiresOn: "2026-11-01T09:00:00Z" } });
+  api.organization.requestMembership.mockResolvedValue({ result: { commandId: "r-2", commandStatus: "Effective", authorizationRevision: 4, requestId: "r-2", expiresOn: "2026-11-07T09:00:00Z" } });
+});
+
+describe("PeopleDirectoryPage", () => {
+  it("requests 15 rows and pages with server cursors", async () => {
+    renderPage();
+    expect(await screen.findByText("Person 01")).toBeInTheDocument();
+    expect(api.organization.members).toHaveBeenCalledWith({ pageSize: 15 }, expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
+    expect(await screen.findByText("Person 16")).toBeInTheDocument();
+    expect(api.organization.members).toHaveBeenLastCalledWith({ pageSize: 15, continuationToken: "page-2" }, expect.anything());
+  });
+
+  it("makes a designer through the Authority with a reason and step-up", async () => {
+    renderPage();
+    await screen.findByText("Person 01");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Actions for Person 03" }));
+    await userEvent.setup().click(screen.getByRole("menuitem", { name: "Make designer: Person 03" }));
+    await confirmChange(/Make Person 03 a designer/, "Make designer");
+    await waitFor(() => expect(api.organization.grantMemberRole).toHaveBeenCalledWith("u-3", { roleName: "Designer", reason: "unit decision", useDevelopmentStepUp: true }));
+    expect(await screen.findByText("Person 03 is now a designer.")).toBeInTheDocument();
+  });
+
+  it("explains a refusal caused by the recovered-owner safeguard", async () => {
+    api.organization.grantMemberRole.mockRejectedValueOnce(new OperationError({ type: "failed", operationId: "op-9", status: 403, errorCode: "OWNER_RECOVERY_PROBATION", retryable: false }));
+    renderPage();
+    await screen.findByText("Person 01");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Actions for Person 03" }));
+    await user.click(screen.getByRole("menuitem", { name: "Make designer: Person 03" }));
+    await confirmChange(/Make Person 03 a designer/, "Make designer");
+    const dialog = screen.getByRole("dialog", { name: /Make Person 03 a designer/ });
+    expect(await within(dialog).findByText(/recovery safeguard period/)).toBeInTheDocument();
+  });
+
+  it("lets a second owner approve a pending owner proposal", async () => {
+    renderPage();
+    await screen.findByText("Person 01");
+    expect(await screen.findByRole("table", { name: "Owner proposals list" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /Approve: Make Owner for Person 09/ }));
+    await confirmChange(/Approve/, "Approve and apply");
+    await waitFor(() => expect(api.organization.approveOwnerProposal).toHaveBeenCalledWith("p-1", { reason: "unit decision", useDevelopmentStepUp: true }));
+  });
+
+  it("adds a user as a request that needs operator approval and never claims sign-in", async () => {
+    renderPage();
+    await screen.findByText("Person 01");
+    expect(await screen.findByText("Awaiting operators")).toBeInTheDocument();
+    expect(screen.getByText(/sign-in needs the Entra integration, PB-08/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add user" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add user" });
+    expect(within(dialog).getByLabelText(/Identity provider/)).toHaveValue("https://idp.test");
+    expect(within(dialog).getByText("Membership is not sign-in")).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText(/Object ID/), { target: { value: "nia@contoso.example" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Request membership" }));
+    expect(within(dialog).getByText(/not an email address/)).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText(/Object ID/), { target: { value: "dev-nia-2" } });
+    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: "Nia Two" } });
+    fireEvent.change(within(dialog).getByLabelText(/Reason/), { target: { value: "joins intake" } });
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /development-only step-up/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Request membership" }));
+    await waitFor(() =>
+      expect(api.organization.requestMembership).toHaveBeenCalledWith({
+        subjectIdentifier: "dev-nia-2",
+        displayNameHint: "Nia Two",
+        initialRoleName: null,
+        reason: "joins intake",
+        useDevelopmentStepUp: true,
+      }),
+    );
+    expect(await screen.findByText(/Request recorded for Nia Two/)).toBeInTheDocument();
+  });
+
+  it("does not show Add user to someone who cannot manage members", async () => {
+    api.organization.members.mockResolvedValue({ result: directory([person(1, { availableActions: [] })], { canManageMembers: false, ownerProposals: [], membershipRequests: [] }) });
+    renderPage();
+    await screen.findByText("Person 01");
+    expect(screen.queryByRole("button", { name: "Add user" })).toBeNull();
+  });
+
+  it("lists people with Name, Roles, Membership, Presence, Teams and Actions only (no Sign-in or Last sign-in columns)", async () => {
+    renderPage();
+    await screen.findByText("Person 01");
+    const table = screen.getByRole("table", { name: "People" });
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent),
+    ).toEqual(["Person", "Roles", "Membership", "Presence", "Teams", "Actions"]);
+    expect(within(table).getAllByText("Available").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("Away").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("Offline").length).toBeGreaterThan(0);
+  });
+
+  it("shows presence separately from membership (a disabled member can be Offline; an Active one can be Away)", async () => {
+    api.organization.members.mockResolvedValue({ result: directory([person(1), person(2, { membershipState: "Disabled" })]) });
+    renderPage();
+    await screen.findByText("Person 01");
+    const rows = within(screen.getByRole("table", { name: "People" }))
+      .getAllByRole("row")
+      .slice(1);
+    expect(rows[0]).toHaveTextContent("Active");
+    expect(rows[0]).toHaveTextContent("Available");
+    expect(rows[1]).toHaveTextContent("Disabled");
+    expect(rows[1]).toHaveTextContent("Away");
+  });
+
+  it("asks the server for five approvals at a time and pages each list independently, resetting to page one when a filter changes", async () => {
+    const proposals = Array.from({ length: 5 }, (_, i) => ({ ...directory([]).ownerProposals[0]!, proposalId: `p-${i}`, targetDisplayName: `Target ${i}` }));
+    api.organization.ownerProposals.mockImplementation((query: { continuationToken?: string; status?: string }) =>
+      Promise.resolve(
+        query.continuationToken
+          ? approvalPage([{ ...proposals[0]!, proposalId: "p-last", targetDisplayName: "Target last" }], { totalCount: 6, pageStart: 6, previousToken: "back-p" })
+          : approvalPage(proposals, { totalCount: 6, nextToken: "next-p" }),
+      ),
+    );
+    renderPage();
+    await screen.findByText("Target 0");
+    expect(api.organization.ownerProposals).toHaveBeenCalledWith({ pageSize: 5 }, expect.anything());
+    const nav = screen.getByRole("navigation", { name: "Owner proposals pages" });
+    expect(nav).toHaveTextContent("Showing 1–5 of 6 proposals");
+    expect(nav).toHaveTextContent("Page 1 of 2");
+    fireEvent.click(within(nav).getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Target last")).toBeInTheDocument();
+    expect(api.organization.ownerProposals).toHaveBeenLastCalledWith({ pageSize: 5, continuationToken: "next-p" }, expect.anything());
+    // the membership requests list is separate: it never moved
+    expect(api.organization.membershipRequests).toHaveBeenCalledTimes(1);
+    expect(api.organization.membershipRequests).toHaveBeenCalledWith({ pageSize: 5 }, expect.anything());
+    // changing a filter starts again on the first page
+    fireEvent.change(screen.getByLabelText("Search proposals"), { target: { value: "Target 3" } });
+    await waitFor(() => expect(api.organization.ownerProposals).toHaveBeenLastCalledWith({ pageSize: 5, q: "Target 3" }, expect.anything()));
+  });
+
+  describe("Refresh (a request decided outside the app)", () => {
+    const pending = () => ({ ...directory([]).membershipRequests[0]!, requestId: "r-ext", displayNameHint: "Nia External" });
+    const approved = () => ({ ...pending(), requestState: "Approved", decidedOn: "2026-11-01T09:00:00Z", canChange: false });
+    const refreshButton = () => screen.getByRole("button", { name: "Refresh People" });
+
+    it("shows Approved, the new member and updated actions after Refresh, without navigating, keeping search, filter and page", async () => {
+      let decided = false;
+      api.organization.membershipRequests.mockImplementation((query: { continuationToken?: string }) =>
+        Promise.resolve(approvalPage([decided ? approved() : pending()], { totalCount: 6, pageStart: query.continuationToken ? 6 : 1, nextToken: query.continuationToken ? null : "next-r", previousToken: query.continuationToken ? "back-r" : null })),
+      );
+      api.organization.members.mockImplementation(() =>
+        Promise.resolve({ result: directory(decided ? [person(1), person(2, { displayName: "Nia External" })] : [person(1)], { totalCount: decided ? 2 : 1 }) }),
+      );
+      renderPage();
+      const row = async () => within(await screen.findByRole("table", { name: "Membership requests list" })).getByRole("row", { name: /Nia External/ });
+      expect(await row()).toHaveTextContent(/Awaiting operators/);
+      // a search on the requests list and a later page are in effect
+      fireEvent.change(screen.getByLabelText("Search requests"), { target: { value: "Nia" } });
+      await waitFor(() => expect(api.organization.membershipRequests).toHaveBeenLastCalledWith({ pageSize: 5, q: "Nia" }, expect.anything()));
+      fireEvent.click(within(await screen.findByRole("navigation", { name: "Membership requests pages" })).getByRole("button", { name: "Next" }));
+      await waitFor(() => expect(api.organization.membershipRequests).toHaveBeenLastCalledWith({ pageSize: 5, q: "Nia", continuationToken: "next-r" }, expect.anything()));
+
+      decided = true; // the Platform Console approves it
+      const before = { members: api.organization.members.mock.calls.length, proposals: api.organization.ownerProposals.mock.calls.length, requests: api.organization.membershipRequests.mock.calls.length };
+      fireEvent.click(refreshButton());
+      await waitFor(() => expect(within(screen.getByRole("table", { name: "Membership requests list" })).getByRole("row", { name: /Nia External/ })).toHaveTextContent(/Approved/));
+      // both approval lists and the directory were re-read, with the current parameters
+      expect(api.organization.members.mock.calls.length).toBeGreaterThan(before.members);
+      expect(api.organization.ownerProposals.mock.calls.length).toBeGreaterThan(before.proposals);
+      expect(api.organization.membershipRequests.mock.calls.length).toBeGreaterThan(before.requests);
+      expect(api.organization.membershipRequests).toHaveBeenLastCalledWith({ pageSize: 5, q: "Nia", continuationToken: "next-r" }, expect.anything());
+      expect(screen.getByLabelText("Search requests")).toHaveValue("Nia");
+      // actions follow the new status: an approved request no longer offers Edit or Cancel
+      await userEvent.setup().click(within(screen.getByRole("table", { name: "Membership requests list" })).getByRole("button", { name: "Actions for Nia External" }));
+      expect(await screen.findByRole("menuitem", { name: /View details/ })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: /Cancel request/ })).not.toBeInTheDocument();
+      // the newly approved member is listed
+      expect(await screen.findByText(/Updated /)).toBeInTheDocument();
+      expect(screen.getByText("People (2)")).toBeInTheDocument();
+    });
+
+    it("shows a busy Refresh button while it loads", async () => {
+      renderPage();
+      await screen.findByText("Person 01");
+      let release!: () => void;
+      api.organization.members.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ result: directory([person(1)]) }); }));
+      fireEvent.click(refreshButton());
+      await waitFor(() => expect(refreshButton()).toHaveAttribute("aria-busy", "true"));
+      await waitFor(() => expect(release).toBeTypeOf("function"));
+      release();
+      await waitFor(() => expect(refreshButton()).not.toHaveAttribute("aria-busy", "true"));
+    });
+
+    it("reports a failed refresh instead of presenting stale data as current", async () => {
+      renderPage();
+      await screen.findByText("Person 01");
+      api.organization.membershipRequests.mockRejectedValueOnce(new OperationError({ kind: "unavailable", message: "down", status: 503 } as never));
+      fireEvent.click(refreshButton());
+      expect(await screen.findByText("Refresh failed")).toBeInTheDocument();
+      expect(screen.getByText(/may be out of date/)).toBeInTheDocument();
+      expect(screen.queryByText(/Updated /)).not.toBeInTheDocument();
+      fireEvent.click(within(screen.getByText("Refresh failed").closest("[role=alert]") as HTMLElement).getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(screen.queryByText("Refresh failed")).not.toBeInTheDocument());
+    });
+
+    it("cannot start overlapping refreshes, and a slow response is applied only to its own query (an older response never overwrites a newer one)", async () => {
+      renderPage();
+      await screen.findByText("Person 01");
+      const resolvers: Array<(value: unknown) => void> = [];
+      api.organization.membershipRequests.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)));
+      fireEvent.click(refreshButton());
+      await waitFor(() => expect(resolvers.length).toBe(1));
+      expect(refreshButton()).toBeDisabled(); // a second click cannot supersede or duplicate the in-flight refresh
+      // while it is slow, the owner changes the filter: that is a different query, answered separately
+      fireEvent.change(screen.getByLabelText("Search requests"), { target: { value: "Nia" } });
+      await waitFor(() => expect(resolvers.length).toBe(2));
+      resolvers[1]!(approvalPage([approved()]));
+      await waitFor(() => expect(screen.getByRole("row", { name: /Nia External/ })).toHaveTextContent(/Approved/));
+      resolvers[0]!(approvalPage([pending()])); // the older, unfiltered response arrives last
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByRole("row", { name: /Nia External/ })).toHaveTextContent(/Approved/);
+    });
+  });
+
+  it("shows empty states for the approval lists", async () => {
+    api.organization.ownerProposals.mockResolvedValue(approvalPage([]));
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([]));
+    renderPage();
+    expect(await screen.findByText("No owner proposals in the last 30 days.")).toBeInTheDocument();
+    expect(screen.getByText("No membership requests in the last 30 days.")).toBeInTheDocument();
+  });
+
+  it("edits a profile from the Actions menu with the revision token, and a stale revision offers a reload", async () => {
+    const profile = {
+      userId: "u-3",
+      displayName: "Person 03",
+      identityDisplayName: "Person 03",
+      displayNameOverridden: false,
+      preferredName: null,
+      jobTitle: null,
+      profileRevision: 4,
+      profileModifiedOn: null,
+      identityIssuer: "https://idp.test",
+      identitySubject: "sub-3",
+      isCurrentUser: false,
+      canEdit: true,
+    };
+    api.organization.members.mockResolvedValue({ result: directory([person(1), person(2), person(3, { availableActions: ["EditProfile", "GrantDesigner"] })]) });
+    api.organization.memberProfile.mockResolvedValue({ result: profile });
+    api.organization.updateMemberProfile.mockResolvedValue({ result: { ...profile, displayName: "Pat Three", profileRevision: 5 } });
+    renderPage();
+    await screen.findByText("Person 03");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Actions for Person 03" }));
+    await user.click(screen.getByRole("menuitem", { name: "Edit profile: Person 03" }));
+    const dialog = await screen.findByRole("dialog", { name: /Edit profile: Person 03/ });
+    expect(await within(dialog).findByLabelText(/Display name/)).toHaveValue("Person 03");
+    expect(within(dialog).getByText(/cannot be changed in a profile/)).toBeInTheDocument();
+    await user.clear(within(dialog).getByLabelText(/Display name/));
+    await user.type(within(dialog).getByLabelText(/Display name/), "Pat Three");
+    await user.type(within(dialog).getByLabelText("Job title"), "Intake lead");
+    await user.click(within(dialog).getByRole("button", { name: "Save profile" }));
+    await waitFor(() =>
+      expect(api.organization.updateMemberProfile).toHaveBeenCalledWith("u-3", {
+        displayName: "Pat Three",
+        preferredName: null,
+        jobTitle: "Intake lead",
+        expectedRevision: 4,
+        resetDisplayName: false,
+      }),
+    );
+    expect(await screen.findByText("Profile saved for Pat Three.")).toBeInTheDocument();
+  });
+
+  const request = (state: string, extra: Record<string, unknown> = {}) => ({
+    ...directory([]).membershipRequests[0]!,
+    requestId: `r-${state}`,
+    displayNameHint: `Person ${state}`,
+    requestState: state,
+    canChange: state === "Pending",
+    ...extra,
+  });
+
+  async function openRequestActions(name: string) {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: `Actions for ${name}` }));
+    return user;
+  }
+
+  it("offers Edit request, Cancel request and Copy ID for an awaiting request, and the right actions for every other status", async () => {
+    const rows = [request("Pending"), request("Approved"), request("Rejected"), request("Expired"), request("Cancelled"), request("Replaced", { replacedByRequestId: "r-new" })];
+    api.organization.membershipRequests.mockResolvedValue(approvalPage(rows));
+    renderPage();
+    const user = userEvent.setup();
+    const expectations: Array<[string, string[]]> = [
+      ["Person Pending", ["Edit request", "Cancel request", "Copy ID"]],
+      ["Person Approved", ["View details", "Copy ID"]],
+      ["Person Rejected", ["View details", "Create new request", "Copy ID"]],
+      ["Person Expired", ["View details", "Create new request", "Copy ID"]],
+      ["Person Cancelled", ["View details", "Create new request", "Copy ID"]],
+      ["Person Replaced", ["View details", "Copy ID"]],
+    ];
+    for (const [name, labels] of expectations) {
+      await user.click(await screen.findByRole("button", { name: `Actions for ${name}` }));
+      expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(labels);
+      await user.keyboard("{Escape}");
+    }
+    expect(screen.getByText("Replaced by a newer request")).toBeInTheDocument();
+  });
+
+  it("does not offer Edit or Cancel on a pending request the caller may not change (a Security Administrator)", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending", { canChange: false })]));
+    const user = await openRequestActions("Person Pending");
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["View details", "Copy ID"]);
+    await user.keyboard("{Escape}");
+  });
+
+  it("edits a pending request: identity read-only, only name, role and reason can change, the digest is sent, and the list refreshes", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending", { subjectIdentifier: "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", requestDigest: "digest-edit" })]));
+    api.organization.replaceMembershipRequest.mockResolvedValue({
+      result: { commandId: "r-new", commandStatus: "Effective", authorizationRevision: 5, requestId: "r-new", expiresOn: "2026-11-08T00:00:00Z" },
+    });
+    const user = await openRequestActions("Person Pending");
+    await user.click(screen.getByRole("menuitem", { name: "Edit request: Person Pending" }));
+    const dialog = await screen.findByRole("dialog", { name: /Edit request: Person Pending/ });
+    expect(within(dialog).getByLabelText("Object ID")).toHaveAttribute("readonly");
+    expect(within(dialog).getByLabelText("Object ID")).toHaveValue("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0");
+    expect(within(dialog).getByLabelText("Identity provider")).toHaveAttribute("readonly");
+    expect(within(dialog).getByText(/cancel this request and create a new one/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/^Name/)).toHaveValue("Person Pending");
+    expect(within(dialog).getByLabelText(/Reason/)).toHaveValue("joins");
+    expect(within(dialog).getByRole("combobox", { name: /Initial role/ })).toHaveTextContent("Designer");
+    // nothing changed → refused with a message; empty name → refused
+    await user.click(within(dialog).getByRole("checkbox", { name: /development-only step-up/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    expect(within(dialog).getByText(/Change the name, role or reason/)).toBeInTheDocument();
+    expect(api.organization.replaceMembershipRequest).not.toHaveBeenCalled();
+    await user.clear(within(dialog).getByLabelText(/^Name/));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    expect(within(dialog).getByText("Enter the person's name.")).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText(/^Name/), "Pat Corrected");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api.organization.replaceMembershipRequest).toHaveBeenCalledWith("r-Pending", {
+        expectedRequestDigest: "digest-edit",
+        displayNameHint: "Pat Corrected",
+        initialRoleName: "Designer",
+        reason: "joins",
+        useDevelopmentStepUp: true,
+      }),
+    );
+    expect(await screen.findByText(/Request for Pat Corrected updated/)).toBeInTheDocument();
+    await waitFor(() => expect(api.organization.membershipRequests.mock.calls.length).toBeGreaterThan(1)); // the list was refreshed without a reload
+  });
+
+  it("says when a request changed while the edit dialog was open and sends nothing further", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending")]));
+    api.organization.replaceMembershipRequest.mockRejectedValue(new OperationError({ type: "failed", operationId: "op-1", status: 409, errorCode: "MEMBERSHIP_REQUEST_CHANGED", retryable: false }));
+    const user = await openRequestActions("Person Pending");
+    await user.click(screen.getByRole("menuitem", { name: "Edit request: Person Pending" }));
+    const dialog = await screen.findByRole("dialog", { name: /Edit request/ });
+    await user.type(within(dialog).getByLabelText(/^Name/), " Jr");
+    await user.click(within(dialog).getByRole("checkbox", { name: /development-only step-up/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    expect(await within(dialog).findByText("This request changed")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+
+  it("cancels a pending request only after confirmation with a reason and the step-up", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending", { requestDigest: "digest-cancel" })]));
+    api.organization.cancelMembershipRequest.mockResolvedValue({ result: { commandId: "c", commandStatus: "Effective", authorizationRevision: 6 } });
+    const user = await openRequestActions("Person Pending");
+    await user.click(screen.getByRole("menuitem", { name: "Cancel request: Person Pending" }));
+    const dialog = await screen.findByRole("dialog", { name: "Cancel request: Person Pending" });
+    await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+    expect(within(dialog).getByText("Give a reason (3 to 500 characters).")).toBeInTheDocument();
+    expect(api.organization.cancelMembershipRequest).not.toHaveBeenCalled(); // no cancellation without a reason and confirmation
+    await user.type(within(dialog).getByLabelText(/Reason/), "wrong unit");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+    expect(api.organization.cancelMembershipRequest).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("checkbox", { name: /development-only step-up/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel request" }));
+    await waitFor(() =>
+      expect(api.organization.cancelMembershipRequest).toHaveBeenCalledWith("r-Pending", { expectedRequestDigest: "digest-cancel", reason: "wrong unit", useDevelopmentStepUp: true }),
+    );
+    expect(await screen.findByText(/Request for Person Pending cancelled/)).toBeInTheDocument();
+  });
+
+  it("keeps the request when the owner chooses Keep request", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Pending")]));
+    const user = await openRequestActions("Person Pending");
+    await user.click(screen.getByRole("menuitem", { name: "Cancel request: Person Pending" }));
+    await user.click(within(await screen.findByRole("dialog", { name: /Cancel request/ })).getByRole("button", { name: "Keep request" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(api.organization.cancelMembershipRequest).not.toHaveBeenCalled();
+  });
+
+  it("shows details for a finished request and pre-fills Add user for Create new request", async () => {
+    api.organization.membershipRequests.mockResolvedValue(approvalPage([request("Cancelled", { subjectIdentifier: "dev-nia", displayNameHint: "Nia Newcomer", cancelledOn: "2026-10-31T09:00:00Z" })]));
+    const user = await openRequestActions("Nia Newcomer");
+    await user.click(screen.getByRole("menuitem", { name: "View details: Nia Newcomer" }));
+    const details = await screen.findByRole("dialog", { name: /Request details/ });
+    expect(within(details).getAllByText("Cancelled").length).toBeGreaterThan(0);
+    expect(within(details).getByText("dev-nia")).toBeInTheDocument();
+    await user.click(within(details).getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "Actions for Nia Newcomer" }));
+    await user.click(screen.getByRole("menuitem", { name: "Create new request: Nia Newcomer" }));
+    const add = await screen.findByRole("dialog", { name: "Add user" });
+    expect(within(add).getByLabelText(/Object ID/)).toHaveValue("dev-nia");
+    expect(within(add).getByLabelText(/^Name/)).toHaveValue("Nia Newcomer");
+  });
+});

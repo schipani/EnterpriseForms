@@ -103,6 +103,30 @@ public sealed class BlobSecurityEventArchive : ISecurityEventArchive
         }
     }
 
+    public async Task<byte[]?> ReadAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken)
+    {
+        var name = $"org/{organizationId:D}/{streamName}/{streamRevision.ToString("D12", CultureInfo.InvariantCulture)}.json";
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(timeout);
+        try
+        {
+            var existing = await container.GetBlobClient(name).DownloadContentAsync(cts.Token).ConfigureAwait(false);
+            return existing.Value.Content.ToArray();
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null; // nothing archived at this key (or the container does not exist yet)
+        }
+        catch (RequestFailedException ex)
+        {
+            throw new ArchiveUnavailableException("archive read failed: " + ex.Status, ex);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new ArchiveUnavailableException("archive timeout", ex);
+        }
+    }
+
     public async Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken)
     {
         try
@@ -149,6 +173,9 @@ public sealed class InMemorySecurityEventArchive : ISecurityEventArchive
     }
 
     public Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken) => Task.FromResult((true, "InMemory archive (NOT durable; development only)"));
+
+    public Task<byte[]?> ReadAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken) =>
+        Task.FromResult(entries.TryGetValue($"{organizationId:D}/{streamName}/{streamRevision}", out var stored) ? stored.ToArray() : null);
 }
 
 /// <summary>Registered when no permitted archive is configured: every append fails closed and readiness reports the reason.</summary>
@@ -159,4 +186,6 @@ public sealed class UnavailableSecurityEventArchive(string reason) : ISecurityEv
     public Task<ArchiveReceipt> AppendAsync(Guid organizationId, string streamName, long streamRevision, ReadOnlyMemory<byte> eventBody, byte[] expectedDigest, CancellationToken cancellationToken) => throw new ArchiveUnavailableException(reason);
 
     public Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken) => Task.FromResult((false, reason));
+
+    public Task<byte[]?> ReadAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken) => throw new ArchiveUnavailableException(reason);
 }

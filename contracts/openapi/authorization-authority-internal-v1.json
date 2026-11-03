@@ -1056,6 +1056,210 @@
         }
       }
     },
+    "/internal/v1/operator/organizations/{organizationId}/membership-requests": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "operationId": "ListOrganizationMembershipRequests",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorMembershipRequests"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/membership-requests/{requestId}/approve": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "AC-7.4: dry run, then two ES256 approvals from distinct registered approvers over the exact statement (Development/Testing only until PIM). Re-checks request state, expiry, the requesting owner, the identity and its issuer inside the organization lock; creates the identity binding (and optional designer role) as one journaled command.",
+        "operationId": "ApproveOrganizationMembership",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipApprovalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organizations/{organizationId}/membership-requests/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "operationId": "RejectOrganizationMembership",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipRejectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMembershipRequestEntry"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/platform-operators": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "operationId": "GetPlatformOperatorPlaneStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorPlaneStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/platform-operators/bootstrap": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Recovery ceremony: registers new Platform Operator identities only while fewer than two are active. Dry run first; execution needs two ES256 custodian approvals (DR-C7-3 keys) over the statement. Critical alert; platform journal.",
+        "operationId": "BootstrapPlatformOperators",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformOperatorBootstrapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorBootstrapResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/platform-journal/replay": {
+      "post": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "After a database restore: re-applies archived platform events beyond the database head, each verified against the chain; quarantines on mismatch. Never chooses or edits state.",
+        "operationId": "ReplayPlatformJournal",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformJournalReplayResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/operator/fault-injection": {
       "post": {
         "tags": [
@@ -1130,6 +1334,1143 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContributorWriteSwitchState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/operator/me": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "The signed-in Platform Operator, their four platform permissions and the platform journal state.",
+        "operationId": "GetPlatformOperatorProfile",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorProfile"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/operators": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "platform.operators.view: every registered operator (identity and status) and pending two-operator proposals.",
+        "operationId": "ListPlatformOperators",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorRegistryView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/operators/proposals": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "platform.operators.manage: propose Provision, Reinstate or Remove (dry run returns the statement). A different active operator, not the target, must confirm.",
+        "operationId": "ProposePlatformOperatorChange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformOperatorProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/operators/proposals/{proposalId}/confirm": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "ConfirmPlatformOperatorChange",
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformOperatorConfirmationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/operators/{platformOperatorId}/suspend": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Emergency suspension by one active operator (self included): immediate, invalidates the target's pending approvals, alerted.",
+        "operationId": "SuspendPlatformOperator",
+        "parameters": [
+          {
+            "name": "platformOperatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformOperatorSuspensionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformOperatorDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/membership-requests/search": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "platform.membership_requests.review: cross-organization request metadata, newest first, 15 per page by default (opaque cursor bound to the operator and filter).",
+        "operationId": "SearchPlatformMembershipRequests",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformMembershipRequestSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipRequestPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organizations/{organizationId}/membership-requests/{requestId}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Request metadata, the exact statement v2 and its SHA-256, recorded approvals and the caller's eligibility. The view is journaled.",
+        "operationId": "GetPlatformMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipRequestDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organizations/{organizationId}/membership-requests/{requestId}/approvals": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "platform.membership_requests.decide: one operator's approval. The first is stored as pending evidence; a valid second approval by a different operator creates the membership atomically.",
+        "operationId": "ApprovePlatformMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformMembershipDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organizations/{organizationId}/membership-requests/{requestId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "The approving operator withdraws their own pending approval (nobody else can).",
+        "operationId": "WithdrawPlatformMembershipApproval",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformMembershipDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organizations/{organizationId}/membership-requests/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "One operator rejects with a justification and evidence; any pending approval is invalidated; nothing is granted.",
+        "operationId": "RejectPlatformMembershipRequest",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformMembershipDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMembershipDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organization-onboarding": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Create an immutable onboarding request (dry run validates). The Authority generates the organization id and every owner's user id; 2-10 owners from one approved issuer, never a Platform Operator identity.",
+        "operationId": "CreateOrganizationOnboardingRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationOnboardingCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingCreateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organization-onboarding/search": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Onboarding requests, newest first, 15 per page by default (opaque cursor bound to the operator and filter).",
+        "operationId": "SearchOrganizationOnboardingRequests",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationOnboardingSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organization-onboarding/{requestId}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "The request, its frozen statement and SHA-256, owners, approvals, key custody status, activation and the caller's eligibility.",
+        "operationId": "GetOrganizationOnboardingRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organization-onboarding/{requestId}/approvals": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "ApproveOrganizationOnboardingRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationOnboardingDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organization-onboarding/{requestId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "WithdrawOrganizationOnboardingApproval",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationOnboardingDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organization-onboarding/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "RejectOrganizationOnboardingRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationOnboardingDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organization-onboarding/{requestId}/cancel": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "CancelOrganizationOnboardingRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationOnboardingDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organization-onboarding/{requestId}/initialize": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "InitializeOrganizationFromOnboarding",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationOnboardingDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOnboardingDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organizations/search": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Organizations with lifecycle and owner, Security Administrator and member counts only (metadata; no records, documents, teams or shares).",
+        "operationId": "SearchOrganizationDirectory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationDirectorySearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDirectoryPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/organizations/{organizationId}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Owner identities, counts and onboarding provenance. The view is audited on the organization's audit stream before it is returned.",
+        "operationId": "GetOrganizationDirectoryEntry",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDirectoryDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/operator/organization-onboarding/{requestId}/key-custody": {
+      "get": {
+        "tags": [
+          "Operator"
+        ],
+        "summary": "Read-only, for the development key custody tool: the single key name an approved request needs and whether it may be provisioned now. The Authority never creates the key.",
+        "operationId": "GetOrganizationKeyCustodyStatus",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationKeyCustodyStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/owner-recovery": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Open an immutable owner recovery case (dry run validates) for an organization with fewer than two eligible owners. Grants nothing; three operators approve, then the waiting period runs.",
+        "operationId": "OpenOwnerRecoveryCase",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryCreateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/owner-recovery/search": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Recovery cases, newest first, 15 per page by default (opaque cursor bound to the operator and filter).",
+        "operationId": "SearchOwnerRecoveryCases",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoverySearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/owner-recovery/{caseId}": {
+      "get": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "The case, its frozen statement and SHA-256, owners, evidence, approvals, waiting period, objection and the caller's eligibility. Audited on the organization's audit stream before it is returned.",
+        "operationId": "GetOwnerRecoveryCase",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryCaseDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/owner-recovery/organizations/{organizationId}/members/search": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "summary": "Members who may be proposed as replacement owners (enabled, not owners, not operator identities): minimum metadata, server-side filter and paging; audited before disclosure.",
+        "operationId": "SearchOwnerRecoveryMembers",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryMemberSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryMemberPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/owner-recovery/{caseId}/approvals": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "ApproveOwnerRecoveryCase",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/owner-recovery/{caseId}/approvals/withdraw": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "WithdrawOwnerRecoveryApproval",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/owner-recovery/{caseId}/cancel": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "CancelOwnerRecoveryCase",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/platform/owner-recovery/{caseId}/execute": {
+      "post": {
+        "tags": [
+          "Platform"
+        ],
+        "operationId": "ExecuteOwnerRecoveryCase",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/organizations/owner-recovery/notice": {
+      "post": {
+        "tags": [
+          "Membership"
+        ],
+        "summary": "The organization's open recovery case for an enabled owner or Security Administrator (not found for anyone else).",
+        "operationId": "GetOwnerRecoveryNotice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryNoticeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryNotice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/organizations/owner-recovery/objections": {
+      "post": {
+        "tags": [
+          "Membership"
+        ],
+        "summary": "Object to the open case (fresh step-up, explanation). Ends the case immediately; recorded in the platform journal and the organization's audit stream.",
+        "operationId": "ObjectToOwnerRecoveryCase",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerRecoveryObjectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerRecoveryObjectionResponse"
                 }
               }
             }
@@ -1316,6 +2657,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SecurityAdministratorRoster"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/organizations/roster": {
+      "post": {
+        "tags": [
+          "Membership"
+        ],
+        "summary": "AC-7.3: every identity binding of the caller's organization with its enabled state and organization roles, two-owner proposals and membership requests of the last 30 days. Organization owners and Security Administrators only; anyone else gets 404. No record content or counts.",
+        "operationId": "GetOrganizationRoster",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationRosterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationRosterResponse"
                 }
               }
             }
@@ -2473,6 +3845,178 @@
           "AttachmentLifecycle"
         ]
       },
+      "MembershipApprovalRequest": {
+        "required": [
+          "confirm_organization_id",
+          "justification",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "confirm_organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "approvals": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "MembershipApprovalResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "operation_id",
+          "operation_kind",
+          "organization_id",
+          "organization_display_name",
+          "target",
+          "initial_role_name",
+          "request_state",
+          "consequences",
+          "approval_statement_json",
+          "approval_statement_sha256",
+          "approval_mode",
+          "approval_assurance",
+          "required_approvals",
+          "security_command_id",
+          "command_status",
+          "replayed",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_kind": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/OperatorOrganizationPrincipal"
+          },
+          "initial_role_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "request_state": {
+            "type": "string"
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval_statement_json": {
+            "type": "string"
+          },
+          "approval_statement_sha256": {
+            "type": "string"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "required_approvals": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "command_status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "MembershipRejectionRequest": {
+        "required": [
+          "confirm_organization_id",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "confirm_organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "MigrationCataloguePage": {
         "required": [
           "search_catalogue_snapshot_id",
@@ -2622,6 +4166,42 @@
           }
         }
       },
+      "OperatorMembershipRequests": {
+        "required": [
+          "organization_id",
+          "organization_display_name",
+          "approval_mode",
+          "approvals_operational",
+          "requests",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approvals_operational": {
+            "type": "boolean"
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMembershipRequestEntry"
+            }
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "OperatorOrganizationPrincipal": {
         "required": [
           "authority_user_id",
@@ -2734,6 +4314,252 @@
           }
         }
       },
+      "OrganizationActivation": {
+        "required": [
+          "status",
+          "authorization_revision",
+          "projection_applied_revision"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_applied_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "OrganizationDirectoryDetail": {
+        "required": [
+          "summary",
+          "authorization_revision",
+          "projection_applied_revision",
+          "owners",
+          "onboarding_approved_by",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/OrganizationDirectoryItem"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "projection_applied_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationDirectoryOwner"
+            }
+          },
+          "onboarding_approved_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationDirectoryItem": {
+        "required": [
+          "organization_id",
+          "organization_display_name",
+          "lifecycle",
+          "enabled_owner_count",
+          "security_administrator_count",
+          "member_count",
+          "needs_owners",
+          "onboarding_request_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string"
+          },
+          "enabled_owner_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "security_administrator_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "member_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "needs_owners": {
+            "type": "boolean"
+          },
+          "onboarding_request_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationDirectoryOwner": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OrganizationDirectoryPage": {
+        "required": [
+          "items",
+          "total_count",
+          "next_cursor",
+          "limit",
+          "filter",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationDirectoryItem"
+            }
+          },
+          "total_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "next_cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "filter": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationDirectorySearchRequest": {
+        "required": [
+          "query",
+          "filter",
+          "cursor",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "filter": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "OrganizationGateStatus": {
         "required": [
           "organization_id",
@@ -2787,6 +4613,2449 @@
           },
           "integrity_quarantine_enabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "OrganizationKeyCustodyStatus": {
+        "required": [
+          "request_id",
+          "organization_id",
+          "state",
+          "provision_allowed",
+          "key_name",
+          "key_purpose",
+          "provider_name",
+          "key_status",
+          "key_custody_expires_on",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "provision_allowed": {
+            "type": "boolean"
+          },
+          "key_name": {
+            "type": "string"
+          },
+          "key_purpose": {
+            "type": "string"
+          },
+          "provider_name": {
+            "type": "string"
+          },
+          "key_status": {
+            "type": "string"
+          },
+          "key_custody_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationMembershipRequestEntry": {
+        "required": [
+          "request_id",
+          "requested_authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "display_name_hint",
+          "initial_role_name",
+          "requested_by_authority_user_id",
+          "reason",
+          "requested_on",
+          "expires_on",
+          "request_state",
+          "decided_on",
+          "decision_reason"
+        ],
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requested_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name_hint": {
+            "type": "string"
+          },
+          "initial_role_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requested_by_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_state": {
+            "type": "string"
+          },
+          "decided_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "decision_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "request_digest": {
+            "type": "string",
+            "default": ""
+          },
+          "replaces_request_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "replaced_by_request_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "cancelled_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "OrganizationOnboardingApprovalView": {
+        "required": [
+          "approval_id",
+          "platform_operator_id",
+          "operator_display_name",
+          "is_mine",
+          "justification",
+          "recorded_on",
+          "state",
+          "closure_reason"
+        ],
+        "type": "object",
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform_operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operator_display_name": {
+            "type": "string"
+          },
+          "is_mine": {
+            "type": "boolean"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "recorded_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closure_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OrganizationOnboardingCreateRequest": {
+        "required": [
+          "idempotency_key",
+          "organization_display_name",
+          "initial_owners",
+          "justification"
+        ],
+        "type": "object",
+        "properties": {
+          "idempotency_key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "organization_display_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initial_owners": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingOwnerInput"
+            }
+          },
+          "justification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "OrganizationOnboardingCreateResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "warnings",
+          "request",
+          "replayed",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "request": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationOnboardingDetail"
+              }
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationOnboardingDecisionRequest": {
+        "required": [
+          "expected_statement_sha256",
+          "justification",
+          "evidence_kind",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "expected_statement_sha256": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "justification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "OrganizationOnboardingDecisionResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "request_id",
+          "organization_id",
+          "decision",
+          "statement_json",
+          "statement_sha256",
+          "outcome",
+          "approvals_recorded",
+          "approvals_required",
+          "state",
+          "display_state",
+          "security_command_id",
+          "archive_state",
+          "replayed",
+          "approval_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statement_json": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvals_recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvals_required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "display_state": {
+            "type": "string"
+          },
+          "security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "archive_state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationOnboardingDetail": {
+        "required": [
+          "request_id",
+          "organization_id",
+          "organization_display_name",
+          "identity_issuer_uri",
+          "state",
+          "display_state",
+          "justification",
+          "created_by_platform_operator_id",
+          "created_by_operator_display_name",
+          "created_on",
+          "expires_on",
+          "approved_on",
+          "key_custody_expires_on",
+          "initialized_on",
+          "closed_on",
+          "closure_reason",
+          "closure_justification",
+          "last_initialization_failure_code",
+          "last_initialization_failure_on",
+          "owners",
+          "approvals",
+          "approvals_recorded",
+          "approvals_required",
+          "statement_json",
+          "statement_sha256",
+          "key_custody",
+          "activation",
+          "my_eligibility",
+          "row_revision",
+          "approval_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "identity_issuer_uri": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "display_state": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "created_by_platform_operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_by_operator_display_name": {
+            "type": "string"
+          },
+          "created_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approved_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "key_custody_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "initialized_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closed_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closure_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "closure_justification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "last_initialization_failure_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "last_initialization_failure_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingOwnerView"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingApprovalView"
+            }
+          },
+          "approvals_recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvals_required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "statement_json": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          },
+          "key_custody": {
+            "$ref": "#/components/schemas/OrganizationOnboardingKeyCustody"
+          },
+          "activation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationActivation"
+              }
+            ]
+          },
+          "my_eligibility": {
+            "$ref": "#/components/schemas/OrganizationOnboardingEligibility"
+          },
+          "row_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationOnboardingEligibility": {
+        "required": [
+          "can_approve",
+          "can_withdraw",
+          "can_reject",
+          "can_cancel",
+          "can_initialize",
+          "approve_refusal_code",
+          "approve_refusal_detail",
+          "initialize_refusal_code",
+          "initialize_refusal_detail"
+        ],
+        "type": "object",
+        "properties": {
+          "can_approve": {
+            "type": "boolean"
+          },
+          "can_withdraw": {
+            "type": "boolean"
+          },
+          "can_reject": {
+            "type": "boolean"
+          },
+          "can_cancel": {
+            "type": "boolean"
+          },
+          "can_initialize": {
+            "type": "boolean"
+          },
+          "approve_refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approve_refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initialize_refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initialize_refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OrganizationOnboardingKeyCustody": {
+        "required": [
+          "key_name",
+          "status",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "key_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OrganizationOnboardingListItem": {
+        "required": [
+          "request_id",
+          "organization_id",
+          "organization_display_name",
+          "owner_count",
+          "state",
+          "display_state",
+          "created_on",
+          "expires_on",
+          "approvals_recorded",
+          "approvals_required",
+          "approved_by_me",
+          "created_by_operator_display_name"
+        ],
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "owner_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "display_state": {
+            "type": "string"
+          },
+          "created_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvals_recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvals_required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approved_by_me": {
+            "type": "boolean"
+          },
+          "created_by_operator_display_name": {
+            "type": "string"
+          }
+        }
+      },
+      "OrganizationOnboardingOwnerInput": {
+        "required": [
+          "issuer_uri",
+          "subject_identifier",
+          "display_name_hint",
+          "verification_method",
+          "verification_reference"
+        ],
+        "type": "object",
+        "properties": {
+          "issuer_uri": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subject_identifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "display_name_hint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verification_method": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verification_reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OrganizationOnboardingOwnerView": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "display_name_hint",
+          "verification_method",
+          "verification_reference",
+          "member_of_other_organizations"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name_hint": {
+            "type": "string"
+          },
+          "verification_method": {
+            "type": "string"
+          },
+          "verification_reference": {
+            "type": "string"
+          },
+          "member_of_other_organizations": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OrganizationOnboardingPage": {
+        "required": [
+          "items",
+          "total_count",
+          "next_cursor",
+          "limit",
+          "status",
+          "approved_identity_issuers",
+          "approval_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOnboardingListItem"
+            }
+          },
+          "total_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "next_cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "approved_identity_issuers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationOnboardingSearchRequest": {
+        "required": [
+          "query",
+          "status",
+          "cursor",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "OrganizationOwnerProposal": {
+        "required": [
+          "proposal_id",
+          "target_authority_user_id",
+          "proposed_change",
+          "proposed_by_authority_user_id",
+          "reason",
+          "proposed_on",
+          "expires_on",
+          "proposal_state",
+          "consumed_by_security_command_id"
+        ],
+        "type": "object",
+        "properties": {
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proposed_change": {
+            "type": "string"
+          },
+          "proposed_by_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "proposed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proposal_state": {
+            "type": "string"
+          },
+          "consumed_by_security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationRosterMember": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "membership_enabled",
+          "bound_on",
+          "disabled_on",
+          "organization_roles",
+          "display_name_hint"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "membership_enabled": {
+            "type": "boolean"
+          },
+          "bound_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disabled_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "organization_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "display_name_hint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recovery_restrictions_until": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "OrganizationRosterRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OrganizationRosterResponse": {
+        "required": [
+          "can_manage_members",
+          "can_administer_security",
+          "commands_operational",
+          "commands_unavailable_reason",
+          "operator_approval_operational",
+          "organization_identity_issuer",
+          "members",
+          "owner_proposals",
+          "membership_requests",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "can_manage_members": {
+            "type": "boolean"
+          },
+          "can_administer_security": {
+            "type": "boolean"
+          },
+          "commands_operational": {
+            "type": "boolean"
+          },
+          "commands_unavailable_reason": {
+            "type": "string"
+          },
+          "operator_approval_operational": {
+            "type": "boolean"
+          },
+          "organization_identity_issuer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationRosterMember"
+            }
+          },
+          "owner_proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationOwnerProposal"
+            }
+          },
+          "membership_requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMembershipRequestEntry"
+            }
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryApprovalView": {
+        "required": [
+          "approval_id",
+          "platform_operator_id",
+          "operator_display_name",
+          "is_mine",
+          "justification",
+          "recorded_on",
+          "state",
+          "closure_reason"
+        ],
+        "type": "object",
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform_operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operator_display_name": {
+            "type": "string"
+          },
+          "is_mine": {
+            "type": "boolean"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "recorded_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closure_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OwnerRecoveryCaseDetail": {
+        "required": [
+          "case_id",
+          "organization_id",
+          "organization_display_name",
+          "state",
+          "display_state",
+          "incident_reference",
+          "justification",
+          "opened_by_platform_operator_id",
+          "opened_by_operator_display_name",
+          "opened_on",
+          "waiting_period_ends_on",
+          "waiting_period_remaining_seconds",
+          "expires_on",
+          "recovered_on",
+          "closed_on",
+          "closure_reason",
+          "closure_justification",
+          "last_execution_failure_code",
+          "last_execution_failure_on",
+          "eligible_owners_before",
+          "eligible_owners_after",
+          "current_owners",
+          "subjects",
+          "approvals",
+          "approvals_recorded",
+          "approvals_required",
+          "objection",
+          "statement_json",
+          "statement_sha256",
+          "activation",
+          "my_eligibility",
+          "row_revision",
+          "approval_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "display_state": {
+            "type": "string"
+          },
+          "incident_reference": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "opened_by_platform_operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "opened_by_operator_display_name": {
+            "type": "string"
+          },
+          "opened_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waiting_period_ends_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waiting_period_remaining_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recovered_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closed_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "closure_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "closure_justification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "last_execution_failure_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "last_execution_failure_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "eligible_owners_before": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "eligible_owners_after": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "current_owners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryOwnerView"
+            }
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoverySubjectView"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryApprovalView"
+            }
+          },
+          "approvals_recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvals_required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "objection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRecoveryObjectionView"
+              }
+            ]
+          },
+          "statement_json": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          },
+          "activation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationActivation"
+              }
+            ]
+          },
+          "my_eligibility": {
+            "$ref": "#/components/schemas/OwnerRecoveryEligibility"
+          },
+          "row_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryCreateRequest": {
+        "required": [
+          "idempotency_key",
+          "organization_id",
+          "incident_reference",
+          "justification",
+          "declared_unavailable",
+          "replacements"
+        ],
+        "type": "object",
+        "properties": {
+          "idempotency_key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incident_reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "justification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "declared_unavailable": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryDeclaredInput"
+            }
+          },
+          "replacements": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryReplacementInput"
+            }
+          },
+          "dry_run": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "OwnerRecoveryCreateResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "warnings",
+          "case",
+          "replayed",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "case": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRecoveryCaseDetail"
+              }
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryDecisionRequest": {
+        "required": [
+          "expected_statement_sha256",
+          "justification",
+          "evidence_kind",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "expected_statement_sha256": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "justification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "OwnerRecoveryDecisionResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "case_id",
+          "organization_id",
+          "decision",
+          "statement_json",
+          "statement_sha256",
+          "outcome",
+          "approvals_recorded",
+          "approvals_required",
+          "state",
+          "display_state",
+          "security_command_id",
+          "archive_state",
+          "replayed",
+          "approval_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statement_json": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvals_recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvals_required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "display_state": {
+            "type": "string"
+          },
+          "security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "archive_state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryDeclaredInput": {
+        "required": [
+          "authority_user_id",
+          "reason",
+          "evidence_reference",
+          "evidence_summary"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence_reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence_summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OwnerRecoveryEligibility": {
+        "required": [
+          "can_approve",
+          "can_withdraw",
+          "can_cancel",
+          "can_execute",
+          "approve_refusal_code",
+          "approve_refusal_detail",
+          "execute_refusal_code",
+          "execute_refusal_detail"
+        ],
+        "type": "object",
+        "properties": {
+          "can_approve": {
+            "type": "boolean"
+          },
+          "can_withdraw": {
+            "type": "boolean"
+          },
+          "can_cancel": {
+            "type": "boolean"
+          },
+          "can_execute": {
+            "type": "boolean"
+          },
+          "approve_refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "approve_refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "execute_refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "execute_refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OwnerRecoveryListItem": {
+        "required": [
+          "case_id",
+          "organization_id",
+          "organization_display_name",
+          "incident_reference",
+          "state",
+          "display_state",
+          "opened_on",
+          "waiting_period_ends_on",
+          "expires_on",
+          "approvals_recorded",
+          "approvals_required",
+          "approved_by_me",
+          "replacement_count",
+          "opened_by_operator_display_name"
+        ],
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "incident_reference": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "display_state": {
+            "type": "string"
+          },
+          "opened_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waiting_period_ends_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvals_recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvals_required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approved_by_me": {
+            "type": "boolean"
+          },
+          "replacement_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "opened_by_operator_display_name": {
+            "type": "string"
+          }
+        }
+      },
+      "OwnerRecoveryMemberItem": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "display_name",
+          "member_since"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "member_since": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OwnerRecoveryMemberPage": {
+        "required": [
+          "items",
+          "total_count",
+          "next_cursor",
+          "limit",
+          "active_owner_count",
+          "maximum_owners",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryMemberItem"
+            }
+          },
+          "total_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "next_cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "active_owner_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maximum_owners": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryMemberSearchRequest": {
+        "required": [
+          "query",
+          "cursor",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "exclude_authority_user_ids": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "OwnerRecoveryNotice": {
+        "required": [
+          "case",
+          "can_object",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "case": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRecoveryNoticeCase"
+              }
+            ]
+          },
+          "can_object": {
+            "type": "boolean"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryNoticeCase": {
+        "required": [
+          "case_id",
+          "incident_reference",
+          "justification",
+          "opened_on",
+          "waiting_period_ends_on",
+          "approvals_recorded",
+          "approvals_required",
+          "subjects"
+        ],
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incident_reference": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "opened_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waiting_period_ends_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvals_recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvals_required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryNoticeSubject"
+            }
+          }
+        }
+      },
+      "OwnerRecoveryNoticeRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryNoticeSubject": {
+        "required": [
+          "role",
+          "authority_user_id",
+          "subject_identifier",
+          "display_name_hint",
+          "is_new_identity",
+          "unavailability_reason"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name_hint": {
+            "type": "string"
+          },
+          "is_new_identity": {
+            "type": "boolean"
+          },
+          "unavailability_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OwnerRecoveryObjectionRequest": {
+        "required": [
+          "organization_id",
+          "case_id",
+          "reason",
+          "step_up_evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "step_up_evidence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OwnerRecoveryObjectionResponse": {
+        "required": [
+          "case_id",
+          "state",
+          "objected_on",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "objected_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryObjectionView": {
+        "required": [
+          "objected_on",
+          "objected_by_authority_user_id",
+          "objected_by_subject_identifier",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "objected_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "objected_by_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objected_by_subject_identifier": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "OwnerRecoveryOwnerView": {
+        "required": [
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "enabled",
+          "declared_unavailable",
+          "active_since_case_opened"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "declared_unavailable": {
+            "type": "boolean"
+          },
+          "active_since_case_opened": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OwnerRecoveryPage": {
+        "required": [
+          "items",
+          "total_count",
+          "next_cursor",
+          "limit",
+          "status",
+          "waiting_period_seconds",
+          "approval_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerRecoveryListItem"
+            }
+          },
+          "total_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "next_cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "waiting_period_seconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "OwnerRecoveryReplacementInput": {
+        "required": [
+          "existing_authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "display_name_hint",
+          "verification_method",
+          "verification_reference"
+        ],
+        "type": "object",
+        "properties": {
+          "existing_authority_user_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subject_identifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "display_name_hint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verification_method": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verification_reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OwnerRecoverySearchRequest": {
+        "required": [
+          "query",
+          "status",
+          "cursor",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "OwnerRecoverySubjectView": {
+        "required": [
+          "role",
+          "authority_user_id",
+          "issuer_uri",
+          "subject_identifier",
+          "display_name_hint",
+          "is_new_identity",
+          "verification_method",
+          "verification_reference",
+          "unavailability_reason",
+          "evidence_reference",
+          "evidence_summary"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name_hint": {
+            "type": "string"
+          },
+          "is_new_identity": {
+            "type": "boolean"
+          },
+          "verification_method": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verification_reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unavailability_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence_reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence_summary": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -2902,6 +7171,1277 @@
           "correlation_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "PlatformApprovalStatus": {
+        "required": [
+          "recorded",
+          "required",
+          "approved_by_me",
+          "awaiting_other_operator",
+          "pending_approval_expires_on"
+        ],
+        "type": "object",
+        "properties": {
+          "recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approved_by_me": {
+            "type": "boolean"
+          },
+          "awaiting_other_operator": {
+            "type": "boolean"
+          },
+          "pending_approval_expires_on": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "PlatformApprovalView": {
+        "required": [
+          "approval_id",
+          "platform_operator_id",
+          "operator_display_name",
+          "operator_identity",
+          "recorded_on",
+          "valid_until",
+          "justification",
+          "state",
+          "closure_reason",
+          "is_mine"
+        ],
+        "type": "object",
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform_operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operator_display_name": {
+            "type": "string"
+          },
+          "operator_identity": {
+            "$ref": "#/components/schemas/PlatformIdentity"
+          },
+          "recorded_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "closure_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "is_mine": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PlatformCeremonyTarget": {
+        "required": [
+          "authority_user_id"
+        ],
+        "type": "object",
+        "properties": {
+          "authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformEligibility": {
+        "required": [
+          "can_approve",
+          "can_reject",
+          "can_withdraw",
+          "refusal_code",
+          "refusal_detail"
+        ],
+        "type": "object",
+        "properties": {
+          "can_approve": {
+            "type": "boolean"
+          },
+          "can_reject": {
+            "type": "boolean"
+          },
+          "can_withdraw": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PlatformIdentity": {
+        "required": [
+          "issuer_uri",
+          "subject_identifier"
+        ],
+        "type": "object",
+        "properties": {
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          }
+        }
+      },
+      "PlatformJournalReplayResponse": {
+        "required": [
+          "revision_before",
+          "revision_after",
+          "events_replayed",
+          "gate_open",
+          "gate_refusal",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "revision_before": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "revision_after": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "events_replayed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "gate_open": {
+            "type": "boolean"
+          },
+          "gate_refusal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformJournalStatus": {
+        "required": [
+          "revision",
+          "pending_archive_entries",
+          "quarantined",
+          "quarantine_reason"
+        ],
+        "type": "object",
+        "properties": {
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "pending_archive_entries": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantined": {
+            "type": "boolean"
+          },
+          "quarantine_reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PlatformMembershipDecisionRequest": {
+        "required": [
+          "expected_statement_sha256",
+          "justification",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "expected_statement_sha256": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "evidence_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PlatformMembershipDecisionResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "request_id",
+          "organization_id",
+          "decision",
+          "statement_json",
+          "statement_sha256",
+          "outcome",
+          "approvals_recorded",
+          "approvals_required",
+          "my_approval_id",
+          "security_command_id",
+          "command_status",
+          "authorization_revision",
+          "journal_revision",
+          "journal_archive_state",
+          "evidence_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statement_json": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "approvals_recorded": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "approvals_required": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "my_approval_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "security_command_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "command_status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "journal_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "journal_archive_state": {
+            "type": "string"
+          },
+          "evidence_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformMembershipRequestDetail": {
+        "required": [
+          "request",
+          "request_reason",
+          "replaces_request_id",
+          "statement_json",
+          "statement_sha256",
+          "consequences",
+          "approvals",
+          "my_eligibility",
+          "evidence_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/PlatformMembershipRequestItem"
+          },
+          "request_reason": {
+            "type": "string"
+          },
+          "replaces_request_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "statement_json": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformApprovalView"
+            }
+          },
+          "my_eligibility": {
+            "$ref": "#/components/schemas/PlatformEligibility"
+          },
+          "evidence_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformMembershipRequestItem": {
+        "required": [
+          "request_id",
+          "organization_id",
+          "organization_display_name",
+          "display_name_hint",
+          "target",
+          "initial_role_name",
+          "requested_by_authority_user_id",
+          "requested_by",
+          "requested_on",
+          "expires_on",
+          "request_state",
+          "approval_status",
+          "available_actions"
+        ],
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_display_name": {
+            "type": "string"
+          },
+          "display_name_hint": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/PlatformIdentity"
+          },
+          "initial_role_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "requested_by_authority_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requested_by": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlatformIdentity"
+              }
+            ]
+          },
+          "requested_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_state": {
+            "type": "string"
+          },
+          "approval_status": {
+            "$ref": "#/components/schemas/PlatformApprovalStatus"
+          },
+          "available_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PlatformMembershipRequestPage": {
+        "required": [
+          "items",
+          "total_count",
+          "next_cursor",
+          "limit",
+          "status",
+          "journal",
+          "evidence_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformMembershipRequestItem"
+            }
+          },
+          "total_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "next_cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "evidence_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformMembershipRequestSearchRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "PlatformOperatorBootstrapRequest": {
+        "required": [
+          "operation_id",
+          "operators",
+          "justification",
+          "incident_reference",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformOperatorCandidate"
+            }
+          },
+          "justification": {
+            "type": "string"
+          },
+          "incident_reference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "approvals": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PlatformOperatorBootstrapResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "operation_id",
+          "operation_kind",
+          "organization_id",
+          "target",
+          "approval_statement_json",
+          "approval_statement_sha256",
+          "approval_mode",
+          "approval_assurance",
+          "required_approvals",
+          "registered_operators",
+          "journal",
+          "journal_archive_state",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_kind": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/PlatformCeremonyTarget"
+          },
+          "approval_statement_json": {
+            "type": "string"
+          },
+          "approval_statement_sha256": {
+            "type": "string"
+          },
+          "approval_mode": {
+            "type": "string"
+          },
+          "approval_assurance": {
+            "type": "string"
+          },
+          "required_approvals": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registered_operators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformOperatorSummary"
+            }
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "journal_archive_state": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformOperatorCandidate": {
+        "required": [
+          "issuer_uri",
+          "subject_identifier",
+          "display_name",
+          "evidence_kind",
+          "synthetic_key_identifier",
+          "synthetic_public_key_base64"
+        ],
+        "type": "object",
+        "properties": {
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "evidence_kind": {
+            "type": "string"
+          },
+          "synthetic_key_identifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "synthetic_public_key_base64": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PlatformOperatorConfirmationRequest": {
+        "required": [
+          "expected_statement_sha256",
+          "justification",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "expected_statement_sha256": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "evidence_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PlatformOperatorDecisionResponse": {
+        "required": [
+          "dry_run",
+          "eligible",
+          "refusal_code",
+          "refusal_detail",
+          "operation_kind",
+          "operation_id",
+          "decision",
+          "statement_json",
+          "statement_sha256",
+          "outcome",
+          "target",
+          "proposal_id",
+          "journal_revision",
+          "journal_archive_state",
+          "evidence_assurance",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "dry_run": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "refusal_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusal_detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "operation_kind": {
+            "type": "string"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "statement_json": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "target": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlatformOperatorSummary"
+              }
+            ]
+          },
+          "proposal_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "journal_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "journal_archive_state": {
+            "type": "string"
+          },
+          "evidence_assurance": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformOperatorPlaneStatus": {
+        "required": [
+          "mode",
+          "operational",
+          "evidence_assurance",
+          "active_operator_count",
+          "recovery_ceremony_allowed",
+          "operators",
+          "journal",
+          "journal_gate_refusal",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string"
+          },
+          "operational": {
+            "type": "boolean"
+          },
+          "evidence_assurance": {
+            "type": "string"
+          },
+          "active_operator_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "recovery_ceremony_allowed": {
+            "type": "boolean"
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformOperatorSummary"
+            }
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "journal_gate_refusal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformOperatorProfile": {
+        "required": [
+          "operator",
+          "mode",
+          "evidence_assurance",
+          "permissions",
+          "active_operator_count",
+          "journal",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "operator": {
+            "$ref": "#/components/schemas/PlatformOperatorSummary"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "evidence_assurance": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active_operator_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformOperatorProposalRequest": {
+        "required": [
+          "operation_id",
+          "change",
+          "target_platform_operator_id",
+          "candidate",
+          "justification",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "change": {
+            "type": "string"
+          },
+          "target_platform_operator_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "candidate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlatformOperatorCandidate"
+              }
+            ]
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "evidence_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PlatformOperatorProposalView": {
+        "required": [
+          "proposal_id",
+          "change",
+          "target_platform_operator_id",
+          "target_issuer_uri",
+          "target_subject_identifier",
+          "target_display_name",
+          "proposed_by_platform_operator_id",
+          "justification",
+          "created_on",
+          "expires_on",
+          "state",
+          "statement_sha256"
+        ],
+        "type": "object",
+        "properties": {
+          "proposal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "change": {
+            "type": "string"
+          },
+          "target_platform_operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_issuer_uri": {
+            "type": "string"
+          },
+          "target_subject_identifier": {
+            "type": "string"
+          },
+          "target_display_name": {
+            "type": "string"
+          },
+          "proposed_by_platform_operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "created_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          }
+        }
+      },
+      "PlatformOperatorRegistryView": {
+        "required": [
+          "operators",
+          "pending_proposals",
+          "active_operator_count",
+          "quorum_available",
+          "journal",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "operators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformOperatorSummary"
+            }
+          },
+          "pending_proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformOperatorProposalView"
+            }
+          },
+          "active_operator_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quorum_available": {
+            "type": "boolean"
+          },
+          "journal": {
+            "$ref": "#/components/schemas/PlatformJournalStatus"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PlatformOperatorSummary": {
+        "required": [
+          "platform_operator_id",
+          "issuer_uri",
+          "subject_identifier",
+          "display_name",
+          "status",
+          "evidence_kind",
+          "synthetic_key_identifier",
+          "row_revision",
+          "provisioned_on",
+          "status_changed_on",
+          "status_reason"
+        ],
+        "type": "object",
+        "properties": {
+          "platform_operator_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issuer_uri": {
+            "type": "string"
+          },
+          "subject_identifier": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "evidence_kind": {
+            "type": "string"
+          },
+          "synthetic_key_identifier": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "row_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "provisioned_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status_changed_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status_reason": {
+            "type": "string"
+          }
+        }
+      },
+      "PlatformOperatorSuspensionRequest": {
+        "required": [
+          "operation_id",
+          "justification",
+          "dry_run"
+        ],
+        "type": "object",
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "evidence_kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "evidence": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -4137,7 +9677,15 @@
           "RegisterPublishedFormVersion",
           "ApproveFieldSearch",
           "WithdrawFieldSearch",
-          "UpdateFieldSearchers"
+          "UpdateFieldSearchers",
+          "GrantOrganizationRole",
+          "RevokeOrganizationRole",
+          "ProposeOrganizationOwnerChange",
+          "DisableIdentityBinding",
+          "EnableIdentityBinding",
+          "RequestOrganizationMembership",
+          "CancelOrganizationMembershipRequest",
+          "ReplaceOrganizationMembershipRequest"
         ]
       },
       "SecurityCommandOutcome": {
@@ -4677,6 +10225,12 @@
     },
     {
       "name": "Operator"
+    },
+    {
+      "name": "Platform"
+    },
+    {
+      "name": "Membership"
     },
     {
       "name": "Sessions"

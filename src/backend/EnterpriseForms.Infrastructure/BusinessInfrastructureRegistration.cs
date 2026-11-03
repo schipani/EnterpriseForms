@@ -53,6 +53,8 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<IBrowserSessionStateAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IFieldSearchPolicyAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<ISecurityAdministratorAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<IOrganizationRosterAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<IOwnerRecoveryNoticeAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<ITestStackIdentityAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IRecordDisplayDirectory, EnterpriseForms.Application.Features.FormRecords.Ports.RecordDisplayDirectory>();
         services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearchPolicy.FieldSearchPolicyHandlers>();
@@ -71,6 +73,8 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<FormAccessHandlers>();
         services.AddSingleton<SecurityPolicyHandlers>();
         services.AddSingleton<SecurityAdministratorsHandlers>();
+        services.AddSingleton<OwnerRecoveryNoticeHandlers>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Identity.MemberAdministration.MemberAdministrationHandlers>();
         services.AddSingleton<CreateFormRecordHandler>();
         services.AddSingleton<GetFormRecordHandler>();
         services.AddSingleton<GetRecordProjectionHandler>();
@@ -90,7 +94,6 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<GetRecordActivityHandler>();
         services.AddSingleton<BrandingHandlers>();
         services.AddSingleton<OrganizationOverviewHandler>();
-        services.AddSingleton<EnterpriseForms.Application.Features.Identity.MemberDirectory.GetMemberDirectoryHandler>();
         services.AddSingleton<TeamDirectoryHandlers>();
         services.AddSingleton<DashboardHandler>();
         services.AddSingleton<ISecurityIncidentRecorder, SecurityIncidentRecorder>();

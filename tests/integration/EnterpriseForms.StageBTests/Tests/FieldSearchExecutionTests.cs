@@ -23,10 +23,10 @@ public sealed class FieldSearchExecutionTests(StageBFixture fixture)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private async Task<Ws> WorkspaceAsync(string name)
+    private async Task<Ws> WorkspaceAsync(string name, bool withAdditionalOwners = false)
     {
         var s = new StageBScenario(fixture, name);
-        await s.BootstrapAsync();
+        await s.BootstrapAsync(withAdditionalOwners: withAdditionalOwners);
         var current = await fixture.Api.GetAsync("/api/v1/organization/security-policy", s.Token(s.Designer));
         var policy = await fixture.Api.SendAsync(HttpMethod.Put, "/api/v1/organization/security-policy", s.Token(s.Designer), new { minimumFieldClassification = "Internal", plaintextInternalFieldsPermitted = true, plaintextDowngradePermitted = false, plaintextSearchPermitted = true, policyStatementText = "Selected plaintext Internal fields may be searched in this synthetic organization.", expectedPolicyRevision = current.Root.GetProperty("securityPolicyRevision").GetInt64() }, Guid.NewGuid().ToString("N"));
         Assert.True(policy.IsSuccess, policy.Body);
@@ -477,7 +477,7 @@ END $$;", throwOnError: false);
     [Fact]
     public async Task BenchmarkTheCompleteVerifiedSearchAt50To480RecordsUnderConcurrencyWritesAndRevocations()
     {
-        var w = await WorkspaceAsync("m3-bench");
+        var w = await WorkspaceAsync("m3-bench", withAdditionalOwners: true); // an organization owner cannot join a team alone (OB-F8)
         await w.S.BuildAccusedWorkspaceAsync(); // a second form for unrelated background writes
         var team = await fixture.Api.PostAsync("/api/v1/teams", w.S.Token(w.S.Designer), new { teamName = "Benchmark team " + w.S.Name });
         Assert.Equal(HttpStatusCode.Created, team.Status);
@@ -485,7 +485,8 @@ END $$;", throwOnError: false);
         var users = new[] { w.S.Clerk, w.S.Reader, w.S.Designer, w.S.Administrator, w.S.DesignerOnly };
         foreach (var user in users)
         {
-            var added = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", w.S.Token(w.S.Designer), new { userId = user.AuthorityUserId });
+            var adder = user == w.S.Designer ? w.S.SecondOwner : w.S.Designer; // the Designer is an owner: a different owner adds them
+            var added = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", w.S.Token(adder), new { userId = user.AuthorityUserId });
             Assert.True(added.IsSuccess, added.Body);
         }
 

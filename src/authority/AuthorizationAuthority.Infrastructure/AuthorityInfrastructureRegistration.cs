@@ -83,6 +83,19 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton<SessionService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.FieldSearch.FieldSearchCapabilityService>();
         services.AddSingleton<AuthorizationAuthority.Application.Features.FieldSearch.SecurityAdministratorRosterService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.Membership.OrganizationRosterService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.Membership.MembershipProvisioningService>();
+        // C8 M2 Stages 1-2: Platform Operators. Unavailable unless the API host registers the configured policy (Development/Testing only).
+        services.TryAddSingleton(AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorPolicy.Unavailable);
+        services.AddSingleton<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorEvidenceVerifier>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformJournal>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformOperatorRegistryService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.PlatformOperators.PlatformMembershipApprovalService>();
+        // C8 onboarding (C-104): unavailable (no issuers, legacy bootstrap off) unless the API host registers the configured policy.
+        services.TryAddSingleton(AuthorizationAuthority.Application.Features.OrganizationOnboarding.OrganizationOnboardingPolicy.Create(null, "Production"));
+        services.AddSingleton<AuthorizationAuthority.Application.Features.OrganizationOnboarding.OrganizationOnboardingService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.OrganizationOnboarding.OwnerRecoveryService>();
+        services.AddSingleton<AuthorizationAuthority.Application.Features.OrganizationOnboarding.OrganizationDirectoryService>();
         return services;
     }
 

@@ -50,8 +50,129 @@ services:
       OperatorApprovals__Approvers__0__PublicKeyBase64: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaBC2VnfuPFENfDfpRL5gG6ZhYCDxOJB/Mj8yXvw2PxusfBRgV1d1wjvy/HP67VIRCfW0h67+hMuHCFx7rV/qDQ==
       OperatorApprovals__Approvers__1__ApproverId: test-synthetic-approver-2
       OperatorApprovals__Approvers__1__PublicKeyBase64: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4VrwCbiOwMrK+U4F07V5aaLnSTrgfBh0p7h9aapL/IuZmvII/Yvy9nX/Iz6vjVDz465DRHe0dWZeILR4h/E/Ew==
+      # C8 M2 Stages 1-2: development-only Platform Operator plane on this isolated stack. The synthetic Platform Console credential
+      # and operator-assertion key are mirrored by TestIdentity; operator approval keys are registered by the recovery ceremony
+      # (public halves only). Startup refuses SyntheticDevelopment outside Development/Testing; every other stack leaves it unset.
+      PlatformOperators__Mode: SyntheticDevelopment
+      Identity__PlatformConsole__Issuer: enterpriseforms-platform-console
+      Identity__PlatformConsole__Audience: authorization-authority-platform
+      Identity__PlatformConsole__SharedKeyBase64: cGxhdGZvcm0tY29uc29sZS1zZWN0ZXN0LW9ubHktc2hhcmVkLWtleS0wMA==
+      Identity__OperatorAssertion__Issuer: https://platform-operators.sectest.enterpriseforms.invalid/
+      Identity__OperatorAssertion__Audience: authorization-authority-platform-operator
+      Identity__OperatorAssertion__SharedKeyBase64: cGxhdGZvcm0tb3BlcmF0b3ItYXNzZXJ0aW9uLXNlY3Rlc3Qtb25seS1rMDE=
+      # C8 onboarding (C-104): Platform Console onboarding on this isolated stack, owners from the synthetic test identity provider only.
+      OrganizationOnboarding__ApprovedIdentityIssuers__0: ${TEST_IDP_ISSUER}
+      # C-105: accelerated owner recovery waiting period for the isolated test stack (production target 72 hours; Development/Testing minimum 10 s).
+      OrganizationOnboarding__RecoveryWaitingPeriodSeconds: "20"
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
+    # C8 M2 Stage 3: the Platform Console reaches the Authority over its own network (never trust-edge, which the business shares).
+    networks: [authority-net, trust-edge, platform-edge]
+  vault:
+    # C8 M2 Stage 3: the Platform Console signs operator evidence here, over an internal network shared with nothing else.
+    networks: [authority-net, platform-signing]
+  vault-console-init:
+    # C8 M2 Stage 3 (Testing only): one non-exportable ECDSA P-256 Transit key per synthetic console operator, a policy that allows
+    # ONLY `update` on those three exact sign paths, and a token with that policy alone (fixed synthetic id, this stack only). The
+    # Authority's token cannot use these keys and the console's token cannot use any organization key (asserted by the real-stack tests).
+    image: hashicorp/vault:1.20.4
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        for name in sectest-console-key-dana sectest-console-key-ellis sectest-console-key-frankie; do
+          vault read transit/keys/$$name >/dev/null 2>&1 || vault write transit/keys/$$name type=ecdsa-p256 exportable=false allow_plaintext_backup=false >/dev/null
+        done
+        : > /tmp/console.hcl
+        for name in sectest-console-key-dana sectest-console-key-ellis sectest-console-key-frankie; do
+          echo "path \"transit/sign/$$name/sha2-256\" { capabilities = [\"update\"] }" >> /tmp/console.hcl
+        done
+        vault policy write platform-console-signing /tmp/console.hcl >/dev/null
+        vault token lookup "$$CONSOLE_TOKEN" >/dev/null 2>&1 || vault token create -id="$$CONSOLE_TOKEN" -orphan -no-default-policy -policy=platform-console-signing -ttl=720h -display-name=platform-console-sectest >/dev/null
+        echo "platform console signing keys, policy and token ready"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      CONSOLE_TOKEN: sectest-platform-console-vault-token-0001
+    depends_on:
+      vault-transit-init:
+        condition: service_completed_successfully
+    networks: [authority-net]
+    restart: "no"
+  vault-custody-init:
+    # C8 onboarding (C-104, Testing only): the dedicated organization key custody credential. Vault authorizes a Transit key create as
+    # `update`, so the policy grants `update` on exactly one path segment (transit/keys/<name>: never .../rotate, .../config, .../trim)
+    # with parameters pinned to a non-exportable 256-bit HMAC key (plus token self-lookup). It can create a key; re-creating an existing
+    # key changes nothing; it can never read, rotate, reconfigure, export or delete a key, or sign. The Authority verifies (never creates)
+    # the key before initialization. Fixed synthetic token id (this stack only); the real-stack tests assert the denials.
+    image: hashicorp/vault:1.20.4
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        printf '%s\n' 'path "transit/keys/+" {' '  capabilities = ["update"]' '  allowed_parameters = { "type" = ["hmac"], "key_size" = ["32"], "exportable" = ["false"], "allow_plaintext_backup" = ["false"] }' '}' 'path "auth/token/lookup-self" { capabilities = ["read"] }' > /tmp/custody.hcl
+        vault policy write organization-key-custody /tmp/custody.hcl >/dev/null
+        vault token lookup "$$CUSTODY_TOKEN" >/dev/null 2>&1 || vault token create -id="$$CUSTODY_TOKEN" -orphan -no-default-policy -policy=organization-key-custody -ttl=720h -display-name=organization-key-custody-sectest >/dev/null
+        echo "organization key custody policy and token ready"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      CUSTODY_TOKEN: sectest-organization-key-custody-token-0001
+    depends_on:
+      vault-transit-init:
+        condition: service_completed_successfully
+    networks: [authority-net]
+    restart: "no"
+  platform-console:
+    # C8 M2 Stage 3: the separately deployed Platform Console BFF (Testing). Its own credentials (mirrored by TestIdentity), the three
+    # synthetic console operators registered by the real-stack harness, and Vault Transit signing with each operator's own key.
+    image: enterpriseforms/platform-console:local
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.platform-console
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+      PlatformConsole__Mode: SyntheticDevelopment
+      PlatformConsole__AllowedOrigins__0: http://127.0.0.1:5192
+      PlatformConsole__AllowedOrigins__1: http://localhost:5192
+      # Stage 4 Playwright: the Vite dev server Playwright starts for the console app proxies to this console (E2E_CONSOLE_PORT).
+      PlatformConsole__AllowedOrigins__2: http://127.0.0.1:5198
+      PlatformConsole__AllowedOrigins__3: http://localhost:5198
+      PlatformConsole__Authority__BaseAddress: http://authority:8080
+      PlatformConsole__Authority__WorkloadName: platform-console-sectest
+      PlatformConsole__Authority__ConsoleCredential__Issuer: enterpriseforms-platform-console
+      PlatformConsole__Authority__ConsoleCredential__Audience: authorization-authority-platform
+      PlatformConsole__Authority__ConsoleCredential__SharedKeyBase64: cGxhdGZvcm0tY29uc29sZS1zZWN0ZXN0LW9ubHktc2hhcmVkLWtleS0wMA==
+      PlatformConsole__Authority__OperatorAssertion__Issuer: https://platform-operators.sectest.enterpriseforms.invalid/
+      PlatformConsole__Authority__OperatorAssertion__Audience: authorization-authority-platform-operator
+      PlatformConsole__Authority__OperatorAssertion__SharedKeyBase64: cGxhdGZvcm0tb3BlcmF0b3ItYXNzZXJ0aW9uLXNlY3Rlc3Qtb25seS1rMDE=
+      PlatformConsole__Vault__Address: http://vault:8200
+      PlatformConsole__Vault__Token: sectest-platform-console-vault-token-0001
+      PlatformConsole__Operators__0__SubjectIdentifier: sectest-console-operator-dana
+      PlatformConsole__Operators__0__DisplayName: Dana Console Operator (synthetic)
+      PlatformConsole__Operators__0__VaultKeyName: sectest-console-key-dana
+      PlatformConsole__Operators__1__SubjectIdentifier: sectest-console-operator-ellis
+      PlatformConsole__Operators__1__DisplayName: Ellis Console Operator (synthetic)
+      PlatformConsole__Operators__1__VaultKeyName: sectest-console-key-ellis
+      PlatformConsole__Operators__2__SubjectIdentifier: sectest-console-operator-frankie
+      PlatformConsole__Operators__2__DisplayName: Frankie Console Operator (synthetic)
+      PlatformConsole__Operators__2__VaultKeyName: sectest-console-key-frankie
+    depends_on:
+      authority:
+        condition: service_healthy
+      vault-console-init:
+        condition: service_completed_successfully
+      # The custody init is a one-shot with no other dependent; as a completed dependency it keeps `up --wait` from treating its
+      # normal exit (0) as a failure. The console does not use the custody token.
+      vault-custody-init:
+        condition: service_completed_successfully
+    networks: [platform-edge, platform-signing]
+    ports: ["127.0.0.1:5192:8080"]
+    healthcheck:
+      test: ["CMD", "dotnet", "EnterpriseForms.PlatformConsole.dll", "--probe", "http://127.0.0.1:8080/console-api/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
   api:
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
@@ -135,6 +256,11 @@ services:
     depends_on:
       business-db:
         condition: service_healthy
+networks:
+  # C8 M2 Stage 3: console <-> Authority, and console <-> Vault (internal; nothing else attached).
+  platform-edge: {}
+  platform-signing:
+    internal: true
 volumes:
   # Ephemeral (tmpfs) key ring shared by the two API containers; owned by the runtime image's non-root user (APP_UID 1654).
   api-keyring:

@@ -143,11 +143,13 @@ public sealed class SecurityAdministratorTests
     }
 
     [Fact]
-    public async Task ASecurityAdministratorCannotJoinATeamOnTheirOwnAuthorityButAnOwnerStillCan()
+    public async Task NeitherASecurityAdministratorNorAnOwnerCanJoinATeamOnTheirOwnAuthority()
     {
         Assert.Equal(AuthorityErrorCodes.Forbidden, await RejectedAsync(() => PlanAsync(Administrator, SecurityCommandKind.AddTeamMember, ResourceKind.Team, Team, new TeamMemberPayload(Team, Administrator))));
         Assert.Single((await PlanAsync(Administrator, SecurityCommandKind.AddTeamMember, ResourceKind.Team, Team, new TeamMemberPayload(Team, Member))).AddEdges);
-        Assert.Single((await PlanAsync(Owner, SecurityCommandKind.AddTeamMember, ResourceKind.Team, Team, new TeamMemberPayload(Team, Owner))).AddEdges);
+        // OB-F8 (C-104): the former owner self-join is refused, and a Security Administrator cannot add an owner either.
+        Assert.Equal(AuthorityErrorCodes.TeamJoinRequiresAnotherOwner, await RejectedAsync(() => PlanAsync(Owner, SecurityCommandKind.AddTeamMember, ResourceKind.Team, Team, new TeamMemberPayload(Team, Owner))));
+        Assert.Equal(AuthorityErrorCodes.TeamJoinRequiresAnotherOwner, await RejectedAsync(() => PlanAsync(Administrator, SecurityCommandKind.AddTeamMember, ResourceKind.Team, Team, new TeamMemberPayload(Team, Owner))));
     }
 
     [Fact]

@@ -66,7 +66,7 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             }
 
             var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
-            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate).ConfigureAwait(false);
+            var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
             ApplyPlan(scope, state, command, plan, bound, request, cancellationToken);
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -86,6 +86,13 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             {
                 // Refused Security Administrator appointments and removals: independent, archived evidence on the audit stream.
                 AuditJournal.Append(scope, state, "SecurityAdministratorCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
+            }
+            else if (request.CommandKind is SecurityCommandKind.GrantOrganizationRole or SecurityCommandKind.RevokeOrganizationRole or SecurityCommandKind.ProposeOrganizationOwnerChange
+                     or SecurityCommandKind.DisableIdentityBinding or SecurityCommandKind.EnableIdentityBinding or SecurityCommandKind.RequestOrganizationMembership
+                     or SecurityCommandKind.CancelOrganizationMembershipRequest or SecurityCommandKind.ReplaceOrganizationMembershipRequest)
+            {
+                // C8 M2 (AC-7): refused membership and role commands are archived evidence too (no identities beyond the actor's binding).
+                AuditJournal.Append(scope, state, "MembershipCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
             }
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
             throw;
@@ -209,6 +216,18 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             searchPolicy.SearchPolicyRevision++;
         }
 
+        ApplyMembershipChanges(scope, command, plan, now);
+        if (plan.InvalidatedPlatformApprovals.Count > 0)
+        {
+            AuditJournal.Append(scope, state, "PlatformOperatorApprovalsInvalidated", new
+            {
+                security_command_id = command.SecurityCommandId,
+                command_kind = command.CommandKindName,
+                approvals = plan.InvalidatedPlatformApprovals.Select(i => new { platform_operator_approval_id = i.Approval.PlatformOperatorApprovalId, membership_request_id = i.Approval.OrganizationMembershipRequestId, platform_operator_id = i.Approval.PlatformOperatorId, closure_reason = i.Reason }),
+                correlation_id = command.CorrelationIdentifier,
+            }, TimeProvider.System);
+        }
+
         command.CommandStateName = SecurityCommandStates.CommittedAwaitingProjection;
         command.CommittedAuthorizationRevision = revision;
         command.CommandModifiedOn = now;
@@ -245,6 +264,82 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             command.CommandReasonText,
             command.CorrelationIdentifier);
         scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Authorization, revision, "SecurityCommandCommitted", body, command.SecurityCommandId, null, TimeProvider.System));
+    }
+
+    /// <summary>C8 M2 (AC-7): proposals, membership state, revoked sessions and membership requests, in the command's transaction.</summary>
+    private static void ApplyMembershipChanges(IAuthorityScope scope, SecurityCommand command, CommandPlan plan, DateTimeOffset now)
+    {
+        if (plan.NewProposal is { } proposal)
+        {
+            proposal.OrganizationRoleChangeProposalId = command.SecurityCommandId;
+            scope.AddRoleChangeProposal(proposal);
+        }
+
+        if (plan.ConsumedProposal is { } consumed)
+        {
+            consumed.ProposalStateName = ProposalStates.Consumed;
+            consumed.ConsumedBySecurityCommandId = command.SecurityCommandId;
+            consumed.ProposalConsumedOn = now;
+        }
+
+        if (plan.BindingToDisable is { } disabled)
+        {
+            disabled.IdentityBindingEnabled = false;
+            disabled.IdentityDisabledOn = now;
+            disabled.IdentityDisabledBySecurityCommandId = command.SecurityCommandId;
+            foreach (var session in plan.SessionsToRevoke)
+            {
+                session.SessionRevokedOn = now;
+                session.SessionRevocationReason = Domain.Features.Sessions.SessionRevocationReasons.MembershipDisabled;
+            }
+        }
+
+        if (plan.BindingToEnable is { } enabled)
+        {
+            enabled.IdentityBindingEnabled = true;
+            enabled.IdentityDisabledOn = null;
+            enabled.IdentityEnabledBySecurityCommandId = command.SecurityCommandId;
+        }
+
+        foreach (var expired in plan.ExpiredMembershipRequests)
+        {
+            expired.RequestStateName = MembershipRequestStates.Expired;
+            expired.RequestDecidedOn = now;
+            expired.RequestDecisionReasonText = "expired before operator approval";
+        }
+
+        // AC-7.5: the original leaves Pending (Cancelled or Replaced) in the same transaction as any replacement is inserted.
+        if (plan.CancelledMembershipRequest is { } cancelled)
+        {
+            cancelled.RequestStateName = plan.NewMembershipRequest is null ? MembershipRequestStates.Cancelled : MembershipRequestStates.Replaced;
+            cancelled.RequestCancelledOn = now;
+            cancelled.RequestCancelledByAuthorityUserId = plan.CancelledByAuthorityUserId;
+            cancelled.RequestCancellationReasonText = plan.CancellationReason;
+            cancelled.DecidedBySecurityCommandId = command.SecurityCommandId;
+        }
+
+        if (plan.NewMembershipRequest is { } request)
+        {
+            request.OrganizationMembershipRequestId = command.SecurityCommandId;
+            scope.AddMembershipRequest(request);
+        }
+
+        if (plan.NewBinding is { } binding)
+        {
+            scope.AddIdentityBinding(binding);
+        }
+
+        if (plan.ApprovedMembershipRequest is { } approved)
+        {
+            approved.RequestStateName = MembershipRequestStates.Approved;
+            approved.RequestDecidedOn = now;
+            approved.DecidedBySecurityCommandId = command.SecurityCommandId;
+        }
+
+        foreach (var (approval, reason) in plan.InvalidatedPlatformApprovals)
+        {
+            Features.PlatformOperators.PlatformApprovalLedger.Close(approval, Domain.Features.PlatformOperators.PlatformApprovalStates.Invalidated, reason, now);
+        }
     }
 
     internal static async Task<OperationStatus> ToStatusAsync(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CancellationToken cancellationToken)

@@ -23,6 +23,8 @@ public sealed class ProjectReferenceGraphTests
         ["AuthorizationAuthority.Application"] = ["AuthorizationAuthority.Domain", "AuthorizationAuthority.Contracts", "EnterpriseForms.Integrity"],
         ["AuthorizationAuthority.Infrastructure"] = ["AuthorizationAuthority.Application", "AuthorizationAuthority.Domain"],
         ["AuthorizationAuthority.Api"] = ["AuthorizationAuthority.Application", "AuthorizationAuthority.Infrastructure", "AuthorizationAuthority.Contracts"],
+        // C8 M2 Stage 3: the separately deployed Platform Console BFF consumes only the Authority's published wire contract.
+        ["EnterpriseForms.PlatformConsole"] = ["AuthorizationAuthority.Contracts"],
     };
 
     [Fact]
@@ -45,7 +47,7 @@ public sealed class ProjectReferenceGraphTests
     [Fact]
     public void BusinessAssembliesNeverReferenceTheAuthority()
     {
-        foreach (var (project, refs) in Graph.Where(p => p.Key.StartsWith("EnterpriseForms.", StringComparison.Ordinal)))
+        foreach (var (project, refs) in Graph.Where(p => p.Key.StartsWith("EnterpriseForms.", StringComparison.Ordinal) && p.Key != "EnterpriseForms.PlatformConsole"))
         {
             Assert.DoesNotContain(refs, r => r.StartsWith("AuthorizationAuthority.", StringComparison.Ordinal));
             _ = project;

@@ -4,8 +4,8 @@
   "entries": [
     {
       "path": "CLAUDE-DESIGN.MD",
-      "sha256": "a010cba6658fd6144505e711d74a807479550b6cd2950220376b6831ed39418d",
-      "bytes": 166135
+      "sha256": "6651ccd255620d42879e893c771c2f6cde5a1051f7667fd05bf3678ab92f4ee0",
+      "bytes": 173344
     },
     {
       "path": "CLAUDE.md",
@@ -44,13 +44,13 @@
     },
     {
       "path": "docs/DASHBOARD_SECURITY_MONITORING_STATUS.md",
-      "sha256": "b35f1d3bd023598693da1b3dd6e9aba3db6afd988237a73c62d91e01f632b83a",
-      "bytes": 13863
+      "sha256": "52d44518e209094350c103ea8c5792ae4a39d170248be7fccd25ad997f185f8a",
+      "bytes": 13753
     },
     {
       "path": "docs/FORM_RENAME_STATUS.md",
-      "sha256": "711326b99f099a8efe6f605e4d5a37c505e057385f4c1730bd3062947500ef79",
-      "bytes": 4073
+      "sha256": "12705ef974fc7f72257732b0b0950ea332e9cdd5c447d5a9f86d958a5ccc1c18",
+      "bytes": 4176
     },
     {
       "path": "docs/PHASE0_STATUS.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "91f988d9ddb9e62d2de6f612c08f78e795df7a636086f8acafbf8d0f563d9ebc",
-      "bytes": 35104
+      "sha256": "c0dcca0ecbbaf1b8810a8b65d6b4490f8719224b795da7a8fb2d6271be9b9ea4",
+      "bytes": 81978
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -134,13 +134,13 @@
     },
     {
       "path": "docs/architecture/ADR-ARCH-001-feature-vertical-slices.md",
-      "sha256": "3750ea7d1f79e50718efd3af139f344239f967bb1aeef3cd4ed93a045dffad3e",
+      "sha256": "a822aabc02e73fac8248a251b68d0380e11b5692cf9aa038704eadbd2794c0c0",
       "bytes": 2649
     },
     {
       "path": "docs/architecture/FEATURE_OWNERSHIP_MATRIX.md",
-      "sha256": "7cbd379d73c0c48f3bdecccdf073a362c6be5039d6428f950888624fa9851a20",
-      "bytes": 12589
+      "sha256": "e8b0fa5800c38fd09d03d10d433378eee593c5b56e3f9c1113b460dbb4e4ff9b",
+      "bytes": 18890
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -179,13 +179,33 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
-      "sha256": "48b931679a9e872b6616d305ee45aaa75d021301c25b7116907bed82e5cdae59",
-      "bytes": 44132
+      "sha256": "345df1cb4ce1f37a08ff3d5a3b6ba4db4b352caaa2bc824c889ca559d85817ea",
+      "bytes": 44391
     },
     {
       "path": "docs/architecture/PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md",
       "sha256": "4a75d9dfe380a2ebf0660d2acf6ca3a35bb7f14ca0d07382bd3ca9c086cbe7df",
       "bytes": 46445
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M2_AC7_SECURITY_CONTRACT.md",
+      "sha256": "cc125cb8d160c08fdb61382a135232a6d2549e37199816990280f69ea4f6f1e0",
+      "bytes": 15018
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M2_MEMBERSHIP_REQUEST_EDIT_CANCEL_PROPOSAL.md",
+      "sha256": "b3724fcbe13e629023a8f325c2f0eaca75cd73d10af9a80bd4fd2a2612a34946",
+      "bytes": 11579
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md",
+      "sha256": "592a553e838ae4b11f7f21630bf20885fac7c475b6ddb17479e698d01b2718e2",
+      "bytes": 92014
+    },
+    {
+      "path": "docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md",
+      "sha256": "931df23b4e3f71f69223c6524c26fe5328b1bbf7b1d00ceeaa29a10781c6e550",
+      "bytes": 106322
     },
     {
       "path": "docs/architecture/RECORD_CREATION_IDEMPOTENCY.md",
@@ -234,8 +254,8 @@
     },
     {
       "path": "docs/decisions/ADR-PB-007-PRIORITIZED-REQUESTS-RESUMABLE-UPLOADS.md",
-      "sha256": "245d37d350848047069e61e1c6ca03f5e23eea8558508263edf3fff0f9cacb2f",
-      "bytes": 6928
+      "sha256": "a2946043fac3d280c5807658082bb4e08f8b7025339b76302a17a7974c801325",
+      "bytes": 8316
     },
     {
       "path": "docs/decisions/ADR-PB-008-ENTRA-WORKFORCE-IDENTITY-FIDO2-RECOVERY.md",
@@ -279,8 +299,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "839a798fec00d0cfecfb4ae118ecf66b736d14a05e7612aff993d4b12d7f3cdd",
-      "bytes": 142803
+      "sha256": "78d55489dbcec9a9332e59d48ca82281afc12d699905eb6d55b6627d008ed8ff",
+      "bytes": 167216
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -344,8 +364,8 @@
     },
     {
       "path": "docs/infrastructure/DEV_ENVIRONMENT_PERSISTENT_VAULT.md",
-      "sha256": "bf17f86a8a0ecbe1e09310873505df4daf3c60a7271af3abc2d74c5f0dd86542",
-      "bytes": 13147
+      "sha256": "50154dbca6f6e6fe4b1e41b5632099687d3a18e620af46191105897a76c791e4",
+      "bytes": 15495
     },
     {
       "path": "docs/infrastructure/PB05_DEPLOYMENT_BLUEPRINT.md",
@@ -494,8 +514,8 @@
     },
     {
       "path": "docs/ui/PB14_REPRESENTATIVE_SCREEN_CONTRACTS.md",
-      "sha256": "a097050a59d813570f41ad64bcc01bc8b92d835395f8e20e86cff3f3081ac9f9",
-      "bytes": 4610
+      "sha256": "734f237eb2117670a3f6a77bc97908abd2f6fa932f4663711a48590cb992599e",
+      "bytes": 4774
     },
     {
       "path": "docs/ui/SCREEN_IMPLEMENTATION_MATRIX.md",
@@ -599,8 +619,8 @@
     },
     {
       "path": "scripts/devstack/devstack.py",
-      "sha256": "22091be81d65359474a893af32712653c0d9c17ba6308af758ec5b4e68ba7b62",
-      "bytes": 64202
+      "sha256": "4889e114a89495ac1a49729f33a3f3713e1669171affc25f3b00923f964ea3b5",
+      "bytes": 130020
     },
     {
       "path": "scripts/generate-spec-manifest.py",
@@ -649,8 +669,8 @@
     },
     {
       "path": "scripts/validate-specifications.py",
-      "sha256": "d708b06b376380665ab93bc3319ecf24738079ff5675bbeef8064d3fdb985b8b",
-      "bytes": 2927
+      "sha256": "4723da23ce7c84998b6039c98ede0c598da5beee329cbeb60b1fb59113c84544",
+      "bytes": 2993
     },
     {
       "path": "security_hardening/SEARCH_CAPABILITY_MATRIX.csv",

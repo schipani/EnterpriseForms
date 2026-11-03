@@ -105,6 +105,15 @@ jobs:
         with:
           early-services: clamav
           cache-scope: stage-b
+      # Browser specs that drive the isolated Platform Console (owner-recovery-objection) sign in as a synthetic console operator. The
+      # two-operator registration ceremony lives in the .NET harness, so run exactly that one idempotent test before Playwright.
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Register the synthetic Platform Console operators (harness ceremony; idempotent)
+        run: >
+          dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release
+          -- --filter-method "*RegisterTheConsoleOperatorsForBrowserSpecs" --minimum-expected-tests 1
       - name: Frontend install
         working-directory: src/frontend
         run: npm ci --ignore-scripts

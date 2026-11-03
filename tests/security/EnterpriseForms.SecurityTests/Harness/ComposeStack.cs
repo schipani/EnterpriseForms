@@ -43,6 +43,19 @@ public sealed class ComposeStack
         return Compose($"exec -T authority-db sh -c \"echo {encodedShell} | base64 -d | sh\"", 60);
     }
 
+    /// <summary>
+    /// C8 M2 restore simulation only: writes AuthorityDb as its administrator inside the authority-db container, to reproduce what a
+    /// database restore from an earlier backup leaves behind (platform journal rows and registry state from before an event). Never
+    /// used by product code; exists only on the isolated, disposable security-test stack.
+    /// </summary>
+    public string AuthorityRestoreSimulationSql(string sql)
+    {
+        var encodedSql = Convert.ToBase64String(Encoding.UTF8.GetBytes(sql));
+        var shell = $"echo {encodedSql} | base64 -d | PGPASSWORD=\"$POSTGRES_PASSWORD\" PGOPTIONS='-c search_path=authority' psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -v ON_ERROR_STOP=1 -qAt";
+        var encodedShell = Convert.ToBase64String(Encoding.UTF8.GetBytes(shell));
+        return Compose($"exec -T authority-db sh -c \"echo {encodedShell} | base64 -d | sh\"", 60);
+    }
+
     public string AttackerShell(string shell, bool throwOnError = true, int timeoutSeconds = 60)
     {
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(shell));

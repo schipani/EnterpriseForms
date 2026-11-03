@@ -41,9 +41,10 @@ public sealed class TeamDirectoryHandlers(IBusinessStore store, IAuthorizationAu
         var members = memberships.Select(m => new TeamMemberResponse(m.UserId, users.GetValueOrDefault(m.UserId) ?? m.UserId.ToString("D"), m.CreatedOn, m.AuthorityCommandId)).OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
         var memberIds = memberships.Select(m => m.UserId).ToHashSet();
         var operations = (await scope.GetOpenAuthorityCommandOperationsAsync(context.OrganizationId, teamId, cancellationToken).ConfigureAwait(false)).Select(o => TeamMembershipOperationView.ToResponse(o, users)).ToList();
-        // G25 mirrored as a hint: a Security Administrator who is not an owner is never offered themself (the Authority refuses it anyway).
+        // G25 and OB-F8 (C-104) mirrored as a hint: nobody is offered themself; an owner joins a team only when another owner adds them
+        // (the Authority refuses a self-join, and refuses a Security Administrator adding an owner, whatever the client sends).
         var available = CanManageTeams(decision)
-            ? users.Where(u => !memberIds.Contains(u.Key) && (decision.CanManageConfiguration || u.Key != context.LocalUserId)).Select(u => new DirectoryUserResponse(u.Key, u.Value)).OrderBy(u => u.DisplayName, StringComparer.OrdinalIgnoreCase).ToList()
+            ? users.Where(u => !memberIds.Contains(u.Key) && u.Key != context.LocalUserId).Select(u => new DirectoryUserResponse(u.Key, u.Value)).OrderBy(u => u.DisplayName, StringComparer.OrdinalIgnoreCase).ToList()
             : [];
         return new TeamDetailResponse(team.TeamId, team.TeamName, team.IsActive, team.CreatedOn, team.ModifiedOn, Source, CanManageTeams(decision), members, available, operations);
     }

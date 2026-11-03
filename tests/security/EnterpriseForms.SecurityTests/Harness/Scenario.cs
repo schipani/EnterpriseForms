@@ -36,6 +36,11 @@ public sealed class Scenario
 
     public TestUser Administrator { get; }
 
+    /// <summary>C8 OB-F8: an organization owner cannot join a team alone; a second owner adds them. Only bootstrapped when <see cref="WithSecondOwner"/> is set before <see cref="BootstrapAsync"/>.</summary>
+    public TestUser SecondOwner { get; } = TestUser.New("SecondOwner");
+
+    public bool WithSecondOwner { get; set; }
+
     public Guid FormDefinitionId { get; private set; }
 
     public Guid FormRecordId { get; private set; }
@@ -53,13 +58,18 @@ public sealed class Scenario
             new { authority_user_id = Attacker.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Attacker.Subject, organization_roles = Array.Empty<string>() },
             new { authority_user_id = Reader.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = Reader.Subject, organization_roles = Array.Empty<string>() },
         };
+        if (WithSecondOwner)
+        {
+            identities.Add(new { authority_user_id = SecondOwner.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = SecondOwner.Subject, organization_roles = new[] { "organization_owner" } });
+        }
+
         identities.AddRange(extraMembers.Select(m => new { authority_user_id = m.AuthorityUserId, issuer_uri = TestIdentity.Issuer, subject_identifier = m.Subject, organization_roles = Array.Empty<string>() }));
         var bootstrap = await Fixture.Authority.OperatorAsync(HttpMethod.Post, "/internal/v1/operator/organizations", new { organization_id = OrganizationId, organization_display_name = "SEC " + Evidence.TestId, identities }).ConfigureAwait(false);
         Evidence.ObserveHttp("bootstrap organization", bootstrap, "authorization_revision", "integrity_key_name", "signing_key_version");
         Assert.True(bootstrap.IsSuccess, "bootstrap failed: " + bootstrap.Body);
         await WaitGateReadyAsync().ConfigureAwait(false);
 
-        foreach (var user in new[] { Owner, Attacker, Reader, Administrator }.Concat(extraMembers))
+        foreach (var user in new[] { Owner, Attacker, Reader, Administrator }.Concat(WithSecondOwner ? [SecondOwner] : []).Concat(extraMembers))
         {
             var me = await Fixture.Api.GetAsync("/api/v1/users/me", Token(user)).ConfigureAwait(false);
             Assert.True(me.IsSuccess, "users/me failed for " + user.DisplayName + ": " + me.Body);

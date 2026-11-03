@@ -1311,6 +1311,32 @@ Use current supported stable versions and pinned lockfiles; do not assume an old
 - **Actions:** Switch approved brand tokens, typography presets, color contrast/a11y overlays, 320/768/1440 px and 400% zoom previews; capture visual tests.
 - **Async/edge:** Strictly synthetic data. This gallery is not an access-control or form-preview bypass; screenshot and automated axe tests are required.
 
+#### PG-070 — Operator approvals (`/platform/approvals`, `/platform/approvals/:requestId`) · Platform administration (separate Platform Console)
+- **Audience/permission:** Registered, active Platform Operators only (`platform.membership_requests.review` / `.decide`, Authority-held registry, C8 M2 D8-34). Lives in the separately deployed Platform Console (`apps/platform-console`, BFF `EnterpriseForms.PlatformConsole`), never in the tenant SPA or the business API (D8-33 option A, C-99). Organization roles confer nothing here; operators gain no organization membership or record access.
+- **Sections:** Cross-organization membership-request queue (organization, requested person and verified identity, requested role, requester, requested/expires, approval status "0 of 2 / 1 of 2"), request details (owner's reason, consequences, recorded approvals with justifications, exact statement and fingerprint), decision panel (justification, Approve, Reject, Withdraw my approval).
+- **Actions:** Approve (first approval pending; a second, different operator's approval creates the membership), withdraw own pending approval, reject with justification. Evidence is produced by the console for the signed-in operator only (Development/Testing: per-operator Vault Transit keys; production: Entra transaction-bound step-up, PB-08, not implemented).
+- **Async/edge:** Server-side paging (15), stale statement → reload with explanation, archive outage / rollback refusal → fail-closed banner, suspended operator → session ends. Development banner: synthetic approvals are not two-person evidence. Feature owner: Platform administration / Security. Stage 3 delivered the BFF API; Stage 4 (C-100) delivered the pages in `src/frontend/apps/platform-console` (separate site, dev `http://127.0.0.1:8095/platform/sign-in`).
+
+#### PG-071 — Operators (reserved, not built) · Platform administration (separate Platform Console)
+- Reserved for Platform Operator management (D8-43, owner decision 11 of C-104). Registry changes stay on the Authority platform plane (two-operator provision/reinstate/remove, single-operator suspension). No page exists; do not scaffold it before its own approval.
+
+#### PG-072 — Organizations (`/platform/organizations`, `/platform/organizations/:organizationId`) · Platform administration (separate Platform Console)
+- **Audience/permission:** Active Platform Operators only. Organization metadata and owner identities only: no records, documents, teams, shares or audit content (C-103 D8-61 as proposed).
+- **Sections:** Directory (name, lifecycle Active/Activating/Quarantined, enabled owners with "fewer than two owners" warning and "three recommended" advice, Security Administrators, members), details (owners and binding state, onboarding provenance with approving operators, technical revisions). Each detail view is audited on the organization's audit stream before it is returned (fail closed).
+- **Async/edge:** Server-side paging (15), search, "needs owners" filter. Organizations with fewer than two eligible owners link to owner recovery (PG-075).
+
+#### PG-073 — New organization (`/platform/onboarding/new`) · Platform administration (separate Platform Console)
+- **Sections:** Organization name, 2–10 initial owners from the approved identity issuer (subject, display name, verification method and reference; three recommended), justification; Check (Authority dry run: conflicts, warnings) and Create request. The Authority generates the organization id and every owner's user id; the request is immutable afterwards.
+
+#### PG-074 — Onboarding request (`/platform/onboarding`, `/platform/onboarding/:requestId`) · Platform administration (separate Platform Console)
+- **Sections:** Queue (status filter, search, paging 15) and details: lifecycle stepper (Awaiting approval → Approved → Key provisioning → Initialized → Active), owners, approvals with justifications, frozen statement and fingerprint, key custody status (the key is created by a separate custody credential, never from the browser), initialization failures, activation.
+- **Actions:** Approve (two different operators; the creator may give one), withdraw own approval, reject, cancel (approved, before initialization), initialize (after the custody key is verified; one Authority transaction creates the organization, the owners and their owner roles only). Evidence is signed by the console for the signed-in operator only. Development banner: synthetic approvals are not two-person evidence. Delivered C-104 (Development/Testing).
+
+#### PG-075 — Owner recovery (`/platform/recovery`, `/platform/recovery/new`, `/platform/recovery/:caseId`) · Platform administration (separate Platform Console)
+- **Audience/permission:** Active Platform Operators only; an operator bound in the organization (or named in the case) cannot open or decide it (conflict of interest). Owner identities and case evidence only: no records, documents, teams, shares or audit content.
+- **Sections:** Organizations requiring recovery (fewer than two eligible owners), case queue (status filter, search, paging 15), create case (incident reference, justification, current owner status, owners declared unavailable with reason + evidence reference + evidence summary, 1–3 replacement owners — chosen through ONE selection mechanism: a searchable, server-paged member picker (10 per page, eligible members only, immutable user id used internally) plus an optional proposed new verified identity, all shown in one selected list (three at most; an organization has at most ten active owners) — with verification method and reference; Validate = Authority dry run), case details (states Awaiting approvals → Waiting period → Ready for recovery → Recovered, or Blocked by objection / Expired or cancelled; three-operator progress; waiting period with remaining time from the Authority clock; objection; frozen statement and fingerprint; execution result; history).
+- **Actions:** Approve (three different operators, each with their own evidence), withdraw own approval, cancel, execute (after three approvals, the waiting period and no objection: one Authority transaction adds the replacement owners' owner role and bindings for new identities; nothing is removed or disabled; no team, record or share change). Organizations object from the business app (PG-041 notice). Delivered C-105 (Development/Testing; production unavailable until PB-08 and independent assurance).
+
 ### 16.9 Critical end-to-end UX journeys (must be implemented and tested)
 
 - **J-01 New user:** External sign-in → safe organization chooser/bootstrap → role-aware dashboard → permitted form catalog → create first record → become default owner → see only own record.
@@ -1330,7 +1356,7 @@ Use current supported stable versions and pinned lockfiles; do not assume an old
 
 Claude must create `docs/ui/SCREEN_IMPLEMENTATION_MATRIX.md` during implementation. Each `PG-###` requires a row with: route; owning feature/package; minimum privilege; related API/OpenAPI operation; independent async region query keys; mutation commands; loading/empty/error/denied and integrity states; keyboard/axe test ID; Playwright test ID; implemented/verified status. **Do not mark a page complete solely because the route exists or a static screenshot was built.**
 
-- Treat **PG-001 through PG-055**, **PG-060 through PG-066**, and **PG-068** as required functional screens for the complete enterprise application, with capability gating; **PG-056 through PG-059** and **PG-067** are controlled operational screens required for Level 2 deployment/readiness, but may live in a separate security-operator frontend rather than the ordinary tenant SPA. **PG-069** is an internal development-only tool, never a public production route.
+- Treat **PG-001 through PG-055**, **PG-060 through PG-066**, and **PG-068** as required functional screens for the complete enterprise application, with capability gating; **PG-056 through PG-059** and **PG-067** are controlled operational screens required for Level 2 deployment/readiness, but may live in a separate security-operator frontend rather than the ordinary tenant SPA. **PG-069** is an internal development-only tool, never a public production route. **PG-070** and **PG-072** through **PG-075** are controlled platform-administration screens of the separate Platform Console (C8 M2, C8 onboarding and owner recovery), never part of the tenant SPA; **PG-071** is reserved for Platform Operator management and not built.
 - If two pages are implemented as tabs within one route, preserve distinct deep links, server permissions and acceptance tests. It is acceptable to consolidate presentation but **not** to omit capabilities or weaken access checks.
 - Every page containing one or more server-backed cards or sections must demonstrate *independent refresh* of those regions. Full-page-only refresh does not meet the requirement.
 - Before reporting completion, run end-to-end tests for J-01 through J-12, all page permission gates, responsive layouts, organization theme contrast, and background upload navigation. Tests for undeployed Level 2 infrastructure must be marked **pending**, never falsely declared passing.
@@ -1414,6 +1440,12 @@ Every screen in Section 16 belongs to **exactly one** frontend feature. `app/` m
 | PG-067 | `organizations` | Data retention and legal holds |
 | PG-068 | `exports` | Authorized export builder |
 | PG-069 | `support` | Design-system component gallery |
+| PG-070 | `operator-approvals` | Operator approvals (Platform Console) |
+| PG-071 | `platform-operators` | Operators (Platform Console; reserved, not built) |
+| PG-072 | `organization-directory` | Organizations (Platform Console) |
+| PG-073 | `organization-onboarding` | New organization (Platform Console) |
+| PG-074 | `organization-onboarding` | Onboarding request (Platform Console) |
+| PG-075 | `owner-recovery` | Owner recovery (Platform Console) |
 
 ### 17.1 Feature-to-backend traceability and permitted dependencies
 
@@ -1427,7 +1459,7 @@ Every screen in Section 16 belongs to **exactly one** frontend feature. `app/` m
 
 For each implemented feature/use case, Claude must deliver a working route or endpoint as appropriate; authoritative permission integration, request/response validation, concurrency/idempotency, unit and integration tests, feature-local API client/hook, screen component and accessibility/Playwright verification, audit event traceability, and operational/error states. For asynchronous cards preserve each card's own data query and refresh. For uploads preserve the root upload manager and server durable workflow across SPA navigation. Do **not** mark a screen complete solely because its route exists or because its data comes from an unrestricted mock.
 
-**Architecture fitness functions (release-blocking):** Compile-time .NET assembly dependencies; domain/application namespace rules; cross-feature `Public`-only imports; browser feature-only API coordination; no forbidden direct Authority/SpiceDB/DB calls; shared UI package no business dependency; no duplicate table owners; no forbidden one-word database columns; all 69 routes mapped and tested; production Authority deployment isolated from API and Worker.
+**Architecture fitness functions (release-blocking):** Compile-time .NET assembly dependencies; domain/application namespace rules; cross-feature `Public`-only imports; browser feature-only API coordination; no forbidden direct Authority/SpiceDB/DB calls; shared UI package no business dependency; no duplicate table owners; no forbidden one-word database columns; all 70 routes mapped and tested; production Authority deployment isolated from API and Worker.
 
 
 

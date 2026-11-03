@@ -14,12 +14,17 @@ public static class AuthorityRuntimeGrants
         "security_commands", "security_journal_entries", "authority_relationship_edges", "projection_outbox_events",
         "record_manifest_commits", "record_manifest_leaves", "content_integrity_checkpoints", "content_candidate_leaves",
         "search_catalogue_snapshot_entries", "published_form_versions", "protection_census_results", "protection_reconciliation_attestations",
+        "platform_journal_entries", "platform_operator_evidence_uses",
     ];
 
     private static readonly string[] MutableTables =
     [
         "organization_authorization_states", "identity_bindings", "authority_resources", "record_content_heads", "content_change_operations", "integrity_key_registrations",
         "organization_protection_policies", "search_catalogue_snapshots", "authenticated_sessions", "field_search_approvals",
+        "organization_role_change_proposals", "organization_membership_requests",
+        "platform_operators", "platform_operator_change_proposals", "platform_operator_approvals", "platform_journal_heads",
+        "organization_onboarding_requests", "organization_onboarding_owners", "organization_onboarding_approvals",
+        "organization_owner_recovery_cases", "organization_owner_recovery_subjects", "organization_owner_recovery_approvals", "organization_recovered_owner_probations",
     ];
 
     /// <summary>Every table the runtime role may touch; a model table missing here is a startup defect caught by the unit test, not in Docker.</summary>

@@ -1,6 +1,6 @@
 import type { RecordProjectionResponse, RecordShareSummaryResponse } from "@enterpriseforms/api-client";
-import { useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, Checkbox, DataTable, DescriptionList, Dialog, legendClass, LoadingBlock, Select, StatusMessage } from "@enterpriseforms/ui";
+import { useApi, usePresence } from "@enterpriseforms/app-runtime";
+import { Badge, Button, Card, Checkbox, DataTable, DescriptionList, Dialog, legendClass, LoadingBlock, PresenceIndicator, Select, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ActivityTimeline } from "../../audit";
@@ -168,6 +168,7 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
   const api = useApi();
   const queryClient = useQueryClient();
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.organization.users().then((r) => r.result) });
+  const presence = usePresence((users.data ?? []).map((user) => user.userId), !!users.data);
   const [recipientUserId, setRecipientUserId] = useState<string | undefined>(undefined);
   const [role, setRole] = useState("Reader");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -217,7 +218,7 @@ function CreateShareDialog({ formRecordId, projection, contributorWritesEnabled,
       <div className="flex flex-col gap-3">
         {users.isPending ? <LoadingBlock label="Loading people" /> : null}
         {users.isError ? <ErrorPanel error={users.error} onRetry={() => void users.refetch()} /> : null}
-        {users.data ? <Select label="Person" required value={recipientUserId} placeholder="Choose a person" options={users.data.map((user) => ({ value: user.userId, label: user.displayName }))} onValueChange={setRecipientUserId} /> : null}
+        {users.data ? <Select label="Person" required value={recipientUserId} placeholder="Choose a person" options={users.data.map((user) => ({ value: user.userId, label: user.displayName, trailing: <PresenceIndicator state={presence[user.userId] ?? "Unknown"} /> }))} onValueChange={setRecipientUserId} /> : null}
         <Select label="Role" required value={role} options={rolesFor(contributorWritesEnabled)} onValueChange={setRole} />
         <fieldset className="flex flex-col gap-2 rounded-control border border-line p-3">
           <legend className={`px-1 ${legendClass}`}>Fields to share</legend>

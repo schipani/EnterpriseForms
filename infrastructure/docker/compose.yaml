@@ -234,6 +234,9 @@ services:
       Identity__UserAssertion__Issuer: ${TEST_IDP_ISSUER}
       Identity__UserAssertion__Audience: ${TEST_IDP_AUDIENCE}
       Identity__UserAssertion__SharedKeyBase64: ${TEST_IDP_SHARED_KEY_BASE64}
+      # C8 onboarding (C-104, D8-60): the legacy single-call organization bootstrap serves only the approved fixtures (dev seed and
+      # test harnesses) of these Development/Testing stacks; the Authority refuses it (and refuses to start with it) elsewhere.
+      OrganizationOnboarding__LegacyOrganizationBootstrapEnabled: ${AUTHORITY_LEGACY_ORGANIZATION_BOOTSTRAP_ENABLED:-true}
     depends_on:
       authority-db:
         condition: service_healthy

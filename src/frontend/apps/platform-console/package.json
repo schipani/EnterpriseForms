@@ -1,0 +1,30 @@
+{
+  "name": "@enterpriseforms/platform-console",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Platform Console web app (C8 M2 Stage 4, PG-070 Operator approvals). A separate website from the business app: own origin, own cookie, no business packages. Development/Testing only.",
+  "scripts": {
+    "dev": "vite",
+    "generate": "openapi-typescript ../../../../contracts/openapi/platform-console-v1.json -o src/api/generated/platform-console-v1.ts",
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@enterpriseforms/design-tokens": "0.0.0",
+    "@enterpriseforms/ui": "0.0.0",
+    "@tanstack/react-query": "5.104.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "openapi-typescript": "7.13.0",
+    "tailwindcss": "4.3.3",
+    "vite": "8.3.4"
+  }
+}

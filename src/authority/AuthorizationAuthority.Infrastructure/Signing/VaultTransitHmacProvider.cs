@@ -95,6 +95,61 @@ public sealed class VaultTransitHmacProvider(IHttpClientFactory httpClientFactor
         }
     }
 
+    public async Task<IntegrityKeyInspection> InspectKeyAsync(string providerKeyName, CancellationToken cancellationToken)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(providerKeyName, "^org-[0-9a-f]{32}-[a-z0-9-]{1,40}$"))
+        {
+            throw new IntegrityProviderUnavailableException("invalid key name");
+        }
+
+        try
+        {
+            using var client = CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri($"v1/transit/keys/{Uri.EscapeDataString(providerKeyName)}", UriKind.Relative));
+            request.Headers.Add("X-Vault-Token", options.Value.Token ?? throw new IntegrityProviderUnavailableException("Vault token not configured"));
+            using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return new IntegrityKeyInspection(false, false, 0, "no key under this name");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new IntegrityProviderUnavailableException($"Vault returned {(int)response.StatusCode} for the key inspection");
+            }
+
+            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken).ConfigureAwait(false);
+            var data = document.RootElement.GetProperty("data");
+            var type = data.TryGetProperty("type", out var t) ? t.GetString() : null;
+            var exportable = data.TryGetProperty("exportable", out var e) && e.GetBoolean();
+            var plaintextBackup = data.TryGetProperty("allow_plaintext_backup", out var b) && b.GetBoolean();
+            var version = data.TryGetProperty("latest_version", out var v) ? v.GetInt32() : 0;
+            if (type != "hmac")
+            {
+                return new IntegrityKeyInspection(true, false, version, "the key is not an HMAC key");
+            }
+
+            if (exportable || plaintextBackup)
+            {
+                return new IntegrityKeyInspection(true, false, version, "the key is exportable or allows plaintext backup");
+            }
+
+            return version >= 1 ? new IntegrityKeyInspection(true, true, version, "non-exportable HMAC key") : new IntegrityKeyInspection(true, false, version, "the key has no version");
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new IntegrityProviderUnavailableException("Vault unreachable", ex);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new IntegrityProviderUnavailableException("Vault timeout", ex);
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            throw new IntegrityProviderUnavailableException("Vault response unreadable", ex);
+        }
+    }
+
     private HttpClient CreateClient()
     {
         var client = httpClientFactory.CreateClient(HttpClientName);

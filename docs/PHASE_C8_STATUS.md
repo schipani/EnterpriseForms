@@ -263,3 +263,303 @@ The owner approved **Design R** as the direction for C8-M1-01, **subject to inde
 2. the owner decides any reviewer conditions (notably Q-1, Q-10, Q-11);
 3. hosted CI and the full Stage B suite pass on the final commit (D8-19);
 4. the owner authorizes the merge.
+
+## 14. M2 user management — part available within the current Authority (2026-10-30, C-93) — not merged
+
+Branch `phase-c8/m2-user-management`, from `feature/form-rename` (which is on the owner-accepted C-91 baseline).
+**No Authority change.** The remaining M2 scope (add user, owner/designer roles, disable/enable, roster read) is the
+AC-7 security contract `docs/architecture/PHASE_C8_M2_AC7_SECURITY_CONTRACT.md`, awaiting decisions D8-24…D8-32.
+
+### 14.1 Delivered
+
+| Item | Detail |
+|---|---|
+| People directory API | `GET /api/v1/organization/members?q&role&signInStatus&pageSize&continuationToken`: server pages (default 15) with opaque cursors bound to caller, organization and filters; search over name, identity and team; filters role (`SecurityAdministrator`/`None`) and sign-in (`SignedIn`/`NotRecorded`/`NeverSignedIn`). Authorization unchanged (owner or Security Administrator, decided by the Authority before any read). |
+| All members | For **Security Administrators** the directory adds every enabled Authority binding returned by the **existing** Security Administrator roster read (appointment candidates), so people who have never signed in are listed (name not known yet). Organization owners see people known to the business directory plus the Security Administrators; the page states this coverage. |
+| Last sign-in | New business column `users.last_signed_in_on` (migration `20261030225401_UserLastSignIn`, additive, display only), stamped at sign-in (`EnsureIdentityProjectionHandler.RecordSignInAsync`; today the Development/Testing persona login — the future PB-08 OIDC callback must call it too). |
+| Roles and actions | Security Administrator badges from the Authority roster. For Security Administrators each row carries action hints mirroring the existing C-70 rules (`AppointSecurityAdministrator` for enabled non-holders, `RemoveSecurityAdministrator` unless it is the last); the People page runs them through the existing `appoint`/`remove` endpoints with reason and the development-only step-up. |
+| Not offered | **Add user** is shown disabled, described by an on-page explanation; no owner/designer role or disable controls are rendered (AC-7). |
+| UI | People page uses the approved standard: 40px inputs, 8px controls, 12px cards, search + filters, 15-row `Pager`, success message, dialogs with locked state. Accessible names of row actions start with their visible text (axe `label-content-name-mismatch` found and fixed). |
+
+### 14.2 Tests (executed 2026-10-30, isolated security-test stack rebuilt from this branch)
+
+| Suite | Result |
+|---|---|
+| .NET contract tests (incl. 7 new `MemberDirectoryTests`) | 468 / 468 |
+| Architecture tests (naming, boundaries, ownership, signed-column registry) | 71 / 71 |
+| Stage B: new `PeopleDirectoryTests` + `AdministrationTests`, `SecurityAdministratorTests`, `FormRenameTests` | 13 / 13 |
+| Vitest (incl. updated `MemberTable.test.tsx`, new `PeopleDirectoryPage.test.tsx`) | 268 / 268 |
+| ESLint, TypeScript, production build | clean |
+| Playwright: `organization-administration.spec.ts` (5, owner and Security Administrator People flows with axe), `security-administrators`, `dashboard`, `ui-consistency`, `responsive` (320 px) | 14 / 14 |
+
+`PeopleDirectoryTests` proves on the real stack: the Security Administrator sees 6 people including a bound member who
+never called the API (empty name, `NeverSignedIn`, appoint hint) and has no removal hint on themself as the last
+administrator; the owner sees 5 and no hints; clerk, reader and designer-only get 403 without counts; 4-row pages do not
+overlap; a cursor used by another caller or with other filters is refused; search by subject and the role and sign-in
+filters work; an unknown role filter is 422; another organization's Security Administrator sees none of these people.
+
+Not run: the complete Stage B and SEC-P suites; hosted CI.
+
+### 14.3 Limitations
+
+- Owners do not see members who never signed in, nor anyone's owner/designer role, until AC-7.3.
+- "Sign-in not recorded" covers people seen before the column existed and development personas projected without logging in.
+- Last sign-in is a business-database display value (G21 family residual), not evidence.
+
+## 15. AC-7 implemented for Development/Testing (2026-10-31, C-94 approval, C-95) — not merged, not independently reviewed
+
+Owner approved D8-24…D8-32 and SD-6 (C-94). Implemented on `phase-c8/m2-user-management` on top of §14 (same branch).
+The approved Dashboard, charts, security monitoring, unified styling, form rename and the §14 People features are preserved.
+
+### 15.1 Authorization Authority
+
+| Item | Detail |
+|---|---|
+| Commands | `GrantOrganizationRole` / `RevokeOrganizationRole` (`organization_owner`, `designer`), `ProposeOrganizationOwnerChange` (GrantOwner, RevokeOwner, DisableOwner, EnableOwner), `DisableIdentityBinding` / `EnableIdentityBinding`, `RequestOrganizationMembership`. All through the existing journal → desired state → outbox → SpiceDB projection → Effective gate, with idempotency key + canonical digest, expected-revision CAS, the organization row lock, and refusals journaled on the audit stream (`MembershipCommandRejected`). |
+| Rules | Actor must be an enabled `organization_owner` (`administer_security` and `designer` never qualify); no self-change; step-up through the existing PB-08 gate (synthetic in Development/Testing, refused in staging/production); designer changes by one owner; owner grant/revoke and owner disable/enable by two distinct owners via a single-use proposal (24 h) whose proposer must still be an enabled owner when it is executed and which the target can never approve; last enabled owner and last enabled Security Administrator protected; disabling refused while the person directly owns active records (`OWNS_RECORDS`, count only); a disabled member cannot receive roles. |
+| Disable / enable | One transaction: binding disabled, lifecycle columns stamped, every unrevoked Authority session of that binding revoked (`MEMBERSHIP_DISABLED`). Edges (roles, teams, shares) are kept and unusable because `ActorResolver` and session validation already refuse disabled bindings. Re-enable restores them; revoked sessions stay revoked. |
+| Membership requests | `RequestOrganizationMembership` records a request only (identity of the organization's issuer, immutable subject, display hint, optional designer role, 7-day expiry, Authority user id allocated up front). Operator plane `GET /internal/v1/operator/organizations/{id}/membership-requests`, `POST …/{requestId}/approve` (dry run, then exactly two ES256 approvals from distinct registered approvers over the statement; Development/Testing only) and `POST …/{requestId}/reject` (one operator; grants nothing). Approval re-checks inside the organization lock: still pending, unexpired (an expired one is recorded `Expired`), requester still an enabled owner, identity not bound, issuer still the organization's. Creates the binding (and designer edge) as one journaled command; the request id is the single-use operation id (replay returns the recorded outcome). |
+| Roster read | `POST /internal/v1/organizations/roster` (AC-7.3): every binding with enabled state and roles, proposals and requests of the last 30 days with computed state, flags for command/operator availability, the organization identity issuer. Owners and Security Administrators only; anyone else 404. Behind the organization gate. |
+| Database | AuthorityDb migration `MembershipAdministration`: `identity_bindings` + `identity_disabled_on`, `identity_disabled_by_security_command_id`, `identity_enabled_by_security_command_id`, `organization_membership_request_id`, check `ck_identity_binding_disabled_state`; new `organization_role_change_proposals` and `organization_membership_requests` (multiword snake_case, FKs to the commands, state/expiry/self-proposal checks, one pending request per identity); both added to `AuthorityRuntimeGrants`. No business schema change in this step. |
+
+### 15.2 Business API and UI
+
+- `GET /api/v1/organization/members` now reads the Authority roster: owners and Security Administrators see every member (enabled or disabled, including never signed in), roles and membership state; new filters `role` (OrganizationOwner, Designer, SecurityAdministrator, None) and `membershipState`; owner and Security Administrator action hints; pending proposals and membership requests. Fallback when the roster is unavailable: names only, no roles, no actions.
+- Commands (`Idempotency-Key`, reason, development step-up): `POST …/members/{id}/roles`, `…/roles/{roleName}/remove` (Designer), `…/owner-proposals`, `…/disable`, `…/enable`, `POST /api/v1/organization/owner-proposals/{id}/approve`, `POST /api/v1/organization/membership-requests` (issuer set by the server from the Authority). Business audit: one event per effective command (a retry records nothing new).
+- People page: Add user (request dialog: issuer read-only, object id, name, initial role, reason, step-up, "Membership is not sign-in"); row actions (Make designer, Remove designer role, Propose as owner / owner removal / disabling / re-enabling, Disable / Re-enable membership, Security Administrator actions); "Owner proposals and membership requests" panel with Approve for a second owner; Membership filter and column. Existing 15-row searchable pagination, 8px controls, dialogs and notices unchanged in style.
+- Development tooling: `python scripts/devstack/devstack.py membership list | approve --request-id ID --justification "…" [--execute] | reject --request-id ID --reason "…"` (synthetic approver keys; not two-human evidence).
+
+### 15.3 Implementation choices the owner should know
+
+1. **Re-enabling an owner also needs two owners** (symmetric with disabling, D8-28); the contract only named disabling.
+2. **"Configured Entra tenant" (D8-30)** is enforced as the single identity issuer of the organization's enabled owners, which the operator plane bound at bootstrap; for Entra issuers the subject must be the object id (GUID). Email-like subjects are always refused. There is no separate tenant setting yet; real Entra validation arrives with PB-08.
+3. **With exactly two owners, neither can be removed or disabled**: the proposer and the executor must both differ from the person, so a third owner is needed. The last-owner rule is enforced in addition.
+4. Approving a proposal re-reads it from the Authority and sends the matching command; the Authority decides. Concurrent approvals of one proposal produce exactly one change (the organization lock serializes them).
+5. Business `users.is_active` is not changed by disabling (the Authority decides; pickers may still list a disabled person, and the Authority refuses them).
+
+### 15.4 Tests (executed 2026-10-31; isolated security-test stack rebuilt from this branch, Authority included)
+
+| Suite | Result |
+|---|---|
+| Authority unit tests (incl. 21 new `MembershipAdministrationTests`) | 231 / 231 |
+| Business contract tests (incl. rewritten `MemberDirectoryTests`) | 475 / 475 |
+| Architecture tests | 71 / 71 |
+| Stage B real stack: new `MembershipAdministrationTests` (3) + `PeopleDirectoryTests`, `AdministrationTests`, `SecurityAdministratorTests`, `SecurityAdministratorProvisioningTests`, `SessionRevocationTests`, `FormRenameTests` | 28 / 28 |
+| Vitest | 270 / 270 |
+| ESLint, TypeScript, production build | clean |
+| Playwright (isolated): new `people-administration.spec.ts` (3, axe), `organization-administration` (5), `security-administrators`, `dashboard`, `ui-consistency`, `form-rename`, `responsive` (320 px) | 20 / 20 |
+
+Real-stack proofs include: clerk, Security Administrator, designer-only and another organization's owner refused; self-change and missing step-up refused and journaled; a granted designer can create forms and a revoked one cannot; a disabled member's next request is refused, roles are kept, re-enabling restores access; disabling a record owner refused with a count; the last Security Administrator protected; owner grant needs another owner, the proposer and the target cannot approve, a consumed proposal cannot be reused, two simultaneous approvals produce one change, a disabled owner is refused; a membership request grants nothing, email subjects and duplicates refused, one operator approval refused, two create the member once (replay reports replayed), the new member shows as never signed in with the requested name and designer role, a rejected request cannot be approved; the business audit sequence is exact. In the browser, the disable attempt on a record-owning persona showed the `OWNS_RECORDS` refusal with its count (every persona of the shared test organization owns records or is its last Security Administrator, so the full disable/re-enable path is proven in Stage B).
+
+Not run: complete Stage B and SEC-P suites, hosted CI, human screen-reader review, real Entra.
+
+### 15.5 Remaining restrictions
+
+- AC-7 is unavailable in staging and production until PB-08 step-up and the required assurance exist (D8-31): the Authority's step-up gate refuses every AC-7 command there; operator approval is Development/Testing only until production PIM.
+- Membership is not sign-in: no Entra OIDC sign-in exists yet; an added real identity cannot sign in.
+- AC-7 is not independently reviewed (joins the AC-5/AC-6/AC-9 package); G25/G26, PB-08, DR (G14 replay of the new lifecycle columns has no executed test) and production Level 2 are unchanged.
+- FR-OBS-1 (Form Designer sign-out with unsaved changes) remains open.
+
+## 16. People profiles, live presence and paged approvals (2026-10-31) — Development/Testing, not merged, not independently reviewed
+
+Owner request after visual review of the People page. **No new Authority command, permission or Authority schema change.** Everything below is business-side (BusinessDb migration `UserProfilesAndPresence`, business API, web). Profile edits and presence are display data: neither grants, removes or changes any permission, membership, session or role.
+
+### 16.1 People table
+
+Columns: Person (name, verified identity beneath it, "(you)"), Roles, Membership, **Presence**, Teams, Actions. The Sign-in and Last sign-in columns were removed from the table (the API still returns them and the Sign-in filter is kept). Membership (Active/Disabled, from the Authority) and presence (live activity) are separate columns and never share a badge.
+
+### 16.2 Profiles
+
+| Item | Detail |
+|---|---|
+| Storage | Existing `users` row. New columns: `preferred_name`, `job_title`, `identity_display_name`, `is_display_name_overridden`, `profile_revision`, `profile_modified_on`, `profile_modified_by_user_id`. |
+| Editable | Display name, preferred name, job title. **Never** issuer, subject, tenant binding, Authority membership or roles (the request has no such field); no email field exists. A display name that looks like an email address is refused. |
+| Entra-sourced name policy | `identity_display_name` records what the identity provider last asserted at every sign-in. `display_name` (what the application shows everywhere) follows it **unless** a profile edit overrode it; sign-in never overwrites an override. "Use the name from the identity provider" returns to it. This is the explicit supported policy for the one identity attribute that is editable. |
+| Who | A person edits their own (My profile, account menu). An organization owner (the Authority's ManageOrganization decision, the same authority as membership) edits anyone's in the same organization from People → Actions → Edit profile. Another organization's user is simply not found. The action is not offered on one's own row (My profile covers it). A person who has never signed in has no profile row and cannot be edited. |
+| Concurrency and audit | `expectedRevision` token; stale → 409 `PROFILE_REVISION_CONFLICT` and the dialog offers a reload. One business audit event `USER_PROFILE_UPDATED` per effective change with changed field **names** only (never values); no event for a no-op. |
+| Consistency | Directory, pickers, rosters, audit actors and the shell header use `users.display_name`; bootstrap and `GET /users/me` return it, so the header changes at once after a save. |
+
+### 16.3 Presence
+
+Informational only (never read by authentication, authorization, membership or session code). One row per user in `user_presences` (`last_heartbeat_on`, `last_interaction_on`), shared by all tabs and devices: heartbeat = latest, interaction = greatest. A closed tab sends nothing, so it cannot mark anyone Offline while another tab/device beats.
+
+| State | Rule |
+|---|---|
+| Available | a heartbeat within 150 s and an interaction within 5 min |
+| Away | a heartbeat within 150 s but no interaction for more than 5 min |
+| Offline | no heartbeat within 150 s (network failure, closed browser), explicit sign-out (heartbeat cleared), or never seen |
+| Unknown | presence could not be determined (store failure, person not in the caller's organization, unknown id) — shown as "Presence unknown", never as Offline |
+
+Client: one heartbeat on shell mount and once a minute through the coordinator's low-priority `polling` lane, carrying only "seconds since last interaction"; never retried or queued; an interaction after more than 4 minutes idle sends one early beat so the person shows Available at once; after 30 minutes without interaction the tab stops beating. Presence readers refresh once a minute and only while the page is visible (no hidden-tab polling). Server: user and organization come from the session (the request carries no user id), atomic upsert, repeats within 10 s write nothing, `interactionAgeSeconds` bounded 0–86400, queries bounded to 100 ids and the caller's own organization.
+
+Shown in: People, team rosters (Presence column), team "Add member" picker, record-share recipient picker. Not shown in audit logs, histories or in every mention of a name. Not added to the form-access picker (its component renders the picker after early returns; deferred rather than risk hook order). Documented limitation: signing out on one device while another device is active clears the shared heartbeat until that device's next beat (at most about a minute).
+
+### 16.4 Approvals
+
+`GET /api/v1/organization/owner-proposals` and `/membership-requests`: server pages of **5**, newest first (id tie-break), `q` search, `status` filter (Pending, Approved, Rejected, Expired), opaque cursor bound to the caller and filters (a cursor from other filters is refused). The two lists page independently. Owners and Security Administrators only. The Authority roster window is 30 days and is read per request; only one page leaves the server. The members endpoint still returns the proposal/request arrays for compatibility (the web no longer uses them). Rows are compact two-line rows (long object IDs truncated, full value as tooltip plus a Copy ID action) and become cards below 768 px.
+
+### 16.5 Tests (executed 2026-10-31)
+
+| Suite | Result |
+|---|---|
+| Stage B (isolated stack rebuilt from this tree): new `PeopleProfilesPresenceTests` (3) + `MembershipAdministrationTests`, `PeopleDirectoryTests`, `SecurityAdministratorTests`, `SessionRevocationTests`, `FormRenameTests` | 21 / 21 |
+| Contract tests (OpenAPI snapshot, directory hints) | 475 / 475 |
+| Architecture tests | 71 / 71 |
+| Vitest | 302 / 302 |
+| ESLint, TypeScript, production build | clean |
+| Playwright (isolated): `people-profile-presence` (8), `people-layout` (3), `people-administration` (2 of 3), `organization-administration` (5), `security-administrators` (2) | 20 / 20 run |
+
+Not run: the complete Stage B and SEC-P suites; the first `people-administration` test (it needs a persona that owns records, which a freshly built isolated stack does not have; its designer grant/remove path is covered by `MembershipAdministrationTests`); hosted CI; human screen-reader review. Note: that test, run on a stack without records, really disables its target (it did in the isolated stack; restored).
+
+## 17. People spacing done; membership-request edit/cancel stopped for Authority approval (2026-10-31)
+
+- **Spacing (done):** the People page now separates the Owner proposals and membership requests card from the People card with 24px (`gap-6` on their shared wrapper, not card padding), unchanged card styling; verified at 320, 768 and 1440 px by `people-layout.spec.ts`.
+- **Edit/Cancel request (not implemented):** the Authority has no owner-initiated cancel/replace for a membership request (states Pending/Approved/Rejected/Expired; reject is operator-only). New Authority commands and an AuthorityDb migration are required, so the security-sensitive part is **documented and awaiting approval**: `docs/architecture/PHASE_C8_M2_MEMBERSHIP_REQUEST_EDIT_CANCEL_PROPOSAL.md` (decisions requested in its §3).
+
+## 18. Membership request edit and cancel implemented (2026-10-31, owner approval of the proposal) — Development/Testing, not merged, not independently reviewed
+
+Authority commands `CancelOrganizationMembershipRequest` and `ReplaceOrganizationMembershipRequest` plus the AuthorityDb migration `MembershipRequestEditCancel`, as approved in `docs/architecture/PHASE_C8_M2_MEMBERSHIP_REQUEST_EDIT_CANCEL_PROPOSAL.md` (see its §4 for three small differences). Any enabled owner may cancel or edit a Pending request, with the existing AC-7 step-up (refused in staging and production until PB-08). Edit never mutates a request: the original becomes **Replaced**, a new Pending request with a new id, a fresh seven-day expiry and a link back to the original is created in the same transaction, the verified identity and organization are copied by the Authority (never accepted from the caller), and no approval carries over. Cancelled and Replaced requests can never be approved or rejected (operator dry run and execute both refuse `MEMBERSHIP_REQUEST_NOT_PENDING`); approved memberships are never touched. A stale or concurrently changed request is refused (`MEMBERSHIP_REQUEST_CHANGED` / `STALE_AUTHORIZATION_REVISION`); the commands are idempotent; refusals are journaled (`MembershipCommandRejected`) and accepted commands are in the archived security-command journal; the business audit timeline records `MEMBERSHIP_REQUEST_CANCELLED` / `MEMBERSHIP_REQUEST_REPLACED`.
+
+People page: Membership requests Actions by status — Awaiting operators: Edit request, Cancel request, Copy ID; Approved and Replaced: View details, Copy ID; Rejected, Expired and Cancelled: View details, Create new request (opens Add user pre-filled), Copy ID. Edit shows the identity read-only; cancel needs a reason and the step-up. Five-row paging, search and the status filter (now including Cancelled and Replaced) are unchanged.
+
+| Suite | Result (2026-10-31) |
+|---|---|
+| Authority unit tests (incl. 7 new AC-7.5 tests) | 241 / 241 |
+| Stage B real stack: new `MembershipRequestEditCancelTests` (5) + `MembershipAdministrationTests`, `PeopleProfilesPresenceTests` | 11 / 11 |
+| Business contract tests / architecture tests | 475 / 475, 71 / 71 |
+| Vitest | 309 / 309 |
+| ESLint, TypeScript, production build | clean |
+| Playwright (isolated): `membership-request-edit-cancel` (3), `people-profile-presence` (7), `people-layout` (4), `people-administration` (2), `organization-administration` (5), `security-administrators` (2) | all run passed |
+
+Not run: the complete Stage B and SEC-P suites; the first `people-administration` test (needs a persona that owns records); hosted CI; human screen-reader review. G14 replay of the new request states has no executed test.
+
+## 19. Platform Operator approvals — architecture proposal (2026-10-31, C-96) — awaiting owner decisions, nothing implemented
+
+`docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` proposes replacing `devstack.py membership approve` with a separate Platform Console in which two distinct, individually authenticated Platform Operators each approve the exact request and the Authority executes the membership only after verifying both. It lists the reusable machinery, gaps G-1…G-10, the threat model, tests PO-T01…T25, the staged implementation (Opus/Sonnet) and owner decisions D8-33…D8-44. Until those are recorded, the CLI procedure in §15 remains the only way to decide membership requests (Development/Testing only).
+
+## 20. Platform Operator Stages 1-2 implemented in the Authority (2026-10-31, C-97 approval, C-98) — Development/Testing, not merged, not independently reviewed
+
+The owner approved D8-33…D8-44 for Development/Testing (C-97) with an added condition: a separately protected checkpoint so a database restore cannot silently restore suspended operators. Stages 1 and 2 are implemented in the Authority only, as described in `docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` §16 (registry, two-operator changes, suspension, recovery ceremony, platform journal with archive rollback detection and replay, Platform Console credential, statement v2, per-operator evidence, pending approvals, atomic completion, withdrawal, rejection, invalidation, conflict of interest, cross-organization reads). AuthorityDb migration `PlatformOperatorApprovals` (additive). There is no Platform Console BFF or web UI yet, the People page is unchanged, and the legacy `devstack.py membership approve` path is retained (it now closes any pending platform approval of the request it decides).
+
+| Suite | Result (2026-10-31) |
+|---|---|
+| Authority unit tests (22 new) | 263 / 263 |
+| Contract tests (13 new `PlatformConsoleBoundaryTests`) | 488 / 488 |
+| Architecture tests | 71 / 71 |
+| Real stack (isolated stack rebuilt from this branch): `PlatformOperatorApprovalTests` (4) + `MembershipAdministrationTests` + `MembershipRequestEditCancelTests` | 11 / 12 on the first run; the failure was the existing AC-7.5 three-way owner race test (PF-10, body not captured); 21 / 21 on re-run |
+
+Not run: the complete Stage B and SEC-P suites, Playwright, hosted CI. The persistent development stack was not changed: activating the platform plane there (migration, credentials, three synthetic operators) needs owner approval with Stage 3. Production remains closed: `PlatformOperators:Mode=SyntheticDevelopment` is refused outside Development/Testing and the default `Unavailable` refuses every platform operation; Entra transaction-bound step-up evidence is a refusal stub until PB-08.
+
+## 21. Platform Console Stage 3 — BFF, development sessions, Vault signing, development-stack activation (2026-10-31, C-99) — Development/Testing, not merged, not independently reviewed
+
+The owner approved Stage 3 for Development/Testing (C-99). Built: the separately deployed Platform Console BFF
+(`src/platform-console/EnterpriseForms.PlatformConsole`, dev `http://127.0.0.1:8092/console-api`) with its own container, networks,
+cookie and Authority credential; development operator sign-in bound to one registered operator and its own key; server-side sessions
+(15 min idle, 2 h absolute, server-side sign-out, rotation, ending on suspension); CSRF and origin checks; evidence signed in Vault
+Transit with each operator's own non-exportable ECDSA P-256 key, only after the Authority confirms the reviewed statement, never
+returned to the browser; the PG-070 API (session, queue, details, approval status, approve, withdraw, reject) reusing the Stage 2
+Authority commands unchanged. Authority change: request-detail views audited on the organization audit stream instead of the platform
+journal (PF-8, fail closed). `devstack.py platform-console init|status`; `dev-seed` mode `operator-platform-bootstrap`. PG-070
+registered (owner Platform administration / Security). Details: `docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` §17.
+
+| Suite | Result (2026-10-31) |
+|---|---|
+| Platform Console BFF tests (new, 23) | 23 / 23 |
+| Authority unit tests | 263 / 263 |
+| Contract tests | 488 / 488 |
+| Architecture tests (3 new; 70-page ownership) | 75 / 75 |
+| Real stack, isolated security-test stack recreated with the console: `PlatformConsoleStackTests` (6 new) + `PlatformOperatorApprovalTests` (4) + `MembershipAdministrationTests` (3) + `MembershipRequestEditCancelTests` (5) | 18 / 18 |
+| Chromium cookie check (isolated console): Secure + HttpOnly cookie stored and sent over `http://127.0.0.1`, unreadable by script, sign-out without CSRF 403, after sign-out 401 | passed |
+| Development stack activation (backup verified + restore-test IDENTICAL, migration, Vault keys/policy/isolation, ceremony, verification, console sessions) and two idempotent re-runs | passed |
+
+PF-10 stays open; the race test now reports every racer's actor, status, code and body. Not run: the complete Stage B and SEC-P suites,
+Playwright UI tests (no UI yet), hosted CI. Production remains closed. The legacy CLI approval path is retained (D8-42: retire only
+after the Stage 4 console passes its real-stack tests). Next: Stage 4 (`apps/platform-console`), awaiting the owner's go-ahead.
+
+## 22. Platform Console Stage 4 — web app (2026-11-01, C-100) — Development/Testing, not merged, not independently reviewed
+
+`apps/platform-console` is built and served by `platform-console-web` at `http://127.0.0.1:8095/platform/sign-in` (BFF `:8092`): operator sign-in, PG-070 Operator approvals queue, Review details, approve/withdraw/reject. Details and limits: `docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` §18. Tests: Vitest 18 new (327 total), ESLint/tsc/build clean, Playwright `e2e-console` 15/15 on the isolated stack; the dev queue was only read (no request opened, none decided). Not done: legacy CLI retirement, M3, merge, production authentication, human screen-reader review.
+
+## 23. People Refresh fix and Platform Console queue cards (2026-11-01, C-101)
+
+Root cause: the People page Refresh button called `refetch()` on the directory query only; the owner proposals and membership requests lists are separate queries (their own search, status and cursor) and were never refetched, so an approval made in the Platform Console appeared only when navigating away remounted them. Fix: Refresh refetches every active `organization` query (directory and both approval lists, with their current parameters), shows a busy state and "Updated hh:mm:ss", and on failure shows "Refresh failed … may be out of date" with Try again; overlapping refreshes are impossible (button busy) and TanStack Query never applies an older response over a newer one. The API had no cache. Platform Console queue: cards below 768 px (same facts, Review details, paging, search and filters), table from 768 px. Tests: 5 new People Vitest (external approval, parameters kept, member appears, busy, failure, slow response), 1 new console Vitest; Vitest workspace 332/332; console Playwright 15/15; People Playwright 14/15, the one failure (`people-administration` first test, needs a persona that owns no records) fails identically without this change.
+
+## 24. Stage 5 — integration and security verification (2026-11-01, C-102) — Development/Testing, not merged, not independently reviewed
+
+Details, evidence table and status vocabulary: `docs/architecture/PHASE_C8_M2_PLATFORM_OPERATOR_APPROVALS.md` §19. Summary: the People Playwright failure was a fixture defect (a fresh isolated stack has no record-owning persona; the first run disabled Riley and left the membership disabled) and is fixed with a supported-API fixture, 7 consecutive passes; a cross-application Playwright test reproduces the accepted workflow (two operators approve in the Platform Console, the open People page shows Approved and the new member after Refresh without navigation) on the isolated stack, 6/6 repetitions, and fails against the pre-fix page; operator security controls were executed (real-stack operator suites 11/11, one new suspended-operator test); PF-10 passed 40/40 repetitions and stays OPEN; persistent-stack integration checks were read-only. Implemented and development-verified only: no independent review, PB-08, PB-10, PB-11, PB-12 or G14 is complete; production is not ready.
+
+## 25. Organization onboarding and owner recovery — architecture and security assessment (2026-11-01, C-103) — proposal, nothing implemented
+
+Document: `docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md`. Inspection of the existing organization bootstrap, dev seed and key custody, owner rules, SpiceDB schema, team rules, Platform Operator infrastructure, Security Administrator recovery and sessions. Findings recorded (not fixed): the legacy operator bootstrap needs one owner, no approval and accepts caller-chosen ids, and answers success for a different request with an existing id (OB-F1…OB-F3, OB-F5); the Authority creates organization keys itself, which works in development only while root custody widens the pinned Vault policy (OB-F4); no organization lifecycle or list (OB-F6); with two owners no owner change is possible and with one no owner can be added (OB-F7, the development main organization has one owner); an organization owner can add themselves to any team and teams can own records, so ownership indirectly reaches team-owned records (OB-F8, High for recovery); conflict of interest compares exact identities only (OB-F9). Proposed: two-operator onboarding with an Authority-built statement, separated key custody and atomic initialization; owner recovery with three operators, incident reference, cooling-off with organization veto, add-only scope and recovered-owner probation; multi-organization identity confirmed at the data-model level with MO-1…MO-6 as separate changes; console pages PG-072…PG-075. Focused Authority unit tests 63/63 (Membership administration, Platform Operators, Security Administrator provisioning). Awaiting owner decisions D8-45…D8-61. No Authority command, migration, permission, page or recovery function implemented; development data unchanged; nothing merged; no M3; legacy CLI unchanged.
+
+
+## 26. Organization onboarding implemented for Development/Testing (2026-11-01, C-104) — not merged, not independently reviewed
+
+The owner approved the onboarding architecture for Development/Testing with decisions 1–11 (separate console; two distinct operators, the initiator may give approval one; exact immutable request; two owners minimum, three recommended; Authority-generated ids; independently provisioned keys; inactive until initialization and journal verification; production needs verified owner identity control; legacy creation restricted to fixtures; PG-072…PG-075 with PG-071 preserved) and directed a permanent fix for OB-F8. Delivered (details `docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md` §16): Authority onboarding (create, two-operator approval, reject/withdraw/cancel, key verification, atomic initialization, organizations directory, platform journal events, legacy bootstrap restriction and the OB-F2 false-success fix), AuthorityDb migration `20261101131420_OrganizationOnboarding` (additive), a dedicated Vault custody credential (create-only HMAC keys; the Authority verifies and never creates organization keys), `devstack.py onboarding init|status|provision-key|personas`, Platform Console BFF routes and pages PG-072 Organizations, PG-073 New organization, PG-074 Onboarding request (PG-071 registered as reserved), and the OB-F8 Authority rule (no self-join for anyone; only a different owner can add an owner to a team) with regression tests. Owner recovery not implemented; PG-075 not built.
+
+| Suite | Result (2026-11-01) |
+|---|---|
+| Authority unit tests (24 new, 1 updated) | 282 / 282 |
+| Contract / BFF / architecture / integrity | 488 / 488, 23 / 23, 75 / 75, 34 / 34 |
+| Real stack (isolated stack recreated from this tree): 7 new + 35 regression | 42 / 42 |
+| Frontend Vitest / ESLint / tsc / build | 348 / 348, clean |
+| Platform Console Playwright (isolated stack; 8 new) | 23 / 23 |
+
+Defects found and fixed during testing: the frozen statement did not survive PostgreSQL's microsecond timestamps (refused fail closed; timestamps now truncated); Vault authorizes a Transit key create as `update`, so the create-only custody policy could not create keys (replaced by a single-segment `update` grant with pinned parameters; denials re-verified). Unresolved: D8-49 (edits; requests are immutable instead), D8-48 production detail, D8-54…D8-56 (recovery), D8-59 confirmation; table shape deviates from the D8-51 generic-table proposal. Not run: complete Stage B and SEC-P suites, business-app Playwright, hosted CI, screen-reader review. Production remains closed.
+
+Development stack (2026-11-01): `devstack.py onboarding init` — backup `20261101-085519` verified (checksums) and restore-tested (IDENTICAL), migration applied, custody token and policy created, Authority Vault policy switched to read/hmac/verify by prefix, 12 isolation denials verified, Authority/API/worker/console rebuilt; existing data unchanged (2 organizations, 13 identity bindings, no onboarding request). Console onboarding: `http://127.0.0.1:8095/platform/onboarding`.
+
+## 27. Owner recovery implemented for Development/Testing (2026-11-01, C-105) — not merged, not independently reviewed
+
+The owner directed owner recovery for Development/Testing with strong separation of duties and no implicit access to confidential records, applying the approved direction to D8-54…D8-57. Delivered (details and the proposal-by-proposal review in `docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md` §17): Authority owner recovery (eligibility from Authority state with evidence-backed declared unavailability, three distinct operator approvals with per-operator evidence, trusted-clock waiting period, objections that end the case, invalidation on owner-set or identity changes and on declared owners signing in, add-only atomic execution, idempotent retries, platform journal and organization audit events, replay), AuthorityDb migration `20261101221445_OwnerRecovery` (additive), the recovered-owner safeguard on top of the permanent OB-F8 rule, business notice and objection routes (owners and Security Administrators only), Platform Console BFF routes and PG-075, the PG-041 objection notice, and `devstack.py owner-recovery init|status`. Production execution stays unavailable (PB-08 and independent assurance outstanding); notifications are in-app only and no delivery is claimed.
+
+| Suite | Result (2026-11-01) |
+|---|---|
+| Authority unit tests (19 new) | 301 / 301 |
+| Contract / BFF / architecture (75-page ownership) / integrity | 488 / 488, 23 / 23, 75 / 75, 34 / 34 |
+| Real stack (isolated stack recreated from this tree): `OwnerRecoveryStackTests` (4 new) + regression `OrganizationOnboardingStackTests`, `OwnerTeamJoinStackTests`, `PlatformConsoleStackTests`, `MembershipAdministrationTests`, `TeamMembershipReconciliationTests`, `PeopleDirectoryTests`, `MembershipRequestEditCancelTests` | 57 / 58 combined; the one failure (RC27 rate-limit throughput, load-sensitive) passes alone 1 / 1; concurrent execution repeated 5 / 5 after the fix |
+| Frontend ESLint / tsc / build | clean |
+| Vitest workspace (17 new) | 365 / 365 with two workers; the default parallel run shows 2–4 intermittent 5 s timeouts in existing heavy tests (`PeopleDirectoryPage`, `OrganizationOnboarding`), which pass alone |
+| Platform Console Playwright (isolated stack; 9 new: three-operator lifecycle with the real waiting period, keyboard-only decision, axe, 320/768/1440 px, 200 %/400 % zoom) | 26 / 32 first run; the 6 failures were a spec race (URL read before navigation) — fixed; rerun 6 / 6 and owner-recovery spec 9 / 9 |
+| Business Playwright (isolated stack): objection notice (5 new) and organization administration regression | 5 / 5, 5 / 5 |
+
+Defects found and fixed during testing: under concurrent execution the losing request read a stale tracked case and reported `OWNER_RECOVERY_OWNER_SET_CHANGED` (and journaled a spurious invalidation) instead of `Replayed` — the unlocked lookup is now untracked; the objection confirmation disappeared when the refreshed notice no longer had a case — it now stays; the "cannot object" text named the wrong rule. Covered: one-owner and zero-eligible-owner cases, two eligible owners refused, declared-unavailable evidence, three approvals, same operator twice, suspended operator, conflict of interest, changed owner set, stale/replayed evidence, waiting period, objection blocks, unauthorized and cross-organization objection refused, identity conflicts, concurrent openings and executions, retried execution, archive outage, restore and replay (unit), no record/team/share change, no self-join, recovered owners cannot add each other. Not run: complete Stage B and SEC-P suites, hosted CI, screen-reader review.
+
+Development stack: `devstack.py owner-recovery init` (2026-11-01): backup `Documents\EnterpriseForms-dev-backups\enterpriseforms-dev\20261101-185205` (7 volumes, cold copy) verified (checksums, entry counts) and restore-tested (IDENTICAL); migration `20261101221445_OwnerRecovery` applied; Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated; data unchanged before/after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records); PG-075 at `http://127.0.0.1:8095/platform/recovery` (waiting period 600 s). No recovery case was opened. Evidence: `artifacts/dev-persistent/enterpriseforms-dev-owner-recovery-init-20261101-185506.json`.
+
+
+## 28. Owner recovery refinements (2026-11-01, C-106) — not merged, not independently reviewed
+
+Delivered on the owner's approval (details `docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md` §18): a searchable, server-paged replacement-owner member picker in PG-075 (Authority member search limited to eligible members, minimum metadata, audited, BFF route, no business credential), the recovered-owner restriction in People management (the Authority's own expiry timestamp, compact accessible disclosure, reason shown on refusal), and test stabilization with measured root causes (limiter first-burst-after-idle admits up to 2 × burst; Vitest oversubscription; Playwright navigation race). The owner recovery security model is unchanged.
+
+| Suite | Result (2026-11-01) |
+|---|---|
+| Authority unit tests (5 new: picker eligibility, paging, isolation, id binding, restriction expiry) | 306 / 306 |
+| Contract / BFF / architecture / integrity | 488 / 488, 23 / 23, 75 / 75, 34 / 34 |
+| Real stack, one combined run (recovery incl. 1 new picker test, onboarding, team join, console, membership, reconciliation incl. RC27, people) | 59 / 59 |
+| RC27 rate-limit test, repeated in isolation | 5 / 5 |
+| Vitest workspace (default command, three consecutive full runs; 6 new tests) | 371 / 371 each |
+| ESLint, tsc, build | clean |
+| Platform Console Playwright, complete suite as one run (4 new picker tests, results listed at 320/768/1440 px with axe and no horizontal scroll) | 36 / 36 (first run of the round 35 / 36: a wrong heading name in the new spec, fixed) |
+| Business Playwright: People recovery restrictions (new; 320/768/1440 px, axe, expiry hidden; server response patched in the browser), objection notice, People layout and administration | all passed |
+
+Two harness defects found and fixed: console sign-ins from many test classes in one run cross the console deliberate 20-per-minute login limit, so the console test session now waits out the window (tests of the limiter itself are unchanged); and killing a test run midway can leave the stack worker stopped, which the next run reports as a fixture failure (restore the stack before rerunning).
+
+Development stack: `devstack.py owner-recovery init` re-run (2026-11-01): migration `20261101221445_OwnerRecovery` already applied and backup `20261101-185205` already recorded (no new backup, no migration); Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated only; Vault, databases, SpiceDB and Azurite untouched. Data unchanged before and after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records). No recovery case was opened and the single-owner main organization was not touched. Evidence: `artifacts/dev-persistent/enterpriseforms-dev-owner-recovery-init-20261101-201341.json`. PG-075 `http://127.0.0.1:8095/platform/recovery`; People `http://127.0.0.1:8091/app/organization/users`.
+
+
+## 29. Multi-owner selection and the ten-owner limit (2026-11-01, C-107) — not merged, not independently reviewed
+
+Delivered per the owner's direction (details `docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md` §19): one selection mechanism for every replacement owner (selected list, one searchable server-paged picker of 10, collapsed new-identity form, remove, duplicate and limit messages, owner capacity), server-side duplicate and three-replacement rules, and a single Authority-enforced limit of ten active owners across onboarding, owner grants, owner re-enablement, recovery and the fixture bootstrap, checked at the final operation inside the organization lock. The recovery security model is unchanged.
+
+| Suite | Result (2026-11-01) |
+|---|---|
+| Authority unit tests (7 new: owner limit in the command service incl. re-enable and disabled owners, recovery at the limit, server-side duplicate and three-replacement rules, 10-per-page picker with exclusion and capacity) | 312 / 312 |
+| Contract / BFF / architecture / integrity | 488 / 488, 23 / 23, 75 / 75, 34 / 34 |
+| Real stack, one combined run (recovery incl. 2 new tests, onboarding, team join, console, membership, reconciliation, people) | 61 / 61 |
+| Concurrent owner grants at the limit, repeated | 3 / 3 |
+| Vitest workspace (default command; 5 new) | 376 / 376 |
+| ESLint, tsc, build | clean |
+| Platform Console Playwright, complete suite as one run (selection model, three members one after another, blocked fourth, remove and replace, 320/768/1440 px with the picker, selected list and new-identity form open) | 36 / 36 (two earlier runs of this round failed one new spec on over-broad locators, fixed in the spec) |
+
+Development stack: `devstack.py owner-recovery init` re-run (2026-11-01): migration and backup unchanged (no new backup, no migration); Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated only; Vault, databases, SpiceDB and Azurite untouched. Data unchanged before and after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records; no development organization is near the limit — the largest has fewer than 10 owners). No recovery case was opened. PG-075 `http://127.0.0.1:8095/platform/recovery`.

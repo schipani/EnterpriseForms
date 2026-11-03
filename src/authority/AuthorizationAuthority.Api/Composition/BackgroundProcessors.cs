@@ -42,7 +42,7 @@ public sealed partial class SpiceDbSchemaInitializer(ISpiceDbProjection spiceDb,
 }
 
 /// <summary>Single ordered projection + archive loop. One instance per authority process; the SpiceDB marker CAS fences any duplicate.</summary>
-public sealed partial class AuthorityWorkLoop(IAuthorityStore store, ProjectionProcessor projection, ArchiveProcessor archive, SpiceDbSchemaInitializer schemaInitializer, ILogger<AuthorityWorkLoop> logger) : BackgroundService
+public sealed partial class AuthorityWorkLoop(IAuthorityStore store, ProjectionProcessor projection, ArchiveProcessor archive, AuthorizationAuthority.Application.Features.PlatformOperators.PlatformJournal platformJournal, SpiceDbSchemaInitializer schemaInitializer, ILogger<AuthorityWorkLoop> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -58,6 +58,8 @@ public sealed partial class AuthorityWorkLoop(IAuthorityStore store, ProjectionP
             {
                 if (schemaInitializer.SchemaReady)
                 {
+                    // C8 M2: re-deliver platform journal events whose synchronous delivery failed (ordered; quarantines on mismatch).
+                    await platformJournal.DeliverAsync(stoppingToken).ConfigureAwait(false);
                     foreach (var organizationId in await store.GetOrganizationsWithPendingWorkAsync(stoppingToken).ConfigureAwait(false))
                     {
                         didWork |= await archive.ProcessOrganizationAsync(organizationId, stoppingToken).ConfigureAwait(false) > 0;

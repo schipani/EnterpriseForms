@@ -67,6 +67,81 @@ public static class AuthorityErrorCodes
     public const string DelegatedAssertionNotAccepted = "DELEGATED_ASSERTION_NOT_ACCEPTED";
     public const string KindNotReconcilable = "KIND_NOT_RECONCILABLE";
     public const string RateLimited = "RATE_LIMITED";
+
+    // C8 M2 (AC-7) membership and organization-role administration.
+    public const string SelfChangeForbidden = "SELF_CHANGE_FORBIDDEN";
+    public const string OwnerApprovalRequired = "OWNER_APPROVAL_REQUIRED";
+    public const string ProposalNotPending = "PROPOSAL_NOT_PENDING";
+    public const string ProposalExpired = "PROPOSAL_EXPIRED";
+    public const string ProposalMismatch = "PROPOSAL_MISMATCH";
+    public const string ProposalExists = "PROPOSAL_EXISTS";
+    public const string LastOwner = "LAST_OWNER";
+    public const string RoleAlreadyHeld = "ROLE_ALREADY_HELD";
+    public const string RoleNotHeld = "ROLE_NOT_HELD";
+    public const string MembershipStateConflict = "MEMBERSHIP_STATE_CONFLICT";
+    public const string OwnsRecords = "OWNS_RECORDS";
+    public const string IdentityAlreadyBound = "IDENTITY_ALREADY_BOUND";
+    public const string IdentityNotAllowed = "IDENTITY_NOT_ALLOWED";
+    public const string MembershipRequestExists = "MEMBERSHIP_REQUEST_EXISTS";
+    public const string MembershipRequestNotPending = "MEMBERSHIP_REQUEST_NOT_PENDING";
+
+    /// <summary>C8 M2 (AC-7.5): the request was cancelled, replaced, decided or edited since the caller read it.</summary>
+    public const string MembershipRequestChanged = "MEMBERSHIP_REQUEST_CHANGED";
+    public const string MembershipRequestExpired = "MEMBERSHIP_REQUEST_EXPIRED";
+
+    // C8 M2 Stages 1-2: Platform Operators (D8-33…D8-44).
+    public const string PlatformOperatorsUnavailable = "PLATFORM_OPERATORS_UNAVAILABLE";
+    public const string PlatformOperatorNotActive = "PLATFORM_OPERATOR_NOT_ACTIVE";
+    public const string OperatorEvidenceInvalid = "OPERATOR_EVIDENCE_INVALID";
+    public const string OperatorEvidenceIdentityMismatch = "OPERATOR_EVIDENCE_IDENTITY_MISMATCH";
+    public const string OperatorEvidenceReplayed = "OPERATOR_EVIDENCE_REPLAYED";
+    public const string OperatorEvidenceUnavailable = "OPERATOR_EVIDENCE_UNAVAILABLE";
+    public const string ApprovalStatementChanged = "APPROVAL_STATEMENT_CHANGED";
+    public const string OperatorAlreadyApproved = "OPERATOR_ALREADY_APPROVED";
+    public const string OperatorConflictOfInterest = "OPERATOR_CONFLICT_OF_INTEREST";
+    public const string OperatorQuorumUnavailable = "OPERATOR_QUORUM_UNAVAILABLE";
+    public const string OperatorQuorumPresent = "OPERATOR_QUORUM_PRESENT";
+    public const string OperatorIdentityExists = "OPERATOR_IDENTITY_EXISTS";
+    public const string OperatorStateConflict = "OPERATOR_STATE_CONFLICT";
+    public const string NoPendingApproval = "NO_PENDING_APPROVAL";
+    public const string PlatformOperationReplayed = "PLATFORM_OPERATION_REPLAYED";
+    public const string PlatformJournalBehindArchive = "PLATFORM_JOURNAL_BEHIND_ARCHIVE";
+    public const string PlatformJournalUnverifiable = "PLATFORM_JOURNAL_UNVERIFIABLE";
+    public const string PlatformJournalArchivePending = "PLATFORM_JOURNAL_ARCHIVE_PENDING";
+    public const string PlatformJournalQuarantined = "PLATFORM_JOURNAL_QUARANTINED";
+
+    // C8 onboarding (C-104) and OB-F8.
+    public const string OrganizationOnboardingUnavailable = "ORGANIZATION_ONBOARDING_UNAVAILABLE";
+    public const string OrganizationNameConflict = "ORGANIZATION_NAME_CONFLICT";
+    public const string OrganizationOwnerIdentityInvalid = "ORGANIZATION_OWNER_IDENTITY_INVALID";
+    public const string OrganizationOwnersInsufficient = "ORGANIZATION_OWNERS_INSUFFICIENT";
+    public const string OrganizationOwnerIssuerMismatch = "ORGANIZATION_OWNER_ISSUER_MISMATCH";
+    public const string OrganizationOwnerIsOperator = "ORGANIZATION_OWNER_IS_OPERATOR";
+    public const string OrganizationOnboardingNotPending = "ORGANIZATION_ONBOARDING_NOT_PENDING";
+    public const string OrganizationOnboardingExpired = "ORGANIZATION_ONBOARDING_EXPIRED";
+    public const string OrganizationKeyNotProvisioned = "ORGANIZATION_KEY_NOT_PROVISIONED";
+    public const string OrganizationIdReserved = "ORGANIZATION_ID_RESERVED";
+    public const string LegacyOrganizationBootstrapDisabled = "LEGACY_ORGANIZATION_BOOTSTRAP_DISABLED";
+    public const string TeamJoinRequiresAnotherOwner = "TEAM_JOIN_REQUIRES_ANOTHER_OWNER";
+
+    // C8 owner recovery (C-105).
+    public const string OwnerRecoveryUnavailable = "OWNER_RECOVERY_UNAVAILABLE";
+    public const string OwnerRecoveryNotApplicable = "OWNER_RECOVERY_NOT_APPLICABLE";
+    public const string OwnerRecoveryCaseExists = "OWNER_RECOVERY_CASE_EXISTS";
+    public const string OwnerRecoveryNotOpen = "OWNER_RECOVERY_NOT_OPEN";
+    public const string OwnerRecoveryExpired = "OWNER_RECOVERY_EXPIRED";
+    public const string OwnerRecoveryApprovalsIncomplete = "OWNER_RECOVERY_APPROVALS_INCOMPLETE";
+    public const string OwnerRecoveryWaitingPeriod = "OWNER_RECOVERY_WAITING_PERIOD";
+    public const string OwnerRecoveryObjected = "OWNER_RECOVERY_OBJECTED";
+    public const string OwnerRecoveryOwnerSetChanged = "OWNER_RECOVERY_OWNER_SET_CHANGED";
+    public const string OwnerRecoveryDeclaredOwnerActive = "OWNER_RECOVERY_DECLARED_OWNER_ACTIVE";
+    public const string OwnerRecoveryIdentityConflict = "OWNER_RECOVERY_IDENTITY_CONFLICT";
+    public const string OwnerRecoveryEvidenceRequired = "OWNER_RECOVERY_EVIDENCE_REQUIRED";
+    public const string OwnerRecoveryProbation = "OWNER_RECOVERY_PROBATION";
+
+    /// <summary>C-107: the organization already has (or would exceed) the maximum number of active owners.</summary>
+    public const string OrganizationOwnerLimit = "ORGANIZATION_OWNER_LIMIT";
+    public const string CursorInvalid = "CURSOR_INVALID";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

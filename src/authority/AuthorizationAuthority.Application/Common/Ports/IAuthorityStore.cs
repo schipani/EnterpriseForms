@@ -4,6 +4,7 @@ using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 
@@ -44,6 +45,24 @@ public interface IAuthorityScope : IAsyncDisposable
     Task<IdentityBinding?> FindIdentityBindingByIdAsync(Guid identityBindingId, CancellationToken cancellationToken);
 
     void AddIdentityBinding(IdentityBinding binding);
+
+    /// <summary>C8 M2 (AC-7.2): the binding tracked for update inside the organization lock.</summary>
+    Task<IdentityBinding?> FindIdentityBindingForUpdateAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken);
+
+    /// <summary>C8 M2 (AC-7.2): sessions of one binding that are not revoked (tracked, to revoke them with the disabling command).</summary>
+    Task<List<AuthenticatedSession>> GetUnrevokedSessionsAsync(Guid identityBindingId, CancellationToken cancellationToken);
+
+    Task<OrganizationRoleChangeProposal?> FindRoleChangeProposalAsync(Guid organizationId, Guid proposalId, CancellationToken cancellationToken);
+
+    Task<List<OrganizationRoleChangeProposal>> GetRoleChangeProposalsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken);
+
+    void AddRoleChangeProposal(OrganizationRoleChangeProposal proposal);
+
+    Task<OrganizationMembershipRequest?> FindMembershipRequestAsync(Guid organizationId, Guid requestId, CancellationToken cancellationToken);
+
+    Task<List<OrganizationMembershipRequest>> GetMembershipRequestsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken);
+
+    void AddMembershipRequest(OrganizationMembershipRequest request);
 
     Task<AuthorityResource?> FindResourceAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, CancellationToken cancellationToken);
 
@@ -183,5 +202,164 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>Phase C7 M4: the most recent attestation of each of the given protection decisions (read-only).</summary>
     Task<List<ProtectionReconciliationAttestation>> GetLatestProtectionAttestationsAsync(Guid organizationId, IReadOnlyCollection<Guid> scopingSecurityCommandIds, CancellationToken cancellationToken);
 
+    // ---- C8 M2 Stages 1-2: Platform Operators. Lock order: organization state row first, then the platform journal head. ----
+
+    /// <summary>SELECT ... FOR UPDATE on the single platform journal head row: serializes every platform mutation.</summary>
+    Task<PlatformJournalHead?> LockPlatformJournalAsync(CancellationToken cancellationToken);
+
+    Task<PlatformJournalHead?> ReadPlatformJournalAsync(CancellationToken cancellationToken);
+
+    void AddPlatformJournalHead(PlatformJournalHead head);
+
+    void AddPlatformJournalEntry(PlatformJournalEntry entry);
+
+    /// <summary>Pending-archive platform entries in revision order (tracked).</summary>
+    Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken);
+
+    Task<int> CountPendingPlatformArchiveAsync(CancellationToken cancellationToken);
+
+    /// <summary>Tracked.</summary>
+    Task<PlatformOperator?> FindPlatformOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken);
+
+    /// <summary>Tracked.</summary>
+    Task<PlatformOperator?> FindPlatformOperatorByIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken);
+
+    /// <summary>Every registered operator (tracked), in registration order.</summary>
+    Task<List<PlatformOperator>> GetPlatformOperatorsAsync(CancellationToken cancellationToken);
+
+    void AddPlatformOperator(PlatformOperator platformOperator);
+
+    /// <summary>Tracked.</summary>
+    Task<PlatformOperatorChangeProposal?> FindPlatformOperatorProposalAsync(Guid proposalId, CancellationToken cancellationToken);
+
+    /// <summary>Proposals created since the given instant (tracked).</summary>
+    Task<List<PlatformOperatorChangeProposal>> GetPlatformOperatorProposalsAsync(DateTimeOffset createdSince, CancellationToken cancellationToken);
+
+    void AddPlatformOperatorProposal(PlatformOperatorChangeProposal proposal);
+
+    /// <summary>Tracked.</summary>
+    Task<PlatformOperatorApproval?> FindPlatformApprovalAsync(Guid platformOperatorApprovalId, CancellationToken cancellationToken);
+
+    /// <summary>Every approval of one request (tracked), in recording order.</summary>
+    Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestAsync(Guid organizationMembershipRequestId, CancellationToken cancellationToken);
+
+    /// <summary>Pending approvals recorded by one operator (tracked).</summary>
+    Task<List<PlatformOperatorApproval>> GetPendingPlatformApprovalsForOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken);
+
+    /// <summary>Approvals of the given requests (read-only).</summary>
+    Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationMembershipRequestIds, CancellationToken cancellationToken);
+
+    void AddPlatformApproval(PlatformOperatorApproval approval);
+
+    /// <summary>True when an evidence identifier or digest was already accepted once.</summary>
+    Task<bool> IsPlatformEvidenceUsedAsync(string evidenceUseIdentifier, byte[] evidenceUseSha256, CancellationToken cancellationToken);
+
+    /// <summary>Tracked (journal replay upserts by id).</summary>
+    Task<PlatformOperatorEvidenceUse?> FindPlatformEvidenceUseAsync(Guid platformOperatorEvidenceUseId, CancellationToken cancellationToken);
+
+    void AddPlatformEvidenceUse(PlatformOperatorEvidenceUse evidenceUse);
+
+    /// <summary>Cross-organization page of membership requests (read-only), newest first, keyset after the cursor, with the total.</summary>
+    Task<PlatformRequestStorePage> SearchMembershipRequestsAsync(PlatformMembershipRequestQuery query, CancellationToken cancellationToken);
+
+    // ---- C8 onboarding (C-104). Lock order: platform journal head first, then the onboarding request row. ----
+
+    /// <summary>The request, optionally locked FOR UPDATE.</summary>
+    Task<OrganizationOnboardingRequest?> FindOnboardingRequestAsync(Guid organizationOnboardingRequestId, bool lockForUpdate, CancellationToken cancellationToken);
+
+    Task<OrganizationOnboardingRequest?> FindOnboardingRequestByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken);
+
+    /// <summary>Any request (any state) that reserved this organization id.</summary>
+    Task<OrganizationOnboardingRequest?> FindOnboardingRequestByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>Requests whose stored state is still open (PendingApproval or AwaitingKeyCustody) with this normalized name, tracked.</summary>
+    Task<List<OrganizationOnboardingRequest>> GetOpenOnboardingRequestsByNameAsync(string normalizedName, CancellationToken cancellationToken);
+
+    void AddOnboardingRequest(OrganizationOnboardingRequest request);
+
+    Task<List<OrganizationOnboardingOwner>> GetOnboardingOwnersAsync(Guid organizationOnboardingRequestId, CancellationToken cancellationToken);
+
+    Task<OrganizationOnboardingOwner?> FindOnboardingOwnerAsync(Guid organizationOnboardingOwnerId, CancellationToken cancellationToken);
+
+    void AddOnboardingOwner(OrganizationOnboardingOwner owner);
+
+    Task<List<OrganizationOnboardingApproval>> GetOnboardingApprovalsAsync(Guid organizationOnboardingRequestId, CancellationToken cancellationToken);
+
+    Task<List<OrganizationOnboardingApproval>> GetOnboardingApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationOnboardingRequestIds, CancellationToken cancellationToken);
+
+    Task<OrganizationOnboardingApproval?> FindOnboardingApprovalAsync(Guid organizationOnboardingApprovalId, CancellationToken cancellationToken);
+
+    void AddOnboardingApproval(OrganizationOnboardingApproval approval);
+
+    /// <summary>Newest first; text matches the organization name (case-insensitive).</summary>
+    Task<OnboardingRequestStorePage> SearchOnboardingRequestsAsync(OnboardingRequestQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Every organization with its enabled owner, Security Administrator and member counts (directory; metadata only).</summary>
+    Task<List<OrganizationDirectoryRow>> GetOrganizationDirectoryRowsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Number of organizations in which this exact identity has a binding (any state).</summary>
+    Task<int> CountOrganizationsBindingIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken);
+
+    // ---- C8 owner recovery (C-105). Lock order: organization row, then the platform journal head, then the case row. ----
+
+    /// <summary>With <paramref name="lockForUpdate"/> false: an untracked snapshot (used to find the organization before locking it).</summary>
+    Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseAsync(Guid organizationOwnerRecoveryCaseId, bool lockForUpdate, CancellationToken cancellationToken);
+
+    Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken);
+
+    /// <summary>The organization's case whose stored state is Open (at most one), tracked.</summary>
+    Task<OrganizationOwnerRecoveryCase?> FindOpenOwnerRecoveryCaseAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    void AddOwnerRecoveryCase(OrganizationOwnerRecoveryCase recoveryCase);
+
+    Task<List<OrganizationOwnerRecoverySubject>> GetOwnerRecoverySubjectsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken);
+
+    Task<OrganizationOwnerRecoverySubject?> FindOwnerRecoverySubjectAsync(Guid organizationOwnerRecoverySubjectId, CancellationToken cancellationToken);
+
+    void AddOwnerRecoverySubject(OrganizationOwnerRecoverySubject subject);
+
+    Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken);
+
+    Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsForCasesAsync(IReadOnlyCollection<Guid> organizationOwnerRecoveryCaseIds, CancellationToken cancellationToken);
+
+    Task<OrganizationOwnerRecoveryApproval?> FindOwnerRecoveryApprovalAsync(Guid organizationOwnerRecoveryApprovalId, CancellationToken cancellationToken);
+
+    void AddOwnerRecoveryApproval(OrganizationOwnerRecoveryApproval approval);
+
+    /// <summary>Newest first; text matches the organization name or incident reference (case-insensitive).</summary>
+    Task<OwnerRecoveryStorePage> SearchOwnerRecoveryCasesAsync(OwnerRecoveryQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Probations of the organization that end after <paramref name="now"/>.</summary>
+    Task<List<OrganizationRecoveredOwnerProbation>> GetActiveRecoveredOwnerProbationsAsync(Guid organizationId, DateTimeOffset now, CancellationToken cancellationToken);
+
+    Task<OrganizationRecoveredOwnerProbation?> FindRecoveredOwnerProbationAsync(Guid organizationRecoveredOwnerProbationId, CancellationToken cancellationToken);
+
+    void AddRecoveredOwnerProbation(OrganizationRecoveredOwnerProbation probation);
+
+    /// <summary>Authenticated sessions of this binding created at or after <paramref name="since"/> (evidence that a declared-unavailable owner is active).</summary>
+    Task<int> CountSessionsCreatedSinceAsync(Guid identityBindingId, DateTimeOffset since, CancellationToken cancellationToken);
+
+    /// <summary>Writes staged changes inside the open transaction without committing (orders updates that free a unique value before inserts that take it).</summary>
+    Task FlushAsync(CancellationToken cancellationToken);
+
     Task CommitAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>Filters are applied in the store; <see cref="Status"/> is one of <c>PlatformRequestFilters</c>.</summary>
+public sealed record PlatformMembershipRequestQuery(string? Text, string Status, DateTimeOffset Now, (DateTimeOffset CreatedOn, Guid RequestId)? After, int Limit);
+
+public sealed record PlatformRequestStoreRow(OrganizationMembershipRequest Request, string OrganizationDisplayName);
+
+public sealed record PlatformRequestStorePage(IReadOnlyList<PlatformRequestStoreRow> Rows, int TotalCount);
+
+public sealed record OnboardingRequestQuery(string? Text, string Status, DateTimeOffset Now, (DateTimeOffset CreatedOn, Guid RequestId)? After, int Limit);
+
+public sealed record OnboardingRequestStorePage(IReadOnlyList<OrganizationOnboardingRequest> Rows, int TotalCount);
+
+public sealed record OrganizationDirectoryRow(OrganizationAuthorizationState State, int EnabledOwnerCount, int SecurityAdministratorCount, int EnabledMemberCount);
+
+public sealed record OwnerRecoveryQuery(string? Text, string Status, DateTimeOffset Now, (DateTimeOffset OpenedOn, Guid CaseId)? After, int Limit);
+
+public sealed record OwnerRecoveryStoreRow(OrganizationOwnerRecoveryCase Case, string OrganizationDisplayName, int ValidApprovals);
+
+public sealed record OwnerRecoveryStorePage(IReadOnlyList<OwnerRecoveryStoreRow> Rows, int TotalCount);

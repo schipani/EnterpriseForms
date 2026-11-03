@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    C8 M2 Stage 3: the Platform Console backend-for-frontend. A SEPARATELY deployed service (own container, origin, cookie and
+    Authority credential) for Platform Operators; it holds no business credential, no database and no private key. It references
+    only the Authority's published internal contract (wire DTOs). Development/Testing only until PB-08 (it refuses to start elsewhere).
+  -->
+  <PropertyGroup>
+    <RootNamespace>EnterpriseForms.PlatformConsole</RootNamespace>
+    <OpenApiDocumentsDirectory>$(RepositoryRoot)contracts/openapi</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name platform-console-v1</OpenApiGenerateDocumentsOptions>
+    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../authority/AuthorizationAuthority.Contracts/AuthorizationAuthority.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="EnterpriseForms.PlatformConsole.Tests" />
+    <InternalsVisibleTo Include="EnterpriseForms.ArchitectureTests" />
+  </ItemGroup>
+</Project>

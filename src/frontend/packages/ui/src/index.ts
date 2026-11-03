@@ -9,6 +9,7 @@ export { Tabs, type TabItem } from "./Tabs";
 export { SideNavTabs, type SideNavItem } from "./SideNavTabs";
 export { Badge, Card, DescriptionList, EmptyState, LoadingBlock, PageHeader, ProgressBar, StatusMessage, type StatusTone } from "./Surfaces";
 export { DataTable, type DataTableColumn } from "./DataTable";
+export { PresenceIndicator, type PresenceIndicatorState } from "./PresenceIndicator";
 export { OverflowMenu, RowActions, menuContentClass, menuItemClass, type OverflowMenuItem } from "./Menu";
 export { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 export { KpiTile, Pager, useDebouncedValue, type PagerProps } from "./Collections";

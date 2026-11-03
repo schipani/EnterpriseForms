@@ -110,12 +110,13 @@ public sealed class AuthorizationTamperingTests(StageAFixture fixture)
         var s = new Scenario(fixture, "SEC-P03", "Direct SQL team membership: forged membership cannot grant access; checked against authority revision");
         await ScenarioRunner.RunAsync(s, async () =>
         {
+            s.WithSecondOwner = true; // an organization owner cannot join a team alone (OB-F8): the second owner adds the Owner
             await s.BootstrapAsync();
             var team = await fixture.Api.PostAsync("/api/v1/teams", s.Token(s.Owner), new { teamName = "Investigators" });
             s.Evidence.ObserveHttp("create team", team, "teamId");
             Assert.Equal(HttpStatusCode.Created, team.Status);
             var teamId = team.Root.GetProperty("teamId").GetGuid();
-            var addOwner = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.Owner), new { userId = s.Owner.AuthorityUserId });
+            var addOwner = await fixture.Api.PostAsync($"/api/v1/teams/{teamId:D}/members", s.Token(s.SecondOwner), new { userId = s.Owner.AuthorityUserId });
             Assert.True(addOwner.Root.GetProperty("command").GetProperty("effective").GetBoolean(), addOwner.Body);
             await s.CreateFormAndRecordAsync(ownerTeamId: teamId);
             var gateBefore = await fixture.Authority.GateAsync(s.OrganizationId);

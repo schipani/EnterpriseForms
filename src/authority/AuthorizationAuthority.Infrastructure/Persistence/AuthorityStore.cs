@@ -1,10 +1,12 @@
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Catalogue;
 using AuthorizationAuthority.Domain.Features.Content;
 using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
+using AuthorizationAuthority.Domain.Features.PlatformOperators;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
 using Microsoft.EntityFrameworkCore;
@@ -64,6 +66,28 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             context.IdentityBindings.AsNoTracking().FirstOrDefaultAsync(b => b.IdentityBindingId == identityBindingId, cancellationToken);
 
         public void AddIdentityBinding(IdentityBinding binding) => context.IdentityBindings.Add(binding);
+
+        public Task<IdentityBinding?> FindIdentityBindingForUpdateAsync(Guid organizationId, Guid authorityUserId, CancellationToken cancellationToken) =>
+            context.IdentityBindings.AsTracking().FirstOrDefaultAsync(b => b.OrganizationId == organizationId && b.AuthorityUserId == authorityUserId, cancellationToken);
+
+        public Task<List<AuthenticatedSession>> GetUnrevokedSessionsAsync(Guid identityBindingId, CancellationToken cancellationToken) =>
+            context.Sessions.AsTracking().Where(s => s.IdentityBindingId == identityBindingId && s.SessionRevokedOn == null).ToListAsync(cancellationToken);
+
+        public Task<OrganizationRoleChangeProposal?> FindRoleChangeProposalAsync(Guid organizationId, Guid proposalId, CancellationToken cancellationToken) =>
+            context.RoleChangeProposals.AsTracking().FirstOrDefaultAsync(p => p.OrganizationId == organizationId && p.OrganizationRoleChangeProposalId == proposalId, cancellationToken);
+
+        public Task<List<OrganizationRoleChangeProposal>> GetRoleChangeProposalsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            context.RoleChangeProposals.AsNoTracking().Where(p => p.OrganizationId == organizationId && p.ProposalCreatedOn >= createdSince).OrderByDescending(p => p.ProposalCreatedOn).ToListAsync(cancellationToken);
+
+        public void AddRoleChangeProposal(OrganizationRoleChangeProposal proposal) => context.RoleChangeProposals.Add(proposal);
+
+        public Task<OrganizationMembershipRequest?> FindMembershipRequestAsync(Guid organizationId, Guid requestId, CancellationToken cancellationToken) =>
+            context.MembershipRequests.AsTracking().FirstOrDefaultAsync(r => r.OrganizationId == organizationId && r.OrganizationMembershipRequestId == requestId, cancellationToken);
+
+        public Task<List<OrganizationMembershipRequest>> GetMembershipRequestsAsync(Guid organizationId, DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            context.MembershipRequests.AsNoTracking().Where(r => r.OrganizationId == organizationId && r.RequestCreatedOn >= createdSince).OrderByDescending(r => r.RequestCreatedOn).ToListAsync(cancellationToken);
+
+        public void AddMembershipRequest(OrganizationMembershipRequest request) => context.MembershipRequests.Add(request);
 
         public Task<AuthorityResource?> FindResourceAsync(Guid organizationId, string resourceTypeName, Guid resourceEntityId, CancellationToken cancellationToken) =>
             context.Resources.FirstOrDefaultAsync(r => r.OrganizationId == organizationId && r.ResourceTypeName == resourceTypeName && r.ResourceEntityId == resourceEntityId, cancellationToken);
@@ -259,6 +283,294 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
                     .GroupBy(a => a.ScopingSecurityCommandId)
                     .Select(g => g.MaxBy(a => a.AttestedAuditJournalRevision)!)
                     .ToList();
+
+        // ---- C8 M2 Stages 1-2: Platform Operators ----
+
+        public Task<PlatformJournalHead?> LockPlatformJournalAsync(CancellationToken cancellationToken) =>
+            context.PlatformJournalHeads.FromSqlInterpolated($"SELECT * FROM authority.platform_journal_heads WHERE platform_journal_head_id = {PlatformJournalHead.SingletonId} FOR UPDATE")
+                .AsTracking().FirstOrDefaultAsync(cancellationToken);
+
+        public Task<PlatformJournalHead?> ReadPlatformJournalAsync(CancellationToken cancellationToken) =>
+            context.PlatformJournalHeads.AsNoTracking().FirstOrDefaultAsync(h => h.PlatformJournalHeadId == PlatformJournalHead.SingletonId, cancellationToken);
+
+        public void AddPlatformJournalHead(PlatformJournalHead head) => context.PlatformJournalHeads.Add(head);
+
+        public void AddPlatformJournalEntry(PlatformJournalEntry entry) => context.PlatformJournalEntries.Add(entry);
+
+        public Task<List<PlatformJournalEntry>> GetPendingPlatformJournalEntriesAsync(int limit, CancellationToken cancellationToken) =>
+            context.PlatformJournalEntries.AsTracking().Where(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).OrderBy(e => e.PlatformJournalRevision).Take(limit).ToListAsync(cancellationToken);
+
+        public Task<int> CountPendingPlatformArchiveAsync(CancellationToken cancellationToken) =>
+            context.PlatformJournalEntries.CountAsync(e => e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending, cancellationToken);
+
+        public Task<PlatformOperator?> FindPlatformOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken) =>
+            context.PlatformOperators.AsTracking().FirstOrDefaultAsync(o => o.PlatformOperatorId == platformOperatorId, cancellationToken);
+
+        public Task<PlatformOperator?> FindPlatformOperatorByIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) =>
+            context.PlatformOperators.AsTracking().FirstOrDefaultAsync(o => o.OperatorIssuerUri == issuerUri && o.OperatorSubjectIdentifier == subjectIdentifier, cancellationToken);
+
+        public Task<List<PlatformOperator>> GetPlatformOperatorsAsync(CancellationToken cancellationToken) =>
+            context.PlatformOperators.AsTracking().OrderBy(o => o.OperatorProvisionedOn).ThenBy(o => o.PlatformOperatorId).ToListAsync(cancellationToken);
+
+        public void AddPlatformOperator(PlatformOperator platformOperator) => context.PlatformOperators.Add(platformOperator);
+
+        public Task<PlatformOperatorChangeProposal?> FindPlatformOperatorProposalAsync(Guid proposalId, CancellationToken cancellationToken) =>
+            context.PlatformOperatorProposals.AsTracking().FirstOrDefaultAsync(p => p.PlatformOperatorChangeProposalId == proposalId, cancellationToken);
+
+        public Task<List<PlatformOperatorChangeProposal>> GetPlatformOperatorProposalsAsync(DateTimeOffset createdSince, CancellationToken cancellationToken) =>
+            context.PlatformOperatorProposals.AsTracking().Where(p => p.ProposalCreatedOn >= createdSince).OrderBy(p => p.ProposalCreatedOn).ToListAsync(cancellationToken);
+
+        public void AddPlatformOperatorProposal(PlatformOperatorChangeProposal proposal) => context.PlatformOperatorProposals.Add(proposal);
+
+        public Task<PlatformOperatorApproval?> FindPlatformApprovalAsync(Guid platformOperatorApprovalId, CancellationToken cancellationToken) =>
+            context.PlatformOperatorApprovals.AsTracking().FirstOrDefaultAsync(a => a.PlatformOperatorApprovalId == platformOperatorApprovalId, cancellationToken);
+
+        public Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestAsync(Guid organizationMembershipRequestId, CancellationToken cancellationToken) =>
+            context.PlatformOperatorApprovals.AsTracking().Where(a => a.OrganizationMembershipRequestId == organizationMembershipRequestId).OrderBy(a => a.ApprovalRecordedOn).ToListAsync(cancellationToken);
+
+        public Task<List<PlatformOperatorApproval>> GetPendingPlatformApprovalsForOperatorAsync(Guid platformOperatorId, CancellationToken cancellationToken) =>
+            context.PlatformOperatorApprovals.AsTracking().Where(a => a.PlatformOperatorId == platformOperatorId && a.ApprovalStateName == PlatformApprovalStates.Pending).ToListAsync(cancellationToken);
+
+        public async Task<List<PlatformOperatorApproval>> GetPlatformApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationMembershipRequestIds, CancellationToken cancellationToken) =>
+            organizationMembershipRequestIds.Count == 0
+                ? []
+                : await context.PlatformOperatorApprovals.AsNoTracking().Where(a => organizationMembershipRequestIds.Contains(a.OrganizationMembershipRequestId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        public void AddPlatformApproval(PlatformOperatorApproval approval) => context.PlatformOperatorApprovals.Add(approval);
+
+        public Task<bool> IsPlatformEvidenceUsedAsync(string evidenceUseIdentifier, byte[] evidenceUseSha256, CancellationToken cancellationToken) =>
+            context.PlatformEvidenceUses.AnyAsync(e => e.EvidenceUseIdentifier == evidenceUseIdentifier || e.EvidenceUseSha256 == evidenceUseSha256, cancellationToken);
+
+        public Task<PlatformOperatorEvidenceUse?> FindPlatformEvidenceUseAsync(Guid platformOperatorEvidenceUseId, CancellationToken cancellationToken) =>
+            context.PlatformEvidenceUses.AsTracking().FirstOrDefaultAsync(e => e.PlatformOperatorEvidenceUseId == platformOperatorEvidenceUseId, cancellationToken);
+
+        public void AddPlatformEvidenceUse(PlatformOperatorEvidenceUse evidenceUse) => context.PlatformEvidenceUses.Add(evidenceUse);
+
+        public async Task<PlatformRequestStorePage> SearchMembershipRequestsAsync(PlatformMembershipRequestQuery query, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            var now = query.Now;
+            var rows = from r in context.MembershipRequests.AsNoTracking()
+                       join o in context.OrganizationStates.AsNoTracking() on r.OrganizationId equals o.OrganizationId
+                       select new { Request = r, OrganizationDisplayName = o.OrganizationDisplayName };
+            var pendingApprovals = context.PlatformOperatorApprovals.AsNoTracking().Where(a => a.ApprovalStateName == PlatformApprovalStates.Pending && a.ApprovalValidUntil > now);
+            rows = query.Status switch
+            {
+                PlatformRequestFilters.NeedsDecision => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn > now),
+                PlatformRequestFilters.AwaitingFirstApproval => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn > now
+                                                                                     && !pendingApprovals.Any(a => a.OrganizationMembershipRequestId == x.Request.OrganizationMembershipRequestId)),
+                PlatformRequestFilters.AwaitingSecondApproval => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn > now
+                                                                                      && pendingApprovals.Any(a => a.OrganizationMembershipRequestId == x.Request.OrganizationMembershipRequestId)),
+                PlatformRequestFilters.Approved => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Approved),
+                PlatformRequestFilters.Rejected => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Rejected),
+                PlatformRequestFilters.Expired => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Expired || (x.Request.RequestStateName == MembershipRequestStates.Pending && x.Request.RequestExpiresOn <= now)),
+                PlatformRequestFilters.CancelledOrReplaced => rows.Where(x => x.Request.RequestStateName == MembershipRequestStates.Cancelled || x.Request.RequestStateName == MembershipRequestStates.Replaced),
+                _ => rows,
+            };
+            if (!string.IsNullOrWhiteSpace(query.Text))
+            {
+                var pattern = "%" + query.Text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+                var id = Guid.TryParse(query.Text, out var parsed) ? parsed : (Guid?)null;
+                rows = rows.Where(x => EF.Functions.ILike(x.Request.RequestedDisplayNameHint, pattern, "\\") || EF.Functions.ILike(x.Request.RequestedSubjectIdentifier, pattern, "\\")
+                                       || EF.Functions.ILike(x.Request.RequestedIssuerUri, pattern, "\\") || EF.Functions.ILike(x.OrganizationDisplayName, pattern, "\\")
+                                       || (id != null && (x.Request.OrganizationMembershipRequestId == id || x.Request.OrganizationId == id)));
+            }
+
+            var total = await rows.CountAsync(cancellationToken).ConfigureAwait(false);
+            if (query.After is { } after)
+            {
+                rows = rows.Where(x => x.Request.RequestCreatedOn < after.CreatedOn || (x.Request.RequestCreatedOn == after.CreatedOn && x.Request.OrganizationMembershipRequestId.CompareTo(after.RequestId) < 0));
+            }
+
+            var page = await rows.OrderByDescending(x => x.Request.RequestCreatedOn).ThenByDescending(x => x.Request.OrganizationMembershipRequestId).Take(query.Limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new PlatformRequestStorePage(page.Select(x => new PlatformRequestStoreRow(x.Request, x.OrganizationDisplayName)).ToList(), total);
+        }
+
+        // ---- C8 onboarding ----
+
+        public Task<OrganizationOnboardingRequest?> FindOnboardingRequestAsync(Guid organizationOnboardingRequestId, bool lockForUpdate, CancellationToken cancellationToken) =>
+            lockForUpdate
+                ? context.OnboardingRequests.FromSqlInterpolated($"SELECT * FROM authority.organization_onboarding_requests WHERE organization_onboarding_request_id = {organizationOnboardingRequestId} FOR UPDATE").AsTracking().FirstOrDefaultAsync(cancellationToken)
+                : context.OnboardingRequests.AsTracking().FirstOrDefaultAsync(r => r.OrganizationOnboardingRequestId == organizationOnboardingRequestId, cancellationToken);
+
+        public Task<OrganizationOnboardingRequest?> FindOnboardingRequestByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken) =>
+            context.OnboardingRequests.AsTracking().FirstOrDefaultAsync(r => r.CreatedByPlatformOperatorId == platformOperatorId && r.CreateIdempotencyKey == idempotencyKey, cancellationToken);
+
+        public Task<OrganizationOnboardingRequest?> FindOnboardingRequestByOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            context.OnboardingRequests.AsTracking().FirstOrDefaultAsync(r => r.ReservedOrganizationId == organizationId, cancellationToken);
+
+        public Task<List<OrganizationOnboardingRequest>> GetOpenOnboardingRequestsByNameAsync(string normalizedName, CancellationToken cancellationToken) =>
+            context.OnboardingRequests.AsTracking()
+                .Where(r => r.OrganizationNormalizedName == normalizedName && (r.OnboardingStateName == OrganizationOnboardingStates.PendingApproval || r.OnboardingStateName == OrganizationOnboardingStates.AwaitingKeyCustody))
+                .ToListAsync(cancellationToken);
+
+        public void AddOnboardingRequest(OrganizationOnboardingRequest request) => context.OnboardingRequests.Add(request);
+
+        public Task<List<OrganizationOnboardingOwner>> GetOnboardingOwnersAsync(Guid organizationOnboardingRequestId, CancellationToken cancellationToken) =>
+            context.OnboardingOwners.AsTracking().Where(o => o.OrganizationOnboardingRequestId == organizationOnboardingRequestId).OrderBy(o => o.OwnerOrdinalNumber).ToListAsync(cancellationToken);
+
+        public Task<OrganizationOnboardingOwner?> FindOnboardingOwnerAsync(Guid organizationOnboardingOwnerId, CancellationToken cancellationToken) =>
+            context.OnboardingOwners.AsTracking().FirstOrDefaultAsync(o => o.OrganizationOnboardingOwnerId == organizationOnboardingOwnerId, cancellationToken);
+
+        public void AddOnboardingOwner(OrganizationOnboardingOwner owner) => context.OnboardingOwners.Add(owner);
+
+        public Task<List<OrganizationOnboardingApproval>> GetOnboardingApprovalsAsync(Guid organizationOnboardingRequestId, CancellationToken cancellationToken) =>
+            context.OnboardingApprovals.AsTracking().Where(a => a.OrganizationOnboardingRequestId == organizationOnboardingRequestId).OrderBy(a => a.ApprovalRecordedOn).ThenBy(a => a.OrganizationOnboardingApprovalId).ToListAsync(cancellationToken);
+
+        public async Task<List<OrganizationOnboardingApproval>> GetOnboardingApprovalsForRequestsAsync(IReadOnlyCollection<Guid> organizationOnboardingRequestIds, CancellationToken cancellationToken) =>
+            organizationOnboardingRequestIds.Count == 0
+                ? []
+                : await context.OnboardingApprovals.AsNoTracking().Where(a => organizationOnboardingRequestIds.Contains(a.OrganizationOnboardingRequestId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        public Task<OrganizationOnboardingApproval?> FindOnboardingApprovalAsync(Guid organizationOnboardingApprovalId, CancellationToken cancellationToken) =>
+            context.OnboardingApprovals.AsTracking().FirstOrDefaultAsync(a => a.OrganizationOnboardingApprovalId == organizationOnboardingApprovalId, cancellationToken);
+
+        public void AddOnboardingApproval(OrganizationOnboardingApproval approval) => context.OnboardingApprovals.Add(approval);
+
+        public async Task<OnboardingRequestStorePage> SearchOnboardingRequestsAsync(OnboardingRequestQuery query, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            var now = query.Now;
+            var rows = context.OnboardingRequests.AsNoTracking();
+            rows = query.Status switch
+            {
+                OrganizationOnboardingFilters.NeedsApproval => rows.Where(r => r.OnboardingStateName == OrganizationOnboardingStates.PendingApproval && r.RequestExpiresOn > now),
+                OrganizationOnboardingFilters.AwaitingKeyCustody => rows.Where(r => r.OnboardingStateName == OrganizationOnboardingStates.AwaitingKeyCustody && r.KeyCustodyExpiresOn > now),
+                OrganizationOnboardingFilters.Initialized => rows.Where(r => r.OnboardingStateName == OrganizationOnboardingStates.Initialized),
+                OrganizationOnboardingFilters.Closed => rows.Where(r => r.OnboardingStateName == OrganizationOnboardingStates.Rejected || r.OnboardingStateName == OrganizationOnboardingStates.Cancelled
+                    || r.OnboardingStateName == OrganizationOnboardingStates.Expired || (r.OnboardingStateName == OrganizationOnboardingStates.PendingApproval && r.RequestExpiresOn <= now)
+                    || (r.OnboardingStateName == OrganizationOnboardingStates.AwaitingKeyCustody && r.KeyCustodyExpiresOn <= now)),
+                _ => rows,
+            };
+            if (!string.IsNullOrWhiteSpace(query.Text))
+            {
+                var pattern = "%" + query.Text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+                var id = Guid.TryParse(query.Text, out var parsed) ? parsed : (Guid?)null;
+                rows = rows.Where(r => EF.Functions.ILike(r.OrganizationDisplayName, pattern, "\\") || (id != null && (r.OrganizationOnboardingRequestId == id || r.ReservedOrganizationId == id)));
+            }
+
+            var total = await rows.CountAsync(cancellationToken).ConfigureAwait(false);
+            if (query.After is { } after)
+            {
+                rows = rows.Where(r => r.RequestCreatedOn < after.CreatedOn || (r.RequestCreatedOn == after.CreatedOn && r.OrganizationOnboardingRequestId.CompareTo(after.RequestId) < 0));
+            }
+
+            var page = await rows.OrderByDescending(r => r.RequestCreatedOn).ThenByDescending(r => r.OrganizationOnboardingRequestId).Take(query.Limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new OnboardingRequestStorePage(page, total);
+        }
+
+        public async Task<List<OrganizationDirectoryRow>> GetOrganizationDirectoryRowsAsync(CancellationToken cancellationToken)
+        {
+            var enabledUsers = context.IdentityBindings.AsNoTracking().Where(b => b.IdentityBindingEnabled);
+            var roleEdges = context.RelationshipEdges.AsNoTracking().Where(e => e.ResourceTypeName == ResourceTypeNames.Organization && e.SubjectTypeName == ResourceTypeNames.User && e.RelationshipRemovedOn == null);
+            var rows = await context.OrganizationStates.AsNoTracking()
+                .OrderBy(s => s.OrganizationDisplayName)
+                .Select(s => new
+                {
+                    State = s,
+                    Owners = roleEdges.Count(e => e.OrganizationId == s.OrganizationId && e.ResourceEntityId == s.OrganizationId && e.RelationshipName == OrganizationRoleNames.OrganizationOwner
+                                                  && enabledUsers.Any(b => b.OrganizationId == s.OrganizationId && b.AuthorityUserId == e.SubjectEntityId)),
+                    Administrators = roleEdges.Count(e => e.OrganizationId == s.OrganizationId && e.ResourceEntityId == s.OrganizationId && e.RelationshipName == OrganizationRoleNames.SystemAdministrator
+                                                          && enabledUsers.Any(b => b.OrganizationId == s.OrganizationId && b.AuthorityUserId == e.SubjectEntityId)),
+                    Members = enabledUsers.Count(b => b.OrganizationId == s.OrganizationId),
+                })
+                .Take(5000)
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            return rows.Select(r => new OrganizationDirectoryRow(r.State, r.Owners, r.Administrators, r.Members)).ToList();
+        }
+
+        public Task<int> CountOrganizationsBindingIdentityAsync(string issuerUri, string subjectIdentifier, CancellationToken cancellationToken) =>
+            context.IdentityBindings.AsNoTracking().Where(b => b.IdentityIssuerUri == issuerUri && b.IdentitySubjectIdentifier == subjectIdentifier).Select(b => b.OrganizationId).Distinct().CountAsync(cancellationToken);
+
+        // ---- C8 owner recovery ----
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseAsync(Guid organizationOwnerRecoveryCaseId, bool lockForUpdate, CancellationToken cancellationToken) =>
+            lockForUpdate
+                ? context.OwnerRecoveryCases.FromSqlInterpolated($"SELECT * FROM authority.organization_owner_recovery_cases WHERE organization_owner_recovery_case_id = {organizationOwnerRecoveryCaseId} FOR UPDATE").AsTracking().FirstOrDefaultAsync(cancellationToken)
+                // Untracked: callers read the case only to find its organization before locking it; a tracked copy would make the later
+                // FOR UPDATE read return this stale instance instead of the row committed by a concurrent decision.
+                : context.OwnerRecoveryCases.AsNoTracking().FirstOrDefaultAsync(c => c.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId, cancellationToken);
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOwnerRecoveryCaseByIdempotencyKeyAsync(Guid platformOperatorId, string idempotencyKey, CancellationToken cancellationToken) =>
+            context.OwnerRecoveryCases.AsTracking().FirstOrDefaultAsync(c => c.OpenedByPlatformOperatorId == platformOperatorId && c.CreateIdempotencyKey == idempotencyKey, cancellationToken);
+
+        public Task<OrganizationOwnerRecoveryCase?> FindOpenOwnerRecoveryCaseAsync(Guid organizationId, CancellationToken cancellationToken) =>
+            context.OwnerRecoveryCases.AsTracking().FirstOrDefaultAsync(c => c.OrganizationId == organizationId && c.RecoveryStateName == OwnerRecoveryStates.Open, cancellationToken);
+
+        public void AddOwnerRecoveryCase(OrganizationOwnerRecoveryCase recoveryCase) => context.OwnerRecoveryCases.Add(recoveryCase);
+
+        public Task<List<OrganizationOwnerRecoverySubject>> GetOwnerRecoverySubjectsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken) =>
+            context.OwnerRecoverySubjects.AsTracking().Where(s => s.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId).OrderBy(s => s.RecoverySubjectRoleName).ThenBy(s => s.SubjectOrdinalNumber).ToListAsync(cancellationToken);
+
+        public Task<OrganizationOwnerRecoverySubject?> FindOwnerRecoverySubjectAsync(Guid organizationOwnerRecoverySubjectId, CancellationToken cancellationToken) =>
+            context.OwnerRecoverySubjects.AsTracking().FirstOrDefaultAsync(s => s.OrganizationOwnerRecoverySubjectId == organizationOwnerRecoverySubjectId, cancellationToken);
+
+        public void AddOwnerRecoverySubject(OrganizationOwnerRecoverySubject subject) => context.OwnerRecoverySubjects.Add(subject);
+
+        public Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsAsync(Guid organizationOwnerRecoveryCaseId, CancellationToken cancellationToken) =>
+            context.OwnerRecoveryApprovals.AsTracking().Where(a => a.OrganizationOwnerRecoveryCaseId == organizationOwnerRecoveryCaseId).OrderBy(a => a.ApprovalRecordedOn).ThenBy(a => a.OrganizationOwnerRecoveryApprovalId).ToListAsync(cancellationToken);
+
+        public async Task<List<OrganizationOwnerRecoveryApproval>> GetOwnerRecoveryApprovalsForCasesAsync(IReadOnlyCollection<Guid> organizationOwnerRecoveryCaseIds, CancellationToken cancellationToken) =>
+            organizationOwnerRecoveryCaseIds.Count == 0
+                ? []
+                : await context.OwnerRecoveryApprovals.AsNoTracking().Where(a => organizationOwnerRecoveryCaseIds.Contains(a.OrganizationOwnerRecoveryCaseId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        public Task<OrganizationOwnerRecoveryApproval?> FindOwnerRecoveryApprovalAsync(Guid organizationOwnerRecoveryApprovalId, CancellationToken cancellationToken) =>
+            context.OwnerRecoveryApprovals.AsTracking().FirstOrDefaultAsync(a => a.OrganizationOwnerRecoveryApprovalId == organizationOwnerRecoveryApprovalId, cancellationToken);
+
+        public void AddOwnerRecoveryApproval(OrganizationOwnerRecoveryApproval approval) => context.OwnerRecoveryApprovals.Add(approval);
+
+        public async Task<OwnerRecoveryStorePage> SearchOwnerRecoveryCasesAsync(OwnerRecoveryQuery query, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            var now = query.Now;
+            var valid = context.OwnerRecoveryApprovals.AsNoTracking().Where(a => a.ApprovalStateName == OnboardingApprovalStates.Valid);
+            var rows = from c in context.OwnerRecoveryCases.AsNoTracking()
+                       join o in context.OrganizationStates.AsNoTracking() on c.OrganizationId equals o.OrganizationId
+                       select new { Case = c, OrganizationDisplayName = o.OrganizationDisplayName, Approvals = valid.Count(a => a.OrganizationOwnerRecoveryCaseId == c.OrganizationOwnerRecoveryCaseId) };
+            var open = rows.Where(x => x.Case.RecoveryStateName == OwnerRecoveryStates.Open && x.Case.CaseExpiresOn > now);
+            rows = query.Status switch
+            {
+                OwnerRecoveryFilters.Open => open,
+                OwnerRecoveryFilters.AwaitingApprovals => open.Where(x => x.Approvals < 3),
+                OwnerRecoveryFilters.WaitingPeriod => open.Where(x => x.Approvals >= 3 && x.Case.WaitingPeriodEndsOn > now),
+                OwnerRecoveryFilters.Ready => open.Where(x => x.Approvals >= 3 && x.Case.WaitingPeriodEndsOn <= now),
+                OwnerRecoveryFilters.Objected => rows.Where(x => x.Case.RecoveryStateName == OwnerRecoveryStates.Objected),
+                OwnerRecoveryFilters.Recovered => rows.Where(x => x.Case.RecoveryStateName == OwnerRecoveryStates.Recovered),
+                OwnerRecoveryFilters.Closed => rows.Where(x => x.Case.RecoveryStateName == OwnerRecoveryStates.Cancelled || x.Case.RecoveryStateName == OwnerRecoveryStates.Expired
+                    || x.Case.RecoveryStateName == OwnerRecoveryStates.Invalidated || (x.Case.RecoveryStateName == OwnerRecoveryStates.Open && x.Case.CaseExpiresOn <= now)),
+                _ => rows,
+            };
+            if (!string.IsNullOrWhiteSpace(query.Text))
+            {
+                var pattern = "%" + query.Text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
+                var id = Guid.TryParse(query.Text, out var parsed) ? parsed : (Guid?)null;
+                rows = rows.Where(x => EF.Functions.ILike(x.OrganizationDisplayName, pattern, "\\") || EF.Functions.ILike(x.Case.IncidentReferenceText, pattern, "\\")
+                                       || (id != null && (x.Case.OrganizationOwnerRecoveryCaseId == id || x.Case.OrganizationId == id)));
+            }
+
+            var total = await rows.CountAsync(cancellationToken).ConfigureAwait(false);
+            if (query.After is { } after)
+            {
+                rows = rows.Where(x => x.Case.CaseOpenedOn < after.OpenedOn || (x.Case.CaseOpenedOn == after.OpenedOn && x.Case.OrganizationOwnerRecoveryCaseId.CompareTo(after.CaseId) < 0));
+            }
+
+            var page = await rows.OrderByDescending(x => x.Case.CaseOpenedOn).ThenByDescending(x => x.Case.OrganizationOwnerRecoveryCaseId).Take(query.Limit).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return new OwnerRecoveryStorePage(page.Select(x => new OwnerRecoveryStoreRow(x.Case, x.OrganizationDisplayName, x.Approvals)).ToList(), total);
+        }
+
+        public Task<List<OrganizationRecoveredOwnerProbation>> GetActiveRecoveredOwnerProbationsAsync(Guid organizationId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            context.RecoveredOwnerProbations.AsNoTracking().Where(p => p.OrganizationId == organizationId && p.ProbationEndsOn > now).ToListAsync(cancellationToken);
+
+        public Task<OrganizationRecoveredOwnerProbation?> FindRecoveredOwnerProbationAsync(Guid organizationRecoveredOwnerProbationId, CancellationToken cancellationToken) =>
+            context.RecoveredOwnerProbations.AsTracking().FirstOrDefaultAsync(p => p.OrganizationRecoveredOwnerProbationId == organizationRecoveredOwnerProbationId, cancellationToken);
+
+        public void AddRecoveredOwnerProbation(OrganizationRecoveredOwnerProbation probation) => context.RecoveredOwnerProbations.Add(probation);
+
+        public Task<int> CountSessionsCreatedSinceAsync(Guid identityBindingId, DateTimeOffset since, CancellationToken cancellationToken) =>
+            context.Sessions.AsNoTracking().CountAsync(s => s.IdentityBindingId == identityBindingId && s.SessionCreatedOn >= since, cancellationToken);
+
+        public Task FlushAsync(CancellationToken cancellationToken) => context.SaveChangesAsync(cancellationToken);
 
         public async Task CommitAsync(CancellationToken cancellationToken)
         {

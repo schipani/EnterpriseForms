@@ -70,6 +70,11 @@ export type UpdateFieldSearchersRequest = S["UpdateFieldSearchersRequest"];
 export type FieldSearchAdministrationResponse = S["FieldSearchAdministrationResponse"];
 export type FieldSearchAdministrationFormResponse = S["FieldSearchAdministrationFormResponse"];
 export type SecurityAdministratorsResponse = S["SecurityAdministratorsResponse"];
+export type OwnerRecoveryNoticeResponse = S["OwnerRecoveryNoticeResponse"];
+export type OwnerRecoveryNoticeCaseResponse = S["OwnerRecoveryNoticeCaseResponse"];
+export type OwnerRecoveryNoticeSubjectResponse = S["OwnerRecoveryNoticeSubjectResponse"];
+export type OwnerRecoveryObjectionRequest = S["OwnerRecoveryObjectionRequest"];
+export type OwnerRecoveryObjectionResponse = S["OwnerRecoveryObjectionResponse"];
 export type SecurityAdministratorResponse = S["SecurityAdministratorResponse"];
 export type AppointSecurityAdministratorRequest = S["AppointSecurityAdministratorRequest"];
 export type RemoveSecurityAdministratorRequest = S["RemoveSecurityAdministratorRequest"];
@@ -168,6 +173,34 @@ export type DashboardPeriodQuery = { periodDays: 7 | 30 | 90; timeZone?: string 
 
 /** Shared shape of the dashboard section queries: every list is paged on the server (default 15 rows, opaque cursor). */
 export type DashboardPageQuery = { pageSize?: number; continuationToken?: string };
+/** People directory (C8 M2): server-paged, default 15 rows. */
+export type OrganizationMemberQuery = {
+  q?: string;
+  role?: "OrganizationOwner" | "Designer" | "SecurityAdministrator" | "None";
+  signInStatus?: "SignedIn" | "NotRecorded" | "NeverSignedIn";
+  membershipState?: "Enabled" | "Disabled";
+  pageSize?: number;
+  continuationToken?: string;
+};
+export type MemberRoleChangeRequest = S["MemberRoleChangeRequest"];
+export type MemberCommandRequest = S["MemberCommandRequest"];
+export type OwnerProposalRequest = S["OwnerProposalRequest"];
+export type CreateMembershipRequestRequest = S["CreateMembershipRequestRequest"];
+export type MemberCommandResponse = S["MemberCommandResponse"];
+export type OwnerProposalResponse = S["OwnerProposalResponse"];
+export type OwnerProposalPageResponse = S["OwnerProposalPageResponse"];
+export type MembershipRequestPageResponse = S["MembershipRequestPageResponse"];
+export type UserProfileResponse = S["UserProfileResponse"];
+export type CancelMembershipRequestRequest = S["CancelMembershipRequestRequest"];
+export type ReplaceMembershipRequestRequest = S["ReplaceMembershipRequestRequest"];
+export type UpdateUserProfileRequest = S["UpdateUserProfileRequest"];
+export type PresenceQueryResponse = S["PresenceQueryResponse"];
+export type UserPresenceResponse = S["UserPresenceResponse"];
+/** Informational presence of a person; "Unknown" means it could not be determined (never "offline"). */
+export type PresenceState = "Available" | "Away" | "Offline" | "Unknown";
+/** Approval lists (C8 M2): two independent server-paged lists, default 5 rows, newest first. */
+export type ApprovalQuery = { q?: string; status?: "Pending" | "Approved" | "Rejected" | "Expired" | "Cancelled" | "Replaced"; pageSize?: number; continuationToken?: string };
+export type MembershipRequestResponse = S["MembershipRequestResponse"];
 
 export type DashboardUploadQuery = DashboardPageQuery & { q?: string; status?: "InProgress" | "Completed" | "Failed" | "Cancelled"; from?: string; before?: string };
 
@@ -308,6 +341,16 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       get: (formRecordId: string, fileAttachmentId: string, signal?: AbortSignal) => read<DocumentDetailResponse>("documents.get", { formRecordId, fileAttachmentId }, undefined, "interactive-read", signal),
       remove: (formRecordId: string, fileAttachmentId: string, request: RemoveDocumentRequest) => write<FormRecordResponse>("POST", "documents.remove", { formRecordId, fileAttachmentId }, request, { idempotent: true, resourceKey: `record:${formRecordId}` }),
     },
+    /** C8 M2: my own directory profile (non-security fields) and shared informational presence. */
+    profile: {
+      mine: (signal?: AbortSignal) => read<UserProfileResponse>("users.myProfile", undefined, undefined, "interactive-read", signal),
+      updateMine: (request: UpdateUserProfileRequest) => write<UserProfileResponse>("PUT", "users.updateMyProfile", undefined, request, { resourceKey: "profile:me" }),
+    },
+    presence: {
+      /** Not idempotent-keyed on purpose: a failed beat is never retried (the next beat or the expiry covers it). */
+      heartbeat: (interactionAgeSeconds: number) => write<void>("POST", "presence.heartbeat", undefined, { interactionAgeSeconds }, { lane: "polling", responseKind: "none" }),
+      query: (userIds: string[], signal?: AbortSignal) => read<PresenceQueryResponse>("presence.query", undefined, { userIds: userIds.join(",") }, "polling", signal),
+    },
     organization: {
       branding: (signal?: AbortSignal) => read<BrandingResponse>("organization.branding", undefined, undefined, "interactive-read", signal),
       updateBranding: (request: UpdateBrandingRequest) => write<BrandingResponse>("PUT", "organization.updateBranding", undefined, request, { resourceKey: "branding" }),
@@ -317,12 +360,32 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       securityAdministrators: (signal?: AbortSignal) => read<SecurityAdministratorsResponse>("organization.securityAdministrators", undefined, undefined, "interactive-read", signal),
       appointSecurityAdministrator: (request: AppointSecurityAdministratorRequest) => write<void>("POST", "organization.appointSecurityAdministrator", undefined, request, { lane: "security", resourceKey: "organization:security-administrators" }),
       removeSecurityAdministrator: (userId: string, request: RemoveSecurityAdministratorRequest) => write<void>("POST", "organization.removeSecurityAdministrator", { userId }, request, { lane: "security", resourceKey: "organization:security-administrators" }),
+      /** C8 owner recovery (C-105): the open case, if the caller may see it; case is null otherwise. */
+      ownerRecoveryNotice: (signal?: AbortSignal) => read<OwnerRecoveryNoticeResponse>("organization.ownerRecoveryNotice", undefined, undefined, "interactive-read", signal),
+      objectToOwnerRecovery: (caseId: string, request: OwnerRecoveryObjectionRequest) => write<OwnerRecoveryObjectionResponse>("POST", "organization.objectToOwnerRecovery", { caseId }, request, { lane: "security", resourceKey: "organization:owner-recovery" }),
       securityPolicy: (signal?: AbortSignal) => read<OrganizationSecurityPolicyResponse>("organization.securityPolicy", undefined, undefined, "interactive-read", signal),
       updateSecurityPolicy: (request: UpdateOrganizationSecurityPolicyRequest) => write<OrganizationSecurityPolicyResponse>("PUT", "organization.updateSecurityPolicy", undefined, request, { resourceKey: "security-policy" }),
       /** Phase C8 M1 (PG-041): independently computed parts; owners and Security Administrators only. */
       overview: (signal?: AbortSignal) => read<OrganizationOverviewResponse>("organization.overview", undefined, undefined, "interactive-read", signal),
       /** Phase C8 M1 (PG-050, read-only): projection rows labelled as such, Security Administrator badges from the Authority roster. */
-      members: (signal?: AbortSignal) => read<OrganizationMemberDirectoryResponse>("organization.members", undefined, undefined, "interactive-read", signal),
+      members: (query: OrganizationMemberQuery, signal?: AbortSignal) => read<OrganizationMemberDirectoryResponse>("organization.members", undefined, query, "interactive-read", signal),
+      ownerProposals: (query: ApprovalQuery, signal?: AbortSignal) => read<OwnerProposalPageResponse>("organization.ownerProposals", undefined, query, "interactive-read", signal),
+      membershipRequests: (query: ApprovalQuery, signal?: AbortSignal) => read<MembershipRequestPageResponse>("organization.membershipRequests", undefined, query, "interactive-read", signal),
+      /** C8 M2 (AC-7.5): cancel, or edit by replacement, a pending membership request (Authority commands; one Idempotency-Key per user action). */
+      cancelMembershipRequest: (requestId: string, request: CancelMembershipRequestRequest) => write<MemberCommandResponse>("POST", "organization.cancelMembershipRequest", { requestId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      replaceMembershipRequest: (requestId: string, request: ReplaceMembershipRequestRequest) => write<MemberCommandResponse>("POST", "organization.replaceMembershipRequest", { requestId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      memberProfile: (userId: string, signal?: AbortSignal) => read<UserProfileResponse>("organization.memberProfile", { userId }, undefined, "interactive-read", signal),
+      updateMemberProfile: (userId: string, request: UpdateUserProfileRequest) => write<UserProfileResponse>("PUT", "organization.updateMemberProfile", { userId }, request, { resourceKey: `profile:${userId}` }),
+      // C8 M2 (AC-7): every change is an Authority security command; one Idempotency-Key per user action.
+      grantMemberRole: (userId: string, request: MemberRoleChangeRequest) => write<MemberCommandResponse>("POST", "organization.grantMemberRole", { userId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      revokeMemberRole: (userId: string, roleName: string, request: MemberCommandRequest) =>
+        write<MemberCommandResponse>("POST", "organization.revokeMemberRole", { userId, roleName }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      proposeOwnerChange: (userId: string, request: OwnerProposalRequest) => write<MemberCommandResponse>("POST", "organization.proposeOwnerChange", { userId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      approveOwnerProposal: (proposalId: string, request: MemberCommandRequest) =>
+        write<MemberCommandResponse>("POST", "organization.approveOwnerProposal", { proposalId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      disableMember: (userId: string, request: MemberCommandRequest) => write<MemberCommandResponse>("POST", "organization.disableMember", { userId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      enableMember: (userId: string, request: MemberCommandRequest) => write<MemberCommandResponse>("POST", "organization.enableMember", { userId }, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
+      requestMembership: (request: CreateMembershipRequestRequest) => write<MemberCommandResponse>("POST", "organization.requestMembership", undefined, request, { idempotent: true, lane: "security", resourceKey: "organization:members" }),
     },
     teams: {
       /** Phase C8 M1 (PG-048): directory with member counts; owners and Security Administrators only. */

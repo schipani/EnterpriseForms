@@ -25,6 +25,8 @@ public sealed class BusinessDbContext(DbContextOptions<BusinessDbContext> option
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<UserPresence> UserPresences => Set<UserPresence>();
+
     public DbSet<Team> Teams => Set<Team>();
 
     public DbSet<TeamMembership> TeamMemberships => Set<TeamMembership>();
