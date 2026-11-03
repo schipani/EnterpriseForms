@@ -59,8 +59,8 @@ export function AppShellLayout({ children }: PropsWithChildren) {
         Skip to main content
       </a>
       {/* The full header stays in the page flow, so collapsing never moves the content. While the compact bar is pinned over the top
-          the full header is hidden from assistive technology and made inert, so there is always exactly one set of controls. */}
-      <header className="border-b border-line bg-surface" aria-hidden={compact || undefined} inert={compact}>
+          the full header is made invisible (visibility, which a Radix dialog cannot undo the way it restores aria-hidden) and inert, so there is always exactly one set of controls. */}
+      <header className={`border-b border-line bg-surface ${compact ? "invisible" : ""}`} inert={compact}>
         <div className={`mx-auto flex w-full ${width} flex-wrap items-center gap-3 px-4 py-2`}>
           <Link to={authenticated ? "/app/dashboard" : "/"} className="flex min-h-11 items-center gap-3 rounded-control">
             <Brand branding={branding} size="full" />

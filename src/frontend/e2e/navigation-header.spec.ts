@@ -208,7 +208,7 @@ test.describe("pinned, collapsing header", () => {
     await expect(compact.getByRole("button", { name: "Sign out" })).toBeVisible();
     await expect(compact.getByRole("button", { name: /Account menu/ })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(1); // only the compact bar's controls are exposed
-    await expect(page.locator("header").first()).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("header").first()).toHaveClass(/invisible/);
     await evidence(page, "header-compact");
 
     await page.evaluate(() => window.scrollTo(0, 0));

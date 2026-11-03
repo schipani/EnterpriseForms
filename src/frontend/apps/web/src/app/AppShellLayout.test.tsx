@@ -88,7 +88,7 @@ describe("AppShellLayout header", () => {
     expect(compactBar().className).toContain("visible translate-y-0");
     expect(compactBar().className).not.toContain("invisible");
     // The full header is now hidden from assistive technology and inert.
-    expect(document.querySelector("header")).toHaveAttribute("aria-hidden", "true");
+    expect(document.querySelector("header")!.className).toContain("invisible");
     expect(document.querySelector("header")).toHaveAttribute("inert");
     expect(compactBar().className).toContain("fixed"); // pinned over the page; the full header keeps its place in the flow, so nothing jumps
     expect(compactBar().className).toContain("motion-reduce:transition-none");
@@ -99,7 +99,7 @@ describe("AppShellLayout header", () => {
     expect(compactBar()).toHaveAttribute("data-active", "true");
     scrollTo(0);
     expect(compactBar()).toHaveAttribute("data-active", "false");
-    expect(document.querySelector("header")).not.toHaveAttribute("aria-hidden"); // the full header is back
+    expect(document.querySelector("header")!.className).not.toContain("invisible"); // the full header is back
   });
 
   it("re-renders only when a threshold is crossed, not on every scroll event", () => {
