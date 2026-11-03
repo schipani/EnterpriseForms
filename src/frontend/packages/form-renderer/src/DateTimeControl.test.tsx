@@ -8,7 +8,7 @@ import type { RendererField } from "./validation";
 
 const id = "0199a2b3-c4d5-7e6f-8123-456789abcd01";
 const fields: RendererField[] = [{ fieldDefinitionId: id, fieldKey: "appointment", fieldDisplayName: "Appointment", fieldDataType: "DateTime", options: [] }];
-const layout: FormLayout = { ...emptyLayout("Visit"), sections: [{ sectionKey: "main", title: "Visit", gridColumns: 4, elements: [{ kind: "field", fieldDefinitionId: id, control: "datetime", label: "Appointment", required: false, layout: { columnSpan: 4, startOnNewRow: true } }] }] };
+const layout: FormLayout = { ...emptyLayout("Visit"), sections: [{ sectionKey: "main", title: "Visit", gridColumns: 4, elements: [{ kind: "field", fieldDefinitionId: id, control: "dateTime", label: "Appointment", required: false, layout: { columnSpan: 4, startOnNewRow: true } }] }] };
 
 afterEach(() => setActiveFormatting(FALLBACK_SETTINGS));
 
