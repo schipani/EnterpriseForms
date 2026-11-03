@@ -23,7 +23,7 @@ public static class OrganizationEndpoints
         branding.MapPut("/", static async Task<Ok<BrandingResponse>> (UpdateBrandingRequest request, HttpContext http, BrandingHandlers handlers, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await handlers.UpdateAsync(BusinessAuthentication.RequireContext(http), request, cancellationToken).ConfigureAwait(false)))
             .WithName("UpdateOrganizationBranding")
-            .WithSummary("OrganizationOwner only; WCAG pairwise contrast validated server-side; revision CAS.");
+            .WithSummary("OrganizationOwner only; a change reason of 3..500 characters is required and audited; WCAG pairwise contrast validated server-side; revision CAS.");
 
         branding.MapGet("/logo", static async Task<Results<FileContentHttpResult, NotFound>> (HttpContext http, BrandingHandlers handlers, CancellationToken cancellationToken) =>
             {
@@ -32,7 +32,7 @@ public static class OrganizationEndpoints
             })
             .WithName("GetOrganizationLogo");
 
-        branding.MapPost("/logo", static async Task<Ok<BrandingResponse>> (HttpContext http, BrandingHandlers handlers, CancellationToken cancellationToken) =>
+        branding.MapPost("/logo", static async Task<Ok<BrandingResponse>> (HttpContext http, BrandingHandlers handlers, string? changeReason, CancellationToken cancellationToken) =>
             {
                 using var buffer = new MemoryStream();
                 var limited = new byte[81920];
@@ -46,7 +46,7 @@ public static class OrganizationEndpoints
                     }
                 }
 
-                return TypedResults.Ok(await handlers.UploadLogoAsync(BusinessAuthentication.RequireContext(http), buffer.ToArray(), cancellationToken).ConfigureAwait(false));
+                return TypedResults.Ok(await handlers.UploadLogoAsync(BusinessAuthentication.RequireContext(http), buffer.ToArray(), changeReason, cancellationToken).ConfigureAwait(false));
             })
             .Accepts<Stream>("image/png")
             .DisableAntiforgery()

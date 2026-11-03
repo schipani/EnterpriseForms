@@ -71,6 +71,29 @@ describe("RegionalPreferencesCard", () => {
     expect(screen.getByTestId("preview-date-only")).toHaveTextContent("2026-03-08");
   });
 
+  it("puts the form on the left and the live preview on the right on wide screens, stacking on narrow ones, and explains the language setting honestly", async () => {
+    regional.preferences.mockResolvedValue({ result: preferences() });
+    renderCard();
+    const form = await screen.findByRole("region", { name: "Time zone, date, number and language" });
+    const grid = form.parentElement!;
+    expect(grid.className).toContain("grid-cols-1");
+    expect(grid.className).toContain("lg:grid-cols-[minmax(0,13fr)_minmax(0,7fr)]");
+    expect(screen.getByRole("region", { name: "Preview" }).parentElement).toBe(grid);
+    expect(screen.getByText(/Translation of the application \(menus, buttons, messages and form text\) is planned but not available yet/)).toBeInTheDocument();
+    expect(screen.getByText(/English remains the fallback/)).toBeInTheDocument();
+  });
+
+  it("updates the preview immediately for an unsaved choice", async () => {
+    const user = userEvent.setup();
+    regional.preferences.mockResolvedValue({ result: preferences() });
+    renderCard();
+    await screen.findByTestId("preview-zone");
+    expect(screen.getByTestId("preview-zone")).toHaveTextContent("America/Winnipeg");
+    await user.click(within(screen.getByRole("group", { name: "Time zone" })).getByRole("radio", { name: /^Use browser settings/ }));
+    expect(regional.updatePreferences).not.toHaveBeenCalled();
+    expect(screen.getByTestId("preview-zone")).not.toHaveTextContent("America/Winnipeg");
+  });
+
   it("saves each setting independently, sends no value unless Explicit, and carries the revision it read", async () => {
     const user = userEvent.setup();
     regional.preferences.mockResolvedValue({ result: preferences() });

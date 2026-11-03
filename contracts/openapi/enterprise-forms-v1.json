@@ -4375,7 +4375,7 @@
         "tags": [
           "Organizations"
         ],
-        "summary": "OrganizationOwner only; WCAG pairwise contrast validated server-side; revision CAS.",
+        "summary": "OrganizationOwner only; a change reason of 3..500 characters is required and audited; WCAG pairwise contrast validated server-side; revision CAS.",
         "operationId": "UpdateOrganizationBranding",
         "requestBody": {
           "content": {
@@ -4418,6 +4418,15 @@
           "Organizations"
         ],
         "operationId": "UploadOrganizationLogo",
+        "parameters": [
+          {
+            "name": "changeReason",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "image/png": {
@@ -13164,7 +13173,8 @@
           "secondaryButtonForegroundColor",
           "secondaryButtonBorderColor",
           "organizationDefaultTextScalePercent",
-          "organizationColorMode"
+          "organizationColorMode",
+          "changeReason"
         ],
         "type": "object",
         "properties": {
@@ -13209,6 +13219,9 @@
             "format": "double"
           },
           "organizationColorMode": {
+            "type": "string"
+          },
+          "changeReason": {
             "type": "string"
           }
         }

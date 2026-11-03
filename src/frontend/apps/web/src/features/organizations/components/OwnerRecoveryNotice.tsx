@@ -43,7 +43,7 @@ export function OwnerRecoveryNotice() {
   const recoveryCase = data?.case;
   if (confirmed !== null && !recoveryCase) {
     return (
-      <Card title="Owner recovery case" aria-label="Owner recovery case">
+      <Card title="Owner recovery case" aria-label="Owner recovery case" className="mb-6">
         <StatusMessage tone="success" title="Objection recorded">
           Your objection was recorded. The recovery is blocked. (Case {confirmed}.)
         </StatusMessage>
@@ -63,7 +63,7 @@ export function OwnerRecoveryNotice() {
   const unavailable = names(recoveryCase, "DeclaredUnavailable");
 
   return (
-    <Card title="Owner recovery case in progress" aria-label="Owner recovery case in progress">
+    <Card title="Owner recovery case in progress" aria-label="Owner recovery case in progress" className="mb-6">
       <p className="m-0 text-sm">
         Platform Operators opened a case to restore owners to this organization. If you do not recognise it, object: an objection blocks the recovery, and operators must investigate before any new case.
       </p>

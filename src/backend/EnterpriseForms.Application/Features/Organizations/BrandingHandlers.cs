@@ -37,6 +37,7 @@ public sealed class BrandingHandlers(IBusinessStore store, IAuthorizationAuthori
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
         await RequireOrganizationOwnerAsync(context, cancellationToken).ConfigureAwait(false);
+        var reason = ChangeReasons.Require(request.ChangeReason);
         if (string.IsNullOrWhiteSpace(request.OrganizationDisplayName) || request.OrganizationDisplayName.Length > 200 || (request.LogoAlternativeText?.Length ?? 0) > 200)
         {
             throw new BusinessException("INVALID_REQUEST", 422, "organization display name (max 200) is required");
@@ -80,17 +81,18 @@ public sealed class BrandingHandlers(IBusinessStore store, IAuthorizationAuthori
         branding.BrandingRevision++;
         branding.BrandingModifiedOn = now;
         branding.BrandingModifiedByUserId = context.LocalUserId;
-        Audit.AuditRecorder.Record(scope, context, clock, "Organization", "ORGANIZATION_SETTINGS_UPDATED", "organization branding updated", targetEntityType: "organization_branding", targetEntityId: branding.OrganizationBrandingId, metadata: new { revision = branding.BrandingRevision });
+        Audit.AuditRecorder.Record(scope, context, clock, "Organization", "ORGANIZATION_SETTINGS_UPDATED", "organization branding updated", targetEntityType: "organization_branding", targetEntityId: branding.OrganizationBrandingId, metadata: new { revision = branding.BrandingRevision, reason });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToResponse(branding);
     }
 
     /// <summary>PNG only, decoded header validated, size-capped; stored bytes are the uploaded PNG (re-encoding is a PB-14 follow-up, noted in STAGE_B_STATUS).</summary>
-    public async Task<BrandingResponse> UploadLogoAsync(RequestContext context, byte[] png, CancellationToken cancellationToken)
+    public async Task<BrandingResponse> UploadLogoAsync(RequestContext context, byte[] png, string? changeReason, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(png);
         await RequireOrganizationOwnerAsync(context, cancellationToken).ConfigureAwait(false);
+        var reason = ChangeReasons.Require(changeReason);
         if (png.Length is < 8 or > 2 * 1024 * 1024 || !png.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
         {
             throw new BusinessException("INVALID_REQUEST", 422, "logo must be a PNG of at most 2 MiB");
@@ -113,7 +115,7 @@ public sealed class BrandingHandlers(IBusinessStore store, IAuthorizationAuthori
         // the public logo bytes (not a secret) so a later replacement can be told apart from a re-upload of the same file.
         Audit.AuditRecorder.Record(scope, context, clock, Audit.AuditCategories.Security, replaced ? Domain.Features.Audit.AuditActions.OrganizationLogoReplaced : Domain.Features.Audit.AuditActions.OrganizationLogoUploaded,
             replaced ? "organization logo replaced" : "organization logo uploaded", targetEntityType: "organization_branding", targetEntityId: branding.OrganizationBrandingId,
-            metadata: new { revision = branding.BrandingRevision, logoSizeBytes = png.Length, logoSha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(png)) });
+            metadata: new { revision = branding.BrandingRevision, reason, logoSizeBytes = png.Length, logoSha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(png)) });
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         return ToResponse(branding);
     }

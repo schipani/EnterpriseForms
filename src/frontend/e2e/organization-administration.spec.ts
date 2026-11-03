@@ -26,19 +26,18 @@ async function axe(page: Page) {
 const teamName = `Intake E2E ${Date.now().toString(36)}`;
 
 test.describe("Organization administration (C8 M1)", () => {
-  test("an organization owner navigates the administration shell and every card refreshes independently", async ({ page }) => {
+  test("an organization owner navigates the administration shell and every card loads independently", async ({ page }) => {
     await signIn(page, "owner");
     await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Organization", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Organization overview" })).toBeVisible();
     await expect(orgNav(page, "Overview")).toHaveAttribute("aria-current", "page");
     for (const name of ["Organization", "Members and roles", "Teams", "Authentication", "Data protection", "Security Administrators"]) {
       await expect(page.getByRole("region", { name })).toBeVisible();
-      await expect(page.getByRole("button", { name: `Refresh ${name}` })).toBeVisible();
+      await expect(page.getByRole("button", { name: `Refresh ${name}` })).toHaveCount(0);
     }
     await expect(page.getByRole("region", { name: "Members and roles" })).toContainText(/Member count source: business projection/);
     await expect(page.getByRole("region", { name: "Authentication" })).toContainText("Not enforced — awaits PB-08");
     await expect(page.getByRole("region", { name: "Data protection" })).toContainText("Minimum field classification");
-    await page.getByRole("button", { name: "Refresh Data protection" }).click();
     await expect(page.getByRole("region", { name: "Data protection" })).toContainText("Minimum field classification");
     await axe(page);
 

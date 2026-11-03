@@ -66,12 +66,7 @@ public sealed class RegionalSettingsHandlers(IBusinessStore store, IAuthorizatio
 
     private static void Validate(UpdateOrganizationSettingsRequest request)
     {
-        var reason = request.ChangeReason?.Trim() ?? string.Empty;
-        if (reason.Length is < 3 or > 500)
-        {
-            throw new BusinessException("INVALID_REQUEST", 422, "a reason of 3..500 characters is required");
-        }
-
+        _ = ChangeReasons.Require(request.ChangeReason);
         if (!RegionalCatalog.IsCountry(request.DefaultCountryCode))
         {
             throw new BusinessException("INVALID_COUNTRY", 422, "the default country is not in the catalog (Europe is a region: choose a country)");

@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "22a4774e40fbcf3afb7d45689eb27079015a705926c411eaac9ed6eed17002e4",
-      "bytes": 86554
+      "sha256": "ac95d42b1aded82cceafb86cb6541fc5eef1f985aa29439c9575c2838b9ae222",
+      "bytes": 88958
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -439,8 +439,8 @@
     },
     {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
-      "sha256": "6513ffe2b8bb3fd91cbc1a4460271bf416b1f581c4611bdbe049cadc9e5bcc87",
-      "bytes": 5463
+      "sha256": "9c8bfa1200ec2d6c5c2c3a9e47dbd66f3f51e08aab1dbfa3c61a05bfbb72d717",
+      "bytes": 6545
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",

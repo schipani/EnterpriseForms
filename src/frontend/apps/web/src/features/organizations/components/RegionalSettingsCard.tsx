@@ -86,7 +86,7 @@ export function RegionalSettingsCard() {
   const readOnly = !canManage;
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,13fr)_minmax(0,7fr)]">
       <Card title={<span id="regional-defaults-heading">Regional defaults</span>} aria-labelledby="regional-defaults-heading">
         <p className="text-sm text-muted">
           These defaults apply to every member who has not chosen their own. They change only how dates, times and numbers are shown; stored values, permissions and audit history are not affected.{" "}
@@ -98,7 +98,7 @@ export function RegionalSettingsCard() {
           </StatusMessage>
         ) : null}
         <form
-          className="flex min-w-0 flex-col gap-4"
+          className="flex w-full min-w-0 max-w-xl flex-col gap-4"
           onSubmit={(event) => {
             event.preventDefault();
             if (valid && !readOnly) {
@@ -123,7 +123,7 @@ export function RegionalSettingsCard() {
             onValueChange={(zone) => set({ zone })}
             options={orderedZones.map((z) => ({ value: z.ianaTimeZoneId, label: `${z.timeZoneDisplayName} · ${z.ianaTimeZoneId}` }))}
           />
-          <Select label="Default language" value={draft.language} disabled={readOnly} onValueChange={(language) => set({ language })} options={languageList.languages.map((l) => ({ value: l.languageCode, label: `${l.languageDisplayName} — ${l.nativeLanguageName}` }))} />
+          <Select label="Default language" helpText="Saved as the organization's default language. Translation of the application is planned but not available yet, so the application is shown in English for now. Values people enter and uploaded documents are never translated automatically." value={draft.language} disabled={readOnly} onValueChange={(language) => set({ language })} options={languageList.languages.map((l) => ({ value: l.languageCode, label: `${l.languageDisplayName} — ${l.nativeLanguageName}` }))} />
           <Select label="Default date format" value={draft.date} disabled={readOnly} onValueChange={(date) => set({ date })} options={dateList.presets.map((p) => ({ value: p.dateFormatPresetKey, label: p.presetDisplayName }))} />
           <Select label="Default number format" value={draft.number} disabled={readOnly} onValueChange={(number) => set({ number })} options={numberList.presets.map((p) => ({ value: p.numberFormatPresetKey, label: p.presetDisplayName }))} />
           {readOnly ? null : (

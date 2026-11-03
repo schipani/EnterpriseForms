@@ -1,23 +1,18 @@
 import type { OrganizationOverviewResponse, OrganizationSecurityPolicyResponse, SecurityAdministratorsResponse } from "@enterpriseforms/api-client";
-import { ActionIcons, Badge, Button, Card, DescriptionList, StatusMessage } from "@enterpriseforms/ui";
+import { Badge, Card, DescriptionList, StatusMessage } from "@enterpriseforms/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-/** One overview card: title, an independent refresh action, an "open" link and either its content or its unavailable notice. */
-export function OverviewCard({ id, title, to, openLabel, refreshing, onRefresh, unavailableReason, children }: { id: string; title: string; to?: string | undefined; openLabel?: string | undefined; refreshing: boolean; onRefresh: () => void; unavailableReason?: string | null | undefined; children: ReactNode }) {
+/** One overview card: title, an "open" link and either its content or its unavailable notice. Data is read when the page opens and again on a page reload. */
+export function OverviewCard({ id, title, to, openLabel, unavailableReason, children }: { id: string; title: string; to?: string | undefined; openLabel?: string | undefined; unavailableReason?: string | null | undefined; children: ReactNode }) {
   return (
     <Card
       title={<span id={`overview-${id}-heading`}>{title}</span>}
       aria-labelledby={`overview-${id}-heading`}
-      actions={
-        <Button size="sm" variant="ghost" icon={ActionIcons.refresh} busy={refreshing} aria-label={`Refresh ${title}`} onClick={onRefresh}>
-          Refresh
-        </Button>
-      }
     >
       {unavailableReason ? (
         <StatusMessage tone="warning" title="Unavailable">
-          {unavailableReason}. Nothing is guessed; refresh to try again.
+          {unavailableReason}. Nothing is guessed; reload the page to try again.
         </StatusMessage>
       ) : (
         children
@@ -33,15 +28,15 @@ export function OverviewCard({ id, title, to, openLabel, refreshing, onRefresh, 
   );
 }
 
-/** Organization, members, teams and authentication cards from the overview aggregate (one refresh for the aggregate). */
-export function OverviewAggregateCards({ overview, refreshing, onRefresh }: { overview: OrganizationOverviewResponse; refreshing: boolean; onRefresh: () => void }) {
+/** Organization, members, teams and authentication cards from the overview aggregate (one query for the aggregate). */
+export function OverviewAggregateCards({ overview }: { overview: OrganizationOverviewResponse }) {
   const o = overview.organization;
   const m = overview.members;
   const t = overview.teams;
   const a = overview.authentication;
   return (
     <>
-      <OverviewCard id="organization" title="Organization" to={overview.canManageConfiguration ? "/app/organization/branding" : undefined} openLabel="Open branding" refreshing={refreshing} onRefresh={onRefresh} unavailableReason={o.status.available ? null : o.status.unavailableReason}>
+      <OverviewCard id="organization" title="Organization" to={overview.canManageConfiguration ? "/app/organization/branding" : undefined} openLabel="Open branding" unavailableReason={o.status.available ? null : o.status.unavailableReason}>
         <DescriptionList
           items={[
             { term: "Display name", detail: o.organizationDisplayName ?? "" },
@@ -50,7 +45,7 @@ export function OverviewAggregateCards({ overview, refreshing, onRefresh }: { ov
           ]}
         />
       </OverviewCard>
-      <OverviewCard id="members" title="Members and roles" to="/app/organization/users" openLabel="Open People" refreshing={refreshing} onRefresh={onRefresh} unavailableReason={m.status.available ? null : m.status.unavailableReason}>
+      <OverviewCard id="members" title="Members and roles" to="/app/organization/users" openLabel="Open People" unavailableReason={m.status.available ? null : m.status.unavailableReason}>
         <DescriptionList
           items={[
             { term: "People seen in this organization", detail: m.projectedMemberCount === null || m.projectedMemberCount === undefined ? "Unavailable" : String(m.projectedMemberCount) },
@@ -59,10 +54,10 @@ export function OverviewAggregateCards({ overview, refreshing, onRefresh }: { ov
         />
         <p className="m-0 text-sm text-muted">Member count source: {m.memberCountSource}. Security Administrators come from the Authorization Authority. Owner and designer roles are not shown yet (M2).</p>
       </OverviewCard>
-      <OverviewCard id="teams" title="Teams" to="/app/organization/teams" openLabel="Open Teams" refreshing={refreshing} onRefresh={onRefresh} unavailableReason={t.status.available ? null : t.status.unavailableReason}>
+      <OverviewCard id="teams" title="Teams" to="/app/organization/teams" openLabel="Open Teams" unavailableReason={t.status.available ? null : t.status.unavailableReason}>
         <DescriptionList items={[{ term: "Active teams", detail: t.teamCount === null || t.teamCount === undefined ? "Unavailable" : String(t.teamCount) }]} />
       </OverviewCard>
-      <OverviewCard id="authentication" title="Authentication" refreshing={refreshing} onRefresh={onRefresh}>
+      <OverviewCard id="authentication" title="Authentication">
         <div className="flex flex-wrap gap-2">
           <Badge tone="neutral">{a.authenticationRequirementName}</Badge>
           <Badge tone="warning">{a.authenticationRolloutStatus === "NotEnforced" ? "Not enforced — awaits PB-08" : a.authenticationRolloutStatus}</Badge>
@@ -74,9 +69,9 @@ export function OverviewAggregateCards({ overview, refreshing, onRefresh }: { ov
 }
 
 /** Data-protection floor summary (its own query, its own refresh). */
-export function DataProtectionOverviewCard({ policy, refreshing, onRefresh, unavailableReason }: { policy: OrganizationSecurityPolicyResponse | undefined; refreshing: boolean; onRefresh: () => void; unavailableReason?: string | null | undefined }) {
+export function DataProtectionOverviewCard({ policy, unavailableReason }: { policy: OrganizationSecurityPolicyResponse | undefined; unavailableReason?: string | null | undefined }) {
   return (
-    <OverviewCard id="data-protection" title="Data protection" to="/app/organization/data-protection" openLabel="Open Data protection" refreshing={refreshing} onRefresh={onRefresh} unavailableReason={unavailableReason}>
+    <OverviewCard id="data-protection" title="Data protection" to="/app/organization/data-protection" openLabel="Open Data protection" unavailableReason={unavailableReason}>
       {policy ? (
         <>
           <div className="flex flex-wrap gap-2">
@@ -96,9 +91,9 @@ export function DataProtectionOverviewCard({ policy, refreshing, onRefresh, unav
 }
 
 /** Security Administrators count (the roster query, its own refresh). */
-export function SecurityAdministratorsOverviewCard({ roster, refreshing, onRefresh, unavailableReason }: { roster: SecurityAdministratorsResponse | undefined; refreshing: boolean; onRefresh: () => void; unavailableReason?: string | null | undefined }) {
+export function SecurityAdministratorsOverviewCard({ roster, unavailableReason }: { roster: SecurityAdministratorsResponse | undefined; unavailableReason?: string | null | undefined }) {
   return (
-    <OverviewCard id="security-administrators" title="Security Administrators" to="/app/organization/security-administrators" openLabel="Open Security Administrators" refreshing={refreshing} onRefresh={onRefresh} unavailableReason={unavailableReason}>
+    <OverviewCard id="security-administrators" title="Security Administrators" to="/app/organization/security-administrators" openLabel="Open Security Administrators" unavailableReason={unavailableReason}>
       {roster ? (
         <>
           <DescriptionList items={[{ term: "Appointed", detail: String(roster.administrators.length) }]} />

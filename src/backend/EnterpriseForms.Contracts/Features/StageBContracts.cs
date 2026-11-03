@@ -15,7 +15,7 @@ public sealed record BootstrapResponse(SessionResponse Session, BrandingResponse
 
 public sealed record BrandingResponse(string OrganizationDisplayName, bool HasLogo, string? LogoAlternativeText, string PrimaryButtonBackgroundColor, string PrimaryButtonForegroundColor, string SecondaryButtonBackgroundColor, string SecondaryButtonForegroundColor, string SecondaryButtonBorderColor, decimal OrganizationDefaultTextScalePercent, string OrganizationColorMode, long BrandingRevision);
 
-public sealed record UpdateBrandingRequest(long ExpectedBrandingRevision, string OrganizationDisplayName, string? LogoAlternativeText, string PrimaryButtonBackgroundColor, string PrimaryButtonForegroundColor, string SecondaryButtonBackgroundColor, string SecondaryButtonForegroundColor, string SecondaryButtonBorderColor, decimal OrganizationDefaultTextScalePercent, string OrganizationColorMode);
+public sealed record UpdateBrandingRequest(long ExpectedBrandingRevision, string OrganizationDisplayName, string? LogoAlternativeText, string PrimaryButtonBackgroundColor, string PrimaryButtonForegroundColor, string SecondaryButtonBackgroundColor, string SecondaryButtonForegroundColor, string SecondaryButtonBorderColor, decimal OrganizationDefaultTextScalePercent, string OrganizationColorMode, string ChangeReason);
 
 public sealed record UiPreferenceResponse(string TextScalePreferenceMode, decimal? ExplicitTextScalePercent, decimal EffectiveTextScalePercent, long PreferenceRevision);
 

@@ -110,13 +110,13 @@ export function RegionalPreferencesCard() {
   const browserLocale = browser.languages[0] ?? "not available";
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,13fr)_minmax(0,7fr)]">
       <Card title={<span id="regional-preferences-heading">Time zone, date, number and language</span>} aria-labelledby="regional-preferences-heading">
         <p className="text-sm text-muted">
           These choices change only how dates, times and numbers are shown to you. Stored values, permissions and the audit history are never changed. Each setting is independent.
         </p>
         <form
-          className="flex min-w-0 flex-col gap-6"
+          className="flex w-full min-w-0 max-w-xl flex-col gap-6"
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate();
@@ -160,7 +160,7 @@ export function RegionalPreferencesCard() {
             legend="Language"
             value={draft.language}
             onValueChange={(v) => set({ language: v as Mode })}
-            helpText="Language changes only form and application labels that have been translated; anything you or others entered is never translated."
+            helpText="Your language choice is saved. Translation of the application (menus, buttons, messages and form text) is planned but not available yet, so the application is shown in English for now. Anything people enter and uploaded documents are never translated automatically. English remains the fallback."
             options={[
               { value: "OrganizationDefault", label: `Use organization default (${label(languageItems, org.defaultLanguageCode)})` },
               { value: "BrowserDefault", label: "Use browser settings" },

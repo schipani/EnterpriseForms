@@ -1563,7 +1563,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetOrganizationBranding"];
-        /** OrganizationOwner only; WCAG pairwise contrast validated server-side; revision CAS. */
+        /** OrganizationOwner only; a change reason of 3..500 characters is required and audited; WCAG pairwise contrast validated server-side; revision CAS. */
         put: operations["UpdateOrganizationBranding"];
         post?: never;
         delete?: never;
@@ -3955,6 +3955,7 @@ export interface components {
             /** Format: double */
             organizationDefaultTextScalePercent: number | string;
             organizationColorMode: string;
+            changeReason: string;
         };
         UpdateFieldDefinitionRequest: {
             fieldDisplayName: string;
@@ -6930,7 +6931,9 @@ export interface operations {
     };
     UploadOrganizationLogo: {
         parameters: {
-            query?: never;
+            query?: {
+                changeReason?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

@@ -1,6 +1,5 @@
 import type { OrganizationOverviewResponse } from "@enterpriseforms/api-client";
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { organizationNavigation } from "./OrganizationLayout";
 import { OverviewAggregateCards } from "./OverviewCards";
@@ -32,25 +31,23 @@ describe("organizationNavigation", () => {
 });
 
 describe("OverviewAggregateCards", () => {
-  it("renders every part with its own refresh action and labels the member-count source", async () => {
-    const onRefresh = vi.fn();
-    render(<OverviewAggregateCards overview={overview} refreshing={false} onRefresh={onRefresh} />);
+  it("renders every part without a refresh button and labels the member-count source", () => {
+    render(<OverviewAggregateCards overview={overview} />);
     const members = screen.getByRole("region", { name: "Members and roles" });
     expect(within(members).getByText("5")).toBeInTheDocument();
     expect(within(members).getByText(/Member count source: business projection/)).toBeInTheDocument();
     expect(within(members).getByText(/Owner and designer roles are not shown yet/)).toBeInTheDocument();
     expect(screen.getByText("Not enforced — awaits PB-08")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Refresh Teams" }));
-    expect(onRefresh).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByRole("button", { name: /^Refresh / })).toHaveLength(4);
+    expect(screen.queryAllByRole("button", { name: /refresh/i })).toHaveLength(0);
   });
 
   it("shows an unavailable part as such instead of a guessed value", () => {
     const degraded: OrganizationOverviewResponse = { ...overview, teams: { status: { available: false, unavailableReason: "the business projection could not be read" }, teamCount: null } };
-    render(<OverviewAggregateCards overview={degraded} refreshing={false} onRefresh={() => undefined} />);
+    render(<OverviewAggregateCards overview={degraded} />);
     const teams = screen.getByRole("region", { name: "Teams" });
     expect(within(teams).getByText("Unavailable")).toBeInTheDocument();
     expect(within(teams).getByText(/the business projection could not be read/)).toBeInTheDocument();
     expect(within(teams).queryByText("Active teams")).toBeNull();
+    expect(within(teams).queryByText(/refresh/i)).toBeNull(); // the notice no longer tells people to click a button that does not exist
   });
 });

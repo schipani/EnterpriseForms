@@ -594,3 +594,16 @@ Branch `phase-c8/m3-regional-preferences` from `main` 935f241. Specification: `d
 - `npm ci` in the owner's working tree failed on locked files (running Vite servers) and left its `node_modules` incomplete; Level 3 was therefore run from a clean worktree. Run `npm ci` in the working tree after stopping the dev servers.
 - Organization settings are unsigned presentation rows (G21 family, recorded in the architecture document). Language affects only the `lang` attribute and the preference value in M3; form translation is a later phase.
 - Not done (out of scope): §4G option availability policies, dependent lists, translations, M4, legacy CLI retirement.
+
+
+## 31. M3 owner-review refinements (2026-11-03) — PR #49, not merged, awaiting owner re-acceptance
+
+Changes after the owner's review of M3 (no Authority, permission or migration change):
+- **Organization overview:** the owner recovery notice has 24px (`mb-6`) below it, only while the notice is displayed. The per-card Refresh buttons are removed (props, handlers and the "refresh to try again" wording); queries still load on open and the page-level error panel keeps its Retry. The People directory Refresh is unchanged (it synchronizes requests approved in the Platform Operator Console).
+- **Regional settings and Personal preferences:** form left (about 65%), live preview right (about 35%), top-aligned; one column on narrow screens; form controls limited to a readable width. The preview follows unsaved choices.
+- **Branding reason:** `PUT /organization/branding` requires `changeReason` (3 to 500 characters, trimmed); `POST /organization/branding/logo` requires the same as query parameter `changeReason`. The reason is stored in the audit metadata (`ORGANIZATION_SETTINGS_UPDATED`, `ORGANIZATION_LOGO_UPLOADED`, `ORGANIZATION_LOGO_REPLACED`) in the same transaction. One shared rule (`ChangeReasons`) now also serves regional settings. Authority check, revision CAS, contrast validation and logo validation are unchanged and still run. Personal preferences need no reason.
+- **Language wording:** the language setting now says that the choice is saved, that application translation is planned but not available yet (English is shown), that English remains the fallback, and that entered values and documents are never translated automatically.
+
+**Backlog (not implemented, not scheduled ahead of M4):** application localization. The owner expects translated application vocabulary (navigation, buttons, validation messages, form labels, dropdown display text, instructions). The architecture already holds PG-036, the Form Localization Editor, and CLAUDE.md section 4F (translation snapshots, English fallback, no translation of stored data). M3 resolves and stores the language only. A separate decision is needed for scope, catalog ownership and ordering.
+
+**Verification approach for this refinement (owner decision, see `docs/testing/FAST_FEEDBACK_TESTING.md`):** targeted tests locally, full verification by GitHub Actions after the push. The full local Level 3 script was not rerun.
