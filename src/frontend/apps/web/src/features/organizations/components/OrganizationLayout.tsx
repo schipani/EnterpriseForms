@@ -1,6 +1,6 @@
 import { useSession } from "@enterpriseforms/app-runtime";
 import { NavigationIcons, PageHeader, StatusMessage, type NavigationIconComponent } from "@enterpriseforms/ui";
-import { Link } from "@tanstack/react-router";
+import { SideNavLayout } from "../../support";
 import type { PropsWithChildren, ReactNode } from "react";
 
 export type OrganizationNavItem = { to: string; label: string; icon: NavigationIconComponent; exact?: boolean };
@@ -85,40 +85,9 @@ export function OrganizationLayout({ title, lead, actions, children }: PropsWith
   return (
     <>
       <PageHeader title={title} lead={lead} actions={actions} />
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-        <nav aria-label="Organization" className="min-w-0 rounded-panel border border-line bg-surface p-3 lg:sticky lg:top-4">
-          {groups.map((group, index) => {
-            const GroupIcon = group.icon;
-            return (
-              <div key={group.id} className={index === 0 ? "" : "mt-3 border-t border-line pt-3"}>
-                <h2 id={`organization-nav-${group.id}`} className="m-0 flex min-h-9 items-center gap-2 px-3 text-base font-semibold text-body">
-                  <GroupIcon aria-hidden="true" focusable="false" size={18} strokeWidth={2} className="shrink-0" />
-                  <span>{group.title}</span>
-                </h2>
-                <ul aria-labelledby={`organization-nav-${group.id}`} className="m-0 mt-1 flex list-none flex-col gap-1 p-0 pl-3">
-                  {group.items.map((item) => {
-                    const ItemIcon = item.icon;
-                    return (
-                      <li key={item.to}>
-                        <Link
-                          to={item.to}
-                          activeOptions={{ exact: item.exact ?? false }}
-                          className="flex min-h-11 w-full items-center gap-2 rounded-control border-l-[3px] border-transparent px-3 text-base font-medium text-muted hover:bg-page hover:text-body"
-                          activeProps={{ className: "flex min-h-11 w-full items-center gap-2 rounded-control border-l-[3px] border-primary bg-page px-3 text-base font-semibold text-body", "aria-current": "page" }}
-                        >
-                          <ItemIcon aria-hidden="true" focusable="false" size={16} strokeWidth={2} className="shrink-0" />
-                          <span className="min-w-0">{item.label}</span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
-        </nav>
-        <div className="min-w-0">{children}</div>
-      </div>
+      <SideNavLayout label="Organization" groups={groups}>
+        {children}
+      </SideNavLayout>
     </>
   );
 }

@@ -44,7 +44,7 @@ const pages: Array<[string, string]> = [
   ["New form", "/app/forms/new"],
   ["Activity", "/app/activity"],
   ["Upload Center", "/app/uploads"],
-  ["Preferences", "/app/me/preferences"],
+  ["Preferences", "/app/user/regional"],
   ["Organization overview", "/app/organization"],
   ["People", "/app/organization/users"],
   ["Teams", "/app/organization/teams"],

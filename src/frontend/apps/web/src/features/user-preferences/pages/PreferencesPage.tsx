@@ -3,7 +3,7 @@ import { Button, Card, LoadingBlock, Select, StatusMessage } from "@enterprisefo
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
-import { PreferencesLayout } from "../components/PreferencesLayout";
+import { UserLayout } from "../components/UserLayout";
 import { RegionalPreferencesCard } from "../components/RegionalPreferencesCard";
 
 /** Accessible text size: organization default or an explicit percentage, applied immediately through the font-scale token (B-08). */
@@ -46,29 +46,29 @@ function TextSizeCard() {
   );
 }
 
-/** PG-007 personal preferences, area 1: regional settings (time zone, date format, number format). */
+/** PG-007 personal preferences: regional settings (time zone, date format, number format). */
 export function PreferencesPage() {
   return (
-    <PreferencesLayout>
+    <UserLayout title="Regional settings" lead="How you see dates, times and numbers. These choices apply to you only.">
       <RegionalPreferencesCard area="regional" />
-    </PreferencesLayout>
+    </UserLayout>
   );
 }
 
-/** PG-007 personal preferences, area 2: language. */
+/** PG-007 personal preferences: language. */
 export function LanguagePreferencePage() {
   return (
-    <PreferencesLayout>
+    <UserLayout title="Language" lead="The language you use. This choice applies to you only.">
       <RegionalPreferencesCard area="language" />
-    </PreferencesLayout>
+    </UserLayout>
   );
 }
 
-/** PG-007 personal preferences, area 3: text size. */
+/** PG-007 personal preferences: text size. */
 export function TextSizePreferencePage() {
   return (
-    <PreferencesLayout>
+    <UserLayout title="Text size" lead="The base text size you see. This choice applies to you only.">
       <TextSizeCard />
-    </PreferencesLayout>
+    </UserLayout>
   );
 }

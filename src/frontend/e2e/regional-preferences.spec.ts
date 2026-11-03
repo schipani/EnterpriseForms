@@ -9,8 +9,8 @@ import { signIn } from "./support";
  */
 
 async function useBrowserSettings(page: Page) {
-  await page.goto("/app/settings/preferences");
-  await expect(page.getByRole("heading", { level: 1, name: "Preferences" })).toBeVisible();
+  await page.goto("/app/user/regional");
+  await expect(page.getByRole("heading", { level: 1, name: "Regional settings" })).toBeVisible();
 }
 
 test.describe("browser in America/Toronto", () => {
@@ -60,22 +60,22 @@ test.describe("browser in America/Toronto", () => {
     await expect(page.getByText("Regional defaults saved")).toBeVisible();
   });
 
-  test("the preferences page has a left navigation with Regional settings, Language and Text size, each on its own address", async ({ page }) => {
+  test("the User page has a left navigation with My Profile, Regional Settings, Language and Text Size, each on its own address", async ({ page }) => {
     await signIn(page, "clerk");
     await useBrowserSettings(page);
-    const nav = page.getByRole("navigation", { name: "Preferences" });
-    await expect(nav.getByRole("link")).toHaveText(["Regional settings", "Language", "Text size"]);
-    await expect(nav.getByRole("link", { name: "Regional settings" })).toHaveAttribute("aria-current", "page");
+    const nav = page.getByRole("navigation", { name: "User" });
+    await expect(nav.getByRole("link")).toHaveText(["My Profile", "Regional Settings", "Language", "Text Size"]);
+    await expect(nav.getByRole("link", { name: "Regional Settings" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("group", { name: "Time zone" })).toBeVisible();
     await expect(page.getByRole("group", { name: "Language" })).toHaveCount(0);
     await nav.getByRole("link", { name: "Language" }).click();
-    await expect(page).toHaveURL(/\/app\/settings\/preferences\/language$/);
+    await expect(page).toHaveURL(/\/app\/user\/language$/);
     await expect(nav.getByRole("link", { name: "Language" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("group", { name: "Language" })).toBeVisible();
     await expect(page.getByText(/planned but not available yet/)).toBeVisible();
     await expect(page.getByRole("group", { name: "Time zone" })).toHaveCount(0);
     await nav.getByRole("link", { name: "Text size" }).click();
-    await expect(page).toHaveURL(/\/app\/settings\/preferences\/text-size$/);
+    await expect(page).toHaveURL(/\/app\/user\/text-size$/);
     await expect(nav.getByRole("link", { name: "Text size" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("combobox", { name: "Text size preference" })).toBeVisible();
     await page.reload();

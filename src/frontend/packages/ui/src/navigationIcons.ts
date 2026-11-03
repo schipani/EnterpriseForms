@@ -1,4 +1,4 @@
-import { Accessibility, Building2, ClipboardCheck, Globe, LayoutDashboard, Languages, LockKeyhole, Paintbrush, Palette, ShieldCheck, ShieldUser, Users, UsersRound, type LucideIcon } from "lucide-react";
+import { Accessibility, Building2, ClipboardCheck, Globe, LayoutDashboard, Languages, LockKeyhole, Paintbrush, Palette, ShieldCheck, ShieldUser, Users, UsersRound, UserRound, CircleUserRound, Menu, type LucideIcon } from "lucide-react";
 
 export type NavigationIconComponent = LucideIcon;
 
@@ -20,4 +20,8 @@ export const NavigationIcons = {
   lockKeyhole: LockKeyhole,
   shieldUser: ShieldUser,
   clipboardCheck: ClipboardCheck,
+  userRound: UserRound,
+  circleUserRound: CircleUserRound,
+  /** The compact header's menu button. */
+  menu: Menu,
 } as const satisfies Record<string, NavigationIconComponent>;
