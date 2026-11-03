@@ -1,4 +1,5 @@
 using System.Net;
+using EnterpriseForms.SecurityTests.Harness;
 using EnterpriseForms.StageBTests.Harness;
 using Xunit;
 
@@ -66,7 +67,7 @@ public sealed class RegionalPreferencesTests(StageBFixture fixture)
 
         // Every successful change is audited with the reason (not the stored data of anyone).
         var audit = fixture.Stack.AttackerSql($"SELECT count(*) FROM audit_events WHERE tenant_id = '{s.OrganizationId:D}' AND event_action = 'ORGANIZATION_SETTINGS_UPDATED' AND event_metadata_json::text LIKE '%Head office moved%';").Trim();
-        Assert.Equal("1", audit);
+        Assert.Equal("2", audit); // both saves carry the reason
         Assert.Equal("2", fixture.Stack.AttackerSql($"SELECT organization_setting_revision FROM organization_settings WHERE tenant_id = '{s.OrganizationId:D}';").Trim());
     }
 
