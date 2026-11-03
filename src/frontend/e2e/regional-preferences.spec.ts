@@ -86,7 +86,7 @@ test.describe("browser in America/Toronto", () => {
     await signIn(page, "owner");
     await page.goto("/app/organization/regional");
     const nav = page.getByRole("navigation", { name: "Organization" });
-    await expect(nav.getByRole("link")).toHaveText(["Overview", "People", "Teams", "Branding", "Regional settings", "Language", "Text size", "Data protection", "Security administrators"]);
+    await expect(nav.getByRole("link")).toHaveText(["Overview", "People", "Teams", "Branding", "Regional Settings", "Language", "Text Size", "Data Protection", "Security Administrators"]);
     await expect(page.getByRole("combobox", { name: /Default language/ })).toHaveCount(0);
 
     // Language tab: its own save; restores English afterwards.

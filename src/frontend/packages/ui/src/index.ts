@@ -19,3 +19,4 @@ export { FALLBACK_SETTINGS, SUPPORTED_LANGUAGES, createFormatter, getActiveForma
 export { useFormatter } from "./useFormatter";
 export { SearchableSelect, type SearchableSelectProps } from "./SearchableSelect";
 export { FormattingPreview } from "./FormattingPreview";
+export { NavigationIcons, type NavigationIconComponent } from "./navigationIcons";

@@ -1,7 +1,7 @@
 import type { OrganizationOverviewResponse } from "@enterpriseforms/api-client";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { organizationNavigation } from "./OrganizationLayout";
+import { organizationNavigation, type OrganizationNavGroup } from "./OrganizationLayout";
 import { OverviewAggregateCards } from "./OverviewCards";
 
 vi.mock("@tanstack/react-router", () => ({ Link: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => <a href={to} className={className}>{children}</a> }));
@@ -17,16 +17,54 @@ const overview: OrganizationOverviewResponse = {
   authentication: { authenticationRequirementName: "PasswordlessFederated", authenticationRolloutStatus: "NotEnforced", statusExplanation: "Sign-in is delegated; FIDO2 enforcement awaits PB-08." },
 };
 
+const labels = (groups: OrganizationNavGroup[]) => groups.map((g) => ({ group: g.title, items: g.items.map((i) => i.label) }));
+
 describe("organizationNavigation", () => {
-  it("offers nothing to a member without administration capabilities", () => {
+  it("shows nothing without a capability", () => {
     expect(organizationNavigation(() => false)).toEqual([]);
   });
 
-  it("gives an owner every page except Search approvals, and a Security Administrator everything except Branding", () => {
-    const owner = organizationNavigation((c) => c === "organization.manage").map((i) => i.label);
-    expect(owner).toEqual(["Overview", "People", "Teams", "Branding", "Regional settings", "Language", "Text size", "Data protection", "Security administrators"]);
-    const security = organizationNavigation((c) => c === "security.administer").map((i) => i.label);
-    expect(security).toEqual(["Overview", "People", "Teams", "Data protection", "Security administrators", "Search approvals"]);
+  it("gives an owner the three groups in order, without Search Approvals", () => {
+    expect(labels(organizationNavigation((c) => c === "organization.manage"))).toEqual([
+      { group: "Organization", items: ["Overview", "People", "Teams"] },
+      { group: "Appearance & Localization", items: ["Branding", "Regional Settings", "Language", "Text Size"] },
+      { group: "Security & Governance", items: ["Data Protection", "Security Administrators"] },
+    ]);
+  });
+
+  it("gives a Security Administrator no Appearance & Localization group at all (never an empty heading) and adds Search Approvals", () => {
+    expect(labels(organizationNavigation((c) => c === "security.administer"))).toEqual([
+      { group: "Organization", items: ["Overview", "People", "Teams"] },
+      { group: "Security & Governance", items: ["Data Protection", "Security Administrators", "Search Approvals"] },
+    ]);
+  });
+
+  it("keeps all ten original destinations on their original routes", () => {
+    const everything = organizationNavigation((c) => c === "organization.manage" || c === "security.administer").flatMap((g) => g.items.map((i) => i.to));
+    expect(everything).toEqual([
+      "/app/organization",
+      "/app/organization/users",
+      "/app/organization/teams",
+      "/app/organization/branding",
+      "/app/organization/regional",
+      "/app/organization/language",
+      "/app/organization/text-size",
+      "/app/organization/data-protection",
+      "/app/organization/security-administrators",
+      "/app/organization/search-approvals",
+    ]);
+  });
+
+  it("marks only Overview as an exact match so it is not active on every other Organization page", () => {
+    const items = organizationNavigation(() => true).flatMap((g) => g.items);
+    expect(items.filter((i) => i.exact).map((i) => i.label)).toEqual(["Overview"]);
+  });
+
+  it("assigns an icon to every group and every item", () => {
+    for (const group of organizationNavigation(() => true)) {
+      expect(group.icon).toBeDefined();
+      expect(group.items.every((i) => i.icon !== undefined)).toBe(true);
+    }
   });
 });
 

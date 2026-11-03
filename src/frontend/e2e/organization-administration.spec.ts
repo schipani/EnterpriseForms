@@ -26,6 +26,47 @@ async function axe(page: Page) {
 const teamName = `Intake E2E ${Date.now().toString(36)}`;
 
 test.describe("Organization administration (C8 M1)", () => {
+  test("the Organization navigation shows three groups; the active item follows the route, exactly one at a time", async ({ page }) => {
+    await signIn(page, "owner");
+    const nav = page.getByRole("navigation", { name: "Organization" });
+    const routes: Array<[string, string]> = [
+      ["/app/organization", "Overview"],
+      ["/app/organization/users", "People"],
+      ["/app/organization/teams", "Teams"],
+      ["/app/organization/branding", "Branding"],
+      ["/app/organization/regional", "Regional Settings"],
+      ["/app/organization/language", "Language"],
+      ["/app/organization/text-size", "Text Size"],
+      ["/app/organization/data-protection", "Data Protection"],
+      ["/app/organization/security-administrators", "Security Administrators"],
+    ];
+    for (const [path, label] of routes) {
+      await page.goto(path); // a direct visit (and so a refresh) shows the right item
+      await expect(nav.getByRole("heading", { level: 2 })).toHaveText(["Organization", "Appearance & Localization", "Security & Governance"]);
+      await expect(nav.locator('a[aria-current="page"]'), path).toHaveCount(1);
+      await expect(nav.getByRole("link", { name: label, exact: true }), path).toHaveAttribute("aria-current", "page");
+      await expect(nav.locator("svg[aria-hidden='true']")).toHaveCount(12);
+    }
+    // The group headings are labels, not links.
+    await expect(nav.getByRole("link", { name: "Appearance & Localization" })).toHaveCount(0);
+    // Keyboard: Tab reaches the links in order and shows a visible focus ring.
+    await page.goto("/app/organization");
+    await nav.getByRole("link", { name: "Overview", exact: true }).focus();
+    await page.keyboard.press("Tab");
+    const focused = page.locator(":focus");
+    await expect(focused).toHaveText("People");
+    const outline = await focused.evaluate((el) => { const c = getComputedStyle(el); return `${c.outlineStyle}|${c.outlineWidth}|${c.boxShadow}`; });
+    expect(outline).not.toBe("none|0px|none");
+    // 320 px: the groups stack, nothing scrolls sideways, and every link is at least 44 px high.
+    await page.setViewportSize({ width: 320, height: 800 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    for (const link of await nav.getByRole("link").all()) {
+      expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
+    await axe(page);
+    await signOut(page);
+  });
+
   test("an organization owner navigates the administration shell and every card loads independently", async ({ page }) => {
     await signIn(page, "owner");
     await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Organization", exact: true }).click();
@@ -58,11 +99,11 @@ test.describe("Organization administration (C8 M1)", () => {
     await orgNav(page, "Branding").click();
     await expect(page.getByRole("heading", { level: 1, name: "Organization branding" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Data protection policy" })).toHaveCount(0);
-    await orgNav(page, "Data protection").click();
+    await orgNav(page, "Data Protection").click();
     await expect(page.getByRole("heading", { level: 1, name: "Data protection" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Save data protection policy" })).toBeVisible();
     await axe(page);
-    await orgNav(page, "Security administrators").click();
+    await orgNav(page, "Security Administrators").click();
     await expect(page.getByRole("heading", { level: 1, name: "Security Administrators" })).toBeVisible();
     await expect(page.getByText("Only Security Administrators can appoint or remove Security Administrators.")).toBeVisible();
     await axe(page);
@@ -168,7 +209,7 @@ test.describe("Organization administration (C8 M1)", () => {
     await page.goto("/app/organization");
     await expect(page.getByRole("heading", { level: 1, name: "Organization overview" })).toBeVisible();
     await expect(orgNav(page, "Branding")).toHaveCount(0);
-    await expect(orgNav(page, "Search approvals")).toBeVisible();
+    await expect(orgNav(page, "Search Approvals")).toBeVisible();
     await orgNav(page, "Teams").click();
     await expect(page.getByRole("heading", { level: 1, name: "Teams" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Create team" })).toBeVisible();
@@ -198,7 +239,7 @@ test.describe("Organization administration (C8 M1)", () => {
     await appoint.getByRole("button", { name: "Cancel" }).click();
     await expect(appoint).toBeHidden();
     await axe(page);
-    await orgNav(page, "Data protection").click();
+    await orgNav(page, "Data Protection").click();
     await expect(page.getByText("Only the organization owner can change this policy.")).toBeVisible();
     await page.goto("/app/organization/branding");
     await expect(page.getByText("Only an organization owner can change branding.")).toBeVisible();
