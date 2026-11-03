@@ -1,6 +1,6 @@
 import type { TeamMemberResponse, TeamMembershipOperationResponse } from "@enterpriseforms/api-client";
 import { useApi, usePresence, useSession } from "@enterpriseforms/app-runtime";
-import { ActionIcons, Badge, Button, Card, DescriptionList, Dialog, LoadingBlock, PresenceIndicator, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DescriptionList, Dialog, LoadingBlock, PresenceIndicator, Select, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -20,6 +20,7 @@ import { teamDirectoryKey } from "./TeamsPage";
  * the server, so every administrator sees them.
  */
 export function TeamDetailPage() {
+  useFormatter();
   const { teamId } = useParams({ strict: false }) as { teamId: string };
   const api = useApi();
   const session = useSession();
@@ -275,7 +276,7 @@ export function TeamDetailPage() {
             <DescriptionList
               items={[
                 { term: "Members", detail: String(team.data.members.length) },
-                { term: "Created", detail: new Date(team.data.createdOn).toLocaleDateString() },
+                { term: "Created", detail: getActiveFormatter().date(team.data.createdOn) },
                 { term: "Source", detail: team.data.source },
               ]}
             />

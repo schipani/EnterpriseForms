@@ -51,13 +51,15 @@ describe("OwnerRecoveryNotice", () => {
     api.organization.ownerRecoveryNotice.mockResolvedValue({ result: { case: null, canObject: false } });
     const { container } = renderNotice();
     await waitFor(() => expect(api.organization.ownerRecoveryNotice).toHaveBeenCalled());
-    expect(container).toBeEmptyDOMElement();
+    expect(container).toBeEmptyDOMElement(); // no notice, no spacing wrapper, no gap
   });
 
   it("shows the case with names only and no objection form when the caller cannot object", async () => {
     api.organization.ownerRecoveryNotice.mockResolvedValue({ result: withCase(false) });
     renderNotice();
     expect(await screen.findByRole("heading", { name: "Owner recovery case in progress" })).toBeInTheDocument();
+    // 24px of space below the notice (mb-6) so it never touches the overview cards; it exists only while the notice is shown.
+    expect(screen.getByLabelText("Owner recovery case in progress")).toHaveClass("mb-6");
     expect(screen.getByText("INC-4411")).toBeInTheDocument();
     expect(screen.getByText("Both owners left the company.")).toBeInTheDocument();
     expect(screen.getByText("2 of 3")).toBeInTheDocument();

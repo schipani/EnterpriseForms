@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { signOut } from "./support";
 
 /**
  * PB-14 automated design validation (docs/testing/PB14_UI_DESIGN_ACCEPTANCE_TESTS.csv): axe-core WCAG 2.2 AA scans and
@@ -152,8 +153,7 @@ test.describe("PB-14 automated accessibility and responsive validation", () => {
       await page.keyboard.press("Escape");
       await expect(add).toBeHidden();
     }
-    await page.getByRole("button", { name: /Account menu/ }).click();
-    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await signOut(page);
 
     // Phase 1B: the organization data-protection policy card (owner).
     await page.setViewportSize({ width: 1440, height: 900 });

@@ -1,5 +1,5 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Card, ColumnChart, DonutChart, KpiTile, LoadingBlock, Select, browserTimeZone, formatCalendarDate } from "@enterpriseforms/ui";
+import { Card, ColumnChart, DonutChart, KpiTile, LoadingBlock, Select, browserTimeZone, formatCalendarDate, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -18,6 +18,7 @@ const PERIODS = [
  * independently. An empty list is never presented as proof that the data is verified or secure.
  */
 export function SecurityMonitoringSection() {
+  useFormatter();
   const api = useApi();
   const [period, setPeriod] = useState<"7" | "30" | "90">("30");
   const timeZone = browserTimeZone();
@@ -26,7 +27,7 @@ export function SecurityMonitoringSection() {
     queryFn: ({ signal }) => api.security.incidentSummary({ periodDays: Number(period) as 7 | 30 | 90, ...(timeZone ? { timeZone } : {}) }, signal).then((r) => r.result),
   });
   const data = summary.data;
-  const kpi = (value: number | string | undefined) => (value === undefined ? "" : Number(value).toLocaleString());
+  const kpi = (value: number | string | undefined) => (value === undefined ? "" : getActiveFormatter().number(value));
   return (
     <section aria-labelledby="security-monitoring-heading" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">

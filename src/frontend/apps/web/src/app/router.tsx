@@ -1,4 +1,4 @@
-import { Outlet, createRootRoute, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
+import { Outlet, createRootRoute, createRoute, createRouter, lazyRouteComponent, redirect, type RouterHistory } from "@tanstack/react-router";
 import { parseRecordsSearch, parseRecordTabSearch } from "../features/form-records/routeSearch";
 import { AppShellLayout, AuthenticatedLayout, LandingRedirect } from "./AppShellLayout";
 
@@ -43,6 +43,9 @@ const activityRoute = createRoute({ getParentRoute: () => appRoute, path: "/acti
 const brandingRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/branding", component: lazyRouteComponent(() => import("../features/organizations"), "BrandingPage") });
 // Phase C8 M1: administration shell (PG-041 overview, PG-050 people, PG-048/049 teams, PG-046 data protection, Security Administrators).
 const organizationOverviewRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization", component: lazyRouteComponent(() => import("../features/organizations"), "OverviewPage") });
+const organizationRegionalRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/regional", component: lazyRouteComponent(() => import("../features/organizations"), "RegionalSettingsPage") });
+const organizationLanguageRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/language", component: lazyRouteComponent(() => import("../features/organizations"), "LanguageSettingsPage") });
+const organizationTextSizeRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/text-size", component: lazyRouteComponent(() => import("../features/organizations"), "TextSizeSettingsPage") });
 const organizationDataProtectionRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/data-protection", component: lazyRouteComponent(() => import("../features/organizations"), "DataProtectionPage") });
 const organizationSecurityAdministratorsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/security-administrators", component: lazyRouteComponent(() => import("../features/organizations"), "SecurityAdministratorsPage") });
 const organizationPeopleRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/users", component: lazyRouteComponent(() => import("../features/identity"), "PeopleDirectoryPage") });
@@ -52,8 +55,25 @@ const searchApprovalsRoute = createRoute({ getParentRoute: () => appRoute, path:
 // PG-056 security incidents (security-operations): Security Administrators only; every request is authorized again by the server.
 const securityIncidentsRoute = createRoute({ getParentRoute: () => appRoute, path: "/security/incidents", component: lazyRouteComponent(() => import("../features/security-operations"), "SecurityIncidentsPage") });
 const securityIncidentRoute = createRoute({ getParentRoute: () => appRoute, path: "/security/incidents/$securityIncidentId", component: lazyRouteComponent(() => import("../features/security-operations"), "SecurityIncidentPage") });
-const profileRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/profile", component: lazyRouteComponent(() => import("../features/identity"), "MyProfilePage") });
-const preferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
+// The signed-in person's own area (/app/user): My Profile, then Regional Settings, Language and Text Size under Experience & Preferences.
+const userProfileRoute = createRoute({ getParentRoute: () => appRoute, path: "/user", component: lazyRouteComponent(() => import("../features/identity"), "MyProfilePage") });
+const userRegionalRoute = createRoute({ getParentRoute: () => appRoute, path: "/user/regional", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
+const userLanguageRoute = createRoute({ getParentRoute: () => appRoute, path: "/user/language", component: lazyRouteComponent(() => import("../features/user-preferences"), "LanguagePreferencePage") });
+const userTextSizeRoute = createRoute({ getParentRoute: () => appRoute, path: "/user/text-size", component: lazyRouteComponent(() => import("../features/user-preferences"), "TextSizePreferencePage") });
+/**
+ * Earlier addresses of those pages stay valid as redirects to the canonical route (no duplicate page implementations). The query
+ * string and hash travel with the redirect; each target differs from its source, so a loop is impossible.
+ */
+const redirectTo = (target: string) => ({ location }: { location: { searchStr: string; hash: string } }) => {
+  throw redirect({ href: `${target}${location.searchStr}${location.hash ? `#${location.hash.replace(/^#/, "")}` : ""}`, replace: true });
+};
+const legacyRoutes = [
+  ["/me/profile", "/app/user"],
+  ["/me/preferences", "/app/user/regional"],
+  ["/settings/preferences", "/app/user/regional"],
+  ["/settings/preferences/language", "/app/user/language"],
+  ["/settings/preferences/text-size", "/app/user/text-size"],
+].map(([path, target]) => createRoute({ getParentRoute: () => appRoute, path: path!, beforeLoad: redirectTo(target!) }));
 /**
  * PG-069 component gallery (ADR-PB-014: internal, never a production route). It exists only in development builds (the Vite
  * dev server, which the Playwright suites use) or when a build sets VITE_ENABLE_COMPONENT_GALLERY=true; it is not in any
@@ -66,11 +86,11 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, profileRoute, preferencesRoute, ...developmentRoutes, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationLanguageRoute, organizationTextSizeRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, userProfileRoute, userRegionalRoute, userLanguageRoute, userTextSizeRoute, ...legacyRoutes, ...developmentRoutes, noPermissionRoute]),
 ]);
 
-export function createAppRouter() {
-  return createRouter({ routeTree, defaultPreload: "intent", scrollRestoration: true });
+export function createAppRouter(history?: RouterHistory) {
+  return createRouter({ routeTree, defaultPreload: "intent", scrollRestoration: true, ...(history ? { history } : {}) });
 }
 
 declare module "@tanstack/react-router" {

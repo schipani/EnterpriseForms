@@ -86,3 +86,8 @@ body {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
 }
+
+/* The pinned compact header (3.5rem) must not cover anchors or focused controls: scrolling to them leaves it clear. */
+html {
+  scroll-padding-top: 4.5rem;
+}

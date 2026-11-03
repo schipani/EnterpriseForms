@@ -44,3 +44,12 @@ Baseline, from the public Actions API for real runs on `phase-c/form-platform-ex
 Expected after (not yet measured): wall clock ≈ max(integration job, browser job) ≈ 8 min instead of ≈ 12.5 min, plus whatever the cache saves on stack start.
 
 **After: pending.** No pull request exists for this branch yet and this session has no GitHub credentials, so no post-change run has happened. Once a PR is opened, record the comparable numbers here (runs are readable at `https://api.github.com/repos/schipani/EnterpriseForms/actions/runs/<id>/jobs`) and note any optimisation that showed no gain. Not yet verified: that `docker/bake-action` with `source: .`/`workdir` loads images under the compose-expected tags (otherwise compose rebuilds them — visible as the `Build first-party images` step's outcome and a long `Start the stack` step).
+
+
+## Routine verification policy (owner decision, 2026-11-03)
+
+A full local Level 3 run takes two to three hours on a developer laptop and is no longer the routine check for every change. For ordinary development and UI refinements:
+
+- **While implementing:** targeted component tests, frontend lint and TypeScript checks, the frontend build, the Playwright specs that cover the change, targeted .NET tests (and contract tests for changed request schemas), and the specification manifest and integrity validation when tracked documents change.
+- **After pushing:** GitHub Actions runs the required workflows. All four mandatory contexts, CodeQL, Stage B integration and Stage B browser tests must pass; hosted failures are investigated and fixed, never worked around by loosening assertions or thresholds.
+- **Still required:** comprehensive security verification (the Level 3 script, SEC-P01..SEC-P12, Stage B integration, the PB-03/PB-12 evidence gates) remains required at security-relevant changes and at release gates. This policy does not disable or bypass any CI protection.

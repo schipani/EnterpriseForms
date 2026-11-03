@@ -1,3 +1,4 @@
+import { getActiveFormatter } from "@enterpriseforms/ui";
 /** My Records URL state (filters and sort are shareable; the page cursor is not — it is bound to the session and expires). */
 export interface RecordsSearch {
   form?: string | undefined;
@@ -73,7 +74,7 @@ export function parseRecordsSearch(search: Record<string, unknown>): RecordsSear
 
 export function formatDateTime(instant: string): string {
   const parsed = Date.parse(instant);
-  return Number.isNaN(parsed) ? instant : new Date(parsed).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return Number.isNaN(parsed) ? instant : getActiveFormatter().instant(parsed);
 }
 
 /** Same short reference the server derives from a record id (display only; the full id stays authoritative). */

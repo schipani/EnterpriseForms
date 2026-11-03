@@ -812,6 +812,16 @@ public sealed class BusinessStore(IDbContextFactory<BusinessDbContext> contextFa
 
         public void AddUiPreference(UserUiPreference preference) => context.UserUiPreferences.Add(preference);
 
+        public Task<OrganizationSetting?> FindOrganizationSettingAsync(Guid tenantId, CancellationToken cancellationToken) =>
+            context.OrganizationSettings.FirstOrDefaultAsync(o => o.TenantId == tenantId, cancellationToken);
+
+        public void AddOrganizationSetting(OrganizationSetting setting) => context.OrganizationSettings.Add(setting);
+
+        public Task<UserPreference?> FindUserPreferenceAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken) =>
+            context.UserPreferences.FirstOrDefaultAsync(p => p.TenantId == tenantId && p.UserId == userId, cancellationToken);
+
+        public void AddUserPreference(UserPreference preference) => context.UserPreferences.Add(preference);
+
         /// <summary>Escapes LIKE wildcards so user text is matched literally (escape character backslash).</summary>
         private static string LikeEscape(string text) => text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 

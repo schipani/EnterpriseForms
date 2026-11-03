@@ -1,5 +1,5 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { ActionIcons, Badge, Button, Card, DataTable, LoadingBlock, PageHeader, RowActions, StatusMessage } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, LoadingBlock, PageHeader, RowActions, StatusMessage, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -8,6 +8,7 @@ import { ErrorPanel } from "../../support";
 
 /** PG-029 form catalog: what the authority lets this user design or use. */
 export function FormsPage() {
+  useFormatter();
   const api = useApi();
   const session = useSession();
   const forms = useQuery({ queryKey: ["forms"], queryFn: () => api.forms.list().then((r) => r.result) });
@@ -57,7 +58,7 @@ export function FormsPage() {
               { key: "name", header: "Form", isRowHeader: true, render: (row) => (row.canDesign ? <Link to="/app/forms/$formDefinitionId/design" params={{ formDefinitionId: row.formDefinitionId }} className="underline-offset-4 hover:underline">{row.formDefinitionName}</Link> : row.formDefinitionName) },
               { key: "version", header: "Published", render: (row) => (row.currentVersionNumber === null ? <Badge tone="neutral">Not published</Badge> : <Badge tone="success">v{row.currentVersionNumber}</Badge>) },
               { key: "draft", header: "Draft", render: (row) => (row.hasDraft ? <Badge tone="warning">Draft pending</Badge> : <span className="text-muted">None</span>) },
-              { key: "modified", header: "Modified", render: (row) => new Date(row.modifiedOn).toLocaleString() },
+              { key: "modified", header: "Modified", render: (row) => getActiveFormatter().instant(row.modifiedOn) },
               {
                 key: "actions",
                 header: "Actions",

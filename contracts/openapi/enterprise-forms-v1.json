@@ -4490,6 +4490,276 @@
         }
       }
     },
+    "/api/v1/organization/settings": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Organization regional defaults (country, IANA time zone, language, date and number presets). Any member may read; ETag carries the revision (0 = system default, never saved).",
+        "operationId": "GetOrganizationSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Organization owner only (Authority manage_configuration); reason required; If-Match required (428 missing, 412 stale); values validated against the typed catalog; audited as ORGANIZATION_SETTINGS_UPDATED.",
+        "operationId": "UpdateOrganizationSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSettingsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Precondition Required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/preferences": {
+      "get": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "summary": "The caller's own regional preferences plus the organization defaults needed to resolve them. A missing row means OrganizationDefault for all four.",
+        "operationId": "GetRegionalPreferences",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPreferencesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "summary": "Updates only the caller's own preferences (no user id is accepted). Each mode is OrganizationDefault, BrowserDefault or Explicit; the value is allowed exactly when Explicit and must be in the catalog. If-Match is honored when sent (412 stale).",
+        "operationId": "UpdateRegionalPreferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserPreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPreferencesResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/countries": {
+      "get": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "operationId": "GetCountryCatalog",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountryCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/time-zones": {
+      "get": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "summary": "IANA zones, each once, ordered (organization-country zones first when organizationContext=true, then the persisted order).",
+        "operationId": "GetTimeZoneCatalog",
+        "parameters": [
+          {
+            "name": "organizationContext",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeZoneCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/languages": {
+      "get": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "operationId": "GetLanguageCatalog",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LanguageCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/date-formats": {
+      "get": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "operationId": "GetDateFormatCatalog",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DateFormatCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/number-formats": {
+      "get": {
+        "tags": [
+          "UserPreferences"
+        ],
+        "operationId": "GetNumberFormatCatalog",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberFormatCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organization/security-policy": {
       "get": {
         "tags": [
@@ -5906,6 +6176,52 @@
           }
         }
       },
+      "CountryCatalogEntry": {
+        "required": [
+          "countryCode",
+          "countryDisplayName",
+          "geographicRegionCode",
+          "displaySortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string"
+          },
+          "countryDisplayName": {
+            "type": "string"
+          },
+          "geographicRegionCode": {
+            "type": "string"
+          },
+          "displaySortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CountryCatalogResponse": {
+        "required": [
+          "catalogVersion",
+          "countries"
+        ],
+        "type": "object",
+        "properties": {
+          "catalogVersion": {
+            "type": "string"
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CountryCatalogEntry"
+            }
+          }
+        }
+      },
       "CreateChildRecordRequest": {
         "required": [
           "formRelationshipDefinitionId",
@@ -6707,6 +7023,60 @@
           },
           "dataEndpointKey": {
             "type": "string"
+          }
+        }
+      },
+      "DateFormatCatalogResponse": {
+        "required": [
+          "catalogVersion",
+          "presets"
+        ],
+        "type": "object",
+        "properties": {
+          "catalogVersion": {
+            "type": "string"
+          },
+          "presets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DateFormatPresetEntry"
+            }
+          }
+        }
+      },
+      "DateFormatPresetEntry": {
+        "required": [
+          "dateFormatPresetKey",
+          "presetDisplayName",
+          "intlLocaleTag",
+          "monthStyle",
+          "hourCycle",
+          "displaySortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "dateFormatPresetKey": {
+            "type": "string"
+          },
+          "presetDisplayName": {
+            "type": "string"
+          },
+          "intlLocaleTag": {
+            "type": "string"
+          },
+          "monthStyle": {
+            "type": "string"
+          },
+          "hourCycle": {
+            "type": "string"
+          },
+          "displaySortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -8823,6 +9193,52 @@
           }
         }
       },
+      "LanguageCatalogEntry": {
+        "required": [
+          "languageCode",
+          "languageDisplayName",
+          "nativeLanguageName",
+          "displaySortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "languageCode": {
+            "type": "string"
+          },
+          "languageDisplayName": {
+            "type": "string"
+          },
+          "nativeLanguageName": {
+            "type": "string"
+          },
+          "displaySortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "LanguageCatalogResponse": {
+        "required": [
+          "catalogVersion",
+          "languages"
+        ],
+        "type": "object",
+        "properties": {
+          "catalogVersion": {
+            "type": "string"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageCatalogEntry"
+            }
+          }
+        }
+      },
       "MemberCommandRequest": {
         "required": [
           "reason"
@@ -9062,6 +9478,56 @@
           "canChange": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "NumberFormatCatalogResponse": {
+        "required": [
+          "catalogVersion",
+          "presets"
+        ],
+        "type": "object",
+        "properties": {
+          "catalogVersion": {
+            "type": "string"
+          },
+          "presets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NumberFormatPresetEntry"
+            }
+          }
+        }
+      },
+      "NumberFormatPresetEntry": {
+        "required": [
+          "numberFormatPresetKey",
+          "presetDisplayName",
+          "intlLocaleTag",
+          "exampleText",
+          "displaySortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "numberFormatPresetKey": {
+            "type": "string"
+          },
+          "presetDisplayName": {
+            "type": "string"
+          },
+          "intlLocaleTag": {
+            "type": "string"
+          },
+          "exampleText": {
+            "type": "string"
+          },
+          "displaySortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -9647,6 +10113,50 @@
           "plaintextSearchPermitted": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "OrganizationSettingsResponse": {
+        "required": [
+          "defaultCountryCode",
+          "defaultIanaTimeZoneId",
+          "defaultLanguageCode",
+          "defaultDateFormatPresetKey",
+          "defaultNumberFormatPresetKey",
+          "organizationSettingRevision",
+          "isSystemDefault",
+          "catalogVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultCountryCode": {
+            "type": "string"
+          },
+          "defaultIanaTimeZoneId": {
+            "type": "string"
+          },
+          "defaultLanguageCode": {
+            "type": "string"
+          },
+          "defaultDateFormatPresetKey": {
+            "type": "string"
+          },
+          "defaultNumberFormatPresetKey": {
+            "type": "string"
+          },
+          "organizationSettingRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "isSystemDefault": {
+            "type": "boolean"
+          },
+          "catalogVersion": {
+            "type": "string"
           }
         }
       },
@@ -12501,6 +13011,71 @@
           }
         }
       },
+      "TimeZoneCatalogEntry": {
+        "required": [
+          "ianaTimeZoneId",
+          "timeZoneDisplayName",
+          "countryCodes",
+          "timeZoneSortOrder",
+          "contextPriority"
+        ],
+        "type": "object",
+        "properties": {
+          "ianaTimeZoneId": {
+            "type": "string"
+          },
+          "timeZoneDisplayName": {
+            "type": "string"
+          },
+          "countryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeZoneSortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "contextPriority": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "TimeZoneCatalogResponse": {
+        "required": [
+          "catalogVersion",
+          "organizationCountryCode",
+          "timeZones"
+        ],
+        "type": "object",
+        "properties": {
+          "catalogVersion": {
+            "type": "string"
+          },
+          "organizationCountryCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "timeZones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeZoneCatalogEntry"
+            }
+          }
+        }
+      },
       "TransferOwnershipRequest": {
         "required": [
           "newOwnerUserId",
@@ -12890,6 +13465,33 @@
           }
         }
       },
+      "UpdateOrganizationSettingsRequest": {
+        "required": [
+          "defaultCountryCode",
+          "defaultIanaTimeZoneId",
+          "defaultLanguageCode",
+          "defaultDateFormatPresetKey",
+          "defaultNumberFormatPresetKey"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultCountryCode": {
+            "type": "string"
+          },
+          "defaultIanaTimeZoneId": {
+            "type": "string"
+          },
+          "defaultLanguageCode": {
+            "type": "string"
+          },
+          "defaultDateFormatPresetKey": {
+            "type": "string"
+          },
+          "defaultNumberFormatPresetKey": {
+            "type": "string"
+          }
+        }
+      },
       "UpdateSecurityIncidentRequest": {
         "required": [
           "expectedIncidentRevision"
@@ -12947,6 +13549,57 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "UpdateUserPreferencesRequest": {
+        "required": [
+          "timeZonePreferenceMode",
+          "ianaTimeZoneId",
+          "dateFormatPreferenceMode",
+          "dateFormatPresetKey",
+          "numberFormatPreferenceMode",
+          "numberFormatPresetKey",
+          "languagePreferenceMode",
+          "languageCode"
+        ],
+        "type": "object",
+        "properties": {
+          "timeZonePreferenceMode": {
+            "type": "string"
+          },
+          "ianaTimeZoneId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dateFormatPreferenceMode": {
+            "type": "string"
+          },
+          "dateFormatPresetKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "numberFormatPreferenceMode": {
+            "type": "string"
+          },
+          "numberFormatPresetKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "languagePreferenceMode": {
+            "type": "string"
+          },
+          "languageCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -13209,6 +13862,70 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "UserPreferencesResponse": {
+        "required": [
+          "timeZonePreferenceMode",
+          "ianaTimeZoneId",
+          "dateFormatPreferenceMode",
+          "dateFormatPresetKey",
+          "numberFormatPreferenceMode",
+          "numberFormatPresetKey",
+          "languagePreferenceMode",
+          "languageCode",
+          "preferenceRevision",
+          "organizationDefaults"
+        ],
+        "type": "object",
+        "properties": {
+          "timeZonePreferenceMode": {
+            "type": "string"
+          },
+          "ianaTimeZoneId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dateFormatPreferenceMode": {
+            "type": "string"
+          },
+          "dateFormatPresetKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "numberFormatPreferenceMode": {
+            "type": "string"
+          },
+          "numberFormatPresetKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "languagePreferenceMode": {
+            "type": "string"
+          },
+          "languageCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "preferenceRevision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "organizationDefaults": {
+            "$ref": "#/components/schemas/OrganizationSettingsResponse"
           }
         }
       },

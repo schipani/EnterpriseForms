@@ -93,6 +93,8 @@ public static class BusinessInfrastructureRegistration
         services.TryAddSingleton(sp => configuration.GetSection(EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions.SectionName).Get<EnterpriseForms.Application.Features.Teams.MembershipReconciliation.TeamMembershipReconciliationOptions>() ?? new());
         services.AddSingleton<GetRecordActivityHandler>();
         services.AddSingleton<BrandingHandlers>();
+        services.AddSingleton<RegionalSettingsHandlers>();
+        services.AddSingleton<EnterpriseForms.Application.Features.UserPreferences.PreferenceHandlers>();
         services.AddSingleton<OrganizationOverviewHandler>();
         services.AddSingleton<TeamDirectoryHandlers>();
         services.AddSingleton<DashboardHandler>();

@@ -111,19 +111,19 @@ test.describe("Dashboard", () => {
     await signOut(page);
   });
 
-  test("Organization sidebar is wider, sentence case, and fits Security administrators on one line", async ({ page }) => {
+  test("Organization sidebar shows three labelled groups and fits Security Administrators on one line", async ({ page }) => {
     await signIn(page, "owner");
     await page.goto("/app/organization");
     const nav = page.getByRole("navigation", { name: "Organization" });
-    await expect(nav.getByRole("link")).toHaveText(["Overview", "People", "Teams", "Branding", "Data protection", "Security administrators"]);
+    await expect(nav.getByRole("link")).toHaveText(["Overview", "People", "Teams", "Branding", "Regional Settings", "Language", "Text Size", "Data Protection", "Security Administrators"]);
     const box = await nav.boundingBox();
-    expect(Math.round(box!.width)).toBe(256);
-    const link = await nav.getByRole("link", { name: "Security administrators", exact: true }).boundingBox();
+    expect(Math.round(box!.width)).toBe(288);
+    const link = await nav.getByRole("link", { name: "Security Administrators", exact: true }).boundingBox();
     expect(link!.height).toBeLessThanOrEqual(48);
     // Same width on every Organization page.
-    for (const path of ["/app/organization/users", "/app/organization/teams", "/app/organization/branding", "/app/organization/data-protection", "/app/organization/security-administrators"]) {
+    for (const path of ["/app/organization/users", "/app/organization/teams", "/app/organization/branding", "/app/organization/regional", "/app/organization/language", "/app/organization/text-size", "/app/organization/data-protection", "/app/organization/security-administrators", "/app/organization/search-approvals"]) {
       await page.goto(path);
-      expect(Math.round((await page.getByRole("navigation", { name: "Organization" }).boundingBox())!.width), path).toBe(256);
+      expect(Math.round((await page.getByRole("navigation", { name: "Organization" }).boundingBox())!.width), path).toBe(288);
     }
     await page.setViewportSize({ width: 320, height: 800 });
     expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);

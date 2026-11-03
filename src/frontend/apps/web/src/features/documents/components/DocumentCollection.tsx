@@ -1,7 +1,7 @@
 import type { DocumentSummaryResponse } from "@enterpriseforms/api-client";
 import { DOWNLOAD_PATH, resolvePath, useApi, useRuntime } from "@enterpriseforms/app-runtime";
 import type { LayoutUploadPolicy } from "@enterpriseforms/form-renderer";
-import { ActionIcons, Badge, Button, buttonClass, Card, DataTable, Dialog, LoadingBlock, ProgressBar, RowActions, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, buttonClass, Card, DataTable, Dialog, LoadingBlock, ProgressBar, RowActions, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { phaseTone, useUploadItems } from "../../jobs";
@@ -18,6 +18,7 @@ const formatBytes = (bytes: number | string) => {
  * A document is only shown as Ready when the server committed its verified version.
  */
 export function DocumentCollection({ formRecordId, fieldDefinitionId, label, documents, policy, canEdit, contentRevision, onChanged }: { formRecordId: string; fieldDefinitionId: string; label: string; documents: readonly DocumentSummaryResponse[]; policy: LayoutUploadPolicy | undefined; canEdit: boolean; contentRevision: number; onChanged: () => void }) {
+  useFormatter();
   const { uploads } = useRuntime();
   const api = useApi();
   const queryClient = useQueryClient();
@@ -166,7 +167,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
           { key: "version", header: "Version", render: (row) => `v${row.currentVersionNumber}` },
           { key: "scan", header: "Scan", render: (row) => <Badge tone={row.scanVerdict === "Clean" ? "success" : "danger"}>{row.scanVerdict}</Badge> },
           { key: "state", header: "State", render: (row) => <Badge tone={row.attachmentLifecycleState === "Ready" && row.inAcceptedManifest ? "success" : "warning"}>{row.inAcceptedManifest ? row.attachmentLifecycleState : "Not in verified manifest"}</Badge> },
-          { key: "uploaded", header: "Uploaded", render: (row) => new Date(row.uploadedOn).toLocaleString() },
+          { key: "uploaded", header: "Uploaded", render: (row) => getActiveFormatter().instant(row.uploadedOn) },
           {
             key: "actions",
             header: "Actions",
@@ -261,6 +262,7 @@ export function DocumentCollection({ formRecordId, fieldDefinitionId, label, doc
 }
 
 function VersionHistoryDialog({ formRecordId, document, onClose }: { formRecordId: string; document: DocumentSummaryResponse; onClose: () => void }) {
+  useFormatter();
   const api = useApi();
   const detail = useQuery({ queryKey: ["documents", formRecordId, document.fileAttachmentId], queryFn: () => api.documents.get(formRecordId, document.fileAttachmentId).then((r) => r.result) });
   return (
@@ -278,7 +280,7 @@ function VersionHistoryDialog({ formRecordId, document, onClose }: { formRecordI
             { key: "size", header: "Size", render: (row) => formatBytes(row.plaintextSizeBytes) },
             { key: "scan", header: "Scanner", render: (row) => `${row.scanVerdict} (${row.scannerName})` },
             { key: "state", header: "State", render: (row) => <Badge tone={row.versionState === "Current" ? "success" : row.versionState === "Processed" ? "warning" : "neutral"}>{row.versionState === "Processed" ? "Processed (not committed)" : row.versionState}</Badge> },
-            { key: "uploaded", header: "Uploaded", render: (row) => new Date(row.uploadedOn).toLocaleString() },
+            { key: "uploaded", header: "Uploaded", render: (row) => getActiveFormatter().instant(row.uploadedOn) },
             { key: "dl", header: "Actions", isActions: true, render: (row) => (row.versionState !== "Processed" ? <a href={`${resolvePath(DOWNLOAD_PATH, { formRecordId, fileAttachmentId: document.fileAttachmentId })}?versionNumber=${row.versionNumber}`} download={row.originalFileName} className="underline underline-offset-4">Download v{row.versionNumber}</a> : null) },
           ]}
         />

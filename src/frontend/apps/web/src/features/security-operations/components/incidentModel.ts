@@ -1,3 +1,4 @@
+import { getActiveFormatter } from "@enterpriseforms/ui";
 import type { StatusTone } from "@enterpriseforms/ui";
 
 /** Display vocabulary for security incidents. A type describes what was observed, never who or why. */
@@ -56,5 +57,5 @@ export function parseIncidentSearch(text: string): string | null {
 }
 
 export function formatInstant(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleString() : "—";
+  return value ? getActiveFormatter().instant(value) : "—";
 }

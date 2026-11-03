@@ -1,6 +1,6 @@
 import type { RecordProjectionResponse, RecordShareSummaryResponse } from "@enterpriseforms/api-client";
 import { useApi, usePresence } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, Checkbox, DataTable, DescriptionList, Dialog, legendClass, LoadingBlock, PresenceIndicator, Select, StatusMessage } from "@enterpriseforms/ui";
+import { Badge, Button, Card, Checkbox, DataTable, DescriptionList, Dialog, legendClass, LoadingBlock, PresenceIndicator, Select, StatusMessage, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ActivityTimeline } from "../../audit";
@@ -27,6 +27,7 @@ const SHARED_EDIT_DESCRIPTION = "shared fields changed by a person with shared e
  * and documents are never covered by an existing share.
  */
 export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: string; projection: RecordProjectionResponse }) {
+  useFormatter();
   const api = useApi();
   const queryClient = useQueryClient();
   const canManage = projection.permissions.canManageAccess;
@@ -109,7 +110,7 @@ export function RecordAccessPanel({ formRecordId, projection }: { formRecordId: 
                 { key: "fields", header: "Fields", render: (row) => row.fieldKeys.join(", ") },
                 { key: "status", header: "Status", render: (row) => <Badge tone={row.shareStatus === "Active" ? "success" : "neutral"}>{row.shareStatus}</Badge> },
                 { key: "by", header: "Shared by", render: (row) => row.sharedByDisplayName ?? row.sharedByUserId },
-                { key: "created", header: "Created", render: (row) => new Date(row.shareCreatedOn).toLocaleString() },
+                { key: "created", header: "Created", render: (row) => getActiveFormatter().instant(row.shareCreatedOn) },
                 { key: "actions", header: "Actions", isActions: true, render: (row) => (row.shareStatus === "Active" ? <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(row)}>Revoke</Button> : null) },
               ]}
             />

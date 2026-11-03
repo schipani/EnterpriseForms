@@ -71,3 +71,50 @@ public sealed class UserUiPreferenceConfiguration : IEntityTypeConfiguration<Use
         });
     }
 }
+
+public sealed class OrganizationSettingConfiguration : IEntityTypeConfiguration<OrganizationSetting>
+{
+    public void Configure(EntityTypeBuilder<OrganizationSetting> builder)
+    {
+        builder.MapSnakeCase("organization_settings");
+        builder.HasKey(s => s.OrganizationSettingId);
+        builder.Property(s => s.DefaultCountryCode).HasMaxLength(2).IsFixedLength();
+        builder.Property(s => s.DefaultIanaTimeZoneId).HasMaxLength(64);
+        builder.Property(s => s.DefaultLanguageCode).HasMaxLength(12);
+        builder.Property(s => s.DefaultDateFormatPresetKey).HasMaxLength(32);
+        builder.Property(s => s.DefaultNumberFormatPresetKey).HasMaxLength(32);
+        builder.HasIndex(s => s.TenantId).IsUnique().HasDatabaseName("uq_organization_settings_tenant");
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(s => s.TenantId).HasConstraintName("fk_organization_settings_tenant");
+        builder.ToTable(t => t.HasCheckConstraint("ck_organization_settings_revision", "organization_setting_revision >= 1"));
+    }
+}
+
+public sealed class UserPreferenceConfiguration : IEntityTypeConfiguration<UserPreference>
+{
+    private const string Modes = "('OrganizationDefault','BrowserDefault','Explicit')";
+
+    public void Configure(EntityTypeBuilder<UserPreference> builder)
+    {
+        builder.MapSnakeCase("user_preferences");
+        builder.HasKey(p => p.UserPreferenceId);
+        builder.Property(p => p.TimeZonePreferenceMode).HasMaxLength(20);
+        builder.Property(p => p.IanaTimeZoneId).HasMaxLength(64);
+        builder.Property(p => p.DateFormatPreferenceMode).HasMaxLength(20);
+        builder.Property(p => p.DateFormatPresetKey).HasMaxLength(32);
+        builder.Property(p => p.NumberFormatPreferenceMode).HasMaxLength(20);
+        builder.Property(p => p.NumberFormatPresetKey).HasMaxLength(32);
+        builder.Property(p => p.LanguagePreferenceMode).HasMaxLength(20);
+        builder.Property(p => p.LanguageCode).HasMaxLength(12);
+        builder.HasIndex(p => new { p.TenantId, p.UserId }).IsUnique().HasDatabaseName("uq_user_preferences_tenant_user");
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(p => p.TenantId).HasConstraintName("fk_user_preferences_tenant");
+        builder.HasOne<User>().WithMany().HasForeignKey(p => p.UserId).HasConstraintName("fk_user_preferences_user");
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_user_preferences_time_zone", $"time_zone_preference_mode IN {Modes} AND (time_zone_preference_mode = 'Explicit') = (iana_time_zone_id IS NOT NULL)");
+            t.HasCheckConstraint("ck_user_preferences_date_format", $"date_format_preference_mode IN {Modes} AND (date_format_preference_mode = 'Explicit') = (date_format_preset_key IS NOT NULL)");
+            t.HasCheckConstraint("ck_user_preferences_number_format", $"number_format_preference_mode IN {Modes} AND (number_format_preference_mode = 'Explicit') = (number_format_preset_key IS NOT NULL)");
+            t.HasCheckConstraint("ck_user_preferences_language", $"language_preference_mode IN {Modes} AND (language_preference_mode = 'Explicit') = (language_code IS NOT NULL)");
+            t.HasCheckConstraint("ck_user_preferences_revision", "preference_revision >= 1");
+        });
+    }
+}

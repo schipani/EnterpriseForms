@@ -11,7 +11,7 @@ export const overviewKey = ["organization", "overview"];
 /**
  * PG-041 organization overview (Phase C8 M1). The aggregate endpoint returns independently computed parts, so one lagging
  * projection or an unreachable Authority marks a card "Unavailable" instead of failing the page. The data-protection and
- * Security Administrators cards use their own queries and refresh on their own. Nothing here shows record content.
+ * Security Administrators cards use their own queries. Nothing here shows record content.
  */
 export function OverviewPage() {
   const api = useApi();
@@ -28,11 +28,11 @@ export function OverviewPage() {
       {overview.isPending ? <LoadingBlock label="Loading the organization overview" /> : null}
       {overview.isError ? <ErrorPanel error={overview.error} onRetry={() => void overview.refetch()} /> : null}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {overview.data ? <OverviewAggregateCards overview={overview.data} refreshing={overview.isFetching} onRefresh={() => void overview.refetch()} /> : null}
+        {overview.data ? <OverviewAggregateCards overview={overview.data} /> : null}
         {overview.data ? (
           <>
-            <DataProtectionOverviewCard policy={policy.data} refreshing={policy.isFetching} onRefresh={() => void policy.refetch()} unavailableReason={unavailable(policy)} />
-            <SecurityAdministratorsOverviewCard roster={roster.data} refreshing={roster.isFetching} onRefresh={() => void roster.refetch()} unavailableReason={unavailable(roster)} />
+            <DataProtectionOverviewCard policy={policy.data} unavailableReason={unavailable(policy)} />
+            <SecurityAdministratorsOverviewCard roster={roster.data} unavailableReason={unavailable(roster)} />
           </>
         ) : null}
       </div>

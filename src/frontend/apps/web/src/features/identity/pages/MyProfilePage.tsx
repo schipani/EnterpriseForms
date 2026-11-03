@@ -1,8 +1,9 @@
 import { presentError, useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Card, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
+import { Card, LoadingBlock, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
+import { UserLayout } from "../../user-preferences";
 import { ProfileForm } from "../components/ProfileForm";
 
 /**
@@ -27,8 +28,7 @@ export function MyProfilePage() {
   });
   const conflict = save.isError && presentError(save.error).code === "PROFILE_REVISION_CONFLICT";
   return (
-    <>
-      <PageHeader title="My profile" lead="How your name appears to people in this organization." />
+    <UserLayout title="My profile" lead="How your name appears to people in this organization.">
       <Card>
         {profile.isPending ? <LoadingBlock label="Loading your profile" /> : null}
         {profile.isError ? <ErrorPanel error={profile.error} onRetry={() => void profile.refetch()} /> : null}
@@ -54,6 +54,6 @@ export function MyProfilePage() {
           />
         ) : null}
       </Card>
-    </>
+    </UserLayout>
   );
 }

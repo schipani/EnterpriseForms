@@ -1,4 +1,4 @@
-import { Button, Checkbox, RequiredMarker, Select, TextArea, TextInput, errorTextClass, helpTextClass, legendClass } from "@enterpriseforms/ui";
+import { Button, Checkbox, RequiredMarker, Select, TextArea, TextInput, errorTextClass, helpTextClass, legendClass, useFormatter, getActiveFormatter, instantToLocalDateTime, localDateTimeToInstant, zoneOffsetLabel } from "@enterpriseforms/ui";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { changeInOccurrence, changeTopLevel, groupKeyFor, initialGroups, moveOccurrence, newOccurrence, occurrenceErrorKey, occurrenceRuleStates, occurrenceScopeValues, type GroupInfo, type GroupValueMap, type RepeatingSection } from "./groups";
 import type { DocumentElement, FieldElement, FormLayout, LayoutElement, LayoutSection, RelatedElement } from "./layout";
@@ -385,8 +385,8 @@ export function FieldControl({ element, field, value, error, onChange, readOnly,
     case "Date":
       return <TextInput {...common} type="date" value={value} min={element.validation?.minDate} max={element.validation?.maxDate} onChange={(event) => onChange(event.target.value)} />;
     case "DateTime":
-      // The control edits local wall-clock time; the value sent and stored is the UTC instant (second precision).
-      return <TextInput {...common} type="datetime-local" step={60} value={toLocalDateTimeInput(value)} onChange={(event) => onChange(fromLocalDateTimeInput(event.target.value))} />;
+      // The control edits wall-clock time in the user's effective time zone; the value sent and stored is the UTC instant.
+      return <DateTimeControl common={common} value={value} onChange={onChange} />;
     case "Guid":
       return <TextInput {...common} type="text" inputMode="text" autoComplete="off" spellCheck={false} placeholder="0199a2b3-c4d5-7e6f-8123-456789abcdef" value={value} maxLength={36} onChange={(event) => onChange(event.target.value.trim().toLowerCase())} />;
     case "Boolean":
@@ -429,6 +429,7 @@ function SingleSelectControl({ element, field, value, common, onChange, parentVa
 
 /** Multi-select dropdown as an accessible group of checkboxes: every option is a real, labelled control with an obvious checked state. */
 function MultiSelectControl({ element, field, value, label, helpText, note, error, required, onChange, parentValue, parentLabel }: { element: FieldElement; field: RendererField; value: string; label: string; helpText: string | undefined; note: string | undefined; error: string | undefined; required: boolean | undefined; onChange: (value: string) => void; parentValue: string | undefined; parentLabel: string | undefined }) {
+  useFormatter();
   const id = useId();
   const selected = splitSelection(value);
   const choices = dependentChoicesFor(element, field, selected, parentValue);
@@ -489,7 +490,7 @@ export function displayValue(field: RendererField, value: string | undefined, el
   }
   if (field.fieldDataType === "DateTime") {
     const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? value : `${new Date(parsed).toLocaleString()} (${value})`;
+    return Number.isNaN(parsed) ? value : `${getActiveFormatter().instant(parsed)} (${value})`;
   }
   if (field.fieldDataType === "Option") {
     return describeSelection(element, field, value);
@@ -499,8 +500,8 @@ export function displayValue(field: RendererField, value: string | undefined, el
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** UTC instant (wire) → value of an <input type="datetime-local"> in the viewer's zone; empty/invalid → "". */
-export function toLocalDateTimeInput(wire: string): string {
+/** UTC instant (wire) -> value of an <input type="datetime-local"> as wall-clock time in the given IANA zone; empty/invalid -> "". */
+export function toLocalDateTimeInput(wire: string, timeZone: string): string {
   if (!wire) {
     return "";
   }
@@ -508,19 +509,97 @@ export function toLocalDateTimeInput(wire: string): string {
   if (Number.isNaN(parsed.getTime())) {
     return "";
   }
-  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+  const l = instantToLocalDateTime(parsed, timeZone);
+  return `${l.year}-${pad(l.month)}-${pad(l.day)}T${pad(l.hour)}:${pad(l.minute)}`;
 }
 
-/** datetime-local value (viewer's zone) → UTC instant at second precision; empty → "". */
-export function fromLocalDateTimeInput(local: string): string {
+export type LocalEntry = { kind: "empty" } | { kind: "invalid" } | { kind: "ok"; wire: string } | { kind: "gap" } | { kind: "ambiguous"; earlier: string; later: string };
+
+const toWire = (date: Date) => date.toISOString().replace(/\.\d{3}Z$/, "Z");
+
+/**
+ * datetime-local text (wall-clock time in `timeZone`) -> what it means. A time inside a spring-forward gap does not exist and a
+ * time inside a fall-back fold occurs twice; both are reported, never resolved silently.
+ */
+export function fromLocalDateTimeInput(local: string, timeZone: string): LocalEntry {
   if (!local) {
-    return "";
+    return { kind: "empty" };
   }
-  const parsed = new Date(local);
-  if (Number.isNaN(parsed.getTime())) {
-    return local;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
+  if (!m) {
+    return { kind: "invalid" };
   }
-  return parsed.toISOString().replace(/\.\d{3}Z$/, "Z");
+  const result = localDateTimeToInstant({ year: Number(m[1]), month: Number(m[2]), day: Number(m[3]), hour: Number(m[4]), minute: Number(m[5]) }, timeZone);
+  if (result.kind === "ok") {
+    return { kind: "ok", wire: toWire(result.instant) };
+  }
+  return result.kind === "gap" ? { kind: "gap" } : { kind: "ambiguous", earlier: toWire(result.earlier), later: toWire(result.later) };
+}
+
+function DateTimeControl({ common, value, onChange }: { common: { label: string; helpText: string | undefined; note: string | undefined; error: string | undefined; required: boolean; disabled: boolean }; value: string; onChange: (value: string) => void }) {
+  const { settings } = useFormatter();
+  const zone = settings.timeZone;
+  const [draft, setDraft] = useState<string | null>(null);
+  const [fold, setFold] = useState<"earlier" | "later" | null>(null);
+  const emitted = useRef(value);
+  useEffect(() => {
+    if (value !== emitted.current) {
+      emitted.current = value;
+      setDraft(null);
+      setFold(null);
+    }
+  }, [value]);
+  const emit = (wire: string) => {
+    emitted.current = wire;
+    onChange(wire);
+  };
+  const text = draft ?? toLocalDateTimeInput(value, zone);
+  const entry = draft === null ? ({ kind: "empty" } as LocalEntry) : fromLocalDateTimeInput(draft, zone);
+  const formatter = getActiveFormatter();
+  const offsetOf = (wire: string) => zoneOffsetLabel(zone, new Date(wire));
+  let problem: string | undefined;
+  if (entry.kind === "gap") {
+    problem = `That time does not exist in ${zone} on that date (clocks move forward). Choose another time.`;
+  } else if (entry.kind === "ambiguous" && fold === null) {
+    problem = `That time happens twice in ${zone} on that date (clocks move back). Choose which one you mean.`;
+  }
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <TextInput
+        {...common}
+        error={common.error ?? problem}
+        note={common.note ?? `Time zone: ${zone}`}
+        type="datetime-local"
+        step={60}
+        value={text}
+        onChange={(event) => {
+          const next = event.target.value;
+          setDraft(next);
+          setFold(null);
+          const parsed = fromLocalDateTimeInput(next, zone);
+          emit(parsed.kind === "ok" ? parsed.wire : "");
+        }}
+      />
+      {entry.kind === "ambiguous" ? (
+        <div role="group" aria-label="Which occurrence of this time" className="flex flex-wrap gap-2">
+          {(["earlier", "later"] as const).map((which) => (
+            <Button
+              key={which}
+              type="button"
+              variant={fold === which ? "primary" : "secondary"}
+              aria-pressed={fold === which}
+              onClick={() => {
+                setFold(which);
+                emit(which === "earlier" ? entry.earlier : entry.later);
+              }}
+            >
+              {`${which === "earlier" ? "First" : "Second"} time (${offsetOf(which === "earlier" ? entry.earlier : entry.later)}) — ${formatter.instant(which === "earlier" ? entry.earlier : entry.later, "time")}`}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function ReadOnlyValue({ label, value, helpText, encrypted, locked }: { label: string; value: string; helpText?: string | undefined; encrypted?: boolean | undefined; locked?: boolean | undefined }) {

@@ -1,6 +1,6 @@
 import type { FieldDefinitionResponse, FieldProtectionMigrationResponse, FieldProtectionReconciliationResponse, FieldProtectionVerificationResponse, OrganizationSecurityPolicyResponse, StrengthenFieldProtectionRequest } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Checkbox, legendClass, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Badge, Button, Checkbox, legendClass, Select, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -112,6 +112,7 @@ function HistoryScopeNote({ encrypted, retainedRevisions }: { encrypted: boolean
  * not known locally, never counted either way.
  */
 function VerificationSummary({ verification, unresolvedRecords }: { verification: FieldProtectionVerificationResponse | null; unresolvedRecords: number }) {
+  useFormatter();
   if (verification === null && unresolvedRecords === 0) {
     return null;
   }
@@ -122,7 +123,7 @@ function VerificationSummary({ verification, unresolvedRecords }: { verification
     <div className="flex flex-col gap-1 text-xs text-muted" role="group" aria-label="Migration check">
       {verification ? (
         <p>
-          {`Last check by the migration worker (${new Date(verification.checkedOn).toLocaleString()}): `}
+          {`Last check by the migration worker (${getActiveFormatter().instant(verification.checkedOn)}): `}
           {remaining === 0 && unverified === 0
             ? "no checked record's current version still holds the old form."
             : `${remaining} record(s) still hold the old form in their current version${unverified > 0 ? `, ${unverified} record(s) could not be checked` : ""}.`}
@@ -178,6 +179,7 @@ function Count({ label, value }: { label: string; value: number | string | null 
  * The Authority's counts and the worker's own observations are shown apart; nothing here is a claim about retained history.
  */
 function ReconciliationSummary({ reconciliation, decrypting, canRequest, onRequest, requesting, requestError }: { reconciliation: FieldProtectionReconciliationResponse | null; decrypting: boolean; canRequest: boolean; onRequest: (reason: string) => void; requesting: boolean; requestError: unknown }) {
+  useFormatter();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const label = reconciliation ? (RECONCILIATION_LABELS[reconciliation.state] ?? { tone: "warning" as const, label: reconciliation.state }) : null;
@@ -188,7 +190,7 @@ function ReconciliationSummary({ reconciliation, decrypting, canRequest, onReque
     <div className="flex flex-col gap-2 rounded-control border border-line bg-page p-3" role="group" aria-label="Completeness reconciliation">
       <div className="flex flex-wrap items-center gap-2">
         {label ? <Badge tone={label.tone}>{label.label}</Badge> : <span className="text-sm">No reconciliation yet</span>}
-        {reconciliation ? <span className="text-xs text-muted">{reconciliation.mode === "VerifyOnly" ? "verify only" : "migration completion"} · requested {new Date(reconciliation.requestedOn).toLocaleString()}</span> : null}
+        {reconciliation ? <span className="text-xs text-muted">{reconciliation.mode === "VerifyOnly" ? "verify only" : "migration completion"} · requested {getActiveFormatter().instant(reconciliation.requestedOn)}</span> : null}
       </div>
       {active && reconciliation ? (
         <p className="text-xs text-muted" aria-live="polite">
@@ -201,7 +203,7 @@ function ReconciliationSummary({ reconciliation, decrypting, canRequest, onReque
       {reconciliation && !active && reconciliation.state !== "Complete" && reasonCode ? <p className="text-xs">{`Not attested: ${INCOMPLETE_REASONS[reasonCode] ?? reasonCode}.`}</p> : null}
       {attestation ? (
         <details className="text-xs text-muted">
-          <summary className="cursor-pointer text-body">{`Authority attestation (${new Date(attestation.attestedOn).toLocaleString()})`}</summary>
+          <summary className="cursor-pointer text-body">{`Authority attestation (${getActiveFormatter().instant(attestation.attestedOn)})`}</summary>
           <dl className="mt-2 grid gap-1 sm:grid-cols-2 sm:gap-x-6">
             <Count label="Registered records (expected)" value={attestation.expectedRecordCount} />
             <Count label="With accepted content" value={attestation.acceptedRecordCount} />

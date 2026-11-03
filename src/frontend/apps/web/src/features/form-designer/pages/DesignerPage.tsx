@@ -2,7 +2,7 @@ import type { FieldDefinitionResponse, StrengthenFieldProtectionRequest } from "
 import { useApi } from "@enterpriseforms/app-runtime";
 import { DesignerCanvas, columnSlotFor, duplicateSection, elementKey, findElement, findOptionFilterCycle, findRuleCycle, insertElement, insertSection, locateField, moveSection, newSectionKey, placedIds, removeElement, setSectionRepeat, updateElement, type DesignerSelection } from "@enterpriseforms/form-designer";
 import { FormRenderer, describeCondition, emptyLayout, initialValues, serializeLayout, tryParseLayout, type Breakpoint, type FieldElement, type FormLayout, type RendererField } from "@enterpriseforms/form-renderer";
-import { ActionIcons, Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, menuContentClass, menuItemClass, RowActions, Select, SideNavTabs, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, Dialog, FieldLayoutProvider, LoadingBlock, menuContentClass, menuItemClass, RowActions, Select, SideNavTabs, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useParams } from "@tanstack/react-router";
@@ -30,6 +30,7 @@ type View = "design" | "fields" | "rules" | "preview" | "versions" | "settings" 
  * immutable.
  */
 export function DesignerPage() {
+  useFormatter();
   const { formDefinitionId } = useParams({ from: "/app/forms/$formDefinitionId/design" });
   const api = useApi();
   const queryClient = useQueryClient();
@@ -727,7 +728,7 @@ export function DesignerPage() {
               columns={[
                 { key: "v", header: "Version", isRowHeader: true, render: (row) => `v${row.versionNumber}` },
                 { key: "reason", header: "Change reason", render: (row) => row.changeReason },
-                { key: "published", header: "Published", render: (row) => new Date(row.publishedOn).toLocaleString() },
+                { key: "published", header: "Published", render: (row) => getActiveFormatter().instant(row.publishedOn) },
                 { key: "restored", header: "Restored from", render: (row) => (row.restoredFromFormVersionId ? "earlier version" : "") },
                 {
                   key: "actions",

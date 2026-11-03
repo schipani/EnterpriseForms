@@ -1,5 +1,5 @@
 import type { OrganizationMemberResponse, PresenceState } from "@enterpriseforms/api-client";
-import { Badge, Button, OverflowMenu, PresenceIndicator } from "@enterpriseforms/ui";
+import { Badge, Button, OverflowMenu, PresenceIndicator, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useId, useState } from "react";
 
 const ROLE_LABELS: Record<string, string> = { OrganizationOwner: "Owner", Designer: "Designer", SecurityAdministrator: "Security administrator" };
@@ -65,6 +65,7 @@ export function describeRemaining(untilMilliseconds: number, nowMilliseconds: nu
 
 /** Compact disclosure beside the Owner badge while the recovered-owner safeguard is active; hidden regions add no height. */
 function RecoveryRestrictions({ until }: { until: string }) {
+  useFormatter();
   const [open, setOpen] = useState(false);
   const regionId = useId();
   const end = Date.parse(until);
@@ -78,7 +79,7 @@ function RecoveryRestrictions({ until }: { until: string }) {
       </Button>
       <span id={regionId} hidden={!open} className="block max-w-prose rounded-control border border-line bg-page p-3 text-help">
         <span className="block">
-          Recovery restrictions end {new Date(end).toLocaleString()} ({describeRemaining(end, Date.now())}).
+          Recovery restrictions end {getActiveFormatter().instant(end)} ({describeRemaining(end, Date.now())}).
         </span>
         <span className="mt-1 block">Until then this owner cannot:</span>
         <ul className="list-disc pl-5">

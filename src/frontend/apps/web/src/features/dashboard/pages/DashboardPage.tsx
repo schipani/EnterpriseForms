@@ -1,5 +1,5 @@
 import { useSession } from "@enterpriseforms/app-runtime";
-import { PageHeader, Select } from "@enterpriseforms/ui";
+import { PageHeader, Select, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useState } from "react";
 import { SecurityMonitoringSection } from "../../security-operations";
 import { DashboardAnalytics, PERIOD_OPTIONS, type DashboardPeriod } from "../components/DashboardAnalytics";
@@ -12,9 +12,10 @@ import { ActivitySection, FormsSection, RecordsSection, UploadsSection } from ".
  * capabilities only choose which sections to ask for.
  */
 export function DashboardPage() {
+  useFormatter();
   const session = useSession();
   const [period, setPeriod] = useState<DashboardPeriod>(30);
-  const today = new Intl.DateTimeFormat(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
+  const today = getActiveFormatter().longDate(new Date());
   return (
     <>
       <PageHeader

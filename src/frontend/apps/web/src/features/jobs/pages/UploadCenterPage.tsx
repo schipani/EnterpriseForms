@@ -1,6 +1,6 @@
 import { useApi, useRuntime } from "@enterpriseforms/app-runtime";
 import type { UploadItem } from "@enterpriseforms/upload-manager";
-import { Badge, Button, Card, DataTable, LoadingBlock, PageHeader, ProgressBar, StatusMessage } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, LoadingBlock, PageHeader, ProgressBar, StatusMessage, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -33,6 +33,7 @@ export function phaseTone(phase: UploadItem["phase"]): "info" | "success" | "war
 
 /** PG-021 Upload Center: in-tab uploads (durable across SPA navigation) plus server sessions that need a re-selected file. */
 export function UploadCenterPage() {
+  useFormatter();
   const { uploads } = useRuntime();
   const api = useApi();
   const items = useUploadItems();
@@ -109,7 +110,7 @@ export function UploadCenterPage() {
                 { key: "file", header: "File", isRowHeader: true, render: (row) => row.originalFileName },
                 { key: "state", header: "State", render: (row) => <Badge tone="neutral">{row.sessionState}</Badge> },
                 { key: "progress", header: "Received", render: (row) => `${row.receivedChunkIndexes.length} / ${row.expectedChunkCount} chunks` },
-                { key: "expires", header: "Expires", render: (row) => new Date(row.sessionExpiresOn).toLocaleString() },
+                { key: "expires", header: "Expires", render: (row) => getActiveFormatter().instant(row.sessionExpiresOn) },
                 {
                   key: "actions",
                   header: "Actions",

@@ -1604,6 +1604,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Organization regional defaults (country, IANA time zone, language, date and number presets). Any member may read; ETag carries the revision (0 = system default, never saved). */
+        get: operations["GetOrganizationSettings"];
+        /** Organization owner only (Authority manage_configuration); reason required; If-Match required (428 missing, 412 stale); values validated against the typed catalog; audited as ORGANIZATION_SETTINGS_UPDATED. */
+        put: operations["UpdateOrganizationSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's own regional preferences plus the organization defaults needed to resolve them. A missing row means OrganizationDefault for all four. */
+        get: operations["GetRegionalPreferences"];
+        /** Updates only the caller's own preferences (no user id is accepted). Each mode is OrganizationDefault, BrowserDefault or Explicit; the value is allowed exactly when Explicit and must be in the catalog. If-Match is honored when sent (412 stale). */
+        put: operations["UpdateRegionalPreferences"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/countries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCountryCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/time-zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** IANA zones, each once, ordered (organization-country zones first when organizationContext=true, then the persisted order). */
+        get: operations["GetTimeZoneCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/languages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetLanguageCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/date-formats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetDateFormatCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/number-formats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetNumberFormatCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organization/security-policy": {
         parameters: {
             query?: never;
@@ -2054,6 +2171,17 @@ export interface components {
         CommandStatusResponse: {
             command: components["schemas"]["CommandOutcome"];
         };
+        CountryCatalogEntry: {
+            countryCode: string;
+            countryDisplayName: string;
+            geographicRegionCode: string;
+            /** Format: int32 */
+            displaySortOrder: number | string;
+        };
+        CountryCatalogResponse: {
+            catalogVersion: string;
+            countries: components["schemas"]["CountryCatalogEntry"][];
+        };
         CreateChildRecordRequest: {
             /** Format: uuid */
             formRelationshipDefinitionId: string;
@@ -2240,6 +2368,19 @@ export interface components {
             /** Format: int32 */
             minimumColumnSpan: number | string;
             dataEndpointKey: string;
+        };
+        DateFormatCatalogResponse: {
+            catalogVersion: string;
+            presets: components["schemas"]["DateFormatPresetEntry"][];
+        };
+        DateFormatPresetEntry: {
+            dateFormatPresetKey: string;
+            presetDisplayName: string;
+            intlLocaleTag: string;
+            monthStyle: string;
+            hourCycle: string;
+            /** Format: int32 */
+            displaySortOrder: number | string;
         };
         DevelopmentLoginRequest: {
             personaKey: string;
@@ -2785,6 +2926,17 @@ export interface components {
             groupDisplayName: string;
             lifecycleStatus: string;
         };
+        LanguageCatalogEntry: {
+            languageCode: string;
+            languageDisplayName: string;
+            nativeLanguageName: string;
+            /** Format: int32 */
+            displaySortOrder: number | string;
+        };
+        LanguageCatalogResponse: {
+            catalogVersion: string;
+            languages: components["schemas"]["LanguageCatalogEntry"][];
+        };
         MemberCommandRequest: {
             reason: string;
             /** @default false */
@@ -2851,6 +3003,18 @@ export interface components {
             cancelledOn?: null | string;
             /** @default false */
             canChange: boolean;
+        };
+        NumberFormatCatalogResponse: {
+            catalogVersion: string;
+            presets: components["schemas"]["NumberFormatPresetEntry"][];
+        };
+        NumberFormatPresetEntry: {
+            numberFormatPresetKey: string;
+            presetDisplayName: string;
+            intlLocaleTag: string;
+            exampleText: string;
+            /** Format: int32 */
+            displaySortOrder: number | string;
         };
         OptionListItemChange: {
             /** Format: uuid */
@@ -3008,6 +3172,17 @@ export interface components {
             authorityCommandId?: null | string;
             /** @default false */
             plaintextSearchPermitted: boolean;
+        };
+        OrganizationSettingsResponse: {
+            defaultCountryCode: string;
+            defaultIanaTimeZoneId: string;
+            defaultLanguageCode: string;
+            defaultDateFormatPresetKey: string;
+            defaultNumberFormatPresetKey: string;
+            /** Format: int64 */
+            organizationSettingRevision: number | string;
+            isSystemDefault: boolean;
+            catalogVersion: string;
         };
         OverviewPartStatus: {
             available: boolean;
@@ -3734,6 +3909,20 @@ export interface components {
             /** Format: date-time */
             modifiedOn: string;
         };
+        TimeZoneCatalogEntry: {
+            ianaTimeZoneId: string;
+            timeZoneDisplayName: string;
+            countryCodes: string[];
+            /** Format: int32 */
+            timeZoneSortOrder: number | string;
+            /** Format: int32 */
+            contextPriority: number | string;
+        };
+        TimeZoneCatalogResponse: {
+            catalogVersion: string;
+            organizationCountryCode: null | string;
+            timeZones: components["schemas"]["TimeZoneCatalogEntry"][];
+        };
         TransferOwnershipRequest: {
             /** Format: uuid */
             newOwnerUserId: null | string;
@@ -3817,6 +4006,13 @@ export interface components {
             /** @default false */
             plaintextSearchPermitted: boolean;
         };
+        UpdateOrganizationSettingsRequest: {
+            defaultCountryCode: string;
+            defaultIanaTimeZoneId: string;
+            defaultLanguageCode: string;
+            defaultDateFormatPresetKey: string;
+            defaultNumberFormatPresetKey: string;
+        };
         UpdateSecurityIncidentRequest: {
             /** Format: int64 */
             expectedIncidentRevision: number | string;
@@ -3831,6 +4027,16 @@ export interface components {
             textScalePreferenceMode: string;
             /** Format: double */
             explicitTextScalePercent: null | number | string;
+        };
+        UpdateUserPreferencesRequest: {
+            timeZonePreferenceMode: string;
+            ianaTimeZoneId: null | string;
+            dateFormatPreferenceMode: string;
+            dateFormatPresetKey: null | string;
+            numberFormatPreferenceMode: string;
+            numberFormatPresetKey: null | string;
+            languagePreferenceMode: string;
+            languageCode: null | string;
         };
         UpdateUserProfileRequest: {
             displayName: null | string;
@@ -3891,6 +4097,19 @@ export interface components {
             /** Format: int32 */
             versionNumber: null | number | string;
             scanVerdict: null | string;
+        };
+        UserPreferencesResponse: {
+            timeZonePreferenceMode: string;
+            ianaTimeZoneId: null | string;
+            dateFormatPreferenceMode: string;
+            dateFormatPresetKey: null | string;
+            numberFormatPreferenceMode: string;
+            numberFormatPresetKey: null | string;
+            languagePreferenceMode: string;
+            languageCode: null | string;
+            /** Format: int64 */
+            preferenceRevision: number | string;
+            organizationDefaults: components["schemas"]["OrganizationSettingsResponse"];
         };
         UserPresenceResponse: {
             /** Format: uuid */
@@ -6772,6 +6991,250 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UiPreferenceResponse"];
+                };
+            };
+        };
+    };
+    GetOrganizationSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSettingsResponse"];
+                };
+            };
+        };
+    };
+    UpdateOrganizationSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrganizationSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationSettingsResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRegionalPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPreferencesResponse"];
+                };
+            };
+        };
+    };
+    UpdateRegionalPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserPreferencesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPreferencesResponse"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCountryCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountryCatalogResponse"];
+                };
+            };
+        };
+    };
+    GetTimeZoneCatalog: {
+        parameters: {
+            query?: {
+                organizationContext?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeZoneCatalogResponse"];
+                };
+            };
+        };
+    };
+    GetLanguageCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LanguageCatalogResponse"];
+                };
+            };
+        };
+    };
+    GetDateFormatCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DateFormatCatalogResponse"];
+                };
+            };
+        };
+    };
+    GetNumberFormatCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NumberFormatCatalogResponse"];
                 };
             };
         };

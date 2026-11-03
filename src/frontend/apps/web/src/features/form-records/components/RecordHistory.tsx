@@ -1,6 +1,6 @@
 import { useApi } from "@enterpriseforms/app-runtime";
 import type { RecordVersionItemResponse, RecordVersionListResponse } from "@enterpriseforms/api-client";
-import { Badge, Button, Card, DataTable, EmptyState, LoadingBlock } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, EmptyState, LoadingBlock, useFormatter } from "@enterpriseforms/ui";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ErrorPanel } from "../../support";
@@ -12,6 +12,7 @@ import { formatDateTime } from "./recordList";
  * versions comes from the Authorization Authority, oldest first; opening a version checks it again before it is shown.
  */
 export function RecordHistory({ formRecordId }: { formRecordId: string }) {
+  useFormatter();
   const api = useApi();
   const history = useInfiniteQuery<RecordVersionListResponse>({
     queryKey: ["records", "versions", formRecordId],

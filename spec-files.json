@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "c0dcca0ecbbaf1b8810a8b65d6b4490f8719224b795da7a8fb2d6271be9b9ea4",
-      "bytes": 81978
+      "sha256": "03014a47b2355f94a80725bf344bb74bfefdc3c675cb341d56b2320d74e124a3",
+      "bytes": 93056
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -179,8 +179,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md",
-      "sha256": "345df1cb4ce1f37a08ff3d5a3b6ba4db4b352caaa2bc824c889ca559d85817ea",
-      "bytes": 44391
+      "sha256": "f85125e002633753713ce8e0e49ec1730d5dccc607edb0d17704c85d090cf7e1",
+      "bytes": 44465
     },
     {
       "path": "docs/architecture/PHASE_C8_M1_01_DURABLE_COMMAND_RECONCILIATION.md",
@@ -439,8 +439,8 @@
     },
     {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
-      "sha256": "6513ffe2b8bb3fd91cbc1a4460271bf416b1f581c4611bdbe049cadc9e5bcc87",
-      "bytes": 5463
+      "sha256": "9c8bfa1200ec2d6c5c2c3a9e47dbd66f3f51e08aab1dbfa3c61a05bfbb72d717",
+      "bytes": 6545
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",

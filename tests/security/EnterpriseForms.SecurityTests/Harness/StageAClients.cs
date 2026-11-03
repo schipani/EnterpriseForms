@@ -30,9 +30,14 @@ public sealed class BusinessApiClient(string baseAddress)
 
     public Task<HttpResult> PatchAsync(string path, string token, object body, string? idempotencyKey = null) => SendAsync(HttpMethod.Patch, path, token, body, idempotencyKey ?? Guid.NewGuid().ToString("N"));
 
-    public async Task<HttpResult> SendAsync(HttpMethod method, string path, string? token, object? body, string? idempotencyKey)
+    public async Task<HttpResult> SendAsync(HttpMethod method, string path, string? token, object? body, string? idempotencyKey, string? ifMatch = null)
     {
         using var request = new HttpRequestMessage(method, path);
+        if (ifMatch is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
         if (token is not null)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);

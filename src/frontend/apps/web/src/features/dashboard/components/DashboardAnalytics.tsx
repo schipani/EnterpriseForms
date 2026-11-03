@@ -1,5 +1,5 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Card, ColumnChart, DonutChart, KpiTile, LoadingBlock, browserTimeZone, formatCalendarDate } from "@enterpriseforms/ui";
+import { Card, ColumnChart, DonutChart, KpiTile, LoadingBlock, browserTimeZone, formatCalendarDate, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorPanel } from "../../support";
 
@@ -18,7 +18,7 @@ export function periodStart(days: DashboardPeriod, now = new Date()): string {
   return start.toISOString();
 }
 
-const count = (value: number | string | undefined) => (value === undefined ? "" : Number(value).toLocaleString());
+const count = (value: number | string | undefined) => (value === undefined ? "" : getActiveFormatter().number(value));
 
 const bucketLabels = (buckets: ReadonlyArray<{ bucketStartDate: string; bucketDayCount: number | string }>) =>
   buckets.map((b) => ({
@@ -32,6 +32,7 @@ const bucketLabels = (buckets: ReadonlyArray<{ bucketStartDate: string; bucketDa
  * loading or failure, so one failing source never blanks the others. All numbers are the caller's own authorized data.
  */
 export function DashboardAnalytics({ period }: { period: DashboardPeriod }) {
+  useFormatter();
   const api = useApi();
   const timeZone = browserTimeZone();
   const periodQuery = { periodDays: period, ...(timeZone ? { timeZone } : {}) };

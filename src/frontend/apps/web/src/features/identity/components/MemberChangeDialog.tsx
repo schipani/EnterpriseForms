@@ -1,6 +1,6 @@
 import type { MemberCommandRequest, OrganizationMemberResponse, OwnerProposalResponse } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Button, Checkbox, Dialog, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { Button, Checkbox, Dialog, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -101,6 +101,7 @@ export function MemberChangeDialog({
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
+  useFormatter();
   const api = useApi();
   const session = useSession();
   const queryClient = useQueryClient();
@@ -136,7 +137,7 @@ export function MemberChangeDialog({
           return `${name} is no longer a Security Administrator.`;
         default: {
           const proposal = (await api.organization.proposeOwnerChange(member.userId, { change: PROPOSALS[action]!, ...request })).result;
-          return `Proposal recorded for ${name}. Another organization owner must approve it before ${new Date(proposal.expiresOn ?? Date.now()).toLocaleString()}.`;
+          return `Proposal recorded for ${name}. Another organization owner must approve it before ${getActiveFormatter().instant(proposal.expiresOn ?? Date.now())}.`;
         }
       }
     },

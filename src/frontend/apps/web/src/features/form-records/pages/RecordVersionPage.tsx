@@ -1,7 +1,7 @@
 import { DOWNLOAD_PATH, presentError, resolvePath, useApi } from "@enterpriseforms/app-runtime";
 import type { RecordRestoreResponse, RecordVersionViewResponse } from "@enterpriseforms/api-client";
 import { FormRenderer, type FormLayout } from "@enterpriseforms/form-renderer";
-import { ActionIcons, Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
@@ -18,6 +18,7 @@ import { parseProjectionLayout, toGroupInfos, toGroups, toRendererFields, toValu
  * record can restore this version as a new version (the server checks every condition again).
  */
 export function RecordVersionPage() {
+  useFormatter();
   const { formRecordId, contentRevision } = useParams({ from: "/app/records/$formRecordId/versions/$contentRevision" });
   const revision = Number(contentRevision);
   const api = useApi();

@@ -1,4 +1,5 @@
 import type { OrganizationMemberResponse } from "@enterpriseforms/api-client";
+import { getActiveFormatter } from "@enterpriseforms/ui";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -147,7 +148,7 @@ describe("Recovery restrictions", () => {
     await user.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
     expect(region).toBeVisible();
-    expect(region).toHaveTextContent(`Recovery restrictions end ${new Date(ends).toLocaleString()} (about 12 days).`);
+    expect(region).toHaveTextContent(`Recovery restrictions end ${getActiveFormatter().instant(ends)} (about 12 days).`);
     expect(region).toHaveTextContent("add other owners recovered by the same case to teams");
     expect(region).toHaveTextContent("grant them the Designer role");
     expect(region).toHaveTextContent("act as their second owner for owner changes");

@@ -1,12 +1,10 @@
-/** Generic date helpers for filters and charts (no business knowledge). */
+/** Generic date helpers for filters and charts (no business knowledge). Display formatting lives in ./formatting. */
+
+import { getActiveFormatter, readBrowserEnvironment } from "./formatting";
 
 /** The browser's IANA time zone, or undefined when it cannot be resolved (the server then uses UTC and says so). */
 export function browserTimeZone(): string | undefined {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
-  } catch {
-    return undefined;
-  }
+  return readBrowserEnvironment().timeZone;
 }
 
 /**
@@ -31,13 +29,7 @@ export function localDateRange(fromDate: string, toDate: string): { from?: strin
   return result;
 }
 
-/** A calendar date (`yyyy-mm-dd`, already in the chart's zone) formatted for an axis ("Oct 28") or a tooltip. */
+/** A calendar date (`yyyy-mm-dd`, already in the chart's zone) formatted for an axis ("Oct 28") or a tooltip, in the user's date order. Never shifted. */
 export function formatCalendarDate(isoDate: string, style: "short" | "long" = "short"): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
-  if (!match) {
-    return isoDate;
-  }
-  // Noon UTC formatted in UTC: the calendar date never shifts with the viewer's zone.
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
-  return new Intl.DateTimeFormat(undefined, style === "short" ? { month: "short", day: "numeric", timeZone: "UTC" } : { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }).format(date);
+  return getActiveFormatter().calendarDate(isoDate, style);
 }

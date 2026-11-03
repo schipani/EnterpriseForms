@@ -1,7 +1,7 @@
 import { useApi } from "@enterpriseforms/app-runtime";
 import type { RecordProjectionResponse } from "@enterpriseforms/api-client";
 import { FormRenderer, type DocumentElement, type FormLayout, type RelatedElement } from "@enterpriseforms/form-renderer";
-import { ActionIcons, Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, Tabs } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DescriptionList, LoadingBlock, PageHeader, StatusMessage, Tabs, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -177,6 +177,7 @@ export function RecordPage() {
 }
 
 function RecordSummary({ data }: { data: RecordProjectionResponse }) {
+  useFormatter();
   const summary = data.summary;
   const complete = data.permissions.isCompleteProjection;
   const sharedEditable = (data.sharedFieldAccess ?? []).filter((item) => item.editable).length;

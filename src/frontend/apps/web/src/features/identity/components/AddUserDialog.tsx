@@ -1,5 +1,5 @@
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Button, Checkbox, Dialog, Select, StatusMessage, TextInput, errorTextClass } from "@enterpriseforms/ui";
+import { Button, Checkbox, Dialog, Select, StatusMessage, TextInput, errorTextClass, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -47,6 +47,7 @@ export function AddUserDialog({
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
+  useFormatter();
   const api = useApi();
   const queryClient = useQueryClient();
   const [subject, setSubject] = useState(initial?.subject ?? "");
@@ -67,7 +68,7 @@ export function AddUserDialog({
         })
         .then((r) => r.result),
     onSuccess: async (outcome) => {
-      onDone(`Request recorded for ${name.trim()}. It needs two operator approvals before ${new Date(outcome.expiresOn ?? Date.now()).toLocaleDateString()}; until then the person is not a member.`);
+      onDone(`Request recorded for ${name.trim()}. It needs two operator approvals before ${getActiveFormatter().date(outcome.expiresOn ?? Date.now())}; until then the person is not a member.`);
       close();
       await queryClient.invalidateQueries({ queryKey: ["organization"] });
     },

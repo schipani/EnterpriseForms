@@ -1,8 +1,9 @@
 import type { FieldSearchAdministrationFormResponse } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, DataTable, LoadingBlock, PageHeader, StatusMessage } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, LoadingBlock, StatusMessage } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { OrganizationLayout } from "../../organizations";
 import { ErrorPanel } from "../../support";
 import { FieldSearchersCard } from "../components/FieldSearchersCard";
 import { FieldSearchSection, fieldSearchKey } from "../components/FieldSearchSection";
@@ -25,21 +26,19 @@ export function SearchApprovalsPage() {
 
   if (!allowed) {
     return (
-      <>
-        <PageHeader title="Search approvals" />
+      <OrganizationLayout title="Search approvals">
         <StatusMessage tone="info" title="Security administrators only">
           Approving fields for Advanced Search is done by security administrators.
         </StatusMessage>
-      </>
+      </OrganizationLayout>
     );
   }
 
   return (
-    <>
-      <PageHeader
-        title="Search approvals"
-        lead="Choose which plaintext Public or Internal fields of each published form can be used in Advanced Search, and who may search them. Approving a field never gives access to records: searches only ever cover records a person can already find."
-      />
+    <OrganizationLayout
+      title="Search approvals"
+      lead="Choose which plaintext Public or Internal fields of each published form can be used in Advanced Search, and who may search them. Approving a field never gives access to records: searches only ever cover records a person can already find."
+    >
       {administration.isPending ? <LoadingBlock label="Reading search approvals from the Authorization Authority" /> : null}
       {administration.isError ? <ErrorPanel error={administration.error} onRetry={() => void administration.refetch()} /> : null}
       {administration.data ? (
@@ -83,7 +82,7 @@ export function SearchApprovalsPage() {
           {selected ? <FormApprovals key={selected.formDefinitionId} form={selected} onClose={() => setSelected(null)} /> : null}
         </div>
       ) : null}
-    </>
+    </OrganizationLayout>
   );
 }
 
