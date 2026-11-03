@@ -63,7 +63,8 @@ export const FALLBACK_SETTINGS: FormattingSettings = {
 
 export function isValidTimeZone(id: string | null | undefined): id is string {
   // Area/Location identifiers only: the runtime also accepts legacy aliases such as "EST" and "PST8PDT", which are not valid choices.
-  if (!id || !/^[A-Z][A-Za-z_]*\/[A-Za-z0-9_+\-/]+$/.test(id)) {
+  // "UTC" itself is what many browsers and servers report for Coordinated Universal Time and is a valid choice.
+  if (!id || !(id === "UTC" || /^[A-Z][A-Za-z_]*\/[A-Za-z0-9_+\-/]+$/.test(id))) {
     return false;
   }
   try {

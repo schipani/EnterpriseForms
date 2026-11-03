@@ -70,6 +70,11 @@ describe("resolveFormatting precedence (explicit > organization > browser, per s
     expect(resolveFormatting({ preferences: null, organization: null, catalogs: undefined, browser: { timeZone: undefined, languages: [] } })).toEqual({ ...FALLBACK_SETTINGS });
   });
 
+  it("a browser that reports UTC is honoured in browser mode instead of silently using the organization zone", () => {
+    const s = resolveFormatting({ preferences: { ...allOrg, timeZonePreferenceMode: "BrowserDefault" }, organization: org, catalogs, browser: { timeZone: "UTC", languages: ["en"] } });
+    expect(s.timeZone).toBe("UTC");
+  });
+
   it("browser languages map to a supported language, Chinese to Simplified, else English", () => {
     const pick = (languages: string[]) => resolveFormatting({ preferences: { ...allOrg, languagePreferenceMode: "BrowserDefault" }, organization: org, catalogs, browser: { timeZone: "Etc/UTC", languages } }).language;
     expect(pick(["zh-CN"])).toBe("zh-Hans");
@@ -82,6 +87,8 @@ describe("time zone helpers", () => {
   it("accepts IANA identifiers and rejects offsets and abbreviations", () => {
     expect(isValidTimeZone("America/Toronto")).toBe(true);
     expect(isValidTimeZone("America/Winnipeg")).toBe(true);
+    expect(isValidTimeZone("UTC")).toBe(true);
+    expect(isValidTimeZone("Etc/UTC")).toBe(true);
     expect(isValidTimeZone("EST")).toBe(false);
     expect(isValidTimeZone("UTC-05:00")).toBe(false);
     expect(isValidTimeZone("")).toBe(false);
