@@ -1,6 +1,6 @@
 import { presentError, useApi, useSession } from "@enterpriseforms/app-runtime";
 import type { SecurityIncidentDetailResponse, UpdateSecurityIncidentRequest } from "@enterpriseforms/api-client";
-import { Badge, Button, Card, DataTable, DescriptionList, LoadingBlock, PageHeader, Select, StatusMessage, TextArea } from "@enterpriseforms/ui";
+import { Badge, Button, Card, DataTable, DescriptionList, LoadingBlock, PageHeader, Select, StatusMessage, TextArea, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -14,6 +14,7 @@ const UNASSIGNED = "unassigned";
  * trail. No record content is ever shown, and no action here repairs, re-signs or releases a record.
  */
 export function SecurityIncidentPage() {
+  useFormatter();
   const { securityIncidentId } = useParams({ strict: false }) as { securityIncidentId: string };
   const api = useApi();
   const session = useSession();
@@ -221,6 +222,7 @@ function InvestigationCard({ data, update, onSaved }: { data: SecurityIncidentDe
 }
 
 function NotesCard({ data, add, onSaved }: { data: SecurityIncidentDetailResponse; add: (note: string) => Promise<SecurityIncidentDetailResponse>; onSaved: (result: SecurityIncidentDetailResponse) => void }) {
+  useFormatter();
   const [note, setNote] = useState("");
   const [validation, setValidation] = useState<string | null>(null);
   const save = useMutation({

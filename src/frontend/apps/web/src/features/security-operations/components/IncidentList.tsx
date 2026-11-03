@@ -1,6 +1,6 @@
 import { useApi } from "@enterpriseforms/app-runtime";
 import type { SecurityIncidentListItemResponse, SecurityIncidentQuery } from "@enterpriseforms/api-client";
-import { ActionIcons, Badge, Button, DataTable, EmptyState, LoadingBlock, Pager, Select, TextInput, localDateRange, useDebouncedValue } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, DataTable, EmptyState, LoadingBlock, Pager, Select, TextInput, localDateRange, useDebouncedValue, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -15,6 +15,7 @@ const PAGE_SIZE = 15;
  * discover the record.
  */
 export function IncidentList({ caption = "Security incidents", compact = false }: { caption?: string; compact?: boolean }) {
+  useFormatter();
   const api = useApi();
   const [text, setText] = useState("");
   const [type, setType] = useState("all");

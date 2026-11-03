@@ -1,6 +1,6 @@
 import type { OrganizationMemberQuery } from "@enterpriseforms/api-client";
 import { presentError, useApi, usePresence, useSession } from "@enterpriseforms/app-runtime";
-import { ActionIcons, Button, Card, LoadingBlock, Pager, Select, StatusMessage, TextInput, useDebouncedValue } from "@enterpriseforms/ui";
+import { ActionIcons, Button, Card, LoadingBlock, Pager, Select, StatusMessage, TextInput, useDebouncedValue, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { OrganizationLayout } from "../../organizations";
@@ -29,6 +29,7 @@ const filterGrid = "grid items-start gap-x-3 gap-y-2 sm:grid-cols-3";
  * the actions shown are its rules mirrored for this person.
  */
 export function PeopleDirectoryPage() {
+  useFormatter();
   const api = useApi();
   const session = useSession();
   const queryClient = useQueryClient();
@@ -104,7 +105,7 @@ export function PeopleDirectoryPage() {
         <>
           {refreshedAt && !refreshError ? (
             <span className="self-center text-help text-muted" aria-live="polite">
-              Updated {refreshedAt.toLocaleTimeString()}
+              Updated {getActiveFormatter().instant(refreshedAt, "time")}
             </span>
           ) : null}
           <Button size="sm" variant="ghost" icon={ActionIcons.refresh} busy={refreshing} aria-label="Refresh People" onClick={() => void refreshAll()}>

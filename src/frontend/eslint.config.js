@@ -70,6 +70,19 @@ export default tseslint.config(
     rules: { "no-restricted-globals": ["error", { name: "localStorage", message: "No browser storage." }, { name: "sessionStorage", message: "No browser storage." }] },
   },
   {
+    // C8 M3: one formatting resolver. Dates, times and numbers are shown only through packages/ui/src/formatting.ts, which resolves
+    // explicit > organization > browser per setting. Ad-hoc toLocale*String or Intl formatters would ignore the user's choices.
+    files: ["apps/web/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
+    ignores: ["packages/ui/src/formatting.ts", "**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        { selector: "CallExpression[callee.property.name=/^toLocale(Date|Time)?String$/]", message: "Format dates and numbers with useFormatter()/getActiveFormatter() from @enterpriseforms/ui, never toLocale*String (C8 M3)." },
+        { selector: "MemberExpression[object.name='Intl'][property.name=/^(DateTimeFormat|NumberFormat)$/]", message: "Use the shared formatter in packages/ui/src/formatting.ts, never Intl.DateTimeFormat/NumberFormat directly (C8 M3)." },
+      ],
+    },
+  },
+  {
     // App shell composes feature public exports only.
     files: ["apps/web/src/app/**/*.{ts,tsx}"],
     rules: {

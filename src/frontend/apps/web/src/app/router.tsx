@@ -43,6 +43,7 @@ const activityRoute = createRoute({ getParentRoute: () => appRoute, path: "/acti
 const brandingRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/branding", component: lazyRouteComponent(() => import("../features/organizations"), "BrandingPage") });
 // Phase C8 M1: administration shell (PG-041 overview, PG-050 people, PG-048/049 teams, PG-046 data protection, Security Administrators).
 const organizationOverviewRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization", component: lazyRouteComponent(() => import("../features/organizations"), "OverviewPage") });
+const organizationRegionalRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/regional", component: lazyRouteComponent(() => import("../features/organizations"), "RegionalSettingsPage") });
 const organizationDataProtectionRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/data-protection", component: lazyRouteComponent(() => import("../features/organizations"), "DataProtectionPage") });
 const organizationSecurityAdministratorsRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/security-administrators", component: lazyRouteComponent(() => import("../features/organizations"), "SecurityAdministratorsPage") });
 const organizationPeopleRoute = createRoute({ getParentRoute: () => appRoute, path: "/organization/users", component: lazyRouteComponent(() => import("../features/identity"), "PeopleDirectoryPage") });
@@ -54,6 +55,8 @@ const securityIncidentsRoute = createRoute({ getParentRoute: () => appRoute, pat
 const securityIncidentRoute = createRoute({ getParentRoute: () => appRoute, path: "/security/incidents/$securityIncidentId", component: lazyRouteComponent(() => import("../features/security-operations"), "SecurityIncidentPage") });
 const profileRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/profile", component: lazyRouteComponent(() => import("../features/identity"), "MyProfilePage") });
 const preferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
+// PG-007 personal preferences live at /app/settings/preferences; /app/me/preferences stays as an alias for existing links.
+const settingsPreferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/settings/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
 /**
  * PG-069 component gallery (ADR-PB-014: internal, never a production route). It exists only in development builds (the Vite
  * dev server, which the Playwright suites use) or when a build sets VITE_ENABLE_COMPONENT_GALLERY=true; it is not in any
@@ -66,7 +69,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, profileRoute, preferencesRoute, ...developmentRoutes, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, profileRoute, preferencesRoute, settingsPreferencesRoute, ...developmentRoutes, noPermissionRoute]),
 ]);
 
 export function createAppRouter() {

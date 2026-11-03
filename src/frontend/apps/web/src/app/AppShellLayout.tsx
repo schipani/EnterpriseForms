@@ -96,8 +96,8 @@ function UserMenu() {
           <DropdownMenu.Item className={menuItemClass} onSelect={() => void navigate({ to: "/app/me/profile" })}>
             My profile
           </DropdownMenu.Item>
-          <DropdownMenu.Item className={menuItemClass} onSelect={() => void navigate({ to: "/app/me/preferences" })}>
-            Text size preferences
+          <DropdownMenu.Item className={menuItemClass} onSelect={() => void navigate({ to: "/app/settings/preferences" })}>
+            Preferences
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-line" />
           <DropdownMenu.Item

@@ -1,5 +1,5 @@
 import type { PresenceState, TeamMemberResponse } from "@enterpriseforms/api-client";
-import { ActionIcons, Badge, Button, DataTable, PresenceIndicator } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, DataTable, PresenceIndicator, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 
 /**
  * Team roster (PG-049, Phase C8 M1) from the membership projection. Each row names the Authority command that made the
@@ -19,6 +19,7 @@ export function TeamRoster({
   onRemove?: ((member: TeamMemberResponse) => void) | undefined;
   removingUserId?: string | null | undefined;
 }) {
+  useFormatter();
   return (
     <DataTable
       caption="Team members"
@@ -29,7 +30,7 @@ export function TeamRoster({
       columns={[
         { key: "name", header: "Name", isRowHeader: true, render: (row) => row.displayName },
         { key: "presence", header: "Presence", render: (row) => <PresenceIndicator state={presence?.[row.userId] ?? "Unknown"} /> },
-        { key: "since", header: "Member since", render: (row) => new Date(row.memberSince).toLocaleDateString() },
+        { key: "since", header: "Member since", render: (row) => getActiveFormatter().date(row.memberSince) },
         { key: "command", header: "Authority command", render: (row) => (row.authorityCommandId ? <Badge tone="success">Effective</Badge> : <Badge tone="warning">Unverified projection row</Badge>) },
         ...(canManage && onRemove
           ? [

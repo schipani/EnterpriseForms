@@ -101,8 +101,8 @@ public static class RegionalCatalog
 
     private static readonly DateFormatPresetEntry[] DateList =
     [
-        new("iso-24h", "2026-11-03, 24-hour clock", "sv-SE", "2-digit", "h23", 1),
-        new("iso-12h", "2026-11-03, 12-hour clock", "sv-SE", "2-digit", "h12", 2),
+        new("iso-24h", "2026-11-03, 24-hour clock", "en-CA", "2-digit", "h23", 1),
+        new("iso-12h", "2026-11-03, 12-hour clock", "en-CA", "2-digit", "h12", 2),
         new("dmy-24h", "03/11/2026, 24-hour clock", "en-GB", "2-digit", "h23", 3),
         new("mdy-12h", "11/03/2026, 12-hour clock", "en-US", "2-digit", "h12", 4),
         new("dmy-text-24h", "03 Nov 2026, 24-hour clock", "en-GB", "short", "h23", 5),

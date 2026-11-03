@@ -1,6 +1,6 @@
 import type { SecurityAdministratorResponse } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, Dialog, LoadingBlock, Select, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, Dialog, LoadingBlock, Select, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -15,6 +15,7 @@ const rosterKey = ["organization", "security-administrators"];
  * Security Administrator of an organization comes from the independently authorized operator process.
  */
 export function SecurityAdministratorsCard() {
+  useFormatter();
   const api = useApi();
   const session = useSession();
   const queryClient = useQueryClient();
@@ -101,7 +102,7 @@ export function SecurityAdministratorsCard() {
           columns={[
             { key: "name", header: "Name", isRowHeader: true, render: (row) => (row.isCurrentUser ? `${row.displayName} (you)` : row.displayName) },
             { key: "identity", header: "Verified identity", render: (row) => <span className="break-all text-sm">{`${row.identitySubject} · ${row.identityIssuer}`}</span> },
-            { key: "appointed", header: "Appointed", render: (row) => new Date(row.appointedOn).toLocaleDateString() },
+            { key: "appointed", header: "Appointed", render: (row) => getActiveFormatter().date(row.appointedOn) },
             { key: "status", header: "Status", render: () => <Badge tone="success">Active</Badge> },
             ...(data.canManage
               ? [

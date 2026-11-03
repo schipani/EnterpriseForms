@@ -1,5 +1,5 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, Checkbox, LoadingBlock, Select, StatusMessage, TextArea } from "@enterpriseforms/ui";
+import { Badge, Button, Card, Checkbox, LoadingBlock, Select, StatusMessage, TextArea, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -12,6 +12,7 @@ const CLASSIFICATIONS = ["Public", "Internal", "Confidential", "Restricted"] as 
  * default and says so. Changing it is audited; it never changes how stored values are protected.
  */
 export function SecurityPolicyCard() {
+  useFormatter();
   const api = useApi();
   const session = useSession();
   const queryClient = useQueryClient();
@@ -49,7 +50,7 @@ export function SecurityPolicyCard() {
   return (
     <Card title={<span id="data-protection-policy-heading">Data protection policy</span>} aria-labelledby="data-protection-policy-heading">
       <div className="flex flex-wrap gap-2">
-        <Badge tone={policy.data.isUnreviewedDefault ? "warning" : "success"}>{policy.data.isUnreviewedDefault ? "Development default — not yet reviewed" : `Reviewed ${new Date(policy.data.policyReviewedOn!).toLocaleDateString()}`}</Badge>
+        <Badge tone={policy.data.isUnreviewedDefault ? "warning" : "success"}>{policy.data.isUnreviewedDefault ? "Development default — not yet reviewed" : `Reviewed ${getActiveFormatter().date(policy.data.policyReviewedOn!)}`}</Badge>
         <Badge tone="neutral">Policy revision {String(policy.data.securityPolicyRevision)}</Badge>
       </div>
       <p className="text-sm text-muted">New free text and documents are always Confidential and encrypted by default. This policy decides what designers may choose beyond that default. It never decrypts or re-protects stored values.</p>

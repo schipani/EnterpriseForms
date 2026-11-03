@@ -1,6 +1,6 @@
 import type { OwnerRecoveryNoticeCaseResponse } from "@enterpriseforms/api-client";
 import { useApi } from "@enterpriseforms/app-runtime";
-import { Button, Card, Checkbox, StatusMessage, TextArea } from "@enterpriseforms/ui";
+import { Button, Card, Checkbox, StatusMessage, TextArea, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -19,6 +19,7 @@ const names = (c: OwnerRecoveryNoticeCaseResponse, role: string) => c.subjects.f
  * never evidence summaries or record content. A confirmation appears only after the server has recorded the objection.
  */
 export function OwnerRecoveryNotice() {
+  useFormatter();
   const api = useApi();
   const queryClient = useQueryClient();
   const notice = useQuery({ queryKey: ownerRecoveryNoticeKey, queryFn: ({ signal }) => api.organization.ownerRecoveryNotice(signal).then((r) => r.result) });
@@ -72,7 +73,7 @@ export function OwnerRecoveryNotice() {
         <dt className="text-muted">Justification</dt>
         <dd className="m-0 whitespace-pre-wrap break-words">{recoveryCase.justification}</dd>
         <dt className="text-muted">Waiting period ends</dt>
-        <dd className="m-0">{new Date(recoveryCase.waitingPeriodEndsOn).toLocaleString()}</dd>
+        <dd className="m-0">{getActiveFormatter().instant(recoveryCase.waitingPeriodEndsOn)}</dd>
         <dt className="text-muted">Operator approvals</dt>
         <dd className="m-0">
           {Number(recoveryCase.approvalsRecorded)} of {Number(recoveryCase.approvalsRequired)}

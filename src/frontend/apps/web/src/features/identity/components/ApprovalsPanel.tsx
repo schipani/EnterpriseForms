@@ -1,6 +1,6 @@
 import type { ApprovalQuery, MembershipRequestResponse, OwnerProposalResponse } from "@enterpriseforms/api-client";
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Card, LoadingBlock, OverflowMenu, Pager, Select, StatusMessage, TextInput, useDebouncedValue } from "@enterpriseforms/ui";
+import { Badge, Button, Card, LoadingBlock, OverflowMenu, Pager, Select, StatusMessage, TextInput, useDebouncedValue, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { ErrorPanel } from "../../support";
@@ -32,7 +32,7 @@ const PROPOSAL_STATUS_OPTIONS = [
 
 const REQUEST_STATUS_OPTIONS = [...PROPOSAL_STATUS_OPTIONS, { value: "Cancelled", label: "Cancelled" }, { value: "Replaced", label: "Replaced" }];
 
-const date = (value: string) => new Date(value).toLocaleDateString();
+const date = (value: string) => getActiveFormatter().date(value);
 
 interface Column<T> {
   key: string;
@@ -119,6 +119,7 @@ function requestDetail(row: MembershipRequestResponse): string {
 
 /** Name with a short muted second line; the full text is the tooltip. */
 function TwoLine({ primary, secondary }: { primary: string; secondary?: string | undefined }) {
+  useFormatter();
   return (
     <>
       <div className="truncate font-semibold" title={primary}>
@@ -158,6 +159,7 @@ function useApprovalList() {
 }
 
 function Filters({ list, idPrefix, noun, options }: { list: ReturnType<typeof useApprovalList>; idPrefix: string; noun: string; options: { value: string; label: string }[] }) {
+  useFormatter();
   return (
     <div className="grid items-start gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
       <TextInput
@@ -200,6 +202,7 @@ function RequestActions({
   onCreateNew: () => void;
   onCopied: () => void;
 }) {
+  useFormatter();
   const name = row.displayNameHint || row.subjectIdentifier;
   const item = (key: string, label: string, run: () => void) => ({
     key,
@@ -250,6 +253,7 @@ export function ApprovalsPanel({
   onCreateNew: (initial: { subject: string; name: string; role: string | null }) => void;
   onDone: (message: string) => void;
 }) {
+  useFormatter();
   const api = useApi();
   const [editing, setEditing] = useState<MembershipRequestResponse | null>(null);
   const [cancelling, setCancelling] = useState<MembershipRequestResponse | null>(null);

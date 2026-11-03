@@ -1,6 +1,6 @@
 import type { MembershipRequestResponse } from "@enterpriseforms/api-client";
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
-import { Badge, Button, Checkbox, DescriptionList, Dialog, Select, StatusMessage, TextInput, errorTextClass } from "@enterpriseforms/ui";
+import { Badge, Button, Checkbox, DescriptionList, Dialog, Select, StatusMessage, TextInput, errorTextClass, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -8,7 +8,7 @@ import { providerName } from "./MemberTable";
 
 const STALE_CODES = new Set(["MEMBERSHIP_REQUEST_CHANGED", "STALE_AUTHORIZATION_REVISION", "MEMBERSHIP_REQUEST_NOT_PENDING"]);
 
-const date = (value: string | null | undefined) => (value ? new Date(value).toLocaleString() : "—");
+const date = (value: string | null | undefined) => (value ? getActiveFormatter().instant(value) : "—");
 
 export const REQUEST_STATUS_LABELS: Record<string, string> = {
   Pending: "Awaiting operators",
@@ -23,6 +23,7 @@ export const requestStatusTone = (state: string) => (state === "Pending" ? "warn
 
 /** Names the problem when the request moved on since the list was read; the person reloads instead of overwriting. */
 function StaleNotice({ error }: { error: unknown }) {
+  useFormatter();
   return (
     <StatusMessage tone="warning" title="This request changed">
       {presentError(error).code === "MEMBERSHIP_REQUEST_NOT_PENDING"
@@ -33,6 +34,7 @@ function StaleNotice({ error }: { error: unknown }) {
 }
 
 function StepUp({ operational, stepUp, setStepUp, touched }: { operational: boolean; stepUp: boolean; setStepUp: (value: boolean) => void; touched: boolean }) {
+  useFormatter();
   return operational ? (
     <>
       <Checkbox
@@ -66,10 +68,12 @@ export function EditRequestDialog({
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
+  useFormatter();
   return request ? <EditRequestForm key={request.requestId + request.requestDigest} request={request} operational={operational} onClose={onClose} onDone={onDone} /> : null;
 }
 
 function EditRequestForm({ request, operational, onClose, onDone }: { request: MembershipRequestResponse; operational: boolean; onClose: () => void; onDone: (message: string) => void }) {
+  useFormatter();
   const api = useApi();
   const queryClient = useQueryClient();
   const [name, setName] = useState(request.displayNameHint);
@@ -179,10 +183,12 @@ export function CancelRequestDialog({
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
+  useFormatter();
   return request ? <CancelRequestForm key={request.requestId + request.requestDigest} request={request} operational={operational} onClose={onClose} onDone={onDone} /> : null;
 }
 
 function CancelRequestForm({ request, operational, onClose, onDone }: { request: MembershipRequestResponse; operational: boolean; onClose: () => void; onDone: (message: string) => void }) {
+  useFormatter();
   const api = useApi();
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
@@ -244,6 +250,7 @@ function CancelRequestForm({ request, operational, onClose, onDone }: { request:
 
 /** Read-only details of a request in any status, including its replacement lineage. */
 export function RequestDetailsDialog({ request, onClose }: { request: MembershipRequestResponse | null; onClose: () => void }) {
+  useFormatter();
   return (
     <Dialog
       open={request !== null}

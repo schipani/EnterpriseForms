@@ -101,6 +101,16 @@ export const ENDPOINTS = {
   "organization.uploadLogo": { method: "POST", path: "/api/v1/organization/branding/logo" },
   "preferences.get": { method: "GET", path: "/api/v1/me/ui-preferences" },
   "preferences.update": { method: "PUT", path: "/api/v1/me/ui-preferences" },
+  // C8 M3: organization regional defaults (PG-043), personal regional preferences (PG-007) and the typed regional catalog.
+  "organization.settings": { method: "GET", path: "/api/v1/organization/settings" },
+  "organization.updateSettings": { method: "PUT", path: "/api/v1/organization/settings" },
+  "regional.get": { method: "GET", path: "/api/v1/me/preferences" },
+  "regional.update": { method: "PUT", path: "/api/v1/me/preferences" },
+  "catalog.countries": { method: "GET", path: "/api/v1/catalog/countries" },
+  "catalog.timeZones": { method: "GET", path: "/api/v1/catalog/time-zones" },
+  "catalog.languages": { method: "GET", path: "/api/v1/catalog/languages" },
+  "catalog.dateFormats": { method: "GET", path: "/api/v1/catalog/date-formats" },
+  "catalog.numberFormats": { method: "GET", path: "/api/v1/catalog/number-formats" },
   "users.list": { method: "GET", path: "/api/v1/users" },
   // C8 M2: directory profiles, shared presence and the paged approval lists.
   "users.myProfile": { method: "GET", path: "/api/v1/users/me/profile" },

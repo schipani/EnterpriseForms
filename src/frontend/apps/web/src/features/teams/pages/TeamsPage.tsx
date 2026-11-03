@@ -1,5 +1,5 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { ActionIcons, Badge, Button, Card, DataTable, Dialog, LoadingBlock, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, DataTable, Dialog, LoadingBlock, StatusMessage, TextInput, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -14,6 +14,7 @@ export const teamDirectoryKey = ["organization", "teams"];
  * committed but has not made Effective is reported as pending, never as done.
  */
 export function TeamsPage() {
+  useFormatter();
   const api = useApi();
   const session = useSession();
   const navigate = useNavigate();
@@ -82,7 +83,7 @@ export function TeamsPage() {
               },
               { key: "members", header: "Members", render: (row) => String(row.memberCount) },
               { key: "status", header: "Status", render: (row) => (row.isActive ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Inactive</Badge>) },
-              { key: "created", header: "Created", render: (row) => new Date(row.createdOn).toLocaleDateString() },
+              { key: "created", header: "Created", render: (row) => getActiveFormatter().date(row.createdOn) },
             ]}
           />
         </Card>

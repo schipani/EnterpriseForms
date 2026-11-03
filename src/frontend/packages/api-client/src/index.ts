@@ -31,6 +31,16 @@ export type BrandingResponse = S["BrandingResponse"];
 export type UpdateBrandingRequest = S["UpdateBrandingRequest"];
 export type UiPreferenceResponse = S["UiPreferenceResponse"];
 export type UpdateUiPreferenceRequest = S["UpdateUiPreferenceRequest"];
+export type OrganizationSettingsResponse = S["OrganizationSettingsResponse"];
+export type UpdateOrganizationSettingsRequest = S["UpdateOrganizationSettingsRequest"];
+export type UserPreferencesResponse = S["UserPreferencesResponse"];
+export type UpdateUserPreferencesRequest = S["UpdateUserPreferencesRequest"];
+export type CountryCatalogResponse = S["CountryCatalogResponse"];
+export type TimeZoneCatalogResponse = S["TimeZoneCatalogResponse"];
+export type TimeZoneCatalogEntry = S["TimeZoneCatalogEntry"];
+export type LanguageCatalogResponse = S["LanguageCatalogResponse"];
+export type DateFormatCatalogResponse = S["DateFormatCatalogResponse"];
+export type NumberFormatCatalogResponse = S["NumberFormatCatalogResponse"];
 export type DevelopmentPersonaResponse = S["DevelopmentPersonaResponse"];
 export type DashboardResponse = S["DashboardResponse"];
 export type DashboardCountResponse = S["DashboardCountResponse"];
@@ -406,6 +416,18 @@ export function createApiClient(coordinator: IRequestCoordinator) {
     preferences: {
       get: (signal?: AbortSignal) => read<UiPreferenceResponse>("preferences.get", undefined, undefined, "interactive-read", signal),
       update: (request: UpdateUiPreferenceRequest) => write<UiPreferenceResponse>("PUT", "preferences.update", undefined, request, { resourceKey: "preferences" }),
+    },
+    /** C8 M3: regional defaults, personal regional preferences (If-Match carries the revision read) and the typed catalog. */
+    regional: {
+      settings: (signal?: AbortSignal) => read<OrganizationSettingsResponse>("organization.settings", undefined, undefined, "interactive-read", signal),
+      updateSettings: (request: UpdateOrganizationSettingsRequest, expectedRevision: number) => write<OrganizationSettingsResponse>("PUT", "organization.updateSettings", undefined, request, { resourceKey: "organization-settings", expectedRevision: String(expectedRevision) }),
+      preferences: (signal?: AbortSignal) => read<UserPreferencesResponse>("regional.get", undefined, undefined, "interactive-read", signal),
+      updatePreferences: (request: UpdateUserPreferencesRequest, expectedRevision: number) => write<UserPreferencesResponse>("PUT", "regional.update", undefined, request, { resourceKey: "regional-preferences", expectedRevision: String(expectedRevision) }),
+      countries: (signal?: AbortSignal) => read<CountryCatalogResponse>("catalog.countries", undefined, undefined, "background-read", signal),
+      timeZones: (organizationContext: boolean, signal?: AbortSignal) => read<TimeZoneCatalogResponse>("catalog.timeZones", undefined, { organizationContext }, "interactive-read", signal),
+      languages: (signal?: AbortSignal) => read<LanguageCatalogResponse>("catalog.languages", undefined, undefined, "background-read", signal),
+      dateFormats: (signal?: AbortSignal) => read<DateFormatCatalogResponse>("catalog.dateFormats", undefined, undefined, "background-read", signal),
+      numberFormats: (signal?: AbortSignal) => read<NumberFormatCatalogResponse>("catalog.numberFormats", undefined, undefined, "background-read", signal),
     },
   };
 }

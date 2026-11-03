@@ -1,6 +1,6 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import type { RecordProjectionResponse, RecordRestoreResponse, RecordVersionItemResponse, RestorePreviewResponse } from "@enterpriseforms/api-client";
-import { ActionIcons, Badge, Button, Checkbox, DataTable, Dialog, LoadingBlock, StatusMessage, TextInput } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Checkbox, DataTable, Dialog, LoadingBlock, StatusMessage, TextInput, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -49,6 +49,7 @@ export function RestoreVersionAction({ formRecordId, version, projection, onRest
 }
 
 function RestoreDialog({ formRecordId, revision, projection, onClose, onRestored }: { formRecordId: string; revision: number; projection: RecordProjectionResponse; onClose: () => void; onRestored: (result: RecordRestoreResponse) => void }) {
+  useFormatter();
   const api = useApi();
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");

@@ -1,6 +1,6 @@
 import { presentError, useApi } from "@enterpriseforms/app-runtime";
 import type { FieldSearchRequest, FieldSearchResponse, RecordListItemResponse, RecordListQuery, RecordListResponse } from "@enterpriseforms/api-client";
-import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, helpTextClass, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage, TextInput, type DataTableColumn } from "@enterpriseforms/ui";
+import { ActionIcons, Badge, Button, Card, Checkbox, DataTable, EmptyState, helpTextClass, LoadingBlock, OverflowMenu, PageHeader, RowActions, Select, StatusMessage, TextInput, type DataTableColumn, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
@@ -319,6 +319,7 @@ export function RecordsPage() {
  * verified answer; a failure is explained and is never presented as "no records match".
  */
 function FieldSearchResults({ state, busy, onRetry, onPage, onClear }: { state: { result?: FieldSearchResponse; failure?: SearchFailure }; busy: boolean; onRetry: () => void; onPage: (cursor: string) => void; onClear: () => void }) {
+  useFormatter();
   const clear = (
     <Button variant="secondary" size="sm" icon={ActionIcons.reset} onClick={onClear}>
       Clear advanced search
@@ -431,6 +432,7 @@ function recordColumns(): DataTableColumn<RecordListItemResponse>[] {
 }
 
 function CreatedCell({ row }: { row: RecordListItemResponse }) {
+  useFormatter();
   return (
     <span className="flex flex-col">
       <span>{formatDateTime(row.createdOn)}</span>

@@ -1,6 +1,6 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
 import type { AuditEventResponse, DashboardUploadItemResponse, DashboardUploadQuery, FormDefinitionSummaryResponse, RecordListItemResponse } from "@enterpriseforms/api-client";
-import { Badge, DataTable, EmptyState, Select, TextInput, localDateRange, useDebouncedValue } from "@enterpriseforms/ui";
+import { Badge, DataTable, EmptyState, Select, TextInput, localDateRange, useDebouncedValue, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -10,7 +10,7 @@ import { DashboardSection, useCursorRestart, usePageCursor } from "./DashboardSe
 /** Every dashboard list shows 15 rows per page by default (server-side). */
 export const DASHBOARD_PAGE_SIZE = 15;
 
-const formatInstant = (value: string) => new Date(value).toLocaleString();
+const formatInstant = (value: string) => getActiveFormatter().instant(value);
 
 const filterGrid = "grid items-start gap-x-3 gap-y-2 sm:grid-cols-2";
 
@@ -18,6 +18,7 @@ const recordStatusTone = (status: string) => (status === "Submitted" ? "success"
 
 /** My Records (exact reference/ID lookup, status and form filters). The full search lives on the My Records page. */
 export function RecordsSection() {
+  useFormatter();
   const api = useApi();
   const [text, setText] = useState("");
   const [status, setStatus] = useState("all");
@@ -123,6 +124,7 @@ const formatBytes = (bytes: number) => (bytes < 1024 ? `${bytes} B` : bytes < 10
 
 /** The caller's own uploads: file name search, status and date filters. */
 export function UploadsSection() {
+  useFormatter();
   const api = useApi();
   const [text, setText] = useState("");
   const [status, setStatus] = useState("all");
@@ -215,6 +217,7 @@ const OUTCOMES = [
 
 /** The caller's own activity (audit events): type, outcome and date filters. */
 export function ActivitySection() {
+  useFormatter();
   const api = useApi();
   const [category, setCategory] = useState("all");
   const [outcome, setOutcome] = useState("all");
@@ -297,6 +300,7 @@ export function ActivitySection() {
 
 /** Forms the caller may use (create records) or design, by name. */
 export function FormsSection() {
+  useFormatter();
   const api = useApi();
   const session = useSession();
   const designer = session.hasCapability("forms.design");

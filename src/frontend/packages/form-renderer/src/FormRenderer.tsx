@@ -1,4 +1,4 @@
-import { Button, Checkbox, RequiredMarker, Select, TextArea, TextInput, errorTextClass, helpTextClass, legendClass } from "@enterpriseforms/ui";
+import { Button, Checkbox, RequiredMarker, Select, TextArea, TextInput, errorTextClass, helpTextClass, legendClass, useFormatter, getActiveFormatter } from "@enterpriseforms/ui";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { changeInOccurrence, changeTopLevel, groupKeyFor, initialGroups, moveOccurrence, newOccurrence, occurrenceErrorKey, occurrenceRuleStates, occurrenceScopeValues, type GroupInfo, type GroupValueMap, type RepeatingSection } from "./groups";
 import type { DocumentElement, FieldElement, FormLayout, LayoutElement, LayoutSection, RelatedElement } from "./layout";
@@ -429,6 +429,7 @@ function SingleSelectControl({ element, field, value, common, onChange, parentVa
 
 /** Multi-select dropdown as an accessible group of checkboxes: every option is a real, labelled control with an obvious checked state. */
 function MultiSelectControl({ element, field, value, label, helpText, note, error, required, onChange, parentValue, parentLabel }: { element: FieldElement; field: RendererField; value: string; label: string; helpText: string | undefined; note: string | undefined; error: string | undefined; required: boolean | undefined; onChange: (value: string) => void; parentValue: string | undefined; parentLabel: string | undefined }) {
+  useFormatter();
   const id = useId();
   const selected = splitSelection(value);
   const choices = dependentChoicesFor(element, field, selected, parentValue);
@@ -489,7 +490,7 @@ export function displayValue(field: RendererField, value: string | undefined, el
   }
   if (field.fieldDataType === "DateTime") {
     const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? value : `${new Date(parsed).toLocaleString()} (${value})`;
+    return Number.isNaN(parsed) ? value : `${getActiveFormatter().instant(parsed)} (${value})`;
   }
   if (field.fieldDataType === "Option") {
     return describeSelection(element, field, value);

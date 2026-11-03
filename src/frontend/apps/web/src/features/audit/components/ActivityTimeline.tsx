@@ -1,8 +1,9 @@
 import type { AuditEventResponse } from "@enterpriseforms/api-client";
-import { Badge } from "@enterpriseforms/ui";
+import { Badge, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 
 /** Chronological activity list (event time + sequence ordering is server-side; this is a local projection, B-06). */
 export function ActivityTimeline({ events }: { events: readonly AuditEventResponse[] }) {
+  useFormatter();
   if (events.length === 0) {
     return <p className="text-muted">No activity recorded.</p>;
   }
@@ -11,7 +12,7 @@ export function ActivityTimeline({ events }: { events: readonly AuditEventRespon
       {events.map((event) => (
         <li key={event.auditEventId} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-start sm:gap-4">
           <time dateTime={event.eventOccurredOn} className="shrink-0 text-sm text-muted sm:w-44">
-            {new Date(event.eventOccurredOn).toLocaleString()}
+            {getActiveFormatter().instant(event.eventOccurredOn)}
           </time>
           <div className="min-w-0 flex-1">
             <p className="font-medium">

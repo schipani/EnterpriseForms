@@ -3,6 +3,7 @@ import CoordinatorWorker from "@enterpriseforms/work-queue/worker?worker";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { useState } from "react";
+import { FormattingSync } from "./FormattingSync";
 import { createAppRouter } from "./router";
 
 /**
@@ -27,6 +28,7 @@ export function App() {
     <RuntimeProvider runtime={runtime}>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
+          <FormattingSync />
           <RouterProvider router={router} />
         </SessionProvider>
       </QueryClientProvider>

@@ -1,4 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { getActiveFormatter } from "./formatting";
+import { useFormatter } from "./useFormatter";
 
 /**
  * Lightweight, dependency-free charts for the dashboard. Colors come from the fixed --ui-chart-* tokens, assigned to a
@@ -11,7 +13,7 @@ export type ChartColor = "chart-1" | "chart-2" | "chart-3" | "chart-4" | "chart-
 
 const colorVar = (color: ChartColor) => `var(--ui-${color})`;
 
-const numberFormat = new Intl.NumberFormat();
+const numberFormat = { format: (value: number) => getActiveFormatter().number(value) };
 
 /**
  * The rendered width of an element, kept current with ResizeObserver, so a chart adapts to its card rather than to the
@@ -72,6 +74,7 @@ export interface DonutSlice {
 
 /** Part-to-whole of a few categories. The legend lists every category with its count and share. */
 export function DonutChart({ title, slices, totalLabel, emptyMessage = "Nothing to show yet." }: { title: string; slices: DonutSlice[]; totalLabel: string; emptyMessage?: string }) {
+  useFormatter();
   const [active, setActive] = useState<string | null>(null);
   const total = slices.reduce((sum, slice) => sum + Math.max(0, slice.value), 0);
   const radius = 44;
@@ -177,6 +180,7 @@ function niceMaximum(value: number): number {
  * when the plot has focus; the tooltip is announced politely.
  */
 export function ColumnChart({ title, buckets, series, stacked = false, valueNoun, emptyMessage = "No activity in this period." }: { title: string; buckets: ColumnBucket[]; series: ColumnSeries[]; stacked?: boolean; valueNoun: string; emptyMessage?: string }) {
+  useFormatter();
   const [active, setActive] = useState<number | null>(null);
   const tooltipId = useId();
   const plotRef = useRef<HTMLDivElement>(null);
