@@ -12,8 +12,17 @@ export async function signIn(page: Page, persona: Persona) {
 }
 
 export async function signOut(page: Page) {
-  await page.getByRole("button", { name: /Account menu/ }).click();
-  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  // At the top of the page, or on a wide screen, the account menu holds Sign out. Once the page has scrolled on a narrow screen the pinned
+  // compact bar has no account menu, only a Sign out button of its own (the one session logout), and the full header is hidden.
+  const account = page.getByRole("button", { name: /Account menu/ });
+  const compactSignOut = page.getByTestId("compact-header").getByRole("button", { name: "Sign out" });
+  await expect(account.or(compactSignOut).first()).toBeVisible();
+  if (await account.count()) {
+    await account.click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+  } else {
+    await compactSignOut.click();
+  }
   await expect(page.getByRole("heading", { level: 1, name: "Sign in", exact: true })).toBeVisible();
 }
 
