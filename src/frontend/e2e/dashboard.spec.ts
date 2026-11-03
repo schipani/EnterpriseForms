@@ -115,13 +115,13 @@ test.describe("Dashboard", () => {
     await signIn(page, "owner");
     await page.goto("/app/organization");
     const nav = page.getByRole("navigation", { name: "Organization" });
-    await expect(nav.getByRole("link")).toHaveText(["Overview", "People", "Teams", "Branding", "Data protection", "Security administrators"]);
+    await expect(nav.getByRole("link")).toHaveText(["Overview", "People", "Teams", "Branding", "Regional settings", "Data protection", "Security administrators"]);
     const box = await nav.boundingBox();
     expect(Math.round(box!.width)).toBe(256);
     const link = await nav.getByRole("link", { name: "Security administrators", exact: true }).boundingBox();
     expect(link!.height).toBeLessThanOrEqual(48);
     // Same width on every Organization page.
-    for (const path of ["/app/organization/users", "/app/organization/teams", "/app/organization/branding", "/app/organization/data-protection", "/app/organization/security-administrators"]) {
+    for (const path of ["/app/organization/users", "/app/organization/teams", "/app/organization/branding", "/app/organization/regional", "/app/organization/data-protection", "/app/organization/security-administrators"]) {
       await page.goto(path);
       expect(Math.round((await page.getByRole("navigation", { name: "Organization" }).boundingBox())!.width), path).toBe(256);
     }

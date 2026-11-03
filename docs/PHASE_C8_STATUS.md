@@ -563,3 +563,34 @@ Delivered per the owner's direction (details `docs/architecture/PHASE_C8_ORGANIZ
 | Platform Console Playwright, complete suite as one run (selection model, three members one after another, blocked fourth, remove and replace, 320/768/1440 px with the picker, selected list and new-identity form open) | 36 / 36 (two earlier runs of this round failed one new spec on over-broad locators, fixed in the spec) |
 
 Development stack: `devstack.py owner-recovery init` re-run (2026-11-01): migration and backup unchanged (no new backup, no migration); Authority, API, worker, web, console BFF and console web rebuilt from this tree and recreated only; Vault, databases, SpiceDB and Azurite untouched. Data unchanged before and after (3 organizations, 16 identity bindings, 1029 active edges, 8 owner edges, 3 platform operators, 253 registered records; no development organization is near the limit — the largest has fewer than 10 owners). No recovery case was opened. PG-075 `http://127.0.0.1:8095/platform/recovery`.
+
+
+## 30. M3 — Organization regional defaults and personal preferences (2026-11-03) — not merged, awaiting owner functional acceptance
+
+Branch `phase-c8/m3-regional-preferences` from `main` 935f241. Specification: `docs/architecture/PHASE_C8_ADMINISTRATION_AND_GOVERNANCE.md` M3 (D8-9). No Authority, SpiceDB or permission change; `user_ui_preferences` unchanged.
+
+**Delivered**
+- Business migration `PhaseC8M3RegionalPreferences`: `organization_settings` (unique per tenant, revision, created/modified on/by) and `user_preferences` (unique per tenant and user; the four modes and their values; check constraints make a value present exactly when the mode is Explicit). UUIDv7 keys, multiword columns; runtime grants select/insert/update only.
+- API (`/api/v1`): `GET/PUT /organization/settings` (ETag and `If-Match`: 428 missing, 412 stale; reason required; Authority `manage_configuration` checked on every write), `GET/PUT /me/preferences` (own row only, tenant-scoped; `If-Match` honored when sent), `GET /catalog/{countries,time-zones,languages,date-formats,number-formats}`.
+- Typed, versioned code catalog (`RegionalCatalog`, version 2026.11.1): Canada, United States, Mexico then European countries (Europe is a region, not a country), 38 IANA zones with country affinity (`organizationContext=true` lists the organization country first, each zone once), ten languages, six date presets (locale tag + month style + hour cycle), seven number presets. No relational catalog tables.
+- Audit: `ORGANIZATION_SETTINGS_UPDATED` (previous/current values and reason) and `USER_PREFERENCES_UPDATED` (modes only), written in the same transaction as the change.
+- One client formatter (`packages/ui/src/formatting.ts`): resolves explicit, then organization, then browser, per setting; instants shown in the effective IANA zone and never altered; date-only values never shift; DST gap and fold helpers. All 30 former `toLocale*String`/`Intl` call sites use it (record pages, timelines, audit, uploads, dashboards, security monitoring, people and teams). ESLint rule `no-restricted-syntax` forbids new ones outside `formatting.ts` (verified with a probe file).
+- DateTime fields now edit wall-clock time in the user's effective zone (previously the browser's zone): a time inside a spring-forward gap is rejected with a message; a time in a fall-back fold requires choosing the first or second occurrence.
+- Pages: PG-043 `/app/organization/regional` (owners edit, others read; live preview) and PG-007 `/app/settings/preferences` (`/app/me/preferences` kept as alias) with a filterable zone list, per-setting radio modes, preview, reset, and the existing text-size card.
+
+**Tests run**
+| Suite | Result |
+|---|---|
+| .NET (Authority 312, contract 499 incl. OpenAPI snapshot and 11 new catalog tests, architecture 75, integrity 34, console 23) | 943 / 943 |
+| Frontend: Vitest 413, ESLint, tsc, build, generated-client drift | clean (clean worktree, Level 3) |
+| Stage A gate SEC-P01..SEC-P12 | passed (Level 3) |
+| Stage B integration, full | 269 / 270; see below |
+| `RegionalPreferencesTests` (new, real stack: Authority-decided writes, 428/412, catalog validation, org and user isolation, audit, DB check) | 3 / 3 |
+| Playwright `regional-preferences.spec.ts` (America/Toronto and Asia/Tokyo browsers, axe, 320 px) | 4 / 4 |
+| Playwright, full suite on the isolated stack (all projects) | 172 passed, 4 skipped, 1 failed: the Organization sidebar test pinned the owner's link list and needed the new "Regional settings" link; updated, rerun with the new spec 8 / 8 |
+
+**Known issues**
+- Stage B `SearchCatalogueTests.BenchmarkTheVerifiedScopeAt50And150And480Records` fails on this developer laptop at 480 records with the typed `SEARCH_VERIFICATION_LIMIT` (time) refusal, reproducibly in isolation. PHASE_C7_STATUS already records that this laptop is about twice as slow as the reference runner and refuses at 480 records (PB-09 open). Unrelated to M3 (search untouched); the test was not changed.
+- `npm ci` in the owner's working tree failed on locked files (running Vite servers) and left its `node_modules` incomplete; Level 3 was therefore run from a clean worktree. Run `npm ci` in the working tree after stopping the dev servers.
+- Organization settings are unsigned presentation rows (G21 family, recorded in the architecture document). Language affects only the `lang` attribute and the preference value in M3; form translation is a later phase.
+- Not done (out of scope): §4G option availability policies, dependent lists, translations, M4, legacy CLI retirement.
