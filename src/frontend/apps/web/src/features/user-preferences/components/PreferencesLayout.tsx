@@ -6,7 +6,8 @@ export type PreferencesNavItem = { to: string; label: string; exact?: boolean };
 
 /** The personal preference areas, in order. Each is its own route so a tab can be linked to and reloaded. */
 export const PREFERENCES_NAVIGATION: PreferencesNavItem[] = [
-  { to: "/app/settings/preferences", label: "Time zone, date, number and language", exact: true },
+  { to: "/app/settings/preferences", label: "Regional settings", exact: true },
+  { to: "/app/settings/preferences/language", label: "Language" },
   { to: "/app/settings/preferences/text-size", label: "Text size" },
 ];
 

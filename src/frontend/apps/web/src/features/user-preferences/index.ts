@@ -1,1 +1,1 @@
-export { PreferencesPage, TextSizePreferencePage } from "./pages/PreferencesPage";
+export { LanguagePreferencePage, PreferencesPage, TextSizePreferencePage } from "./pages/PreferencesPage";

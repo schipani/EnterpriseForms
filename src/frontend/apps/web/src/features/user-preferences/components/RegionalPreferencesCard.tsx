@@ -35,7 +35,7 @@ const toInput = (d: Draft): RegionalPreferenceInput => ({
  * "organization default", "browser settings" or an explicit choice. Presentation only (nothing stored changes); only the
  * signed-in user's own row is written. Browser values are shown for transparency and are never saved.
  */
-export function RegionalPreferencesCard() {
+export function RegionalPreferencesCard({ area = "regional" }: { area?: "regional" | "language" }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const prefs = useQuery({ queryKey: ["regional-preferences"], queryFn: () => api.regional.preferences().then((r) => r.result), staleTime: 60_000 });
@@ -54,7 +54,13 @@ export function RegionalPreferencesCard() {
 
   const save = useMutation({
     mutationFn: () => {
-      const input = toInput(draft!);
+      // Each area saves on its own: this area's choices come from the form, the other area's from what was last saved.
+      const saved = toInput(toDraft(prefs.data!));
+      const edited = toInput(draft!);
+      const input =
+        area === "regional"
+          ? { ...saved, timeZonePreferenceMode: edited.timeZonePreferenceMode, ianaTimeZoneId: edited.ianaTimeZoneId, dateFormatPreferenceMode: edited.dateFormatPreferenceMode, dateFormatPresetKey: edited.dateFormatPresetKey, numberFormatPreferenceMode: edited.numberFormatPreferenceMode, numberFormatPresetKey: edited.numberFormatPresetKey }
+          : { ...saved, languagePreferenceMode: edited.languagePreferenceMode, languageCode: edited.languageCode };
       return api.regional
         .updatePreferences(
           {
@@ -108,12 +114,15 @@ export function RegionalPreferencesCard() {
     setDraft({ ...draft, ...patch });
   };
   const browserLocale = browser.languages[0] ?? "not available";
+  const regional = area === "regional";
 
   return (
-    <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_28rem]">
-      <Card title={<span id="regional-preferences-heading">Time zone, date, number and language</span>} aria-labelledby="regional-preferences-heading">
+    <div className={regional ? "grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_28rem]" : "grid min-w-0 grid-cols-1 items-start gap-4"}>
+      <Card title={<span id="regional-preferences-heading">{regional ? "Regional settings" : "Language"}</span>} aria-labelledby="regional-preferences-heading">
         <p className="text-sm text-muted">
-          These choices change only how dates, times and numbers are shown to you. Stored values, permissions and the audit history are never changed. Each setting is independent.
+          {regional
+            ? "These choices change only how dates, times and numbers are shown to you. Stored values, permissions and the audit history are never changed. Each setting is independent."
+            : "Your language choice is saved with your other preferences. It changes nothing that is stored."}
         </p>
         <form
           className="flex w-full min-w-0 max-w-xl flex-col gap-6"
@@ -122,51 +131,57 @@ export function RegionalPreferencesCard() {
             save.mutate();
           }}
         >
-          <RadioGroup
-            legend="Time zone"
-            value={draft.timeZone}
-            onValueChange={(v) => set({ timeZone: v as Mode })}
-            options={[
-              { value: "OrganizationDefault", label: `Use organization default (${zoneName(org.defaultIanaTimeZoneId)})` },
-              { value: "BrowserDefault", label: `Use browser settings (${browser.timeZone ?? "not available"})` },
-              {
-                value: "Explicit",
-                label: "Choose my own",
-                details: <SearchableSelect label="My time zone" filterLabel="Filter time zones" value={draft.zone} onValueChange={(zone) => set({ zone })} options={zoneList.timeZones.map((z) => ({ value: z.ianaTimeZoneId, label: `${z.timeZoneDisplayName} · ${z.ianaTimeZoneId}` }))} />,
-              },
-            ]}
-          />
-          <RadioGroup
-            legend="Date and time format"
-            value={draft.date}
-            onValueChange={(v) => set({ date: v as Mode })}
-            options={[
-              { value: "OrganizationDefault", label: `Use organization default (${label(dateItems, org.defaultDateFormatPresetKey)})` },
-              { value: "BrowserDefault", label: `Use browser settings (${browserLocale})` },
-              { value: "Explicit", label: "Choose my own", details: <Select label="My date and time format" value={draft.dateKey} onValueChange={(dateKey) => set({ dateKey })} options={dateItems.map((i) => ({ value: i.key, label: i.text }))} /> },
-            ]}
-          />
-          <RadioGroup
-            legend="Number format"
-            value={draft.number}
-            onValueChange={(v) => set({ number: v as Mode })}
-            options={[
-              { value: "OrganizationDefault", label: `Use organization default (${label(numberItems, org.defaultNumberFormatPresetKey)})` },
-              { value: "BrowserDefault", label: `Use browser settings (${browserLocale})` },
-              { value: "Explicit", label: "Choose my own", details: <Select label="My number format" value={draft.numberKey} onValueChange={(numberKey) => set({ numberKey })} options={numberItems.map((i) => ({ value: i.key, label: i.text }))} /> },
-            ]}
-          />
-          <RadioGroup
-            legend="Language"
-            value={draft.language}
-            onValueChange={(v) => set({ language: v as Mode })}
-            helpText="Your language choice is saved. Translation of the application (menus, buttons, messages and form text) is planned but not available yet, so the application is shown in English for now. Anything people enter and uploaded documents are never translated automatically. English remains the fallback."
-            options={[
-              { value: "OrganizationDefault", label: `Use organization default (${label(languageItems, org.defaultLanguageCode)})` },
-              { value: "BrowserDefault", label: "Use browser settings" },
-              { value: "Explicit", label: "Choose my own", details: <Select label="My language" value={draft.languageCode} onValueChange={(languageCode) => set({ languageCode })} options={languageItems.map((i) => ({ value: i.key, label: i.text }))} /> },
-            ]}
-          />
+          {regional ? (
+            <>
+            <RadioGroup
+              legend="Time zone"
+              value={draft.timeZone}
+              onValueChange={(v) => set({ timeZone: v as Mode })}
+              options={[
+                { value: "OrganizationDefault", label: `Use organization default (${zoneName(org.defaultIanaTimeZoneId)})` },
+                { value: "BrowserDefault", label: `Use browser settings (${browser.timeZone ?? "not available"})` },
+                {
+                  value: "Explicit",
+                  label: "Choose my own",
+                  details: <SearchableSelect label="My time zone" filterLabel="Filter time zones" value={draft.zone} onValueChange={(zone) => set({ zone })} options={zoneList.timeZones.map((z) => ({ value: z.ianaTimeZoneId, label: `${z.timeZoneDisplayName} · ${z.ianaTimeZoneId}` }))} />,
+                },
+              ]}
+            />
+            <RadioGroup
+              legend="Date and time format"
+              value={draft.date}
+              onValueChange={(v) => set({ date: v as Mode })}
+              options={[
+                { value: "OrganizationDefault", label: `Use organization default (${label(dateItems, org.defaultDateFormatPresetKey)})` },
+                { value: "BrowserDefault", label: `Use browser settings (${browserLocale})` },
+                { value: "Explicit", label: "Choose my own", details: <Select label="My date and time format" value={draft.dateKey} onValueChange={(dateKey) => set({ dateKey })} options={dateItems.map((i) => ({ value: i.key, label: i.text }))} /> },
+              ]}
+            />
+            <RadioGroup
+              legend="Number format"
+              value={draft.number}
+              onValueChange={(v) => set({ number: v as Mode })}
+              options={[
+                { value: "OrganizationDefault", label: `Use organization default (${label(numberItems, org.defaultNumberFormatPresetKey)})` },
+                { value: "BrowserDefault", label: `Use browser settings (${browserLocale})` },
+                { value: "Explicit", label: "Choose my own", details: <Select label="My number format" value={draft.numberKey} onValueChange={(numberKey) => set({ numberKey })} options={numberItems.map((i) => ({ value: i.key, label: i.text }))} /> },
+              ]}
+            />
+            </>
+          ) : null}
+          {!regional ? (
+            <RadioGroup
+              legend="Language"
+              value={draft.language}
+              onValueChange={(v) => set({ language: v as Mode })}
+              helpText="Your language choice is saved. Translation of the application (menus, buttons, messages and form text) is planned but not available yet, so the application is shown in English for now. Anything people enter and uploaded documents are never translated automatically. English remains the fallback."
+              options={[
+                { value: "OrganizationDefault", label: `Use organization default (${label(languageItems, org.defaultLanguageCode)})` },
+                { value: "BrowserDefault", label: "Use browser settings" },
+                { value: "Explicit", label: "Choose my own", details: <Select label="My language" value={draft.languageCode} onValueChange={(languageCode) => set({ languageCode })} options={languageItems.map((i) => ({ value: i.key, label: i.text }))} /> },
+              ]}
+            />
+          ) : null}
           {save.isError ? <ErrorPanel error={save.error} /> : null}
           {saved ? <StatusMessage tone="success" title="Preferences saved and applied" /> : null}
           <div className="flex flex-wrap gap-2">
@@ -176,17 +191,19 @@ export function RegionalPreferencesCard() {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => set({ timeZone: "OrganizationDefault", date: "OrganizationDefault", number: "OrganizationDefault", language: "OrganizationDefault" })}
+              onClick={() => set(regional ? { timeZone: "OrganizationDefault", date: "OrganizationDefault", number: "OrganizationDefault" } : { language: "OrganizationDefault" })}
             >
               Reset to organization defaults
             </Button>
           </div>
         </form>
       </Card>
-      <Card title={<span id="regional-preview-heading">Preview</span>} aria-labelledby="regional-preview-heading">
-        <p className="text-sm text-muted">How a fixed sample, just after the March daylight-saving change, will look with the choices above.</p>
-        <FormattingPreview settings={preview} />
-      </Card>
+      {regional ? (
+        <Card title={<span id="regional-preview-heading">Preview</span>} aria-labelledby="regional-preview-heading">
+          <p className="text-sm text-muted">How a fixed sample, just after the March daylight-saving change, will look with the choices above.</p>
+          <FormattingPreview settings={preview} />
+        </Card>
+      ) : null}
     </div>
   );
 }

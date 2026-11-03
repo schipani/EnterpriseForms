@@ -46,16 +46,25 @@ function TextSizeCard() {
   );
 }
 
-/** PG-007 personal preferences, area 1: time zone, date, number and language. */
+/** PG-007 personal preferences, area 1: regional settings (time zone, date format, number format). */
 export function PreferencesPage() {
   return (
     <PreferencesLayout>
-      <RegionalPreferencesCard />
+      <RegionalPreferencesCard area="regional" />
     </PreferencesLayout>
   );
 }
 
-/** PG-007 personal preferences, area 2: text size. */
+/** PG-007 personal preferences, area 2: language. */
+export function LanguagePreferencePage() {
+  return (
+    <PreferencesLayout>
+      <RegionalPreferencesCard area="language" />
+    </PreferencesLayout>
+  );
+}
+
+/** PG-007 personal preferences, area 3: text size. */
 export function TextSizePreferencePage() {
   return (
     <PreferencesLayout>

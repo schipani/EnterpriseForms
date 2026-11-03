@@ -57,6 +57,7 @@ const profileRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/pr
 const preferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/me/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
 // PG-007 personal preferences live at /app/settings/preferences; /app/me/preferences stays as an alias for existing links.
 const settingsPreferencesRoute = createRoute({ getParentRoute: () => appRoute, path: "/settings/preferences", component: lazyRouteComponent(() => import("../features/user-preferences"), "PreferencesPage") });
+const languagePreferenceRoute = createRoute({ getParentRoute: () => appRoute, path: "/settings/preferences/language", component: lazyRouteComponent(() => import("../features/user-preferences"), "LanguagePreferencePage") });
 const textSizePreferenceRoute = createRoute({ getParentRoute: () => appRoute, path: "/settings/preferences/text-size", component: lazyRouteComponent(() => import("../features/user-preferences"), "TextSizePreferencePage") });
 /**
  * PG-069 component gallery (ADR-PB-014: internal, never a production route). It exists only in development builds (the Vite
@@ -70,7 +71,7 @@ const noPermissionRoute = createRoute({ getParentRoute: () => appRoute, path: "/
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, profileRoute, preferencesRoute, settingsPreferencesRoute, textSizePreferenceRoute, ...developmentRoutes, noPermissionRoute]),
+  appRoute.addChildren([dashboardRoute, formsRoute, newFormRoute, designerRoute, recordsRoute, newRecordRoute, recordRoute, editRecordRoute, recordVersionRoute, newChildRoute, uploadsRoute, activityRoute, brandingRoute, organizationOverviewRoute, organizationRegionalRoute, organizationDataProtectionRoute, organizationSecurityAdministratorsRoute, organizationPeopleRoute, organizationTeamsRoute, organizationTeamRoute, searchApprovalsRoute, securityIncidentsRoute, securityIncidentRoute, profileRoute, preferencesRoute, settingsPreferencesRoute, languagePreferenceRoute, textSizePreferenceRoute, ...developmentRoutes, noPermissionRoute]),
 ]);
 
 export function createAppRouter() {

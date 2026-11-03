@@ -34,11 +34,11 @@ const preferences = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-function renderCard() {
+function renderCard(area: "regional" | "language" = "regional") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <RegionalPreferencesCard />
+      <RegionalPreferencesCard area={area} />
     </QueryClientProvider>,
   );
 }
@@ -66,21 +66,50 @@ describe("RegionalPreferencesCard", () => {
     regional.preferences.mockResolvedValue({ result: preferences() });
     renderCard();
     expect(await screen.findByRole("radio", { name: "Use organization default (Central Time (Winnipeg))", checked: true })).toBeInTheDocument();
-    expect(screen.getAllByRole("radio", { checked: true })).toHaveLength(4);
+    expect(screen.getAllByRole("radio", { checked: true })).toHaveLength(3); // time zone, date and number; language has its own tab
+    expect(screen.queryByRole("group", { name: "Language" })).not.toBeInTheDocument();
     expect(screen.getByTestId("preview-zone")).toHaveTextContent("America/Winnipeg (UTC−06:00 on the sample date)");
     expect(screen.getByTestId("preview-date-only")).toHaveTextContent("2026-03-08");
   });
 
-  it("puts the form on the left and the live preview on the right on wide screens, stacking on narrow ones, and explains the language setting honestly", async () => {
+  it("puts the form on the left and the live preview on the right on wide screens and stacks them on narrow ones", async () => {
     regional.preferences.mockResolvedValue({ result: preferences() });
     renderCard();
-    const form = await screen.findByRole("region", { name: "Time zone, date, number and language" });
+    const form = await screen.findByRole("region", { name: "Regional settings" });
     const grid = form.parentElement!;
     expect(grid.className).toContain("grid-cols-1");
     expect(grid.className).toContain("xl:grid-cols-[minmax(0,1fr)_28rem]");
     expect(screen.getByRole("region", { name: "Preview" }).parentElement).toBe(grid);
+  });
+
+  it("shows the language setting on its own tab, explains it honestly and saves only the language", async () => {
+    const user = userEvent.setup();
+    regional.preferences.mockResolvedValue({ result: preferences({ timeZonePreferenceMode: "Explicit", ianaTimeZoneId: "Europe/Rome" }) });
+    regional.updatePreferences.mockImplementation(async (request: Record<string, unknown>) => ({ result: preferences({ ...request, preferenceRevision: 5 }) }));
+    renderCard("language");
+    const group = await screen.findByRole("group", { name: "Language" });
+    expect(screen.getByRole("region", { name: "Language" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Time zone" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Preview" })).not.toBeInTheDocument();
     expect(screen.getByText(/Translation of the application \(menus, buttons, messages and form text\) is planned but not available yet/)).toBeInTheDocument();
     expect(screen.getByText(/English remains the fallback/)).toBeInTheDocument();
+    await user.click(within(group).getByRole("radio", { name: /^Use browser settings/ }));
+    await user.click(screen.getByRole("button", { name: "Save preferences" }));
+    await waitFor(() => expect(regional.updatePreferences).toHaveBeenCalled());
+    // The regional settings are sent exactly as last saved; only the language changed.
+    expect(regional.updatePreferences).toHaveBeenCalledWith(
+      {
+        timeZonePreferenceMode: "Explicit",
+        ianaTimeZoneId: "Europe/Rome",
+        dateFormatPreferenceMode: "OrganizationDefault",
+        dateFormatPresetKey: null,
+        numberFormatPreferenceMode: "OrganizationDefault",
+        numberFormatPresetKey: null,
+        languagePreferenceMode: "BrowserDefault",
+        languageCode: null,
+      },
+      4,
+    );
   });
 
   it("updates the preview immediately for an unsaved choice", async () => {
@@ -121,7 +150,7 @@ describe("RegionalPreferencesCard", () => {
     expect(await screen.findByText("Preferences saved and applied")).toBeInTheDocument();
   });
 
-  it("keeps an explicit choice and resets all four to the organization defaults on request", async () => {
+  it("keeps an explicit choice and resets the three regional settings (not the language) to the organization defaults on request", async () => {
     const user = userEvent.setup();
     regional.preferences.mockResolvedValue({ result: preferences({ timeZonePreferenceMode: "Explicit", ianaTimeZoneId: "Europe/Rome", languagePreferenceMode: "Explicit", languageCode: "fr" }) });
     renderCard();
@@ -129,7 +158,7 @@ describe("RegionalPreferencesCard", () => {
     expect(within(zoneGroup).getByRole("radio", { name: "Choose my own", checked: true })).toBeInTheDocument();
     expect(screen.getByTestId("preview-zone")).toHaveTextContent("Europe/Rome");
     await user.click(screen.getByRole("button", { name: "Reset to organization defaults" }));
-    expect(screen.getAllByRole("radio", { checked: true }).map((r) => r.getAttribute("value"))).toEqual(["OrganizationDefault", "OrganizationDefault", "OrganizationDefault", "OrganizationDefault"]);
+    expect(screen.getAllByRole("radio", { checked: true }).map((r) => r.getAttribute("value"))).toEqual(["OrganizationDefault", "OrganizationDefault", "OrganizationDefault"]);
     expect(screen.getByTestId("preview-zone")).toHaveTextContent("America/Winnipeg");
   });
 
