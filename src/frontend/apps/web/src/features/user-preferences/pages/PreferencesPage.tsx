@@ -1,8 +1,9 @@
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Button, Card, LoadingBlock, PageHeader, Select, StatusMessage } from "@enterpriseforms/ui";
+import { Button, Card, LoadingBlock, Select, StatusMessage } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
+import { PreferencesLayout } from "../components/PreferencesLayout";
 import { RegionalPreferencesCard } from "../components/RegionalPreferencesCard";
 
 /** Accessible text size: organization default or an explicit percentage, applied immediately through the font-scale token (B-08). */
@@ -45,15 +46,20 @@ function TextSizeCard() {
   );
 }
 
-/** PG-007 personal preferences: regional settings (time zone, date, number, language) and text size. Each card saves on its own. */
+/** PG-007 personal preferences, area 1: time zone, date, number and language. */
 export function PreferencesPage() {
   return (
-    <>
-      <PageHeader title="Preferences" lead="How you see dates, times, numbers and text. These choices apply to you only." />
-      <div className="flex min-w-0 flex-col gap-4">
-        <RegionalPreferencesCard />
-        <TextSizeCard />
-      </div>
-    </>
+    <PreferencesLayout>
+      <RegionalPreferencesCard />
+    </PreferencesLayout>
+  );
+}
+
+/** PG-007 personal preferences, area 2: text size. */
+export function TextSizePreferencePage() {
+  return (
+    <PreferencesLayout>
+      <TextSizeCard />
+    </PreferencesLayout>
   );
 }
