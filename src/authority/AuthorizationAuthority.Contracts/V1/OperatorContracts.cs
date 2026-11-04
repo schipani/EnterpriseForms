@@ -22,6 +22,9 @@ public static class OrganizationRoleNames
     public const string OrganizationOwner = "organization_owner";
     public const string SystemAdministrator = "system_administrator";
     public const string Designer = "designer";
+
+    /// <summary>C8 M4 (AC-8): organization#security_auditor (permission view_audit). Appointed and removed by Security Administrators only.</summary>
+    public const string SecurityAuditor = "security_auditor";
 }
 
 public sealed record BootstrapOrganizationRequest(Guid OrganizationId, string OrganizationDisplayName, IReadOnlyList<BootstrapIdentity> Identities);

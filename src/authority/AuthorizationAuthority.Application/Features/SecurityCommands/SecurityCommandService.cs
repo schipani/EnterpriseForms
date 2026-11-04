@@ -68,6 +68,11 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
             var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
+            if (plan.CommandReasonOverride is { } reasonOverride)
+            {
+                command.CommandReasonText = reasonOverride;
+            }
+
             ApplyPlan(scope, state, command, plan, bound, request, cancellationToken);
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -84,8 +89,20 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
             }
             else if (request.CommandKind is SecurityCommandKind.GrantSystemRole or SecurityCommandKind.RevokeSystemRole)
             {
-                // Refused Security Administrator appointments and removals: independent, archived evidence on the audit stream.
-                AuditJournal.Append(scope, state, "SecurityAdministratorCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
+                // C8 M4 (C-110): a refused role command keeps only validated identifiers — never the raw body (free text, a
+                // reason note, step-up evidence or an invalid reason value) — on its row and in its audit-stream entry.
+                var facts = RoleCommandEvidence.From(request.CommandPayload, request.CommandKind == SecurityCommandKind.GrantSystemRole);
+                command.CommandPayloadJson = RoleCommandEvidence.SanitizedPayloadJson(facts);
+                command.CommandReasonText = facts.ReasonCode;
+                if (facts.RoleName == OrganizationRoleNames.SecurityAuditor)
+                {
+                    AuditJournal.Append(scope, state, "SecurityAuditorCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, target_authority_user_id = facts.TargetAuthorityUserId, role_name = facts.RoleName, rejection_reason = ex.ErrorCode, reason_code = facts.ReasonCode, reason_code_valid = facts.ReasonCodeValid, correlation_id = correlationId }, clock);
+                }
+                else
+                {
+                    // Refused Security Administrator appointments and removals: independent, archived evidence on the audit stream (unchanged shape).
+                    AuditJournal.Append(scope, state, "SecurityAdministratorCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
+                }
             }
             else if (request.CommandKind is SecurityCommandKind.GrantOrganizationRole or SecurityCommandKind.RevokeOrganizationRole or SecurityCommandKind.ProposeOrganizationOwnerChange
                      or SecurityCommandKind.DisableIdentityBinding or SecurityCommandKind.EnableIdentityBinding or SecurityCommandKind.RequestOrganizationMembership

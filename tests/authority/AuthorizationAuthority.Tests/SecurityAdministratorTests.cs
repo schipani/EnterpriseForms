@@ -109,26 +109,34 @@ public sealed class SecurityAdministratorTests
         Assert.Equal("STEP_UP_REQUIRED", await RejectedAsync(() => AppointAsync(Administrator, Member, stepUp: null)));
         Assert.Equal("STEP_UP_REQUIRED", await RejectedAsync(() => AppointAsync(Administrator, Member, stepUp: "passkey-ok")));
         Assert.Equal("STEP_UP_REQUIRED", await RejectedAsync(() => AppointAsync(Administrator, Member, gate: FieldSearchApprovalGate.Unavailable))); // production/staging
-        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RejectedAsync(() => AppointAsync(Administrator, Administrator))); // already one
+        Assert.Equal(AuthorityErrorCodes.SelfChangeForbidden, await RejectedAsync(() => AppointAsync(Administrator, Administrator))); // explicit A2, no longer only "already one"
     }
 
+    /// <summary>D8-62a (C-109/C-110): self-removal, allowed before C-110, is refused; another administrator must remove.</summary>
     [Fact]
-    public async Task RemovalNeedsAnotherAdministratorToRemainAndTheLastOneCannotBeRemoved()
+    public async Task NobodyRemovesThemselfAndAnotherAdministratorPerformsTheRemoval()
     {
-        Assert.Equal(AuthorityErrorCodes.LastSecurityAdministrator, await RejectedAsync(() => RemoveAsync(Administrator, Administrator)));
+        Assert.Equal(AuthorityErrorCodes.SelfChangeForbidden, await RejectedAsync(() => RemoveAsync(Administrator, Administrator))); // even as the only one
         store.Edges.Add(Edge(ResourceTypeNames.Organization, Org, OrganizationRoleNames.SystemAdministrator, Member));
-        var plan = await RemoveAsync(Administrator, Administrator); // self-removal while another remains
-        Assert.Equal(Administrator, Assert.Single(plan.RemoveEdges).SubjectEntityId);
+        Assert.Equal(AuthorityErrorCodes.SelfChangeForbidden, await RejectedAsync(() => RemoveAsync(Administrator, Administrator))); // still refused with another one present
+        Assert.Equal(AuthorityErrorCodes.SelfChangeForbidden, await RejectedAsync(() => RemoveAsync(Member, Member)));
+        Assert.Equal(Administrator, Assert.Single((await RemoveAsync(Member, Administrator)).RemoveEdges).SubjectEntityId);
+        Assert.Equal(Member, Assert.Single((await RemoveAsync(Administrator, Member)).RemoveEdges).SubjectEntityId);
         Assert.Equal(AuthorityErrorCodes.Forbidden, await RejectedAsync(() => RemoveAsync(Owner, Member)));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RejectedAsync(() => RemoveAsync(Administrator, Designer))); // not an administrator
     }
 
+    /// <summary>
+    /// A disabled administrator can be removed. The last-administrator rule stays as defence in depth: with self-removal
+    /// refused, the acting administrator always remains, so through the real command path (ActorResolver refuses a disabled
+    /// actor) it is unreachable; at planner level it still refuses a removal that would leave only disabled holders.
+    /// </summary>
     [Fact]
-    public async Task ADisabledAdministratorCanBeRemovedButDoesNotCountAsTheRemainingOne()
+    public async Task ADisabledAdministratorCanBeRemovedAndTheLastAdministratorRuleRemainsAsDefenceInDepth()
     {
         store.Edges.Add(Edge(ResourceTypeNames.Organization, Org, OrganizationRoleNames.SystemAdministrator, Member));
         store.Bindings.Single(b => b.AuthorityUserId == Member).IdentityBindingEnabled = false;
-        Assert.Equal(AuthorityErrorCodes.LastSecurityAdministrator, await RejectedAsync(() => RemoveAsync(Administrator, Administrator))); // only a disabled one would remain
+        Assert.Equal(AuthorityErrorCodes.LastSecurityAdministrator, await RejectedAsync(() => RemoveAsync(Member, Administrator))); // only a disabled one would remain
         Assert.Equal(Member, Assert.Single((await RemoveAsync(Administrator, Member)).RemoveEdges).SubjectEntityId);
     }
 

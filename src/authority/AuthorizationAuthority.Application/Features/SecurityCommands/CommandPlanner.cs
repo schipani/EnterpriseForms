@@ -73,6 +73,12 @@ public sealed class CommandPlan
     public IdentityBinding? NewBinding { get; set; }
 
     public string NormalizedPayloadJson { get; set; } = "{}";
+
+    /// <summary>
+    /// C8 M4 (AC-8.1): when set, replaces the request's free-text change reason on the journaled command. Security Auditor
+    /// commands record only their structured reason code there, whatever the caller sent as <c>change_reason</c>.
+    /// </summary>
+    public string? CommandReasonOverride { get; set; }
 }
 
 /// <summary>

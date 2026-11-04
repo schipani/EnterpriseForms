@@ -74,6 +74,39 @@ public sealed record FieldSearchAdministrationResponse(bool PlaintextSearchPermi
 /// <summary>Payload of GrantSystemRole / RevokeSystemRole. <c>RoleName</c> must be <c>system_administrator</c>.</summary>
 public sealed record SecurityAdministratorPayload(Guid AuthorityUserId, string RoleName, string Reason, string? StepUpEvidence = null);
 
+/// <summary>
+/// C8 M4 (AC-8.1, C-110): payload of GrantSystemRole / RevokeSystemRole when <c>RoleName</c> is <c>security_auditor</c>.
+/// <c>ReasonCode</c> is required and must be one of <see cref="SecurityAuditorReasonCodes"/> for the command's direction
+/// (exact, case-sensitive). <c>ReasonNote</c> is optional (trimmed, at most 500 characters), potentially confidential: it stays
+/// with the command in the Authority journal and is never shown to auditors, in rejection evidence or in business audit
+/// metadata. Free-text <c>reason</c> is not accepted for this role (strict binding rejects it).
+/// </summary>
+public sealed record SecurityAuditorPayload(Guid AuthorityUserId, string RoleName, string ReasonCode, string? ReasonNote = null, string? StepUpEvidence = null);
+
+/// <summary>C8 M4 (C-110): the owner-approved, closed reason codes for Security Auditor appointment and removal. No "Other".</summary>
+public static class SecurityAuditorReasonCodes
+{
+    public const string AuditCoverageAssignment = "AuditCoverageAssignment";
+    public const string InvestigationSupport = "InvestigationSupport";
+    public const string ReplacementOfDepartingAuditor = "ReplacementOfDepartingAuditor";
+    public const string ComplianceReview = "ComplianceReview";
+
+    public const string AssignmentEnded = "AssignmentEnded";
+    public const string RoleChange = "RoleChange";
+    public const string MembershipEnding = "MembershipEnding";
+    public const string ConflictOfInterest = "ConflictOfInterest";
+    public const string SecurityConcern = "SecurityConcern";
+
+    public const int MaximumNoteLength = 500;
+
+    public static readonly IReadOnlyList<string> Appointment = [AuditCoverageAssignment, InvestigationSupport, ReplacementOfDepartingAuditor, ComplianceReview];
+
+    public static readonly IReadOnlyList<string> Removal = [AssignmentEnded, RoleChange, MembershipEnding, ConflictOfInterest, SecurityConcern];
+
+    /// <summary>Exact ordinal match against the list for the direction (appointment or removal).</summary>
+    public static bool IsValid(string? code, bool appointment) => code is not null && (appointment ? Appointment : Removal).Contains(code, StringComparer.Ordinal);
+}
+
 public sealed record SecurityAdministratorRosterRequest(Guid OrganizationId);
 
 /// <summary>A current Security Administrator: verified identity binding and the command that appointed them.</summary>
