@@ -754,3 +754,22 @@ An earlier run of the first shard had 3 failures in the new test class. Two were
   * M4-2 is not started;
   * nothing is pushed.
 - **Decisions requested:** A-Q1…A-Q3 and B-Q1…B-Q4.
+
+## 38. C-116 design review: revision 2 and focused protocol verification (2026-11-04) — documentation and verification only, nothing implemented
+
+- **Approved:** A-Q1, A-Q3, B-Q1, B-Q3, B-Q4. **Conditional:** A-Q2 and B-Q2, answered in `docs/architecture/PHASE_C8_M4_1_DESIGNS_M1_S1.md` revision 2 (§1.9, §4).
+- **Evidence:** `docs/evidence/phase-c8/m4-1-protocol-verification/`, from throwaway probes on the disposable security-test stack.
+
+| Check | Result |
+|---|---|
+| Revoked user during and after a live datastore restore (E1), today's check / S1 protocol | **44,024 stale allows / 0** |
+| The same with SpiceDB stopped and restarted (E3) | **62,034 / 0** |
+| Snapshot pinned before a restore, decision after (E2/E3) | Exact-snapshot check `ALLOW` with `checked_at = S`, so a pin alone is unsafe; the post-decision `fully_consistent` marker read detected it |
+| Datastore replaced (E4); old dump restored into it under a running SpiceDB (E5) | `FailedPrecondition` (no schema); old exact tokens fail "different datastore instance"; the marker reads detect it |
+| Latency added by S1 (50–150 requests/s, batch 1 and 25) | p95 **8.8–9.8 ms**, p99 11.1–14.4 ms (local only, not PB-09 evidence) |
+| M1 known-answer vector | .NET and Python `cryptography` match byte for byte |
+
+- **Revision 2:** history-bound marker; quarantine on every unchanged-state mismatch; permanent-quarantine trigger; single-use verified snapshot; guarantee G-S1 under I1–I6; residuals RE-1…RE-6.
+- **After the probes,** the security-test SpiceDB datastore holds a restored dump. Recreate the stack (`down -v`) before any shard run.
+- **Unchanged:** T16-S failing (D8-78); T16S-1 open; D8-72 containment active; C-111 open; M4-2 not started; nothing pushed.
+- **Decisions requested:** A-Q2, B-Q2, B-Q5…B-Q9.

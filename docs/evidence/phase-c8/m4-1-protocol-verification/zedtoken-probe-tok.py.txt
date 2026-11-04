@@ -1,0 +1,16 @@
+import base64,sys
+def varint(n):
+    out=b''
+    while True:
+        b=n&0x7f; n>>=7
+        if n: out+=bytes([b|0x80])
+        else: return out+bytes([b])
+def ld(tag,data): return bytes([tag])+varint(len(data))+data
+def tok(xid,dsid):
+    rev=base64.b64encode(b'\x08'+varint(xid)).decode().encode()
+    inner=ld(0x0a,rev)+ld(0x12,dsid.encode())
+    return base64.b64encode(ld(0x1a,inner)).decode()
+print(tok(3055,'dc9c1a0a'))   # sanity: should equal GhAKBENPOFgSCGRjOWMxYTBh
+print(tok(3055,'00000000'))   # other datastore id
+print(tok(9_000_000,'dc9c1a0a')) # future xid
+print(tok(3,'dc9c1a0a'))      # very old xid (GC?)

@@ -1,15 +1,25 @@
 # Phase C8 M4-1: Design A (M1 reason-note sealing) and Design B (S1 projection integrity)
 
-- **Status:** **C-115 design proposal, for owner approval. Nothing here is implemented.** It was written under owner decisions D8-76 (M1 conditionally approved), D8-77 (S1 approved as a direction, subject to this protocol review) and D8-78 (T16-S stays active, mandatory and failing).
-  * D8-72 containment stays active: the Authority refuses every reason note.
+- **Status:** **Revision 2 (C-116), for final owner approval. Nothing here is implemented.** Revision 1 was C-115.
+  * **Approved in C-116:**
+    * A-Q1 (fixed-size padding);
+    * A-Q3 (no note-presence flag in the business audit);
+    * B-Q1 (quarantine stays until an approved G14 recovery process exists);
+    * B-Q3 (Authority integrity metrics);
+    * B-Q4 (no SpiceDB read replicas until independently verified).
+  * **Conditionally approved:** A-Q2 (M1 contract) and B-Q2 (S1 protocol). The open conditions are answered in §1.9 and §4. Revision 2 changes the protocol in five places, listed in §2.0.
+  * D8-72 containment stays active.
   * T16-S still fails, and T16S-1 is open (RR-11, High).
-  * Not authorized: push, PR, merge, deploy, M4-2, RCF-1 remediation and any G14 implementation.
-- **Audience:** the project owner (decisions A-Q1…A-Q3 and B-Q1…B-Q4 in §3) and the independent Authority reviewer. Claude (Opus) wrote this in the owner's session. It is not an independent review.
-- **Baseline:** branch `phase-c8/m4-governance-audit` at `6663872`. Findings come from `PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md` §1.5 and §2.4.
-- **New evidence in this round:**
-  * read-only SpiceDB characterisation probes against the running security-test stack (`authzed/spicedb:v1.56.2`), §2.2;
-  * a documentation review of the SpiceDB v1 API, §2.2.
-  * No SpiceDB data was written.
+  * Not authorized: implementation of S1 or M1, push, PR, merge, deploy, M4-2, RCF-1 remediation and G14.
+- **Audience:** the project owner (the final decisions in §3) and the independent Authority reviewer. Claude (Opus) wrote this in the owner's session. It is not an independent review.
+- **Baseline:** branch `phase-c8/m4-governance-audit` at `e117399`. Findings come from `PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md` §1.5 and §2.4.
+- **Evidence:** focused protocol verification under C-116, in `docs/evidence/phase-c8/m4-1-protocol-verification/`, run against the security-test stack (`authzed/spicedb:v1.56.2`):
+  * read-only characterisation (P1–P6);
+  * live datastore rollback during active checks, with and without a SpiceDB restart (E1, E3);
+  * a snapshot pinned across a restore (E2, E3);
+  * datastore replacement (E4, E5);
+  * latency under load;
+  * the M1 known-answer vector, independently reproduced.
 
 ---
 
@@ -22,13 +32,14 @@
 | Primitive | AES-256-GCM (`System.Security.Cryptography.AesGcm`), 128-bit tag | — |
 | Data key | A random 256-bit DEK per note (`RandomNumberGenerator`), single use, zeroed after use | — |
 | Nonce | A random 96-bit nonce (unique because the DEK is single use) | — |
-| Key wrap | `IEncryptionKeyProvider.WrapDataKey(dek, CurrentKeyReference)`. Today that is `LocalDevelopmentKeyProvider`: AES-GCM wrap with AAD `"DynamicForms/DekWrap/v1:" + keyReference`. Elsewhere it is `UnavailableKeyProvider`, which fails closed. | — |
+| Key wrap | `IEncryptionKeyProvider.WrapDataKey(dek, CurrentKeyReference)`. Today that is `LocalDevelopmentKeyProvider`: AES-GCM wrap with AAD `"DynamicForms/DekWrap/v1:" + keyReference`, output `nonce(12) ‖ cipher(32) ‖ tag(16)`. Elsewhere it is `UnavailableKeyProvider`, which fails closed. | — |
 | Context | — | `AuditorReasonNoteContext` and its AAD domain `"DynamicForms/AuditorReasonNote/v1"` (§1.2) |
+| Plaintext encoding | — | A fixed 2,048-byte padded encoding (§1.3) |
 | Component | — | `IAuditorNoteSealer` port (Application) with a single method, `Seal`. `AesGcmAuditorNoteSealer` (Infrastructure, `Features/Organizations`). |
 
 - **Not modified:** `AesGcmFieldEncryptionService`, `AesGcmFileEncryptionService` and `IEncryptionKeyProvider`.
 - **No `Open`:** the sealer has no decrypt method, and none exists anywhere in the product (D8-73).
-- **Test-only opener:** decryption exists only as a test helper in the test project, to prove the confidentiality and binding properties (§1.7).
+- **Test-only opener:** decryption exists only as a test helper in the test project, to prove the confidentiality and binding properties (§1.8).
 
 ### 1.2 Authenticated context and associated data (exact construction)
 
@@ -40,9 +51,9 @@
 | `target_authority_user_id` | the route or body user id | the payload's `authority_user_id` |
 | `role_name` | the constant `security_auditor` | the payload's `role_name` (only `security_auditor` is permitted with an envelope) |
 | `direction` | `appoint` for GrantSystemRole, `remove` for RevokeSystemRole | derived from the command kind, the same mapping |
-| `note_id` | a new UUID v7 per note (`Guid.CreateVersion7()`) | the envelope's `note_id` (§1.3) |
+| `note_id` | a new UUID v7 per note (`Guid.CreateVersion7()`) | the envelope's `note_id` (§1.4) |
 
-**AAD byte string.** Every integer is big-endian. A UUID is its 16-byte big-endian form (`Guid.TryWriteBytes(span, bigEndian: true, out _)`), the same convention the field service uses.
+**AAD byte string.** Every integer is big-endian. A UUID is its 16-byte big-endian form (`Guid.TryWriteBytes(span, bigEndian: true, out _)`; in Python, `uuid.UUID(...).bytes`).
 
 ```
 AAD =  ASCII("DynamicForms/AuditorReasonNote/v1")      33 bytes, no terminator
@@ -52,27 +63,44 @@ AAD =  ASCII("DynamicForms/AuditorReasonNote/v1")      33 bytes, no terminator
     ‖  UUID16(note_id)                                 16
     ‖  Int32BE(len(role_name))  ‖ ASCII(role_name)      4 + 16 ("security_auditor")
     ‖  Int32BE(len(direction))  ‖ ASCII(direction)     4 + 7 ("appoint") or 4 + 6 ("remove")
+                                                        total 116 (appoint) or 115 (remove) bytes
 ```
 
 - **Domain separation by construction.**
   * Field-value AAD starts with `DynamicForms/FieldValue/v1`.
   * Document-segment AAD starts with `Int32BE(1)` (`00 00 00 01`).
-  * Note AAD starts with `DynamicForms/AuditorReasonNote/v1`.
   * The note label differs from the field label at byte 13 (`A` vs `F`), and from the document AAD at byte 0. Every variable-length part is length-prefixed, so no field-value or document AAD can equal a note AAD.
-  * A known-answer test and cross-domain tests (§1.7) check this.
 - **What a note cannot be moved to:** another organization, person, role, direction or note id. Opening it under any changed value fails the GCM tag check.
 - **No command id in the AAD.** The Authority creates the command id after the business seals.
-  * Moving an envelope to a *different* command for the same organization, person, role and direction is instead blocked by `note_id` uniqueness, which the Authority enforces at write time (§1.4, V10).
+  * Moving an envelope to another command with the same organization, person, role and direction is blocked by **note-id uniqueness** (§1.5, V10).
   * The note id is in the AAD, so it cannot be changed without breaking the tag.
-- **Key reference not in the AAD:** like the field service, the AAD omits the key reference. The DEK-wrap AAD already binds it (`"DynamicForms/DekWrap/v1:" + keyReference`), so a wrapped DEK presented under another reference does not unwrap.
+- **Key reference not in the AAD:** like the field service, the AAD omits the key reference. The DEK-wrap AAD already binds it.
+- **Format version:** `envelope_version = 1` is in the AAD, so the padding format (§1.3) is bound to it. Any future format needs a new version.
 
-**Plaintext encoding (A-Q1, recommended):**
-- the note is trimmed and normalized to Unicode NFC (validation in §1.5, B2);
-- `P = UInt16BE(byte_length) ‖ UTF-8 bytes ‖ 0x00 padding to exactly 2,048 bytes`.
+### 1.3 Plaintext padding (A-Q1 approved): deterministic, unambiguous and authenticated
 
-Every ciphertext is then 2,048 bytes, so ciphertext length no longer discloses note length to AuthorityDb administrators, backup holders or archive readers. A 500-character note is at most 2,000 UTF-8 bytes, so it always fits. **Alternative:** no padding (ciphertext length = UTF-8 length), with the length disclosure accepted and documented.
+**Encoding**, business side, after the B2 validation:
 
-### 1.3 Envelope schema (wire and stored form)
+```
+N   = Normalize(Trim(note), NFC)                    (string.Trim(), then NormalizationForm.FormC)
+U   = UTF-8(N), strict (new UTF8Encoding(false, throwOnInvalidBytes: true); lone surrogates are refused)
+L   = len(U)                                        1 ≤ L ≤ 1,500  (≤ 500 UTF-16 units × 3 bytes)
+P   = UInt16BE(L) ‖ U ‖ 0x00 × (2,046 − L)           |P| = 2,048 exactly
+C‖T = AES-256-GCM(DEK, nonce, P, AAD)                |C| = 2,048, |T| = 16
+```
+
+- **Authenticated:** the length prefix and the padding are inside the GCM plaintext, so the tag covers them. Changing either, or truncating `C`, fails decryption.
+- **Deterministic and unambiguous:** `L` fixes the content boundary. Distinct notes give distinct `P`, and each `P` decodes to exactly one note.
+- **Decoding rules,** which bind the test-only opener and any future reviewed read path. All must hold, or the note is rejected as malformed even though the tag verified:
+  * `|P| = 2,048`;
+  * `1 ≤ L ≤ 1,500`;
+  * every byte after `U` equals `0x00`;
+  * `U` is strict UTF-8;
+  * `N` equals its own NFC normalization and trim;
+  * `N` contains no C0 or C1 control character except LF.
+- **No length disclosure:** every ciphertext is 2,048 bytes.
+
+### 1.4 Envelope schema (wire and stored form)
 
 The member sits inside the GrantSystemRole and RevokeSystemRole payload for `role_name = security_auditor`, as `reason_note_envelope`. It is part of the normalized payload, so the command request digest, idempotency, the authorization-stream journal body and its hash chain, and the archive all cover the ciphertext.
 
@@ -82,407 +110,606 @@ The member sits inside the GrantSystemRole and RevokeSystemRole payload for `rol
   "envelope_version":      1,
   "algorithm_name":        "AES-256-GCM",
   "key_reference":         "local-dev-kek-v1",
-  "note_id":               "019a5b2c-0000-7000-8000-000000000000",
+  "note_id":               "019a5b2c-3333-7000-8000-000000000003",
   "nonce_b64":             "<12 bytes>",
-  "ciphertext_b64":        "<2048 bytes (A-Q1 padding) or 1..2000 bytes>",
+  "ciphertext_b64":        "<exactly 2,048 bytes>",
   "tag_b64":               "<16 bytes>",
-  "wrapped_data_key_b64":  "<29..512 bytes; 60 bytes for LocalDevelopment>"
+  "wrapped_data_key_b64":  "<29..512 bytes; 60 for LocalDevelopment>"
 }
 ```
 
 - **Excluded on purpose:**
-  * plaintext length;
-  * provider name: the key reference identifies the KEK version, matching `FieldEncryptedValue`;
-  * any copy of the context fields: they come from the command (§1.2), so they cannot disagree with it.
+  * plaintext length, which is hidden (§1.3);
+  * provider name: the key reference identifies the KEK version;
+  * any copy of the context fields: they come from the command, so they cannot disagree with it.
 - `reason_note` (plaintext) stays a **recognized and permanently refused** member.
 
-### 1.4 Authority validation contract (structural; the Authority holds no key and cannot decrypt)
+### 1.5 Authority validation contract (structural, before any persistence)
 
-These checks run in `SecurityAuditorAsync`, under the organization lock that `SecurityCommandService.SubmitAsync` holds for the whole command (`LockOrganizationAsync`). Every check is exact; nothing is normalized, trimmed or case-folded.
+**Where it runs:** in `SecurityAuditorAsync`, which runs inside `CommandPlanner.PlanAsync`, under the organization lock that `SecurityCommandService.SubmitAsync` holds for the whole command.
+
+**What gets persisted:**
+- Nothing is persisted before planning succeeds.
+- On success, the stored payload is the **normalized** payload, which contains only validated values.
+- On any rejection, the row stores only `RoleCommandEvidence`, never the envelope.
+
+**Rules.** Every check is exact; nothing is normalized, trimmed or case-folded.
 
 | # | Rule | Refusal |
 |---|---|---|
-| V1 | The payload binds strictly, as today (`UnmappedMemberHandling.Disallow`). An unknown member, in the payload or the envelope, is refused. | `INVALID_COMMAND` |
-| V2 | `reason_note` present with any non-null value | `REASON_NOTE_NOT_ACCEPTED` (permanent; D8-72 plaintext refusal) |
-| V3 | `reason_note_envelope` is absent, or an object. An explicit `null` is refused under strict binding (a decision for the reviewer). | `INVALID_COMMAND` |
+| V1 | The payload binds strictly (`UnmappedMemberHandling.Disallow`). An unknown member, in the payload or the envelope, is refused. | `INVALID_COMMAND` |
+| V2 | `reason_note` present with any non-null value | `REASON_NOTE_NOT_ACCEPTED` (permanent; the D8-72 plaintext refusal) |
+| V3 | `reason_note_envelope` is absent, or an object. An explicit `null` is refused. | `INVALID_COMMAND` |
 | V4 | `envelope_format`, `envelope_version` and `algorithm_name` equal exactly `DynamicForms/AuditorReasonNote`, `1` and `AES-256-GCM` | `INVALID_COMMAND` |
 | V5 | `key_reference` is 1–128 characters from `[A-Za-z0-9._:/-]` | `INVALID_COMMAND` |
-| V6 | `note_id` is a canonical lowercase hyphenated UUID, version 7, not all zeros | `INVALID_COMMAND` |
+| V6 | `note_id` is a canonical lowercase hyphenated UUID, version nibble `7`, RFC 4122 variant, not all zeros | `INVALID_COMMAND` |
 | V7 | Each `*_b64` is strict RFC 4648 §4 base64: standard alphabet, required padding, no whitespace, canonical re-encoding equal to the input | `INVALID_COMMAND` |
-| V8 | Decoded sizes: nonce = 12; tag = 16; ciphertext = 2,048 (with A-Q1 padding; otherwise 1–2,000); wrapped DEK = 29–512 | `INVALID_COMMAND` |
-| V9 | Serialized envelope ≤ 4,096 bytes | `INVALID_COMMAND` |
-| V10 | `note_id` is unused in the organization: no non-rejected `security_commands` row of kind Grant or RevokeSystemRole carries it. The query runs under the organization lock, so it is race-free. An idempotent replay with the same key and digest returns before planning and never reaches V10. | `INVALID_COMMAND` |
-| V11 | An envelope with `role_name` other than `security_auditor` | `INVALID_COMMAND` (Security Administrator commands keep their unchanged shape) |
+| V8 | Decoded sizes: nonce = 12, tag = 16, **ciphertext = 2,048**, wrapped DEK = 29–512 | `INVALID_COMMAND` |
+| V9 | Serialized envelope ≤ 4,096 bytes; whole payload ≤ 8,192 bytes | `INVALID_COMMAND` |
+| V10 | `note_id` is unused in the organization: no non-rejected `security_commands` row of kind Grant or RevokeSystemRole with `role_name = security_auditor` carries it. The rows are read and parsed in the application, under the organization lock, so the check is race-free. An idempotent replay (same key, same digest) returns before planning. | `INVALID_COMMAND` |
+| V11 | An envelope with `role_name` other than `security_auditor` | `INVALID_COMMAND` |
 
 - **Rejection evidence is unchanged:**
-  * the rejected row keeps only `RoleCommandEvidence`, and never the envelope (it is caller-supplied and failed validation or the command did);
+  * the row keeps only `RoleCommandEvidence`;
   * the `SecurityAuditorCommandRejected` audit entry keeps its fixed field list;
-  * the rejection code and detail never echo envelope values.
+  * the detail never echoes envelope values.
 - **What the Authority cannot check:**
   * whether the tag verifies;
-  * whether the sealed plaintext is a real note.
+  * whether the plaintext is a real note.
 
-  A business workload that is able to call the Authority could submit a well-formed envelope of random bytes. That is within the existing trust model: the business is already trusted to submit commands and gains nothing by it, because notes are non-authoritative and never decrypted.
+  A business workload able to call the Authority could submit random but well-formed bytes. That stays within the existing trust model: notes are non-authoritative and never decrypted.
 
-### 1.5 Business-side contract (sealing)
+### 1.6 Business-side contract (sealing)
 
 | # | Rule |
 |---|---|
-| B1 | `reasonNote` (string, optional) comes back to the appoint and remove request bodies. It is refused (422) for anything but Security Auditor commands. |
-| B2 | Validation: trim, then NFC. 1–500 UTF-16 characters. No C0 or C1 control characters except LF (U+000A). Otherwise refused with `INVALID_REQUEST`; the value is never echoed. |
-| B3 | `keys.IsConfigured == false`: a request **with** a note is refused (`503 ENCRYPTION_UNAVAILABLE`) and nothing is sent to the Authority. A request **without** a note proceeds unchanged. |
-| B4 | Seal exactly once per request, before `SubmitAndAwaitAsync`. The idempotency key is created once per request (`security-auditor-{appoint,remove}:{user}:{v7}`) and the same payload object, and therefore the same envelope bytes, is reused on every retry. Re-sealing a retry would be an `IDEMPOTENCY_CONFLICT`, and tests prove it never happens. |
-| B5 | Any exception during seal or wrap: the request fails closed (`503 ENCRYPTION_UNAVAILABLE`, generic detail) and nothing is sent. |
-| B6 | Plaintext lifetime: request DTO → normalization → UTF-8 buffer (`P`) → `AesGcm.Encrypt`. `P` and the DEK are zeroed (`CryptographicOperations.ZeroMemory`) in `finally`. The managed `string` cannot be zeroed, a limitation the field service shares. |
-| B7 | Never persisted or logged by the business: no BusinessDb column, no audit metadata (still the code only), no problem-details echo, no request-body logging. A sentinel test (§1.7) proves this. |
-| B8 | Business audit metadata stays `{reasonCode}`. It may add `reasonNoteSupplied: true\|false` only if you approve it. **Recommended: not added**, so even note presence is not disclosed to business-audit readers. |
+| B1 | `reasonNote` (string, optional) comes back to the Security Auditor appoint and remove request bodies, and is refused (422) for any other role command |
+| B2 | Validation: `Trim()`, then `Normalize(FormC)`. 1–500 UTF-16 units. Strict UTF-8 (no lone surrogates). No C0 or C1 control characters except LF (U+000A). Otherwise `422 INVALID_REQUEST`, and the value is never echoed. |
+| B3 | `keys.IsConfigured == false`: a request **with** a note gets `503 ENCRYPTION_UNAVAILABLE` and nothing is sent to the Authority. A request **without** a note proceeds unchanged. |
+| B4 | Seal exactly once per request, before `SubmitAndAwaitAsync`. The same payload object, and therefore the same envelope bytes, is reused on every retry under the request's single idempotency key. |
+| B5 | Any exception during seal or wrap: `503 ENCRYPTION_UNAVAILABLE` (generic detail), and nothing is sent |
+| B6 | Plaintext lifetime: DTO → `N` → `U`/`P` buffers → `AesGcm.Encrypt`. `U`, `P` and the DEK are zeroed in `finally`. Managed strings cannot be zeroed, as with the field service. |
+| B7 | Never persisted or logged: no BusinessDb column, no audit metadata, no problem-details echo, no request-body logging |
+| B8 | **Decided (A-Q3):** business audit metadata stays `{reasonCode}` only, with no note-presence flag |
 
-### 1.6 Key versions, availability and recovery
+### 1.7 Key versions, availability and recovery
 
 - **Key version:**
   * `key_reference` records the KEK version that wrapped the DEK.
   * It is immutable in the journal and archive.
   * A future authorized opening needs that exact KEK version.
 - **Recovery inputs:**
-  * the archived authorization-stream journal body. It contains the envelope and the context fields (organization, kind, `authority_user_id`, `role_name`); confirm at implementation that the body includes every AAD input, and add any that is missing;
+  * the archived authorization-stream journal body. It contains the envelope plus every AAD input: the organization in the journal envelope, the command kind, and `authority_user_id` and `role_name` in the normalized payload. A test asserts this (A-T14).
   * the business KEK version.
-  * Nothing else is needed: the envelope plus that body is self-sufficient.
-- **Inherited gaps:** these are the same dependencies field encryption already has, and **M1 adds no claim**:
-  * no production key provider (Azure Key Vault or Managed HSM);
-  * no rotation: `LocalDevelopmentKeyProvider` unwraps only its single configured reference;
+- **Inherited gaps,** with no new claim:
+  * no production key provider;
+  * no rotation (`LocalDevelopmentKeyProvider` unwraps only its single reference);
   * no per-organization KEK.
 
-  Before any production use, the provider must keep retired key references able to unwrap for as long as sealed notes, archives and backups are retained (G14 item 7).
-- **Erasure:** destroying a KEK version makes every note sealed under it unreadable. The KEK is shared with field values, so notes cannot be erased separately until a dedicated key purpose or reference exists. Purpose separation today rests on the AAD domain (§1.2). That is cryptographically sound, but it is not key separation.
-- **Availability:** a missing or failing key provider refuses only requests that carry a note (B3, B5). Auditor commands are refused in staging and production in any case (PB-08 step-up gate).
+  Before any production use, retired key references must stay able to unwrap for as long as notes, archives and backups are retained (G14 item 7).
+- **Erasure:** the KEK is shared with field values, so notes cannot be erased separately until a dedicated key purpose exists. Purpose separation today is the AAD domain, not key separation.
+- **Availability:** a missing or failing provider refuses only requests that carry a note. Auditor commands are refused in staging and production in any case (PB-08).
 - **Not production-ready:** until production key providers and rotation are implemented and reviewed (D8-76 item 8).
 
-### 1.7 Security tests (Design A)
+### 1.8 Known-answer vector and security tests (Design A)
+
+**KAT-M1-01** is normative for A-T01.
+- It was computed with .NET 10 `AesGcm` and independently reproduced byte for byte with Python `cryptography` 44.0.0.
+- Evidence: `docs/evidence/phase-c8/m4-1-protocol-verification/m1kat-*`.
+
+| Input | Value |
+|---|---|
+| KEK | bytes `00 01 … 1f` |
+| DEK | bytes `20 21 … 3f` |
+| DEK-wrap nonce | bytes `40 … 4b` |
+| content nonce | bytes `50 … 5b` |
+| key reference | `local-dev-kek-v1` |
+| organization / target / note id | `019a5b2c-1111-7000-8000-000000000001` / `019a5b2c-2222-7000-8000-000000000002` / `019a5b2c-3333-7000-8000-000000000003` |
+| role / direction | `security_auditor` / `appoint` |
+| note | `"Covers the Q4 audit cycle.\nContact: Léa"`, which NFC turns into `…Léa` (U+00E9). UTF-8 is 40 bytes. |
+
+| Output | Value |
+|---|---|
+| AAD (116 bytes) | `44796e616d6963466f726d732f41756469746f72526561736f6e4e6f74652f763100000001019a5b2c111170008000000000000001019a5b2c222270008000000000000002019a5b2c3333700080000000000000030000001073656375726974795f61756469746f72000000076170706f696e74` |
+| SHA-256(P) | `53e210f6271cb59265dc59875cd3b07859def1770cb3b0e0d26cdf7cc80c38a6` |
+| SHA-256(C) | `d3df0ab93fbf1a159fb9df7debf956863bbdf9c7181390379989552871841d11` |
+| tag | `c88d22db2a5e2bb5434a1c52d30de413` |
+| wrapped DEK | `404142434445464748494a4bc2988c000219a124e5ed3d1db7493d7449f7606f830039144f7e74deab2ed3e405e2a68bd43d7c6116749b14f108ed35` |
+
+**Tests:**
 
 | ID | Test | Level |
 |---|---|---|
-| A-T01 | Known-answer vector: a fixed KEK, DEK, nonce, context and note give a fixed AAD (hex), ciphertext and tag. Test-only hook: an `internal` seal overload taking DEK and nonce, exposed to tests through `InternalsVisibleTo`. | Unit |
-| A-T02 | Round trip through the **test-only** opener, padding and length prefix included | Unit |
+| A-T01 | KAT-M1-01 reproduced exactly, through an `internal` seal overload taking the DEK and nonce (`InternalsVisibleTo` tests only) | Unit |
+| A-T02 | Round trip through the test-only opener, including every §1.3 decoding rule (a non-zero pad byte, `L` out of range, invalid UTF-8 and non-NFC each rejected) | Unit |
 | A-T03 | Opening with a changed organization, target, role, direction or note id, each separately, fails | Unit |
-| A-T04 | Tampered ciphertext, tag, nonce or wrapped DEK each fails | Unit |
-| A-T05 | Cross-domain: a field-value ciphertext cannot be opened as a note, nor a note as a field value, with the same KEK and identifiers mapped across | Unit |
-| A-T06 | Each B2 validation rule; 500 characters at 4 bytes per character fits; 501 is refused | Unit |
-| A-T07 | Provider unavailable: a note gives 503 and **no Authority command row**; without a note the command succeeds | Integration (Stage B) |
-| A-T08 | Each Authority rule V1–V11 refused, directly and through the API (V10 by reusing an envelope in a second command) | Authority unit and Stage B |
-| A-T09 | Plaintext `reason_note` is still refused (D8-72 regression) | Authority unit and Stage B |
-| A-T10 | Plaintext sentinel: a unique note text is absent from every table of AuthorityDb (`pg_dump` grep), the archive blobs (Azurite), every table of BusinessDb (`pg_dump` grep), and the api, authority and worker container logs. The envelope is present in `security_commands` and the journal body. | Stage B |
-| A-T11 | Idempotent replay reuses the envelope (same digest); an internally re-sealed retry is impossible (B4) | Stage B |
-| A-T12 | Architecture: no product assembly contains a note opener; `IAuditorNoteSealer` has exactly one method; the Authority has no reference to `IEncryptionKeyProvider` or business encryption | Architecture |
-| A-T13 | Rejected command: the stored row and audit entry contain no envelope bytes | Authority unit and Stage B |
+| A-T04 | Tampered ciphertext, tag, nonce or wrapped DEK, and truncated ciphertext, each fails | Unit |
+| A-T05 | Cross-domain: field-value and note ciphertexts cannot be opened as one another (same KEK, identifiers mapped across) | Unit |
+| A-T06 | Each B2 rule. 500 units of 3-byte characters (1,500 bytes) are accepted; 501 units are refused; a lone surrogate is refused | Unit |
+| A-T07 | Provider unavailable: a note gives 503 and **no Authority command row**; without a note the command succeeds | Stage B |
+| A-T08 | Each rule V1–V11 refused, directly and through the API | Authority unit and Stage B |
+| A-T09 | Plaintext `reason_note` still refused (D8-72 regression) | Authority unit and Stage B |
+| A-T10 | Plaintext sentinel: absent from all of AuthorityDb and BusinessDb (`pg_dump` grep), the archive blobs and the api, authority and worker logs; the envelope present in `security_commands` and the journal body | Stage B |
+| A-T11 | An idempotent replay reuses the envelope (same digest) | Stage B |
+| A-T12 | Architecture: no note opener in product assemblies; `IAuditorNoteSealer` has exactly one method; the Authority has no reference to business encryption | Architecture |
+| A-T13 | A rejected command's row and audit entry contain no envelope bytes | Authority unit and Stage B |
+| A-T14 | The archived journal body of an accepted command contains every AAD input and the full envelope | Stage B |
 
-### 1.8 Compatibility and rollout
+### 1.9 Conformance to the C-116 conditions on A-Q2
 
-- **Deploy order:**
-  * The Authority goes first: it accepts envelopes and still refuses plaintext.
-  * The business follows. A business sending an envelope to a containment-era Authority gets `REASON_NOTE_NOT_ACCEPTED`, so this fails safe.
-- **Historic data:** no persisted notes exist (`PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md` §1.1), so no data migration is needed. Historic journal bodies and command payloads are immutable and never re-serialized.
-  * Noteless commands' normalized payloads change from `"reason_note": null` to `"reason_note_envelope": null` for **new** commands only (`CanonicalJson` serializes nulls).
-  * Implementation must confirm that nothing re-serializes historic payloads.
-- **API contracts:**
-  * Business OpenAPI: `reasonNote` comes back, and the TypeScript client is regenerated.
-  * Authority internal OpenAPI: `reason_note_envelope` is defined.
-  * Frontend: the note text area comes back to the People dialog, with the 500-character limit and a statement that the note is encrypted and cannot be read back in the app.
+| # | Condition | Where it is met |
+|---|---|---|
+| 1 | Reuse AES-256-GCM and `IEncryptionKeyProvider` | §1.1; KAT-M1-01 uses exactly that primitive and the provider's wrap format |
+| 2 | A distinct authenticated context | The AAD domain `DynamicForms/AuditorReasonNote/v1` (§1.2); A-T05 |
+| 3 | Bind organization, target, role, direction and note id | The §1.2 AAD; A-T03 |
+| 4 | Note-id uniqueness | V10, under the organization lock; A-T08 |
+| 5 | Authenticated, deterministic, unambiguous padding | §1.3 (inside the GCM plaintext, length-prefixed, zero-padded, decoding rules); A-T02 |
+| 6 | Validate structure and size before persistence | §1.5: V1–V11 run in planning, before commit, and rejected rows never keep the envelope; A-T08, A-T13 |
+| 7 | No application decryption endpoint | §1.1; A-T12 |
+| 8 | D8-72 containment until implementation and tests pass | The Authority's envelope refusal is lifted only in the same commit that adds V1–V11 with passing A-T01…A-T14 and the shards. Plaintext refusal (V2) stays permanently. |
+| 9 | No production-readiness claim without production keys and rotation | §1.7 |
+
+### 1.10 Compatibility and rollout
+
+- **Deploy order:** Authority first (accepts envelopes, still refuses plaintext), then business. A business that sends an envelope to a containment-era Authority gets `REASON_NOTE_NOT_ACCEPTED`, so this fails safe.
+- **Historic data:** no persisted notes exist, so no data migration is needed.
+  * For **new** commands only, the normalized payloads of noteless commands change from `"reason_note": null` to `"reason_note_envelope": null`.
+  * Historic payloads are immutable and never re-serialized; implementation confirms this.
+- **API contracts:** business OpenAPI gets `reasonNote` back (TypeScript client regenerated); Authority internal OpenAPI defines `reason_note_envelope`.
+- **UI:** the note text area comes back with its 500-unit limit and a statement that the note is encrypted and cannot be read back in the app.
 
 ---
 
 ## 2. Design B: S1, Authority-to-SpiceDB projection integrity at decision time
 
+### 2.0 Changes from revision 1
+
+1. **History-bound marker (B-Q5, §2.3).** The marker names the revision **and** the Authority's hash-chained journal digest for that revision. A datastore from another history can no longer match (owner question 4).
+2. **Quarantine on every mismatch observed while the Authority state is unchanged (B-Q6, §2.5).** Revision 1 treated a mismatch that a later read did not reproduce as transient. That could hide a flapping or split datastore. With the state unchanged there is no legitimate cause of a mismatch (§4, Q5).
+3. **Permanent quarantine is enforced in AuthorityDb (B-Q7, §2.5):** a trigger forbids clearing it or changing its reason. Before, permanence relied on the absence of code.
+4. **A single-use snapshot type (§2.4):** no SpiceDB permission operation is possible outside one pin, decide, verify cycle (owner question 2).
+5. **Datastore and schema failure classes from E4 and E5 (§2.6),** a stated deployment invariant (B-Q8), and **measured latency** (§2.10).
+
 ### 2.1 Defect recap (T16S-1)
 
 - **What happens:** after SpiceDB's datastore is restored from an older dump, a revoked auditor (`view_audit`) and a revoked AC-7 designer (`create_form`) are allowed. AuthorityDb still holds both revocations, with `authorization_revision = projection_applied_revision = 4` and the gate `Ready`.
-- **Why:** the gate trusts AuthorityDb alone, and every check runs `at_least_as_fresh` the Authority-held ZedToken.
-- **The marker is not consulted:** the `projection_cursor` marker is compared only by the projector's next write.
+- **Reproduced again in C-116 with today's check:** 44,024 stale allows without a SpiceDB restart (E1) and 62,034 with a restart (E3).
 
-### 2.2 SpiceDB behaviour this protocol relies on (verified 2026-11-04)
+### 2.2 SpiceDB behaviour this protocol relies on (verified)
 
-The documentation sources are the authzed.com docs (consistency, datastores, commands) and authzed/api `permission_service.proto`, `core.proto` and `error_reason.proto`. They are current docs and are not pinned to v1.56. The probes were run read-only against `authzed/spicedb:v1.56.2` on the security-test stack with grpcurl 1.9.1.
+The documentation sources are authzed.com (consistency, datastores, commands) and authzed/api `permission_service.proto`, `core.proto` and `error_reason.proto`. They are current and are not pinned to v1.56. The probes are in the evidence folder.
 
 | # | Behaviour | Source | Used for |
 |---|---|---|---|
-| F1 | WriteRelationships applies all updates in one transaction, with preconditions: "All updates will be applied transactionally, and if any preconditions fail, the entire transaction will be reverted." | proto (documented) | The marker and the revision's deltas become visible together (the projector writes them in one call) |
-| F2 | `at_exact_snapshot`: "all data used in the API call must be *at the given* snapshot … if the snapshot is no longer available, an error will be returned" | proto (documented) | Pins every decision call to one snapshot |
-| F3 | `fully_consistent`: "most recent snapshot … explicitly bypasses caching" | proto and docs (documented) | The decisive post-decision marker read, independent of undocumented caching |
-| F4 | `at_least_as_fresh`: "more recent data might be used if available or faster" | proto (documented) | Pin read only |
-| P1 | A marker read `at_least_as_fresh(authority token)` returns one message whose `read_at` is a quantized revision token (here `GhQKCENPOFhJTzRY…`). `fully_consistent` returns a different, head token. | probe | The pin `S` is a cache-friendly revision |
-| P2 | A ReadRelationships call with no matching relationship streams **zero messages, so no `read_at` at all** (the proto says one message per relationship) | probe and proto | A missing marker yields no token: it must be handled explicitly and fail closed |
-| P3 | `CheckPermission` and `CheckBulkPermissions` at `at_exact_snapshot(S)` return `checked_at` **byte-identical to `S`** (both quantized and head tokens tried) | probe (the proto has no comment) | A decision proves it used `S` |
-| P4 | **`at_least_as_fresh` with a token from a different datastore is silently ignored**: data is served from the current datastore, with no error | probe | **The Authority-held ZedToken is not integrity evidence.** It does not detect a replaced datastore. |
-| P5 | **`at_least_as_fresh` with a token "in the future"** (an xid far beyond the datastore's) **is accepted and echoed as `read_at`**, with current data served and no error | probe | The same conclusion: a ZedToken proves nothing about freshness against a restored datastore |
-| P6 | `at_exact_snapshot` errors: a different datastore gives `Unknown` "ZedToken specified references a different datastore instance but at-exact-snapshot was requested"; a future revision gives `OutOfRange` "invalid revision: revision was invalid"; a garbage-collected revision gives `OutOfRange` "invalid revision: revision has expired"; a malformed token gives `InvalidArgument` "invalid revision requested" (for every mode) | probe (the docs name only "Snapshot Expired", with no code) | Failure classification (§2.6) |
-| P7 | GC window default 24 h (`--datastore-gc-window`); quantization interval default 5 s | docs (commands) | `S` is used within milliseconds, far inside the window |
-| P8 | Read replicas: "checking if a revision has been replicated into the target replica. If missing, it will fall back to the primary" | docs | **Deployment constraint:** no read replicas until S1 is re-verified with them (B-Q4) |
-| P9 | pg_dump or pg_restore into a different PostgreSQL cluster can make data "associated with a future transaction ID and therefore isn't visible" | docs (datastores) | Such a restore shows **no marker**, so it fails closed as `MARKER_MISSING` |
-| U1 | Whether ReadRelationships or checks are served from a cache keyed by revision | **Undocumented** | The protocol does not depend on it: the decisive read is `fully_consistent` (F3) |
-| U2 | gRPC status of a failed precondition | Undocumented in the docs; the projector already treats `FailedPrecondition` this way | Unchanged |
+| F1 | WriteRelationships applies all updates and preconditions in one transaction | proto (documented) | The marker and the revision's deltas are visible together |
+| F2 | `at_exact_snapshot` uses exactly the given snapshot, and errors if it is unavailable | proto (documented) | Pins a decision |
+| F3 | `fully_consistent` uses the most recent snapshot and "explicitly bypasses caching" | proto and docs (documented) | The decisive post-decision marker read |
+| F4 | `at_least_as_fresh` may use newer data | proto (documented) | Pin read only |
+| P1 | A marker read `at_least_as_fresh` returns one message with a quantized `read_at` | probe | The pin `S` |
+| P2 | A zero-match read streams no message and so no `read_at` | probe and proto | A missing marker is explicit and fails closed |
+| P3 | Check and CheckBulk at `at_exact_snapshot(S)` return `checked_at` **byte-identical** to `S` | probe | The decision proves it ran at `S` |
+| P4 | `at_least_as_fresh` with a **foreign-datastore** token is silently ignored and serves current data | probe | **The ZedToken is not integrity evidence** |
+| P5 | `at_least_as_fresh` with a **future** token is accepted and echoed | probe | The same |
+| P6 | `at_exact_snapshot` errors: different datastore gives `Unknown`; future and expired give `OutOfRange`; a malformed token gives `InvalidArgument` (all modes) | probe | §2.6 |
+| P7 | GC window 24 h; quantization 5 s (defaults) | docs | `S` is used within milliseconds |
+| P8 | Read replicas fall back to the primary when a revision is missing | docs | Excluded by B-Q4 |
+| P9 | A dump restored into another cluster can make data invisible (future xids) | docs | Appears as no marker, so it fails closed |
+| **E2/E3** | **A check at a snapshot pinned *before* a restore, evaluated *after* it, sees the restored data**: the revoked user is `ALLOW`, with `checked_at = S`. The marker read at `S` also shows the restored marker. | experiment | **A pin alone is unsafe.** The decisive read must come after the decision. |
+| **E4** | After the datastore is replaced by an empty one, reads fail `FailedPrecondition` "object definition … not found" until the schema is rewritten | experiment | `SCHEMA_MISSING` class (§2.6) |
+| **E5** | After an old dump is restored under a running SpiceDB, every pre-existing exact-snapshot token fails with "different datastore instance", while `at_least_as_fresh` serves the restored data | experiment | §2.6; the marker reads detect it |
+| U1 | Whether ReadRelationships or checks are served from a cache keyed by revision | **undocumented** | Not relied on: M2 is `fully_consistent` (F3) |
 
-**Consequence:** the ZedToken is a snapshot selector, not integrity evidence (P4, P5). Integrity rests on three things:
-1. **The marker.** Written atomically with each revision's deltas (F1), it states which Authority revision the SpiceDB state represents.
-2. **The Authority's own committed revision**, which is outside SpiceDB.
-3. **The deployment invariant** that only the Authority projector holds the SpiceDB preshared key and network path. This is existing; business components have neither.
+**Consequence:** integrity never rests on a ZedToken (P4, P5). It rests on four things:
+- the history-bound **marker** (§2.3);
+- its atomic write with each revision (F1);
+- the **Authority's committed state**, which is outside SpiceDB;
+- the invariants in §2.9.
 
-### 2.3 Checkpoint definition
+### 2.3 Checkpoint: the history-bound marker (B-Q5)
 
-- **What exists today:** one relationship per organization, `organization:{org}#projection_cursor@projection_step:step-{org}-{n}`.
-- **How the projector maintains it:**
-  * It applies revision `n` in **one** WriteRelationships call: `MUST_MATCH` the marker for `n−1`, `MUST_NOT_MATCH` the marker for `n`, the deltas, then delete the `n−1` marker and touch the `n` marker.
-  * So `n` always equals the Authority's `projection_applied_revision` after acknowledgement.
-- **No schema change:** S1 changes neither the marker nor the schema.
-- **Valid marker:** exactly one relationship matching the filter, with a subject id of exactly `step-{org:D}-{decimal}`, where the decimal has no sign, no leading zeros (except `0`) and fits `Int64`.
+- **Marker v2:** for each organization, exactly one relationship
 
-**Why a matching marker at snapshot `X` implies SpiceDB's state at `X` is the projection of revisions `1..n`:**
-1. The marker for `n` is visible exactly in snapshots after the write of `n` and before the write of `n+1` (F1).
-2. Every legitimate write moves the marker.
-3. A restored datastore is a dump of one consistent pg_dump snapshot, in which the marker and the tuples (one table, `relation_tuple`) agree with each other at the dump's revision `d`.
-   * If `d ≠ n`, the marker shows `d`.
-   * If `d = n`, the dump *is* the current state and nothing was lost.
-4. A datastore restored into another cluster or never seeded shows no marker (P9).
+  ```
+  organization:{org:D}#projection_cursor@projection_step:step-{org:D}-{n}-{h}
+  ```
 
-**Not detected:** a writer *inside* the Authority domain who forges the marker for `n` over stale tuples. That is outside the Level 2 trust assumption (the Authority domain is not compromised; §4M). It is residual R-B1 (§2.9).
+  * `n` is the authorization revision (decimal, no sign, no leading zeros except `0`, fits Int64).
+  * `h` is the 64 lowercase hex characters of the authorization-stream journal entry digest for revision `n` (`SecurityJournalEntry.JournalEventDigest`, SHA-256 of the canonical envelope that chains to the previous entry). For `n = 0`, `h` is 64 zeros.
+  * Object ids up to 1,024 characters are allowed; this one is about 128 characters, from `[a-z0-9-]`.
+- **Expected value at decision time:** the gate requires `A = P`, so `h = hex(state.LatestSecurityJournalDigest)`, which is already on the organization row. That costs no extra AuthorityDb read.
+  * This assumes revision `n` has exactly one authorization-stream entry with stream revision `n`. `SecurityCommandService` is the only place that sets `AuthorizationRevision`, and it appends that entry in the same transaction. A test asserts this (U-09).
+- **Projector:** applying revision `n` uses:
+  * `MUST_MATCH step-{org}-{n−1}-{hex(journal.JournalPreviousDigest or zeros)}`;
+  * `MUST_NOT_MATCH` any marker for `n`;
+  * the deltas;
+  * delete the old marker, touch `step-{org}-{n}-{hex(journal.JournalEventDigest)}`.
 
-### 2.4 Decision protocol ("pin, decide, verify")
+  The projector already reads the journal entry. A projector writing into a datastore from another history therefore fails its precondition (existing `PROJECTION_DIVERGENCE` quarantine).
+- **What a matching marker means:** SpiceDB's state at that snapshot is the projection of *this* Authority history up to `n`. Every legitimate write moves the marker in the same transaction (F1). A restored dump carries the marker of the dump's own revision and history. A replaced or other-cluster datastore carries none (P9, E4). A datastore from a cloned or unrelated environment carries a different `h`.
+- **Transition, one time at Authority startup, before readiness:** for each organization, under `LockOrganizationAsync`, read the marker `fully_consistent`.
+  * Exactly one v1 marker `step-{org}-{P}` with `P = projection_applied_revision`: one `WriteRelationships` (`MUST_MATCH` v1, delete v1, touch v2 with `h` from the journal entry for `P`).
+  * A v2 marker already as expected: nothing to do.
+  * Anything else: quarantine with the matching reason (§2.5).
 
-This applies to every Authority path that consults SpiceDB for a protected decision. There are six decision methods in three services, which hold every SpiceDB `Check*` and `LookupResources` call in the Authority (verified by grep at `6663872`):
+  Decisions and the projector stay disabled until the transition completes. That costs one write per organization, once. It applies to the development stack too.
+
+### 2.4 Decision protocol ("pin, decide, verify") and the single-use snapshot
+
+This applies to every SpiceDB permission operation in the Authority. There are six decision methods in three services, and they hold every `Check*` and `LookupResources` call (verified by grep at `e117399`; `SecurityCommandService` is likewise the only writer of `AuthorizationRevision`):
 - `PermissionCheckService.CheckBatchAsync` and `DiscoverAsync`;
 - `ContentService.GetHeadAsync`, `GetHistoryAsync` and `VerifyRecordCoreAsync` (with `CheckFieldLeavesAsync`);
 - `SearchCatalogueService.IssueUserCatalogueAsync`.
 
-The projector's own reads keep their existing rules (§2.7).
-
 ```
-R1  state₁ ← AuthorityDb organization state (existing gate):
-      not quarantined, archive current, A₁ = P₁ (authorization_revision = projection_applied_revision), Z₁ present.
-      Otherwise fail as today (423 / 503).
+R1  state₁ ← AuthorityDb organization state (existing gate): not quarantined, archive current, A₁ = P₁, Z₁ present.
+    expected marker E = step-{org}-{P₁}-{hex(LatestSecurityJournalDigest₁)}.
 
-M1  PIN:     ReadRelationships(organization:{org}#projection_cursor, at_least_as_fresh(Z₁))
-             → markers m₁, snapshot S = read_at.
-             Require exactly one valid marker with step(m₁) = P₁.   [early detection]
-             Zero messages → there is no S, and the candidate is MARKER_MISSING.
+M1  PIN      ReadRelationships(marker filter, at_least_as_fresh(Z₁)) → markers, S = read_at.
+             Require exactly one marker = E. Zero messages (no S) or anything else → mismatch.
 
-D   DECIDE:  every Check / CheckBulk / LookupResources of the request uses at_exact_snapshot(S),
-             including every LookupResources page.
-             Require checked_at = S (byte-equal), or looked_up_at = S for every result.
-             Any mismatch → deny (503 AUTHORITY_NOT_READY), alert, no quarantine.
+D   DECIDE   every Check / CheckBulk / LookupResources (every page) at at_exact_snapshot(S).
+             Require checked_at = S (byte-equal); for LookupResources, looked_up_at = S for every result.
 
-M2  VERIFY:  ReadRelationships(organization:{org}#projection_cursor, fully_consistent) → marker m₂.
-             Require exactly one valid marker with step(m₂) = P₁.   [decisive; bypasses caches, F3]
+M2  VERIFY   ReadRelationships(marker filter, fully_consistent) → markers. Require exactly one marker = E.  [decisive]
 
-R2  state₂ ← AuthorityDb organization state.
-             Require A₂ = A₁, P₂ = P₁, not quarantined. Otherwise retry from R1 (at most 2, as today),
-             then 503 AUTHORITY_NOT_READY.
+R2  state₂ ← AuthorityDb organization state. Require A₂ = A₁, P₂ = P₁, digest unchanged, not quarantined.
+             Otherwise retry from R1 (at most 2, as today), then 503 AUTHORITY_NOT_READY.
+             M2 and R2 may run concurrently (option O-B2, §2.10); both must succeed.
 
-    Return the decision, bound to (A₁, P₁) as today. S is not exposed to the business.
+Release the decision, bound to (A₁, P₁) as today.
 ```
 
-**Mismatch at M1 or M2** (marker missing, invalid, duplicated, or `step ≠ P₁`):
-1. Never allow.
-2. Run **lock-confirm** (§2.5).
-3. If confirmed: 423 `INTEGRITY_QUARANTINE`.
-4. If not confirmed: the state moved (legitimate progress). Retry, then 503 `AUTHORITY_NOT_READY`.
+- **On any mismatch at M1 or M2:** never allow, and run lock-confirm (§2.5).
+- **Contract (implementation-ready).** All of it lives in `AuthorizationAuthority.Application/Common`.
 
-**Why this is enough. Check-to-use analysis:**
+```csharp
+public enum ProjectionSnapshotState { Open, Completed, Failed }
 
-| Window | What can happen | Outcome |
-|---|---|---|
-| R1 → M1 | A new revision commits and is projected: `A` and the marker advance | M1 sees a marker > P₁; lock-confirm sees `A ≠ A₁`, so retry; no false quarantine |
-| M1 → D | The projector writes `P₁+1` | D is pinned to `S`, which still shows `P₁` (F2). M2 shows `P₁+1` and R2 shows `A₂ ≠ A₁`, so retry |
-| M1 → D | **A datastore restore lands in between** (S's revision is reused on restored rows) | D may evaluate restored, stale data at `S`. **M2 runs after D**, reads head without caches (F3) and sees the restored marker `d ≠ P₁`, so **deny and quarantine**. This window is why a pin-only check (M1 alone) is **not** sufficient, and why the owner was right that "a marker comparison alone" does not prove the decision's state. |
-| During D | A restore while a multi-dispatch check runs (partly old, partly restored data) | M2 runs after D completes and sees the restored marker, so deny |
-| D → M2 | A restore after D | D used pre-restore, current data, so the decision was correct; M2 still detects the restore, so deny and quarantine (a correct detection) |
-| M2 → R2 | A legitimate revision commits | R2 shows `A₂ ≠ A₁`, so retry |
-| After R2 | A revoke commits after the decision is returned | **Pre-existing post-decision revocation window**, unchanged by S1. It is bounded by the existing business rechecks (streams, exports, CONS rules). It is not T16S-1 and is listed as R-B3. |
+/// Single-use, single-request. Constructed only by ProjectionIntegrityVerifier (internal constructor).
+public sealed class VerifiedProjectionSnapshot
+{
+    public Guid OrganizationId { get; }
+    public long ExpectedRevision { get; }          // P₁
+    internal string ExpectedMarker { get; }        // E
+    internal string Pin { get; }                   // S (never leaves the Authority)
+    public ProjectionSnapshotState State { get; }
+}
 
-- **Invariant obtained:** a decision is returned only if, at some instant after it was evaluated:
-  * SpiceDB's head carried the marker for `P₁` (M2);
-  * the decision was evaluated at a snapshot carrying the marker for `P₁` (M1 and D);
-  * the Authority's committed revision was `P₁` throughout `[R1, R2]`.
-- **Why that closes T16S-1:** every legitimate SpiceDB change moves the marker (F1), so the state evaluated is the projection of exactly the Authority's committed revision. A rollback is detected unless the restored marker coincidentally equals `P₁`. In that case the restored state *is* revision `P₁`'s state, so nothing is lost.
+public sealed class ProjectionIntegrityVerifier(ISpiceDbProjection spiceDb, IAuthorityStore store, ISecurityAlertSink alerts, ProjectionIntegrityMetrics metrics, TimeProvider clock)
+{
+    // M1. Precondition: the caller evaluated the gate (R1) on `state`. Throws Quarantined/NotReady on failure.
+    public Task<VerifiedProjectionSnapshot> PinAsync(OrganizationAuthorizationState state, Guid correlationId, CancellationToken ct);
+    // M2 + R2. Moves Open→Completed, or →Failed and throws. Required before any decision is released.
+    public Task CompleteAsync(VerifiedProjectionSnapshot snapshot, IAuthorityScope scope, Guid correlationId, CancellationToken ct);
+}
 
-**Batch and multi-call requests:** one M1, one M2 and one R1/R2 pair per Authority request, not per check. A 250-item batch costs two marker reads. Content verification, which makes several checks, uses one `S` for all of them.
-
-**Type-level enforcement:**
-- `ISpiceDbProjection.Check*` and `LookupResources` take a `VerifiedProjectionSnapshot` (opaque: organization, expected step `P₁`, pin `S`) instead of a raw ZedToken string.
-- Only the new `ProjectionIntegrityVerifier` (Application/Common) can construct one, so no call path can compile against an unverified token.
-- The type is also the vehicle for the M2 obligation: `verifier.CompleteAsync(snapshot)` must be called before a decision is released. An architecture test checks every consumer.
-- An architecture test forbids using `OrganizationAuthorizationState.ProjectionZedToken` outside the verifier and the projector.
-
-### 2.5 Lock-confirm and persistent quarantine
-
-Triggered by any marker mismatch at M1 or M2, or by the periodic check (§2.8).
-
-```
-1. New scope; LockOrganizationAsync(org): the same row lock the projector holds for its whole SpiceDB write,
-   so no projection write can occur while it is held.
-2. Re-read state. If quarantined already → done (423). If A ≠ P (projection pending, including a crash after a
-   SpiceDB write and before acknowledgement) or (A, P) ≠ (A₁, P₁) → release, no quarantine, caller retries/503.
-3. ReadRelationships(marker, fully_consistent) under the lock. If exactly one valid marker with step = P → release,
-   no quarantine (transient; counted), caller retries.
-4. Otherwise: confirmed. In the same transaction:
-     state.IntegrityQuarantineEnabled = true
-     state.IntegrityQuarantineReasonCode = PROJECTION_MARKER_BEHIND | PROJECTION_MARKER_AHEAD
-                                          | PROJECTION_MARKER_MISSING | PROJECTION_MARKER_INVALID
-     AuditJournal.Append(audit stream, "ProjectionIntegrityQuarantined",
-        { organization_id, reason_code, expected_projection_revision = P, observed_marker_step (null if none),
-          detection_source = "decision" | "periodic", correlation_id })
-   Commit, then ISecurityAlertSink.Raise(Critical, "PROJECTION_INTEGRITY_QUARANTINE", fixed summary).
+// ISpiceDbProjection: decision reads take the snapshot, never a raw token.
+Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkAsync(IReadOnlyList<SpiceDbCheck> checks, VerifiedProjectionSnapshot snapshot, CancellationToken ct);
+Task<SpiceDbCheckOutcome> CheckAsync(SpiceDbCheck check, VerifiedProjectionSnapshot snapshot, CancellationToken ct);
+Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, VerifiedProjectionSnapshot snapshot, int maximumResults, CancellationToken ct);
+// Marker reads used by the verifier, the S2 check and the transition:
+Task<MarkerObservation> ReadMarkerAsync(Guid organizationId, MarkerReadConsistency consistency, string? atLeastAsFreshToken, CancellationToken ct);
+public sealed record MarkerObservation(IReadOnlyList<string> MarkerSubjectIds, string? ReadAt);
 ```
 
-- **Meaning of each reason code:**
-  * `BEHIND` (`step < P`): a SpiceDB datastore rollback.
-  * `AHEAD` (`step > P` with `A = P`): AuthorityDb is older than SpiceDB (an AuthorityDb rollback or forgery). This is partial early detection of a T16-A-class event, not its remediation.
-  * `MISSING`: an empty, other-cluster or pre-bootstrap datastore (P2, P9).
-  * `INVALID`: duplicated or malformed markers.
-- **No false positives from legitimate progress:** step 2 runs under the projector-excluding lock, and every legitimate marker change needs a committed `A` increase first, which READ COMMITTED makes visible to the re-read.
-- **Quarantine is persistent:**
-  * It is the existing AuthorityDb columns and needs no migration.
-  * It survives restarts.
-  * It blocks every protected decision (`OrganizationGate`) and every security command (`SecurityCommandService`).
-  * **New in S1:** it also blocks the projector, which writes nothing to SpiceDB for a quarantined organization. Today the projector does not check quarantine.
-- **Clearing (B-Q1):** **no code path clears any quarantine today**, for any reason code, and S1 adds none. Clearing requires an explicitly authorized recovery process:
-  * an S3 rebuild from AuthorityDb desired state, under the G14 recovery control plane;
-  * a new marker and a new pin;
-  * two distinct approvals.
+- **The operations enforce the state machine:**
+  * every decision read requires `State = Open` and throws otherwise;
+  * `CompleteAsync` is the only transition to `Completed`;
+  * after `Completed` or `Failed`, no SpiceDB operation accepts the snapshot.
 
-  That is G14 and is not authorized. **Consequence:** until G14, a quarantined organization stays unavailable for protected access. In Development/Testing the stack is disposable. The alternative needs your authorization: a minimal, two-person operator-plane "verified re-projection" command, in G14 scope.
+  A decision path therefore cannot check, complete, check again and return; and it cannot return without completing.
+- **Architecture tests:**
+  * **ARCH-01:** no `Check*` or `LookupResources` call outside a method that also calls `PinAsync` and `CompleteAsync`;
+  * **ARCH-02:** `OrganizationAuthorizationState.ProjectionZedToken` is read only by the verifier, the projector and the transition;
+  * **ARCH-03:** nothing outside a future, approved G14 recovery service assigns `IntegrityQuarantineEnabled = false`.
+
+### 2.5 Lock-confirm and permanent quarantine
+
+Triggered by any mismatch at M1 or M2, by S2 (§2.8), by the transition (§2.3), or by a `different datastore instance` error on `at_exact_snapshot(S)` (§2.6).
+
+```
+1. New scope; LockOrganizationAsync(org): the same row lock the projector holds through its whole SpiceDB write,
+   so no projection write can run concurrently.
+2. Re-read state. Already quarantined → done (423). If (A, P, LatestSecurityJournalDigest) ≠ (A₁, P₁, digest₁) or A ≠ P:
+   the state moved → no quarantine; the caller retries or returns 503.
+3. The state is unchanged: the mismatch is unexplained by any legitimate event (§4, Q5). Read the marker fully_consistent
+   under the lock and record it as evidence (it does NOT veto the quarantine; revision 2 change 2).
+4. In the same transaction:
+     IntegrityQuarantineEnabled = true
+     IntegrityQuarantineReasonCode = PROJECTION_MARKER_BEHIND | PROJECTION_MARKER_AHEAD | PROJECTION_MARKER_MISSING
+                                    | PROJECTION_MARKER_INVALID | PROJECTION_FOREIGN_HISTORY | PROJECTION_SCHEMA_MISSING
+     AuditJournal.Append(audit stream, "ProjectionIntegrityQuarantined", { organization_id, reason_code,
+        expected_projection_revision, expected_marker_digest, observed_markers (≤ 4 subject ids, at detection and
+        under the lock), detection_phase = pin | verify | periodic | transition | snapshot_error, correlation_id })
+   Commit, then ISecurityAlertSink.Raise(Critical, "PROJECTION_INTEGRITY_QUARANTINE", fixed summary), then the metric.
+```
+
+**Reason codes:**
+- `BEHIND`: the observed step < `P`.
+- `AHEAD`: step > `P` with `A = P` (AuthorityDb older than SpiceDB).
+- `FOREIGN_HISTORY`: step = `P` with a different digest.
+- `MISSING`: no marker.
+- `INVALID`: duplicated or malformed markers.
+- `SCHEMA_MISSING`: the E4 error on a marker read.
+
+**Persistence and permanence (B-Q7):**
+- The existing columns `organization_authorization_states.integrity_quarantine_enabled` and `integrity_quarantine_reason_code`.
+- An AuthorityDb migration adds the trigger `organization_quarantine_is_permanent` (`BEFORE UPDATE`). It raises when `OLD.integrity_quarantine_enabled` is true and `NEW.integrity_quarantine_enabled` is false or `NEW.integrity_quarantine_reason_code IS DISTINCT FROM OLD…`.
+- The quarantine survives restarts and is shared by every Authority instance.
+- A later G14 recovery needs its own reviewed mechanism (a separate identity) to lift it.
+- No code path clears any quarantine today (verified: only `= true` assignments exist).
+
+**Enforcement points:**
+- `OrganizationGate`: all six decision methods, and catalogue snapshot validation;
+- `SecurityCommandService` (commands refused);
+- `ProjectionProcessor` (new: `Idle` without a SpiceDB write when quarantined);
+- the existing checks in onboarding, owner recovery, membership provisioning and Security Administrator provisioning.
 
 ### 2.6 Failure classification, responses and telemetry
 
 | Condition | Decision | Response to the business | Quarantine | Alert |
 |---|---|---|---|---|
 | Gate closed (existing reasons) | deny | 503 `AUTHORITY_NOT_READY` / 423 `INTEGRITY_QUARANTINE` (unchanged) | existing | existing |
-| Marker mismatch, confirmed (§2.5) | deny | 423 `INTEGRITY_QUARANTINE` | **yes** | Critical `PROJECTION_INTEGRITY_QUARANTINE` |
-| Marker mismatch, not confirmed (the state moved) | deny | retry, then 503 `AUTHORITY_NOT_READY` | no | none; counted |
-| SpiceDB unavailable or timeout (gRPC `Unavailable`, `DeadlineExceeded`, transport) | deny | 503 `AUTHORITY_NOT_READY` | no | existing readiness |
-| `at_exact_snapshot(S)` `OutOfRange` (expired or future) or `InvalidArgument` | deny | 503 `AUTHORITY_NOT_READY` | no (the next request's M1 decides) | Warning `PROJECTION_SNAPSHOT_UNAVAILABLE` |
-| `at_exact_snapshot(S)` "different datastore instance" (P6) | deny | 503 `AUTHORITY_NOT_READY` | **lock-confirm runs immediately** (the datastore changed mid-request) | Critical if confirmed |
-| `checked_at` / `looked_up_at` ≠ S | deny | 503 `AUTHORITY_NOT_READY` | no | Critical `PROJECTION_SNAPSHOT_MISMATCH` (unexpected SpiceDB behaviour) |
+| Marker mismatch, state unchanged (§2.5) | deny | 423 `INTEGRITY_QUARANTINE` | **yes** | Critical `PROJECTION_INTEGRITY_QUARANTINE` |
+| Marker mismatch, state moved | deny | retry, then 503 | no | none; counted |
+| Marker read `FailedPrecondition` "object definition … not found" (E4) | deny | 423 | **yes** (`SCHEMA_MISSING`), only through lock-confirm | Critical |
+| SpiceDB unavailable, timeout, transport error, or `Internal` datastore error (seen mid-restore in E1) | deny | 503 | no | existing readiness |
+| `at_exact_snapshot(S)`: `OutOfRange` (expired or future) or `InvalidArgument` | deny | 503 | no (the next request decides) | Warning `PROJECTION_SNAPSHOT_UNAVAILABLE` |
+| `at_exact_snapshot(S)`: "different datastore instance" (E5) | deny | 423 if confirmed | **lock-confirm immediately** | Critical if confirmed |
+| `checked_at` / `looked_up_at` ≠ `S` | deny | 503 | no | Critical `PROJECTION_SNAPSHOT_MISMATCH` |
 
 - **Non-disclosure:**
-  * Business-facing errors carry no marker, step or token values. The business maps `INTEGRITY_QUARANTINE` to its existing `SecurityIncident` type `IntegrityQuarantine` (High); confirm at implementation that an organization-level quarantine raises one.
-  * The journal event and alert carry the organization id, reason code, expected revision and observed step. They carry no user, subject, resource or permission identifiers.
-- **Telemetry (B-Q3, recommended):** a `System.Diagnostics.Metrics` meter `AuthorizationAuthority.ProjectionIntegrity`, with no new package:
-  * counter `projection_integrity_verifications{outcome}`, where outcome is `ok`, `moved`, `mismatch_confirmed`, `mismatch_transient`, `snapshot_error`, `token_mismatch` or `unavailable`;
-  * histogram `projection_integrity_marker_read_ms{phase=pin|verify}`.
-  * There is no Authority meter today. Locally the metrics are visible through `dotnet-counters`; production export is a deployment item.
+  * business-facing errors carry no marker, step, digest or token values;
+  * the business maps `INTEGRITY_QUARANTINE` to its existing `SecurityIncident` (High). Confirm at implementation that an organization-level quarantine raises one.
+  * The journal event and alert carry organization, reason, revision and marker subject ids only. They carry no user, subject, resource or permission identifiers.
+- **Metrics (B-Q3 approved):** meter `AuthorizationAuthority.ProjectionIntegrity`:
+  * counter `projection_integrity_verifications{outcome}`, where outcome is `ok`, `moved`, `mismatch_quarantined`, `snapshot_error`, `token_mismatch` or `unavailable`;
+  * histograms `projection_integrity_marker_read_ms{phase=pin|verify|periodic}` and `projection_integrity_decision_ms{path}`.
 
-### 2.7 Other SpiceDB readers
+### 2.7 Other SpiceDB readers and writers
 
 - **`ProjectionProcessor`:**
-  * keeps its marker CAS and its fully consistent reconciliation reads;
-  * new: returns `Idle` without writing when the organization is quarantined.
-  * Its `DeltaIsReflectedAsync` reads are not decisions.
-- **Onboarding and bootstrap** (`InitializeCursorAsync`): unchanged. A new organization has no grants until its first revision is projected and acknowledged.
+  * the marker CAS becomes v2 (§2.3);
+  * `Idle` without writing when quarantined;
+  * its reconciliation reads (`ReadCursorStepAsync` and `TupleExistsAsync`, both `fully_consistent`) are not decisions.
+- **Onboarding and bootstrap** (`InitializeCursorAsync`): write the v2 marker for `n = 0`.
 - **Readiness `ProbeAsync`:** unchanged (schema presence). S2 adds the marker check.
 
 ### 2.8 Periodic integrity check (S2, a complement and never a replacement)
 
-- **What it does:** a background processor in the Authority, every 60 s (configurable, 10–600 s), and once whenever SpiceDB readiness turns from not-ready to ready. For every organization whose state is `A = P` and not quarantined:
-  * a `fully_consistent` marker read;
-  * the same comparison;
+- **What it does:** a background processor every 60 s (configurable, 10–600 s), and once whenever SpiceDB readiness turns from not-ready to ready. For each organization with `A = P` that is not quarantined:
+  * a `fully_consistent` marker read against `E`;
   * lock-confirm on mismatch.
-- **Purpose:** it catches a rollback in an idle organization (no traffic, so no decisions) and raises the alert without waiting for a user.
-- **Cost:** one point read per organization per interval, so about 25 reads a minute at the PB-09 envelope.
+- **Purpose:** it detects a rollback in an idle organization, and any intermittent divergence that no decision happened to observe.
 
-### 2.9 Residual risks (stated, not resolved by S1)
+### 2.9 Guarantee, invariants and residual exposure (owner: "do not claim absolute rollback prevention")
 
-| ID | Residual | Owner or track |
+**Guarantee G-S1 (claimed, under I1–I6).** A decision is released only if all three hold:
+- it was evaluated by SpiceDB at a snapshot `S` (`checked_at = S`);
+- **after** that evaluation finished, SpiceDB's head, read without caches, carried the marker `E` that names the Authority's committed revision and its hash-chained history digest (M2);
+- the Authority's committed `(A, P, digest)` equalled `(P₁, P₁, digest₁)` and was not quarantined, both before the pin (R1) and after the verify (M2, then R2).
+
+Every legitimate SpiceDB change moves the marker (I2), and a restored, replaced or foreign datastore cannot carry `E` unless its state *is* this history's revision `P₁` (I6). So a stale authorization from a SpiceDB rollback that is **in place when M2 runs, or arrives before D completes** is never released.
+
+**Invariants:**
+
+| ID | Invariant | How it is held |
 |---|---|---|
-| R-B1 | A hostile writer inside the Authority domain forges the marker over stale tuples | Outside the Level 2 trust assumption. A future full reconciliation (desired-relationship digest versus SpiceDB) is G14/S3 work. |
-| R-B2 | AuthorityDb **and** SpiceDB restored to the same older revision: the marker matches, and AuthorityDb's older revision is wrongly trusted | **T16-A / G14** (archive replay, recovery epoch). S1 cannot detect it, because both sides agree. |
-| R-B3 | A revoke committed after the decision is returned (post-decision window) | Pre-existing, bounded by the existing recheck rules. Unchanged. |
-| R-B4 | A datastore swap while SpiceDB keeps a revision cache from the old datastore (U1) | Covered by the cache-bypassing M2 (F3). The no-restart variant RB-12 exercises it. |
-| R-B5 | Read replicas: SpiceDB's replica fallback is documented (P8) but unverified with S1 | Deployment constraint: no replicas until re-verified (B-Q4) |
-| R-B6 | A quarantined organization stays unavailable until G14 | Availability consequence, accepted only by your decision (B-Q1) |
+| I1 | Only the Authority projector writes SpiceDB | Preshared key and Authority-only network (existing deployment boundary) |
+| I2 | Every relationship write moves the marker in the same `WriteRelationships` | Projector code (§2.3) and F1 |
+| I3 | SpiceDB serves every call from **one** datastore at a time: one connection URI to one primary, no read replicas (B-Q4), failover only by synchronous same-endpoint HA (no data loss), and any other datastore change only through the recovery procedure that stops SpiceDB first | Deployment configuration and runbook (B-Q8). Not enforceable in code. |
+| I4 | `fully_consistent` ReadRelationships reads the head without caches | Documented (F3); consistent with E1–E5 |
+| I5 | AuthorityDb is not rolled back and is inside the trust boundary | Out of S1's scope: T16-A / G14 |
+| I6 | A datastore state is either this history's projection at some revision, or carries a different or absent marker | Marker v2 (§2.3), F1, P9 |
 
-### 2.10 Performance and availability
+**Residual exposure (precise):**
 
-- **Added cost per protected Authority request:**
-  * one `at_least_as_fresh` point read (M1), which can use SpiceDB's quantized revision;
-  * one `fully_consistent` point read (M2), which bypasses caches.
+| ID | Exposure | Bound and mitigation |
+|---|---|---|
+| RE-1 | **A datastore that reverts to an older state and back to the current state entirely within one request's D→M2 interval** (D plus M2, about 8–10 ms at p95). Or, if I3 is violated, two live backends behind one SpiceDB at once (D on the stale one, M2 on the current one). | It cannot be eliminated by any Authority-side protocol, because SpiceDB offers no way to evaluate a check and read the marker in one datastore transaction. **Smallest defensible mitigation:** I3 as a binding deployment constraint (B-Q8), plus quarantine on *any* mismatch observed by *any* read (change 2). Under a split or flapping datastore, the first marker read that lands on the stale state (M1 or M2 of any request, or S2) quarantines the organization. Exposure is limited to decisions that complete before that first observation. With half the reads stale, a request escapes detection with probability about 1/8 (M1 current, D stale, M2 current), and the first stale observation is expected within the first one or two requests. |
+| RE-2 | A writer **inside** the Authority domain copies the current marker onto stale tuples | Outside the Level 2 trust assumption (§4M). Full desired-relationship reconciliation is G14/S3. |
+| RE-3 | AuthorityDb and SpiceDB restored together to the same older revision | **T16-A / G14.** Both sides agree, so S1 cannot detect it. |
+| RE-4 | A revoke that commits after a decision was released | Pre-existing post-decision window, unchanged and bounded by existing rechecks (upload chunks, snapshot validation, revision-bound cursors). It is not a rollback. |
+| RE-5 | A false quarantine, for example from SpiceDB misbehaving | Fail-closed by design; it stays until G14 (B-Q1). The availability cost is accepted by that decision. |
+| RE-6 | Undocumented SpiceDB behaviours: the `checked_at` echo (P3), the error classes (P6, E4, E5) | Defence in depth only; the guarantee rests on F1–F3. Pinned by CT tests so an upgrade that changes them fails CI. |
 
-  Both are a single indexed lookup of one relationship. Checks keep the quantized revision (P1, P3), so dispatch caching behaves as it does under `at_least_as_fresh` today; the benchmark will confirm.
-- **No new dependency:** SpiceDB is already required for every decision, so a SpiceDB outage fails closed exactly as today. Lock-confirm runs only on mismatch.
-- **Benchmark before acceptance (B-Q2):** the PB-09 harness on the security-test stack, before and after, at 50 requests/s sustained.
-  * Paths: single check, 250-item batch check, `DiscoverAsync` (LookupResources), `VerifyProjection` (full and partial share), and the search catalogue.
-  * Report p50, p95 and p99, error rate, and SpiceDB CPU.
-  * **Proposed acceptance:** added p95 ≤ 15 ms per request locally, error rate unchanged.
-  * If it fails, the optimization **O-B1** needs your approval: drop M1 on check-only paths and pin `S` from `checked_at` of an `at_least_as_fresh` check (still followed by M2). Lookups keep M1, because zero results carry no token (P2). No caching of verified snapshots across requests (it would reopen the window).
+### 2.10 Performance and availability (measured, C-116)
+
+The probe ran pin, decide and verify against the security-test SpiceDB from a container on the Authority network, open-loop, with every request issuing today's check and the protocol. Evidence: `bench-results.txt`.
+
+| Load | Today's check p50 / p95 / p99 | S1 protocol p50 / p95 / p99 | Added at p95 / p99 |
+|---|---|---|---|
+| 50 requests/s, 60 s, 1 check | 1.51 / 2.20 / 3.08 ms | 7.08 / 10.96 / 14.19 ms | **8.8 / 11.1 ms** |
+| 50 requests/s, 30 s, 1 check | 1.55 / 2.56 / 3.54 | 7.15 / 12.36 / 15.84 | 9.8 / 12.3 |
+| 150 requests/s, 60 s, 1 check | 1.47 / 2.35 / 4.29 | 7.36 / 11.92 / 18.70 | **9.6 / 14.4** |
+| 50 requests/s, 60 s, 25-item batch | 2.43 / 3.62 / 5.36 | 7.91 / 12.95 / 17.49 | 9.3 / 12.1 |
+
+- **Breakdown at p95:**
+  * M1 pin: 3.3–3.7 ms;
+  * M2 `fully_consistent`: 4.3–5.0 ms;
+  * D at the exact snapshot: 0.3–1.3 ms slower than today's `at_least_as_fresh` check.
+  * No errors in any run.
+- **Verdict on the 15 ms target:** the p95 target is **met locally with about 5 ms margin**. At p99 under 150 requests/s the margin is 0.6 ms.
+- **Limits of this evidence:**
+  * small dataset;
+  * single-node Docker;
+  * no TLS;
+  * no zone hops;
+  * the Authority's own AuthorityDb reads are not included (unchanged by S1).
+
+  **It is not PB-09 evidence.** PERF-01 on staging stays mandatory.
+- **If staging exceeds the target:**
+  * **O-B2:** run M2 and R2 concurrently. This is safe per §2.4 and saves one AuthorityDb read.
+  * **O-B1:** drop M1 on check-only paths and pin `S` from `checked_at` of an `at_least_as_fresh` check. That saves about 3.5 ms. M2 stays. Lookups keep M1, because zero results carry no token.
+  * Both need approval.
+  * Never cache verified snapshots across requests.
+- **Availability:**
+  * no new dependency, since SpiceDB is already required for every decision;
+  * a SpiceDB outage fails closed exactly as today;
+  * lock-confirm runs only on a mismatch.
 
 ### 2.11 Regression and verification matrix (Design B)
 
-**Characterisation tests.** These turn §2.2 into executable tests pinned to `authzed/spicedb:v1.56.2`. A SpiceDB upgrade that changes any of them fails CI.
+**Behavioural contract tests.** The six from revision 1 are retained, plus two that pin the C-116 experiments. All are pinned to `authzed/spicedb:v1.56.2`.
 
 | ID | Asserts |
 |---|---|
 | CT-1 | Marker read `at_least_as_fresh` returns one message with `read_at` (P1) |
 | CT-2 | A zero-match ReadRelationships streams no message (P2) |
-| CT-3 | `checked_at` equals `S` byte for byte for Check and CheckBulk at `at_exact_snapshot` (P3); `looked_up_at` equals `S` for LookupResources |
-| CT-4 | `at_least_as_fresh` silently accepts a foreign-datastore token and a future token (P4, P5), so that S1 never relies on the token |
-| CT-5 | The `at_exact_snapshot` error codes in P6 |
-| CT-6 | A marker write together with deltas is atomic: the marker and a delta tuple are never visible apart, under concurrent reads (F1) |
+| CT-3 | `checked_at` = `S` byte for byte for Check and CheckBulk at `at_exact_snapshot`; `looked_up_at` = `S` for every LookupResources result (P3) |
+| CT-4 | `at_least_as_fresh` silently accepts foreign and future tokens (P4, P5), which is why the token is never relied on |
+| CT-5 | The `at_exact_snapshot` error classes (P6) |
+| CT-6 | A marker write together with deltas is atomic under concurrent reads (F1) |
+| CT-7 | After an older dump is restored under a running SpiceDB, pre-existing exact-snapshot tokens fail "different datastore instance" (E5) |
+| CT-8 | A snapshot pinned before a restore evaluates restored data after it (E2), which is why M2 must follow D |
 
-**Rollback regression.** Stage B, shard `authorization-security-onboarding`. Each test dumps `spicedb-db`, makes the change, restores, then asserts. The expectation in each case is deny, then 423 quarantine, a journal event and a Critical alert, unless stated otherwise.
+**Rollback regression.** Stage B, shard `authorization-security-onboarding`. The expectation is: deny, then 423, persistent quarantine, an audit-stream event, a Critical alert and the metric, unless stated otherwise.
 
 | ID | Area | Scenario |
 |---|---|---|
 | RB-01 (= T16-S) | Organization roles (AC-8.1, AC-7) | Revoked auditor `view_audit` and revoked designer `create_form` |
-| RB-02 | Record access (AC-5) | Owner shares read with Bob; dump; revoke the share; restore. Bob is denied discover, read, `GetHead`, `GetHistory` and `VerifyProjection`. |
-| RB-03 | Field-level sharing (AC-5) | A field-item read share is revoked. `VerifyProjection` (partial) does not return the field. `CheckBulk` path. |
-| RB-04 | Team permissions (AC-9 area) | Bob is removed from a team holding a record share, and is denied |
-| RB-05 | Discovery and search (AC-6) | Discover and `IssueUserCatalogue` (LookupResources) do not list the record. No partial result. |
+| RB-02 | Record access (AC-5) | A record read share revoked. Bob is denied discover, read, `GetHead`, `GetHistory` and `VerifyProjection`. |
+| RB-03 | Field-level sharing (AC-5) | A field-item read share revoked; `VerifyProjection` (partial) omits the field |
+| RB-04 | Team permissions (AC-9 area) | Bob removed from a team holding a record share |
+| RB-05 | Discovery and search (AC-6) | Discover and `IssueUserCatalogue` do not list the record; an issued catalogue snapshot fails validation after the quarantine |
 | RB-06 | Form permissions (AC-6, AC-7) | `design`, `create_record` and `query_fields` revoked |
-| RB-07 | Cross-organization isolation | Org X changes after the dump and is quarantined. Org Y is unchanged since the dump: **its marker matches, it stays Ready, and its decisions are correct**. No org X subject gains anything in Y, or the reverse. SpiceDB is shared across organizations, so a restore affects all of them, each judged by its own marker. |
-| RB-08 | Missing marker | Restore from a dump taken before the organization's bootstrap. `PROJECTION_MARKER_MISSING`. |
-| RB-09 | Marker ahead | AuthorityDb organization state set back with the restore simulation. `PROJECTION_MARKER_AHEAD`. |
-| RB-10 | Persistence | After quarantine: restart the Authority and it is still quarantined; security commands are refused; the projector writes nothing (the SpiceDB marker is unchanged) |
-| RB-11 | No false quarantine | 200 concurrent checks while 20 grant/revoke commands commit and project: **zero quarantines**, and every decision is consistent with the revision it reports |
-| RB-12 | Restore without restart | `pg_restore --clean` into the live `spicedb-db` while SpiceDB keeps running. The first decision afterwards is denied (R-B4). |
-| RB-13 | Other cluster | The datastore is dropped, migrated empty and restored (P9). Fail closed (MISSING or schema-absent). |
-| RB-14 | Periodic check | An idle organization is quarantined by S2 within one interval, with no user traffic |
-| RB-15 | Outage | SpiceDB stopped: 503, **no** quarantine; after restart: Ready |
+| RB-07 | Cross-organization isolation | Org X changed after the dump and is quarantined. Org Y, unchanged since the dump, keeps a matching v2 marker, stays Ready and decides correctly. No subject gains anything across organizations. |
+| RB-08 | Missing marker | Dump taken before the organization's bootstrap: `PROJECTION_MARKER_MISSING` |
+| RB-09 | Marker ahead | AuthorityDb organization state set back (restore simulation): `PROJECTION_MARKER_AHEAD` |
+| RB-10 | Persistence | After a restart, still quarantined; commands refused; projector writes nothing (SpiceDB marker unchanged); **the trigger refuses** `UPDATE … SET integrity_quarantine_enabled = false` and a reason change by the Authority runtime role |
+| RB-11 | No false quarantine | 200 concurrent checks while 20 grant and revoke commands commit and project: zero quarantines, and every decision consistent with its reported revision |
+| RB-12 | Restore without restart | Live `pg_restore --clean` under a running SpiceDB; the first decision afterwards is denied |
+| RB-13 | Other datastore | Datastore dropped and migrated empty: `SCHEMA_MISSING`, or `MISSING` after the schema is rewritten. An old dump restored into the replacement: detected (E5). |
+| RB-14 | Periodic check | An idle organization is quarantined by S2 within one interval |
+| RB-15 | Outage | SpiceDB stopped: 503 and **no** quarantine; Ready again after restart |
+| **RB-16** | **Rollback during active permission checks** | Concurrent decision load (8+ workers, all six decision paths) while (a) a live restore and (b) a stop-restore-start run. **Zero allows for revoked subjects**, quarantine committed, every Authority instance denies afterwards. Today's code is the control (C-116: 44,024 and 62,034 stale allows). |
+| **RB-17** | Foreign history | A marker with the correct step and a different digest planted through the test-only SpiceDB path: `PROJECTION_FOREIGN_HISTORY` |
+| **RB-18** | Transition | v1 markers upgraded to v2 at startup; a v1 marker ≠ `P` quarantines; no decision before the transition completes |
 
 **Unit and architecture tests:**
 
 | ID | Asserts |
 |---|---|
-| U-01…U-08 | Verifier state machine with a fake `ISpiceDbProjection`: each M1 and M2 outcome, a token mismatch, each P6 error class, and lock-confirm results 2, 3 and 4 |
-| ARCH-01 | No `Check*` or `LookupResources` call outside `VerifiedProjectionSnapshot`; `ProjectionZedToken` used only by the verifier and the projector |
-| ARCH-02 | Every method that takes a snapshot calls `CompleteAsync` before returning an allow |
+| U-01…U-10 | The verifier state machine with a fake projection: each M1 and M2 outcome, a token mismatch, each §2.6 class, lock-confirm (moved versus unchanged), a snapshot used after `Completed`/`Failed` throws, and U-09 (one authorization-stream entry per revision) |
+| ARCH-01…ARCH-03 | §2.4 |
 
-**Performance:** PERF-01, the §2.10 benchmark.
+**Performance:**
+- **PERF-01:** the §2.10 measurement on every decision path, reporting p50, p95 and p99 and the M1/D/M2 breakdown. It runs on the security-test stack at implementation, and on staging before production.
 
-- **T16-S after the fix:** it must pass by showing a denial *and* the quarantine.
-- **D8-78:** it stays mandatory and is never skipped or marked as an expected failure.
-- **A stale "allowed" anywhere in RB-01…RB-15 is a release-blocking failure.**
+**Release rule:**
+- T16-S (RB-01) stays mandatory and is never skipped or marked as an expected failure (D8-78).
+- **Any stale allow in RB-01…RB-18 blocks release.**
 
 ### 2.12 Rejected alternatives
 
 | Alternative | Why not |
 |---|---|
-| Trust the ZedToken (status quo) | P4 and P5: SpiceDB ignores a foreign or future token under `at_least_as_fresh` |
-| M1 only (pin-and-compare, no M2) | It misses a restore landing between the pin and the decision (§2.4). The owner's warning applies. |
-| Embed the marker in every permission (caveat or intersection with a cursor relation) | It evaluates atomically, but rewrites every permission in `authority.schema.zed`, adds caveat context to every check, changes `Unknown`/conditional handling, and needs organization arrows on every resource type: a broad schema change for no gain over M2 |
-| Cache verified snapshots per organization for a few seconds | Reopens a rollback window and is unsafe across Authority instances |
-| Periodic check only (S2) | Leaves a window between probes. D8-77 forbids it as a replacement. |
+| Trust the ZedToken (status quo) | P4, P5 |
+| A pin without M2 | E2/E3: the pinned snapshot evaluates restored data |
+| Revision-only marker (revision 1) | It collides with a datastore from another history at the same revision (owner question 4) |
+| Treat a non-reproduced mismatch as transient (revision 1) | It hides split or flapping datastores (RE-1) |
+| Embed the marker in every permission (caveat or intersection) | A broad schema rewrite. SpiceDB still evaluates over several datastore queries, so it would not close RE-1 either. |
+| Cache verified snapshots across requests | It reopens a rollback window |
+| S2 only | D8-77 forbids it as a replacement |
 
 ---
 
-## 3. Decisions requested (C-115)
+## 3. Decisions
+
+**Approved (C-116):** A-Q1 (padding), A-Q3 (no presence flag), B-Q1 (quarantine until G14), B-Q3 (metrics), B-Q4 (no read replicas).
+
+**Requested for final approval:**
 
 | ID | Decision | Recommendation |
 |---|---|---|
-| **A-Q1** | Pad note plaintext to a fixed 2,048 bytes (hide length) or leave it unpadded (length disclosed) | **Pad** (§1.2) |
-| **A-Q2** | Approve the AAD construction (§1.2), envelope schema (§1.3), Authority rules V1–V11 (§1.4) and business rules B1–B8 (§1.5) as the M1 contract | **Approve** |
-| **A-Q3** | Business audit discloses note presence (`reasonNoteSupplied`) or not | **Not** (B8) |
-| **B-Q1** | Quarantine clearing: none until the G14 recovery plane (organization unavailable meanwhile), or authorize a minimal two-person verified re-projection command now (G14 scope) | **None until G14** |
-| **B-Q2** | Approve the pin-decide-verify protocol (§2.4–§2.8) with S2, the failure table (§2.6), and the performance acceptance of added p95 ≤ 15 ms (§2.10) | **Approve** |
-| **B-Q3** | Add the Authority metrics meter (§2.6) | **Add** |
-| **B-Q4** | Deployment constraint: no SpiceDB read replicas until S1 is re-verified with them | **Adopt** |
+| **A-Q2** | Approve the M1 contract, revision 2: AAD §1.2, padding §1.3, envelope §1.4, V1–V11 §1.5, B1–B8 §1.6, KAT-M1-01 and A-T01…A-T14 §1.8, conformance §1.9 | **Approve** |
+| **B-Q2** | Approve the S1 protocol, revision 2: §2.3–§2.8, the guarantee and residuals in §2.9, and the matrix in §2.11 | **Approve** |
+| **B-Q5** | History-bound marker v2 with the one-time startup transition (§2.3) | **Adopt** |
+| **B-Q6** | Quarantine on every mismatch observed while the Authority state is unchanged, with no transient branch (§2.5). This accepts that a false quarantine lasts until G14 (RE-5). | **Adopt** |
+| **B-Q7** | AuthorityDb trigger making quarantine permanent, plus ARCH-03 (§2.5) | **Adopt** |
+| **B-Q8** | Deployment invariant I3 (one datastore behind SpiceDB at a time; any other datastore change only through the recovery procedure that stops SpiceDB) as a binding deployment constraint | **Adopt** |
+| **B-Q9** | Performance acceptance: added p95 ≤ 15 ms (met locally with about 5 ms margin; p99 reported), with the staging PERF-01 measurement before production; O-B1 and O-B2 only by separate approval | **Adopt** |
 
-- **After approval:** implementation order is Design B first (highest priority, T16S-1), then Design A.
-- **Each implementation needs:** independent shard runs, a signed local commit, and evidence for the independent review.
-- **Not authorized:** push, PR, merge, deploy, M4-2, RCF-1 remediation and G14.
+- **After approval:**
+  * implement Design B first (T16S-1 is the highest priority), then Design A;
+  * each with independent shard runs, a signed local commit and evidence for the independent review.
+- **Not authorized:** push, PR, merge, deploy, M4-2, RCF-1 remediation, G14.
+
+## 4. Answers to the C-116 Design B questions
+
+**Q1. Can the protocol prevent stale authorization when a rollback occurs after the final marker read (M2)?**
+- **Yes, for decisions:** D completed before M2, so a rollback after M2 was not visible to D. D evaluated the current committed state, as E2/E3 and the race runs confirm.
+  * The rollback does not make that decision stale: it re-grants revoked subjects, and this decision did not observe it.
+  * The next decision for the organization runs the full protocol, and its M1 or M2 sees the rolled-back marker and quarantines.
+- **Derived artefacts** issued from correct decisions never consult SpiceDB again:
+  * catalogue snapshots (≤ 900 s) are revalidated against the AuthorityDb gate, quarantine included (RB-05);
+  * list cursors are revision-bound;
+  * upload chunks re-run the Authority check for every chunk.
+- **The only stale-authorization path left is RE-1** (a revert within one request's D→M2 interval, or a violation of I3). It is mitigated, not eliminated.
+
+**Q2. Can any SpiceDB permission operation occur without repeating the protocol?**
+- **No, by construction.** Every decision read takes a `VerifiedProjectionSnapshot`. Only the verifier creates one, it is single-use and single-request, every read requires `Open`, and the decision is released only after `CompleteAsync` (§2.4). This is backed by ARCH-01 and ARCH-02 and by the grep inventory (all `Check*` and `LookupResources` calls are in the six methods).
+- **Non-decision reads** (the projector's reconciliation reads, schema probe and writes) are not permission operations.
+- **The business has no SpiceDB credential or network path** (I1).
+- **Writes are unaffected by SpiceDB:** content commits, security commands and roster or role planning evaluate the Authority's own `DesiredStateGraph` from AuthorityDb (verified).
+
+**Q3. How do cache bypass and exact-snapshot checks behave across rollback, failover and datastore replacement?**
+
+| Event | Exact-snapshot check at `S` | `fully_consistent` M2 | Outcome |
+|---|---|---|---|
+| Live restore, SpiceDB running (E1, E2) | `S` pinned after the restore: restored data. `S` pinned before: **also restored data** (E2). | Restored marker | Deny and quarantine. Zero stale allows in E1. |
+| Restore with restart (E3) | As above | Restored marker | Deny and quarantine. Zero stale allows. |
+| Replaced, empty datastore (E4) | `FailedPrecondition` (no schema), then no marker after the schema is rewritten | Same | `SCHEMA_MISSING` or `MISSING` quarantine |
+| Old dump restored into the replacement under a running SpiceDB (E5) | Old tokens: "different datastore instance"; new pins: restored data | Restored marker | Deny and quarantine |
+| Synchronous same-endpoint HA failover | Unchanged data | Unchanged marker | No effect (no data loss) |
+| Asynchronous replica promotion | Older data | Older marker | It is a rollback: deny and quarantine. Under I3 it happens only through the recovery procedure. |
+| Two live backends at once | Either | Either | RE-1 |
+
+- **Caching:** SpiceDB's cache keying is undocumented (U1).
+  * M2 is `fully_consistent`, which is documented to bypass caching, so a cached pre-restore answer cannot hide a restore.
+  * A cached check result computed before the restore is the *correct* pre-restore answer, so caching cannot produce a stale allow.
+  * E1 and E2 ran with warm caches and without a restart, and observed no masking in either direction.
+
+**Q4. How can a marker be trusted when SpiceDB accepts tokens from unrelated datastores?**
+- **The token is never trusted** (P4, P5, CT-4).
+- **The marker is trusted only as a statement written atomically with the state it describes** (I2, F1), by the only writer (I1), and only when it names both the revision and the Authority's own hash-chained journal digest (v2).
+- A datastore from an unrelated or cloned environment matches only if it holds the same 256-bit chained digest for revision `P`, which means it is this history's state.
+- **Revision 1's revision-only marker could collide in exactly this case.** That is why v2 is a required change (B-Q5).
+- **A copy forged inside the Authority domain** remains RE-2, outside the trust model.
+
+**Q5. Do the final Authority check and quarantine enforcement prevent returning an authorization after a detected rollback?**
+- **Yes:**
+  * A request that observes a mismatch never allows, whether or not the quarantine commit succeeds.
+  * The quarantine is committed in AuthorityDb and is visible to every Authority instance. Every request whose R1 or R2 runs after the commit fails with 423, including in-flight requests that reach R2 later.
+  * A request whose R2 completed before the commit had an M2 that matched after its D, so its decision was correct, or it is in RE-1.
+  * Commands are refused, the projector stops and catalogue validation fails.
+- **Why a mismatch with the state unchanged is never legitimate:**
+  * the only legitimate marker change is a projector write of `P₁+1`, which requires `A ≥ P₁+1` committed beforehand (READ COMMITTED makes that visible to the re-read under the lock);
+  * an older marker cannot be observed at a snapshot at least as fresh as `Z₁` in the same datastore (F4), or at the head (F3).
+
+  This justifies B-Q6.
+- **If AuthorityDb cannot be written,** requests keep detecting and denying until it can.
+
+**Q6. How is permanent quarantine enforced and persisted?**
+- **Stored:** in the existing AuthorityDb columns, set in one transaction with the audit-stream event, before the alert.
+- **Permanent:**
+  * the B-Q7 trigger forbids clearing it or changing its reason, even by a buggy code path;
+  * ARCH-03 forbids assigning `false`;
+  * no clearing code exists today.
+- **Enforced at:** the gate (all decision paths and snapshot validation), commands, the projector, and the existing onboarding, recovery and provisioning services.
+- **Lifted only by:** a future, separately reviewed G14 recovery mechanism.
+
+**Q7. How are normal projection writes prevented from clearing quarantine?**
+1. The projector checks the quarantine under the organization lock and does nothing.
+2. The projector never writes the quarantine columns, except to set them.
+3. The trigger.
+4. The quarantine is independent of the marker: re-restoring the correct datastore, or a delayed pre-quarantine write landing later (fenced by the marker CAS in any case), cannot lift it.
+5. S2 skips quarantined organizations.
+6. Commands are refused, so no new revision exists to project.
+
+**Q8. Is 15 ms p95 achievable under representative load?**
+- **Locally, yes:** 8.8–9.8 ms added at p95 for 50–150 requests/s and batches of 1 or 25, about 5 ms below the target.
+- **At p99:** 11.1–14.4 ms added, close to the limit at 150 requests/s.
+- **Not yet shown under PB-09 representative conditions** (staging data volume, TLS, zones). PERF-01 on staging is required, and O-B2 and O-B1 are the approved-only fallbacks.
+
+**Stale authorization from a SpiceDB rollback is not claimed to be absolutely impossible.** The claim is G-S1 under I1–I6, with RE-1…RE-6 as stated.
