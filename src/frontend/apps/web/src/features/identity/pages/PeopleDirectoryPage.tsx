@@ -169,6 +169,7 @@ export function PeopleDirectoryPage() {
                   { value: "OrganizationOwner", label: "Organization Owner" },
                   { value: "Designer", label: "Designer" },
                   { value: "SecurityAdministrator", label: "Security Administrator" },
+                  { value: "SecurityAuditor", label: "Security Auditor" },
                   { value: "None", label: "No role" },
                 ]}
                 onValueChange={(value) => restart(() => setRole(value))}

@@ -88,6 +88,10 @@ export type OwnerRecoveryObjectionResponse = S["OwnerRecoveryObjectionResponse"]
 export type SecurityAdministratorResponse = S["SecurityAdministratorResponse"];
 export type AppointSecurityAdministratorRequest = S["AppointSecurityAdministratorRequest"];
 export type RemoveSecurityAdministratorRequest = S["RemoveSecurityAdministratorRequest"];
+export type AppointSecurityAuditorRequest = S["AppointSecurityAuditorRequest"];
+export type RemoveSecurityAuditorRequest = S["RemoveSecurityAuditorRequest"];
+export type SecurityAuditorReasonCodesResponse = S["SecurityAuditorReasonCodesResponse"];
+export type SecurityAuditorReasonCodeResponse = S["SecurityAuditorReasonCodeResponse"];
 export type StrengthenFieldProtectionRequest = S["StrengthenFieldProtectionRequest"];
 export type FieldProtectionMigrationResponse = S["FieldProtectionMigrationResponse"];
 export type FieldProtectionVerificationResponse = S["FieldProtectionVerificationResponse"];
@@ -186,7 +190,7 @@ export type DashboardPageQuery = { pageSize?: number; continuationToken?: string
 /** People directory (C8 M2): server-paged, default 15 rows. */
 export type OrganizationMemberQuery = {
   q?: string;
-  role?: "OrganizationOwner" | "Designer" | "SecurityAdministrator" | "None";
+  role?: "OrganizationOwner" | "Designer" | "SecurityAdministrator" | "SecurityAuditor" | "None";
   signInStatus?: "SignedIn" | "NotRecorded" | "NeverSignedIn";
   membershipState?: "Enabled" | "Disabled";
   pageSize?: number;
@@ -370,6 +374,9 @@ export function createApiClient(coordinator: IRequestCoordinator) {
       securityAdministrators: (signal?: AbortSignal) => read<SecurityAdministratorsResponse>("organization.securityAdministrators", undefined, undefined, "interactive-read", signal),
       appointSecurityAdministrator: (request: AppointSecurityAdministratorRequest) => write<void>("POST", "organization.appointSecurityAdministrator", undefined, request, { lane: "security", resourceKey: "organization:security-administrators" }),
       removeSecurityAdministrator: (userId: string, request: RemoveSecurityAdministratorRequest) => write<void>("POST", "organization.removeSecurityAdministrator", { userId }, request, { lane: "security", resourceKey: "organization:security-administrators" }),
+      securityAuditorReasonCodes: (signal?: AbortSignal) => read<SecurityAuditorReasonCodesResponse>("organization.securityAuditorReasonCodes", undefined, undefined, "interactive-read", signal),
+      appointSecurityAuditor: (request: AppointSecurityAuditorRequest) => write<void>("POST", "organization.appointSecurityAuditor", undefined, request, { lane: "security", resourceKey: "organization:security-auditors" }),
+      removeSecurityAuditor: (userId: string, request: RemoveSecurityAuditorRequest) => write<void>("POST", "organization.removeSecurityAuditor", { userId }, request, { lane: "security", resourceKey: "organization:security-auditors" }),
       /** C8 owner recovery (C-105): the open case, if the caller may see it; case is null otherwise. */
       ownerRecoveryNotice: (signal?: AbortSignal) => read<OwnerRecoveryNoticeResponse>("organization.ownerRecoveryNotice", undefined, undefined, "interactive-read", signal),
       objectToOwnerRecovery: (caseId: string, request: OwnerRecoveryObjectionRequest) => write<OwnerRecoveryObjectionResponse>("POST", "organization.objectToOwnerRecovery", { caseId }, request, { lane: "security", resourceKey: "organization:owner-recovery" }),

@@ -73,6 +73,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<FormAccessHandlers>();
         services.AddSingleton<SecurityPolicyHandlers>();
         services.AddSingleton<SecurityAdministratorsHandlers>();
+        services.AddSingleton<SecurityAuditorsHandlers>();
         services.AddSingleton<OwnerRecoveryNoticeHandlers>();
         services.AddSingleton<EnterpriseForms.Application.Features.Identity.MemberAdministration.MemberAdministrationHandlers>();
         services.AddSingleton<CreateFormRecordHandler>();

@@ -2,7 +2,7 @@ import type { OrganizationMemberResponse, PresenceState } from "@enterpriseforms
 import { Badge, Button, OverflowMenu, PresenceIndicator, getActiveFormatter, useFormatter } from "@enterpriseforms/ui";
 import { useId, useState } from "react";
 
-const ROLE_LABELS: Record<string, string> = { OrganizationOwner: "Owner", Designer: "Designer", SecurityAdministrator: "Security administrator" };
+const ROLE_LABELS: Record<string, string> = { OrganizationOwner: "Owner", Designer: "Designer", SecurityAdministrator: "Security administrator", SecurityAuditor: "Security auditor" };
 
 export type MemberAction =
   | "EditProfile"
@@ -15,7 +15,9 @@ export type MemberAction =
   | "ProposeOwnerDisable"
   | "ProposeOwnerEnable"
   | "AppointSecurityAdministrator"
-  | "RemoveSecurityAdministrator";
+  | "RemoveSecurityAdministrator"
+  | "AppointSecurityAuditor"
+  | "RemoveSecurityAuditor";
 
 /** Visible labels of the row actions; accessible names start with the same text (WCAG 2.5.3). */
 export const MEMBER_ACTION_LABELS: Record<MemberAction, string> = {
@@ -30,6 +32,8 @@ export const MEMBER_ACTION_LABELS: Record<MemberAction, string> = {
   ProposeOwnerEnable: "Propose re-enabling",
   AppointSecurityAdministrator: "Make Security Administrator",
   RemoveSecurityAdministrator: "Remove Security Administrator",
+  AppointSecurityAuditor: "Make Security Auditor",
+  RemoveSecurityAuditor: "Remove Security Auditor",
 };
 
 const isMemberAction = (value: string): value is MemberAction => value in MEMBER_ACTION_LABELS;

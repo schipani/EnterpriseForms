@@ -159,9 +159,41 @@ public static class OrganizationEndpoints
                 return TypedResults.NoContent();
             })
             .WithName("RemoveSecurityAdministrator")
-            .WithSummary("Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains.")
+            .WithSummary("Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective. Nobody removes themself (403 SELF_CHANGE_FORBIDDEN, D8-62a): another Security Administrator performs the removal.")
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        // C8 M4 (AC-8.1): Security Auditors (Authority relation security_auditor, permission view_audit). Appointed and removed by
+        // Security Administrators only, never themself, with step-up and an owner-approved reason code (C-110).
+        var securityAuditors = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/security-auditors").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);
+        securityAuditors.MapGet("/reason-codes", static (HttpContext http) =>
+            {
+                BusinessAuthentication.RequireContext(http);
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(SecurityAuditorsHandlers.ReasonCodes());
+            })
+            .WithName("GetSecurityAuditorReasonCodes")
+            .WithSummary("The owner-approved Security Auditor appointment and removal reason codes with their labels (C-110). The Authority validates every submitted code exactly.");
+
+        securityAuditors.MapPost("/", static async Task<NoContent> (AppointSecurityAuditorRequest request, HttpContext http, SecurityAuditorsHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                await handlers.AppointAsync(BusinessAuthentication.RequireContext(http), request, cancellationToken).ConfigureAwait(false);
+                return TypedResults.NoContent();
+            })
+            .WithName("AppointSecurityAuditor")
+            .WithSummary("Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; the optional note goes to the Authority only. The role grants audit viewing and no record content. 204 once Effective.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        securityAuditors.MapPost("/{userId:guid}/remove", static async Task<NoContent> (Guid userId, RemoveSecurityAuditorRequest request, HttpContext http, SecurityAuditorsHandlers handlers, CancellationToken cancellationToken) =>
+            {
+                await handlers.RemoveAsync(BusinessAuthentication.RequireContext(http), userId, request, cancellationToken).ConfigureAwait(false);
+                return TypedResults.NoContent();
+            })
+            .WithName("RemoveSecurityAuditor")
+            .WithSummary("Removes a Security Auditor (RevokeSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up and a removal reason code. There is no last-auditor rule. 204 once Effective.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         // Phase C8 M1 (PG-041): aggregate of independently failing parts; owners and Security Administrators only (the Authority decides).
         var overview = endpoints.MapGroup(ApiVersions.V1Prefix + "/organization/overview").WithTags(OwnerName).WithFeatureOwner(OwnerName).RequireAuthorization(BusinessAuthentication.Policy);

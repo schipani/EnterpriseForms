@@ -1766,8 +1766,59 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains. */
+        /** Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective. Nobody removes themself (403 SELF_CHANGE_FORBIDDEN, D8-62a): another Security Administrator performs the removal. */
         post: operations["RemoveSecurityAdministrator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/security-auditors/reason-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The owner-approved Security Auditor appointment and removal reason codes with their labels (C-110). The Authority validates every submitted code exactly. */
+        get: operations["GetSecurityAuditorReasonCodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/security-auditors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; the optional note goes to the Authority only. The role grants audit viewing and no record content. 204 once Effective. */
+        post: operations["AppointSecurityAuditor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organization/security-auditors/{userId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Removes a Security Auditor (RevokeSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up and a removal reason code. There is no last-auditor rule. 204 once Effective. */
+        post: operations["RemoveSecurityAuditor"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2072,6 +2123,14 @@ export interface components {
             /** Format: uuid */
             userId: string;
             reason: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
+        AppointSecurityAuditorRequest: {
+            /** Format: uuid */
+            userId: string;
+            reasonCode: null | string;
+            reasonNote?: null | string;
             /** @default false */
             useDevelopmentStepUp: boolean;
         };
@@ -3568,6 +3627,12 @@ export interface components {
             /** @default false */
             useDevelopmentStepUp: boolean;
         };
+        RemoveSecurityAuditorRequest: {
+            reasonCode: null | string;
+            reasonNote?: null | string;
+            /** @default false */
+            useDevelopmentStepUp: boolean;
+        };
         RenameFormDefinitionRequest: {
             formDefinitionName: string;
             /** Format: int64 */
@@ -3675,6 +3740,14 @@ export interface components {
             appointmentUnavailableReason: string;
             administrators: components["schemas"]["SecurityAdministratorResponse"][];
             candidates: components["schemas"]["SecurityAdministratorCandidateResponse"][];
+        };
+        SecurityAuditorReasonCodeResponse: {
+            reasonCode: string;
+            reasonLabel: string;
+        };
+        SecurityAuditorReasonCodesResponse: {
+            appointment: components["schemas"]["SecurityAuditorReasonCodeResponse"][];
+            removal: components["schemas"]["SecurityAuditorReasonCodeResponse"][];
         };
         SecurityIncidentBucketResponse: {
             bucketStartDate: string;
@@ -7385,6 +7458,108 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSecurityAuditorReasonCodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityAuditorReasonCodesResponse"];
+                };
+            };
+        };
+    };
+    AppointSecurityAuditor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppointSecurityAuditorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RemoveSecurityAuditor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemoveSecurityAuditorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

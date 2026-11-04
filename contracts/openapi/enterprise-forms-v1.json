@@ -4888,7 +4888,7 @@
         "tags": [
           "Organizations"
         ],
-        "summary": "Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective; self-removal allowed while another remains.",
+        "summary": "Removes a Security Administrator (RevokeSystemRole, step-up, reason, audited). The last Security Administrator cannot be removed (409 LAST_SECURITY_ADMINISTRATOR). 204 once Effective. Nobody removes themself (403 SELF_CHANGE_FORBIDDEN, D8-62a): another Security Administrator performs the removal.",
         "operationId": "RemoveSecurityAdministrator",
         "parameters": [
           {
@@ -4927,6 +4927,126 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/security-auditors/reason-codes": {
+      "get": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "The owner-approved Security Auditor appointment and removal reason codes with their labels (C-110). The Authority validates every submitted code exactly.",
+        "operationId": "GetSecurityAuditorReasonCodes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityAuditorReasonCodesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/security-auditors": {
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; the optional note goes to the Authority only. The role grants audit viewing and no record content. 204 once Effective.",
+        "operationId": "AppointSecurityAuditor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointSecurityAuditorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/security-auditors/{userId}/remove": {
+      "post": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Removes a Security Auditor (RevokeSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up and a removal reason code. There is no last-auditor rule. 204 once Effective.",
+        "operationId": "RemoveSecurityAuditor",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveSecurityAuditorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5793,6 +5913,35 @@
             "format": "uuid"
           },
           "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "AppointSecurityAuditorRequest": {
+        "required": [
+          "userId",
+          "reasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonNote": {
             "type": [
               "null",
               "string"
@@ -11638,6 +11787,30 @@
           }
         }
       },
+      "RemoveSecurityAuditorRequest": {
+        "required": [
+          "reasonCode"
+        ],
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "useDevelopmentStepUp": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "RenameFormDefinitionRequest": {
         "required": [
           "formDefinitionName",
@@ -12072,6 +12245,42 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SecurityAdministratorCandidateResponse"
+            }
+          }
+        }
+      },
+      "SecurityAuditorReasonCodeResponse": {
+        "required": [
+          "reasonCode",
+          "reasonLabel"
+        ],
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": "string"
+          },
+          "reasonLabel": {
+            "type": "string"
+          }
+        }
+      },
+      "SecurityAuditorReasonCodesResponse": {
+        "required": [
+          "appointment",
+          "removal"
+        ],
+        "type": "object",
+        "properties": {
+          "appointment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAuditorReasonCodeResponse"
+            }
+          },
+          "removal": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAuditorReasonCodeResponse"
             }
           }
         }
