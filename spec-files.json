@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "010a1bbc5bde61f79ed0870cff413775ae1907cf37e033444133a920dfeb7cb6",
-      "bytes": 94621
+      "sha256": "ae5335f1e76ec87529d6ebc28357c782b4c70725e36f10b021d657b8650fc105",
+      "bytes": 96386
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -204,8 +204,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md",
-      "sha256": "1a51f48372fd03f96c85bcd1ef55e6df9dcac1032654a4b33457406df8beb043",
-      "bytes": 33512
+      "sha256": "2bdbc6644c68b4195e7355dc60407cf942cc1090f9564b6a00fe85b1671d1082",
+      "bytes": 49823
     },
     {
       "path": "docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md",
@@ -304,8 +304,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "09e347ab095bd1e99497d201d1f5fc0dc44fb8c460746f45929a220bea5af63d",
-      "bytes": 168309
+      "sha256": "e61369979c430cbf6eb50ff116aef2f59a2e6e1c5f4240aecf67ae9c8a9c9040",
+      "bytes": 172583
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -434,8 +434,8 @@
     },
     {
       "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
-      "sha256": "dc096d0018cd4a745b1e9c12f16870a2dc04aff7387dd91d60bbefdbf7122bcf",
-      "bytes": 21554
+      "sha256": "cca760b72a894cf5bcfc742d6ed889bf9fbdc1fd80175cc3dc98d9a560cc82e9",
+      "bytes": 21965
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",

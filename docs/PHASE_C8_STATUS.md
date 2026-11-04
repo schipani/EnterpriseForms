@@ -633,3 +633,19 @@ Changes after the owner's review of M3 (no Authority, permission or migration ch
   * owner decisions D8-62…D8-70 and reviewer questions Q-1…Q-5.
 - **Finding recorded (pre-existing, not new to M4):** the business database has no PostgreSQL row-level security (F-10; G08 open). The audit explorer relies on a single tenant-bound query adapter plus negative tests, and claims no RLS.
 - **Not done:** nothing implemented. No Authority, business, schema or UI change. D8-6/D8-7 (C-78) preserved unchanged. All findings in the contract §12 stay open. This is not an independent review.
+
+## 33. M4 — owner decisions and corrected AC-8 contract (2026-11-04, C-109) — awaiting final owner acceptance; M4-1 not authorized
+
+- **Owner decisions recorded:** D8-62…D8-70, D8-62a (Security Administrator self-removal refused — intentional C-70 change), D8-67a (directory display names shown; field keys, labels, option text, design-diff labels, free-text reasons and matched counts withheld), and Q-1…Q-5. These are owner decisions, not independent approval.
+- **Contract revision 2:** `docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md`.
+  * **Corrections:** E-1 (self-removal is allowed and tested today, F-15); E-2 (no check-and-record atomicity across SpiceDB and AuthorityDb, F-17).
+  * **AC-8.1:** reason codes for auditor commands.
+  * **AC-8.2:** restricted ownership and share envelopes.
+  * **AC-8.3 protocol:** check → `FOR UPDATE NOWAIT` with a bounded transaction → revision compare → `AuditAccessAuthorized` with `delivery: not_attested` → commit, or 503. Bounded retries, rate limits, telemetry.
+  * **AC-8.4/8.5:** Effective-edge rule in one read-only snapshot.
+  * **Redaction table:** D8-67/D8-67a.
+  * **Risk register:** RR-1…RR-10, including RR-3 (auditor tenure).
+  * **Tests and criteria:** tests T01…T23 and acceptance criteria AC-M4-1.1…AC-M4-5.1.
+- **C-70 specification:** `SECURITY_ADMINISTRATOR_MANAGEMENT.md` rule 7 carries an "approved change, not implemented" note. Code and tests are unchanged until M4-1.
+- **Proposed M4-1 boundary:** C-109. Claude's technical choices to confirm: TC-1…TC-5 (contract §10.2).
+- **Not done:** nothing implemented; nothing pushed; no PR. Independent review is still required for closure and merge; Azure staging evidence is still required before production claims.
