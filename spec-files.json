@@ -439,8 +439,8 @@
     },
     {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
-      "sha256": "9c8bfa1200ec2d6c5c2c3a9e47dbd66f3f51e08aab1dbfa3c61a05bfbb72d717",
-      "bytes": 6545
+      "sha256": "1bd0f10eaa0dcf47df4467e9a39d6925d81973b04e16c11c9b6385f06ab4c8db",
+      "bytes": 10124
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",
@@ -603,9 +603,19 @@
       "bytes": 4044
     },
     {
+      "path": "scripts/ci/stage_b_groups.py",
+      "sha256": "9d50ec3a7dddab064ff2ed325a08326a3a84c92f45c6aba737c67cc6834ac81e",
+      "bytes": 11632
+    },
+    {
       "path": "scripts/ci/summarize_trx.py",
       "sha256": "4930175f3aeddcfe285e6d1c53d43cfa487a50dd6702e5c852ca5b299cde4265",
       "bytes": 1750
+    },
+    {
+      "path": "scripts/ci/test_stage_b_groups.py",
+      "sha256": "ac479aed153becd4a54c8859bcf4c535a8818a462fe0dc083b0351e38dce98e2",
+      "bytes": 9167
     },
     {
       "path": "scripts/ci/test_test_results.py",
@@ -613,9 +623,14 @@
       "bytes": 4364
     },
     {
+      "path": "scripts/dev/stage-b.ps1",
+      "sha256": "7615baf4588defc7d64c87dbc55e4dd5b35595f305b42493ed20884a3ebe2c54",
+      "bytes": 4306
+    },
+    {
       "path": "scripts/dev/test.ps1",
-      "sha256": "e5ca4a8fe0dcb8d1792c5b154ebcbd59b24378bb571b532a78032c1e9e701470",
-      "bytes": 7815
+      "sha256": "613efc76874c97b592042fbd593bc09f7a1ee9a26933c309d6b2a045ad16cdd5",
+      "bytes": 7849
     },
     {
       "path": "scripts/devstack/devstack.py",

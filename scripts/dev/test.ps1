@@ -90,7 +90,7 @@ try {
         if ($LASTEXITCODE -eq 0) { git diff --exit-code -- contracts/openapi }
         if ($LASTEXITCODE -eq 0) { dotnet build tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj -c Release }
         if ($LASTEXITCODE -eq 0) { dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release }
-        if ($LASTEXITCODE -eq 0) { python -m unittest scripts/ci/test_test_results.py }
+        if ($LASTEXITCODE -eq 0) { python -m unittest scripts/ci/test_test_results.py scripts/ci/test_stage_b_groups.py }
         if ($LASTEXITCODE -eq 0) { python scripts/ci/run_dotnet_tests.py EnterpriseForms.All.slnx --results-dir artifacts/test-results --configuration Release --no-build --minimum-expected-tests 10 --min-total 130 }
       }
     }
