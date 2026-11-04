@@ -615,3 +615,21 @@ Changes after the owner's review of M3 (no Authority, permission or migration ch
 - **Search Approvals navigation (owner correction):** Search Approvals is no longer in the primary navigation; it is reached under Organization, Security & Governance, in the Organization sidebar, and the page uses the shared Organization layout. The URL `/app/organization/search-approvals`, the `security.administer` requirement (checked again by the Authority on every request) and the page content are unchanged; an owner without that capability gets the layout and a refusal and the page requests nothing. The Organization sidebar column is 18rem wide (was 16rem).
 
 - **Active indicator, User area and pinned header (owner request):** the active primary item had a 4px underline, but TanStack merges the base and active class names, so `text-muted` won over `text-body` and the underline took the muted slate colour at the very edge of the 44px link. Both navigation levels now draw a 3-4px solid underline under the label in the primary token (black by default) from the router's `aria-current="page"`, with a background and semibold text; focus keeps its own outline. A shared `SideNavLayout` (support feature) renders the Organization and the new User sidebars identically (18rem, 18px group and 16px item Lucide icons, 44px items). The User area is `/app/user` (My Profile) and `/app/user/regional`, `/language`, `/text-size` (Experience & Preferences); the five earlier addresses redirect with the router's `redirect` (query and hash kept), and the account menu goes to My Profile and Preferences there. The header stays in the page flow at the top; after about 72px of scrolling (back near 40px) a fixed 3.5rem compact bar takes over with the small logo, the primary links on one row from 1280px (a Menu button below that, which also holds My Profile and Preferences on a phone), the account menu and a visible Sign out (the one session logout). One passive, frame-throttled scroll listener; state changes only at the thresholds; no layout shift; reduced motion respected; `scroll-padding-top: 4.5rem` keeps focused content clear; the sidebars stick below it. Backend, routes of other areas, authorization and the Platform Console are unchanged.
+
+## 32. M4 — Governance audit and security home: architecture and AC-8 security review (2026-11-04, C-108) — proposal, stopped at the AC-8 approval checkpoint
+
+- **Baseline verified:** PR #50 merged (2026-11-04 09:50 UTC); `main` = `c245200`. Branch `phase-c8/m4-governance-audit` was created from that commit.
+- **Delivered:** `docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md`, which contains:
+  * verified facts F-1…F-14;
+  * risks R-1…R-16;
+  * the permission matrix;
+  * AC-8.1 (`security_auditor` / `view_audit` through `GrantSystemRole`, rules A1–A9);
+  * AC-8.2 (sanitized security-command timeline);
+  * AC-8.3 (Authority check-and-record evidence of audit access, fail closed);
+  * AC-8.4 (security overview, authorized from desired state with an Effective-edge rule so it works while the gate is closed);
+  * AC-8.5 (DR-C7-5 coverage as designed);
+  * business contracts, redaction catalog, migrations (indexes only) and tests (AC8-T01…T17, `AuditExplorerTests`, `SecurityHomeTests` in existing shards);
+  * milestones M4-0…M4-5;
+  * owner decisions D8-62…D8-70 and reviewer questions Q-1…Q-5.
+- **Finding recorded (pre-existing, not new to M4):** the business database has no PostgreSQL row-level security (F-10; G08 open). The audit explorer relies on a single tenant-bound query adapter plus negative tests, and claims no RLS.
+- **Not done:** nothing implemented. No Authority, business, schema or UI change. D8-6/D8-7 (C-78) preserved unchanged. All findings in the contract §12 stay open. This is not an independent review.
