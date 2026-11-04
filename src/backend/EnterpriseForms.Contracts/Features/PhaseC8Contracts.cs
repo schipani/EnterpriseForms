@@ -134,13 +134,12 @@ public sealed record OwnerRecoveryObjectionResponse(Guid CaseId, string State, D
 
 /// <summary>
 /// C8 M4 (AC-8.1, C-110): appoint a Security Auditor. <c>ReasonCode</c> is one of the appointment codes from
-/// <c>GET /api/v1/organization/security-auditors/reason-codes</c>; the Authority validates it exactly. <c>ReasonNote</c> is
-/// optional (at most 500 characters), potentially confidential: it is sent to the Authority only, never stored in this
-/// application's database or audit metadata, and never shown to auditors.
+/// <c>GET /api/v1/organization/security-auditors/reason-codes</c>; the Authority validates it exactly. <c>ReasonNote</c> must be
+/// empty: notes are refused (422 <c>REASON_NOTE_NOT_ACCEPTED</c>, D8-72) until the approved note encryption exists.
 /// </summary>
 public sealed record AppointSecurityAuditorRequest(Guid UserId, string? ReasonCode, string? ReasonNote = null, bool UseDevelopmentStepUp = false);
 
-/// <summary>C8 M4 (AC-8.1): remove a Security Auditor with a removal reason code and an optional note (same rules as appointment).</summary>
+/// <summary>C8 M4 (AC-8.1): remove a Security Auditor with a removal reason code (notes refused, as for appointment).</summary>
 public sealed record RemoveSecurityAuditorRequest(string? ReasonCode, string? ReasonNote = null, bool UseDevelopmentStepUp = false);
 
 /// <summary>One owner-approved reason (C-110): the exact wire value and its display label.</summary>

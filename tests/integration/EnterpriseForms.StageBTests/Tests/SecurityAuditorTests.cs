@@ -11,6 +11,8 @@ namespace EnterpriseForms.StageBTests.Tests;
 /// Security Auditor appointment and removal by Security Administrators only, never by oneself (D8-62a for both roles), with
 /// the owner-approved reason codes and an undisclosed note; <c>view_audit</c> grants nothing else; removal and disabling are
 /// immediate for existing tokens; refusals leave only approved evidence; business-database forgery confers nothing.
+/// D8-72 (C-113): reason notes, plaintext or encrypted, are refused by the business API and by the Authority until the
+/// approved note encryption exists, and nothing of a refused note is persisted, journaled or archived.
 /// Contract tests AC8-T01–T05, T07, T13–T15, T17–T19 and T02a. T16 (recovery replay) is not executed here: the harness has
 /// no journal-replay rebuild of SpiceDB (see the M4-1 status). Nothing here is mocked.
 /// </summary>
@@ -130,7 +132,7 @@ public sealed class SecurityAuditorTests(StageBFixture fixture)
         var recordId = created.Root.GetProperty("formRecordId").GetGuid();
 
         Assert.False(await AllowedAsync(s, s.Clerk, "ViewAudit"));
-        var appointed = await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, "InvestigationSupport", "  " + Note + "  ");
+        var appointed = await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, "InvestigationSupport");
         Assert.Equal(HttpStatusCode.NoContent, appointed.Status);
         Assert.Equal(s.Clerk.AuthorityUserId.ToString("D"), AuditorEdges(s));
 
@@ -165,15 +167,14 @@ public sealed class SecurityAuditorTests(StageBFixture fixture)
         Assert.True(filtered.IsSuccess, filtered.Body);
         Assert.Equal([s.Clerk.AuthorityUserId], filtered.Root.GetProperty("members").EnumerateArray().Select(m => m.GetProperty("userId").GetGuid()).ToList());
 
-        // Explicit journal evidence with the structured code; the note (trimmed) only with the command in the Authority.
+        // Explicit journal evidence with the structured code (no note: D8-72).
         var authorization = Journal(s, "authorization");
         Assert.Contains("\"role_name\":\"security_auditor\"", authorization, StringComparison.Ordinal);
         Assert.Contains("\"reason_code\":\"InvestigationSupport\"", authorization, StringComparison.Ordinal);
-        Assert.Contains("\"reason_note\":\"" + Note + "\"", authorization, StringComparison.Ordinal);
+        Assert.Contains("\"reason_note\":null", authorization, StringComparison.Ordinal);
         Assert.DoesNotContain("synthetic-development-step-up", authorization, StringComparison.Ordinal);
-        Assert.DoesNotContain("NOTE-SENTINEL", Journal(s, "audit"), StringComparison.Ordinal);
 
-        // Business projection: actor, target and the code only; the note never reaches the business database.
+        // Business projection: actor, target and the code only.
         var business = BusinessAudit(s, "SECURITY_AUDITOR_APPOINTED");
         Assert.StartsWith($"{s.Administrator.AuthorityUserId:D}|{s.Clerk.AuthorityUserId:D}|", business, StringComparison.Ordinal);
         Assert.Contains("\"reasonCode\": \"InvestigationSupport\"", business, StringComparison.Ordinal); // jsonb text form
@@ -209,24 +210,23 @@ public sealed class SecurityAuditorTests(StageBFixture fixture)
         var s = await ScenarioAsync("aud-refuse");
         foreach (var actor in new[] { s.Designer, s.DesignerOnly, s.Reader })
         {
-            Refused(await AppointAsync(s, actor, s.Clerk.AuthorityUserId, note: Note), "FORBIDDEN", HttpStatusCode.Forbidden);
-            Refused(await AppointAsync(s, actor, actor.AuthorityUserId, note: Note), "FORBIDDEN", HttpStatusCode.Forbidden);
-            Refused(await DirectAsync(s, actor, "GrantSystemRole", AuditorPayload(s.Clerk.AuthorityUserId, note: Note)), "FORBIDDEN");
+            Refused(await AppointAsync(s, actor, s.Clerk.AuthorityUserId), "FORBIDDEN", HttpStatusCode.Forbidden);
+            Refused(await AppointAsync(s, actor, actor.AuthorityUserId), "FORBIDDEN", HttpStatusCode.Forbidden);
+            Refused(await DirectAsync(s, actor, "GrantSystemRole", AuditorPayload(s.Clerk.AuthorityUserId)), "FORBIDDEN");
         }
 
         // D8-62a: never oneself, through the API or directly.
-        Refused(await AppointAsync(s, s.Administrator, s.Administrator.AuthorityUserId, note: Note), "SELF_CHANGE_FORBIDDEN", HttpStatusCode.Forbidden);
-        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", AuditorPayload(s.Administrator.AuthorityUserId, note: Note)), "SELF_CHANGE_FORBIDDEN");
+        Refused(await AppointAsync(s, s.Administrator, s.Administrator.AuthorityUserId), "SELF_CHANGE_FORBIDDEN", HttpStatusCode.Forbidden);
+        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", AuditorPayload(s.Administrator.AuthorityUserId)), "SELF_CHANGE_FORBIDDEN");
 
         // Exact, case-sensitive, direction-specific codes; no mixing of payload shapes.
         const string invalid = "auditCoverageAssignment-INVALID-SENTINEL-9X";
-        Refused(await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, invalid, Note), "INVALID_COMMAND");
+        Refused(await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, invalid), "INVALID_COMMAND");
         Refused(await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, "auditCoverageAssignment"), "INVALID_COMMAND");
         Refused(await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, Remove), "INVALID_COMMAND");
         Refused(await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, "Other"), "INVALID_COMMAND");
-        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", new { authority_user_id = s.Clerk.AuthorityUserId, role_name = "security_auditor", reason = "free text " + Note, reason_code = Appoint, step_up_evidence = "synthetic-development-step-up" }), "INVALID_COMMAND");
+        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", new { authority_user_id = s.Clerk.AuthorityUserId, role_name = "security_auditor", reason = "free text NOTE-SENTINEL", reason_code = Appoint, step_up_evidence = "synthetic-development-step-up" }), "INVALID_COMMAND");
         Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", new { authority_user_id = s.Clerk.AuthorityUserId, role_name = "system_administrator", reason = "governance ticket", reason_code = Appoint, step_up_evidence = "synthetic-development-step-up" }), "INVALID_COMMAND");
-        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", AuditorPayload(s.Clerk.AuthorityUserId, note: new string('n', 501))), "INVALID_COMMAND");
         Refused(await RemoveAsync(s, s.Administrator, s.Clerk.AuthorityUserId), "INVALID_COMMAND"); // not an auditor
         Assert.Equal(string.Empty, AuditorEdges(s));
         Assert.False(await AllowedAsync(s, s.Clerk, "ViewAudit"));
@@ -274,7 +274,7 @@ public sealed class SecurityAuditorTests(StageBFixture fixture)
         Assert.True(await AllowedAsync(s, s.Clerk, "ViewAudit"));
 
         // Another administrator removes the auditor role: the same token loses view_audit on its next check; the administrator role stays.
-        Assert.Equal(HttpStatusCode.NoContent, (await RemoveAsync(s, s.Administrator, s.Clerk.AuthorityUserId, "ConflictOfInterest", Note)).Status);
+        Assert.Equal(HttpStatusCode.NoContent, (await RemoveAsync(s, s.Administrator, s.Clerk.AuthorityUserId, "ConflictOfInterest")).Status);
         Assert.False(await AllowedAsync(s, s.Clerk, "ViewAudit"));
         Assert.True(await AllowedAsync(s, s.Clerk, "AdministerSecurity"));
         Assert.Equal(string.Empty, AuditorEdges(s));
@@ -354,5 +354,67 @@ public sealed class SecurityAuditorTests(StageBFixture fixture)
         Assert.DoesNotContain("SecurityAuditor", Strings(await MemberAsync(s, s.Administrator, s.Reader.AuthorityUserId), "authorityRoles"));
         Assert.Equal(string.Empty, AuditorEdges(s));
         Assert.DoesNotContain("audit.view", await CapabilitiesAsync(s, s.Reader));
+    }
+
+    /// <summary>
+    /// D8-72 (C-113): a note is refused by the business API before anything is sent, and by the Authority directly (plaintext
+    /// or envelope, appointment or removal); nothing of it is persisted, journaled or archived; commands without a note work.
+    /// </summary>
+    [Fact]
+    public async Task ReasonNotesAreRefusedEverywhereAndNothingOfThemIsKept()
+    {
+        var s = await ScenarioAsync("aud-note-containment");
+        Assert.Equal(HttpStatusCode.NoContent, (await AppointAsync(s, s.Administrator, s.Reader.AuthorityUserId)).Status);
+        var commandsBefore = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_commands WHERE organization_id = '{s.OrganizationId:D}';").Trim();
+
+        // Business API: refused before any Authority call (no command row is created).
+        Refused(await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, note: Note), "REASON_NOTE_NOT_ACCEPTED", HttpStatusCode.UnprocessableEntity);
+        Refused(await RemoveAsync(s, s.Administrator, s.Reader.AuthorityUserId, note: Note), "REASON_NOTE_NOT_ACCEPTED", HttpStatusCode.UnprocessableEntity);
+        Assert.Equal(commandsBefore, fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_commands WHERE organization_id = '{s.OrganizationId:D}';").Trim());
+
+        // Authority, directly: plaintext and envelope, both directions.
+        var envelope = new { envelope_version = 1, algorithm_name = "AES-256-GCM", key_reference = "NOTE-SENTINEL-key", note_id = Guid.CreateVersion7(), ciphertext = "Tk9URS1TRU5USU5FTC1jaXBoZXI=", nonce = "AAAAAAAAAAAAAAAA", tag = "AAAAAAAAAAAAAAAAAAAAAA==", wrapped_data_key = "Tk9URS1TRU5USU5FTC13cmFw" };
+        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", AuditorPayload(s.Clerk.AuthorityUserId, note: Note), changeReason: Note), "REASON_NOTE_NOT_ACCEPTED");
+        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", new { authority_user_id = s.Clerk.AuthorityUserId, role_name = "security_auditor", reason_code = Appoint, reason_note_envelope = envelope, step_up_evidence = "synthetic-development-step-up" }), "REASON_NOTE_NOT_ACCEPTED");
+        Refused(await DirectAsync(s, s.Administrator, "RevokeSystemRole", AuditorPayload(s.Reader.AuthorityUserId, Remove, Note)), "REASON_NOTE_NOT_ACCEPTED");
+        Refused(await DirectAsync(s, s.Administrator, "RevokeSystemRole", new { authority_user_id = s.Reader.AuthorityUserId, role_name = "security_auditor", reason_code = Remove, reason_note_envelope = envelope, step_up_evidence = "synthetic-development-step-up" }), "REASON_NOTE_NOT_ACCEPTED");
+        Assert.Equal(s.Reader.AuthorityUserId.ToString("D"), AuditorEdges(s)); // nothing changed
+
+        // Nothing of the notes anywhere: rejected rows, the audit stream (whose archived copies are these exact, digest-checked
+        // bytes), the authorization journal and the business database.
+        var rejections = Journal(s, "audit", "SecurityAuditorCommandRejected");
+        Assert.Equal(4, rejections.Split(" ;; ").Length);
+        Assert.Contains("REASON_NOTE_NOT_ACCEPTED", rejections, StringComparison.Ordinal);
+        foreach (var text in new[] { rejections, RejectedRoleCommands(s), Journal(s, "authorization"), Journal(s, "audit") })
+        {
+            foreach (var secret in new[] { "NOTE-SENTINEL", "Tk9URS1TRU5USU5FTC", "reason_note_envelope", "wrapped_data_key" })
+            {
+                Assert.DoesNotContain(secret, text, StringComparison.Ordinal);
+            }
+        }
+
+        Assert.Equal("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM audit_events WHERE event_metadata_json::text LIKE '%NOTE-SENTINEL%' OR event_description LIKE '%NOTE-SENTINEL%';").Trim());
+
+        // The refusal evidence is archived like every audit-stream entry (receipt recorded, digest verified by the archive processor).
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(60);
+        string pending;
+        do
+        {
+            pending = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{s.OrganizationId:D}' AND journal_event_kind = 'SecurityAuditorCommandRejected' AND archive_delivery_state <> 'Anchored';").Trim();
+            if (pending == "0")
+            {
+                break;
+            }
+
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+        }
+        while (DateTimeOffset.UtcNow < deadline);
+        Assert.Equal("0", pending);
+
+        // Without a note, both directions still work.
+        await WaitForGateAsync(s);
+        Assert.Equal(HttpStatusCode.NoContent, (await RemoveAsync(s, s.Administrator, s.Reader.AuthorityUserId)).Status);
+        Assert.Equal(HttpStatusCode.NoContent, (await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId)).Status);
+        Assert.Equal(s.Clerk.AuthorityUserId.ToString("D"), AuditorEdges(s));
     }
 }

@@ -181,7 +181,7 @@ public static class OrganizationEndpoints
                 return TypedResults.NoContent();
             })
             .WithName("AppointSecurityAuditor")
-            .WithSummary("Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; the optional note goes to the Authority only. The role grants audit viewing and no record content. 204 once Effective.")
+            .WithSummary("Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; reason notes are refused (422 REASON_NOTE_NOT_ACCEPTED) until note encryption exists. The role grants audit viewing and no record content. 204 once Effective.")
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 

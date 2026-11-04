@@ -56,6 +56,18 @@ public sealed class ComposeStack
         return Compose($"exec -T authority-db sh -c \"echo {encodedShell} | base64 -d | sh\"", 60);
     }
 
+    /// <summary>
+    /// C8 M4 T16-S (C-113) restore simulation only: runs a shell inside the spicedb-db container as its administrator, to
+    /// reproduce what restoring SpiceDB's datastore from an earlier backup leaves behind (pg_dump / pg_restore of the
+    /// <c>spicedb</c> database). Never used by product code; exists only on the isolated, disposable security-test stack.
+    /// </summary>
+    public string SpiceDbDatastoreSimulationShell(string shell, int timeoutSeconds = 120)
+    {
+        var prefixed = "export PGUSER=\"$POSTGRES_USER\" PGPASSWORD=\"$POSTGRES_PASSWORD\" PGDATABASE=spicedb; " + shell;
+        var encodedShell = Convert.ToBase64String(Encoding.UTF8.GetBytes(prefixed));
+        return Compose($"exec -T spicedb-db sh -c \"echo {encodedShell} | base64 -d | sh\"", timeoutSeconds);
+    }
+
     public string AttackerShell(string shell, bool throwOnError = true, int timeoutSeconds = 60)
     {
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(shell));

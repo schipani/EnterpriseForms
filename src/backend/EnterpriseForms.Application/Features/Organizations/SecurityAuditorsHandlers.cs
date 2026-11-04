@@ -15,7 +15,8 @@ namespace EnterpriseForms.Application.Features.Organizations;
 /// RevokeSystemRole security commands that only an existing Security Administrator may submit, never for themself, with
 /// step-up and an owner-approved reason code. Every decision is the Authority's: this handler sends every attempt and never
 /// pre-judges the actor, the target or the code (the Authority validates the code exactly and records each refusal).
-/// The optional note goes to the Authority only: it is never written to this application's database, audit metadata or logs.
+/// Reason notes are refused (D8-72, C-113) until the approved note encryption exists: a note is never sent to the Authority,
+/// stored, logged or audited here, and the Authority refuses one independently.
 /// </summary>
 public sealed class SecurityAuditorsHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
 {
@@ -61,16 +62,21 @@ public sealed class SecurityAuditorsHandlers(IBusinessStore store, IAuthorizatio
     private async Task<string> SubmitAsync(RequestContext context, SecurityCommandKind kind, Guid userId, string? reasonCode, string? reasonNote, bool stepUp, string idempotencyKey, CancellationToken cancellationToken)
     {
         var code = reasonCode?.Trim() ?? string.Empty;
-        var note = string.IsNullOrWhiteSpace(reasonNote) ? null : reasonNote.Trim();
-        if (userId == Guid.Empty || code.Length is 0 or > 64 || note is { Length: > 500 })
+        if (!string.IsNullOrWhiteSpace(reasonNote))
         {
-            throw new BusinessException("INVALID_REQUEST", 422, "choose a person and a reason; an optional note may have up to 500 characters");
+            // D8-72 containment: refused before anything is sent; the note is not echoed, logged or stored.
+            throw new BusinessException("REASON_NOTE_NOT_ACCEPTED", 422, "notes are not accepted yet; submit the reason only");
+        }
+
+        if (userId == Guid.Empty || code.Length is 0 or > 64)
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, "choose a person and a reason");
         }
 
         // The decision only supplies the expected revision; the Authority alone decides (no business pre-check, as for administrators).
         var decision = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.AdministerSecurity), cancellationToken).ConfigureAwait(false);
-        var payload = JsonSerializer.SerializeToElement(new { authority_user_id = userId, role_name = RoleName, reason_code = code, reason_note = note, step_up_evidence = stepUp ? SecurityAdministratorsHandlers.SyntheticStepUpMarker : null });
-        // change_reason carries the structured code only, never the note.
+        var payload = JsonSerializer.SerializeToElement(new { authority_user_id = userId, role_name = RoleName, reason_code = code, step_up_evidence = stepUp ? SecurityAdministratorsHandlers.SyntheticStepUpMarker : null });
+        // change_reason carries the structured code only.
         var command = await awaiter.SubmitAndAwaitAsync(context.ToDelegatedUser(), new SecurityCommandRequest(context.OrganizationId, kind, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), decision.AuthorizationRevision, payload, code), idempotencyKey, cancellationToken).ConfigureAwait(false);
         if (command.CommandStatus != SecurityCommandStatus.Effective)
         {

@@ -85,6 +85,10 @@ public static partial class CommandPlanner
     /// <summary>C8 M4 (AC-8.1, rules A1–A9): Security Auditor appointment and removal.</summary>
     private static async Task<CommandPlan> SecurityAuditorAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, bool appoint, CancellationToken cancellationToken)
     {
+        // D8-72 (C-113) containment: no note, plaintext or encrypted, until the approved note encryption exists. Checked on the
+        // raw body first so the refusal is explicit; the rejected row and its evidence keep validated identifiers only.
+        RoleCommandEvidence.RefuseReasonNote(request.CommandPayload);
+
         // Strict binding: a free-text "reason" (the Security Administrator shape) or any other unknown member is rejected.
         var payload = CanonicalJson.Deserialize<SecurityAuditorPayload>(request.CommandPayload);
         RequireResource(request, ResourceKind.Organization, organizationId);
@@ -102,18 +106,12 @@ public static partial class CommandPlanner
                 : "reason_code must be one of the Security Auditor removal codes: " + string.Join(", ", SecurityAuditorReasonCodes.Removal));
         }
 
-        var note = string.IsNullOrWhiteSpace(payload.ReasonNote) ? null : payload.ReasonNote.Trim();
-        if (note is { Length: > SecurityAuditorReasonCodes.MaximumNoteLength })
-        {
-            throw AuthorityException.Invalid($"reason_note is limited to {SecurityAuditorReasonCodes.MaximumNoteLength} characters");
-        }
-
         RefuseSelfRoleChange(actor, payload.AuthorityUserId);
         gate.RequireStepUp(payload.StepUpEvidence);
         var existing = RoleHolders(graph, organizationId, OrganizationRoleNames.SecurityAuditor).FirstOrDefault(e => e.SubjectEntityId == payload.AuthorityUserId);
         var plan = new CommandPlan
         {
-            NormalizedPayloadJson = CanonicalJson.Serialize(payload with { ReasonNote = note, StepUpEvidence = null }),
+            NormalizedPayloadJson = CanonicalJson.Serialize(payload with { ReasonNote = null, StepUpEvidence = null }),
             CommandReasonOverride = payload.ReasonCode,
         };
         if (appoint)
@@ -162,6 +160,23 @@ public static partial class CommandPlanner
 public static class RoleCommandEvidence
 {
     public sealed record Facts(Guid? TargetAuthorityUserId, string? RoleName, string? ReasonCode, bool? ReasonCodeValid);
+
+    /// <summary>D8-72: a non-null <c>reason_note</c> or <c>reason_note_envelope</c> is refused, whatever its content.</summary>
+    public static void RefuseReasonNote(JsonElement payload)
+    {
+        if (payload.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        foreach (var name in new[] { "reason_note", "reason_note_envelope" })
+        {
+            if (payload.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null)
+            {
+                throw new AuthorityException(AuthorityErrorCodes.ReasonNoteNotAccepted, 422, false, "Security Auditor reason notes are not accepted until note encryption is approved and implemented (D8-72); submit the reason code only");
+            }
+        }
+    }
 
     public static string? RoleNameOf(JsonElement payload) =>
         payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("role_name", out var role) && role.ValueKind == JsonValueKind.String ? role.GetString() : null;

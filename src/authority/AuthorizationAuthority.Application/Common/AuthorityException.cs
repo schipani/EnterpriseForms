@@ -70,6 +70,9 @@ public static class AuthorityErrorCodes
 
     // C8 M2 (AC-7) membership and organization-role administration.
     public const string SelfChangeForbidden = "SELF_CHANGE_FORBIDDEN";
+
+    /// <summary>C8 M4 (D8-72, C-113): Security Auditor reason notes are not accepted until the approved note encryption (R1) exists.</summary>
+    public const string ReasonNoteNotAccepted = "REASON_NOTE_NOT_ACCEPTED";
     public const string OwnerApprovalRequired = "OWNER_APPROVAL_REQUIRED";
     public const string ProposalNotPending = "PROPOSAL_NOT_PENDING";
     public const string ProposalExpired = "PROPOSAL_EXPIRED";

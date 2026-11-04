@@ -88,7 +88,8 @@ public sealed class SecurityAuditorTests
     public async Task ASecurityAdministratorAppointsAnAuditorWithAReasonCodeAndOnlyTheAuditorRelationChanges()
     {
         var before = Revision;
-        var status = await AppointAsync(Administrator, Member, SecurityAuditorReasonCodes.InvestigationSupport, "  " + Note + "  ");
+        var status = await SubmitAsync(Administrator, SecurityCommandKind.GrantSystemRole,
+            new SecurityAuditorPayload(Member, OrganizationRoleNames.SecurityAuditor, SecurityAuditorReasonCodes.InvestigationSupport, null, FieldSearchApprovalGate.SyntheticStepUpEvidence), changeReason: "free-text change reason " + Note);
         Assert.Equal(before + 1, status.AuthorizationRevision);
         Assert.True(Holds(Member, OrganizationRoleNames.SecurityAuditor));
         foreach (var other in new[] { OrganizationRoleNames.SystemAdministrator, OrganizationRoleNames.OrganizationOwner, OrganizationRoleNames.Designer })
@@ -96,18 +97,62 @@ public sealed class SecurityAuditorTests
             Assert.False(Holds(Member, other));
         }
 
-        // Explicit journal evidence: kind, role, target and the structured code; the note is kept (trimmed) with the command only.
+        // Explicit journal evidence: kind, role, target and the structured code; never the caller's change_reason text.
         var command = LastCommand;
         Assert.Equal("GrantSystemRole", command.CommandKindName);
-        Assert.Equal(SecurityAuditorReasonCodes.InvestigationSupport, command.CommandReasonText); // never the note, whatever change_reason said
+        Assert.Equal(SecurityAuditorReasonCodes.InvestigationSupport, command.CommandReasonText); // never the caller's change_reason
         using var payload = JsonDocument.Parse(command.CommandPayloadJson);
         Assert.Equal(OrganizationRoleNames.SecurityAuditor, payload.RootElement.GetProperty("role_name").GetString());
         Assert.Equal(Member, payload.RootElement.GetProperty("authority_user_id").GetGuid());
-        Assert.Equal(Note, payload.RootElement.GetProperty("reason_note").GetString());
+        Assert.Equal(JsonValueKind.Null, payload.RootElement.GetProperty("reason_note").ValueKind);
         Assert.Equal(JsonValueKind.Null, payload.RootElement.GetProperty("step_up_evidence").ValueKind);
         var journal = store.Journal.Single(j => j.JournalStreamName == JournalStreamNames.Authorization && j.SecurityCommandId == command.SecurityCommandId);
         Assert.Contains("\"reason_code\":\"InvestigationSupport\"", journal.JournalEventBodyJson, StringComparison.Ordinal);
         Assert.DoesNotContain(FieldSearchApprovalGate.SyntheticStepUpEvidence, journal.JournalEventBodyJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("SEC-4471", journal.JournalEventBodyJson + command.CommandPayloadJson, StringComparison.Ordinal);
+    }
+
+    /// <summary>D8-72 (C-113): until the approved note encryption exists, any note (plaintext or envelope) is refused and leaves nothing behind.</summary>
+    [Fact]
+    public async Task AnyReasonNotePlaintextOrEnvelopeIsRefusedAndNothingOfItIsPersisted()
+    {
+        var envelope = new { envelope_version = 1, algorithm_name = "AES-256-GCM", key_reference = "SEC-4471-key", note_id = Guid.CreateVersion7(), ciphertext = "U0VDLTQ0NzEtY2lwaGVy", nonce = "AAAAAAAAAAAAAAAA", tag = "AAAAAAAAAAAAAAAAAAAAAA==", wrapped_data_key = "U0VDLTQ0NzEtd3JhcHBlZA==" };
+        var attempts = new (SecurityCommandKind Kind, object Payload)[]
+        {
+            (SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note = Note, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
+            (SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note = "   ", step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
+            (SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note_envelope = envelope, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
+            (SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note = Note, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
+            (SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = envelope, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
+        };
+        var revision = Revision;
+        foreach (var (kind, payload) in attempts)
+        {
+            Assert.Equal(AuthorityErrorCodes.ReasonNoteNotAccepted, await RefusedAsync(() => SubmitAsync(Administrator, kind, payload, changeReason: Note)));
+        }
+
+        Assert.Equal(revision, Revision); // nothing committed
+        Assert.False(Holds(Member, OrganizationRoleNames.SecurityAuditor));
+        Assert.True(Holds(Auditor, OrganizationRoleNames.SecurityAuditor));
+        var rejectedRows = store.Commands.Where(c => c.CommandStateName == SecurityCommandStates.Rejected).ToList();
+        Assert.Equal(attempts.Length, rejectedRows.Count);
+        var evidence = AuditStream("SecurityAuditorCommandRejected");
+        Assert.Equal(attempts.Length, evidence.Count);
+        var everything = string.Join(" ", rejectedRows.Select(c => c.CommandPayloadJson + " " + c.CommandReasonText).Concat(evidence.Select(e => e.JournalEventBodyJson)));
+        foreach (var secret in new[] { "SEC-4471", "U0VDLTQ0NzEt", "reason_note", "ciphertext", "wrapped_data_key", FieldSearchApprovalGate.SyntheticStepUpEvidence })
+        {
+            Assert.DoesNotContain(secret, everything, StringComparison.Ordinal);
+        }
+
+        Assert.All(evidence, e => Assert.Contains(AuthorityErrorCodes.ReasonNoteNotAccepted, e.JournalEventBodyJson, StringComparison.Ordinal));
+
+        // Commands without a note (absent or explicitly null) keep working.
+        await AppointAsync(Administrator, Member, SecurityAuditorReasonCodes.ComplianceReview);
+        // An envelope member is not part of the payload contract yet: even null, strict binding refuses it (no mass assignment).
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => SubmitAsync(Administrator, SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = (object?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence })));
+        await SubmitAsync(Administrator, SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note = (string?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence });
+        Assert.True(Holds(Member, OrganizationRoleNames.SecurityAuditor));
+        Assert.False(Holds(Auditor, OrganizationRoleNames.SecurityAuditor));
     }
 
     [Fact]
@@ -164,7 +209,7 @@ public sealed class SecurityAuditorTests
     }
 
     [Fact]
-    public async Task ThePayloadShapesOfTheTwoRolesCannotBeMixedAndTheNoteIsBounded()
+    public async Task ThePayloadShapesOfTheTwoRolesCannotBeMixed()
     {
         // A free-text reason for an auditor, or a reason code for an administrator, is rejected by strict binding.
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => SubmitAsync(Administrator, SecurityCommandKind.GrantSystemRole,
@@ -173,11 +218,8 @@ public sealed class SecurityAuditorTests
             new { authority_user_id = Member, role_name = OrganizationRoleNames.SystemAdministrator, reason = "governance", reason_code = SecurityAuditorReasonCodes.ComplianceReview, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence })));
         Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => SubmitAsync(Administrator, SecurityCommandKind.GrantSystemRole,
             new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }))); // code missing
-        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => AppointAsync(Administrator, Member, note: new string('n', 501))));
-        await AppointAsync(Administrator, Member, note: "   "); // whitespace-only note is stored as none
-        using var payload = JsonDocument.Parse(LastCommand.CommandPayloadJson);
-        Assert.Equal(JsonValueKind.Null, payload.RootElement.GetProperty("reason_note").ValueKind);
         Assert.False(Holds(Member, OrganizationRoleNames.SystemAdministrator));
+        Assert.False(Holds(Member, OrganizationRoleNames.SecurityAuditor));
     }
 
     [Fact]
@@ -224,7 +266,7 @@ public sealed class SecurityAuditorTests
     public async Task RejectionEvidenceHoldsOnlyApprovedFieldsAndNeverTheNoteStepUpOrAnInvalidValue()
     {
         const string invalidCode = "MyOwnReasonWithSecret-SEC-4471";
-        await RefusedAsync(() => AppointAsync(Administrator, Member, invalidCode, Note));
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => AppointAsync(Administrator, Member, invalidCode)));
         var invalid = LastCommand;
         Assert.Equal(SecurityCommandStates.Rejected, invalid.CommandStateName);
         Assert.Null(invalid.CommandReasonText);
@@ -248,8 +290,8 @@ public sealed class SecurityAuditorTests
             Assert.Equal(AuthorityErrorCodes.InvalidCommand, root.GetProperty("rejection_reason").GetString());
         }
 
-        // A valid code refused for another reason (self-change) is recorded, the note still is not.
-        await RefusedAsync(() => AppointAsync(Administrator, Administrator, SecurityAuditorReasonCodes.ComplianceReview, Note));
+        // A valid code refused for another reason (self-change) is recorded.
+        Assert.Equal(AuthorityErrorCodes.SelfChangeForbidden, await RefusedAsync(() => AppointAsync(Administrator, Administrator, SecurityAuditorReasonCodes.ComplianceReview)));
         var self = AuditStream("SecurityAuditorCommandRejected")[^1];
         Assert.Contains("\"reason_code\":\"ComplianceReview\"", self.JournalEventBodyJson, StringComparison.Ordinal);
         Assert.Contains("\"reason_code_valid\":true", self.JournalEventBodyJson, StringComparison.Ordinal);

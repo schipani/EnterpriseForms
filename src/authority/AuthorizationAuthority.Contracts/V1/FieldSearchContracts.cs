@@ -77,9 +77,9 @@ public sealed record SecurityAdministratorPayload(Guid AuthorityUserId, string R
 /// <summary>
 /// C8 M4 (AC-8.1, C-110): payload of GrantSystemRole / RevokeSystemRole when <c>RoleName</c> is <c>security_auditor</c>.
 /// <c>ReasonCode</c> is required and must be one of <see cref="SecurityAuditorReasonCodes"/> for the command's direction
-/// (exact, case-sensitive). <c>ReasonNote</c> is optional (trimmed, at most 500 characters), potentially confidential: it stays
-/// with the command in the Authority journal and is never shown to auditors, in rejection evidence or in business audit
-/// metadata. Free-text <c>reason</c> is not accepted for this role (strict binding rejects it).
+/// (exact, case-sensitive). <c>ReasonNote</c> must be null or absent: D8-72 (C-113) refuses any note, plaintext or encrypted
+/// (<c>REASON_NOTE_NOT_ACCEPTED</c>), until the approved note encryption exists. Free-text <c>reason</c> is not accepted for
+/// this role (strict binding rejects it).
 /// </summary>
 public sealed record SecurityAuditorPayload(Guid AuthorityUserId, string RoleName, string ReasonCode, string? ReasonNote = null, string? StepUpEvidence = null);
 
