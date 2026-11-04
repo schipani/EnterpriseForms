@@ -120,6 +120,23 @@ class ResultTests(unittest.TestCase):
         self.write_all(alpha_extra=passing("ThreeTests", 1))
         self.assertEqual(self.verify_all(), 1)
 
+    def test_duplicated_test_cannot_mask_a_missing_test_in_the_same_class(self) -> None:
+        # OneTests has two tests (Method0, Method1). Method0 ran twice and Method1 never: the per-class count is still 2.
+        dup = [(f"{NS}.OneTests.Method0", "Passed"), (f"{NS}.OneTests.Method0", "Passed")]
+        trx(self.root / "res", "evidence-alpha", dup + passing("TwoTests", 1))
+        trx(self.root / "res", "evidence-beta", passing("ThreeTests", 2))
+        self.assertEqual(sum(sbg.class_counts(sbg.ids_from_trx(self.root / "res" / "evidence-alpha")[0], NS).values()), 3)
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            code = sbg.main(["--manifest", str(self.write_manifest()), "verify-all", "--artifact-prefix", "evidence-", "--list", str(self.root / "all.txt"), "--results", str(self.root / "res")])
+        self.assertEqual(code, 1)
+        self.assertIn("did not execute Demo.Tests.OneTests.Method1", buffer.getvalue())
+        self.assertIn("Method0 executed 2 times", buffer.getvalue())
+
+    def test_theory_cases_are_identified_by_their_arguments(self) -> None:
+        text = chr(10).join(["Discovered 2 tests in assembly - x", f'  {NS}.OneTests.Refused(input: "a.b")', f'  {NS}.OneTests.Refused(input: "c")'])
+        self.assertEqual(sbg.ids_from_listing(text, NS), Counter({f'{NS}.OneTests.Refused(input: "a.b")': 1, f'{NS}.OneTests.Refused(input: "c")': 1}))
+
     def test_empty_result_file_fails(self) -> None:
         self.write_all()
         trx(self.root / "res", "evidence-beta", [])

@@ -34,9 +34,13 @@ Adding a test class: add its name to exactly one group in the manifest. An unass
 
 CI (`stage-b-integration.yml`): `plan` builds once, runs `--list-tests` and fails when any class is unassigned, doubly assigned, stale, or a group would be empty, then emits the matrix. `integration-shard` runs one matrix job per group (`fail-fast: false`), each on its own runner and clean stack, saving `<group>.trx`, logs and its test list as artifact `stage-b-evidence-<group>`, and verifies the executed per-class counts equal the discovered counts. The aggregate `Stage B integration tests (real stack)` (name preserved) needs `plan` and all shards and fails unless both succeeded and `verify-all` proves every discovered test ran exactly once, passed, in its assigned group, with the total at least the 270 baseline; it does not rely on exit codes. `Designer, parent-child, documents (real ClamAV), …` still needs the integration aggregate and the browser job, unchanged.
 
-### Merge protection finding (not changed)
+### Merge protection
 
-`.github/rulesets/main-branch-protection.json` and the live ruleset 25341169 require only the four `ci` checks. None of the Stage B checks (neither the original aggregate nor `Designer, parent-child, …`) is a required status check, so a failing Stage B does not technically block merge; it relies on the owner not merging red. Smallest safe correction (needs owner approval, not applied): append `{ "context": "Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e" }` to the `required_status_checks` list in the tracked ruleset and the live ruleset. That job already runs on every PR to `main`, so it will always report.
+`Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e` (the final Stage B aggregate, which needs the integration aggregate and the browser job) is a required status check in `.github/rulesets/main-branch-protection.json` and, since 2026-11-04, in live ruleset 25341169 (updated through the GitHub API by the repository owner's credentials and read back; enforcement active, no bypass actors, strict status checks on). Before this change none of the Stage B checks was required. The job runs on every pull request to `main` and fails when either the integration aggregate or the browser job is not `success`.
+
+### Exact-once verification
+
+`stage_b_groups.py` compares individual test identities, not only class counts. xunit v3 `--list-tests` prints each test (and each theory case with its argument text, e.g. `Refused(input: "Smith")`) as the same string the TRX stores as `testName` (verified: the 270 discovered and 270 executed identities were identical sets). Every discovered identity must execute exactly once and pass, and nothing undiscovered may run, so a duplicated test cannot mask a missing one. Limitation: identity equality relies on that name format; a theory whose argument text is not stable between runs would fail closed (reported as a missing plus an unexpected test), never pass.
 
 ## What changed in CI (earlier fast-feedback work)
 

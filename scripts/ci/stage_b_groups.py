@@ -32,34 +32,55 @@ def load_manifest(path: Path) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def class_counts_from_listing(text: str, namespace: str) -> Counter:
-    """Per-class test counts from `--list-tests` output (theories are listed once per case, like the TRX)."""
-    pattern = re.compile(r"^\s+" + re.escape(namespace) + r"\.(\w+)\.\w+")
-    counts: Counter = Counter()
+def _identity_pattern(namespace: str) -> re.Pattern:
+    return re.compile(r"(" + re.escape(namespace) + r"\.(\w+)\.\w+.*)$")
+
+
+def class_of(identity: str, namespace: str) -> str:
+    match = _identity_pattern(namespace).match(identity)
+    return match.group(2) if match else "?"
+
+
+def ids_from_listing(text: str, namespace: str) -> Counter:
+    """Full test identities (class.method plus theory arguments) from `--list-tests` output.
+
+    xunit v3 prints each theory case on its own line with its argument text, and writes the identical string as the TRX
+    `testName`, so discovery and execution can be compared identity by identity (verified on the 270-test suite)."""
+    pattern = _identity_pattern(namespace)
+    ids: Counter = Counter()
     for line in text.splitlines():
-        match = pattern.match(line)
+        match = pattern.match(line.strip())
         if match:
-            counts[match.group(1)] += 1
+            ids[match.group(1)] += 1
     declared = re.search(r"Discovered (\d+) tests? in assembly", text)
-    if declared and int(declared.group(1)) != sum(counts.values()):
-        raise ValueError(f"listing declares {declared.group(1)} tests but {sum(counts.values())} were parsed")
+    if declared and int(declared.group(1)) != sum(ids.values()):
+        raise ValueError(f"listing declares {declared.group(1)} tests but {sum(ids.values())} were parsed")
+    return ids
+
+
+def class_counts(ids: Counter, namespace: str) -> Counter:
+    counts: Counter = Counter()
+    for identity, n in ids.items():
+        counts[class_of(identity, namespace)] += n
     return counts
 
 
-def class_counts_from_trx(results_dir: Path, namespace: str) -> tuple[Counter, Counter, int]:
-    """(total per class, non-passed per class, TRX file count). Unrecognised test names are reported under '?'."""
-    pattern = re.compile(re.escape(namespace) + r"\.(\w+)\.\w+")
-    total: Counter = Counter()
+def class_counts_from_listing(text: str, namespace: str) -> Counter:
+    return class_counts(ids_from_listing(text, namespace), namespace)
+
+
+def ids_from_trx(results_dir: Path) -> tuple[Counter, Counter, int]:
+    """(executed identities, non-passed identities, TRX file count)."""
+    executed: Counter = Counter()
     bad: Counter = Counter()
     files = sorted(Path(results_dir).rglob("*.trx"))
     for file in files:
         for result in ET.parse(file).getroot().iterfind("t:Results/t:UnitTestResult", NS):
-            match = pattern.match(result.get("testName", ""))
-            cls = match.group(1) if match else "?"
-            total[cls] += 1
+            name = result.get("testName", "?")
+            executed[name] += 1
             if result.get("outcome") != "Passed":
-                bad[cls] += 1
-    return total, bad, len(files)
+                bad[name] += 1
+    return executed, bad, len(files)
 
 
 def check_coverage(manifest: dict, discovered: Counter) -> list[str]:
@@ -85,35 +106,45 @@ def check_coverage(manifest: dict, discovered: Counter) -> list[str]:
     return errors
 
 
-def group_expected(manifest: dict, discovered: Counter, group: str) -> Counter:
+def group_expected(manifest: dict, ids: Counter, group: str, namespace: str) -> Counter:
+    """The discovered test identities that belong to `group`."""
     match = [g for g in manifest["groups"] if g["name"] == group]
     if len(match) != 1:
         raise KeyError(f"unknown group '{group}'")
-    return Counter({c: discovered[c] for c in match[0]["classes"] if discovered.get(c)})
+    classes = set(match[0]["classes"])
+    return Counter({i: n for i, n in ids.items() if class_of(i, namespace) in classes})
 
 
-def check_results(expected: Counter, results_dir: Path, namespace: str, label: str) -> list[str]:
-    total, bad, files = class_counts_from_trx(results_dir, namespace)
+def check_results(expected: Counter, results_dir: Path, label: str) -> list[str]:
+    """Identity-level exact-once check: every expected test executed exactly as often as discovered (once), nothing
+    unexpected ran, nothing failed. A duplicated test can therefore never mask a missing one in the same class."""
+    executed, bad, files = ids_from_trx(results_dir)
     if files == 0:
         return [f"{label}: no TRX result file under {results_dir}"]
     errors: list[str] = []
     if not expected:
         errors.append(f"{label}: expects zero tests")
-    for cls in sorted(set(expected) | set(total)):
-        if total.get(cls, 0) != expected.get(cls, 0):
-            errors.append(f"{label}: {cls} executed {total.get(cls, 0)} tests, expected {expected.get(cls, 0)}")
-        if bad.get(cls, 0):
-            errors.append(f"{label}: {cls} has {bad[cls]} test(s) that did not pass")
+    for identity in sorted(set(expected) | set(executed)):
+        want, got = expected.get(identity, 0), executed.get(identity, 0)
+        if got == 0:
+            errors.append(f"{label}: did not execute {identity}")
+        elif want == 0:
+            errors.append(f"{label}: executed unexpected test {identity}")
+        elif got != want:
+            errors.append(f"{label}: {identity} executed {got} times, expected {want}")
+        if bad.get(identity, 0):
+            errors.append(f"{label}: {identity} did not pass")
     return errors
 
 
-def read_listing(path: str, namespace: str) -> Counter:
-    return class_counts_from_listing(Path(path).read_text(encoding="utf-8", errors="replace"), namespace)
+def read_ids(path: str, namespace: str) -> Counter:
+    return ids_from_listing(Path(path).read_text(encoding="utf-8", errors="replace"), namespace)
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
     manifest = load_manifest(args.manifest)
-    discovered = read_listing(args.list, manifest["namespace"])
+    ns = manifest["namespace"]
+    discovered = class_counts(read_ids(args.list, ns), ns)
     errors = check_coverage(manifest, discovered)
     total = sum(discovered.values())
     if total < manifest["minimumTotalTests"]:
@@ -151,11 +182,12 @@ def cmd_verify_group(args: argparse.Namespace) -> int:
     manifest = load_manifest(args.manifest)
     ns = manifest["namespace"]
     # The shard's own listing was produced with the group's filter: it must equal the group's slice of the manifest.
-    listed = read_listing(args.list, ns)
+    listed_ids = read_ids(args.list, ns)
+    listed = class_counts(listed_ids, ns)
     wanted = {c for g in manifest["groups"] if g["name"] == args.group for c in g["classes"]}
     errors = [f"{args.group}: the filter discovered {c}, which the manifest does not assign here" for c in listed if c not in wanted]
     errors += [f"{args.group}: manifest class {c} was not discovered by the filter" for c in wanted if c not in listed]
-    errors += check_results(group_expected(manifest, listed, args.group), Path(args.results), ns, args.group)
+    errors += check_results(group_expected(manifest, listed_ids, args.group, ns), Path(args.results), args.group)
     for error in errors:
         print("FAIL ", error)
     print(f"{'PASS' if not errors else 'FAIL'}  group {args.group}: {sum(listed.values())} tests expected")
@@ -165,7 +197,8 @@ def cmd_verify_group(args: argparse.Namespace) -> int:
 def cmd_verify_all(args: argparse.Namespace) -> int:
     manifest = load_manifest(args.manifest)
     ns = manifest["namespace"]
-    discovered = read_listing(args.list, ns)
+    discovered_ids = read_ids(args.list, ns)
+    discovered = class_counts(discovered_ids, ns)
     errors = check_coverage(manifest, discovered)
     executed = 0
     for group in manifest["groups"]:
@@ -175,8 +208,8 @@ def cmd_verify_all(args: argparse.Namespace) -> int:
         if len(found) != 1:
             errors.append(f"{group['name']}: expected exactly one result artifact directory, found {len(found)}")
             continue
-        errors += check_results(group_expected(manifest, discovered, group["name"]), found[0], ns, group["name"])
-        executed += sum(class_counts_from_trx(found[0], ns)[0].values())
+        errors += check_results(group_expected(manifest, discovered_ids, group["name"], ns), found[0], group["name"])
+        executed += sum(ids_from_trx(found[0])[0].values())
     floor = max(args.min_total, manifest["minimumTotalTests"])
     if executed < floor:
         errors.append(f"executed {executed} tests, below the baseline of {floor}")
