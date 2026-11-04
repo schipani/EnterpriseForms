@@ -1,8 +1,8 @@
 # Phase C8 M4: governance audit and security home (AC-8 architecture and security contract)
 
-- **Status:** **revision 2 (C-109, 2026-11-04). Owner decisions recorded. Awaiting the owner's final acceptance of this
-  corrected contract and of the M4-1 authorization boundary in C-109.** Nothing is implemented. No Authority relation,
-  permission, command, route or schema and no business endpoint, migration or page has changed. Revision 1 was C-108.
+- **Status:** **revision 2 (C-109, 2026-11-04), accepted with TC-1…TC-5 in C-110. M4-1 (AC-8.1 only) implemented for
+  Development/Testing (C-111; `docs/PHASE_C8_STATUS.md` §34): not pushed, not merged, not independently reviewed.**
+  AC-8.2–AC-8.5, the audit pages and the Security Home are not built. Revision 1 was C-108.
 - **Baseline:** `main` = `c245200` (PR #50, merged 2026-11-04 09:50 UTC; it includes C8 M1–M3 and AC-7). Branch
   `phase-c8/m4-governance-audit` was created from that commit and is local only (not pushed, no PR).
 - **Audience:** the project owner (final acceptance) and the independent Authority reviewer (AC-8 joins the

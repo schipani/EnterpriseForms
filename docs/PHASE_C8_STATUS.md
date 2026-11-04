@@ -649,3 +649,54 @@ Changes after the owner's review of M3 (no Authority, permission or migration ch
 - **C-70 specification:** `SECURITY_ADMINISTRATOR_MANAGEMENT.md` rule 7 carries an "approved change, not implemented" note. Code and tests are unchanged until M4-1.
 - **Proposed M4-1 boundary:** C-109. Claude's technical choices to confirm: TC-1…TC-5 (contract §10.2).
 - **Not done:** nothing implemented; nothing pushed; no PR. Independent review is still required for closure and merge; Azure staging evidence is still required before production claims.
+
+## 34. M4-1 — AC-8.1 Security Auditor role implemented (2026-11-04, C-110 authorization, C-111) — Development/Testing, not pushed, not merged, not independently reviewed
+
+**Scope (C-109 boundary, nothing beyond it):**
+- **Authority:**
+  * `organization#security_auditor` / `view_audit` and `RequestedAction.ViewAudit`;
+  * `GrantSystemRole` / `RevokeSystemRole` for `security_auditor` with the C-110 reason codes;
+  * D8-62a self-change refusal for both roles;
+  * sanitized rejection evidence (`SecurityAuditorCommandRejected`, sanitized rejected rows);
+  * the roster lists the role.
+- **Business:**
+  * `/api/v1/organization/security-auditors` (reason codes, appoint, remove);
+  * `SECURITY_AUDITOR_APPOINTED` / `_REMOVED` with the reason code only;
+  * People-page role, filter and own-row-free hints;
+  * the Security Administrators card no longer offers self-removal.
+- **UI:** People-page dialog with a required reason-code select and an optional bounded note. It was drafted by a Sonnet subagent and reviewed before commit.
+- **Not built:** AC-8.2–AC-8.5, any audit read endpoint or page, the `audit.view` capability, business migrations.
+
+**Commits (signed, local only):**
+- `b54821f`: Authority.
+- `667643e`: business API and UI.
+- `7c9acf4`: Stage B tests, browser spec and C-70 specification.
+- The commit carrying this section: contract-test update and documentation.
+
+**Verification (local, real stack; each Stage B shard on its own freshly recreated security-test stack, `down -v` plus rebuild, at `7c9acf4`):**
+
+| Run | Result |
+|---|---|
+| Stage B `authorization-security-onboarding` (incl. new `SecurityAuditorTests` ×7, rewritten `SecurityAdministratorTests`) | **69/69 passed**, 0 skipped, 525 s |
+| Stage B `administration-membership` (incl. updated `PeopleDirectoryTests`) | **55/55 passed**, 0 skipped, 687 s |
+| `run_dotnet_tests.py EnterpriseForms.All.slnx` (Authority 322, contract 500, architecture 75, integrity 34, console 23) | **954/954 passed** |
+| Vitest (whole frontend) / ESLint / typecheck | **450/450**, clean, exit 0 |
+| Playwright `security-administrators.spec.ts` + `organization-administration.spec.ts` (isolated stack, guard verified) | **8/8 passed** |
+| OpenAPI and TypeScript client regeneration | Regenerated and committed. The Authority OpenAPI gains only `ViewAudit`. |
+
+An earlier run of the first shard had 3 failures in the new test class. Two were `jsonb` text formatting in assertions, and one was a missing projection-gate wait after a direct command, which correctly fails closed. Those test defects were fixed before the final runs. A contract test that pinned the Security Administrator hint list was updated after the shard runs; that change is test-only.
+
+**Hosted verification:** not run (nothing pushed; owner instruction).
+
+**Contract tests executed:** AC8-T01–T05, T07, T13–T15, T17–T19, T02a, plus the §8.2 C-70 test updates.
+
+**Not executed: T16** (recovery replay after revoke). Neither the Stage B nor the security harness can rebuild SpiceDB from the journal. AC-7's T16 is likewise not executed. T16 stays open.
+
+**Findings recorded in this milestone:**
+- **F-M4-1a:** with self-removal refused, `LAST_SECURITY_ADMINISTRATOR` can no longer trigger through the command path, because the actor is always a remaining enabled administrator. It is kept as defence in depth and unit-tested at planner level.
+- **F-M4-1b:** rejected `GrantSystemRole`/`RevokeSystemRole` rows (both roles) now keep only validated identifiers instead of the raw request body. This tightens storage; the wire contract is unchanged.
+- **F-M4-1c:** `reason_note` is plaintext in AuthorityDb (command payload and authorization journal body) and in the archive, like every existing command reason. The Authority has no application-level encryption for journal text. It never reaches BusinessDb, logs, rejection evidence or auditors. Encrypting it would be a new design (owner decision).
+- **F-M4-1d (pre-existing, out of scope):** rejected commands of other kinds (AC-7 and others) still store the raw request payload, step-up evidence included, on the rejected row.
+- **F-M4-1e (tooling):** `scripts/dev/stage-b.ps1` says the dev and security-test stacks pin the same subnets. They do not (172.31.x versus 172.30.x), so both can run at once. Under Windows PowerShell 5.1, redirecting the script's output in-session turns Docker's stderr into a terminating error. Run it as a child process instead.
+
+**Still open:** RR-1…RR-10 (contract §3.1, RR-3 auditor tenure included), T16, and everything in contract §12. Independent security review is the closure and merge gate; Azure staging evidence is required before production claims.

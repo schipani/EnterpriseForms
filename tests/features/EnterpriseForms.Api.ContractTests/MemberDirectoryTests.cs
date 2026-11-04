@@ -175,8 +175,28 @@ public sealed class MemberDirectoryTests
         ownerAllowed = false;
         securityAllowed = true;
         var page = await Directory().GetAsync(Context, Query(search: "Person 00"), CancellationToken.None);
-        Assert.Equal(["AppointSecurityAdministrator"], Assert.Single(page.Members).AvailableActions);
+        Assert.Equal(["AppointSecurityAdministrator", "AppointSecurityAuditor"], Assert.Single(page.Members).AvailableActions); // C8 M4 (AC-8.1)
         Assert.False(page.CanManageMembers);
+    }
+
+    /// <summary>C8 M4 (AC-8.1, D8-62a): role hints are never offered on one's own row; auditors (also disabled ones) can be removed.</summary>
+    [Fact]
+    public async Task SecurityRoleHintsAreNeverOfferedOnOnesOwnRowAndAuditorsCanBeRemoved()
+    {
+        ownerAllowed = false;
+        securityAllowed = true;
+        members.RemoveAll(m => m.AuthorityUserId == Me);
+        members.Add(new AuthorityRosterMember(Me, "https://issuer.invalid", "sub-Tess-Tester", true, Now.AddDays(-5), null, ["system_administrator", "security_auditor"], null));
+        var auditor = Guid.CreateVersion7();
+        var disabledAuditor = Guid.CreateVersion7();
+        Add(auditor, "Avery Auditor", ["security_auditor"], signedIn: true);
+        Add(disabledAuditor, "Dana Disabled", ["security_auditor"], signedIn: true, enabled: false);
+        var page = await Directory().GetAsync(Context, new MemberDirectoryQuery(null, null, null, 50, null, null), CancellationToken.None);
+        var self = page.Members.Single(m => m.UserId == Me);
+        Assert.Equal(["SecurityAdministrator", "SecurityAuditor"], self.AuthorityRoles);
+        Assert.Empty(self.AvailableActions!);
+        Assert.Equal(["AppointSecurityAdministrator", "RemoveSecurityAuditor"], page.Members.Single(m => m.UserId == auditor).AvailableActions);
+        Assert.Equal(["RemoveSecurityAuditor"], page.Members.Single(m => m.UserId == disabledAuditor).AvailableActions);
     }
 
     [Fact]
