@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "4ae01679b727d44d5a36789f50fc769347ef43da116117a9e14f77a1117fc20d",
-      "bytes": 101074
+      "sha256": "f559bc4af85793bd316d15ba70bc44a9ec03ac577fc839ebef72a7d78c73983c",
+      "bytes": 101937
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -203,6 +203,11 @@
       "bytes": 92014
     },
     {
+      "path": "docs/architecture/PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md",
+      "sha256": "1b39c6c304113f874aca4b1d78e00f02c541859bfa130801829356e436071c0c",
+      "bytes": 17744
+    },
+    {
       "path": "docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md",
       "sha256": "754a0878fa6a0cf3a30e2566d043491fa4754868122fae973facc440d7f70a58",
       "bytes": 49796
@@ -304,8 +309,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "11e054e1ae6bdfb270206e7ac4b8b40274f49945725ea309d67d057984eefee6",
-      "bytes": 177018
+      "sha256": "1759f38a29653fa16277be553aed0486790ae310b80d8c846d997587cc19aa10",
+      "bytes": 178883
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

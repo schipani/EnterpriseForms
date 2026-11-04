@@ -700,3 +700,13 @@ An earlier run of the first shard had 3 failures in the new test class. Two were
 - **F-M4-1e (tooling):** `scripts/dev/stage-b.ps1` says the dev and security-test stacks pin the same subnets. They do not (172.31.x versus 172.30.x), so both can run at once. Under Windows PowerShell 5.1, redirecting the script's output in-session turns Docker's stderr into a terminating error. Run it as a child process instead.
 
 **Still open:** RR-1…RR-10 (contract §3.1, RR-3 auditor tenure included), T16, and everything in contract §12. Independent security review is the closure and merge gate; Azure staging evidence is required before production claims.
+
+## 35. M4-1 conditional acceptance and open findings (2026-11-04, C-112) — proposals only
+
+- **Owner:** AC-8.1 conditionally accepted as implementation evidence. This is not closure and not independent approval; C-111 stays open.
+- **Open findings:**
+  * **RN-1:** `reason_note` is plaintext in AuthorityDb and the archive, which does not meet C-110. Remediation option R1 is proposed.
+  * **RCF-1:** rejected commands of other kinds keep the raw request, step-up evidence included. Severity: Low now, latent High before PB-08.
+  * **T16:** outstanding, mandatory, not waived; decomposition T16-B, T16-S and T16-A proposed.
+- **Reference:** `docs/architecture/PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md` holds the designs, tests, the review package addendum and decisions D8-71…D8-75.
+- **Not done:** nothing implemented, pushed or merged. M4-2 is not started.
