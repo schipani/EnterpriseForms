@@ -4,8 +4,9 @@
 # then the browser end-to-end workflow with Playwright against the Vite dev server proxying to that stack.
 # Zero discovered tests is a failed run. Synthetic credentials only; no customer data.
 #
-# Structure (CI-speed work): the integration tests and the browser tests are independent (the e2e specs create uniquely
-# named forms), so they run CONCURRENTLY, each against its OWN freshly started, clean-state stack. The job named
+# Structure (CI-speed work): the integration tests are sharded into groups (tests/integration/EnterpriseForms.StageBTests/
+# stage-b-groups.json; scripts/ci/stage_b_groups.py proves every test runs exactly once) and run, together with the browser
+# tests, CONCURRENTLY, each on its OWN freshly started, clean-state stack. The job named
 # "Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e" is kept as the aggregate
 # result so the existing status-check name is unchanged; it succeeds only when BOTH parallel jobs executed and passed.
 name: stage-b-integration
@@ -26,15 +27,60 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  integration:
-    name: Stage B integration tests (real stack)
+  # Plan: build once, discover every Stage B test, and prove the group manifest assigns each test class to exactly one
+  # group (a new, unassigned, duplicated, stale or empty group fails here, before any stack is started). The matrix of
+  # shards comes from the manifest, so the manifest is the single source of truth.
+  plan:
+    name: Stage B integration plan (test discovery and group coverage)
     runs-on: ubuntu-24.04
-    # 60 was exceeded once the Phase C8 RC suite was added (run 41093944068 timed out after 57 min of tests with no failure
-    # reported); the same suite completed inside level3-script. A budget only — no test, filter or assertion changes.
-    timeout-minutes: 90
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
     env:
       DOTNET_NOLOGO: "1"
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: Build the Stage B integration test project
+        run: dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release
+      - name: Checker self-tests
+        run: python -m unittest scripts/ci/test_stage_b_groups.py
+      - name: Discover every test and verify the group manifest covers each exactly once
+        id: plan
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/stage-b-plan
+          dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj --no-build -c Release --list-tests > artifacts/stage-b-plan/all-tests.txt
+          python scripts/ci/stage_b_groups.py plan --list artifacts/stage-b-plan/all-tests.txt --matrix-out artifacts/stage-b-plan/matrix.json | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "matrix=$(cat artifacts/stage-b-plan/matrix.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with:
+          name: stage-b-plan
+          path: artifacts/stage-b-plan
+          if-no-files-found: error
+
+  # One shard per group: own runner, own freshly started clean stack, only that group's test classes. fail-fast is off so a
+  # failed group never cancels the others and every group reports independently while the workflow runs.
+  integration-shard:
+    name: Stage B integration shard (${{ matrix.group }})
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      GROUP: ${{ matrix.group }}
+      EVIDENCE: artifacts/stage-b/${{ matrix.group }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
@@ -50,38 +96,92 @@ jobs:
       # fresh runner (NETSDK1004). Restore it here, with the same pinned package versions; no test or assertion is changed.
       - name: Restore the Infrastructure project for the dotnet-ef subprocess used by RC19
         run: dotnet restore src/backend/EnterpriseForms.Infrastructure/EnterpriseForms.Infrastructure.csproj
+      - name: Discover this group's tests (an empty or mismatched selection fails before the stack starts)
+        run: |
+          mkdir -p "$EVIDENCE"
+          FILTER=$(python scripts/ci/stage_b_groups.py filter "$GROUP")
+          dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj --no-build -c Release --list-tests -- --filter-class $FILTER > "$EVIDENCE/group-tests.txt"
+          COUNT=$(grep -cE "^\s+EnterpriseForms\.StageBTests\.Tests\." "$EVIDENCE/group-tests.txt" || true)
+          echo "group $GROUP discovers $COUNT tests"
+          [ "$COUNT" -gt 0 ]
+          echo "EXPECTED_TESTS=$COUNT" >> "$GITHUB_ENV"
       - name: Start the disposable stack with Stage B services (synthetic credentials)
         uses: ./.github/actions/start-stack
         with:
           early-services: clamav
           cache-scope: stage-b
-      - name: Run Stage B integration tests
-        run: >
-          dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj
-          --no-build -c Release
-          --results-directory artifacts/stage-b/test-results --report-xunit-trx
-          -- --minimum-expected-tests 10
+      - name: Run this group's Stage B integration tests
+        run: |
+          FILTER=$(python scripts/ci/stage_b_groups.py filter "$GROUP")
+          dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj \
+            --no-build -c Release --results-directory "$EVIDENCE/test-results" --report-xunit-trx \
+            -- --minimum-expected-tests "$EXPECTED_TESTS" --filter-class $FILTER
+      - name: Verify the executed population equals the group's expected population (never trusts the exit code)
+        if: always()
+        run: |
+          set -o pipefail
+          # uniquely named result file per group
+          for f in "$EVIDENCE"/test-results/*.trx; do if [ -e "$f" ]; then mv "$f" "$EVIDENCE/test-results/$GROUP.trx"; fi; done
+          python scripts/ci/stage_b_groups.py verify-group --group "$GROUP" --list "$EVIDENCE/group-tests.txt" --results "$EVIDENCE/test-results" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Slowest tests (timing visibility only)
         if: always()
-        run: python scripts/ci/summarize_trx.py artifacts/stage-b/test-results
+        run: python scripts/ci/summarize_trx.py "$EVIDENCE/test-results"
       - name: Collect service logs (sanitized by the services; no secrets are logged)
         if: always()
         working-directory: infrastructure/docker
         run: |
-          mkdir -p ../../artifacts/stage-b/logs
+          mkdir -p "../../$EVIDENCE/logs"
           for s in authority api worker clamav business-migrate; do
-            docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env logs --no-color $s > ../../artifacts/stage-b/logs/$s.log 2>&1 || true
+            docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env logs --no-color $s > "../../$EVIDENCE/logs/$s.log" 2>&1 || true
           done
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: always()
         with:
-          name: stage-b-evidence
-          path: artifacts/stage-b
+          name: stage-b-evidence-${{ matrix.group }}
+          path: artifacts/stage-b/${{ matrix.group }}
           if-no-files-found: error
       - name: Tear down
         if: always()
         working-directory: infrastructure/docker
         run: docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env down -v --remove-orphans
+
+  # Aggregate: keeps the original check name. Passes only if the plan and EVERY shard succeeded and the downloaded results
+  # prove each discovered test ran exactly once in its assigned group and passed.
+  integration:
+    name: Stage B integration tests (real stack)
+    needs: [plan, integration-shard]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: stage-b-plan
+          path: plan
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: stage-b-evidence-*
+          path: shards
+      - name: Every test executed exactly once, passed, in its group (missing, stale, empty or failed results fail)
+        if: always()
+        run: |
+          set -o pipefail
+          python scripts/ci/stage_b_groups.py verify-all --list plan/all-tests.txt --results shards | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Per-group slowest tests
+        if: always()
+        run: python scripts/ci/summarize_trx.py shards --top 10
+      - name: Plan and every shard must have succeeded (skipped, cancelled or failed all fail this gate)
+        if: always()
+        env:
+          PLAN: ${{ needs.plan.result }}
+          SHARDS: ${{ needs.integration-shard.result }}
+        run: |
+          echo "plan=$PLAN shards=$SHARDS"
+          [ "$PLAN" = "success" ] && [ "$SHARDS" = "success" ]
 
   browser:
     name: Stage B browser end-to-end (real stack)

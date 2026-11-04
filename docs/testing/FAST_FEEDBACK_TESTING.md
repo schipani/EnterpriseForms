@@ -16,7 +16,29 @@ Notes:
 - A stack that has run the Stage A tamper tests must not be reused for Stage B (`ARCHIVE_BODY_MISMATCH` quarantine). Level 3 therefore runs `down -v` between the two.
 - Examples: `-Level 2 -Class DocumentTests`, `-Level 2 -Spec designer-ux -NoRebuild`, `-Level 2 -Browser`.
 
-## What changed in CI
+## Stage B integration groups (sharding)
+
+The .NET Stage B integration suite (270 tests, ~62 min sequential in run 41709208259) is split into seven groups defined in `tests/integration/EnterpriseForms.StageBTests/stage-b-groups.json`. A group is a list of test classes; filtering uses xunit v3 `--filter-class` (exact fully qualified names), so no test project is duplicated.
+
+```powershell
+scripts/dev/stage-b.ps1 -List                        # groups, test counts, and the coverage check
+scripts/dev/stage-b.ps1 -Group search-catalogue      # one group
+scripts/dev/stage-b.ps1 -Class DocumentTests         # one class
+scripts/dev/stage-b.ps1 -All                         # every group on one stack
+scripts/dev/stage-b.ps1 -Group records-lifecycle -Fresh   # recreate the sectest stack first
+```
+
+The script reuses a running `enterpriseforms-sectest` stack (starting it only when absent; `-Rebuild` after code changes). `-Fresh` runs `down -v` on that disposable project only; the script never touches the dev stack, its volumes or Vite servers. Level 3 is unchanged and still runs the unfiltered suite.
+
+Adding a test class: add its name to exactly one group in the manifest. An unassigned class fails `-List`, the CI `plan` job and `scripts/ci/test_stage_b_groups.py` (offline source-file check).
+
+CI (`stage-b-integration.yml`): `plan` builds once, runs `--list-tests` and fails when any class is unassigned, doubly assigned, stale, or a group would be empty, then emits the matrix. `integration-shard` runs one matrix job per group (`fail-fast: false`), each on its own runner and clean stack, saving `<group>.trx`, logs and its test list as artifact `stage-b-evidence-<group>`, and verifies the executed per-class counts equal the discovered counts. The aggregate `Stage B integration tests (real stack)` (name preserved) needs `plan` and all shards and fails unless both succeeded and `verify-all` proves every discovered test ran exactly once, passed, in its assigned group, with the total at least the 270 baseline; it does not rely on exit codes. `Designer, parent-child, documents (real ClamAV), …` still needs the integration aggregate and the browser job, unchanged.
+
+### Merge protection finding (not changed)
+
+`.github/rulesets/main-branch-protection.json` and the live ruleset 25341169 require only the four `ci` checks. None of the Stage B checks (neither the original aggregate nor `Designer, parent-child, …`) is a required status check, so a failing Stage B does not technically block merge; it relies on the owner not merging red. Smallest safe correction (needs owner approval, not applied): append `{ "context": "Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e" }` to the `required_status_checks` list in the tracked ruleset and the live ruleset. That job already runs on every PR to `main`, so it will always report.
+
+## What changed in CI (earlier fast-feedback work)
 
 Required status-check names are unchanged (the four `ci` jobs listed in `.github/rulesets/main-branch-protection.json`; the `stage-b` job keeps its original name).
 

@@ -1,0 +1,42 @@
+{
+  "_comment": "Single source of truth for Stage B integration sharding. Every test class under Tests/ must appear in exactly one group (scripts/ci/stage_b_groups.py enforces it in CI and in scripts/dev/stage-b.ps1). Groups are balanced by summed test time measured in run 41709208259 (about 3735 s sequential): forms-documents ~180 s, authorization-security-onboarding ~395 s, records-lifecycle ~455 s, administration-membership ~570 s, search-catalogue ~620 s, protection-reconciliation ~715 s, search-execution ~820 s (one 719 s benchmark that cannot be split further).",
+  "namespace": "EnterpriseForms.StageBTests.Tests",
+  "minimumTotalTests": 270,
+  "groups": [
+    {
+      "name": "forms-documents",
+      "title": "Forms, Designer, Validation and Documents",
+      "classes": ["DesignerTests", "DropdownTests", "RulesTests", "FieldEditTests", "FormRenameTests", "RepeatingGroupsTests", "BrandingTests", "FormAccessTests", "ParentChildTests", "RegionalPreferencesTests", "DocumentTests", "DocumentEncryptionAuditTests", "EncryptionTests"]
+    },
+    {
+      "name": "authorization-security-onboarding",
+      "title": "Authorization, Security, Onboarding and Recovery",
+      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests"]
+    },
+    {
+      "name": "records-lifecycle",
+      "title": "Records, Sharing and Lifecycle",
+      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests"]
+    },
+    {
+      "name": "administration-membership",
+      "title": "Administration, Membership and Authority Commands",
+      "classes": ["TeamMembershipReconciliationTests", "PendingAuthorityCommandTests", "MembershipAdministrationTests", "MembershipRequestEditCancelTests", "OwnerTeamJoinStackTests", "AdministrationTests", "PeopleDirectoryTests", "PeopleProfilesPresenceTests"]
+    },
+    {
+      "name": "search-catalogue",
+      "title": "Field Search Catalogue and Approvals",
+      "classes": ["SearchCatalogueTests", "FieldSearchApprovalTests"]
+    },
+    {
+      "name": "search-execution",
+      "title": "Field Search Execution and Benchmark",
+      "classes": ["FieldSearchExecutionTests"]
+    },
+    {
+      "name": "protection-reconciliation",
+      "title": "Protection Migration and Reconciliation",
+      "classes": ["ProtectionReconciliationTests", "FieldProtectionMigrationTests"]
+    }
+  ]
+}
