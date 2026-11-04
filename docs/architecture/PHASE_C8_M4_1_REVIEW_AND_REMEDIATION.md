@@ -1,6 +1,9 @@
 # Phase C8 M4-1: open findings, remediation proposals and review package addendum
 
-- **Status:** **proposal (C-112, 2026-11-04). Nothing in this document is implemented or authorized.**
+- **Status:** **C-112 proposal; owner decisions D8-71…D8-75 in C-113; execution recorded in C-114 (2026-11-04).**
+  * Implemented under C-113: the D8-72 containment and T16-B/T16-S. T16-B passes. T16-S fails and exposed defect **T16S-1** (§2.4).
+  * Not implemented: R1. The existing service does not support the required binding (§1.5), so a design change is presented as D8-76.
+  * Not authorized: RCF-1 remediation and the T16S-1 remediation.
   * M4-1 (AC-8.1) is conditionally accepted as implementation evidence (owner, C-112). That is not milestone closure and not independent approval, and C-111 stays open.
   * Not authorized: push, PR, merge, deploy, M4-2, and any remediation below.
 - **Audience:** the project owner (decisions D8-71…D8-75) and the independent Authority reviewer (§4 joins the AC-5/AC-6/AC-7/AC-9 package). This document is by Claude and is not an independent review.
@@ -83,6 +86,37 @@ C-110 requires the optional auditor note to be "treated as potentially confident
   * an architecture test that the Authority has no reference to business encryption or the key provider;
   * the idempotency digest covers the envelope.
 
+### 1.5 C-113 verification: does the existing service support the required context binding? **No, not as designed.**
+
+`AesGcmFieldEncryptionService.Aad` is fixed:
+
+```
+"DynamicForms/FieldValue/v1" ‖ int32 envelope version ‖ TenantId ‖ FormRecordId ‖ FieldDefinitionId ‖ FieldValueItemId (16-byte big-endian UUIDs) ‖ int32 length ‖ LogicalType (UTF-8)
+```
+
+- **Context type:** the input is the field-value-specific `FieldEncryptionContext`; the stored envelope is the `FieldEncryptedValue` entity.
+- **Domain label:** a constant for field values.
+- **File service:** `AesGcmFileEncryptionService` is likewise fixed to tenant, record, attachment and version.
+
+Neither offers a context for organization, target user, role, direction and note id. There are two ways to bind the note, and both are cryptographic-usage changes, so per C-113 **R1 is not implemented** and this minimal change is presented for approval:
+
+| Option | Change | Assessment |
+|---|---|---|
+| **M1 (recommended)** | A new `AesGcmAuditorNoteSealer` in business Infrastructure, behind a new port `IAuditorNoteSealer` (`Seal(context, plaintext)` only; no `Open` while D8-73 forbids decryption). It uses the **identical** construction: AES-256-GCM, a random 256-bit per-note DEK wrapped by the existing `IEncryptionKeyProvider`, a random 96-bit nonce, a 128-bit tag, the DEK zeroed after use. Only the AAD differs: `"DynamicForms/AuditorReasonNote/v1"` ‖ int32 version ‖ organization ‖ target Authority user ‖ note id (16-byte big-endian UUIDs) ‖ length-prefixed role name ‖ length-prefixed direction (`appoint`/`remove`). | Same primitive, key provider and key, with a new domain label giving cryptographic domain separation from field values and documents. The existing field and file services are **not modified**: duplicating about 40 lines avoids any risk to field encryption. A known-answer vector and cross-domain tests prove a field ciphertext cannot be opened as a note and the reverse. |
+| M2 | Call the existing `IFieldEncryptionService` unchanged, mapping `TenantId` to organization, `FormRecordId` to target, `FieldDefinitionId` to note id, `FieldValueItemId` to a constant, and `LogicalType` to `"AuditorReasonNote:{role}:{direction}"` | No new code path, but the identifier slots are overloaded and separation from field values rests on the logical-type string under the field-value domain label. That is error-prone and harder to review. **Not recommended.** |
+
+**Substitution protection with M1:**
+- The Authority cannot decrypt (no key), but it validates the envelope's **clear-text context header** (organization, target, role, direction, note id) against the command: organization from the request, target from `authority_user_id`, role from `role_name`, direction from the command kind. Any mismatch is refused.
+- Because the AAD binds the same values, a header altered to match another command makes the ciphertext undecryptable.
+- **Reuse of an envelope in another command** (same organization, target, role and direction) is refused by a note-id uniqueness check over the organization's committed and pending auditor commands (`command_payload_json` containment query; an idempotent replay of the same key is not a reuse).
+
+**Unchanged dependencies to document:**
+- production key providers (Azure Key Vault or Managed HSM) are not implemented;
+- key rotation is not supported, because only the current key reference unwraps;
+- per-organization KEKs do not exist yet.
+
+R1 notes are therefore available in Development/Testing only. Everywhere else, a request with a note is refused (`ENCRYPTION_UNAVAILABLE`), which matches the auditor commands themselves being refused there (PB-08).
+
 ## 2. T16: recovery must not re-grant a revoked auditor
 
 **Status:** outstanding, **mandatory** (owner, C-112). Not waived. Not claimed verified until it passes. The same gap exists for AC-7 T16.
@@ -108,6 +142,52 @@ C-110 requires the optional auditor note to be "treated as potentially confident
 **Harness work (proposed, not authorized):**
 - `ComposeStack` helpers for an Authority-domain SpiceDB datastore dump and restore, mirroring `AuthorityRestoreSimulationSql` (security-test stack only, never product code);
 - a `SpiceDbRollbackTests` class in shard `authorization-security-onboarding`, covering T16-B and T16-S for both the auditor and the AC-7 roles.
+
+### 2.3 Results (C-113 execution, 2026-11-04, commit `b662309`)
+
+| Test | Result |
+|---|---|
+| **T16-B** `RestoringAnOlderBusinessDatabaseCannotRestoreARevokedAuditor` | **PASS.** After a hostile restore of the whole BusinessDb (the business really is older: the `SECURITY_AUDITOR_REMOVED` row is gone), the Authority still holds the committed revoke; `view_audit` is denied, the People roster shows no auditor role, and a second removal is `INVALID_COMMAND`. |
+| **T16-S** `RestoringAnOlderSpiceDbDatastoreCannotMakeARevokedAuthorizationEffective` | **FAIL: security defect T16S-1** (below). The test asserts the secure expectation and is kept failing until an approved remediation exists. |
+
+### 2.4 Defect T16S-1: an older SpiceDB datastore makes revoked authorizations effective again
+
+**Observed** (fresh security-test stack, two independent runs):
+1. A Security Auditor (AC-8.1) and a designer (AC-7) hold their roles.
+2. The `spicedb` database is dumped (`pg_dump -Fc`).
+3. Both roles are revoked through the normal commands. They are Effective, and the Authority checks deny.
+4. SpiceDB is stopped, the datastore is restored from the dump (`pg_restore --clean`), and SpiceDB is restarted.
+5. The Authority's checks now return **`allowed: true`** for the revoked auditor (`view_audit`) **and** the revoked designer (`create_form`), with `authorization_revision = projection_revision = 4` and gate `Ready`. Nothing signals the regression.
+
+**Cause (from the code, §2.1):**
+- The gate trusts only AuthorityDb (`projection_applied_revision`, the stored ZedToken).
+- Checks run `AtLeastAsFresh` against the Authority-held ZedToken. SpiceDB's Postgres datastore marks deletions with a deleted-transaction id, so restored pre-revoke rows are live again and are visible at that token.
+- The `projection_cursor` marker, which the restore also rolled back, is compared only by the projector's next write, never by a read.
+
+**Scope (assessment):**
+- **General, not specific to M4.** Every permission resolved through SpiceDB is exposed to the same rollback:
+  * record discover, read, edit and share (record and share scopes, AC-5 area);
+  * field items and form `design`, `create_record` and `query_fields` (AC-6 field search);
+  * organization roles (AC-7, C-70, AC-8.1);
+  * team-derived access (team membership edges; AC-9's outcome lookup reads AuthorityDb and is not itself affected).
+- **Pre-existing** since Stage A. M4-1 did not introduce it.
+- **Unknown:** how long the stale window lasts. Presumably until the next projection write for the organization fails its cursor compare-and-swap; that is not tested.
+
+**Threat and severity:**
+- A BusinessDb administrator cannot do this. `spicedb-db` is on the internal Authority network, inside the Authority's independently administered domain.
+- The realistic causes are an operational restore of SpiceDB's datastore (a backup, a failover to a lagging replica, or a recovery mistake) or a compromised Authority-domain database.
+- It breaks the recovery invariants of `COORDINATED_DISASTER_RECOVERY.md` (§4R items 1 and 5: never recover authorization from an old snapshot; invalidate ZedTokens after recovery) **silently**.
+- **Severity: High** for recovery and production readiness. It is not exploitable from the business side.
+
+**Remediation candidates (for a separate approval; nothing implemented):**
+
+| ID | Change | Effect | Cost and limits |
+|---|---|---|---|
+| **S1 (recommended now)** | Before answering any check (single and batch), the Authority reads SpiceDB's `projection_cursor` marker fully consistently and requires the marker step to equal `projection_applied_revision`. On mismatch it fails closed (`AUTHORITY_NOT_READY`), sets integrity quarantine for the organization, and raises a security alert. | Detects a restored datastore whose marker is older than the Authority's accepted revision, which covers T16-S. | One extra SpiceDB read per check or batch; PB-09 latency to be measured. It cannot detect an attacker inside the Authority domain who also rewrites the marker (outside the Level 2 trust assumption). |
+| S2 | The same comparison on SpiceDB reconnect or restart and periodically | Cheaper | Leaves a window between probes; complementary to S1, not a substitute. |
+| S3 | An approved rebuild: after any SpiceDB restore, rebuild the organization's tuples from AuthorityDb desired state under the recovery control plane (new marker, new ZedToken, two-person approval) | Restores availability correctly | Part of G14 (T16-A); not a detection control. |
+
+T16-S becomes the regression test for S1. The same test with an AC-7 designer revocation also covers AC-7's T16. After S1, the expected T16-S outcome is **denied, and the organization quarantined until an approved rebuild (S3)**.
 
 ## 3. RCF-1: rejected security commands keep the raw request (separate finding)
 
@@ -180,3 +260,13 @@ To be added to the AC-5/AC-6/AC-7/AC-9 package. The reviewer is asked to confirm
 | D8-73 | Who may decrypt notes | Nobody in-app for now (write-only); any read path is a separate reviewed design |
 | D8-74 | T16 scope for M4 closure | T16-B and T16-S before M4 closure; T16-A under G14 before production |
 | D8-75 | RCF-1 | Recorded now as a PB-08 entry requirement; generalized sanitization and redaction migration as a separate authorized work item |
+
+### 5.1 Decided in C-113, and new decisions requested (C-114)
+
+D8-71…D8-75 were decided in C-113. New requests:
+
+| ID | Decision | Recommendation |
+|---|---|---|
+| D8-76 | R1 minimal design change (§1.5): M1, a separate `AesGcmAuditorNoteSealer` with its own AAD domain and seal-only port, the identical primitive and key provider, existing services unmodified; or M2, slot mapping in the existing field service | **M1** |
+| D8-77 | T16S-1 remediation design (§2.4): S1 check-time cursor verification with quarantine and alert, now; S2 probe as a complement; S3 rebuild under G14 | **S1 now** (+ S2), S3 with G14; the T16-S test is the regression test |
+| D8-78 | Status of the failing T16-S test until S1 is approved and implemented: keep it failing in the suite (honest red) or mark it as a known-defect skip with this reference | **Keep it failing**; the shard reports it explicitly |

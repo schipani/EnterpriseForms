@@ -710,3 +710,22 @@ An earlier run of the first shard had 3 failures in the new test class. Two were
   * **T16:** outstanding, mandatory, not waived; decomposition T16-B, T16-S and T16-A proposed.
 - **Reference:** `docs/architecture/PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md` holds the designs, tests, the review package addendum and decisions D8-71…D8-75.
 - **Not done:** nothing implemented, pushed or merged. M4-2 is not started.
+
+## 36. C-113 execution: containment, R1 checkpoint, T16-B/T16-S (2026-11-04, C-114) — not pushed, not merged, not independently reviewed
+
+- **D8-72 containment:** implemented. Commit `b662309` (the Authority refuses notes; the business API refuses before sending; the UI field is removed).
+- **R1:** stopped. The existing service does not support the required context binding; design change M1 is requested (D8-76).
+- **T16-B:** **PASS**.
+- **T16-S:** **FAIL, security defect T16S-1.** After an older SpiceDB datastore is restored, revoked auditor and designer authorizations are effective again with the gate `Ready`. It is pre-existing and affects all SpiceDB-resolved permissions. Remediation S1 is requested (D8-77); the test is kept failing (D8-78).
+
+**Evidence at `b662309`:**
+
+| Run | Result |
+|---|---|
+| Stage B `authorization-security-onboarding` (fresh stack) | **71/72**; the sole failure is T16-S (the defect). The new containment test and T16-B pass; the SpiceDB restore caused no collateral failures. 551 s |
+| Stage B `administration-membership` (fresh stack) | **55/55**, 683 s |
+| .NET sweep | **955/955** |
+| Vitest / ESLint / typecheck | 450/450, clean, clean |
+| Playwright (two affected specs, isolated stack) | 8/8 |
+
+**Open:** T16S-1 (RR-11), RN-1 (contained, RR-12), RCF-1 (RR-13), T16-A under G14 (RR-14), and every item listed in §34. C-111 is open; M4-2 is not started.
