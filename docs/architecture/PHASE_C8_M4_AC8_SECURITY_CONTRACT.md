@@ -105,8 +105,8 @@
 | RR-8 | An authorized read can be served in the gap between the Authority's answer and the business query, even if a revocation commits in that gap. | Accepted, system-wide (R-9) |
 | RR-9 | A recorded `AuditAccessAuthorized` entry does not prove delivery. A business-reported delivery outcome is unverifiable. | By design (R-18) |
 | RR-10 | Per-organization audit-access rate limits are per Authority instance. With several instances the effective limit multiplies. | Open; documented with the limits |
-| RR-11 | **T16S-1:** restoring SpiceDB's datastore from an older backup makes revoked authorizations effective again (auditor, designer, and generally every SpiceDB-resolved permission) with the gate `Ready` | **Open, High** (pre-existing; C-114). Remediation S1 proposed (D8-77). |
-| RR-12 | **RN-1:** the auditor note was plaintext in AuthorityDb and the archive | **Contained** by D8-72 (notes refused); R1 awaits design approval (D8-76) |
+| RR-11 | **T16S-1:** restoring SpiceDB's datastore from an older backup makes revoked authorizations effective again (auditor, designer, and generally every SpiceDB-resolved permission) with the gate `Ready` | **Open, High** (pre-existing; C-114). S1 approved as a direction (D8-77, C-115); protocol Design B awaits approval (B-Q1…B-Q4); T16-S stays failing (D8-78). |
+| RR-12 | **RN-1:** the auditor note was plaintext in AuthorityDb and the archive | **Contained** by D8-72 (notes refused); M1 conditionally approved (D8-76); Design A contract awaits approval (A-Q1…A-Q3, C-115) |
 | RR-13 | **RCF-1:** rejected commands of other kinds keep the raw request, step-up evidence included | Open, Low now and latent High; must be fixed before PB-08 (D8-75) |
 | RR-14 | **T16-A:** full Authority recovery (AuthorityDb + SpiceDB restored) is untested and needs the G14 recovery plane | Open; production-readiness blocker (D8-74) |
 

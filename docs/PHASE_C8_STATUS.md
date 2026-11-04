@@ -729,3 +729,28 @@ An earlier run of the first shard had 3 failures in the new test class. Two were
 | Playwright (two affected specs, isolated stack) | 8/8 |
 
 **Open:** T16S-1 (RR-11), RN-1 (contained, RR-12), RCF-1 (RR-13), T16-A under G14 (RR-14), and every item listed in §34. C-111 is open; M4-2 is not started.
+
+## 37. Owner decisions D8-76…D8-78; Designs A and B presented (2026-11-04, C-115) — design only, nothing implemented
+
+- **Design document:** `docs/architecture/PHASE_C8_M4_1_DESIGNS_M1_S1.md` (Opus).
+- **Design A (M1):** a seal-only note sealer with its own AAD domain, using the existing primitive and key provider. It defines the exact AAD, envelope schema, validation contract (V1–V11, B1–B8), key-version and recovery behaviour, and tests A-T01…A-T13.
+- **Design B (S1):** pin, decide, verify:
+  * marker pin, then `at_exact_snapshot` decisions with a `checked_at` proof, then a decisive `fully_consistent` marker read, then the AuthorityDb re-read;
+  * lock-confirmed persistent quarantine, an audit event and a Critical alert;
+  * the S2 periodic check;
+  * the regression matrix RB-01…RB-15 and characterisation tests CT-1…CT-6.
+- **New evidence (read-only probes on `authzed/spicedb:v1.56.2`, security-test stack):**
+  * `at_least_as_fresh` ignores a foreign-datastore token and accepts a future token, echoing it;
+  * `checked_at` equals the exact-snapshot token;
+  * zero-match reads stream no token;
+  * the `at_exact_snapshot` error classes are `Unknown` (different datastore), `OutOfRange` (future or expired) and `InvalidArgument` (malformed).
+
+  No SpiceDB data was written.
+- **Unchanged:**
+  * T16-S stays failing (D8-78);
+  * T16S-1 is open (RR-11);
+  * D8-72 containment is active (RR-12);
+  * C-111 is open;
+  * M4-2 is not started;
+  * nothing is pushed.
+- **Decisions requested:** A-Q1…A-Q3 and B-Q1…B-Q4.

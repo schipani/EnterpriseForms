@@ -1,6 +1,7 @@
 # Phase C8 M4-1: open findings, remediation proposals and review package addendum
 
 - **Status:** **C-112 proposal; owner decisions D8-71…D8-75 in C-113; execution recorded in C-114 (2026-11-04).**
+  * **C-115:** D8-76…D8-78 decided. Designs A (M1) and B (S1) are in `PHASE_C8_M4_1_DESIGNS_M1_S1.md` and await approval. Nothing more is implemented.
   * Implemented under C-113: the D8-72 containment and T16-B/T16-S. T16-B passes. T16-S fails and exposed defect **T16S-1** (§2.4).
   * Not implemented: R1. The existing service does not support the required binding (§1.5), so a design change is presented as D8-76.
   * Not authorized: RCF-1 remediation and the T16S-1 remediation.
