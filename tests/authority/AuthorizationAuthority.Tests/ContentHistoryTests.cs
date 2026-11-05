@@ -35,8 +35,16 @@ public sealed class ContentHistoryTests
 
         public Action? DuringCheck { get; set; }
 
+        /// <summary>C8 M4 S1: the projection marker a consistent SpiceDB reports for the organization.</summary>
+        public Func<Guid, MarkerObservation>? Markers { get; set; }
+
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
+            if (targetMethod?.Name == nameof(ISpiceDbProjection.ReadMarkerAsync))
+            {
+                return Task.FromResult(Markers!((Guid)args![0]!));
+            }
+
             if (targetMethod?.Name != nameof(ISpiceDbProjection.CheckAsync))
             {
                 throw new NotSupportedException("unexpected call " + targetMethod?.Name);
@@ -74,8 +82,9 @@ public sealed class ContentHistoryTests
             SpiceDbControl.Allowed.Add(("edit", Owner.ToString("D")));
             SpiceDbControl.Allowed.Add(("discover", Owner.ToString("D")));
             SpiceDbControl.Allowed.Add(("discover", Reader.ToString("D")));
-            Service = new ContentService(Store, mac, spiceDb, new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true));
-            State = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
+            SpiceDbControl.Markers = org => TestProjection.MarkerFor(Store.Organizations.Single(o => o.OrganizationId == org));
+            Service = new ContentService(Store, mac, TestProjection.Verifier(Store, spiceDb), new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true));
+            State = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous }.WithJournalDigest();
             Store.Organizations.Add(State);
             foreach (var user in new[] { Owner, Reader })
             {
@@ -252,7 +261,7 @@ public sealed class ContentHistoryTests
     public async Task AnotherOrganizationsRecordIsNotFoundAndAnUnboundActorIsRefused()
     {
         var h = await new Harness().WithRevisionsAsync(1);
-        var other = new OrganizationAuthorizationState { OrganizationId = Guid.CreateVersion7(), AuthorizationRevision = 1, ProjectionAppliedRevision = 1, ProjectionZedToken = "zed-1", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
+        var other = new OrganizationAuthorizationState { OrganizationId = Guid.CreateVersion7(), AuthorizationRevision = 1, ProjectionAppliedRevision = 1, ProjectionZedToken = "zed-1", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous }.WithJournalDigest();
         h.Store.Organizations.Add(other);
         h.Store.Bindings.Add(new IdentityBinding { IdentityBindingId = Guid.CreateVersion7(), OrganizationId = other.OrganizationId, AuthorityUserId = h.Owner, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = h.Owner.ToString("D"), IdentityBindingEnabled = true });
 

@@ -40,6 +40,12 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         return await projection.Union(archive).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await context.OrganizationStates.AsNoTracking().OrderBy(o => o.OrganizationId).Select(o => o.OrganizationId).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction) : IAuthorityScope
     {
         private bool committed;

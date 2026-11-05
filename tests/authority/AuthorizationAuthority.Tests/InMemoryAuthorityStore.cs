@@ -73,6 +73,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     public Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>([]);
 
+    public Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>(Organizations.Select(o => o.OrganizationId).ToList());
+
     private sealed class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
     {
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
@@ -148,7 +150,7 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
         public void AddOutboxEvent(ProjectionOutboxEvent outboxEvent) => s.Outbox.Add(outboxEvent);
 
-        public Task<ProjectionOutboxEvent?> FindOutboxEventAsync(Guid organizationId, long targetAuthorizationRevision, CancellationToken cancellationToken) => Task.FromResult<ProjectionOutboxEvent?>(null);
+        public Task<ProjectionOutboxEvent?> FindOutboxEventAsync(Guid organizationId, long targetAuthorizationRevision, CancellationToken cancellationToken) => Task.FromResult(s.Outbox.FirstOrDefault(o => o.OrganizationId == organizationId && o.TargetAuthorizationRevision == targetAuthorizationRevision));
 
         public void AddJournalEntry(SecurityJournalEntry entry) => s.Journal.Add(entry);
 

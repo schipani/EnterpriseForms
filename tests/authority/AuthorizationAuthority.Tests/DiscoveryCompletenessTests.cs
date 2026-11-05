@@ -37,7 +37,7 @@ public sealed class DiscoveryCompletenessTests
 
     private sealed class Harness
     {
-        public OrganizationAuthorizationState State { get; } = new() { OrganizationId = Org, AuthorizationRevision = 41, ProjectionAppliedRevision = 41, ProjectionZedToken = "zed-41", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
+        public OrganizationAuthorizationState State { get; } = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 41, ProjectionAppliedRevision = 41, ProjectionZedToken = "zed-41", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous }.WithJournalDigest();
 
         public List<Guid> Registered { get; } = [];
 
@@ -67,6 +67,7 @@ public sealed class DiscoveryCompletenessTests
                 {
                     OrganizationId = Org, AuthorizationRevision = State.AuthorizationRevision, ProjectionAppliedRevision = State.ProjectionAppliedRevision, ProjectionZedToken = State.ProjectionZedToken,
                     CheckpointEnforcementModeName = State.CheckpointEnforcementModeName, IntegrityQuarantineEnabled = State.IntegrityQuarantineEnabled,
+                    LatestSecurityJournalDigest = State.LatestSecurityJournalDigest,
                 });
             };
             scopeControl.Handlers["GetActiveRecordIdsAsync"] = _ => Task.FromResult(Registered.ToList());
@@ -74,15 +75,17 @@ public sealed class DiscoveryCompletenessTests
             var (store, storeControl) = CreateFake<IAuthorityStore>();
             storeControl.Handlers["BeginScopeAsync"] = _ => Task.FromResult(scope);
             var (spiceDb, spiceControl) = CreateFake<ISpiceDbProjection>();
+            MarkerObservation? marker = null; // the projection SpiceDB holds when first read (revision 41); it does not move during the lookup
+            spiceControl.Handlers["ReadMarkerAsync"] = _ => Task.FromResult(marker ??= TestProjection.MarkerFor(State));
             spiceControl.Handlers["LookupResourcesAsync"] = args =>
             {
                 Assert.Equal("discover", args![1]);
                 Assert.Equal(User.ToString("D"), args[3]);
-                Assert.Equal("zed-41", args[4]);
+                Assert.Equal("pin-41", ((VerifiedProjectionSnapshot)args[4]!).Pin); // C8 M4 S1: the lookup runs at the pinned snapshot
                 MaximumRequested = (int)args[5]!;
                 return LookupFailure is null ? Task.FromResult<IReadOnlyList<string>>(Discoverable.ToList()) : Task.FromException<IReadOnlyList<string>>(LookupFailure);
             };
-            return new PermissionCheckService(store, spiceDb);
+            return new PermissionCheckService(store, TestProjection.Verifier(store, spiceDb));
         }
     }
 
@@ -150,8 +153,9 @@ public sealed class DiscoveryCompletenessTests
         Assert.True(failure.Retryable);
 
         var quarantined = WithRecords(10);
+        // C8 M4 S1: a quarantine committed while the lookup ran is reported as the quarantine (423), still failing closed.
         quarantined.DuringLookup = state => state.IntegrityQuarantineEnabled = true;
-        Assert.Equal(AuthorityErrorCodes.AuthorityNotReady, (await Assert.ThrowsAsync<AuthorityException>(() => quarantined.Build().DiscoverAsync(Actor, new DiscoverRecordsRequest(Org, 250, null), CancellationToken.None))).ErrorCode);
+        Assert.Equal(AuthorityErrorCodes.IntegrityQuarantine, (await Assert.ThrowsAsync<AuthorityException>(() => quarantined.Build().DiscoverAsync(Actor, new DiscoverRecordsRequest(Org, 250, null), CancellationToken.None))).ErrorCode);
     }
 
     [Fact]

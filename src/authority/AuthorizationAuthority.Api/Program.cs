@@ -92,6 +92,9 @@ public sealed class Program
         builder.Services.AddSingleton<SpiceDbSchemaInitializer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SpiceDbSchemaInitializer>());
         builder.Services.AddHostedService<AuthorityWorkLoop>();
+        // C8 M4 S1 (S2): periodic projection-integrity check; it complements, never replaces, the decision-time protocol.
+        builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectionIntegrityOptions.SectionName).Get<ProjectionIntegrityOptions>() ?? new ProjectionIntegrityOptions());
+        builder.Services.AddHostedService<ProjectionIntegrityMonitorLoop>();
 
         var app = builder.Build();
 

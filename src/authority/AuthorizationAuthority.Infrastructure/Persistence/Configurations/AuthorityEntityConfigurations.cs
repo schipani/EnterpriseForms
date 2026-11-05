@@ -22,6 +22,8 @@ public sealed class OrganizationAuthorizationStateConfiguration : IEntityTypeCon
         builder.Property(e => e.OrganizationDisplayName).HasMaxLength(200);
         builder.Property(e => e.CheckpointEnforcementModeName).HasMaxLength(30);
         builder.Property(e => e.IntegrityQuarantineReasonCode).HasMaxLength(100);
+        builder.Property(e => e.ProjectionZedToken).HasColumnName("projection_snapshot_zed_token");
+        builder.Property(e => e.LegacyProjectionZedToken).HasColumnName("projection_zed_token");
         builder.HasIndex(e => e.OrganizationOnboardingRequestId).IsUnique().HasFilter("organization_onboarding_request_id IS NOT NULL").HasDatabaseName("uq_organization_onboarding_request");
         builder.HasOne<OrganizationOnboardingRequest>().WithMany().HasForeignKey(e => e.OrganizationOnboardingRequestId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_organization_onboarding_request");
         builder.ToTable(t =>
@@ -29,6 +31,7 @@ public sealed class OrganizationAuthorizationStateConfiguration : IEntityTypeCon
             t.HasCheckConstraint("ck_projection_never_ahead", "projection_applied_revision <= authorization_revision");
             t.HasCheckConstraint("ck_authorization_revision_non_negative", "authorization_revision >= 0 AND projection_applied_revision >= 0 AND content_integrity_revision >= 0");
             t.HasCheckConstraint("ck_checkpoint_enforcement_mode", "checkpoint_enforcement_mode_name IN ('Asynchronous','RequiredBeforeEffective')");
+            t.HasCheckConstraint("ck_legacy_projection_token_retired", "projection_zed_token IS NULL"); // C8 M4 S1 rollback fence
         });
     }
 }

@@ -117,8 +117,11 @@ public sealed class UnavailableMacProvider(string reason) : IIntegrityMacProvide
     public Task<IntegrityKeyInspection> InspectKeyAsync(string providerKeyName, CancellationToken cancellationToken) => throw new IntegrityProviderUnavailableException(reason);
 }
 
-/// <summary>Readiness = provider usable AND authority store reachable AND SpiceDB schema present AND archive reachable.</summary>
-public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory)
+/// <summary>
+/// Readiness = provider usable AND authority store reachable AND SpiceDB schema present AND archive reachable AND the C8 M4 S1
+/// projection-marker transition completed (until then no decision is pinned and the projector does not write).
+/// </summary>
+public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbProjection spiceDb, ISecurityEventArchive archive, IDbContextFactory<AuthorityDbContext> contextFactory, AuthorizationAuthority.Application.Common.ProjectionMarkerTransitionState transition)
 {
     public async Task<(bool Ready, string Detail)> CheckAsync(CancellationToken cancellationToken)
     {
@@ -148,7 +151,12 @@ public sealed class AuthorityReadiness(IIntegrityMacProvider provider, ISpiceDbP
         }
 
         var (archiveReady, archiveDetail) = await archive.ProbeAsync(cancellationToken).ConfigureAwait(false);
-        return archiveReady ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}") : (false, archiveDetail);
+        if (!archiveReady)
+        {
+            return (false, archiveDetail);
+        }
+
+        return transition.Completed ? (true, $"{providerDetail}; {spiceDetail}; {archiveDetail}; projection markers verified") : (false, "ProjectionMarkerTransitionPending");
     }
 }
 

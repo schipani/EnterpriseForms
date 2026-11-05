@@ -129,5 +129,14 @@ public sealed class AuthorizationRollbackTests(StageBFixture fixture)
         var auditorAllowed = auditor.IsSuccess && auditor.Root.GetProperty("allowed").GetBoolean();
         var designerAllowed = revokedDesigner.IsSuccess && revokedDesigner.Root.GetProperty("allowed").GetBoolean();
         Assert.False(auditorAllowed || designerAllowed, $"T16-S DEFECT: a revoked authorization is effective again after a SpiceDB datastore restore (auditor allowed: {auditorAllowed}; AC-7 designer allowed: {designerAllowed}). Observed: {observed}");
+
+        // C8 M4 S1 (RB-01): fail closed for the whole organization, persistent quarantine with audit-stream evidence and a Critical alert.
+        Assert.Equal((HttpStatusCode.Locked, "INTEGRITY_QUARANTINE"), (auditor.Status, auditor.ErrorCode));
+        Assert.Equal((HttpStatusCode.Locked, "INTEGRITY_QUARANTINE"), (revokedDesigner.Status, revokedDesigner.ErrorCode));
+        Assert.Equal(HttpStatusCode.Locked, stillValid.Status);
+        Assert.Equal("Quarantined", gate.GetProperty("projection_gate_state").GetString());
+        Assert.Equal("true|PROJECTION_MARKER_BEHIND", fixture.Stack.AuthorityObserverSql($"SELECT integrity_quarantine_enabled::text || '|' || integrity_quarantine_reason_code FROM organization_authorization_states WHERE organization_id = '{s.OrganizationId:D}';").Trim());
+        Assert.Equal("1", fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{s.OrganizationId:D}' AND journal_stream_name = 'audit' AND journal_event_kind = 'ProjectionIntegrityQuarantined';").Trim());
+        Assert.Contains($"SECURITY ALERT PROJECTION_INTEGRITY_QUARANTINE organization {s.OrganizationId:D}", fixture.Stack.Logs("authority", 5000), StringComparison.Ordinal);
     }
 }

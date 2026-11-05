@@ -54,7 +54,7 @@ public sealed class ContributorWriteProtocolTests
             var mac = new LocalHmacProvider();
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
             Switch = new ShareContributorWriteSwitch(contributorWritesEnabled, testingOverrideAllowed: true);
-            Service = new ContentService(Store, mac, ThrowingProxy.Create<ISpiceDbProjection>(), new NoOpFaultInjector(), TimeProvider.System, Switch);
+            Service = new ContentService(Store, mac, TestProjection.Verifier(Store, ThrowingProxy.Create<ISpiceDbProjection>()), new NoOpFaultInjector(), TimeProvider.System, Switch);
             State = new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous };
             Store.Organizations.Add(State);
             foreach (var user in new[] { Owner, Contributor })

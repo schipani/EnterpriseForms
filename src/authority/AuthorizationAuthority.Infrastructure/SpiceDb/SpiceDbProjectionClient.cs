@@ -1,5 +1,5 @@
-using System.Globalization;
 using System.Reflection;
+using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
@@ -31,7 +31,9 @@ public sealed class SpiceDbOptions
 /// <summary>
 /// Pure managed gRPC projection client. Every relationship mutation is a single WriteRelationships call carrying the
 /// projection-cursor marker CAS (precondition on the expected old marker, delete old marker, touch new marker)
-/// so a delayed stale worker cannot apply a write after the gate reopened (CROSS_SYSTEM §5).
+/// so a delayed stale worker cannot apply a write after the gate reopened (CROSS_SYSTEM §5). Markers are history-bound
+/// (<see cref="ProjectionMarker"/>, C8 M4 S1). Decision reads run at exactly the snapshot's pin and prove it through the
+/// response token; the Authority-held ZedToken is only a freshness selector for the pin read, never integrity evidence.
 /// </summary>
 public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
 {
@@ -91,10 +93,10 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
 
     public async Task<string> InitializeCursorAsync(Guid organizationId, CancellationToken cancellationToken)
     {
-        var (step, token) = await ReadCursorStepAsync(organizationId, cancellationToken).ConfigureAwait(false);
-        if (step is not null)
+        var existing = await ReadMarkerAsync(organizationId, MarkerReadConsistency.FullyConsistent, null, cancellationToken).ConfigureAwait(false);
+        if (existing.MarkerSubjectIds.Count > 0)
         {
-            return token;
+            return existing.ReadAt ?? string.Empty;
         }
 
         var request = new WriteRelationshipsRequest();
@@ -103,15 +105,15 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
             Operation = Precondition.Types.Operation.MustNotMatch,
             Filter = new RelationshipFilter { ResourceType = ResourceTypeNames.Organization, OptionalResourceId = organizationId.ToString("D"), OptionalRelation = CursorRelation },
         });
-        request.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Touch, Relationship = Cursor(organizationId, 0) });
+        request.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Touch, Relationship = Cursor(organizationId, ProjectionMarker.SubjectId(organizationId, 0, null)) });
         return (await WriteAsync(request, cancellationToken).ConfigureAwait(false)).WrittenAt.Token;
     }
 
-    public async Task<string> ApplyDeltaAsync(Guid organizationId, long expectedStep, long newStep, IReadOnlyList<RelationshipDeltaEntry> delta, CancellationToken cancellationToken)
+    public async Task<string> ApplyDeltaAsync(Guid organizationId, string expectedMarkerSubjectId, string newMarkerSubjectId, IReadOnlyList<RelationshipDeltaEntry> delta, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(delta);
         var request = new WriteRelationshipsRequest();
-        var oldMarker = Cursor(organizationId, expectedStep);
+        var oldMarker = Cursor(organizationId, expectedMarkerSubjectId);
         request.OptionalPreconditions.Add(new Precondition
         {
             Operation = Precondition.Types.Operation.MustMatch,
@@ -131,7 +133,7 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
                 ResourceType = ResourceTypeNames.Organization,
                 OptionalResourceId = organizationId.ToString("D"),
                 OptionalRelation = CursorRelation,
-                OptionalSubjectFilter = new SubjectFilter { SubjectType = ResourceTypeNames.ProjectionStep, OptionalSubjectId = StepId(organizationId, newStep) },
+                OptionalSubjectFilter = new SubjectFilter { SubjectType = ResourceTypeNames.ProjectionStep, OptionalSubjectId = newMarkerSubjectId },
             },
         });
 
@@ -145,42 +147,43 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         }
 
         request.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Delete, Relationship = oldMarker });
-        request.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Touch, Relationship = Cursor(organizationId, newStep) });
+        request.Updates.Add(new RelationshipUpdate { Operation = RelationshipUpdate.Types.Operation.Touch, Relationship = Cursor(organizationId, newMarkerSubjectId) });
         return (await WriteAsync(request, cancellationToken).ConfigureAwait(false)).WrittenAt.Token;
     }
 
-    public async Task<(long? Step, string ZedToken)> ReadCursorStepAsync(Guid organizationId, CancellationToken cancellationToken)
+    public async Task<MarkerObservation> ReadMarkerAsync(Guid organizationId, MarkerReadConsistency consistency, string? atLeastAsFreshToken, CancellationToken cancellationToken)
     {
+        if (consistency == MarkerReadConsistency.AtLeastAsFresh && string.IsNullOrEmpty(atLeastAsFreshToken))
+        {
+            throw new SpiceDbUnavailableException("no authority-held ZedToken; projection not confirmed");
+        }
+
         try
         {
             using var call = Permissions.ReadRelationships(new ReadRelationshipsRequest
             {
-                Consistency = new Consistency { FullyConsistent = true },
+                Consistency = consistency == MarkerReadConsistency.FullyConsistent ? new Consistency { FullyConsistent = true } : new Consistency { AtLeastAsFresh = new ZedToken { Token = atLeastAsFreshToken } },
                 RelationshipFilter = new RelationshipFilter { ResourceType = ResourceTypeNames.Organization, OptionalResourceId = organizationId.ToString("D"), OptionalRelation = CursorRelation },
             }, Options(cancellationToken));
-            long? step = null;
-            var token = string.Empty;
+            var subjects = new List<string>();
+            string? readAt = null;
             await foreach (var response in call.ResponseStream.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                token = response.ReadAt.Token;
-                var subjectId = response.Relationship.Subject.Object.ObjectId;
-                var prefix = "step-" + organizationId.ToString("D") + "-";
-                if (subjectId.StartsWith(prefix, StringComparison.Ordinal) && long.TryParse(subjectId[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var parsed))
+                if (readAt is not null && !string.Equals(readAt, response.ReadAt.Token, StringComparison.Ordinal))
                 {
-                    if (step is not null)
-                    {
-                        throw new SpiceDbPreconditionFailedException("multiple projection cursor markers present");
-                    }
-
-                    step = parsed;
+                    throw new SpiceDbSnapshotException(SpiceDbSnapshotFailure.TokenMismatch, "marker read messages disagree on their snapshot");
                 }
+
+                readAt = response.ReadAt.Token;
+                var subject = response.Relationship.Subject.Object;
+                subjects.Add(subject.ObjectType == ResourceTypeNames.ProjectionStep ? subject.ObjectId : "?" + subject.ObjectType);
             }
 
-            return (step, token);
+            return new MarkerObservation(subjects, readAt);
         }
         catch (RpcException ex)
         {
-            throw new SpiceDbUnavailableException("ReadRelationships failed: " + ex.Status.StatusCode, ex);
+            throw Classify(ex, "ReadRelationships");
         }
     }
 
@@ -218,21 +221,18 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         }
     }
 
-    public async Task<SpiceDbCheckOutcome> CheckAsync(SpiceDbCheck check, string zedToken, CancellationToken cancellationToken)
+    public async Task<SpiceDbCheckOutcome> CheckAsync(SpiceDbCheck check, VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken)
     {
-        var outcomes = await CheckBulkAsync([check], zedToken, cancellationToken).ConfigureAwait(false);
+        var outcomes = await CheckBulkAsync([check], snapshot, cancellationToken).ConfigureAwait(false);
         return outcomes[0];
     }
 
-    public async Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkAsync(IReadOnlyList<SpiceDbCheck> checks, string zedToken, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkAsync(IReadOnlyList<SpiceDbCheck> checks, VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(checks);
-        if (string.IsNullOrEmpty(zedToken))
-        {
-            throw new SpiceDbUnavailableException("no authority-held ZedToken; projection not confirmed");
-        }
-
-        var request = new CheckBulkPermissionsRequest { Consistency = new Consistency { AtLeastAsFresh = new ZedToken { Token = zedToken } } };
+        ArgumentNullException.ThrowIfNull(snapshot);
+        snapshot.RequireOpen();
+        var request = new CheckBulkPermissionsRequest { Consistency = new Consistency { AtExactSnapshot = new ZedToken { Token = snapshot.Pin } } };
         foreach (var check in checks)
         {
             request.Items.Add(new CheckBulkPermissionsRequestItem
@@ -246,6 +246,11 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         try
         {
             var response = await Permissions.CheckBulkPermissionsAsync(request, Options(cancellationToken)).ConfigureAwait(false);
+            if (!string.Equals(response.CheckedAt?.Token, snapshot.Pin, StringComparison.Ordinal))
+            {
+                throw new SpiceDbSnapshotException(SpiceDbSnapshotFailure.TokenMismatch, "checked_at differs from the pinned snapshot");
+            }
+
             var outcomes = new List<SpiceDbCheckOutcome>(checks.Count);
             foreach (var pair in response.Pairs)
             {
@@ -272,16 +277,14 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         }
         catch (RpcException ex)
         {
-            throw new SpiceDbUnavailableException("CheckBulkPermissions failed: " + ex.Status.StatusCode, ex);
+            throw Classify(ex, "CheckBulkPermissions");
         }
     }
 
-    public async Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, string zedToken, int maximumResults, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, VerifiedProjectionSnapshot snapshot, int maximumResults, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(zedToken))
-        {
-            throw new SpiceDbUnavailableException("no authority-held ZedToken; projection not confirmed");
-        }
+        ArgumentNullException.ThrowIfNull(snapshot);
+        snapshot.RequireOpen();
 
         // Cursor-paged (C-28). Every page repeats the same request (SpiceDB binds a cursor to the request, consistency
         // included); a cursor also carries the snapshot revision of the first page, so the pages form one consistent view.
@@ -294,7 +297,7 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
             {
                 var request = new LookupResourcesRequest
                 {
-                    Consistency = new Consistency { AtLeastAsFresh = new ZedToken { Token = zedToken } },
+                    Consistency = new Consistency { AtExactSnapshot = new ZedToken { Token = snapshot.Pin } },
                     ResourceObjectType = resourceType,
                     Permission = permission,
                     Subject = new SubjectReference { Object = new ObjectReference { ObjectType = subjectType, ObjectId = subjectId } },
@@ -311,6 +314,11 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
                     await foreach (var response in call.ResponseStream.ReadAllAsync(cancellationToken).ConfigureAwait(false))
                     {
                         received++;
+                        if (!string.Equals(response.LookedUpAt?.Token, snapshot.Pin, StringComparison.Ordinal))
+                        {
+                            throw new SpiceDbSnapshotException(SpiceDbSnapshotFailure.TokenMismatch, "looked_up_at differs from the pinned snapshot");
+                        }
+
                         cursor = response.AfterResultCursor;
                         // Conditional (caveated) permission is not permission: it is never listed (fail closed).
                         if (response.Permissionship == LookupPermissionship.HasPermission && seen.Add(response.ResourceObjectId))
@@ -337,7 +345,7 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         }
         catch (RpcException ex)
         {
-            throw new SpiceDbUnavailableException("LookupResources failed: " + ex.Status.StatusCode, ex);
+            throw Classify(ex, "LookupResources");
         }
     }
 
@@ -385,13 +393,37 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
 
     private CallOptions Options(CancellationToken cancellationToken) => new(Headers, DateTime.UtcNow.Add(timeout), cancellationToken);
 
-    private static string StepId(Guid organizationId, long step) => "step-" + organizationId.ToString("D") + "-" + step.ToString(CultureInfo.InvariantCulture);
+    /// <summary>
+    /// Failure classes characterised on SpiceDB v1.56.2 (Design B §2.2 P6, E4, E5; contract tests CT-5/CT-7): a pin from a
+    /// different datastore instance (<c>Unknown</c>), an expired, future or malformed revision (<c>OutOfRange</c>,
+    /// <c>InvalidArgument</c>), a datastore without schema (<c>FailedPrecondition</c> "... not found"). Anything else is an outage.
+    /// </summary>
+    private static Exception Classify(RpcException ex, string operation)
+    {
+        var detail = ex.Status.Detail ?? string.Empty;
+        if (detail.Contains("different datastore instance", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SpiceDbSnapshotException(SpiceDbSnapshotFailure.DatastoreChanged, operation + ": the pinned snapshot belongs to a different datastore instance", ex);
+        }
 
-    private static Relationship Cursor(Guid organizationId, long step) => new()
+        if (ex.StatusCode is StatusCode.OutOfRange || (ex.StatusCode is StatusCode.InvalidArgument && detail.Contains("revision", StringComparison.OrdinalIgnoreCase)))
+        {
+            return new SpiceDbSnapshotException(SpiceDbSnapshotFailure.Unavailable, operation + ": pinned snapshot unavailable (" + ex.Status.StatusCode + ")", ex);
+        }
+
+        if (ex.StatusCode is StatusCode.FailedPrecondition && detail.Contains("not found", StringComparison.OrdinalIgnoreCase) && detail.Contains("definition", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SpiceDbSchemaMissingException(operation + ": the datastore has no schema", ex);
+        }
+
+        return new SpiceDbUnavailableException(operation + " failed: " + ex.Status.StatusCode, ex);
+    }
+
+    private static Relationship Cursor(Guid organizationId, string markerSubjectId) => new()
     {
         Resource = new ObjectReference { ObjectType = ResourceTypeNames.Organization, ObjectId = organizationId.ToString("D") },
         Relation = CursorRelation,
-        Subject = new SubjectReference { Object = new ObjectReference { ObjectType = ResourceTypeNames.ProjectionStep, ObjectId = StepId(organizationId, step) } },
+        Subject = new SubjectReference { Object = new ObjectReference { ObjectType = ResourceTypeNames.ProjectionStep, ObjectId = markerSubjectId } },
     };
 
     private static Relationship ToRelationship(RelationshipTuple tuple) => new()

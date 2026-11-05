@@ -443,6 +443,11 @@
       "bytes": 18024
     },
     {
+      "path": "docs/security/PROJECTION_INTEGRITY_S1_OPERATIONS.md",
+      "sha256": "368fda96c0d87e044d1ea6b76174c916af365c7654a5dd0da908d6387e2029e3",
+      "bytes": 9998
+    },
+    {
       "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
       "sha256": "4da458cdae2adf6b21107193690a7a9a7d5cf238bf9cf70439c2aacd7bc50214",
       "bytes": 24608
@@ -764,8 +769,8 @@
     },
     {
       "path": "trust_authority/COORDINATED_DISASTER_RECOVERY.md",
-      "sha256": "e87ee5ef768b9623e466a687048e9baaa2f0aa8717d3a99a42dc1ecbea4da776",
-      "bytes": 29979
+      "sha256": "76d4171483645e7ff67589a243155693594bc9487f273743a6582cad6c104b8e",
+      "bytes": 30773
     },
     {
       "path": "trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md",

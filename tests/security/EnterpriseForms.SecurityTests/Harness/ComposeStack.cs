@@ -68,6 +68,86 @@ public sealed class ComposeStack
         return Compose($"exec -T spicedb-db sh -c \"echo {encodedShell} | base64 -d | sh\"", timeoutSeconds);
     }
 
+    /// <summary>
+    /// C8 M4 S1 restore simulation only: replaces SpiceDB's datastore by a fresh, migrated, empty one (SpiceDB stopped, database
+    /// dropped and recreated, <c>spicedb-migrate</c> run, SpiceDB started), as an operator replacing the datastore would leave it.
+    /// Security-test stack only.
+    /// </summary>
+    public void ReplaceSpiceDbDatastoreWithEmpty()
+    {
+        Stop("spicedb");
+        SpiceDbAdministrationShell("psql -d postgres -v ON_ERROR_STOP=1 -qAt -c 'DROP DATABASE spicedb' -c 'CREATE DATABASE spicedb' && echo RECREATED");
+        Compose("run --rm spicedb-migrate", 180);
+        Compose("up -d --wait spicedb", 180);
+    }
+
+    /// <summary>
+    /// C8 M4 S1 restore simulation only: restores <paramref name="dumpFile"/> (inside <c>spicedb-db</c>) into SpiceDB's datastore.
+    /// <paramref name="mode"/>: "restart" stops SpiceDB around a <c>pg_restore --clean</c>; "live" restores under a running SpiceDB;
+    /// "recreate" stops SpiceDB, drops and recreates the database and restores the whole dump into it.
+    /// </summary>
+    public void RestoreSpiceDbDatastore(string dumpFile, string mode)
+    {
+        switch (mode)
+        {
+            case "live":
+                SpiceDbDatastoreSimulationShell($"pg_restore --clean --if-exists --no-owner -d spicedb {dumpFile} >/dev/null 2>&1; echo RESTORED", 180);
+                return;
+            case "restart":
+            case "recreate":
+                try
+                {
+                    Stop("spicedb");
+                    if (mode == "recreate")
+                    {
+                        SpiceDbAdministrationShell("psql -d postgres -v ON_ERROR_STOP=1 -qAt -c 'DROP DATABASE spicedb' -c 'CREATE DATABASE spicedb' && echo RECREATED");
+                        SpiceDbDatastoreSimulationShell($"pg_restore --no-owner -d spicedb {dumpFile} >/dev/null 2>&1; echo RESTORED", 180);
+                    }
+                    else
+                    {
+                        SpiceDbDatastoreSimulationShell($"pg_restore --clean --if-exists --no-owner -d spicedb {dumpFile} >/dev/null 2>&1; echo RESTORED", 180);
+                    }
+                }
+                finally
+                {
+                    Compose("up -d --wait spicedb", 180);
+                }
+
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mode), mode, "live, restart or recreate");
+        }
+    }
+
+    /// <summary>
+    /// C8 M4 S1: runs the SpiceDB behavioural-contract probe (tests/integration/EnterpriseForms.SpiceDbContractProbe, built output in
+    /// <paramref name="probeDirectory"/>) in a throwaway container on this stack's authority network, where SpiceDB is reachable.
+    /// The probe writes only relationships of a random organization the Authority does not know. Security-test stack only.
+    /// </summary>
+    public string SpiceDbProbe(string probeDirectory, string arguments, int timeoutSeconds = 300, bool throwOnError = true)
+    {
+        var container = Compose("ps -q spicedb").Trim();
+        var networks = Run("docker", $"inspect --format \"{{{{range $k, $v := .NetworkSettings.Networks}}}}{{{{$k}}}} {{{{end}}}}\" {container}", 30);
+        var network = networks.Split(' ', StringSplitOptions.RemoveEmptyEntries).Single(n => n.EndsWith("authority-net", StringComparison.Ordinal));
+        var key = EnvironmentFileValue("SPICEDB_PRESHARED_KEY");
+        return Run("docker", $"run --rm --network {network} -e SPICEDB_KEY={key} -v \"{probeDirectory}:/probe:ro\" mcr.microsoft.com/dotnet/aspnet:10.0 dotnet /probe/EnterpriseForms.SpiceDbContractProbe.dll {arguments}", timeoutSeconds, throwOnError);
+    }
+
+    private string SpiceDbAdministrationShell(string shell)
+    {
+        var prefixed = "export PGUSER=\"$POSTGRES_USER\" PGPASSWORD=\"$POSTGRES_PASSWORD\"; " + shell;
+        var encodedShell = Convert.ToBase64String(Encoding.UTF8.GetBytes(prefixed));
+        return Compose($"exec -T spicedb-db sh -c \"echo {encodedShell} | base64 -d | sh\"", 120);
+    }
+
+    private static string EnvironmentFileValue(string name)
+    {
+        var file = File.Exists(Path.Combine(DockerDirectory, ".env")) ? ".env" : "env.example";
+        var line = File.ReadAllLines(Path.Combine(DockerDirectory, file)).FirstOrDefault(l => l.StartsWith(name + "=", StringComparison.Ordinal))
+                   ?? throw new InvalidOperationException(name + " is not set in " + file);
+        return line[(name.Length + 1)..].Trim();
+    }
+
     public string AttackerShell(string shell, bool throwOnError = true, int timeoutSeconds = 60)
     {
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(shell));

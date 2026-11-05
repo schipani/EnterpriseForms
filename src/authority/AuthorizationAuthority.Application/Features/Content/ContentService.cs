@@ -20,7 +20,7 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// commit proves the staged bytes equal the approved candidate and CAS-advances the trusted head, verify compares an
 /// observed projection with the complete accepted leaf index. No generic signing path exists (A9).
 /// </summary>
-public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ISpiceDbProjection spiceDb, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites)
+public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites)
 {
     private const int MaxCandidateItems = 500;
     private static readonly TimeSpan OperationLifetime = TimeSpan.FromMinutes(10);
@@ -415,7 +415,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             return await ToRevisionAsync(scope, state, head, correlationId, cancellationToken).ConfigureAwait(false);
         }
 
-        var discover = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+        var discover = await verifier.CheckAsync(snapshot, new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), cancellationToken).ConfigureAwait(false);
+        if (!await verifier.CompleteAsync(snapshot, "head", cancellationToken).ConfigureAwait(false))
+        {
+            throw AuthorityException.NotReady("authorization state moved during head lookup");
+        }
+
         if (discover != SpiceDbCheckOutcome.Allowed)
         {
             throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false); // concealment-safe
@@ -458,7 +464,13 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // History is part of the record's content: only a full reader now (V1, architecture section 3.3), never a share reader,
         // a revoked recipient or a former owner, whatever they could see when a revision was accepted.
-        var read = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "read", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
+        var read = await verifier.CheckAsync(snapshot, new SpiceDbCheck(ResourceTypeNames.FormRecord, formRecordId.ToString("D"), "read", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D")), cancellationToken).ConfigureAwait(false);
+        if (!await verifier.CompleteAsync(snapshot, "history", cancellationToken).ConfigureAwait(false))
+        {
+            throw AuthorityException.NotReady("authorization state moved during history");
+        }
+
         if (read != SpiceDbCheckOutcome.Allowed)
         {
             throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false); // concealment-safe
@@ -530,7 +542,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
-        var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, bound, request.FormRecordId, request.RequestedAction, request.ObservedItems, request.HistoricCommittedOperationId, null, includeEditable: true, correlationId, cancellationToken).ConfigureAwait(false);
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: true, correlationId, cancellationToken).ConfigureAwait(false);
+        var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, snapshot, bound, request.FormRecordId, request.RequestedAction, request.ObservedItems, request.HistoricCommittedOperationId, null, includeEditable: true, correlationId, cancellationToken).ConfigureAwait(false);
         if (quarantined)
         {
             // Tamper evidence is committed and the failure returned (the authorization re-read cannot change that outcome).
@@ -542,6 +555,9 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         {
             return result;
         }
+
+        // The organization lock is held, so the state cannot move; the decisive marker re-read still runs (S1).
+        await verifier.CompleteAsync(snapshot, "verify_projection", cancellationToken).ConfigureAwait(false);
 
         var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
         if (after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision)
@@ -588,13 +604,14 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: true, correlationId, cancellationToken).ConfigureAwait(false);
         var results = new List<BatchVerificationResult>(request.Records.Count);
         var anyQuarantined = false;
         foreach (var item in request.Records)
         {
             try
             {
-                var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, bound, item.FormRecordId, RequestedAction.Read, item.ObservedItems ?? [], null, item.ExpectedCommittedOperationId, includeEditable: false, correlationId, cancellationToken).ConfigureAwait(false);
+                var (result, quarantined) = await VerifyRecordCoreAsync(scope, state, snapshot, bound, item.FormRecordId, RequestedAction.Read, item.ObservedItems ?? [], null, item.ExpectedCommittedOperationId, includeEditable: false, correlationId, cancellationToken).ConfigureAwait(false);
                 anyQuarantined |= quarantined;
                 var readable = !result.Verified ? [] : result.IsCompleteProjection ? result.AuthorizedItems : result.ReadableItems ?? [];
                 results.Add(new BatchVerificationResult(item.FormRecordId, result.Verified, result.FailureReasonCode, result.CommittedContentRevision, result.CommittedOperationId, result.IsCompleteProjection, readable));
@@ -612,6 +629,8 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             }
         }
 
+        // Decisive marker re-read after every record's decision (S1); a mismatch quarantines and commits any head quarantines too.
+        await verifier.CompleteAsync(snapshot, "verify_projections", cancellationToken).ConfigureAwait(false);
         var after = await scope.ReadOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
         var moved = after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision;
         if (anyQuarantined)
@@ -784,6 +803,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     private async Task<(VerifyRecordProjectionResult Result, bool Quarantined)> VerifyRecordCoreAsync(
         IAuthorityScope scope,
         OrganizationAuthorizationState state,
+        VerifiedProjectionSnapshot snapshot,
         BoundActor bound,
         Guid formRecordId,
         RequestedAction requestedAction,
@@ -803,10 +823,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         var subject = bound.AuthorityUserId.ToString("D");
         var recordId = formRecordId.ToString("D");
-        var fullRead = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, requestedAction == RequestedAction.Edit ? "edit" : "read", ResourceTypeNames.User, subject), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false) == SpiceDbCheckOutcome.Allowed;
+        var fullRead = await verifier.CheckAsync(snapshot, new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, requestedAction == RequestedAction.Edit ? "edit" : "read", ResourceTypeNames.User, subject), cancellationToken).ConfigureAwait(false) == SpiceDbCheckOutcome.Allowed;
         if (!fullRead)
         {
-            var discover = await spiceDb.CheckAsync(new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, "discover", ResourceTypeNames.User, subject), state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
+            var discover = await verifier.CheckAsync(snapshot, new SpiceDbCheck(ResourceTypeNames.FormRecord, recordId, "discover", ResourceTypeNames.User, subject), cancellationToken).ConfigureAwait(false);
             if (discover != SpiceDbCheckOutcome.Allowed)
             {
                 throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
@@ -896,15 +916,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             // Field-level shares scope value leaves and selection leaves (a plaintext dropdown / multi-select stores one selection leaf per option) by the same field-item edges.
             // Phase C5 (D7): both the readable and the editable subsets are returned, so a partial editor needs one verification; advisory only — prepare/commit decide.
             var fieldLeaves = expected.Where(l => l.ManifestItemKindCode is (byte)ManifestItemKind.FieldValue or (byte)ManifestItemKind.FieldSelection).ToList();
-            readable = await CheckFieldLeavesAsync(fieldLeaves, "read", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false);
-            editable = includeEditable ? await CheckFieldLeavesAsync(fieldLeaves, "edit", subject, state.ProjectionZedToken!, cancellationToken).ConfigureAwait(false) : [];
+            readable = await CheckFieldLeavesAsync(snapshot, fieldLeaves, "read", subject, cancellationToken).ConfigureAwait(false);
+            editable = includeEditable ? await CheckFieldLeavesAsync(snapshot, fieldLeaves, "edit", subject, cancellationToken).ConfigureAwait(false) : [];
             authorized = requestedAction == RequestedAction.Edit ? editable : readable;
         }
 
         return (new VerifyRecordProjectionResult(true, null, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, authorized, fullRead, correlationId, readable, editable, contributorWrites.Enabled), false);
     }
 
-    private async Task<List<VerifiedProjectionItem>> CheckFieldLeavesAsync(List<RecordManifestLeaf> fieldLeaves, string permission, string subject, string zedToken, CancellationToken cancellationToken)
+    private async Task<List<VerifiedProjectionItem>> CheckFieldLeavesAsync(VerifiedProjectionSnapshot snapshot, List<RecordManifestLeaf> fieldLeaves, string permission, string subject, CancellationToken cancellationToken)
     {
         if (fieldLeaves.Count == 0)
         {
@@ -912,7 +932,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
 
         var checks = fieldLeaves.Select(l => new SpiceDbCheck(ResourceTypeNames.FieldItem, l.ManifestItemId.ToString("D"), permission, ResourceTypeNames.User, subject)).ToList();
-        var outcomes = await spiceDb.CheckBulkAsync(checks, zedToken, cancellationToken).ConfigureAwait(false);
+        var outcomes = await verifier.CheckBulkAsync(snapshot, checks, cancellationToken).ConfigureAwait(false);
         return fieldLeaves.Where((_, i) => outcomes[i] == SpiceDbCheckOutcome.Allowed).Select(l => new VerifiedProjectionItem((ManifestItemKind)l.ManifestItemKindCode, l.ManifestItemId)).ToList();
     }
 

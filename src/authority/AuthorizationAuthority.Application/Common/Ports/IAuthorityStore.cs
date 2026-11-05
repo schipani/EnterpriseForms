@@ -24,6 +24,9 @@ public interface IAuthorityStore
 
     /// <summary>Organizations that have pending projection or archive work (used by background processors, outside a scope).</summary>
     Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken);
+
+    /// <summary>C8 M4 S1: every registered organization (the startup marker transition and the periodic integrity check, outside a scope).</summary>
+    Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken cancellationToken);
 }
 
 public interface IAuthorityScope : IAsyncDisposable

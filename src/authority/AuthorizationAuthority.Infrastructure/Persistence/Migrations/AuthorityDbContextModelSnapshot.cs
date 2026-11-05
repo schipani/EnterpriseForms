@@ -1352,6 +1352,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("latest_security_journal_digest");
 
+                    b.Property<string>("LegacyProjectionZedToken")
+                        .HasColumnType("text")
+                        .HasColumnName("projection_zed_token");
+
                     b.Property<string>("OrganizationDisplayName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1376,7 +1380,7 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("ProjectionZedToken")
                         .HasColumnType("text")
-                        .HasColumnName("projection_zed_token");
+                        .HasColumnName("projection_snapshot_zed_token");
 
                     b.Property<DateTimeOffset>("StateModifiedOn")
                         .HasColumnType("timestamp with time zone")
@@ -1397,6 +1401,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_authorization_revision_non_negative", "authorization_revision >= 0 AND projection_applied_revision >= 0 AND content_integrity_revision >= 0");
 
                             t.HasCheckConstraint("ck_checkpoint_enforcement_mode", "checkpoint_enforcement_mode_name IN ('Asynchronous','RequiredBeforeEffective')");
+
+                            t.HasCheckConstraint("ck_legacy_projection_token_retired", "projection_zed_token IS NULL");
 
                             t.HasCheckConstraint("ck_projection_never_ahead", "projection_applied_revision <= authorization_revision");
                         });

@@ -28,4 +28,8 @@
     <Compile Include="../../security/EnterpriseForms.SecurityTests/Harness/StageAClients.cs" Link="Harness/StageAClients.cs" />
     <Compile Include="../../security/EnterpriseForms.SecurityTests/Harness/TestIdentity.cs" Link="Harness/TestIdentity.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- C8 M4 S1: built alongside the tests and run in a container on the stack's authority network (CT-1..CT-6, marker reads). -->
+    <ProjectReference Include="../EnterpriseForms.SpiceDbContractProbe/EnterpriseForms.SpiceDbContractProbe.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
 </Project>

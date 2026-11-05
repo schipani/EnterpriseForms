@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.Authorization;
 using AuthorizationAuthority.Application.Features.Content;
@@ -68,6 +69,11 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton(TimeProvider.System);
         services.TryAddSingleton(FieldSearchApprovalGate.Unavailable); // the API host registers the configured gate (OD-7)
         services.AddSingleton<SecurityCommandService>();
+        // C8 M4 S1: projection-integrity protocol (pin, decide, verify), startup marker transition and periodic check.
+        services.AddSingleton<ProjectionMarkerTransitionState>();
+        services.AddSingleton<ProjectionIntegrityMetrics>();
+        services.AddSingleton<ProjectionIntegrityVerifier>();
+        services.AddSingleton<ProjectionIntegrityMonitor>();
         services.AddSingleton<PermissionCheckService>();
         services.AddSingleton<FormAccessService>();
         services.AddSingleton<ContentService>();

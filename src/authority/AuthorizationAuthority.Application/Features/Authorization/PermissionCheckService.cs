@@ -5,8 +5,11 @@ using AuthorizationAuthority.Domain.Features.Organizations;
 
 namespace AuthorizationAuthority.Application.Features.Authorization;
 
-/// <summary>Authorization check (CROSS_SYSTEM §2 "Authorization check"): gate → fresh SpiceDB check at the authority-held token → gate re-read.</summary>
-public sealed class PermissionCheckService(IAuthorityStore store, ISpiceDbProjection spiceDb)
+/// <summary>
+/// Authorization check (CROSS_SYSTEM §2 "Authorization check"): gate → pin the projection marker → SpiceDB check at exactly
+/// the pinned snapshot → decisive marker re-read and gate re-read (C8 M4 S1, <see cref="ProjectionIntegrityVerifier"/>).
+/// </summary>
+public sealed class PermissionCheckService(IAuthorityStore store, ProjectionIntegrityVerifier verifier)
 {
     private const int MaxGateRetries = 2;
 
@@ -40,7 +43,7 @@ public sealed class PermissionCheckService(IAuthorityStore store, ISpiceDbProjec
                         ?? throw AuthorityException.NotRegistered("organization is not registered");
             var gate = await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false);
             OrganizationGate.RequireOpen(gate);
-            var zedToken = state.ProjectionZedToken!;
+            var snapshot = await verifier.PinAsync(scope, state, organizationLocked: false, correlationId, cancellationToken).ConfigureAwait(false);
 
             var checks = new List<SpiceDbCheck>(requests.Count);
             var registryDenied = new bool[requests.Count];
@@ -55,11 +58,10 @@ public sealed class PermissionCheckService(IAuthorityStore store, ISpiceDbProjec
                 }
             }
 
-            var outcomes = await spiceDb.CheckBulkAsync(checks, zedToken, cancellationToken).ConfigureAwait(false);
+            var outcomes = await verifier.CheckBulkAsync(snapshot, checks, cancellationToken).ConfigureAwait(false);
 
-            // Re-read: if the authoritative state moved during the check, the outcome may be stale — retry or fail closed.
-            var after = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)!;
-            if (after!.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision || after.IntegrityQuarantineEnabled)
+            // Verify: the head marker after the decision and the authoritative state; if the state moved, the outcome may be stale — retry or fail closed.
+            if (!await verifier.CompleteAsync(snapshot, "check", cancellationToken).ConfigureAwait(false))
             {
                 continue;
             }
@@ -132,19 +134,19 @@ public sealed class PermissionCheckService(IAuthorityStore store, ISpiceDbProjec
         }
 
         var registered = (await scope.GetActiveRecordIdsAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)).ToHashSet();
+        var snapshot = await verifier.PinAsync(scope, state, organizationLocked: false, Guid.CreateVersion7(), cancellationToken).ConfigureAwait(false);
         IReadOnlyList<string> lookedUp;
         try
         {
-            lookedUp = await spiceDb.LookupResourcesAsync(ResourceTypeNames.FormRecord, "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D"), state.ProjectionZedToken!, MaximumDiscoverableRecords, cancellationToken).ConfigureAwait(false);
+            lookedUp = await verifier.LookupResourcesAsync(snapshot, ResourceTypeNames.FormRecord, "discover", ResourceTypeNames.User, bound.AuthorityUserId.ToString("D"), MaximumDiscoverableRecords, cancellationToken).ConfigureAwait(false);
         }
         catch (SpiceDbLookupLimitExceededException)
         {
             throw new AuthorityException(AuthorityErrorCodes.LimitExceeded, 422, false, $"more than {MaximumDiscoverableRecords} discoverable records; nothing partial is returned");
         }
 
-        // Re-read: the lookup ran at the token of `state`; if the authoritative state moved meanwhile, fail closed (retryable).
-        var after = await scope.ReadOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false);
-        if (after is null || after.AuthorizationRevision != state.AuthorizationRevision || after.ProjectionAppliedRevision != state.ProjectionAppliedRevision || after.IntegrityQuarantineEnabled)
+        // Verify: the lookup ran at the pinned snapshot of `state`; if the head marker or the authoritative state moved meanwhile, fail closed (retryable).
+        if (!await verifier.CompleteAsync(snapshot, "discover", cancellationToken).ConfigureAwait(false))
         {
             throw AuthorityException.NotReady("authorization state moved during discovery");
         }

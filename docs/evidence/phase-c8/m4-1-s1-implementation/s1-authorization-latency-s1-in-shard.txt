@@ -1,0 +1,5 @@
+# PERF-01 current - commit 70894d20afaad16cb4b587ca0a40d31ec47e7151 - stack sha256:d054a2542cf4609ccf282754d6cde00962bbf2743c960e7f14f2b81cce7fedc2 (api=sha256:43185aa82d58752a466f4e45c79bd4a83660df77f9e38bac7c8c1706ba440d95;authority=sha256:7d4c7a12f8805542e4f7a8ed550ab5cc663a67a7f98e28777db15bdeffcd9701) - 2026-11-04T23:39:03.1822058+00:00
+# open loop, Authority HTTP check from the host; single = one check per request, batch25 = /check-batch with 25 checks
+single@50rps   n=  1501 achieved_rps=  50.0 p50=  15.31 p95=  27.97 p99=  35.92 ms failures=none
+single@150rps  n=  4501 achieved_rps= 149.9 p50=  16.02 p95=  30.41 p99=  58.34 ms failures=none
+batch25@50rps  n=  1501 achieved_rps=  50.0 p50=  16.01 p95=  33.52 p99=  72.66 ms failures=none

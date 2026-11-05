@@ -153,6 +153,7 @@ Evidence bundle: recovery operation ID, trusted epoch, selected archive/ledger r
 7. Verifying all returned search rows still does not establish search completeness against a hostile index (G06). Rebuild search from recovered trusted leaves and keep broader completeness assurances separately assessed.
 8. Old SpiceDB revision tokens/caches must be discarded after rebuild. The projection must be verified from desired authoritative relationships before protected access resumes.
 9. References and scripts are *design and validation artifacts*, not tested Azure deployment. The production finding remains open until full real cloud DR exercise and third-party review.
+10. **C8 M4 S1 interface (C-117):** decisions are now refused, and the organization permanently quarantined, when SpiceDB's history-bound projection marker does not match the Authority's committed revision and journal digest (`docs/security/PROJECTION_INTEGRITY_S1_OPERATIONS.md`). S1 does **not** implement any item of this document. Step E (deterministic SpiceDB rebuild) must write the history-bound marker, and the recovery control plane is the only intended way to lift an S1 quarantine, through a reviewed replacement of the AuthorityDb permanence trigger function under the migration identity, with two-person approval and archived evidence. S1 detects a SpiceDB-only rollback; a coordinated AuthorityDb+SpiceDB rollback (T16-A) still requires this document's replay and recovery epoch.
 
 ## 11. Acceptance criteria and release gate
 

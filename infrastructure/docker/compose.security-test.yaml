@@ -28,6 +28,8 @@ services:
       Testing__StackIdentity: enterpriseforms-security-test
       # C-28: a small lookup page makes every multi-record discovery test cross SpiceDB cursor pages (production keeps 1000).
       SpiceDb__LookupPageSize: "20"
+      # C8 M4 S1 (S2): a short periodic projection-integrity check so RB-14 observes it within a test (production default 60 s).
+      ProjectionIntegrity__PeriodicCheckSeconds: "10"
       # Phase C7 OD-1: synthetic field-protection verifier credential for this isolated stack only (TestIdentity.VerifierToken
       # mirrors it). Other stacks set nothing, so the migration catalogue is unreachable there (fail closed).
       Identity__Verifier__Issuer: enterpriseforms-field-protection-verifier

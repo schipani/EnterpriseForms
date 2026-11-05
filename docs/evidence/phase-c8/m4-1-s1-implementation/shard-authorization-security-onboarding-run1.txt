@@ -1,0 +1,9 @@
+failed EnterpriseForms.StageBTests.Tests.ProjectionIntegrityRollbackTests.Rb10AQuarantineIsPermanentAcrossRestartsCommandsProjectionAndDirectUpdates (43s 197ms)
+  total: 93
+  failed: 1
+  succeeded: 92
+failed EnterpriseForms.StageBTests.Tests.ProjectionIntegrityRollbackTests.Rb10AQuarantineIsPermanentAcrossRestartsCommandsProjectionAndDirectUpdates (43s 197ms)
+  from C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.TimeoutException : timed out waiting for a committed revision pending projection
+    at EnterpriseForms.StageBTests.Tests.ProjectionIntegrityRollbackTests.WaitUntilAsync(Func`1 condition, String what, Nullable`1 timeout) in C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\Tests\ProjectionIntegrityRollbackTests.cs:485
+    at EnterpriseForms.StageBTests.Tests.ProjectionIntegrityRollbackTests.Rb10AQuarantineIsPermanentAcrossRestartsCommandsProjectionAndDirectUpdates() in C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\integration\EnterpriseForms.StageBTests\Tests\ProjectionIntegrityRollbackTests.cs:210
