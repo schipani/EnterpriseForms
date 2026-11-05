@@ -148,5 +148,7 @@ public static class BusinessInfrastructureRegistration
 
         services.AddSingleton<IFileEncryptionService, AesGcmFileEncryptionService>();
         services.AddSingleton<IFieldEncryptionService, AesGcmFieldEncryptionService>();
+        // C8 M4 M1: seal-only Security Auditor reason notes (same primitive and key provider, its own AAD context; no decrypt anywhere).
+        services.AddSingleton<EnterpriseForms.Application.Features.Organizations.ReasonNotes.IAuditorNoteSealer, EnterpriseForms.Infrastructure.Features.Organizations.AesGcmAuditorNoteSealer>();
     }
 }

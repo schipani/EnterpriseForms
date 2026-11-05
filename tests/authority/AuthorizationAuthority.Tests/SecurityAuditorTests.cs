@@ -112,18 +112,16 @@ public sealed class SecurityAuditorTests
         Assert.DoesNotContain("SEC-4471", journal.JournalEventBodyJson + command.CommandPayloadJson, StringComparison.Ordinal);
     }
 
-    /// <summary>D8-72 (C-113): until the approved note encryption exists, any note (plaintext or envelope) is refused and leaves nothing behind.</summary>
+    /// <summary>D8-72 (kept permanently by M1, C-117): a plaintext note is refused whatever its content and leaves nothing behind.</summary>
     [Fact]
-    public async Task AnyReasonNotePlaintextOrEnvelopeIsRefusedAndNothingOfItIsPersisted()
+    public async Task APlaintextReasonNoteIsRefusedPermanentlyAndNothingOfItIsPersisted()
     {
-        var envelope = new { envelope_version = 1, algorithm_name = "AES-256-GCM", key_reference = "SEC-4471-key", note_id = Guid.CreateVersion7(), ciphertext = "U0VDLTQ0NzEtY2lwaGVy", nonce = "AAAAAAAAAAAAAAAA", tag = "AAAAAAAAAAAAAAAAAAAAAA==", wrapped_data_key = "U0VDLTQ0NzEtd3JhcHBlZA==" };
         var attempts = new (SecurityCommandKind Kind, object Payload)[]
         {
             (SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note = Note, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
             (SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note = "   ", step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
-            (SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note_envelope = envelope, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
+            (SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note = Note, reason_note_envelope = Envelope(), step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
             (SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note = Note, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
-            (SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = envelope, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }),
         };
         var revision = Revision;
         foreach (var (kind, payload) in attempts)
@@ -139,7 +137,7 @@ public sealed class SecurityAuditorTests
         var evidence = AuditStream("SecurityAuditorCommandRejected");
         Assert.Equal(attempts.Length, evidence.Count);
         var everything = string.Join(" ", rejectedRows.Select(c => c.CommandPayloadJson + " " + c.CommandReasonText).Concat(evidence.Select(e => e.JournalEventBodyJson)));
-        foreach (var secret in new[] { "SEC-4471", "U0VDLTQ0NzEt", "reason_note", "ciphertext", "wrapped_data_key", FieldSearchApprovalGate.SyntheticStepUpEvidence })
+        foreach (var secret in new[] { "SEC-4471", "reason_note", "ciphertext_b64", "wrapped_data_key_b64", FieldSearchApprovalGate.SyntheticStepUpEvidence })
         {
             Assert.DoesNotContain(secret, everything, StringComparison.Ordinal);
         }
@@ -148,11 +146,71 @@ public sealed class SecurityAuditorTests
 
         // Commands without a note (absent or explicitly null) keep working.
         await AppointAsync(Administrator, Member, SecurityAuditorReasonCodes.ComplianceReview);
-        // An envelope member is not part of the payload contract yet: even null, strict binding refuses it (no mass assignment).
-        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => SubmitAsync(Administrator, SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = (object?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence })));
+        // A null envelope and a null plaintext note are both simply no note (V3 as amended in C-117).
+        await SubmitAsync(Administrator, SecurityCommandKind.GrantSystemRole, new { authority_user_id = Designer, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note_envelope = (object?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence });
+        Assert.True(Holds(Designer, OrganizationRoleNames.SecurityAuditor));
         await SubmitAsync(Administrator, SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note = (string?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence });
         Assert.True(Holds(Member, OrganizationRoleNames.SecurityAuditor));
         Assert.False(Holds(Auditor, OrganizationRoleNames.SecurityAuditor));
+    }
+
+    /// <summary>A structurally valid sealed note (random bytes: the Authority cannot and does not decrypt; V4–V9 are structural).</summary>
+    private static object Envelope(Guid? noteId = null, int ciphertextBytes = 2048, string format = "DynamicForms/AuditorReasonNote", string keyReference = "local-dev-kek-v1") => new
+    {
+        envelope_format = format,
+        envelope_version = 1,
+        algorithm_name = "AES-256-GCM",
+        key_reference = keyReference,
+        note_id = (noteId ?? Guid.CreateVersion7()).ToString("D"),
+        nonce_b64 = Convert.ToBase64String(new byte[12]),
+        ciphertext_b64 = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(ciphertextBytes)),
+        tag_b64 = Convert.ToBase64String(new byte[16]),
+        wrapped_data_key_b64 = Convert.ToBase64String(new byte[60]),
+    };
+
+    /// <summary>
+    /// C8 M4 M1 (C-117, A-Q2): a sealed note is accepted, kept only as ciphertext in the normalized payload, the authorization
+    /// journal and (through it) the archive; plaintext notes stay refused permanently (V2); every structural rule V3–V11 refuses.
+    /// </summary>
+    [Fact]
+    public async Task ASealedNoteIsAcceptedAsCiphertextOnlyAndEveryEnvelopeRuleIsEnforced()
+    {
+        var noteId = Guid.CreateVersion7();
+        var envelope = Envelope(noteId);
+        await SubmitAsync(Administrator, SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note_envelope = envelope, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence });
+        Assert.True(Holds(Member, OrganizationRoleNames.SecurityAuditor));
+        using (var payload = JsonDocument.Parse(LastCommand.CommandPayloadJson))
+        {
+            Assert.Equal(noteId.ToString("D"), payload.RootElement.GetProperty("reason_note_envelope").GetProperty("note_id").GetString());
+            Assert.Equal(2048, Convert.FromBase64String(payload.RootElement.GetProperty("reason_note_envelope").GetProperty("ciphertext_b64").GetString()!).Length);
+        }
+
+        var journal = store.Journal.Single(j => j.JournalStreamName == JournalStreamNames.Authorization && j.SecurityCommandId == LastCommand.SecurityCommandId);
+        Assert.Contains("\"note_id\":\"" + noteId.ToString("D") + "\"", journal.JournalEventBodyJson, StringComparison.Ordinal);
+
+        // V10: the same note id cannot be attached to another command.
+        Assert.Equal(AuthorityErrorCodes.InvalidCommand, await RefusedAsync(() => SubmitAsync(Administrator, SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = Envelope(noteId), step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence })));
+
+        var refused = new (string Rule, object Payload, string Code)[]
+        {
+            ("V2 plaintext", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note = Note, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.ReasonNoteNotAccepted),
+            ("V3 not an object", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = "sealed note as a string", step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("V4 format", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = Envelope(format: "Other"), step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("V5 key reference", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = Envelope(keyReference: "bad key ref"), step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("V6 note id", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = Envelope(Guid.NewGuid()), step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("V8 size", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = Envelope(ciphertextBytes: 2000), step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+        };
+        foreach (var (rule, payload, code) in refused)
+        {
+            Assert.True(code == await RefusedAsync(() => SubmitAsync(Administrator, SecurityCommandKind.RevokeSystemRole, payload)), rule);
+        }
+
+        // Rejected rows and audit-stream evidence never keep envelope bytes or the plaintext.
+        var everything = string.Join(" ", store.Commands.Where(c => c.CommandStateName == SecurityCommandStates.Rejected).Select(c => c.CommandPayloadJson + " " + c.CommandReasonText).Concat(AuditStream("SecurityAuditorCommandRejected").Select(e => e.JournalEventBodyJson)));
+        foreach (var secret in new[] { "SEC-4471", "ciphertext_b64", "wrapped_data_key_b64", noteId.ToString("D") })
+        {
+            Assert.DoesNotContain(secret, everything, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

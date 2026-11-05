@@ -1800,7 +1800,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; reason notes are refused (422 REASON_NOTE_NOT_ACCEPTED) until note encryption exists. The role grants audit viewing and no record content. 204 once Effective. */
+        /** Appoints a verified member as Security Auditor (GrantSystemRole with role security_auditor): only a Security Administrator, never themself, with step-up (unavailable in staging and production until PB-08) and an appointment reason code; an optional reason note (at most 500 characters) is encrypted by this API before it is sent and cannot be read back in the application (503 ENCRYPTION_UNAVAILABLE when no key provider is configured). The role grants audit viewing and no record content. 204 once Effective. */
         post: operations["AppointSecurityAuditor"];
         delete?: never;
         options?: never;

@@ -144,6 +144,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) =>
             Task.FromResult(s.Commands.FirstOrDefault(c => c.OrganizationId == organizationId && c.CommandIdempotencyKey == idempotencyKey));
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.Commands.Where(c => c.OrganizationId == organizationId && commandKinds.Contains(c.CommandKindName) && c.CommandStateName != SecurityCommandStates.Rejected).Select(c => c.CommandPayloadJson).ToList());
+
         public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) => Task.FromResult(s.Commands.FirstOrDefault(c => c.SecurityCommandId == securityCommandId));
 
         public void AddCommand(SecurityCommand command) => s.Commands.Add(command);

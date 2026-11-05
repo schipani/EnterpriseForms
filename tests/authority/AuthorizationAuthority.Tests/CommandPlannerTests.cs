@@ -442,6 +442,8 @@ public sealed class CommandPlannerTests
 
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid org, string key, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) => Task.FromResult(new List<string>());
+
         public void AddCommand(SecurityCommand command) => throw new NotSupportedException();
 
         public void AddOutboxEvent(ProjectionOutboxEvent outboxEvent) => throw new NotSupportedException();

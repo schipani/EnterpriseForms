@@ -167,7 +167,7 @@ public sealed class SecurityAuditorTests(StageBFixture fixture)
         Assert.True(filtered.IsSuccess, filtered.Body);
         Assert.Equal([s.Clerk.AuthorityUserId], filtered.Root.GetProperty("members").EnumerateArray().Select(m => m.GetProperty("userId").GetGuid()).ToList());
 
-        // Explicit journal evidence with the structured code (no note: D8-72).
+        // Explicit journal evidence with the structured code (this appointment has no note).
         var authorization = Journal(s, "authorization");
         Assert.Contains("\"role_name\":\"security_auditor\"", authorization, StringComparison.Ordinal);
         Assert.Contains("\"reason_code\":\"InvestigationSupport\"", authorization, StringComparison.Ordinal);
@@ -357,64 +357,77 @@ public sealed class SecurityAuditorTests(StageBFixture fixture)
     }
 
     /// <summary>
-    /// D8-72 (C-113): a note is refused by the business API before anything is sent, and by the Authority directly (plaintext
-    /// or envelope, appointment or removal); nothing of it is persisted, journaled or archived; commands without a note work.
+    /// C8 M4 M1 (C-117, A-T07…A-T11, A-T13, A-T14): an optional note is sealed by the business API and reaches the Authority as
+    /// ciphertext only: the command payload, the authorization journal and therefore its archived copy hold the envelope (with
+    /// every AAD input), never the plaintext; plaintext stays refused directly at the Authority; a note id cannot be reused; an
+    /// idempotent replay is the same command; an invalid note is refused before anything is sent. The plaintext sentinel is
+    /// absent from every table of AuthorityDb and BusinessDb (pg_dump) and from the api, authority and worker logs.
     /// </summary>
     [Fact]
-    public async Task ReasonNotesAreRefusedEverywhereAndNothingOfThemIsKept()
+    public async Task ASealedReasonNoteReachesTheAuthorityAsCiphertextOnlyAndThePlaintextIsNeverKept()
     {
-        var s = await ScenarioAsync("aud-note-containment");
-        Assert.Equal(HttpStatusCode.NoContent, (await AppointAsync(s, s.Administrator, s.Reader.AuthorityUserId)).Status);
-        var commandsBefore = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_commands WHERE organization_id = '{s.OrganizationId:D}';").Trim();
+        var s = await ScenarioAsync("aud-note-sealed");
+        Assert.Equal(HttpStatusCode.NoContent, (await AppointAsync(s, s.Administrator, s.Reader.AuthorityUserId, note: Note)).Status);
+        var payloadJson = fixture.Stack.AuthorityObserverSql($"SELECT command_payload_json FROM security_commands WHERE organization_id = '{s.OrganizationId:D}' AND command_kind_name = 'GrantSystemRole' AND command_state_name <> 'Rejected' ORDER BY command_created_on DESC LIMIT 1;").Trim();
+        using var payload = JsonDocument.Parse(payloadJson);
+        var envelope = payload.RootElement.GetProperty("reason_note_envelope");
+        Assert.Equal(("DynamicForms/AuditorReasonNote", 1, "AES-256-GCM"), (envelope.GetProperty("envelope_format").GetString(), envelope.GetProperty("envelope_version").GetInt32(), envelope.GetProperty("algorithm_name").GetString()));
+        Assert.Matches("^[A-Za-z0-9._:/-]{1,128}$", envelope.GetProperty("key_reference").GetString());
+        var noteId = envelope.GetProperty("note_id").GetString()!;
+        Assert.Matches("^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", noteId);
+        Assert.Equal(2048, Convert.FromBase64String(envelope.GetProperty("ciphertext_b64").GetString()!).Length);
+        Assert.Equal(JsonValueKind.Null, payload.RootElement.GetProperty("reason_note").ValueKind);
 
-        // Business API: refused before any Authority call (no command row is created).
-        Refused(await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId, note: Note), "REASON_NOTE_NOT_ACCEPTED", HttpStatusCode.UnprocessableEntity);
-        Refused(await RemoveAsync(s, s.Administrator, s.Reader.AuthorityUserId, note: Note), "REASON_NOTE_NOT_ACCEPTED", HttpStatusCode.UnprocessableEntity);
+        // A-T14: the authorization journal body (archived byte for byte) holds the envelope and every AAD input.
+        var authorization = Journal(s, "authorization");
+        Assert.Contains("\"note_id\":\"" + noteId + "\"", authorization, StringComparison.Ordinal);
+        Assert.Contains("\"authority_user_id\":\"" + s.Reader.AuthorityUserId.ToString("D") + "\"", authorization, StringComparison.Ordinal);
+        Assert.Contains("\"role_name\":\"security_auditor\"", authorization, StringComparison.Ordinal);
+
+        // Removal with a note works too (direction "remove").
+        Assert.Equal(HttpStatusCode.NoContent, (await RemoveAsync(s, s.Administrator, s.Reader.AuthorityUserId, note: Note + " removal")).Status);
+        Assert.Equal(string.Empty, AuditorEdges(s));
+
+        // A-T09: a plaintext note is still refused directly at the Authority.
+        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", AuditorPayload(s.Clerk.AuthorityUserId, note: Note), changeReason: Note), "REASON_NOTE_NOT_ACCEPTED");
+
+        // V10: the stored envelope cannot be attached to another command.
+        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", new { authority_user_id = s.Reader.AuthorityUserId, role_name = "security_auditor", reason_code = Appoint, reason_note_envelope = JsonSerializer.Deserialize<JsonElement>(envelope.GetRawText()), step_up_evidence = "synthetic-development-step-up" }), "INVALID_COMMAND");
+
+        // A-T11: an idempotent replay (same key, same sealed payload) is the same command, not a conflict and not a second note.
+        var fresh = new
+        {
+            envelope_format = "DynamicForms/AuditorReasonNote", envelope_version = 1, algorithm_name = "AES-256-GCM", key_reference = "local-dev-kek-v1", note_id = Guid.CreateVersion7().ToString("D"),
+            nonce_b64 = Convert.ToBase64String(new byte[12]), ciphertext_b64 = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(2048)), tag_b64 = Convert.ToBase64String(new byte[16]), wrapped_data_key_b64 = Convert.ToBase64String(new byte[60]),
+        };
+        await WaitForGateAsync(s);
+        var gate = await fixture.Authority.GateAsync(s.OrganizationId);
+        var key = "aud-note-replay-" + Guid.NewGuid().ToString("N");
+        var body = new { authority_user_id = s.Clerk.AuthorityUserId, role_name = "security_auditor", reason_code = Appoint, reason_note_envelope = fresh, step_up_evidence = "synthetic-development-step-up" };
+        var first = await DirectAsync(s, s.Administrator, "GrantSystemRole", body, expectedRevision: gate.GetProperty("authorization_revision").GetInt64(), idempotencyKey: key);
+        var replay = await DirectAsync(s, s.Administrator, "GrantSystemRole", body, expectedRevision: gate.GetProperty("authorization_revision").GetInt64(), idempotencyKey: key);
+        Assert.True(first.IsSuccess && replay.IsSuccess, first.Body + " / " + replay.Body);
+        Assert.Equal(first.Root.GetProperty("command_id").GetString(), replay.Root.GetProperty("command_id").GetString());
+        Assert.Equal("1", fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_commands WHERE organization_id = '{s.OrganizationId:D}' AND command_idempotency_key = '{key}';").Trim());
+
+        // B2: an invalid note is refused before anything is sent (no command row).
+        await WaitForGateAsync(s);
+        var commandsBefore = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_commands WHERE organization_id = '{s.OrganizationId:D}';").Trim();
+        Refused(await AppointAsync(s, s.Administrator, s.Designer.AuthorityUserId, note: new string('x', 501)), "INVALID_REQUEST", HttpStatusCode.UnprocessableEntity);
         Assert.Equal(commandsBefore, fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_commands WHERE organization_id = '{s.OrganizationId:D}';").Trim());
 
-        // Authority, directly: plaintext and envelope, both directions.
-        var envelope = new { envelope_version = 1, algorithm_name = "AES-256-GCM", key_reference = "NOTE-SENTINEL-key", note_id = Guid.CreateVersion7(), ciphertext = "Tk9URS1TRU5USU5FTC1jaXBoZXI=", nonce = "AAAAAAAAAAAAAAAA", tag = "AAAAAAAAAAAAAAAAAAAAAA==", wrapped_data_key = "Tk9URS1TRU5USU5FTC13cmFw" };
-        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", AuditorPayload(s.Clerk.AuthorityUserId, note: Note), changeReason: Note), "REASON_NOTE_NOT_ACCEPTED");
-        Refused(await DirectAsync(s, s.Administrator, "GrantSystemRole", new { authority_user_id = s.Clerk.AuthorityUserId, role_name = "security_auditor", reason_code = Appoint, reason_note_envelope = envelope, step_up_evidence = "synthetic-development-step-up" }), "REASON_NOTE_NOT_ACCEPTED");
-        Refused(await DirectAsync(s, s.Administrator, "RevokeSystemRole", AuditorPayload(s.Reader.AuthorityUserId, Remove, Note)), "REASON_NOTE_NOT_ACCEPTED");
-        Refused(await DirectAsync(s, s.Administrator, "RevokeSystemRole", new { authority_user_id = s.Reader.AuthorityUserId, role_name = "security_auditor", reason_code = Remove, reason_note_envelope = envelope, step_up_evidence = "synthetic-development-step-up" }), "REASON_NOTE_NOT_ACCEPTED");
-        Assert.Equal(s.Reader.AuthorityUserId.ToString("D"), AuditorEdges(s)); // nothing changed
-
-        // Nothing of the notes anywhere: rejected rows, the audit stream (whose archived copies are these exact, digest-checked
-        // bytes), the authorization journal and the business database.
-        var rejections = Journal(s, "audit", "SecurityAuditorCommandRejected");
-        Assert.Equal(4, rejections.Split(" ;; ").Length);
-        Assert.Contains("REASON_NOTE_NOT_ACCEPTED", rejections, StringComparison.Ordinal);
-        foreach (var text in new[] { rejections, RejectedRoleCommands(s), Journal(s, "authorization"), Journal(s, "audit") })
+        // A-T10/A-T13: the plaintext sentinel exists nowhere: no AuthorityDb or BusinessDb table, no rejected row or audit entry,
+        // no container log. (The archive stores the journal bodies checked above, digest-verified byte for byte.)
+        var authorityDump = fixture.Stack.Compose("exec -T authority-db sh -c \"PGPASSWORD=\\\"$POSTGRES_PASSWORD\\\" pg_dump -U \\\"$POSTGRES_USER\\\" -d \\\"$POSTGRES_DB\\\" | grep -c NOTE-SENTINEL || true\"", 120).Trim();
+        Assert.Equal("0", authorityDump.Split('\n')[^1].Trim());
+        var businessDump = fixture.Stack.AttackerShell("pg_dump | grep -c NOTE-SENTINEL || true", timeoutSeconds: 120).Trim();
+        Assert.Equal("0", businessDump.Split('\n')[^1].Trim());
+        foreach (var text in new[] { RejectedRoleCommands(s), Journal(s, "audit"), fixture.Stack.Logs("api", 5000), fixture.Stack.Logs("authority", 5000), fixture.Stack.Logs("worker", 5000) })
         {
-            foreach (var secret in new[] { "NOTE-SENTINEL", "Tk9URS1TRU5USU5FTC", "reason_note_envelope", "wrapped_data_key" })
-            {
-                Assert.DoesNotContain(secret, text, StringComparison.Ordinal);
-            }
+            Assert.DoesNotContain("NOTE-SENTINEL", text, StringComparison.Ordinal);
         }
 
-        Assert.Equal("0", fixture.Stack.AttackerSql($"SELECT count(*) FROM audit_events WHERE event_metadata_json::text LIKE '%NOTE-SENTINEL%' OR event_description LIKE '%NOTE-SENTINEL%';").Trim());
-
-        // The refusal evidence is archived like every audit-stream entry (receipt recorded, digest verified by the archive processor).
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(60);
-        string pending;
-        do
-        {
-            pending = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{s.OrganizationId:D}' AND journal_event_kind = 'SecurityAuditorCommandRejected' AND archive_delivery_state <> 'Anchored';").Trim();
-            if (pending == "0")
-            {
-                break;
-            }
-
-            await Task.Delay(500, TestContext.Current.CancellationToken);
-        }
-        while (DateTimeOffset.UtcNow < deadline);
-        Assert.Equal("0", pending);
-
-        // Without a note, both directions still work.
-        await WaitForGateAsync(s);
-        Assert.Equal(HttpStatusCode.NoContent, (await RemoveAsync(s, s.Administrator, s.Reader.AuthorityUserId)).Status);
-        Assert.Equal(HttpStatusCode.NoContent, (await AppointAsync(s, s.Administrator, s.Clerk.AuthorityUserId)).Status);
-        Assert.Equal(s.Clerk.AuthorityUserId.ToString("D"), AuditorEdges(s));
+        Assert.DoesNotContain("ciphertext_b64", RejectedRoleCommands(s), StringComparison.Ordinal); // refused rows never keep an envelope
+        Assert.DoesNotContain("reasonNote", BusinessAudit(s, "SECURITY_AUDITOR_APPOINTED"), StringComparison.Ordinal); // B8: code only
     }
 }

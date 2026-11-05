@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationMemberResponse } from "@enterpriseforms/api-client";
@@ -53,6 +53,7 @@ function renderDialog(action: "AppointSecurityAuditor" | "RemoveSecurityAuditor"
   );
 }
 
+const HELPER = "Encrypted before it is sent and kept only as ciphertext with the command. It cannot be read back in this application, is never shown to Security Auditors and is not stored in this application's audit log.";
 
 describe("MemberChangeDialog: Security Auditor", () => {
   beforeEach(() => {
@@ -62,7 +63,7 @@ describe("MemberChangeDialog: Security Auditor", () => {
     api.organization.removeSecurityAuditor.mockResolvedValue(undefined);
   });
 
-  it("requires a reason from the appointment list and sends only reasonCode (no reason, no note: D8-72)", async () => {
+  it("requires a reason from the appointment list and sends reasonCode and a trimmed note, never reason", async () => {
     const user = userEvent.setup();
     renderDialog("AppointSecurityAuditor");
     const dialog = await screen.findByRole("dialog", { name: /Make Sam Person a Security Auditor/ });
@@ -74,19 +75,32 @@ describe("MemberChangeDialog: Security Auditor", () => {
     await waitFor(() => expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["Select a reason", "Oversight role", "Cover for absence"]));
     await user.selectOptions(select, "COVER");
     expect(confirm).toBeEnabled();
+    fireEvent.change(within(dialog).getByLabelText(/Note \(optional\)/), { target: { value: "  covering Q4  " } });
     await user.click(confirm);
     await waitFor(() => expect(api.organization.appointSecurityAuditor).toHaveBeenCalledTimes(1));
     const body = api.organization.appointSecurityAuditor.mock.calls[0]![0];
-    expect(body).toEqual({ userId: "u-9", reasonCode: "COVER", useDevelopmentStepUp: true });
+    expect(body).toEqual({ userId: "u-9", reasonCode: "COVER", reasonNote: "covering Q4", useDevelopmentStepUp: true });
     expect(body).not.toHaveProperty("reason");
-    expect(body).not.toHaveProperty("reasonNote");
   });
 
-  it("offers no note field while notes are refused (D8-72)", async () => {
+  it("limits the note to 500 characters with a visible counter and the exact helper text; an empty note is sent as null", async () => {
+    const user = userEvent.setup();
     renderDialog("AppointSecurityAuditor");
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).queryByLabelText(/Note/)).toBeNull();
-    expect(within(dialog).queryByRole("textbox")).toBeNull();
+    const note = within(dialog).getByLabelText(/Note \(optional\)/) as HTMLTextAreaElement;
+    expect(note).toHaveAttribute("maxlength", "500");
+    expect(within(dialog).getByText(HELPER)).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("0 / 500");
+    fireEvent.change(note, { target: { value: "x".repeat(600) } });
+    expect(note.value).toHaveLength(500);
+    expect(dialog).toHaveTextContent("500 / 500");
+    fireEvent.change(note, { target: { value: "   " } });
+    await user.click(within(dialog).getByLabelText(/development-only step-up/i));
+    await waitFor(() => expect(within(dialog).getAllByRole("option").length).toBe(3));
+    await user.selectOptions(within(dialog).getByLabelText(/Reason/), "OVERSIGHT_ROLE");
+    await user.click(within(dialog).getByRole("button", { name: "Appoint" }));
+    await waitFor(() => expect(api.organization.appointSecurityAuditor).toHaveBeenCalled());
+    expect(api.organization.appointSecurityAuditor.mock.calls[0]![0]).toMatchObject({ reasonCode: "OVERSIGHT_ROLE", reasonNote: null });
   });
 
   it("uses the removal list for a removal and sends no reason key", async () => {
@@ -101,7 +115,7 @@ describe("MemberChangeDialog: Security Auditor", () => {
     await waitFor(() => expect(api.organization.removeSecurityAuditor).toHaveBeenCalledTimes(1));
     const [userId, body] = api.organization.removeSecurityAuditor.mock.calls[0]!;
     expect(userId).toBe("u-9");
-    expect(body).toEqual({ reasonCode: "ROLE_ENDED", useDevelopmentStepUp: true });
+    expect(body).toEqual({ reasonCode: "ROLE_ENDED", reasonNote: null, useDevelopmentStepUp: true });
     expect(body).not.toHaveProperty("reason");
   });
 });

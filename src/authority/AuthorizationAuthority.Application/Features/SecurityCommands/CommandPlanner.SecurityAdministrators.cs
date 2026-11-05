@@ -82,12 +82,12 @@ public static partial class CommandPlanner
         return plan;
     }
 
-    /// <summary>C8 M4 (AC-8.1, rules A1–A9): Security Auditor appointment and removal.</summary>
+    /// <summary>C8 M4 (AC-8.1, rules A1–A9): Security Auditor appointment and removal, with an optional sealed reason note (M1).</summary>
     private static async Task<CommandPlan> SecurityAuditorAsync(IAuthorityScope scope, Guid organizationId, BoundActor actor, SecurityCommandRequest request, DesiredStateGraph graph, FieldSearchApprovalGate gate, bool appoint, CancellationToken cancellationToken)
     {
-        // D8-72 (C-113) containment: no note, plaintext or encrypted, until the approved note encryption exists. Checked on the
-        // raw body first so the refusal is explicit; the rejected row and its evidence keep validated identifiers only.
-        RoleCommandEvidence.RefuseReasonNote(request.CommandPayload);
+        // Plaintext notes are refused permanently (D8-72) and an explicit null envelope is refused (V2/V3), on the raw body so
+        // the refusal is explicit; the rejected row and its evidence keep validated identifiers only.
+        AuditorReasonNoteEnvelopeValidation.RequireNoPlaintextNote(request.CommandPayload);
 
         // Strict binding: a free-text "reason" (the Security Administrator shape) or any other unknown member is rejected.
         var payload = CanonicalJson.Deserialize<SecurityAuditorPayload>(request.CommandPayload);
@@ -108,6 +108,15 @@ public static partial class CommandPlanner
 
         RefuseSelfRoleChange(actor, payload.AuthorityUserId);
         gate.RequireStepUp(payload.StepUpEvidence);
+        if (payload.ReasonNoteEnvelope is { } envelope)
+        {
+            // C8 M4 M1 (V4–V10): structure and sizes, then note-id uniqueness under the organization lock the command holds. The
+            // Authority holds no key; the AAD context (organization, target, role, direction) is the command's, not the envelope's.
+            var noteId = AuditorReasonNoteEnvelopeValidation.Validate(envelope);
+            var used = await scope.GetCommandPayloadsAsync(organizationId, [nameof(SecurityCommandKind.GrantSystemRole), nameof(SecurityCommandKind.RevokeSystemRole)], cancellationToken).ConfigureAwait(false);
+            AuditorReasonNoteEnvelopeValidation.RequireUnusedNoteId(noteId, used);
+        }
+
         var existing = RoleHolders(graph, organizationId, OrganizationRoleNames.SecurityAuditor).FirstOrDefault(e => e.SubjectEntityId == payload.AuthorityUserId);
         var plan = new CommandPlan
         {
@@ -154,29 +163,12 @@ public static partial class CommandPlanner
 
 /// <summary>
 /// C8 M4 (C-110): the only facts a refused GrantSystemRole / RevokeSystemRole may leave behind — on the rejected command row
-/// and in its audit-stream entry. Validated identifiers only: never free text, a reason note, step-up evidence or an
-/// invalid submitted reason value.
+/// and in its audit-stream entry. Validated identifiers only: never free text, a reason note or its sealed envelope, step-up
+/// evidence or an invalid submitted reason value.
 /// </summary>
 public static class RoleCommandEvidence
 {
     public sealed record Facts(Guid? TargetAuthorityUserId, string? RoleName, string? ReasonCode, bool? ReasonCodeValid);
-
-    /// <summary>D8-72: a non-null <c>reason_note</c> or <c>reason_note_envelope</c> is refused, whatever its content.</summary>
-    public static void RefuseReasonNote(JsonElement payload)
-    {
-        if (payload.ValueKind != JsonValueKind.Object)
-        {
-            return;
-        }
-
-        foreach (var name in new[] { "reason_note", "reason_note_envelope" })
-        {
-            if (payload.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null)
-            {
-                throw new AuthorityException(AuthorityErrorCodes.ReasonNoteNotAccepted, 422, false, "Security Auditor reason notes are not accepted until note encryption is approved and implemented (D8-72); submit the reason code only");
-            }
-        }
-    }
 
     public static string? RoleNameOf(JsonElement payload) =>
         payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("role_name", out var role) && role.ValueKind == JsonValueKind.String ? role.GetString() : null;

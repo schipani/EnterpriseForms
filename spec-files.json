@@ -449,8 +449,8 @@
     },
     {
       "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
-      "sha256": "4da458cdae2adf6b21107193690a7a9a7d5cf238bf9cf70439c2aacd7bc50214",
-      "bytes": 24608
+      "sha256": "b5682f017416ba615e15759474f5fad146dd8633a363898fb5bf216768cc72ed",
+      "bytes": 25076
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",

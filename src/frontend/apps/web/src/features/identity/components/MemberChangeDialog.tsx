@@ -1,6 +1,6 @@
 import type { MemberCommandRequest, OrganizationMemberResponse, OwnerProposalResponse } from "@enterpriseforms/api-client";
 import { useApi, useSession } from "@enterpriseforms/app-runtime";
-import { Button, Checkbox, Dialog, FieldShell, StatusMessage, TextInput, getActiveFormatter, inputClass, useFormatter } from "@enterpriseforms/ui";
+import { Button, Checkbox, Dialog, FieldShell, StatusMessage, TextArea, TextInput, getActiveFormatter, inputClass, useFormatter } from "@enterpriseforms/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorPanel } from "../../support";
@@ -97,6 +97,9 @@ function describe(change: MemberChange): { title: string; description: string; c
   }
 }
 
+const NOTE_LIMIT = 500;
+const AUDITOR_NOTE_HELP = "Encrypted before it is sent and kept only as ciphertext with the command. It cannot be read back in this application, is never shown to Security Auditors and is not stored in this application's audit log.";
+
 /**
  * One dialog for every People change (C8 M2): reason (recorded with the Authority command), the development-only step-up,
  * and the server's answer. Pending is never shown as done; refusals show the Authority's reason (for example a record
@@ -123,6 +126,7 @@ export function MemberChangeDialog({
   const [stepUp, setStepUp] = useState(false);
   const [reasonCode, setReasonCode] = useState("");
   const [reasonTouched, setReasonTouched] = useState(false);
+  const [note, setNote] = useState("");
   const auditorAction = change?.kind === "member" && (change.action === "AppointSecurityAuditor" || change.action === "RemoveSecurityAuditor") ? change.action : null;
   const reasonCodes = useQuery({
     queryKey: ["organization", "security-auditors", "reason-codes"],
@@ -159,11 +163,10 @@ export function MemberChangeDialog({
           await api.organization.removeSecurityAdministrator(member.userId, { reason: request.reason, useDevelopmentStepUp: stepUp });
           return `${name} is no longer a Security Administrator.`;
         case "AppointSecurityAuditor":
-          // D8-72 (C-113): no reason note is sent until the approved note encryption exists.
-          await api.organization.appointSecurityAuditor({ userId: member.userId, reasonCode, useDevelopmentStepUp: stepUp });
+          await api.organization.appointSecurityAuditor({ userId: member.userId, reasonCode, reasonNote: note.trim() || null, useDevelopmentStepUp: stepUp });
           return `${name} is now a Security Auditor.`;
         case "RemoveSecurityAuditor":
-          await api.organization.removeSecurityAuditor(member.userId, { reasonCode, useDevelopmentStepUp: stepUp });
+          await api.organization.removeSecurityAuditor(member.userId, { reasonCode, reasonNote: note.trim() || null, useDevelopmentStepUp: stepUp });
           return `${name} is no longer a Security Auditor.`;
         default: {
           const proposal = (await api.organization.proposeOwnerChange(member.userId, { change: PROPOSALS[action]!, ...request })).result;
@@ -183,6 +186,7 @@ export function MemberChangeDialog({
     setStepUp(false);
     setReasonCode("");
     setReasonTouched(false);
+    setNote("");
     mutation.reset();
     onClose();
   };
@@ -235,6 +239,15 @@ export function MemberChangeDialog({
               </select>
             )}
           </FieldShell>
+          <TextArea
+            label="Note (optional)"
+            value={note}
+            maxLength={NOTE_LIMIT}
+            rows={3}
+            helpText={AUDITOR_NOTE_HELP}
+            note={`${note.length} / ${NOTE_LIMIT}`}
+            onChange={(event) => setNote(event.target.value.slice(0, NOTE_LIMIT))}
+          />
         </>
       ) : (
         <TextInput

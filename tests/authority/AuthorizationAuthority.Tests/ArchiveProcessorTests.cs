@@ -281,6 +281,8 @@ public sealed class ArchiveProcessorTests
 
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid org, string key, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<SecurityCommand?> FindCommandAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
 
         public void AddCommand(SecurityCommand command) => throw new NotSupportedException();

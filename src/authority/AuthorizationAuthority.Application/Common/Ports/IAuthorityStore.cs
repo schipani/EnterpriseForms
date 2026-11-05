@@ -91,6 +91,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken);
 
+    /// <summary>C8 M4 M1 (V10): stored payloads of the organization's non-rejected commands of the given kinds (note-id uniqueness, read under the organization lock).</summary>
+    Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken);
+
     Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken);
 
     void AddCommand(SecurityCommand command);

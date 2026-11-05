@@ -126,6 +126,11 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<SecurityCommand?> FindCommandByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken) =>
             context.SecurityCommands.FirstOrDefaultAsync(c => c.OrganizationId == organizationId && c.CommandIdempotencyKey == idempotencyKey, cancellationToken);
 
+        public Task<List<string>> GetCommandPayloadsAsync(Guid organizationId, IReadOnlyCollection<string> commandKinds, CancellationToken cancellationToken) =>
+            context.SecurityCommands.AsNoTracking()
+                .Where(c => c.OrganizationId == organizationId && commandKinds.Contains(c.CommandKindName) && c.CommandStateName != SecurityCommandStates.Rejected)
+                .Select(c => c.CommandPayloadJson).ToListAsync(cancellationToken);
+
         public Task<SecurityCommand?> FindCommandAsync(Guid securityCommandId, CancellationToken cancellationToken) =>
             context.SecurityCommands.FirstOrDefaultAsync(c => c.SecurityCommandId == securityCommandId, cancellationToken);
 

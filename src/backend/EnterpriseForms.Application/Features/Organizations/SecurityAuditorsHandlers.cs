@@ -4,6 +4,7 @@ using EnterpriseForms.Application.Common.Authority;
 using EnterpriseForms.Application.Common.Persistence;
 using EnterpriseForms.Application.Features.Audit;
 using EnterpriseForms.Application.Features.FormDefinitions.CreateFormDefinition;
+using EnterpriseForms.Application.Features.Organizations.ReasonNotes;
 using EnterpriseForms.Contracts.Features;
 using EnterpriseForms.Domain.Features.Audit;
 
@@ -15,10 +16,12 @@ namespace EnterpriseForms.Application.Features.Organizations;
 /// RevokeSystemRole security commands that only an existing Security Administrator may submit, never for themself, with
 /// step-up and an owner-approved reason code. Every decision is the Authority's: this handler sends every attempt and never
 /// pre-judges the actor, the target or the code (the Authority validates the code exactly and records each refusal).
-/// Reason notes are refused (D8-72, C-113) until the approved note encryption exists: a note is never sent to the Authority,
-/// stored, logged or audited here, and the Authority refuses one independently.
+/// An optional reason note (C8 M4 M1, Design A revision 2) is validated, then sealed exactly once with
+/// <see cref="IAuditorNoteSealer"/> before anything is sent: the Authority receives ciphertext only, and the note is never
+/// stored, logged or audited here (the business audit keeps the reason code only, B8). Without a configured key provider a
+/// request with a note is refused (503) and nothing is sent; a request without a note is unaffected.
 /// </summary>
-public sealed class SecurityAuditorsHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, TimeProvider clock)
+public sealed class SecurityAuditorsHandlers(IBusinessStore store, IAuthorizationAuthorityClient authority, AuthorityCommandAwaiter awaiter, IAuditorNoteSealer sealer, TimeProvider clock)
 {
     public const string RoleName = "security_auditor";
 
@@ -62,10 +65,14 @@ public sealed class SecurityAuditorsHandlers(IBusinessStore store, IAuthorizatio
     private async Task<string> SubmitAsync(RequestContext context, SecurityCommandKind kind, Guid userId, string? reasonCode, string? reasonNote, bool stepUp, string idempotencyKey, CancellationToken cancellationToken)
     {
         var code = reasonCode?.Trim() ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(reasonNote))
+        string? note;
+        try
         {
-            // D8-72 containment: refused before anything is sent; the note is not echoed, logged or stored.
-            throw new BusinessException("REASON_NOTE_NOT_ACCEPTED", 422, "notes are not accepted yet; submit the reason only");
+            note = AuditorReasonNoteFormat.Normalize(reasonNote);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new BusinessException("INVALID_REQUEST", 422, ex.Message); // fixed rule text; the note is never echoed
         }
 
         if (userId == Guid.Empty || code.Length is 0 or > 64)
@@ -73,9 +80,43 @@ public sealed class SecurityAuditorsHandlers(IBusinessStore store, IAuthorizatio
             throw new BusinessException("INVALID_REQUEST", 422, "choose a person and a reason");
         }
 
+        // B3/B4/B5: sealed exactly once, before anything is sent; the same envelope is reused on every retry of this request.
+        object? envelope = null;
+        if (note is not null)
+        {
+            if (!sealer.IsAvailable)
+            {
+                throw new BusinessException("ENCRYPTION_UNAVAILABLE", 503, "reason notes cannot be encrypted in this environment; submit without a note");
+            }
+
+            AuditorReasonNoteEnvelope sealedNote;
+            try
+            {
+                var direction = kind == SecurityCommandKind.GrantSystemRole ? AuditorReasonNoteFormat.Appoint : AuditorReasonNoteFormat.Remove;
+                sealedNote = sealer.Seal(new AuditorReasonNoteContext(context.OrganizationId, userId, RoleName, direction, Guid.CreateVersion7()), note);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new BusinessException("ENCRYPTION_UNAVAILABLE", 503, "the reason note could not be encrypted; nothing was sent");
+            }
+
+            envelope = new
+            {
+                envelope_format = sealedNote.EnvelopeFormat,
+                envelope_version = sealedNote.EnvelopeVersion,
+                algorithm_name = sealedNote.AlgorithmName,
+                key_reference = sealedNote.KeyReference,
+                note_id = sealedNote.NoteId,
+                nonce_b64 = sealedNote.NonceB64,
+                ciphertext_b64 = sealedNote.CiphertextB64,
+                tag_b64 = sealedNote.TagB64,
+                wrapped_data_key_b64 = sealedNote.WrappedDataKeyB64,
+            };
+        }
+
         // The decision only supplies the expected revision; the Authority alone decides (no business pre-check, as for administrators).
         var decision = await authority.CheckPermissionAsync(context.ToDelegatedUser(), new PermissionCheckRequest(context.OrganizationId, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), ProtectedAction.AdministerSecurity), cancellationToken).ConfigureAwait(false);
-        var payload = JsonSerializer.SerializeToElement(new { authority_user_id = userId, role_name = RoleName, reason_code = code, step_up_evidence = stepUp ? SecurityAdministratorsHandlers.SyntheticStepUpMarker : null });
+        var payload = JsonSerializer.SerializeToElement(new { authority_user_id = userId, role_name = RoleName, reason_code = code, step_up_evidence = stepUp ? SecurityAdministratorsHandlers.SyntheticStepUpMarker : null, reason_note_envelope = envelope });
         // change_reason carries the structured code only.
         var command = await awaiter.SubmitAndAwaitAsync(context.ToDelegatedUser(), new SecurityCommandRequest(context.OrganizationId, kind, new ResourceReference(ProtectedResourceKind.Organization, context.OrganizationId), decision.AuthorizationRevision, payload, code), idempotencyKey, cancellationToken).ConfigureAwait(false);
         if (command.CommandStatus != SecurityCommandStatus.Effective)
