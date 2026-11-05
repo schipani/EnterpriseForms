@@ -963,8 +963,17 @@ public sealed class TeamMembershipReconciliationTests(StageBFixture fixture)
         }
         finally
         {
-            // Simulated Authority clearance (no Stage A product path).
-            SimulateAuthorityState($"UPDATE organization_authorization_states SET integrity_quarantine_enabled = false, integrity_quarantine_reason_code = NULL WHERE organization_id = '{s.OrganizationId:D}'");
+            // Simulated Authority clearance (no product path). Since S1 (C-117) an ordinary UPDATE cannot clear a quarantine
+            // (trigger trg_organization_integrity_quarantine_is_permanent, RB-10); clearing is reserved for a privileged G14
+            // recovery under the migration identity. This stands in for that step on the disposable stack: the trigger is
+            // suspended for this one UPDATE only, inside one transaction.
+            SimulateAuthorityState($"""
+                BEGIN;
+                ALTER TABLE organization_authorization_states DISABLE TRIGGER trg_organization_integrity_quarantine_is_permanent;
+                UPDATE organization_authorization_states SET integrity_quarantine_enabled = false, integrity_quarantine_reason_code = NULL WHERE organization_id = '{s.OrganizationId:D}';
+                ALTER TABLE organization_authorization_states ENABLE TRIGGER trg_organization_integrity_quarantine_is_permanent;
+                COMMIT;
+                """);
         }
 
         await WaitProjectedAsync(s, "team-add:" + key, 60);
