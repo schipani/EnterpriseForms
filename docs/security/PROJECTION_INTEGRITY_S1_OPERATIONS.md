@@ -69,6 +69,7 @@ The marker names the Authority's committed revision **and** its hash-chained aut
   4. record the recovery operation and its evidence in the independent archive;
   5. invalidate sessions, unlocks, tokens and cached decisions issued before recovery (recovery epoch).
 - **S1 implements none of this,** by owner decision (B-Q1): until G14 exists, a quarantined organization stays unavailable for protected access. In Development and Testing the stack is disposable.
+- **Testing only:** Stage B `RC24` (team-membership reconciler) needs a quarantine lifted to test that reconciliation resumes. It stands in for the privileged step with `ALTER TABLE … DISABLE TRIGGER`, one `UPDATE`, then `ENABLE TRIGGER`, in a single transaction, as the database owner on the disposable stack. The same DDL privilege that would let a recovery lift a quarantine lets an AuthorityDb administrator do so too: the trigger stops ordinary `UPDATE`s by any role, not DDL by the table owner. That administrator is inside the Level 2 Authority trust boundary (RR-7, G08).
 - **Reason codes:**
 
 | Reason code | Meaning |

@@ -146,7 +146,7 @@ public sealed class SecurityAuditorTests
 
         // Commands without a note (absent or explicitly null) keep working.
         await AppointAsync(Administrator, Member, SecurityAuditorReasonCodes.ComplianceReview);
-        // A null envelope and a null plaintext note are both simply no note (V3 as amended in C-117).
+        // A null envelope and a null plaintext note are both simply no note (V3 as amended in C-117 and approved in C-118).
         await SubmitAsync(Administrator, SecurityCommandKind.GrantSystemRole, new { authority_user_id = Designer, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note_envelope = (object?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence });
         Assert.True(Holds(Designer, OrganizationRoleNames.SecurityAuditor));
         await SubmitAsync(Administrator, SecurityCommandKind.RevokeSystemRole, new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note = (string?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence });
@@ -211,6 +211,56 @@ public sealed class SecurityAuditorTests
         {
             Assert.DoesNotContain(secret, everything, StringComparison.Ordinal);
         }
+    }
+
+    /// <summary>
+    /// V3 as approved by the owner (C-118): an omitted envelope and an explicit JSON null are the same "no note". Both commit, and the
+    /// normalized payload and the authorization journal body are identical apart from the target. Every non-null value that is not a
+    /// valid envelope is refused, and a plaintext note is refused even when the envelope is null.
+    /// </summary>
+    [Fact]
+    public async Task AnOmittedAndANullEnvelopeAreEquivalentAndEveryOtherNonEnvelopeValueIsRefused()
+    {
+        string Normalized(Guid target)
+        {
+            var command = store.Commands.Last(c => c.CommandStateName != SecurityCommandStates.Rejected);
+            var journal = store.Journal.Single(j => j.JournalStreamName == JournalStreamNames.Authorization && j.SecurityCommandId == command.SecurityCommandId);
+            using var payload = JsonDocument.Parse(command.CommandPayloadJson);
+            Assert.Equal(target, payload.RootElement.GetProperty("authority_user_id").GetGuid());
+            // Only per-command values differ between the two journal bodies: ids, sequence numbers, digests and times.
+            var body = journal.JournalEventBodyJson.Replace(target.ToString("D"), "<target>", StringComparison.Ordinal);
+            body = System.Text.RegularExpressions.Regex.Replace(body, "\"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\"", "\"<id>\"");
+            body = System.Text.RegularExpressions.Regex.Replace(body, "\"([a-z_]*revision)\":[0-9]+", "\"$1\":<n>");
+            body = System.Text.RegularExpressions.Regex.Replace(body, "\"([a-z_]*digest[a-z_]*)\":(null|\"[^\"]*\")", "\"$1\":<v>"); // the first entry of a stream has no previous digest
+            body = System.Text.RegularExpressions.Regex.Replace(body, "\"[0-9a-fA-F]{64}\"|\"[0-9]{4}-[0-9]{2}-[0-9]{2}T[^\"]*\"", "\"<v>\"");
+            return command.CommandPayloadJson.Replace(target.ToString("D"), "<target>", StringComparison.Ordinal) + "\n" + journal.JournalEventKind + "\n" + body;
+        }
+
+        await SubmitAsync(Administrator, SecurityCommandKind.GrantSystemRole, new { authority_user_id = Member, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence });
+        var omitted = Normalized(Member);
+        await SubmitAsync(Administrator, SecurityCommandKind.GrantSystemRole, new { authority_user_id = Designer, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.ComplianceReview, reason_note = (string?)null, reason_note_envelope = (object?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence });
+        var explicitNull = Normalized(Designer);
+        Assert.True(Holds(Member, OrganizationRoleNames.SecurityAuditor) && Holds(Designer, OrganizationRoleNames.SecurityAuditor));
+        Assert.Equal(omitted, explicitNull);
+        Assert.DoesNotContain("ciphertext_b64", omitted, StringComparison.Ordinal);
+
+        var revision = Revision;
+        var refused = new (string Case, object Payload, string Code)[]
+        {
+            ("number", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = 0, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("boolean", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = false, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("empty string", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = string.Empty, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("array", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = Array.Empty<object>(), step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("empty object", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note_envelope = new { }, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.InvalidCommand),
+            ("plaintext with a null envelope", new { authority_user_id = Auditor, role_name = OrganizationRoleNames.SecurityAuditor, reason_code = SecurityAuditorReasonCodes.AssignmentEnded, reason_note = Note, reason_note_envelope = (object?)null, step_up_evidence = FieldSearchApprovalGate.SyntheticStepUpEvidence }, AuthorityErrorCodes.ReasonNoteNotAccepted),
+        };
+        foreach (var (name, payload, code) in refused)
+        {
+            Assert.True(code == await RefusedAsync(() => SubmitAsync(Administrator, SecurityCommandKind.RevokeSystemRole, payload)), name);
+        }
+
+        Assert.Equal(revision, Revision);
+        Assert.True(Holds(Auditor, OrganizationRoleNames.SecurityAuditor));
     }
 
     [Fact]

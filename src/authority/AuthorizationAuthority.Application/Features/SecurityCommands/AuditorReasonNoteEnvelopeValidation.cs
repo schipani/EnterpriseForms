@@ -27,7 +27,7 @@ public static partial class AuditorReasonNoteEnvelopeValidation
     private static partial Regex CanonicalUuidV7();
 
     /// <summary>
-    /// V2 on the raw body: a plaintext note is refused permanently (D8-72). V3 (amended in C-117): <c>reason_note_envelope</c> is
+    /// V2 on the raw body: a plaintext note is refused permanently (D8-72). V3 (amended in C-117, approved by the owner in C-118): <c>reason_note_envelope</c> is
     /// absent, null or an object; an explicit null means no note, exactly like a null <c>reason_note</c>, because the Authority
     /// contract serializer writes nulls (refusing them would refuse every noteless command built from the contract record).
     /// </summary>

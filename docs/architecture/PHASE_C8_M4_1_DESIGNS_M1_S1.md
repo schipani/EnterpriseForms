@@ -1,16 +1,10 @@
 # Phase C8 M4-1: Design A (M1 reason-note sealing) and Design B (S1 projection integrity)
 
-- **Status:** **Revision 2 (C-116), for final owner approval. Nothing here is implemented.** Revision 1 was C-115.
-  * **Approved in C-116:**
-    * A-Q1 (fixed-size padding);
-    * A-Q3 (no note-presence flag in the business audit);
-    * B-Q1 (quarantine stays until an approved G14 recovery process exists);
-    * B-Q3 (Authority integrity metrics);
-    * B-Q4 (no SpiceDB read replicas until independently verified).
-  * **Conditionally approved:** A-Q2 (M1 contract) and B-Q2 (S1 protocol). The open conditions are answered in §1.9 and §4. Revision 2 changes the protocol in five places, listed in §2.0.
-  * D8-72 containment stays active.
-  * T16-S still fails, and T16S-1 is open (RR-11, High).
-  * Not authorized: implementation of S1 or M1, push, PR, merge, deploy, M4-2, RCF-1 remediation and G14.
+- **Status:** **Revision 2, approved in C-117 and implemented in Development/Testing** (S1 `5f5fb07` with test fix `051a65d`; M1 `9b47a8b`). Not pushed, not merged, not independently reviewed. Revision 1 was C-115; revision 2 was C-116.
+  * **Approved in C-117:** A-Q2, B-Q2, B-Q5 (journal digest in the marker), B-Q6 (quarantine on any confirmed unchanged-state mismatch), B-Q7 (permanence trigger), B-Q8 (one database backend behind SpiceDB at a time; replacement and restore only with SpiceDB stopped), B-Q9 (added p95 ≤ 15 ms, subject to Azure staging validation).
+  * **V3 amended (owner approval, C-118):** an explicit `null` envelope is equivalent to an omitted one (no note); §1.5.
+  * T16-S passes; T16S-1 is remediated in Development/Testing (RR-11), pending independent review and staging evidence. D8-72 containment is lifted (RR-12).
+  * Still not authorized: push, PR, merge, deploy, M4-2, RCF-1 remediation and G14.
 - **Audience:** the project owner (the final decisions in §3) and the independent Authority reviewer. Claude (Opus) wrote this in the owner's session. It is not an independent review.
 - **Baseline:** branch `phase-c8/m4-governance-audit` at `e117399`. Findings come from `PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md` §1.5 and §2.4.
 - **Evidence:** focused protocol verification under C-116, in `docs/evidence/phase-c8/m4-1-protocol-verification/`, run against the security-test stack (`authzed/spicedb:v1.56.2`):
@@ -139,7 +133,7 @@ The member sits inside the GrantSystemRole and RevokeSystemRole payload for `rol
 |---|---|---|
 | V1 | The payload binds strictly (`UnmappedMemberHandling.Disallow`). An unknown member, in the payload or the envelope, is refused. | `INVALID_COMMAND` |
 | V2 | `reason_note` present with any non-null value | `REASON_NOTE_NOT_ACCEPTED` (permanent; the D8-72 plaintext refusal) |
-| V3 | `reason_note_envelope` is absent, or an object. An explicit `null` is refused. | `INVALID_COMMAND` |
+| V3 | `reason_note_envelope` is absent, an explicit JSON `null`, or an object. Absent and `null` are equivalent: no note (amended by owner approval, C-118). Any other value (string, number, boolean, array) is refused, and an object must pass V4–V11. A plaintext `reason_note` is refused under V2 whatever the envelope is. | `INVALID_COMMAND` |
 | V4 | `envelope_format`, `envelope_version` and `algorithm_name` equal exactly `DynamicForms/AuditorReasonNote`, `1` and `AES-256-GCM` | `INVALID_COMMAND` |
 | V5 | `key_reference` is 1–128 characters from `[A-Za-z0-9._:/-]` | `INVALID_COMMAND` |
 | V6 | `note_id` is a canonical lowercase hyphenated UUID, version nibble `7`, RFC 4122 variant, not all zeros | `INVALID_COMMAND` |

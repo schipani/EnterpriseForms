@@ -773,3 +773,166 @@ An earlier run of the first shard had 3 failures in the new test class. Two were
 - **After the probes,** the security-test SpiceDB datastore holds a restored dump. Recreate the stack (`down -v`) before any shard run.
 - **Unchanged:** T16-S failing (D8-78); T16S-1 open; D8-72 containment active; C-111 open; M4-2 not started; nothing pushed.
 - **Decisions requested:** A-Q2, B-Q2, B-Q5…B-Q9.
+
+## 39. C-117 implementation of S1 and M1; C-118 interim acceptance (2026-11-04/05) — Development/Testing, not pushed, not merged, not independently reviewed
+
+- **C-117:** A-Q2, B-Q2 and B-Q5…B-Q9 approved.
+- **C-118:** interim owner acceptance of S1 and M1, and approval of the V3 change.
+- **Still open:** M4-1, pending the final evidence and an independent security review.
+- **Not authorized:** M4-2, push, PR, merge, deploy, G14 and the RCF-1 fix.
+- **Evidence:** `docs/evidence/phase-c8/m4-1-s1-implementation/` (README, per-shard summaries, latency files).
+- **Operations guide:** `docs/security/PROJECTION_INTEGRITY_S1_OPERATIONS.md`.
+
+### 39.1 Commits (signed, local)
+
+| Commit | Content |
+|---|---|
+| `5f5fb07` | **S1 projection integrity** (57 files). Authority: ports and `VerifiedProjectionSnapshot`; `ProjectionMarker` v2; `ProjectionIntegrityVerifier` (pin, decide, verify, lock-confirmed quarantine); `ProjectionIntegrityMonitor` (marker transition and S2 periodic check); projector changes; migration `20261104231152_ProjectionIntegrityS1` (snapshot-token column, legacy-token check constraint, permanence trigger); metrics; readiness gating. Tests: 21 Authority unit tests; architecture tests ARCH-01…03 and U-09; SpiceDB contract probe CT-1…CT-6; Stage B RB-02…RB-15, T16-S tightened as RB-01, and a latency test. Docs: operations guide; DR §10 item 10 |
+| `9b47a8b` | **M1 sealed Security Auditor notes** (24 files): `IAuditorNoteSealer` and `AesGcmAuditorNoteSealer`; normalization and padding; Authority validation V1–V11; handlers, contracts, OpenAPI and the TypeScript client; the People dialog note field; Authority, contract and Stage B tests |
+| `051a65d` | RC24 test: since the trigger refuses ordinary UPDATEs, it now simulates the privileged G14 clearance. No product change |
+| documentation commit (this section) | C-117 and C-118 records; V3 contract amendment with its equivalence test; risk register; evidence; manifest |
+
+### 39.2 Stage B results by shard (each run on a freshly recreated security-test stack)
+
+| Shard | S1 run at `5f5fb07` | Rerun at `051a65d` (S1 + M1 + RC24 fix) | Status |
+|---|---|---|---|
+| authorization-security-onboarding | **93/93**. An earlier run from the uncommitted working tree was 92/93: an RB-10 test setup error, fixed before the commit | **93/93** | Passed in full at both commits |
+| forms-documents | **38/38** | not rerun | Passed in full at `5f5fb07`; not rerun (M1 does not touch it) |
+| records-lifecycle | **62/62** | not rerun | Passed in full at `5f5fb07`; not rerun |
+| administration-membership | **52/55**, three failures (listed below the table) | **55/55** | Passed in full only at `051a65d` |
+| search-catalogue | **16/17**: `BenchmarkTheVerifiedScopeAt50And150And480Records` failed, because the 480-record scope was refused with `SEARCH_VERIFICATION_LIMIT` (time) | shard not rerun; class `SearchCatalogueTests` alone **11/12** (the same benchmark failure) | **Partial.** See 39.4: the 480-record time-limit refusal is **probably contributed to by S1, not proven** (pre-S1 passed alone at 12.5 s p50; S1 was refused in both runs) |
+| search-execution | **14/14** | not rerun | Passed in full at `5f5fb07`; not rerun |
+| protection-reconciliation | **22/22** | not rerun | Passed in full at `5f5fb07`; not rerun |
+
+The three `administration-membership` failures at `5f5fb07`:
+- **RC24 (caused by S1):** the new permanence trigger refused the test's own SQL clearance. The test was fixed in `051a65d`.
+- **RC19 (environment):** NETSDK1004, because the worktree had never been restored with NuGet.
+- **`StaleAndConcurrentChangesLoseCleanlyAndValidationHolds` (timing, intermittent):** the losing request got a retryable 503 `AUTHORITY_NOT_READY` (`AwaitingArchive`) instead of a 409. Nothing was changed.
+
+**Not every shard passed in full at one commit.**
+- Five shards passed in full at `5f5fb07`.
+- `administration-membership` passed in full only on the rerun at `051a65d`.
+- `search-catalogue` never passed in full. At `051a65d` only its main class was rerun, 11/12, with the same benchmark refusal.
+- Four shards were not rerun at `051a65d`: forms-documents, records-lifecycle, search-execution and protection-reconciliation.
+
+### 39.3 Required tests
+
+| Test | Result (fresh stack) |
+|---|---|
+| T16-S = RB-01 (SpiceDB datastore restored from before a revoke) | **Pass** at `5f5fb07` and `051a65d`: 423 `INTEGRITY_QUARANTINE`; gate `Quarantined`; reason `PROJECTION_MARKER_BEHIND`; one `ProjectionIntegrityQuarantined` journal event; the alert is logged. The revoked auditor and the revoked designer are denied |
+| T16-B (hostile BusinessDb restore) | **Pass** at both commits |
+| RB-02…RB-15 | **Pass** at both commits (cases listed below the table) |
+| CT-1…CT-6 (SpiceDB behaviour contract) | **Pass** at both commits |
+| M1 Stage B `ASealedReasonNoteReachesTheAuthorityAsCiphertextOnlyAndThePlaintextIsNeverKept` | **Pass** at `051a65d` (checks listed below the table) |
+| M1 contract tests (business API) | **Pass**: KAT-M1-01; context binding (organization, target, role, direction, note id); tampering; cross-domain; padding and normalization rules; key provider unavailable (503, nothing sent); no decrypt operation exists |
+| M1 Authority tests | **Pass**: plaintext refused permanently; envelope rules V2–V10; omitted and `null` equivalent (C-118) |
+| Non-stack sweep at the documentation commit | **990/990** (Authority 346 including the new V3 equivalence test, contract 507, architecture 80, integrity 34, platform console 23) |
+
+RB-02…RB-15 cover:
+- shares;
+- field items;
+- team membership;
+- discovery and the catalogue;
+- form permissions;
+- cross-organization isolation;
+- a missing marker;
+- the Authority behind SpiceDB;
+- permanence across restarts, commands, projection and a direct UPDATE;
+- legitimate concurrent changes, which never quarantine;
+- a live restore;
+- a replaced datastore;
+- the periodic check;
+- an outage, which fails closed without quarantine.
+
+The M1 Stage B test checks that:
+- the Authority receives only the envelope with its 2,048-byte ciphertext;
+- the plaintext sentinel appears nowhere: not in a `pg_dump` of AuthorityDb or BusinessDb, the rejected rows, the audit stream, or the api, authority and worker logs;
+- the Authority refuses plaintext;
+- a note id cannot be reused;
+- an idempotent replay is one command;
+- an invalid note sends nothing.
+
+### 39.4 Performance
+
+**Authorization checks** (`AuthorizationLatencyTests`: open loop, host to Authority; fresh stack per run; two runs each; p95 in ms):
+
+| Load | Pre-S1 | S1 | Added (mean) |
+|---|---|---|---|
+| single @ 50 rps | 14.80, 15.59 | 21.86, 21.40 | +6.4 |
+| single @ 150 rps | 20.62, 16.65 | 27.86, 38.63 | +14.6 (+7.2 and +22.0) |
+| batch of 25 @ 50 rps | 16.80, 14.55 | 22.70, 25.62 | +8.5 |
+
+- **B-Q9 target (added p95 ≤ 15 ms):** met at 50 rps. At 150 rps it is **not reliably met** on this laptop: the mean is 14.6 ms, but one run added 22 ms.
+- **Measurement limits:**
+  * one developer laptop, with the owner's dev stack running at the same time;
+  * no TLS, zones or staging data volume;
+  * two runs per configuration.
+- **The staging performance gate decides:** Azure staging PERF-01 under PB-09 conditions is required before production readiness.
+- **Optimizations O-B2 and O-B1:** not implemented; they need separate approval.
+
+**Verified search scope** (`SearchCatalogueTests` benchmark, server ms):
+
+| Run (fresh stack each) | 50 records p50 / p95 | 150 records p50 / p95 | 480 records p50 / p95 |
+|---|---|---|---|
+| Pre-S1 `70894d2`, class alone | 1,990 / 2,132 | 5,738 / 6,197 | **12,481 / 12,952 (passed)** |
+| S1 `5f5fb07`, in the shard | 1,327 / 1,498 | 4,276 / 4,824 | **refused** (`SEARCH_VERIFICATION_LIMIT`, time, 15 s) |
+| S1 + M1 `051a65d`, class alone | 1,561 / 1,697 | 4,451 / 4,717 | **refused** (same) |
+
+- **Verdict: S1 probably contributes, but this is not proven.**
+- **Evidence for an S1 contribution:** like-for-like (class alone, fresh stack), pre-S1 completed 480 records, and S1 was refused in both of its runs.
+- **Evidence against a simple slowdown:**
+  * At 50 and 150 records S1 was *faster* than the pre-S1 run, so run-to-run variance on this laptop (about ±30%) dominates.
+  * Pre-S1 already used 83% of the 15 s budget at 480 records.
+  * Pre-S1 has exceeded the budget on this laptop before (`PHASE_C7_STATUS.md` §15.5).
+  * The comparison is three runs, not a statistical sample.
+- **What S1 adds on this path:**
+  * for each verification batch, one pin (marker read) and one verify (marker read plus AuthorityDb re-read): about 20 extra round trips over the 10 batches of a 480-record scope;
+  * the per-record checks at an exact snapshot instead of `at_least_as_fresh`.
+  * This is enough to push a scope at the edge of the budget over it. It has not been isolated.
+- **Behaviour is safe:**
+  * the refusal is the typed, non-partial fail-closed answer (PB-04);
+  * no result was partial;
+  * no test other than the benchmark failed.
+- **Effect:** on this laptop, verified search near the 500-record ceiling is refused more often. Hosted runners were about 2× faster in C7 (480 records at 6.1 s). Whether S1 changes this on staging is unmeasured.
+- **Possible remedy (not implemented, needs approval):** verify each batch with one bulk check instead of one check per record. This uses the same snapshot and the same S1 protocol. A staging measurement of the search path should be added to PERF-01.
+
+### 39.5 Invariants (as implemented and tested)
+
+- **Every protected SpiceDB decision is pinned and verified:**
+  * permission checks, bulk checks and lookups run at the pinned exact snapshot, and `checked_at`/`looked_up_at` must equal it;
+  * a `fully_consistent` marker read and an AuthorityDb re-read follow every decision;
+  * the single-use `VerifiedProjectionSnapshot` is the only route to the SpiceDB ports (ARCH-01…03).
+- **A confirmed mismatch quarantines the organization:**
+  * only when the Authority state is unchanged;
+  * the quarantine is lock-confirmed and persisted together with an audit-stream event, and a Critical alert follows;
+  * if the Authority state changed in the meantime, the decision is retried; it never results in an allow.
+- **A quarantine is permanent under normal operation:**
+  * no code path clears it;
+  * the trigger refuses, for every role, UPDATEs that clear it or change its reason;
+  * the projector does not write for a quarantined organization;
+  * only a privileged G14 recovery could lift it, and that recovery is not implemented.
+- **A pre-S1 Authority cannot run silently against an S1 database:** the legacy token column is constrained `NULL`. The minimum safe version and the pipeline rule are documented, but the PB-11 pipeline that would enforce it does not exist yet.
+- **Single SpiceDB backend (I3, B-Q8):** a deployment rule that the code cannot enforce. RE-1 is the accepted residual risk.
+- **M1:**
+  * no plaintext note is persisted anywhere;
+  * there is no decrypt operation;
+  * notes are refused when no key provider is configured;
+  * an omitted envelope and a `null` envelope are equivalent.
+
+### 39.6 Remaining defects, risks and deviations
+
+- **Defects:** no known open security defect in S1 or M1 on the tested paths. There has been no independent security review.
+- **Open performance finding P-S1-1:** a 480-record verified search scope is refused at the 15 s budget with S1 on this laptop; S1 probably contributes (§39.4). This is fail-closed, not a security defect. It needs either the bulk-check remedy (approval required) or staging evidence.
+- **Risks:**
+  * RE-1, accepted under I3;
+  * RE-2…RE-6, see `PROJECTION_INTEGRITY_S1_OPERATIONS.md`;
+  * a false quarantine lasts until G14 exists, an availability risk;
+  * RR-13 (RCF-1) and RR-14 (T16-A, needs G14) remain open;
+  * RR-6 and RR-7: archive immutability and AuthorityDb administration in production;
+  * M1 has no production key providers or key rotation yet;
+  * the trigger stops UPDATEs, not DDL by the table owner, who is inside the Authority trust boundary.
+- **Deviations:**
+  * V3, approved in C-118;
+  * B-Q9 not reliably met at 150 rps locally;
+  * the `search-catalogue` shard was not rerun in full at the final commit, and four other shards were not rerun at it.
+- **Observed test flakiness:** the membership race test once got a retryable 503 (`AwaitingArchive`). The test still expects only 409s, and is unchanged here.

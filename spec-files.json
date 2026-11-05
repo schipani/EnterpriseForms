@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/PHASE_C8_STATUS.md",
-      "sha256": "76b5c4d56179e440d69235fce1752a14de1bdb2e809d4aee8043a7930f2321b8",
-      "bytes": 106689
+      "sha256": "213bc51c4f7836703d1eb310d8f737adae2939cc2ac03894f97051ca57e56b0e",
+      "bytes": 119138
     },
     {
       "path": "docs/PREBUILD_OPEN_ITEMS.md",
@@ -204,8 +204,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_M4_1_DESIGNS_M1_S1.md",
-      "sha256": "ec3d08188ff5b7286d3f79d3d3b4acc71ae218721a11bed00652cf08f0115090",
-      "bytes": 57865
+      "sha256": "96c2be241f941108706ffe3dff368c1348cad196e619a7f245dd73f8f834488e",
+      "bytes": 58228
     },
     {
       "path": "docs/architecture/PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md",
@@ -214,8 +214,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_M4_AC8_SECURITY_CONTRACT.md",
-      "sha256": "dd1a3bb02e0a04947afe338f86a13bc4a403583da40f61626531217ed08f420a",
-      "bytes": 50949
+      "sha256": "0c060be401e72bec17367010ecbccfbc00c849aca1acbba8ed6f090e1da15afc",
+      "bytes": 51965
     },
     {
       "path": "docs/architecture/PHASE_C8_ORGANIZATION_ONBOARDING_OWNER_RECOVERY.md",
@@ -314,8 +314,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "d0dfa05c5211ae2c0b67d09a256818e90270f322723f5e983b295d7695fa506e",
-      "bytes": 191092
+      "sha256": "ea04d5f97755467dc4bcfa8ff1b2399f60af609906fcc4ce1f2b21388e3ebdd1",
+      "bytes": 197302
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -444,13 +444,13 @@
     },
     {
       "path": "docs/security/PROJECTION_INTEGRITY_S1_OPERATIONS.md",
-      "sha256": "368fda96c0d87e044d1ea6b76174c916af365c7654a5dd0da908d6387e2029e3",
-      "bytes": 9998
+      "sha256": "decb2e5bd92f02b7f288fee729d16f18ada54ac037225d5829f043fcd63cb003",
+      "bytes": 10580
     },
     {
       "path": "docs/security/SECURITY_ADMINISTRATOR_MANAGEMENT.md",
-      "sha256": "b5682f017416ba615e15759474f5fad146dd8633a363898fb5bf216768cc72ed",
-      "bytes": 25076
+      "sha256": "888feee620960f2165344ba8a7e6f4b54aa290680443a2279c32c0375c98fadb",
+      "bytes": 25148
     },
     {
       "path": "docs/security/stage-a-vault-transit-vectors.json",
