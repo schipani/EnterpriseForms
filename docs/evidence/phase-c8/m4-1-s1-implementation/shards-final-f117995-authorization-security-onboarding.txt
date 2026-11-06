@@ -1,0 +1,20 @@
+== 2026-11-05T09:09:26Z authorization-security-onboarding fresh stack at f117995
+failed EnterpriseForms.StageBTests.Tests.SecurityAdministratorTests.BrowserSessionsNeedCsrfAndKeepNoPrivilegeAfterRemovalOrSignOut (156ms)
+  total: 93
+  failed: 1
+  succeeded: 92
+  skipped: 0
+exit 1 elapsed 948s
+-- failure excerpt --
+failed EnterpriseForms.StageBTests.Tests.SecurityAdministratorTests.BrowserSessionsNeedCsrfAndKeepNoPrivilegeAfterRemovalOrSignOut (156ms)
+  from C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.Net.Http.HttpRequestException : Response status code does not indicate success: 423 (Locked).
+    at System.Net.Http.HttpResponseMessage.EnsureSuccessStatusCode()
+    at System.Net.Http.Json.HttpClientJsonExtensions.<FromJsonAsyncCore>g__Core|12_0[TValue,TJsonOptions](HttpClient client, Task`1 responseTask, Boolean usingResponseHeadersRead, CancellationTokenSource linkedCTS, Func`4 deserializeMethod, TJsonOptions jsonOptions, CancellationToken cancellationToken)
+    at EnterpriseForms.StageBTests.Tests.SecurityAdministratorTests.BrowserSessionsNeedCsrfAndKeepNoPrivilegeAfterRemovalOrSignOut() in C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\Tests\SecurityAdministratorTests.cs:313
+    --- End of stack trace from previous location ---
+C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64) failed with 1 error(s) (14m 30s 071ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 93

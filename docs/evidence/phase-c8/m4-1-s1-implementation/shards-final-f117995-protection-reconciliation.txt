@@ -1,0 +1,25 @@
+== 2026-11-05T10:40:40Z protection-reconciliation fresh stack at f117995
+INCOMPLETE: the host slept or restarted during this shard (one test ran 16 h; its docker exec failed with -1073741502). Results of this pass are not complete; see shards-final-rerun-f117995-protection-reconciliation.txt
+-- failure excerpt --
+failed EnterpriseForms.StageBTests.Tests.ProtectionReconciliationTests.TheCatalogueCeilingEndsIncompleteAndExpiredSnapshotsAreRenewedSafely (4m 29s 502ms)
+  from C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  Assert.Equal() Failure: Strings differ
+                                            ↓ (pos 31)
+  Expected: "Blocked|ENCRYPTION_UNAVAILABLE|1"
+  Actual:   "Blocked|ENCRYPTION_UNAVAILABLE|2"
+                                            ↑ (pos 31)
+    at EnterpriseForms.StageBTests.Tests.ProtectionReconciliationTests.TheCatalogueCeilingEndsIncompleteAndExpiredSnapshotsAreRenewedSafely() in C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\Tests\ProtectionReconciliationTests.cs:645
+    --- End of stack trace from previous location ---
+failed EnterpriseForms.StageBTests.Tests.ProtectionReconciliationTests.OutagesAndRestartsResumeTheReconciliationAndHeldCensusResultsAreReused (16h 03m 10s 939ms)
+  from C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.InvalidOperationException : docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env exec -T attacker-sql sh -c "echo U0VMRUNUIHRyYW5zaWVudF9mYWlsdXJlX2NvdW50IEZST00gZmllbGRfcHJvdGVjdGlvbl9yZWNvbmNpbGlhdGlvbnMgV0hFUkUgZmllbGRfZGVmaW5pdGlvbl9pZCA9ICcwMWExYWI1ZS0zOWVhLTczZDItOTkzZC0wNzRlM2Q5YjA1YzAnIEFORCByZWNvbmNpbGlhdGlvbl9tb2RlID0gJ1ZlcmlmeU9ubHknOw== | base64 -d | psql -v ON_ERROR_STOP=1 -qAt" failed (-1073741502):
+-- failure excerpt --
+failed EnterpriseForms.StageBTests.Tests.ProtectionReconciliationTests.OutagesAndRestartsResumeTheReconciliationAndHeldCensusResultsAreReused (16h 03m 10s 939ms)
+  from C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  Xunit.MicrosoftTestingPlatform.XunitException: System.InvalidOperationException : docker compose -f compose.yaml -f compose.security-test.yaml --env-file .env exec -T attacker-sql sh -c "echo U0VMRUNUIHRyYW5zaWVudF9mYWlsdXJlX2NvdW50IEZST00gZmllbGRfcHJvdGVjdGlvbl9yZWNvbmNpbGlhdGlvbnMgV0hFUkUgZmllbGRfZGVmaW5pdGlvbl9pZCA9ICcwMWExYWI1ZS0zOWVhLTczZDItOTkzZC0wNzRlM2Q5YjA1YzAnIEFORCByZWNvbmNpbGlhdGlvbl9tb2RlID0gJ1ZlcmlmeU9ubHknOw== | base64 -d | psql -v ON_ERROR_STOP=1 -qAt" failed (-1073741502): 
+  
+    at EnterpriseForms.SecurityTests.Harness.ComposeStack.Run(String fileName, String arguments, Int32 timeoutSeconds, Boolean throwOnError) in C:\t\final-shards\tests\security\EnterpriseForms.SecurityTests\Harness\ComposeStack.cs:213
+    at EnterpriseForms.SecurityTests.Harness.ComposeStack.Compose(String arguments, Int32 timeoutSeconds, Boolean throwOnError) in C:\t\final-shards\tests\security\EnterpriseForms.SecurityTests\Harness\ComposeStack.cs:22
+    at EnterpriseForms.SecurityTests.Harness.ComposeStack.AttackerSql(String sql, Boolean throwOnError) in C:\t\final-shards\tests\security\EnterpriseForms.SecurityTests\Harness\ComposeStack.cs:29
+    at EnterpriseForms.StageBTests.Tests.ProtectionReconciliationTests.OutagesAndRestartsResumeTheReconciliationAndHeldCensusResultsAreReused() in C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\Tests\ProtectionReconciliationTests.cs:332
+    --- End of stack trace from previous location ---

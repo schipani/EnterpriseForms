@@ -1,0 +1,390 @@
+P1PROBE catalogue lookedUp=1 pinLookupComplete=24.5
+P1PROBE verify records=1 total=37.2 pin=5.6 loop=25.4 complete=6.1 spiceCalls=1 spiceItems=1 spiceMs=2.9 macCalls=8 macMs=15.3
+P1PROBE catalogue lookedUp=2 pinLookupComplete=24.8
+P1PROBE verify records=2 total=52.7 pin=2.5 loop=45.4 complete=4.8 spiceCalls=2 spiceItems=2 spiceMs=8.8 macCalls=16 macMs=24.5
+P1PROBE catalogue lookedUp=1 pinLookupComplete=10.9
+P1PROBE catalogue lookedUp=3 pinLookupComplete=12.7
+P1PROBE verify records=3 total=58.3 pin=2.1 loop=52.5 complete=3.7 spiceCalls=3 spiceItems=3 spiceMs=7.3 macCalls=24 macMs=29.6
+P1PROBE catalogue lookedUp=0 pinLookupComplete=10.3
+P1PROBE catalogue lookedUp=1 pinLookupComplete=14.0
+P1PROBE verify records=1 total=40.3 pin=1.9 loop=33.9 complete=4.5 spiceCalls=3 spiceItems=9 spiceMs=14.2 macCalls=8 macMs=10.9
+P1PROBE catalogue lookedUp=3 pinLookupComplete=10.7
+P1PROBE catalogue lookedUp=50 pinLookupComplete=32.0
+P1PROBE verify records=50 total=844.0 pin=2.0 loop=836.8 complete=5.2 spiceCalls=50 spiceItems=50 spiceMs=113.0 macCalls=400 macMs=486.3
+P1PROBE catalogue lookedUp=50 pinLookupComplete=14.6
+P1PROBE verify records=50 total=933.7 pin=6.3 loop=922.3 complete=5.2 spiceCalls=50 spiceItems=50 spiceMs=181.4 macCalls=400 macMs=497.1
+P1PROBE catalogue lookedUp=50 pinLookupComplete=23.6
+P1PROBE verify records=50 total=1137.4 pin=2.7 loop=1124.7 complete=10.0 spiceCalls=50 spiceItems=50 spiceMs=153.5 macCalls=400 macMs=653.0
+P1PROBE catalogue lookedUp=50 pinLookupComplete=20.9
+P1PROBE verify records=50 total=1100.8 pin=3.5 loop=1093.2 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=158.6 macCalls=400 macMs=627.4
+P1PROBE catalogue lookedUp=50 pinLookupComplete=15.7
+P1PROBE verify records=50 total=1118.2 pin=6.0 loop=1107.7 complete=4.4 spiceCalls=50 spiceItems=50 spiceMs=207.3 macCalls=400 macMs=595.8
+P1PROBE catalogue lookedUp=50 pinLookupComplete=26.7
+P1PROBE verify records=50 total=866.6 pin=2.0 loop=860.7 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=123.4 macCalls=400 macMs=496.1
+P1PROBE catalogue lookedUp=50 pinLookupComplete=11.6
+P1PROBE verify records=50 total=829.8 pin=2.0 loop=824.2 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=112.2 macCalls=400 macMs=471.7
+P1PROBE catalogue lookedUp=50 pinLookupComplete=12.4
+P1PROBE verify records=50 total=912.4 pin=2.3 loop=906.4 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=124.0 macCalls=400 macMs=526.7
+P1PROBE catalogue lookedUp=50 pinLookupComplete=27.1
+P1PROBE verify records=50 total=1216.1 pin=3.4 loop=1207.8 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=230.2 macCalls=400 macMs=656.5
+P1PROBE catalogue lookedUp=50 pinLookupComplete=17.3
+P1PROBE verify records=50 total=1282.5 pin=3.0 loop=1275.0 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=165.2 macCalls=400 macMs=752.5
+P1PROBE catalogue lookedUp=50 pinLookupComplete=16.6
+P1PROBE verify records=50 total=1281.5 pin=4.8 loop=1270.4 complete=6.2 spiceCalls=50 spiceItems=50 spiceMs=240.5 macCalls=400 macMs=695.0
+P1PROBE catalogue lookedUp=50 pinLookupComplete=28.2
+P1PROBE verify records=50 total=1134.5 pin=2.6 loop=1127.0 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=158.3 macCalls=400 macMs=655.9
+P1PROBE catalogue lookedUp=50 pinLookupComplete=16.9
+P1PROBE verify records=50 total=910.8 pin=2.2 loop=904.0 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=125.5 macCalls=400 macMs=518.3
+P1PROBE catalogue lookedUp=50 pinLookupComplete=34.0
+P1PROBE verify records=50 total=992.3 pin=2.5 loop=985.2 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=180.2 macCalls=400 macMs=540.4
+P1PROBE catalogue lookedUp=50 pinLookupComplete=13.3
+P1PROBE verify records=50 total=1348.1 pin=4.3 loop=1338.8 complete=5.0 spiceCalls=50 spiceItems=50 spiceMs=176.2 macCalls=400 macMs=774.7
+P1PROBE catalogue lookedUp=50 pinLookupComplete=15.9
+P1PROBE verify records=50 total=1267.1 pin=6.6 loop=1256.2 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=234.9 macCalls=400 macMs=678.8
+P1PROBE catalogue lookedUp=150 pinLookupComplete=84.8
+P1PROBE verify records=50 total=1153.8 pin=3.4 loop=1145.3 complete=5.1 spiceCalls=50 spiceItems=50 spiceMs=214.7 macCalls=400 macMs=633.9
+P1PROBE verify records=50 total=985.8 pin=2.7 loop=978.4 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=178.3 macCalls=400 macMs=524.3
+P1PROBE verify records=50 total=951.4 pin=4.9 loop=942.6 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=184.2 macCalls=400 macMs=503.0
+P1PROBE catalogue lookedUp=150 pinLookupComplete=45.2
+P1PROBE verify records=50 total=1107.5 pin=2.7 loop=1098.6 complete=6.2 spiceCalls=50 spiceItems=50 spiceMs=210.5 macCalls=400 macMs=597.1
+P1PROBE verify records=50 total=1362.1 pin=3.2 loop=1349.9 complete=9.0 spiceCalls=50 spiceItems=50 spiceMs=248.6 macCalls=400 macMs=744.5
+P1PROBE verify records=50 total=1351.5 pin=6.5 loop=1339.3 complete=5.7 spiceCalls=50 spiceItems=50 spiceMs=250.6 macCalls=400 macMs=730.5
+P1PROBE catalogue lookedUp=150 pinLookupComplete=78.9
+P1PROBE verify records=50 total=1326.9 pin=4.2 loop=1317.8 complete=5.0 spiceCalls=50 spiceItems=50 spiceMs=252.2 macCalls=400 macMs=719.4
+P1PROBE verify records=50 total=1245.4 pin=5.1 loop=1234.3 complete=6.0 spiceCalls=50 spiceItems=50 spiceMs=242.0 macCalls=400 macMs=664.4
+P1PROBE verify records=50 total=1186.6 pin=3.1 loop=1178.3 complete=5.1 spiceCalls=50 spiceItems=50 spiceMs=226.7 macCalls=400 macMs=639.7
+P1PROBE catalogue lookedUp=150 pinLookupComplete=67.0
+P1PROBE verify records=50 total=1280.2 pin=3.2 loop=1272.7 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=249.9 macCalls=400 macMs=688.8
+P1PROBE verify records=50 total=1285.1 pin=5.0 loop=1273.9 complete=6.2 spiceCalls=50 spiceItems=50 spiceMs=239.3 macCalls=400 macMs=694.5
+P1PROBE verify records=50 total=1112.0 pin=2.8 loop=1105.3 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=212.3 macCalls=400 macMs=601.5
+P1PROBE catalogue lookedUp=150 pinLookupComplete=55.2
+P1PROBE verify records=50 total=1052.7 pin=6.0 loop=1040.5 complete=6.2 spiceCalls=50 spiceItems=50 spiceMs=204.3 macCalls=400 macMs=561.1
+P1PROBE verify records=50 total=1147.2 pin=2.6 loop=1138.8 complete=5.8 spiceCalls=50 spiceItems=50 spiceMs=216.6 macCalls=400 macMs=618.7
+P1PROBE verify records=50 total=1161.3 pin=3.8 loop=1153.1 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=227.3 macCalls=400 macMs=617.3
+P1PROBE catalogue lookedUp=150 pinLookupComplete=63.6
+P1PROBE verify records=50 total=1156.1 pin=2.3 loop=1149.3 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=225.1 macCalls=400 macMs=601.8
+P1PROBE verify records=50 total=943.5 pin=3.1 loop=936.3 complete=4.2 spiceCalls=50 spiceItems=50 spiceMs=181.9 macCalls=400 macMs=506.4
+P1PROBE verify records=50 total=991.4 pin=2.2 loop=985.1 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=185.0 macCalls=400 macMs=544.3
+P1PROBE catalogue lookedUp=150 pinLookupComplete=55.2
+P1PROBE verify records=50 total=1097.0 pin=3.4 loop=1086.5 complete=7.1 spiceCalls=50 spiceItems=50 spiceMs=212.0 macCalls=400 macMs=580.8
+P1PROBE verify records=50 total=1328.0 pin=3.3 loop=1316.4 complete=8.2 spiceCalls=50 spiceItems=50 spiceMs=252.0 macCalls=400 macMs=717.2
+P1PROBE verify records=50 total=1292.4 pin=9.3 loop=1277.8 complete=5.2 spiceCalls=50 spiceItems=50 spiceMs=248.2 macCalls=400 macMs=685.9
+P1PROBE catalogue lookedUp=150 pinLookupComplete=70.6
+P1PROBE verify records=50 total=976.6 pin=2.8 loop=969.0 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=186.3 macCalls=400 macMs=523.7
+P1PROBE verify records=50 total=888.2 pin=2.1 loop=881.4 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=168.4 macCalls=400 macMs=478.9
+P1PROBE verify records=50 total=913.0 pin=3.5 loop=906.4 complete=3.0 spiceCalls=50 spiceItems=50 spiceMs=170.1 macCalls=400 macMs=492.5
+P1PROBE catalogue lookedUp=150 pinLookupComplete=59.5
+P1PROBE verify records=50 total=944.8 pin=2.5 loop=936.9 complete=5.5 spiceCalls=50 spiceItems=50 spiceMs=182.2 macCalls=400 macMs=497.8
+P1PROBE verify records=50 total=1314.8 pin=3.1 loop=1307.1 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=243.9 macCalls=400 macMs=718.2
+P1PROBE verify records=50 total=1312.3 pin=5.2 loop=1302.1 complete=5.0 spiceCalls=50 spiceItems=50 spiceMs=251.2 macCalls=400 macMs=695.6
+P1PROBE catalogue lookedUp=150 pinLookupComplete=78.0
+P1PROBE verify records=50 total=981.7 pin=2.2 loop=975.3 complete=4.2 spiceCalls=50 spiceItems=50 spiceMs=188.0 macCalls=400 macMs=523.8
+P1PROBE verify records=50 total=921.6 pin=2.4 loop=915.3 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=177.5 macCalls=400 macMs=487.9
+P1PROBE verify records=50 total=887.8 pin=3.2 loop=880.9 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=166.3 macCalls=400 macMs=476.1
+P1PROBE catalogue lookedUp=150 pinLookupComplete=47.9
+P1PROBE verify records=50 total=899.3 pin=4.3 loop=890.7 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=172.2 macCalls=400 macMs=473.9
+P1PROBE verify records=50 total=1148.8 pin=2.2 loop=1142.1 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=219.0 macCalls=400 macMs=605.7
+P1PROBE verify records=50 total=1299.4 pin=5.5 loop=1288.0 complete=5.9 spiceCalls=50 spiceItems=50 spiceMs=245.5 macCalls=400 macMs=704.3
+P1PROBE catalogue lookedUp=150 pinLookupComplete=73.3
+P1PROBE verify records=50 total=1181.7 pin=3.6 loop=1172.5 complete=5.7 spiceCalls=50 spiceItems=50 spiceMs=226.3 macCalls=400 macMs=631.3
+P1PROBE verify records=50 total=1026.6 pin=3.1 loop=1018.0 complete=5.5 spiceCalls=50 spiceItems=50 spiceMs=189.9 macCalls=400 macMs=556.8
+P1PROBE verify records=50 total=1025.0 pin=3.7 loop=1014.9 complete=6.4 spiceCalls=50 spiceItems=50 spiceMs=194.2 macCalls=400 macMs=554.8
+P1PROBE catalogue lookedUp=150 pinLookupComplete=79.8
+P1PROBE verify records=50 total=1311.6 pin=2.9 loop=1304.1 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=252.9 macCalls=400 macMs=715.7
+P1PROBE verify records=50 total=1261.1 pin=6.1 loop=1248.8 complete=6.3 spiceCalls=50 spiceItems=50 spiceMs=245.1 macCalls=400 macMs=671.2
+P1PROBE verify records=50 total=1227.1 pin=2.8 loop=1217.4 complete=7.0 spiceCalls=50 spiceItems=50 spiceMs=233.4 macCalls=400 macMs=650.4
+P1PROBE catalogue lookedUp=480 pinLookupComplete=178.4
+P1PROBE verify records=50 total=921.3 pin=2.3 loop=915.2 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=171.2 macCalls=400 macMs=501.1
+P1PROBE verify records=50 total=934.5 pin=4.0 loop=924.6 complete=5.9 spiceCalls=50 spiceItems=50 spiceMs=168.7 macCalls=400 macMs=499.8
+P1PROBE verify records=50 total=1121.0 pin=2.4 loop=1113.8 complete=4.8 spiceCalls=50 spiceItems=50 spiceMs=205.9 macCalls=400 macMs=603.8
+P1PROBE verify records=50 total=1288.9 pin=3.8 loop=1280.2 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=242.1 macCalls=400 macMs=698.3
+P1PROBE verify records=50 total=1283.0 pin=6.8 loop=1269.0 complete=7.2 spiceCalls=50 spiceItems=50 spiceMs=245.8 macCalls=400 macMs=670.7
+P1PROBE verify records=50 total=904.2 pin=2.7 loop=896.8 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=167.6 macCalls=400 macMs=482.6
+P1PROBE verify records=50 total=892.4 pin=3.3 loop=885.3 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=172.3 macCalls=400 macMs=473.6
+P1PROBE verify records=50 total=1003.7 pin=2.5 loop=995.7 complete=5.5 spiceCalls=50 spiceItems=50 spiceMs=185.4 macCalls=400 macMs=539.1
+P1PROBE catalogue lookedUp=0 pinLookupComplete=18.3
+P1PROBE catalogue lookedUp=2 pinLookupComplete=13.7
+P1PROBE verify records=2 total=40.9 pin=2.1 loop=34.8 complete=4.1 spiceCalls=2 spiceItems=2 spiceMs=5.5 macCalls=16 macMs=19.0
+P1PROBE catalogue lookedUp=2 pinLookupComplete=9.2
+P1PROBE verify records=2 total=49.3 pin=2.5 loop=41.1 complete=5.6 spiceCalls=2 spiceItems=2 spiceMs=5.5 macCalls=16 macMs=24.6
+P1PROBE catalogue lookedUp=2 pinLookupComplete=8.3
+P1PROBE verify records=2 total=36.4 pin=2.8 loop=29.1 complete=4.5 spiceCalls=2 spiceItems=2 spiceMs=4.9 macCalls=8 macMs=10.1
+P1PROBE catalogue lookedUp=2 pinLookupComplete=15.0
+P1PROBE verify records=2 total=43.7 pin=2.8 loop=36.4 complete=4.5 spiceCalls=2 spiceItems=2 spiceMs=5.9 macCalls=14 macMs=19.3
+P1PROBE catalogue lookedUp=1 pinLookupComplete=14.3
+P1PROBE verify records=1 total=35.6 pin=4.1 loop=24.9 complete=6.6 spiceCalls=1 spiceItems=1 spiceMs=3.6 macCalls=8 macMs=14.7
+P1PROBE catalogue lookedUp=1 pinLookupComplete=11.0
+P1PROBE verify records=1 total=24.4 pin=2.9 loop=16.3 complete=5.2 spiceCalls=1 spiceItems=1 spiceMs=3.1 macCalls=4 macMs=6.8
+P1PROBE catalogue lookedUp=2 pinLookupComplete=14.6
+P1PROBE catalogue lookedUp=3 pinLookupComplete=13.1
+P1PROBE catalogue lookedUp=3 pinLookupComplete=10.9
+P1PROBE catalogue lookedUp=0 pinLookupComplete=13.9
+P1PROBE catalogue lookedUp=1 pinLookupComplete=19.0
+P1PROBE catalogue lookedUp=0 pinLookupComplete=26.2
+P1PROBE catalogue lookedUp=3 pinLookupComplete=19.0
+P1PROBE verify records=3 total=66.1 pin=3.6 loop=57.9 complete=4.6 spiceCalls=3 spiceItems=3 spiceMs=10.5 macCalls=16 macMs=24.9
+P1PROBE catalogue lookedUp=3 pinLookupComplete=9.9
+P1PROBE catalogue lookedUp=2 pinLookupComplete=16.8
+P1PROBE catalogue lookedUp=2 pinLookupComplete=14.2
+P1PROBE catalogue lookedUp=2 pinLookupComplete=17.8
+P1PROBE verify records=2 total=55.6 pin=3.0 loop=47.5 complete=5.1 spiceCalls=2 spiceItems=2 spiceMs=7.0 macCalls=16 macMs=27.3
+P1PROBE verify records=1 total=17.9 pin=2.6 loop=10.8 complete=4.5 spiceCalls=2 spiceItems=2 spiceMs=8.7 macCalls=0 macMs=0.0
+P1PROBE verify records=1 total=14.9 pin=4.9 loop=5.6 complete=4.4 spiceCalls=1 spiceItems=1 spiceMs=3.1 macCalls=0 macMs=0.0
+P1PROBE catalogue lookedUp=1 pinLookupComplete=14.8
+P1PROBE verify records=1 total=29.7 pin=2.9 loop=21.9 complete=4.8 spiceCalls=1 spiceItems=1 spiceMs=3.2 macCalls=8 macMs=12.1
+P1PROBE catalogue lookedUp=3 pinLookupComplete=16.2
+P1PROBE catalogue lookedUp=3 pinLookupComplete=10.4
+P1PROBE catalogue lookedUp=3 pinLookupComplete=10.7
+P1PROBE catalogue lookedUp=204 pinLookupComplete=136.0
+P1PROBE verify records=50 total=1230.5 pin=3.4 loop=1221.7 complete=5.4 spiceCalls=50 spiceItems=50 spiceMs=232.8 macCalls=400 macMs=659.8
+P1PROBE verify records=50 total=1225.4 pin=3.2 loop=1217.3 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=242.9 macCalls=400 macMs=647.5
+P1PROBE verify records=50 total=1259.6 pin=3.8 loop=1250.5 complete=5.3 spiceCalls=50 spiceItems=50 spiceMs=239.6 macCalls=400 macMs=670.0
+P1PROBE verify records=50 total=991.6 pin=2.7 loop=985.2 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=189.0 macCalls=400 macMs=523.8
+P1PROBE catalogue lookedUp=204 pinLookupComplete=29.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=65.8
+P1PROBE verify records=50 total=894.5 pin=2.7 loop=888.3 complete=3.5 spiceCalls=50 spiceItems=50 spiceMs=169.0 macCalls=400 macMs=482.3
+P1PROBE verify records=50 total=941.4 pin=2.8 loop=933.9 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=176.2 macCalls=400 macMs=508.4
+P1PROBE verify records=50 total=1077.9 pin=3.5 loop=1069.6 complete=4.8 spiceCalls=50 spiceItems=50 spiceMs=204.8 macCalls=400 macMs=576.9
+P1PROBE verify records=50 total=1209.5 pin=2.9 loop=1201.3 complete=5.4 spiceCalls=50 spiceItems=50 spiceMs=231.9 macCalls=400 macMs=645.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=100.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=41.2
+P1PROBE verify records=50 total=1130.8 pin=2.6 loop=1121.6 complete=6.6 spiceCalls=50 spiceItems=50 spiceMs=210.8 macCalls=400 macMs=609.0
+P1PROBE verify records=50 total=1001.2 pin=2.3 loop=995.0 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=189.2 macCalls=400 macMs=534.4
+P1PROBE verify records=50 total=1022.5 pin=2.1 loop=1015.8 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=186.7 macCalls=400 macMs=554.2
+P1PROBE verify records=50 total=1108.3 pin=2.6 loop=1100.8 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=210.2 macCalls=400 macMs=598.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=130.2
+P1PROBE verify records=50 total=1242.1 pin=2.8 loop=1234.5 complete=4.8 spiceCalls=50 spiceItems=50 spiceMs=231.1 macCalls=400 macMs=669.6
+P1PROBE verify records=50 total=1129.6 pin=3.7 loop=1120.9 complete=5.0 spiceCalls=50 spiceItems=50 spiceMs=217.8 macCalls=400 macMs=606.9
+P1PROBE verify records=50 total=1003.8 pin=2.3 loop=997.7 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=194.4 macCalls=400 macMs=528.8
+P1PROBE verify records=50 total=934.9 pin=3.1 loop=928.0 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=171.7 macCalls=400 macMs=500.8
+P1PROBE catalogue lookedUp=204 pinLookupComplete=82.2
+P1PROBE catalogue lookedUp=204 pinLookupComplete=30.1
+P1PROBE verify records=50 total=920.5 pin=2.1 loop=914.4 complete=4.0 spiceCalls=50 spiceItems=50 spiceMs=176.7 macCalls=400 macMs=489.4
+P1PROBE verify records=50 total=1130.9 pin=2.3 loop=1123.0 complete=5.6 spiceCalls=50 spiceItems=50 spiceMs=200.8 macCalls=400 macMs=626.5
+P1PROBE verify records=50 total=952.6 pin=2.5 loop=946.5 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=179.5 macCalls=400 macMs=508.5
+P1PROBE verify records=50 total=944.7 pin=2.5 loop=938.2 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=187.7 macCalls=400 macMs=499.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=77.6
+P1PROBE verify records=50 total=942.7 pin=2.4 loop=936.2 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=178.5 macCalls=400 macMs=507.5
+P1PROBE verify records=50 total=1099.4 pin=3.0 loop=1091.9 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=212.4 macCalls=400 macMs=588.9
+P1PROBE verify records=50 total=1177.8 pin=2.8 loop=1170.2 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=223.3 macCalls=400 macMs=633.5
+P1PROBE verify records=50 total=1374.0 pin=2.6 loop=1366.2 complete=5.3 spiceCalls=50 spiceItems=50 spiceMs=254.6 macCalls=400 macMs=743.8
+P1PROBE catalogue lookedUp=204 pinLookupComplete=112.3
+P1PROBE verify records=50 total=1298.5 pin=2.7 loop=1290.8 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=251.4 macCalls=400 macMs=677.4
+P1PROBE verify records=50 total=976.4 pin=2.8 loop=969.4 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=179.9 macCalls=400 macMs=522.4
+P1PROBE verify records=50 total=969.8 pin=2.6 loop=962.2 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=175.1 macCalls=400 macMs=524.4
+P1PROBE verify records=50 total=961.2 pin=2.4 loop=953.3 complete=5.4 spiceCalls=50 spiceItems=50 spiceMs=183.6 macCalls=400 macMs=510.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=83.3
+P1PROBE catalogue lookedUp=204 pinLookupComplete=32.4
+P1PROBE verify records=50 total=898.3 pin=2.8 loop=891.7 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=171.5 macCalls=400 macMs=475.5
+P1PROBE verify records=50 total=893.4 pin=2.9 loop=886.9 complete=3.5 spiceCalls=50 spiceItems=50 spiceMs=173.8 macCalls=400 macMs=470.4
+P1PROBE verify records=50 total=1109.6 pin=2.6 loop=1102.7 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=202.7 macCalls=400 macMs=595.2
+P1PROBE verify records=50 total=944.3 pin=2.1 loop=937.8 complete=4.4 spiceCalls=50 spiceItems=50 spiceMs=177.0 macCalls=400 macMs=505.2
+P1PROBE catalogue lookedUp=204 pinLookupComplete=86.4
+P1PROBE verify records=50 total=902.8 pin=2.3 loop=896.9 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=171.7 macCalls=400 macMs=484.1
+P1PROBE verify records=50 total=1025.7 pin=5.1 loop=1015.6 complete=5.0 spiceCalls=50 spiceItems=50 spiceMs=194.1 macCalls=400 macMs=547.5
+P1PROBE verify records=50 total=950.5 pin=3.1 loop=942.4 complete=5.0 spiceCalls=50 spiceItems=50 spiceMs=179.1 macCalls=400 macMs=511.4
+P1PROBE verify records=50 total=1139.3 pin=3.9 loop=1130.9 complete=4.4 spiceCalls=50 spiceItems=50 spiceMs=225.8 macCalls=400 macMs=596.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=98.6
+P1PROBE verify records=50 total=1350.6 pin=3.4 loop=1340.6 complete=6.5 spiceCalls=50 spiceItems=50 spiceMs=259.0 macCalls=400 macMs=727.3
+P1PROBE verify records=50 total=993.8 pin=3.4 loop=985.9 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=185.3 macCalls=400 macMs=536.7
+P1PROBE verify records=50 total=912.1 pin=2.3 loop=906.0 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=172.5 macCalls=400 macMs=490.0
+P1PROBE verify records=50 total=965.6 pin=2.3 loop=959.0 complete=4.4 spiceCalls=50 spiceItems=50 spiceMs=185.6 macCalls=400 macMs=512.3
+P1PROBE catalogue lookedUp=204 pinLookupComplete=78.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=30.5
+P1PROBE verify records=50 total=1100.0 pin=2.4 loop=1092.0 complete=5.7 spiceCalls=50 spiceItems=50 spiceMs=202.1 macCalls=400 macMs=600.0
+P1PROBE verify records=50 total=984.5 pin=4.6 loop=975.5 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=187.4 macCalls=400 macMs=530.6
+P1PROBE verify records=50 total=1187.7 pin=3.3 loop=1179.9 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=220.1 macCalls=400 macMs=646.0
+P1PROBE verify records=50 total=964.2 pin=3.0 loop=957.3 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=188.1 macCalls=400 macMs=505.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=77.7
+P1PROBE catalogue lookedUp=204 pinLookupComplete=29.0
+P1PROBE verify records=50 total=889.1 pin=2.1 loop=883.0 complete=4.0 spiceCalls=50 spiceItems=50 spiceMs=168.1 macCalls=400 macMs=476.6
+P1PROBE verify records=50 total=1149.2 pin=2.5 loop=1141.9 complete=4.8 spiceCalls=50 spiceItems=50 spiceMs=219.0 macCalls=400 macMs=612.8
+P1PROBE verify records=50 total=1239.5 pin=3.5 loop=1230.9 complete=5.2 spiceCalls=50 spiceItems=50 spiceMs=231.1 macCalls=400 macMs=676.8
+P1PROBE verify records=50 total=1127.0 pin=2.7 loop=1118.7 complete=5.6 spiceCalls=50 spiceItems=50 spiceMs=206.5 macCalls=400 macMs=619.4
+P1PROBE catalogue lookedUp=204 pinLookupComplete=90.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=36.2
+P1PROBE verify records=50 total=1121.9 pin=3.5 loop=1114.9 complete=3.5 spiceCalls=50 spiceItems=50 spiceMs=203.3 macCalls=400 macMs=615.8
+P1PROBE verify records=50 total=947.6 pin=2.5 loop=941.9 complete=3.2 spiceCalls=50 spiceItems=50 spiceMs=177.5 macCalls=400 macMs=510.1
+P1PROBE verify records=50 total=914.0 pin=2.2 loop=907.4 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=168.1 macCalls=400 macMs=493.4
+P1PROBE verify records=50 total=1096.7 pin=3.2 loop=1088.4 complete=5.2 spiceCalls=50 spiceItems=50 spiceMs=209.8 macCalls=400 macMs=584.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=103.2
+P1PROBE verify records=50 total=1203.0 pin=4.0 loop=1194.9 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=232.1 macCalls=400 macMs=642.1
+P1PROBE verify records=50 total=1161.1 pin=2.6 loop=1153.6 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=227.4 macCalls=400 macMs=613.4
+P1PROBE verify records=50 total=1150.0 pin=2.9 loop=1142.4 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=222.0 macCalls=400 macMs=613.5
+P1PROBE verify records=50 total=1047.7 pin=2.8 loop=1041.0 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=200.7 macCalls=400 macMs=557.7
+P1PROBE catalogue lookedUp=204 pinLookupComplete=118.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=118.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=94.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=114.5
+P1PROBE verify records=50 total=1172.4 pin=3.7 loop=1163.3 complete=5.3 spiceCalls=50 spiceItems=50 spiceMs=224.3 macCalls=400 macMs=636.7
+P1PROBE verify records=50 total=1169.1 pin=3.2 loop=1158.2 complete=7.7 spiceCalls=50 spiceItems=50 spiceMs=157.1 macCalls=400 macMs=677.8
+P1PROBE verify records=50 total=1019.1 pin=5.6 loop=1009.2 complete=4.2 spiceCalls=50 spiceItems=50 spiceMs=137.6 macCalls=400 macMs=581.4
+P1PROBE verify records=50 total=994.4 pin=5.0 loop=982.7 complete=6.7 spiceCalls=50 spiceItems=50 spiceMs=189.3 macCalls=400 macMs=530.4
+P1PROBE verify records=50 total=1007.3 pin=3.4 loop=999.0 complete=4.8 spiceCalls=50 spiceItems=50 spiceMs=192.5 macCalls=400 macMs=540.7
+P1PROBE verify records=50 total=894.8 pin=2.4 loop=889.0 complete=3.4 spiceCalls=50 spiceItems=50 spiceMs=122.0 macCalls=400 macMs=514.0
+P1PROBE verify records=50 total=947.8 pin=2.4 loop=939.9 complete=5.5 spiceCalls=50 spiceItems=50 spiceMs=128.8 macCalls=400 macMs=544.0
+P1PROBE verify records=50 total=976.0 pin=3.9 loop=968.5 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=135.9 macCalls=400 macMs=562.1
+P1PROBE verify records=50 total=1036.3 pin=4.8 loop=1027.6 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=195.4 macCalls=400 macMs=558.9
+P1PROBE verify records=50 total=977.9 pin=2.4 loop=970.5 complete=5.0 spiceCalls=50 spiceItems=50 spiceMs=130.7 macCalls=400 macMs=568.2
+P1PROBE verify records=50 total=968.6 pin=2.4 loop=961.5 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=133.3 macCalls=400 macMs=561.4
+P1PROBE verify records=50 total=1244.3 pin=4.4 loop=1234.4 complete=5.5 spiceCalls=50 spiceItems=50 spiceMs=160.3 macCalls=400 macMs=704.4
+P1PROBE verify records=50 total=1171.7 pin=3.3 loop=1161.5 complete=6.8 spiceCalls=50 spiceItems=50 spiceMs=218.6 macCalls=400 macMs=630.2
+P1PROBE catalogue lookedUp=204 pinLookupComplete=123.2
+P1PROBE catalogue lookedUp=204 pinLookupComplete=123.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=100.4
+P1PROBE catalogue lookedUp=204 pinLookupComplete=129.9
+P1PROBE verify records=50 total=959.7 pin=3.2 loop=952.7 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=175.7 macCalls=400 macMs=517.7
+P1PROBE verify records=50 total=912.0 pin=2.5 loop=905.9 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=127.2 macCalls=400 macMs=522.0
+P1PROBE verify records=50 total=891.8 pin=2.3 loop=884.9 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=121.8 macCalls=400 macMs=517.9
+P1PROBE verify records=50 total=1112.6 pin=5.1 loop=1102.8 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=211.8 macCalls=400 macMs=590.4
+P1PROBE verify records=50 total=1014.0 pin=3.2 loop=1006.1 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=190.8 macCalls=400 macMs=545.2
+P1PROBE verify records=50 total=863.0 pin=2.7 loop=857.0 complete=3.3 spiceCalls=50 spiceItems=50 spiceMs=120.6 macCalls=400 macMs=491.1
+P1PROBE verify records=50 total=916.8 pin=1.9 loop=911.4 complete=3.4 spiceCalls=50 spiceItems=50 spiceMs=124.0 macCalls=400 macMs=531.2
+P1PROBE verify records=50 total=1055.7 pin=2.3 loop=1049.5 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=140.8 macCalls=400 macMs=615.2
+P1PROBE verify records=50 total=1133.3 pin=2.2 loop=1126.2 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=206.4 macCalls=400 macMs=618.6
+P1PROBE verify records=50 total=1128.0 pin=3.9 loop=1119.4 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=216.7 macCalls=400 macMs=594.2
+P1PROBE verify records=50 total=863.3 pin=3.9 loop=855.9 complete=3.4 spiceCalls=50 spiceItems=50 spiceMs=121.8 macCalls=400 macMs=493.7
+P1PROBE verify records=50 total=938.5 pin=2.5 loop=932.5 complete=3.4 spiceCalls=50 spiceItems=50 spiceMs=129.3 macCalls=400 macMs=543.5
+P1PROBE verify records=50 total=944.8 pin=2.1 loop=938.7 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=175.4 macCalls=400 macMs=511.4
+P1PROBE verify records=50 total=944.7 pin=2.4 loop=938.3 complete=4.0 spiceCalls=50 spiceItems=50 spiceMs=127.9 macCalls=400 macMs=536.7
+P1PROBE catalogue lookedUp=204 pinLookupComplete=107.3
+P1PROBE catalogue lookedUp=204 pinLookupComplete=105.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=108.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=105.5
+P1PROBE verify records=50 total=920.0 pin=4.2 loop=911.7 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=180.8 macCalls=400 macMs=487.4
+P1PROBE verify records=50 total=939.0 pin=3.0 loop=931.0 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=124.7 macCalls=400 macMs=539.7
+P1PROBE verify records=50 total=1077.7 pin=3.3 loop=1070.0 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=142.2 macCalls=400 macMs=627.5
+P1PROBE verify records=50 total=1009.9 pin=5.2 loop=1000.1 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=192.5 macCalls=400 macMs=541.6
+P1PROBE verify records=50 total=1199.3 pin=3.5 loop=1190.3 complete=5.5 spiceCalls=50 spiceItems=50 spiceMs=227.0 macCalls=400 macMs=646.5
+P1PROBE verify records=50 total=959.7 pin=2.8 loop=953.1 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=134.0 macCalls=400 macMs=549.3
+P1PROBE verify records=50 total=895.9 pin=2.1 loop=890.3 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=124.3 macCalls=400 macMs=510.9
+P1PROBE verify records=50 total=879.5 pin=2.2 loop=872.9 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=120.3 macCalls=400 macMs=502.6
+P1PROBE verify records=50 total=1028.5 pin=4.1 loop=1020.3 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=195.2 macCalls=400 macMs=557.7
+P1PROBE verify records=50 total=1041.1 pin=2.4 loop=1032.7 complete=6.1 spiceCalls=50 spiceItems=50 spiceMs=141.9 macCalls=400 macMs=603.3
+P1PROBE verify records=50 total=954.7 pin=2.6 loop=947.4 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=131.9 macCalls=400 macMs=545.4
+P1PROBE verify records=50 total=921.4 pin=2.5 loop=915.2 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=124.5 macCalls=400 macMs=537.5
+P1PROBE verify records=50 total=1114.6 pin=2.3 loop=1108.1 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=201.0 macCalls=400 macMs=605.9
+P1PROBE verify records=50 total=931.6 pin=4.0 loop=923.9 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=181.3 macCalls=400 macMs=500.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=119.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=125.8
+P1PROBE catalogue lookedUp=204 pinLookupComplete=125.4
+P1PROBE catalogue lookedUp=204 pinLookupComplete=112.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=57.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=55.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=56.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=59.6
+P1PROBE verify records=50 total=1060.6 pin=3.8 loop=1051.2 complete=5.6 spiceCalls=50 spiceItems=50 spiceMs=196.9 macCalls=400 macMs=571.8
+P1PROBE verify records=50 total=992.4 pin=2.8 loop=984.7 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=132.6 macCalls=400 macMs=572.7
+P1PROBE verify records=50 total=910.6 pin=2.4 loop=904.5 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=120.3 macCalls=400 macMs=537.1
+P1PROBE verify records=50 total=986.3 pin=3.6 loop=978.9 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=181.2 macCalls=400 macMs=540.4
+P1PROBE verify records=50 total=1031.8 pin=3.0 loop=1023.3 complete=5.5 spiceCalls=50 spiceItems=50 spiceMs=198.0 macCalls=400 macMs=554.5
+P1PROBE verify records=50 total=962.9 pin=2.6 loop=956.4 complete=4.0 spiceCalls=50 spiceItems=50 spiceMs=133.1 macCalls=400 macMs=554.0
+P1PROBE verify records=50 total=991.4 pin=2.6 loop=982.1 complete=6.7 spiceCalls=50 spiceItems=50 spiceMs=135.2 macCalls=400 macMs=566.3
+P1PROBE verify records=50 total=965.8 pin=5.6 loop=956.7 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=130.3 macCalls=400 macMs=551.5
+P1PROBE verify records=50 total=979.8 pin=3.3 loop=969.9 complete=6.6 spiceCalls=50 spiceItems=50 spiceMs=185.7 macCalls=400 macMs=533.2
+P1PROBE verify records=50 total=1091.8 pin=6.5 loop=1076.6 complete=8.7 spiceCalls=50 spiceItems=50 spiceMs=156.8 macCalls=400 macMs=607.1
+P1PROBE verify records=50 total=1039.6 pin=3.8 loop=1031.5 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=143.1 macCalls=400 macMs=600.8
+P1PROBE verify records=50 total=949.1 pin=3.5 loop=942.0 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=128.3 macCalls=400 macMs=550.2
+P1PROBE verify records=50 total=982.1 pin=2.3 loop=975.9 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=181.6 macCalls=400 macMs=539.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=121.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=122.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=122.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=132.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=36.3
+P1PROBE catalogue lookedUp=204 pinLookupComplete=36.4
+P1PROBE catalogue lookedUp=204 pinLookupComplete=36.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=37.0
+P1PROBE verify records=50 total=990.7 pin=2.8 loop=983.6 complete=4.4 spiceCalls=50 spiceItems=50 spiceMs=192.0 macCalls=400 macMs=524.9
+P1PROBE verify records=50 total=991.4 pin=2.4 loop=981.1 complete=7.9 spiceCalls=50 spiceItems=50 spiceMs=132.3 macCalls=400 macMs=576.4
+P1PROBE verify records=50 total=1084.0 pin=4.0 loop=1076.1 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=145.9 macCalls=400 macMs=629.8
+P1PROBE verify records=50 total=970.6 pin=4.5 loop=960.1 complete=6.0 spiceCalls=50 spiceItems=50 spiceMs=183.7 macCalls=400 macMs=522.4
+P1PROBE verify records=50 total=1064.3 pin=3.2 loop=1057.5 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=215.6 macCalls=400 macMs=563.1
+P1PROBE verify records=50 total=958.8 pin=2.5 loop=951.7 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=133.7 macCalls=400 macMs=550.2
+P1PROBE verify records=50 total=1004.9 pin=2.4 loop=998.2 complete=4.4 spiceCalls=50 spiceItems=50 spiceMs=139.6 macCalls=400 macMs=575.6
+P1PROBE verify records=50 total=949.1 pin=2.9 loop=942.6 complete=3.5 spiceCalls=50 spiceItems=50 spiceMs=133.8 macCalls=400 macMs=540.9
+P1PROBE verify records=50 total=958.1 pin=4.1 loop=949.7 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=179.2 macCalls=400 macMs=518.7
+P1PROBE verify records=50 total=917.3 pin=2.4 loop=910.8 complete=4.1 spiceCalls=50 spiceItems=50 spiceMs=128.4 macCalls=400 macMs=526.1
+P1PROBE verify records=50 total=847.3 pin=2.2 loop=841.1 complete=4.0 spiceCalls=50 spiceItems=50 spiceMs=115.8 macCalls=400 macMs=483.2
+P1PROBE verify records=50 total=1006.3 pin=2.1 loop=999.0 complete=5.1 spiceCalls=50 spiceItems=50 spiceMs=137.7 macCalls=400 macMs=580.5
+P1PROBE verify records=50 total=1204.1 pin=3.0 loop=1197.3 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=214.5 macCalls=400 macMs=664.2
+P1PROBE verify records=50 total=904.3 pin=3.5 loop=895.2 complete=5.7 spiceCalls=50 spiceItems=50 spiceMs=178.9 macCalls=400 macMs=476.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=169.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=175.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=136.8
+P1PROBE catalogue lookedUp=204 pinLookupComplete=176.7
+P1PROBE catalogue lookedUp=204 pinLookupComplete=115.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=179.7
+P1PROBE catalogue lookedUp=204 pinLookupComplete=86.3
+P1PROBE catalogue lookedUp=204 pinLookupComplete=91.5
+P1PROBE verify records=50 total=1149.7 pin=4.0 loop=1140.8 complete=5.0 spiceCalls=50 spiceItems=50 spiceMs=220.7 macCalls=400 macMs=616.0
+P1PROBE verify records=50 total=1125.7 pin=2.7 loop=1118.4 complete=4.6 spiceCalls=50 spiceItems=50 spiceMs=155.3 macCalls=400 macMs=643.9
+P1PROBE verify records=50 total=1030.3 pin=6.2 loop=1019.2 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=199.2 macCalls=400 macMs=548.4
+P1PROBE verify records=50 total=895.5 pin=2.4 loop=889.2 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=122.6 macCalls=400 macMs=513.8
+P1PROBE verify records=50 total=912.2 pin=2.3 loop=906.3 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=123.4 macCalls=400 macMs=532.5
+P1PROBE verify records=50 total=1004.5 pin=2.4 loop=990.3 complete=11.8 spiceCalls=50 spiceItems=50 spiceMs=131.2 macCalls=400 macMs=581.0
+P1PROBE verify records=50 total=1157.8 pin=13.9 loop=1139.0 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=151.8 macCalls=400 macMs=659.0
+P1PROBE verify records=50 total=1073.2 pin=4.3 loop=1059.9 complete=9.0 spiceCalls=50 spiceItems=50 spiceMs=206.0 macCalls=400 macMs=567.2
+P1PROBE verify records=50 total=1007.2 pin=4.0 loop=998.4 complete=4.9 spiceCalls=50 spiceItems=50 spiceMs=197.4 macCalls=400 macMs=528.9
+P1PROBE verify records=50 total=915.4 pin=2.6 loop=909.0 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=125.6 macCalls=400 macMs=521.9
+P1PROBE verify records=50 total=929.7 pin=2.5 loop=922.9 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=128.9 macCalls=400 macMs=535.0
+P1PROBE verify records=50 total=995.5 pin=2.4 loop=986.9 complete=6.2 spiceCalls=50 spiceItems=50 spiceMs=135.4 macCalls=400 macMs=571.1
+P1PROBE verify records=50 total=1080.2 pin=12.7 loop=1062.1 complete=5.4 spiceCalls=50 spiceItems=50 spiceMs=207.6 macCalls=400 macMs=577.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=127.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=126.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=124.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=125.9
+P1PROBE catalogue lookedUp=204 pinLookupComplete=131.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=134.8
+P1PROBE catalogue lookedUp=204 pinLookupComplete=128.2
+P1PROBE catalogue lookedUp=204 pinLookupComplete=134.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=42.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=43.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=42.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=42.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=43.2
+P1PROBE catalogue lookedUp=204 pinLookupComplete=43.3
+P1PROBE catalogue lookedUp=204 pinLookupComplete=42.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=43.5
+P1PROBE verify records=50 total=954.4 pin=3.4 loop=947.4 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=182.6 macCalls=400 macMs=510.8
+P1PROBE verify records=50 total=1182.0 pin=2.5 loop=1173.4 complete=6.1 spiceCalls=50 spiceItems=50 spiceMs=156.8 macCalls=400 macMs=692.4
+P1PROBE verify records=50 total=1086.2 pin=4.9 loop=1077.1 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=202.7 macCalls=400 macMs=587.7
+P1PROBE verify records=50 total=1057.3 pin=2.2 loop=1051.0 complete=4.0 spiceCalls=50 spiceItems=50 spiceMs=146.2 macCalls=400 macMs=611.3
+P1PROBE verify records=50 total=926.2 pin=2.1 loop=919.6 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=127.2 macCalls=400 macMs=539.1
+P1PROBE verify records=50 total=917.6 pin=2.6 loop=911.5 complete=3.5 spiceCalls=50 spiceItems=50 spiceMs=122.6 macCalls=400 macMs=524.9
+P1PROBE verify records=50 total=962.1 pin=2.4 loop=955.4 complete=4.3 spiceCalls=50 spiceItems=50 spiceMs=128.6 macCalls=400 macMs=556.4
+P1PROBE verify records=50 total=1116.6 pin=2.8 loop=1109.4 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=222.9 macCalls=400 macMs=587.5
+P1PROBE verify records=50 total=1025.6 pin=2.4 loop=1018.4 complete=4.8 spiceCalls=50 spiceItems=50 spiceMs=195.4 macCalls=400 macMs=555.7
+P1PROBE verify records=50 total=927.8 pin=2.2 loop=917.2 complete=8.3 spiceCalls=50 spiceItems=50 spiceMs=126.0 macCalls=400 macMs=530.7
+P1PROBE verify records=50 total=969.7 pin=2.3 loop=962.2 complete=5.2 spiceCalls=50 spiceItems=50 spiceMs=136.6 macCalls=400 macMs=554.3
+P1PROBE verify records=50 total=996.6 pin=3.1 loop=986.1 complete=7.4 spiceCalls=50 spiceItems=50 spiceMs=137.6 macCalls=400 macMs=568.9
+P1PROBE verify records=50 total=1126.7 pin=5.3 loop=1114.0 complete=7.4 spiceCalls=50 spiceItems=50 spiceMs=222.6 macCalls=400 macMs=600.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=123.4
+P1PROBE catalogue lookedUp=204 pinLookupComplete=122.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=127.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=125.2
+P1PROBE catalogue lookedUp=204 pinLookupComplete=130.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=128.3
+P1PROBE catalogue lookedUp=204 pinLookupComplete=129.7
+P1PROBE catalogue lookedUp=204 pinLookupComplete=137.4
+P1PROBE catalogue lookedUp=204 pinLookupComplete=51.6
+P1PROBE catalogue lookedUp=204 pinLookupComplete=51.7
+P1PROBE catalogue lookedUp=204 pinLookupComplete=51.8
+P1PROBE catalogue lookedUp=204 pinLookupComplete=52.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=52.0
+P1PROBE catalogue lookedUp=204 pinLookupComplete=52.1
+P1PROBE catalogue lookedUp=204 pinLookupComplete=52.5
+P1PROBE catalogue lookedUp=204 pinLookupComplete=59.3
+P1PROBE verify records=50 total=940.0 pin=3.9 loop=932.2 complete=4.0 spiceCalls=50 spiceItems=50 spiceMs=182.4 macCalls=400 macMs=510.1
+P1PROBE verify records=50 total=901.3 pin=2.6 loop=894.9 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=124.0 macCalls=400 macMs=516.5
+P1PROBE verify records=50 total=1075.5 pin=3.7 loop=1067.9 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=208.5 macCalls=400 macMs=582.4
+P1PROBE verify records=50 total=1018.7 pin=2.2 loop=1009.1 complete=7.4 spiceCalls=50 spiceItems=50 spiceMs=138.3 macCalls=400 macMs=591.0
+P1PROBE verify records=50 total=955.7 pin=2.5 loop=949.5 complete=3.7 spiceCalls=50 spiceItems=50 spiceMs=130.0 macCalls=400 macMs=551.7
+P1PROBE verify records=50 total=841.1 pin=2.1 loop=834.5 complete=4.5 spiceCalls=50 spiceItems=50 spiceMs=115.9 macCalls=400 macMs=480.5
+P1PROBE verify records=50 total=1048.9 pin=2.9 loop=1041.2 complete=4.7 spiceCalls=50 spiceItems=50 spiceMs=137.4 macCalls=400 macMs=599.8
+P1PROBE verify records=50 total=1066.6 pin=4.6 loop=1058.0 complete=3.9 spiceCalls=50 spiceItems=50 spiceMs=205.1 macCalls=400 macMs=571.4
+P1PROBE verify records=50 total=1212.7 pin=2.3 loop=1205.1 complete=5.2 spiceCalls=50 spiceItems=50 spiceMs=230.0 macCalls=400 macMs=648.6
+P1PROBE verify records=50 total=935.2 pin=2.4 loop=929.2 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=129.7 macCalls=400 macMs=536.4
+P1PROBE verify records=50 total=868.2 pin=2.0 loop=862.6 complete=3.6 spiceCalls=50 spiceItems=50 spiceMs=119.0 macCalls=400 macMs=501.3
+P1PROBE verify records=50 total=862.3 pin=2.3 loop=856.1 complete=3.8 spiceCalls=50 spiceItems=50 spiceMs=118.8 macCalls=400 macMs=496.0
+P1PROBE verify records=50 total=1006.5 pin=3.8 loop=997.2 complete=5.5 spiceCalls=50 spiceItems=50 spiceMs=187.3 macCalls=400 macMs=548.3
+P1PROBE verify records=50 total=958.1 pin=4.4 loop=946.9 complete=6.8 spiceCalls=50 spiceItems=50 spiceMs=131.6 macCalls=400 macMs=545.7

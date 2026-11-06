@@ -1,0 +1,20 @@
+== 2026-11-05T09:50:29Z search-catalogue fresh stack at f117995
+failed EnterpriseForms.StageBTests.Tests.SearchCatalogueTests.BenchmarkTheVerifiedScopeAt50And150And480Records (8m 15s 583ms)
+  total: 17
+  failed: 1
+  succeeded: 16
+  skipped: 0
+exit 1 elapsed 1241s
+-- failure excerpt --
+failed EnterpriseForms.StageBTests.Tests.SearchCatalogueTests.BenchmarkTheVerifiedScopeAt50And150And480Records (8m 15s 583ms)
+  from C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\bin\Release\net10.0\EnterpriseForms.StageBTests.dll (net10.0|x64)
+  {"type":"https://enterpriseforms.invalid/problems/search-verification-limit","title":"SEARCH_VERIFICATION_LIMIT","status":422,"detail":"the search scope is too large to verify completely; narrow it","retryable":false,"limit_kind":"time","correlation_id":"01a1ab27-204d-79dd-8154-80dfac2e7dae"}
+    at EnterpriseForms.StageBTests.Tests.SearchCatalogueTests.BenchmarkTheVerifiedScopeAt50And150And480Records() in C:\t\final-shards\tests\integration\EnterpriseForms.StageBTests\Tests\SearchCatalogueTests.cs:528
+    --- End of stack trace from previous location ---
+  Standard output
+    {
+      "measuredOn": "2026-11-05T09:53:14.6779727+00:00",
+      "environment": "GitHub-hosted isolated Docker stack (compose.security-test)",
+      "note": "provisional engineering measurement; small sample sizes; p99 of n\u003C=15 runs is the maximum",
+      "scenarios": [
+        {

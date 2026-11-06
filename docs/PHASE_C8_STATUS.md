@@ -936,3 +936,84 @@ The M1 Stage B test checks that:
   * B-Q9 not reliably met at 150 rps locally;
   * the `search-catalogue` shard was not rerun in full at the final commit, and four other shards were not rerun at it.
 - **Observed test flakiness:** the membership race test once got a retryable 503 (`AwaitingArchive`). The test still expects only 409s, and is unchanged here.
+
+## 40. C-119: final Stage B reruns, P-S1-1 investigation and the independent review package (2026-11-05/06). Development/Testing, not pushed, not independently reviewed
+
+Owner decision C-119: S1 and M1 accepted **as implemented, for the purpose of independent review**. This does not close M4-1 and is not independent approval.
+
+- M4-2 is unauthorized.
+- No push, PR, merge or deploy.
+- No G14 or RCF-1 work.
+
+Code baseline: `f117995`, with no product or test change since. This section and its evidence are documentation only.
+
+### 40.1 Final Stage B matrix at `f117995` (fresh stack per run; a failed shard rerun once, except the known benchmark)
+
+| Shard | Final pass | Single rerun | Full pass at `f117995`? |
+|---|---|---|---|
+| forms-documents | 38/38 | not needed | yes |
+| authorization-security-onboarding | 92/93: `SecurityAdministratorTests.BrowserSessionsNeedCsrfAndKeepNoPrivilegeAfterRemovalOrSignOut`, 423 | 92/93, the same | **no** |
+| records-lifecycle | 62/62 | not needed | yes |
+| administration-membership | 55/55 | not needed | yes |
+| search-catalogue | 16/17: the 480-record benchmark refused (`time`, P-S1-1) | not rerun (known finding) | **no** |
+| search-execution | 14/14 | not needed | yes |
+| protection-reconciliation | incomplete: 1 failure, then the host slept during the next test | 22/22 | yes (rerun) |
+
+**Five of seven shards pass in full at `f117995`. The Stage B suite is not green.**
+
+**Failures:**
+- **Authorization failure, reproducible, a test-isolation defect:**
+  * RB-13 swaps in an empty SpiceDB datastore, and S1 then quarantines every organization on the stack (`PROJECTION_SCHEMA_MISSING`; 18 organizations in one burst in the rerun);
+  * those include the seeded development organization (`01a1aee5-0415…`, the earliest on the stack, created by dev-seed), which the browser-session tests share;
+  * a later seeded-organization test therefore gets 423;
+  * S1 behaved as designed;
+  * it passed at `5f5fb07` and `051a65d`, so test order evidently varies between runs;
+  * the fix, not implemented, is a test change for owner decision: isolate the tests that destroy the whole datastore.
+- **Protection-reconciliation final-pass failure:** `TheCatalogueCeilingEndsIncompleteAndExpiredSnapshotsAreRenewedSafely` expected round 1 and saw round 2 of a correctly blocked reconciliation. It did not recur in the rerun. Recorded as intermittent timing; the cause has not been investigated.
+
+**Evidence:** `docs/evidence/phase-c8/m4-1-s1-implementation/shards-final-f117995-*.txt`, `shards-final-rerun-f117995-*.txt`, `shards-final-rerun-f117995-quarantine-alerts.txt`.
+
+### 40.2 P-S1-1 investigation (Opus)
+
+**Method:** a throwaway timing probe on `f117995`, never committed, with its diff kept as evidence. One run of the benchmark class on a fresh stack. Per 50-record Authority batch (median):
+
+| Component | Time | Share of the batch |
+|---|---|---|
+| S1 pin | 2.8 ms | 0.7%, together with the verify |
+| S1 verify | 4.6 ms | |
+| 50 single-record SpiceDB checks | 182 ms | 19% |
+| 400 per-leaf MAC verifications | 556 ms | 54% |
+| Other AuthorityDb reads and processing | 272 ms | 27% |
+
+**Business side:** sequential BusinessDb content reads took about a third of the search.
+
+**480-record scope:** refused again. In the 8 of 10 batches that finished, S1's pin and verify took 68 ms in total.
+
+**Conclusion, for the independent reviewer to confirm:** the refusal is a capacity limit that predates S1, not an S1 regression. The pre-S1 480-record figure (12.5 s) is below a linear extrapolation of its own 150-record figure, and this is unexplained.
+
+**Proposal** (`docs/architecture/PHASE_C8_M4_1_P_S1_1_SEARCH_OPTIMIZATION_PROPOSAL.md`; nothing implemented):
+- O-1: batch-level bulk SpiceDB checks, with result mapping by echoed request and fail-the-call on per-item errors; about −1.4 s at 480 records;
+- O-2: batched BusinessDb content reads, no authorization change; about −4 to −5 s;
+- O-3 and O-4: concurrent MAC verification and batched AuthorityDb reads, deferred to PERF-01;
+- rejected options listed in the proposal.
+
+**New PERF-01 observation:** 3,840 HMAC verifications per 480-record search against Managed HSM in production.
+
+### 40.3 Independent review package
+
+`docs/architecture/PHASE_C8_M4_1_S1_M1_INDEPENDENT_REVIEW_PACKAGE.md`:
+- the eight owner questions, with the source, test and evidence paths for each;
+- how to reproduce;
+- limitations;
+- the final matrix;
+- the P-S1-1 summary;
+- the findings and attestation templates.
+
+**It has not been submitted:** no independent reviewer is available inside this session, and an AI agent acting for the owner or Claude is excluded by the package's own independence rule. The owner sends it to a reviewer.
+
+### 40.4 Open items
+
+- the Stage B suite is not green: the RB-13 test-isolation defect, and P-S1-1;
+- independent security review not started;
+- PERF-01 and the Azure staging recovery evidence remain mandatory;
+- §39.6 risks unchanged.

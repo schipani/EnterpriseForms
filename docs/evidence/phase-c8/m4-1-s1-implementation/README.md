@@ -47,3 +47,32 @@
 - The refusal is the typed fail-closed answer, with no partial result.
 
 See `docs/PHASE_C8_STATUS.md` §39.4 (finding P-S1-1).
+
+## P-S1-1 timing probe (C-119, 2026-11-05)
+
+Throwaway instrumentation, never committed, applied to `f117995` in a scratch worktree. The benchmark class was run once on a fresh stack.
+
+| File | Content |
+|---|---|
+| `p-s1-1-probe-instrumentation.diff` | The exact timers added: `Stopwatch` around the S1 pin and verify, the SpiceDB decision calls, the MAC-provider calls, catalogue issuance, and the business-side content reads and verify calls |
+| `p-s1-1-probe-authority-lines.txt`, `p-s1-1-probe-business-lines.txt` | Raw `P1PROBE` log lines from the Authority and API containers |
+| `p-s1-1-probe-summary.txt` | Medians per 50-record batch, and the 480-record attempts |
+| `p-s1-1-probe-run.txt` | Class result: 11/12; the 480-record scope was refused again (`time`) |
+
+**Result:**
+- S1 pin and verify: 2.8 ms and 4.6 ms per 50-record batch (0.7%); 68 ms in total across the 8 of 10 batches finished in the refused 480-record scope.
+- MAC verification: 54% of Authority batch time.
+- SpiceDB checks: 19%.
+- BusinessDb content reads: about a third of the search.
+
+Analysis and options: `docs/architecture/PHASE_C8_M4_1_P_S1_1_SEARCH_OPTIMIZATION_PROPOSAL.md`.
+
+## Final Stage B matrix at `f117995` (C-119, 2026-11-05/06)
+
+| File | Content |
+|---|---|
+| `shards-final-f117995-<group>.txt` | The final pass of all seven shards at `f117995`, each on a fresh stack, with failure excerpts. `protection-reconciliation` is marked INCOMPLETE: the host slept during it |
+| `shards-final-rerun-f117995-<group>.txt` | The single reruns: `protection-reconciliation` 22/22 and `authorization-security-onboarding` 92/93 (the same failure) |
+| `shards-final-rerun-f117995-quarantine-alerts.txt` | The Authority's quarantine alerts during the authorization rerun. RB-13's datastore replacement quarantined every organization (`PROJECTION_SCHEMA_MISSING`), including the seeded organization |
+
+**Result:** five of seven shards pass in full at `f117995`; the suite is not green. See `docs/PHASE_C8_STATUS.md` §40.1.

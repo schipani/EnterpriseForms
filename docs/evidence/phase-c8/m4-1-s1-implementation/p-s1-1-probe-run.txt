@@ -1,0 +1,7 @@
+== 2026-11-05T08:42:46Z SearchCatalogueTests fresh stack at f117995
+failed EnterpriseForms.StageBTests.Tests.SearchCatalogueTests.BenchmarkTheVerifiedScopeAt50And150And480Records (8m 06s 119ms)
+  total: 12
+  failed: 1
+  succeeded: 11
+  skipped: 0
+exit 1 elapsed 1072s
