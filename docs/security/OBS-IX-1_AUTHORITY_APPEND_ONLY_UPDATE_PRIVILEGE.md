@@ -4,6 +4,7 @@
   * Raised during the indexed-search design (C-120). It is not caused by that design and does not depend on it.
   * **No remediation is implemented or authorized.**
   * It is included in the indexed-search independent review package as question 12.
+  * **C-122 (FD-7, deferred):** the independent reviewer is to establish the severity and recommend remediation. The proposed Medium is **not** accepted and must not be treated as an accepted rating.
 - **Raised by:** Claude (Opus), from source inspection at `e830d08`. Not an independent finding. Its severity is **proposed**, not assessed.
 - **Area:** G08 (privileged PostgreSQL access), AuthorityDb; related to G02, G03 and G14 (journal and manifest immutability).
 
@@ -53,7 +54,7 @@ So the role needs `UPDATE` only on specific lifecycle columns of four tables. It
 
 The reviewer should determine which alterations are detected, by what, and when.
 
-**Proposed severity: Medium** (defense-in-depth gap on integrity-critical tables; trusted actor required). The reviewer decides.
+**Proposed severity: Medium** (defense-in-depth gap on integrity-critical tables; trusted actor required). **Not accepted (C-122 FD-7).** The reviewer establishes the severity.
 
 ## 4. Remediation options (not implemented; each needs owner approval)
 

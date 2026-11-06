@@ -3,8 +3,9 @@
 - **Status:** **APPROVED BY THE OWNER AS THE GOVERNING ARCHITECTURAL AMENDMENT, CONDITIONAL (C-121, 2026-11-06). Subject to the mandatory security conditions in §6 and to independent design review before any implementation.**
   * Drafted 2026-11-06 under C-120 by Claude (Opus); not an independent review.
   * Relaxations: R-A accepted; R-B conditionally accepted; R-C accepted for the Tier 2 design; R-D accepted (§3).
+  * C-122 (2026-11-06): FD-1 to FD-8 decided (design §17.7). No independent review has occurred.
 - **What this approval does not do:**
-  * It does not change `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md`. The §4 text is applied only on the owner's decision FD-5 (proposed: after the independent design review, at the start of IX-3).
+  * It does not change `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md`. Under owner decision FD-5 (C-122), the §4 text is applied only after independent review acceptance **and** separate authorization to begin IX-3. The existing tests are not modified now.
   * It authorizes **no** implementation stage (IX-1 to IX-7) and **no** Tier 2 implementation or enablement.
   * It grants no production approval. That needs independent design and implementation review, Azure staging evidence (PERF-01) and PB-12 release evidence.
 - **Amends:** `ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md`:
@@ -111,9 +112,9 @@ The texts below are the amendment wording to which those decisions apply.
 >
 > Withdrawn values persist in WAL and backups until their retention expires."
 
-## 4. Proposed acceptance-test changes (effective only on owner decision FD-5)
+## 4. Proposed acceptance-test changes (FD-5, C-122)
 
-Applied to `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` **only on owner decision FD-5** (proposed: after the independent design review, at the start of IX-3). V1 (`VerifiedScan`) keeps its current pass criteria for as long as it remains in service.
+Applied to `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` **only after independent review acceptance and separate authorization to begin IX-3** (FD-5, approved C-122). Not applied now. V1 (`VerifiedScan`) keeps its current pass criteria for as long as it remains in service.
 
 | Test | Proposed pass criterion for the indexed engine |
 |---|---|
@@ -146,6 +147,12 @@ Applied to `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` **only on ow
 **Independent design review** before implementation:
 - package: `docs/architecture/INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md`;
 - twelve questions, as specified by the owner in C-121.
+
+**Conditions added by C-122** (design §17.7, §17.9):
+- FD-1: sweep completion tracked per verification scope; interrupted, failed or incomplete checks never reset a deadline; overdue verification disables indexed search until the required checks complete successfully.
+- FD-2: stored results are invalidated across all Authority instances on revocation, session termination, searchability change and organization quarantine; whole-page fail-closed behaviour is preserved.
+- FD-4: any indication of permission-integrity damage invokes S1 verification first; no search-index state suppresses or downgrades an organization authorization quarantine.
+- FD-3, FD-6, FD-7: Tier 2 completeness, a separate search process and OBS-IX-1 severity go to the independent reviewer.
 
 ## 7. Rejected alternatives (summary)
 

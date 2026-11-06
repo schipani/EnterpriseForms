@@ -1,6 +1,6 @@
 # Indexed search (Option C): independent design review package
 
-- **Status:** **Ready for submission to an independent reviewer (C-121). NOT REVIEWED. NOT SUBMITTED.**
+- **Status:** **Ready for submission to a qualified human reviewer independent of the implementation (C-121; owner decisions FD-1 to FD-8 recorded in C-122). NOT REVIEWED. NOT SUBMITTED. No review attestation exists.**
 - **Independence notice:**
   * This package was written by the design agent (Claude).
   * Neither Claude nor the project owner is an independent reviewer.
@@ -37,6 +37,14 @@
   * R-A, R-C and R-D accepted, R-B conditionally accepted;
   * five mandatory conditions (design §17);
   * **no implementation stage authorized; Tier 2 approved for review only.**
+- **C-122:**
+  * FD-1 approved with conditions (completion per verification scope; no deadline reset by interrupted, failed or incomplete checks; overdue disables indexed search until the checks complete);
+  * FD-2 approved (with cross-instance invalidation and whole-page fail-closed);
+  * FD-3 approved for review only;
+  * FD-4 and FD-5 approved;
+  * FD-6 and FD-7 deferred to this review;
+  * FD-8: external action; no review has occurred.
+  * Details: design §17.7 and §17.9.
 
 **Owner approval is not independent approval.** This review is a precondition for any implementation.
 
@@ -44,7 +52,7 @@
 
 The reviewer must:
 - not have contributed to the design, implementation, testing or documentation of this project;
-- not rely on the owner's decisions (C-120, C-121) or on any claim in this package;
+- not rely on the owner's decisions (C-120, C-121, C-122) or on any claim in this package;
 - not be an AI agent acting for the owner or for Claude (such a review is not independent and must not be recorded as such);
 - be independent of the business-deployment chain, in the sense of the PB-12 independent Security Owner role;
 - record any conflict of interest (section 9), including any relationship with the owner, Anthropic, Authzed/SpiceDB or Microsoft Azure.
@@ -72,7 +80,8 @@ For each question:
   * grants in `AuthorityRuntimeGrants.cs`;
   * separate cluster and connection strings in `infrastructure/docker/compose.yaml`.
 - **Examine:**
-  * whether reader-role separation is meaningful while one Authority process holds both credentials (UF-5, FD-6);
+  * whether reader-role separation is meaningful while one Authority process holds both credentials (UF-5);
+  * **FD-6 (deferred to you, C-122):** whether a separately deployed Authority search process, holding only its own read-only database credential, is necessary;
   * completeness of the exposure inventory: logs (bind parameters, constraint `DETAIL` lines), Query Store, temp files, PITR copies, geo-backups, support access;
   * whether every proposed PostgreSQL logging setting is available per role on Azure Database for PostgreSQL Flexible Server (UF-4);
   * whether R-D is acceptable for the regulated data categories expected.
@@ -142,6 +151,11 @@ For each question:
   * whether the fence can stall indefinitely under write load;
   * whether R-C caps reveal anything;
   * **whether Tier 2's completeness guarantees are sufficient for separate approval**.
+  * **FD-3 (C-122), specifically:**
+    - omitted affected records: an affected-set computation that misses a record whose access rows changed (§17.1 table and M3);
+    - missed events: a security command or content commit that changes edges or approved-field postings without writing `search_access_pending_verifications` in the same transaction;
+    - projection divergence: access rows, canonical edges and SpiceDB disagreeing, and whether every divergence path reaches S1 first (Q4);
+    - whether the 7-day M2 comparison interval (disable at 14 days) is adequate.
 
 ### Q6. Search-index tampering and rollback
 
@@ -156,14 +170,16 @@ For each question:
 ### Q7. Per-record seals and reconciliation
 
 - **Claim:**
-  * Entry seals (HMAC with the existing organization integrity key, domain-separated) are verified at least every 24 h.
-  * Deep re-derivation covers every record within 30 days.
-  * An overdue sweep stops the index from serving.
-- **Where:** design §4, §6.5, §17.5; IX-D14; FD-1.
+  * Entry seals (HMAC with the existing organization integrity key, domain-separated) are verified with a 24 h target; the index is suspended when any entry has gone 48 h without a successful verification.
+  * Deep re-derivation targets every record within 30 days; suspension at 60 days.
+  * Completion is tracked per verification scope; interrupted, failed or incomplete runs never reset a deadline; an overdue scope suspends indexed search until it completes successfully (FD-1, C-122).
+- **Where:** design §4, §6.5, §17.5, §17.9.1; IX-D14; FD-1.
 - **Examine:**
   * domain separation from row HMACs;
   * absence of any signing-oracle exposure (the seal is computed only inside the commit or attestation paths);
-  * whether 24 h and 30 days are appropriate;
+  * **FD-1 (C-122):** whether the intervals (1 h, 24 h, 30 days) adequately address the integrity threat model;
+  * whether the grace between target and threshold (2 h, 48 h, 60 days) is acceptable, or the threshold should equal the target (UF-13);
+  * rules R1 to R8 of §17.9.1: can any run path record completion it did not earn, and is automatic clearing of `Suspended` safe;
   * the Managed HSM load of about 29 verifications/s at the PB-09 envelope (UF-3);
   * whether quarantine on an overdue sweep is the right availability trade.
 
@@ -173,8 +189,9 @@ For each question:
   * a SpiceDB re-decision of the page's records;
   * revalidation of the searchability approval;
   * whole-page failure on any unverifiable step.
-- **Where:** design §17.3; IX-D5; FD-2.
+- **Where:** design §17.3, §17.9.2; IX-D5; FD-2.
 - **Examine:**
+  * **FD-2 (C-122):** cross-instance invalidation for revocation, session termination, searchability changes and organization quarantine (rules X1 to X4): any instance-local state a page check could rely on;
   * the nonce-protected query digest;
   * session-bound deletion;
   * the capacity refusal at instance level (aggregate-load signal);
@@ -188,9 +205,9 @@ For each question:
   * S1 organization quarantine always applies and is evaluated first.
   * The V1 fallback re-enters every V1 and S1 gate.
   * Search-side signals of authorization damage escalate through S1's decisive check (Q4 rule) before being classified as index failures.
-- **Where:** design §17.2; IX-D7, IX-D8; FD-4.
+- **Where:** design §17.2, §17.9.1 (new `Suspended` state); IX-D7, IX-D8; FD-4 (approved, C-122).
 - **Basis:** S1 quarantine reasons and the permanence trigger (`PROJECTION_INTEGRITY_S1_OPERATIONS.md`).
-- **Examine:** any path where an index failure masks, delays or replaces an S1 quarantine, or where the fallback could serve during an S1 quarantine.
+- **Examine:** any path where an index failure or suspension masks, delays, downgrades or replaces an S1 quarantine, or where the fallback could serve during an S1 quarantine.
 
 ### Q10. Disaster recovery and application rollback
 
@@ -220,8 +237,7 @@ For each question:
 - **Where:** the OBS-IX-1 document.
 - **Examine:**
   * which alterations are detected today, by what and when;
-  * the proposed severity (Medium);
-  * remediation options A to D.
+  * **FD-7 (deferred to you, C-122):** establish the severity (the proposed Medium is **not** accepted) and recommend remediation among options A to D or another;
 - **No remediation is authorized.**
 
 ## 4. Commits and how to read them
@@ -231,7 +247,8 @@ For each question:
 | `e830d08` | Code baseline (M4-1 state; no indexed-search code) |
 | `a89b6e4` | Design revision 1 as presented (C-120 input) |
 | `a24733e` | Design revision 2, A2 drafted, C-120 recorded |
-| (this commit) | Revision 3, owner decisions C-121, OBS-IX-1, this package |
+| `1a74acc` | Revision 3, owner decisions C-121, OBS-IX-1, this package |
+| (this commit) | Owner decisions C-122 (FD-1 to FD-8); design §17.7 and §17.9; corrected sweep guarantees (§17.5); this package updated |
 
 **To reproduce the code facts:**
 - `git show e830d08:<path>` for each source file cited in the design §3 table and in question 2;
@@ -250,23 +267,50 @@ No runtime stack is needed for a design review.
 | UF-5 | The runtime and reader credentials are in one Authority process; reader separation limits query-path SQL only | FD-6 |
 | UF-6 | Page-invalidation rate under write load (`form_content_revision`) unknown | IX-3 measurement |
 | UF-7 | I-2 cost, Tier 1 probe cost and the timing residual are unmeasured | IX-3/IX-13 |
-| UF-8 | Authority-domain omission detected within 24 h, not per query (R-IX-6) | Accepted design trade; question 7 |
+| UF-8 | Authority-domain omission detected within the S-B bound (target 24 h, guaranteed 48 h), not per query (R-IX-6) | Accepted design trade; question 7 |
 | UF-9 | Backup retention is the persistence bound for withdrawn plaintext (R-IX-3); the PB-10 retention decision is pending | PB-10 |
 | UF-10 | G14 recovery plane not implemented; projection rebuild after a full Authority recovery depends on it; T16-A untested | G14 |
 | UF-11 | The V1 fallback engine fails its 480-record benchmark (P-S1-1), so fallback limits are lower than V1's nominal 500 | P-S1-1 |
 | UF-12 | `LookupSubjects` cost for the Tier 2 fence scales with changed records × approved fields | Question 5; PERF-01 |
+| UF-13 | Revision 3 stated sweep targets as guarantees. Corrected in C-122: guaranteed bounds are the overdue thresholds (2 h, 48 h, 60 days). Whether the grace is acceptable is open | Question 7 |
 
-## 6. Owner decisions still pending
+## 6. Owner decisions (C-122) and items for your judgment
 
-FD-1 to FD-8 are in design §17.7:
-- sweep intervals and overdue rule;
-- stored-result limits and per-page re-decision;
-- the Tier 2 fence in review scope;
-- the S1 escalation rule;
-- timing of the ENC-SR text;
-- a separate search container;
-- the OBS-IX-1 disposition;
-- reviewer selection and submission.
+### 6.1 Owner decisions
+
+Recorded in design §17.7; conditions in §17.9. They are **not** evidence for any claim, and you must not rely on them (section 2).
+
+| # | Decision |
+|---|---|
+| FD-1 | Sweep intervals approved with conditions (completion per scope; no reset by failed runs; overdue suspends) |
+| FD-2 | Stored-result limits and per-page re-decision approved; cross-instance invalidation required |
+| FD-3 | Tier 2 completeness in review scope; implementation unauthorized |
+| FD-4 | S1 verification first for any permission-integrity signal |
+| FD-5 | ENC-SR text applied only after review acceptance and separate IX-3 authorization |
+| FD-6 | Separate search process: **deferred to you** |
+| FD-7 | OBS-IX-1 severity and remediation: **deferred to you** |
+| FD-8 | Reviewer selection and submission: external, not yet done |
+
+### 6.2 Items requiring your judgment
+
+The owner has asked specifically for your judgment on these. Each maps to a question.
+
+| # | Item | Question |
+|---|---|---|
+| J-1 | Whether a separately deployed Authority search process with its own read-only credential is necessary (FD-6) | Q1 |
+| J-2 | Whether the plaintext-exposure inventory is complete and R-D acceptable for the expected data | Q1 |
+| J-3 | Whether inline derivation is truly atomic with the head, and builder backfill race-free | Q2 |
+| J-4 | Whether I-2 binds the predicate-relevant value, and R-A semantics are acceptable | Q3 |
+| J-5 | Tier 1 snapshot consistency, enforceability of scope-driven plans, residual timing channels | Q4 |
+| J-6 | Tier 2: omitted affected records, missed events, projection divergence, the 7-day comparison interval, and sufficiency for separate approval (FD-3) | Q5 |
+| J-7 | Whether rollback and partial-restore fencing is enough | Q6 |
+| J-8 | Whether the sweep intervals address the integrity threat model; target-versus-threshold grace; safety of rules R1 to R8 (FD-1, UF-13) | Q7 |
+| J-9 | Cross-instance invalidation and page reauthorization (FD-2) | Q8 |
+| J-10 | Whether any path lets an index failure or suspension suppress or downgrade an S1 quarantine (FD-4) | Q9 |
+| J-11 | DR and rollback with G14 unimplemented | Q10 |
+| J-12 | Whether any relaxation beyond R-A to R-D is implicit, and the adequacy of the proposed ENC-SR text | Q11 |
+| J-13 | OBS-IX-1 severity and recommended remediation (FD-7) | Q12 |
+| J-14 | Overall verdicts for Tier 1 and Tier 2 (section 8) | All |
 
 ## 7. Known limitations of this package
 
@@ -310,7 +354,7 @@ Overall verdict (reviewer's choice):
 |---|---|
 | Reviewer name | |
 | Organization | |
-| Independence statement | I did not contribute to the design, implementation, testing or documentation of this project, and I am not an AI agent acting for the owner or for Claude. I have not relied on the owner's decisions (C-120, C-121). |
+| Independence statement | I did not contribute to the design, implementation, testing or documentation of this project, and I am not an AI agent acting for the owner or for Claude. I have not relied on the owner's decisions (C-120, C-121, C-122). |
 | Conflicts of interest (or "none") | |
 | Commit reviewed | |
 | Scope reviewed (questions 1 to 12; any excluded) | |

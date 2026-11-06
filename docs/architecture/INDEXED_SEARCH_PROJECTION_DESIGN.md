@@ -4,6 +4,7 @@
   * Revision 1 received conditional architectural approval with conditions C1 to C4 (C-120).
   * Revision 2 answered C1 to C4.
   * Revision 3 records the owner decisions on IX-D1 to IX-D14 (§15) and answers the five C-121 mandatory conditions (§17). It is the version submitted for independent review: [INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md](INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md).
+  * **C-122 (2026-11-06):** the owner decided FD-1 to FD-8 (§17.7). Their attached conditions are specified in §17.9. FD-6 and FD-7 are deferred to the reviewer. **No independent review has occurred.**
   * **Tier 2 (§9) is approved for further review only.** Neither its implementation nor its enablement is authorized.
   * Prepared by Claude (Opus). This is not an independent review.
 - **Revision 1:** [INDEXED_SEARCH_PROJECTION_DESIGN_R1.md](INDEXED_SEARCH_PROJECTION_DESIGN_R1.md), cited here as "R1 §…". Its sections remain part of the design unless this revision changes them; where they differ, this revision governs.
@@ -633,7 +634,7 @@ The owner's decisions in §15.1 apply to these texts. "Recommend" is Claude's re
 
 ## 16. Implementation stages and acceptance gates (each stage needs its own authorization)
 
-**No stage IX-1 to IX-7 is authorized (C-121).** IX-0 is in progress: owner decisions are recorded and the independent design review package is prepared but not yet submitted. Tier 2 work (IX-5) additionally needs the separate approval required by §17.1.
+**No stage IX-1 to IX-7 is authorized (C-121, C-122).** IX-0 is in progress: owner decisions IX-D1 to IX-D14 (C-121) and FD-1 to FD-8 (C-122) are recorded, and the independent design review package is ready but not yet submitted (FD-8). Tier 2 work (IX-5) additionally needs the separate approval required by §17.1.
 
 | Stage | Content | Exit gate |
 |---|---|---|
@@ -655,7 +656,7 @@ The owner's decisions in §15.1 apply to these texts. "Recommend" is Claude's re
 - IX-38–41: Tier 2 divergence, coupling guard, differential, sweep;
 - IX-42: the runtime `DELETE` grant is confined to derived tables.
 
-R1 §K's acceptance criteria 1–10 remain, extended to the new tests (and to IX-43 to IX-52 of §17.8).
+R1 §K's acceptance criteria 1–10 remain, extended to the new tests (and to IX-43 to IX-52 of §17.8 and IX-53 to IX-56 of §17.9.3).
 
 **Unchanged:** M4-1 stays open pending independent review; M4-2 unauthorized; no push, PR, merge or deploy.
 
@@ -727,6 +728,7 @@ are detected by M2 within 7 days, not per query. A divergence in which both Spic
 | **S1 organization quarantine** (`IntegrityQuarantineEnabled`, gate `Quarantined`) | Organization | **Refused** 423 `INTEGRITY_QUARANTINE` | **Refused** (the same gate) | **Refused** | Refused (existing S1) | S1 only | G14 recovery only (S1 rules, permanence trigger). **Never** by any search action |
 | Organization gate closed (projection behind, archive pending) | Organization | Refused, retryable (as today) | Refused (the same gate) | Refused, retryable | As today | Existing | Existing |
 | **Search-index quarantine** (`search_projection_states.projection_status_name = Quarantined`) | The organization's search index | Not served (503 `SEARCH_VERIFICATION_UNAVAILABLE`, reason `SEARCH_INDEX_INCONSISTENT`) | Allowed only through the complete V1 path and within V1 limits (IX-D8) | Refused; the snapshot is deleted | **Unaffected** | Search checks and sweeps | Journaled `SearchProjectionRebuild` and a completed rebuild |
+| **Search-index suspension** (`projection_status_name = Suspended`, reason `INTEGRITY_SWEEP_OVERDUE`; C-122 FD-1, §17.9) | The organization's search index | Not served (503 `SEARCH_VERIFICATION_UNAVAILABLE`, reason `SEARCH_INDEX_VERIFICATION_OVERDUE`) | As for quarantine (IX-D8) | Refused; the snapshot is deleted | **Unaffected** | Overdue evaluation only | Successful completion of every overdue verification scope (§17.9). A sweep **finding** during that completion converts it to a quarantine |
 | Record content quarantine | Record | Any search with the record in scope fails (D3 parity) | Same | Same | Record refused (existing) | Verification paths | Existing |
 
 **Rules:**
@@ -844,23 +846,25 @@ are detected by M2 within 7 days, not per query. A divergence in which both Spic
 
 ### 17.5 IX-D14 condition: sweep intervals, failure handling and guarantees
 
-| Sweep | Checks | Interval / coverage (proposed; FD-1) | On a finding | On inability to run | Overdue rule |
+| Sweep | Checks | Interval / coverage (approved, C-122 FD-1) | On a finding | On inability to run | Overdue rule |
 |---|---|---|---|---|---|
-| **S-A cheap** | I-1 for the whole organization; withdrawn-field residue; cross-organization rows; anomalies | Every organization, every hour | Search-index quarantine and Critical alert (after the Q4 escalation check where relevant) | Retry with backoff | Warning at 1.5 h; **search-index quarantine** `INTEGRITY_SWEEP_OVERDUE` at 2 h since the last complete pass |
-| **S-B seals** | One MAC verify per entry, ordered by `last_seal_verified_on` | Every entry verified **at least once per 24 h**, rate-limited to the HSM budget | Search-index quarantine, Critical | MAC provider unavailable: paused, retried | Warning at 36 h; quarantine when any entry is unverified for 48 h |
-| **S-C deep** | Re-derive from BusinessDb bytes verified against heads | Every record at least once per **30 days**, plus a daily random sample (≥1% or 1,000 records) | Business mismatch: **record** quarantine (existing). Posting mismatch: search-index quarantine | Builder or HSM unavailable: paused | Warning at 45 days; quarantine at 60 days |
+| **S-A cheap** | I-1 for the whole organization; withdrawn-field residue; cross-organization rows; anomalies | Every organization, every hour | Search-index quarantine and Critical alert (after the Q4 escalation check where relevant) | Retry with backoff | Warning at 1.5 h; **search-index suspension** `INTEGRITY_SWEEP_OVERDUE` at 2 h since the last **successful complete** pass (§17.9) |
+| **S-B seals** | One MAC verify per entry, ordered by `last_seal_verified_on` | Every entry verified **at least once per 24 h**, rate-limited to the HSM budget | Search-index quarantine, Critical | MAC provider unavailable: paused, retried | Warning at 36 h; suspension when any entry has had no successful verification for 48 h |
+| **S-C deep** | Re-derive from BusinessDb bytes verified against heads | Every record at least once per **30 days**, plus a daily random sample (≥1% or 1,000 records) | Business mismatch: **record** quarantine (existing). Posting mismatch: search-index quarantine | Builder or HSM unavailable: paused | Warning at 45 days; suspension when any record has had no successful comparison for 60 days |
 | **S-D Tier 2** | §17.1 M1 continuous; M2 full | M1 continuous; M2 every record within 7 days | §17.1 | Paused | Tier 2 disabled when M1 lags (fence) or M2 exceeds 14 days |
 
-**Guarantees** (precise; they hold only while no overdue rule has fired; when one fires, the index stops serving):
+**Guarantees** (precise; they hold only while the index is neither suspended nor quarantined; when an overdue rule fires, the index stops serving).
 
-| Manipulation | Detected |
-|---|---|
-| Authority-domain change that would **add** a match | Never served: I-2 on every query |
-| Authority-domain change or deletion of a posting that would **remove** a match | Within 24 h (S-B) |
-| Entry deletion | Every query (Tier 1) or within 1 h (S-A, Tier 2) |
-| Stale or replayed entry, partial restore, old Authority commit | Every query (I-1) |
-| Derivation defect affecting postings | Within 30 days for every record (S-C), sooner by sample; golden vectors before release |
-| Business-byte tampering | On open (full verified read) and within 30 days (S-C) |
+> **Correction (C-122).** Revision 3 stated the S-B, S-A and S-C bounds as the scheduling targets (24 h, 1 h, 30 days). The index keeps serving until the overdue threshold fires, so the **guaranteed** bound is the threshold. The table now gives both. Whether the grace between target and threshold is acceptable is a reviewer question (package Q7).
+
+| Manipulation | Detected: target | Detected: guaranteed bound |
+|---|---|---|
+| Authority-domain change that would **add** a match | Never served: I-2 on every query | Same |
+| Authority-domain change or deletion of a posting that would **remove** a match | Within 24 h (S-B) | Within 48 h (S-B threshold) |
+| Entry deletion | Every query (Tier 1); within 1 h (S-A, Tier 2) | Every query (Tier 1); within 2 h (S-A threshold, Tier 2) |
+| Stale or replayed entry, partial restore, old Authority commit | Every query (I-1) | Same |
+| Derivation defect affecting postings | Within 30 days for every record (S-C), sooner by sample; golden vectors before release | Within 60 days (S-C threshold) |
+| Business-byte tampering | On open (full verified read); within 30 days (S-C) | On open; within 60 days (S-C threshold) |
 
 **Evidence:**
 - every completed pass is journaled (counts, duration, oldest verified time) and shown on the Release Security Dashboard;
@@ -872,18 +876,18 @@ are detected by M2 within 7 days, not per query. A divergence in which both Spic
 
 Recorded as a separate finding: [OBS-IX-1](../security/OBS-IX-1_AUTHORITY_APPEND_ONLY_UPDATE_PRIVILEGE.md). It is included in the review package (question 12). No remediation is implemented or authorized.
 
-### 17.7 Decisions still requiring owner approval
+### 17.7 Owner decisions FD-1 to FD-8 (C-122, 2026-11-06)
 
-| # | Decision | Recommendation |
-|---|---|---|
-| FD-1 | Sweep intervals and overdue rules of §17.5, including that an overdue sweep stops the index from serving | Approve |
-| FD-2 | Stored-result limits of §17.3 (lifetime 5/15 min, 3 per session, 10,000 per snapshot, 500,000 per instance) and per-page SpiceDB re-decision | Approve |
-| FD-3 | The verified-revision fence (§17.1 M1) as the Tier 2 completeness mechanism to be assessed by the reviewer | Include in review scope; no implementation |
-| FD-4 | The Q4 escalation rule: search-side signals of authorization damage go through S1's decisive check first | Approve |
-| FD-5 | When the A2 §4 ENC-SR text is applied to the acceptance-test file | After the independent design review, at the start of IX-3 |
-| FD-6 | A separate Authority search container with only the reader credential | Decide after the reviewer's answer to question 1 |
-| FD-7 | OBS-IX-1 severity and remediation path | Decide after the reviewer's answer to question 12 |
-| FD-8 | Reviewer selection and submission of the package | Owner action |
+| # | Subject | Owner decision (C-122) | Attached condition (binding) | Where answered |
+|---|---|---|---|---|
+| FD-1 | Sweep intervals and overdue rules of §17.5 | **Approved with conditions**: hourly integrity-check scheduling, complete seal verification within 24 h, BusinessDb comparison of every record within 30 days | Completion tracked per required verification scope; interrupted, failed or incomplete checks never reset a deadline; overdue verification disables indexed search until the required checks complete successfully; the reviewer assesses whether the intervals address the integrity threat model | §17.5, §17.9.1; package Q7 |
+| FD-2 | Stored-result limits of §17.3 (lifetime 5/15 min, 3 per session, 10,000 per snapshot, 500,000 per instance) and per-page SpiceDB re-decision | **Approved** | Cross-instance invalidation for revocation, session termination, searchability changes and organization quarantine; whole-page fail-closed behaviour preserved | §17.3, §17.9.2; package Q8 |
+| FD-3 | The verified-revision fence (§17.1 M1) as the Tier 2 completeness mechanism | **Approved for review only** | The reviewer assesses omitted affected records, missed events, projection divergence and the 7-day comparison interval. Tier 2 implementation stays unauthorized | §17.1; package Q5 |
+| FD-4 | The Q4 escalation rule | **Approved** | Any indication of permission-integrity damage invokes S1 verification first; a search-index quarantine or suspension never suppresses or downgrades an organization authorization quarantine | §17.2 |
+| FD-5 | When the A2 §4 ENC-SR text is applied | **Approved**: only after independent review acceptance **and** separate authorization to begin IX-3 | The existing acceptance tests are not modified now | A2 §4 |
+| FD-6 | A separate Authority search process with its own read-only database credential | **Deferred** | The reviewer assesses whether it is necessary; not implemented | package Q1 |
+| FD-7 | OBS-IX-1 severity and remediation | **Deferred** | The reviewer establishes the severity and recommends remediation. The proposed Medium is **not** accepted | package Q12; OBS-IX-1 |
+| FD-8 | Reviewer selection and submission | **External action required** | The package is ready for a qualified human reviewer independent of the implementation. No review has occurred; no attestation is created or implied | package §2, §9 |
 
 ### 17.8 New tests (revision 3)
 
@@ -892,5 +896,64 @@ Recorded as a separate finding: [OBS-IX-1](../security/OBS-IX-1_AUTHORITY_APPEND
 - IX-45: `SearchProjectionRebuild` is refused while the organization is S1-quarantined;
 - IX-46: the Q4 escalation (an injected SpiceDB mismatch during a search results in the S1 quarantine, not only the index quarantine);
 - IX-47 to IX-50: stored results (expiry and purge; per-session eviction; every page-check failure in §17.3, each with its specified code and no partial page; nonce-protected digest);
-- IX-51: overdue sweeps quarantine the index;
+- IX-51: overdue sweeps suspend the index (C-122: suspension, not quarantine; see §17.9.1 and IX-53);
 - IX-52 (only if Tier 2 is approved later): fence, affected-set property test and M2 sweep.
+
+### 17.9 C-122 conditions
+
+#### 17.9.1 FD-1: completion tracking per verification scope
+
+**Verification scopes.** A deadline belongs to a scope, never to a sweep run.
+
+| Sweep | Scope unit | Recorded on success only | Deadline |
+|---|---|---|---|
+| S-A | Organization | `last_successful_cheap_pass_on`, written only when every check of the pass completed and passed for the whole organization | 2 h after it |
+| S-B | Each `search_record_entries` row | `last_seal_verified_on` of the entry, written only after the MAC verification of **that** entry returned `Valid` | 48 h after the oldest value in the organization |
+| S-C | Each record | `last_deep_verified_on` of the record, written only after its re-derivation matched | 60 days after the oldest value in the organization |
+| S-D (Tier 2, review only) | Each record (M2); organization (M1 fence) | `last_access_verified_on` of the record | §17.1 |
+
+**Rules.**
+- **R1.** A timestamp is written only for a unit whose check completed with a passing result, in the same transaction as that result. Nothing else writes it: not scheduling, not a run start, not a retry, not a batch that ended early.
+- **R2.** An interrupted run (crash, cancellation, timeout, lease loss), a failed run (provider unavailable, error) or an incomplete run (rate-limited, partial batch) leaves untouched every timestamp it did not earn under R1. **A deadline is never reset by such a run.**
+- **R3.** A run that is unable to verify a unit (for example `IntegrityServiceUnavailable`) records the attempt for observability only (`last_attempted_on`, outcome code). Attempts never count as completion.
+- **R4.** A newly created or re-derived entry starts with the timestamp of the commit or attestation that sealed it (a successful verification under the organization lock).
+- **R5.** The overdue evaluation runs independently of the sweeps (its own schedule, every 5 minutes, and before every indexed search through the projection-state check). It sets `Suspended` with reason `INTEGRITY_SWEEP_OVERDUE` and the overdue scope names, journals the transition and raises a High alert.
+- **R6.** `Suspended` is cleared only when **every** overdue scope has had a successful completion under R1. The deadline is recomputed from the recorded timestamps, never from a run summary. The clearing is journaled.
+- **R7.** A finding during a catch-up run sets `Quarantined` (§17.2), which takes precedence over `Suspended` and is cleared only by a rebuild (IX-D7).
+- **R8.** While the index is suspended, the V1 fallback follows IX-D8 and §17.2 (full V1 and S1 path, V1 limits).
+
+**Evidence.** Per scope, the dashboard shows the oldest successful timestamp, the deadline and the last attempt outcome. No values.
+
+**Change from revision 3.** An overdue threshold previously set a search-index **quarantine**, which only a rebuild clears (IX-D7). C-122 requires indexed search to be disabled "until the required integrity checks complete successfully", so overdue now sets the separate `Suspended` state (R5, R6). Findings still quarantine.
+
+**For the reviewer (package Q7):**
+- whether the targets (1 h, 24 h, 30 days) and thresholds (2 h, 48 h, 60 days) adequately address the integrity threat model;
+- whether the grace between target and threshold is acceptable, or the threshold should equal the target;
+- whether automatic clearing of `Suspended` on successful completion is safe.
+
+#### 17.9.2 FD-2: cross-instance invalidation of stored results
+
+**Principle.** Every fact a page check depends on is read from AuthorityDb at page time. No Authority instance holds a cache of snapshot existence, session validity, authorization revision, approval state, quarantine state or SpiceDB decisions that a page check consults. So an invalidation committed through any instance is effective on every instance at its next page request.
+
+| Invalidating event | Committed by | Deleted in the same transaction | Also refused at page time by |
+|---|---|---|---|
+| Permission revocation (any authorization change) | Security-command transaction (any instance) | The organization's snapshots whose authorization revision is below the new revision | Page check 4 (revision) and check 7 (fresh SpiceDB decision) |
+| Session termination (logout, revocation, tenant switch, expiry) | Session transaction on `authenticated_sessions` | All snapshots of that session | Page check 2 (session must be live) |
+| Searchability change (AC-6 approval withdrawn, classification strengthened, operator narrowed, coverage leaving `Complete`) | The AC-6 command or coverage transaction | All snapshots of the affected form | Page check 5 (approval revalidation) |
+| S1 organization quarantine | S1 quarantine transaction | All snapshots of the organization (purge) | Page check 3 (organization gate and S1 state) |
+| Search-index quarantine or suspension | Projection-state transaction | All snapshots of the organization | Page check 6 (projection state) |
+
+**Rules.**
+- **X1.** Deletion is the first line; the page check is the second. Each event is covered by both, so a missed or failed deletion still cannot produce a page.
+- **X2.** If a deletion fails, the invalidating transaction fails. A revocation is never committed with its snapshots left in place.
+- **X3.** The Authority's in-process admission counters (R1 §E, "per instance") are capacity controls only. They never authorize a page.
+- **X4.** Whole-page fail-closed behaviour of §17.3 is unchanged: any failed check returns no page.
+
+**Clarification.** The "500,000 live entries per Authority instance" limit of §17.3 is a capacity guard. It is counted from AuthorityDb rows tagged with the creating instance; it plays no part in invalidation.
+
+#### 17.9.3 New tests (C-122)
+
+- IX-53: interrupted, failed, rate-limited and partial sweep runs do not move any deadline; overdue suspends; suspension clears only after successful completion of every overdue scope; a finding during catch-up quarantines.
+- IX-54: two Authority instances. Each FD-2 invalidating event committed through instance A refuses the next page on instance B, with and without the deletion step (fault-injected), and never returns a partial page.
+- IX-55: a failed snapshot deletion aborts the revoking transaction (X2).
+- IX-56: no page check reads an instance-local cache (architecture test).
