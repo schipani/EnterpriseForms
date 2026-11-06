@@ -4,6 +4,7 @@
   * Drafted 2026-11-06 under C-120 by Claude (Opus); not an independent review.
   * Relaxations: R-A accepted; R-B conditionally accepted; R-C accepted for the Tier 2 design; R-D accepted (§3).
   * C-122 (2026-11-06): FD-1 to FD-8 decided (design §17.7). No independent review has occurred.
+  * C-123 (2026-11-06): owner-led Tier 1 review in progress (`docs/architecture/INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md`). It is not an independent third-party assessment, which remains an outstanding production-readiness requirement.
 - **What this approval does not do:**
   * It does not change `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md`. Under owner decision FD-5 (C-122), the §4 text is applied only after independent review acceptance **and** separate authorization to begin IX-3. The existing tests are not modified now.
   * It authorizes **no** implementation stage (IX-1 to IX-7) and **no** Tier 2 implementation or enablement.
@@ -49,6 +50,8 @@
 | P-11 | Audit of executions without values (API) | Evidence journaled in the result transaction; no predicate values in any log (design §5.3) |
 | P-12 | Opening a known record requires authorization, integrity verification and, for protected values, decryption (capability table) | Unchanged |
 | P-13 | Future blind indexes or encrypted search remain separate decisions (§7) | Unchanged; A2 covers only plaintext Public/Internal |
+
+> **Wording note (C-123, owner review OR-1).** P-6 lists I-2 among the fail-closed checks. I-2 refuses false additions made by changing postings only. It does not refuse a coordinated rewrite of postings, leaves and head root by a writer holding the Authority runtime credential; that case is detected by entry seals and on open (design §6.3 correction). This is a corrected statement of strength inside the Authority domain, not a relaxation of the Level 2 guarantees: the population is still decided by SpiceDB, so no unauthorized record can be disclosed.
 
 ## 3. Changes (relaxations) and the owner's decisions on them (C-121)
 

@@ -5,6 +5,7 @@
   * Revision 2 answered C1 to C4.
   * Revision 3 records the owner decisions on IX-D1 to IX-D14 (§15) and answers the five C-121 mandatory conditions (§17). It is the version submitted for independent review: [INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md](INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md).
   * **C-122 (2026-11-06):** the owner decided FD-1 to FD-8 (§17.7). Their attached conditions are specified in §17.9. FD-6 and FD-7 are deferred to the reviewer. **No independent review has occurred.**
+  * **C-123 (2026-11-06):** the owner acts as the designated owner reviewer (an owner-led review, **not** an independent third-party assessment; `docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md`). The proposed sweep-deadline decision is in §17.10. The Tier 1 owner-review evidence is `INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md`; its findings OR-1 to OR-4 are marked where they correct this document.
   * **Tier 2 (§9) is approved for further review only.** Neither its implementation nor its enablement is authorized.
   * Prepared by Claude (Opus). This is not an independent review.
 - **Revision 1:** [INDEXED_SEARCH_PROJECTION_DESIGN_R1.md](INDEXED_SEARCH_PROJECTION_DESIGN_R1.md), cited here as "R1 §…". Its sections remain part of the design unless this revision changes them; where they differ, this revision governs.
@@ -85,6 +86,10 @@ Verified against the code at `e830d08`:
 - every path that changes `record_content_heads`, `authority_resources.resource_lifecycle_state` for records, or AC-6 approval states, by an architecture test that fails when a new writer appears without a derivation hook;
 - `ReadCommitted` plus the organization lock gives no anomaly for derivation. All derivation reads are of rows locked or written in the same transaction.
 
+> **Owner review OR-2 (C-123), design defect, fix proposed, not yet accepted.** `organization_authorization_states.content_integrity_revision` is advanced at four sites, not only on commit (`ContentService.cs` 368 commit; 735 and 901 verified-read quarantine; 1235 share-editor `CurrentSnapshotMismatch` incident, with no head change). R1 §C.1 step 5 advances `projection_content_integrity_revision` only on commit. Under I-1's equality rule, one mismatched share-editor request would therefore quarantine the organization's whole index. **Proposed fix:** every increment site advances the projection revision in the same transaction (with no posting change at 735, 901 and 1235), and the IX-1 architecture test is keyed on the increment. Until the owner accepts a fix, this blocks IX-1.
+>
+> **Owner review OR-3 (C-123), contract clause.** `CommitAsync` commits the transaction on four abort paths before the head changes (lines 248, 260, 292, 321). Derivation and sealing run only between line 326 and the final commit at 387; no abort path writes `authority_search` rows (test IX-61).
+
 ---
 
 ## 4. Schema (Authority domain, schema `authority_search`)
@@ -151,7 +156,7 @@ Naming, indexes, partitioning and growth estimates follow R1 §B.3 to §B.5, wit
 | Business API runs a query outside AC-6 policy | The Authority re-checks `query_fields`, the approval id, operator, value type and coverage `Complete` for every condition. A forged request gets the same indistinguishable refusal as today |
 | Builder forges or withholds | Bytes failing the HMAC, leaf-set or root check are refused, and the record is quarantined as in V1. Withholding leaves the coverage `Building`; `Complete` is set only by Authority attestation |
 | Authority runtime bug writes a wrong posting | Golden derivation vectors; the per-match integrity check (§6.3) refuses a match whose posting does not hash to the accepted leaf; sweeps |
-| AuthorityDb administrator edits rows | Outside the Level 2 threat model (`CLAUDE.md` §4M: the Authority and its administrators are trusted). Still: the per-match check (§6.3) prevents false **additions**; seals and sweeps detect **omissions** (§6.4); object-level pgAudit alerts on human access (§5.3) |
+| AuthorityDb administrator edits rows | Outside the Level 2 threat model (`CLAUDE.md` §4M: the Authority and its administrators are trusted). Still: the per-match check (§6.3) prevents false additions **made by changing postings only**; a coordinated rewrite of postings, leaves and head root passes it and is detected by seals and the open path (correction OR-1, §6.3); seals and sweeps detect **omissions** (§6.4); object-level pgAudit alerts on human access (§5.3) |
 | Old Authority version (rollback) commits without deriving | The projection revision stays behind the content revision; the query refuses; the projection goes `Rebuilding` (§12.4) |
 
 ### 5.3 Administrative access, backup, retention, replication, logging
@@ -216,7 +221,12 @@ Any failure fails the whole search and sets the projection to `Quarantined` (loc
 
 This is V1's Authority-side root check, run on the matched records. It costs CPU only: for 10,000 matches × 50 leaves, about 500,000 SHA-256 operations. Any mismatch fails the whole search and quarantines the projection.
 
-**Effect:** a returned match is **cryptographically tied to the anchored accepted root** (root → content checkpoint → journal → ledger). No posting can add a match that the accepted content does not support.
+**Effect:** a returned match is tied to the accepted root **as recorded in AuthorityDb**. No change to postings alone can add a match that the accepted content does not support.
+
+> **Correction (C-123, owner review OR-1).** Revision 3 said the match is "cryptographically tied to the anchored accepted root" and that "no posting can add a match". That overstates I-2. I-2 is unkeyed and compares against `record_manifest_leaves` and `record_content_heads.committed_manifest_root`, which the runtime role can rewrite (OBS-IX-1). The read path binds a head to its journal entry by operation id only, and does not compare roots (`ContentService.cs` 1350–1358). A writer holding the runtime database credential can rewrite posting, leaf digest and head root consistently, and pass I-2.
+> - **Impact:** a false match among records the caller is already authorized to discover (Tier 1 population is decided by SpiceDB). It is an integrity failure; no unauthorized record is disclosed.
+> - **Detection:** entry seals (keyed; S-B deadline), and the open path (BusinessDb bytes no longer match the head root, so the record is quarantined).
+> - **Proposed option, owner decision pending:** verify the entry seal of every record on a returned page before the page is released (at most one MAC verification per displayed record; PERF-01).
 
 ### 6.4 Omission and addition: demonstration matrix
 
@@ -224,6 +234,7 @@ This is V1's Authority-side root check, run on the matched records. It costs CPU
 |---|---|---|---|---|
 | Delete, alter or inject business rows | business DBA | n/a: search does not read BusinessDb | n/a: search does not read BusinessDb; the record still matches on accepted content | Structural; damage is caught on open and by the deep sweep |
 | Alter a posting value so a non-match matches | Authority domain | **I-2** (bytes, digest, root) | n/a | Every query |
+| Rewrite posting, leaf digest and head root consistently (OR-1) | Authority domain with the runtime credential | **Not by I-2.** Entry seal (S-B); per-page seal check if adopted | n/a | S-B deadline (or every page, if adopted) |
 | Alter or delete a posting so a match disappears | Authority domain | n/a | **Entry seal** (HMAC) mismatch in the cheap sweep; deep-sweep re-derivation | Sweep interval |
 | Delete an entry | Authority domain | n/a | **I-1** (contentful head without entry) | Every query (Tier 1); sweep (Tier 2) |
 | Replay old postings or entry | Authority domain | **I-1** (operation binding) and I-2 | I-1 | Every query |
@@ -234,7 +245,7 @@ This is V1's Authority-side root check, run on the matched records. It costs CPU
 **Conclusion, stated precisely:**
 - Against the **Level 2 adversary** (business database administrator or credential), indexed search can neither omit nor add eligible results: structurally, BusinessDb is not consulted.
 - Against manipulation **inside the Authority domain** (outside the Level 2 model):
-  * additions are prevented on every query;
+  * additions made by changing postings alone are prevented on every query; a coordinated rewrite including leaves and head root is detected by seals within the S-B deadline (correction OR-1);
   * omissions are detected **within a sweep interval, not on every query**, except for entry deletion in Tier 1.
 - V1 has a comparable exposure. An Authority-domain deletion of a registry row silently removes a record from V1's catalogue too.
 - Per-query omission detection for value changes would need a per-query verification of all in-scope seals (IX-D14 option B).
@@ -634,7 +645,7 @@ The owner's decisions in §15.1 apply to these texts. "Recommend" is Claude's re
 
 ## 16. Implementation stages and acceptance gates (each stage needs its own authorization)
 
-**No stage IX-1 to IX-7 is authorized (C-121, C-122).** IX-0 is in progress: owner decisions IX-D1 to IX-D14 (C-121) and FD-1 to FD-8 (C-122) are recorded, and the independent design review package is ready but not yet submitted (FD-8). Tier 2 work (IX-5) additionally needs the separate approval required by §17.1.
+**No stage IX-1 to IX-7 is authorized (C-121, C-122).** IX-0 is in progress: owner decisions IX-D1 to IX-D14 (C-121) and FD-1 to FD-8 (C-122) are recorded, and the independent design review package is ready but not yet submitted (FD-8). C-123: the owner-led Tier 1 review is in progress; independent third-party assessment remains an outstanding production-readiness requirement. Tier 2 work (IX-5) additionally needs the separate approval required by §17.1.
 
 | Stage | Content | Exit gate |
 |---|---|---|
@@ -773,6 +784,8 @@ are detected by M2 within 7 days, not per query. A divergence in which both Spic
 | Session end (logout, revocation, tenant switch) | All of that session's snapshots deleted. The Authority holds sessions (`authenticated_sessions`), so the deletion is in the revoking transaction |
 | Organization quarantine or offboarding | Not served; purged |
 
+> **Correction (C-123, owner review OR-4).** R1 §B.2 says these snapshots are purged "like `search_catalogue_snapshots`". No catalogue-snapshot purge exists today: there is no delete code in the Authority and no `DELETE` grant. Catalogue snapshots are bound to the user but not to the session (`SearchCatalogueSnapshot.cs` 19). The purge job, the session binding and the `DELETE` grant on result-snapshot tables are **new work** for IX-3.
+
 **Storage and resource limits.**
 
 | Limit | Value (proposed; FD-2) | Refusal |
@@ -853,13 +866,16 @@ are detected by M2 within 7 days, not per query. A divergence in which both Spic
 | **S-C deep** | Re-derive from BusinessDb bytes verified against heads | Every record at least once per **30 days**, plus a daily random sample (≥1% or 1,000 records) | Business mismatch: **record** quarantine (existing). Posting mismatch: search-index quarantine | Builder or HSM unavailable: paused | Warning at 45 days; suspension when any record has had no successful comparison for 60 days |
 | **S-D Tier 2** | §17.1 M1 continuous; M2 full | M1 continuous; M2 every record within 7 days | §17.1 | Paused | Tier 2 disabled when M1 lags (fence) or M2 exceeds 14 days |
 
+> **C-123:** the overdue thresholds in this table (2 h, 48 h, 60 days) are superseded, on the owner's confirmation, by the deadlines of §17.10 (1 h, 24 h, 30 days, no grace).
+
 **Guarantees** (precise; they hold only while the index is neither suspended nor quarantined; when an overdue rule fires, the index stops serving).
 
 > **Correction (C-122).** Revision 3 stated the S-B, S-A and S-C bounds as the scheduling targets (24 h, 1 h, 30 days). The index keeps serving until the overdue threshold fires, so the **guaranteed** bound is the threshold. The table now gives both. Whether the grace between target and threshold is acceptable is a reviewer question (package Q7).
 
 | Manipulation | Detected: target | Detected: guaranteed bound |
 |---|---|---|
-| Authority-domain change that would **add** a match | Never served: I-2 on every query | Same |
+| Authority-domain change to **postings only** that would **add** a match | Never served: I-2 on every query | Same |
+| Coordinated Authority-domain rewrite of posting, leaf digest and head root (OR-1) | Within the S-B deadline; on open | Same (per page, if per-page seal verification is adopted) |
 | Authority-domain change or deletion of a posting that would **remove** a match | Within 24 h (S-B) | Within 48 h (S-B threshold) |
 | Entry deletion | Every query (Tier 1); within 1 h (S-A, Tier 2) | Every query (Tier 1); within 2 h (S-A threshold, Tier 2) |
 | Stale or replayed entry, partial restore, old Authority commit | Every query (I-1) | Same |
@@ -902,6 +918,8 @@ Recorded as a separate finding: [OBS-IX-1](../security/OBS-IX-1_AUTHORITY_APPEND
 ### 17.9 C-122 conditions
 
 #### 17.9.1 FD-1: completion tracking per verification scope
+
+> **C-123:** the deadlines in this table and rules R5 to R7 are superseded, on the owner's confirmation, by §17.10.
 
 **Verification scopes.** A deadline belongs to a scope, never to a sweep run.
 
@@ -957,3 +975,67 @@ Recorded as a separate finding: [OBS-IX-1](../security/OBS-IX-1_AUTHORITY_APPEND
 - IX-54: two Authority instances. Each FD-2 invalidating event committed through instance A refuses the next page on instance B, with and without the deletion step (fault-injected), and never returns a partial page.
 - IX-55: a failed snapshot deletion aborts the revoking transaction (X2).
 - IX-56: no page check reads an instance-local cache (architecture test).
+
+### 17.10 C-123 proposed decision: sweep deadlines without grace (UF-13)
+
+> **Status:** owner-proposed decision C-123, recorded with its implementation contract **before any coding**. It supersedes the overdue thresholds of §17.5 and rules R5 to R7 of §17.9.1 once the owner confirms it. Nothing is implemented.
+
+#### 17.10.1 Decision as stated by the owner
+
+- Hourly integrity verification: enforce the **1-hour** deadline.
+- Seal verification: enforce the **24-hour** deadline.
+- BusinessDb record comparison: enforce the **30-day** deadline.
+- The grace that extended these to 2 h, 48 h and 60 days is removed.
+- An overdue required verification scope suspends indexed search.
+- Successful completion of every overdue scope may clear the suspension automatically.
+- A **failed** integrity verification quarantines the search index and does **not** clear automatically.
+- A completed sweep run never substitutes for successful verification of its individual required scopes.
+
+#### 17.10.2 Implementation contract
+
+**Scopes and deadlines.**
+
+| Sweep | Scope unit | Completion timestamp (written only on a passing result for that unit) | Deadline | Scheduling target (must be inside the deadline) | Warning |
+|---|---|---|---|---|---|
+| S-A | Organization pass (all S-A checks for the whole organization) | `last_successful_cheap_pass_on` | **1 h** after it | A new pass starts at least every **15 minutes** | 45 min |
+| S-B | Each `search_record_entries` row | `last_seal_verified_on` | **24 h** after the entry's timestamp | Every entry verified within **16 h** | Oldest entry over 18 h |
+| S-C | Each record | `last_deep_verified_on` | **30 days** | Every record within **20 days** | Oldest record over 25 days |
+| S-D (Tier 2) | — | — | Not part of this decision; Tier 2 is design-only | — | — |
+
+**Outcome classes.** Every unit check ends in exactly one class:
+
+| Class | Meaning | Examples | Effect |
+|---|---|---|---|
+| **Pass** | The check completed and the evidence matched | Seal `Valid`; re-derived postings equal stored; I-1 holds | Write that unit's timestamp, in the same transaction as the result |
+| **Fail** (failed integrity verification) | The check completed and the evidence did **not** match | Seal `Invalid`; I-1 violation; posting mismatch; withdrawn-field residue; cross-organization row; anomaly on a predicate field | **Quarantine** the index (after the Q4 escalation where it applies; §17.2). Never cleared automatically: only a journaled `SearchProjectionRebuild` and a completed rebuild (IX-D7) |
+| **Inconclusive** | The check could not reach a result | MAC provider unavailable (`IntegrityProviderUnavailableException`), timeout, cancellation, lease loss, database error, builder unavailable, rate limit reached | No timestamp. Record `last_attempted_on` and the outcome code for observability. The deadline keeps running |
+
+A business-byte mismatch found by S-C remains a **record** quarantine (existing behaviour), in addition to the index outcome for the postings.
+
+**Rules.**
+- **D1, no substitution.** Only a Pass writes a scope timestamp. A run record (start, end, counts) is observability only; no code path reads a run record to compute a deadline or to clear a suspension. An S-A pass is a Pass only when every S-A check passed for the whole organization; a partial S-A pass writes nothing.
+- **D2, deadline evaluation.** `overdue` = (now − oldest scope timestamp) > deadline, evaluated per sweep kind over all units of the organization. There is **no grace**: the comparison uses the deadline itself.
+- **D3, suspension.** The evaluation runs every 5 minutes and before every indexed search and page (through the projection-state check). Overdue sets `Suspended` with reason `INTEGRITY_SWEEP_OVERDUE` and the overdue sweep kinds; journaled; High alert.
+- **D4, clearing a suspension.** Automatic, only when D2 no longer holds for **every** overdue kind, recomputed from the unit timestamps. Journaled.
+- **D5, precedence.** `Quarantined` takes precedence over `Suspended`. A Fail during catch-up converts the state to `Quarantined`. A later successful pass never clears a quarantine.
+- **D6, new and rebuilt entries.** An entry sealed in a commit or a verified backfill under the organization lock starts with that time as its S-B timestamp (the seal was computed over bytes verified in the same transaction). A rebuild sets every entry's timestamp the same way. *Owner to confirm:* this treats creation as the first verification.
+- **D7, clock.** Timestamps and evaluation use the Authority clock abstraction. Instance clocks must be NTP-synchronized; the evaluation refuses to clear a suspension if a timestamp lies in the future by more than 1 minute (treated as Inconclusive).
+- **D8, fallback.** While suspended or quarantined, IX-D8 applies (complete V1 and S1 path, V1 limits).
+
+#### 17.10.3 Consequences to accept
+
+- **Availability.** Without grace, an outage of the MAC provider or the Authority worker longer than the remaining slack suspends indexed search. Slack is 45 minutes for S-A and 8 hours for S-B at the scheduling targets. The V1 fallback is limited (UF-11: its 480-record benchmark fails), so for large forms a suspension means search is unavailable.
+- **HSM throughput.** S-B within 16 h at the PB-09 envelope (up to 2.5M entries) needs about **43 MAC verifications/s** on average (29/s at exactly 24 h). Unmeasured; PERF-01 (UF-3). If PERF-01 cannot meet it, the deadline or the envelope must be revisited by the owner.
+- **Guarantees.** The detection bounds of §17.5 become 1 h (S-A), 24 h (S-B) and 30 days (S-C), equal to the deadlines.
+
+#### 17.10.4 Test implications
+
+| Test | Change |
+|---|---|
+| IX-51 | Revised: overdue **suspends** (not quarantine) at exactly the deadline, for each sweep kind |
+| IX-53 | Revised: interrupted, inconclusive, rate-limited and partial runs write no timestamp and move no deadline; suspension clears only after every overdue scope passes; a Fail during catch-up quarantines |
+| **IX-57** (new) | Boundaries with a controlled clock: deadline − 1 s serves; deadline + 1 s suspends; no grace, for S-A, S-B and S-C |
+| **IX-58** (new) | Classification: MAC provider unavailable → Inconclusive → eventual suspension, never quarantine; seal `Invalid` → quarantine immediately |
+| **IX-59** (new) | A quarantine is not cleared by any number of later successful passes; only by `SearchProjectionRebuild` |
+| **IX-60** (new) | Steady state: a compressed-clock soak run at the scheduling targets never suspends; one entry left unverified suspends the whole organization index at 24 h |
+| PERF-01 | Adds the S-B throughput at the 16 h scheduling target (about 43/s at the envelope) |
