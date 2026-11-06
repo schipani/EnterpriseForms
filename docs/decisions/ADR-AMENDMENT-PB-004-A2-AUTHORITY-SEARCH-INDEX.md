@@ -1,10 +1,12 @@
 # ADR-PB-004 Amendment A2: Authority-owned trusted search index (V2)
 
-- **Status:** **PROPOSED, not accepted.** Drafted 2026-11-06 under C-120 (conditional architectural approval of Option C). Prepared by Claude (Opus); not an independent review.
-- **Grants nothing until accepted:**
-  * it does not change `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md`;
-  * it does not authorize implementation, which is staged separately (design §16);
-  * it does not grant production approval, which needs independent review, Azure staging evidence (PERF-01) and PB-12 release evidence.
+- **Status:** **APPROVED BY THE OWNER AS THE GOVERNING ARCHITECTURAL AMENDMENT, CONDITIONAL (C-121, 2026-11-06). Subject to the mandatory security conditions in §6 and to independent design review before any implementation.**
+  * Drafted 2026-11-06 under C-120 by Claude (Opus); not an independent review.
+  * Relaxations: R-A accepted; R-B conditionally accepted; R-C accepted for the Tier 2 design; R-D accepted (§3).
+- **What this approval does not do:**
+  * It does not change `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md`. The §4 text is applied only on the owner's decision FD-5 (proposed: after the independent design review, at the start of IX-3).
+  * It authorizes **no** implementation stage (IX-1 to IX-7) and **no** Tier 2 implementation or enablement.
+  * It grants no production approval. That needs independent design and implementation review, Azure staging evidence (PERF-01) and PB-12 release evidence.
 - **Amends:** `ADR-PB-004-ENCRYPTION-SEARCH-CAPABILITY.md`:
   * §7, which reserved "independently maintained V2 trusted indexes" for a separate ADR;
   * §4, §5 and the API requirements, where stated below.
@@ -47,7 +49,16 @@
 | P-12 | Opening a known record requires authorization, integrity verification and, for protected values, decryption (capability table) | Unchanged |
 | P-13 | Future blind indexes or encrypted search remain separate decisions (§7) | Unchanged; A2 covers only plaintext Public/Internal |
 
-## 3. Proposed changes (relaxations), each for explicit acceptance
+## 3. Changes (relaxations) and the owner's decisions on them (C-121)
+
+| Relaxation | Owner decision |
+|---|---|
+| R-A | **Accepted.** Search may operate on Authority-accepted content without re-verifying BusinessDb for every search. Full verified reads on record opening and independent reconciliation remain mandatory |
+| R-B | **Conditionally accepted.** Tier 2 access-row completeness and SpiceDB equivalence require independent security assessment before implementation; Tier 2 is not to be implemented or enabled until separately approved |
+| R-C | **Accepted for the Tier 2 design.** Result caps, timeouts and admission controls must not disclose unauthorized information |
+| R-D | **Accepted.** Only explicitly approved, unencrypted Public/Internal values may be stored in the Authority index; encrypted fields and their derived search representations remain prohibited |
+
+The texts below are the amendment wording to which those decisions apply.
 
 ### R-A: search-time verification of BusinessDb bytes
 
@@ -100,9 +111,9 @@
 >
 > Withdrawn values persist in WAL and backups until their retention expires."
 
-## 4. Proposed acceptance-test changes (effective only on acceptance of A2)
+## 4. Proposed acceptance-test changes (effective only on owner decision FD-5)
 
-Applied to `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` **only after acceptance**. V1 (`VerifiedScan`) keeps its current pass criteria for as long as it remains in service.
+Applied to `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` **only on owner decision FD-5** (proposed: after the independent design review, at the start of IX-3). V1 (`VerifiedScan`) keeps its current pass criteria for as long as it remains in service.
 
 | Test | Proposed pass criterion for the indexed engine |
 |---|---|
@@ -122,7 +133,21 @@ Applied to `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` **only after
 4. Independent design review before IX-1, and independent implementation review before any production use.
 5. G06 stays OPEN until the indexed engine's tests (IX-01 to IX-42, ENC-SR-01 to 22) have executed evidence and independent review.
 
-## 6. Rejected alternatives (summary)
+## 6. Mandatory security conditions (C-121)
+
+| # | Condition | Design answer |
+|---|---|---|
+| 1 | **Tier 2 completeness:** document how missing authorized records are detected, not only unauthorized additions. No Tier 2 implementation or enablement before independent review and separate approval | Design §17.1 (verified-revision fence M1, rolling equivalence sweep M2, affected-set tests M3, differentials M4–M6) |
+| 2 | **Quarantine separation:** a search-index integrity failure may quarantine the index without quarantining the organization. An S1 authorization-integrity failure always keeps its organization-level quarantine. Search fallback never bypasses an S1 quarantine | Design §17.2 (Q1–Q5) |
+| 3 | **Stored search results:** expiration and cleanup; storage and resource limits; reauthorization on page retrieval; searchability-approval revalidation; behaviour after revocation, classification change or organization quarantine; whole-query failure when validation cannot complete | Design §17.3 |
+| 4 | **AuthorityDb access:** strict separation of runtime, search-reader, administrator and business identities; plaintext exposure through backups, replication, diagnostics and administration documented | Design §5, §17.4 |
+| 5 | **OBS-IX-1** recorded as a separate finding and included in the review package; no unrelated remediation without approval | `docs/security/OBS-IX-1_AUTHORITY_APPEND_ONLY_UPDATE_PRIVILEGE.md` |
+
+**Independent design review** before implementation:
+- package: `docs/architecture/INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md`;
+- twelve questions, as specified by the owner in C-121.
+
+## 7. Rejected alternatives (summary)
 
 | Alternative | Reason |
 |---|---|
@@ -131,6 +156,6 @@ Applied to `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` **only after
 | Match-first checking | Its cost and limits reveal unauthorized matches |
 | Authenticated range-proof index | Novel, unreviewed, and does not compose with access filtering |
 | Caching verified heads | Contrary to `CLAUDE.md` §4L.5 |
-| Blind indexes or deterministic encryption | Outside A2 (§7) |
+| Blind indexes or deterministic encryption | Outside A2 (ADR-PB-004 §7) |
 
 The detail is in design §9.1 and §14, and R1 §H.

@@ -1,11 +1,14 @@
-# Indexed search projection (Option C): architecture and security design — revision 2
+# Indexed search projection (Option C): architecture and security design — revision 3
 
-- **Status:** **Design for final owner approval. Nothing here is implemented.**
-  * Revision 1 received **conditional architectural approval**, with conditions C1 to C4 (C-120, 2026-11-06).
-  * Revision 2 answers those conditions. It adds a scalable permission tier (§9), per-query integrity checks for returned matches (§6.3) and the exact decision texts (§15).
+- **Status:** **Architecture approved by the owner as the selected direction (C-121, 2026-11-06), subject to mandatory security conditions and independent design review. Nothing here is implemented, and no implementation stage (IX-1 to IX-7) is authorized.**
+  * Revision 1 received conditional architectural approval with conditions C1 to C4 (C-120).
+  * Revision 2 answered C1 to C4.
+  * Revision 3 records the owner decisions on IX-D1 to IX-D14 (§15) and answers the five C-121 mandatory conditions (§17). It is the version submitted for independent review: [INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md](INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md).
+  * **Tier 2 (§9) is approved for further review only.** Neither its implementation nor its enablement is authorized.
   * Prepared by Claude (Opus). This is not an independent review.
 - **Revision 1:** [INDEXED_SEARCH_PROJECTION_DESIGN_R1.md](INDEXED_SEARCH_PROJECTION_DESIGN_R1.md), cited here as "R1 §…". Its sections remain part of the design unless this revision changes them; where they differ, this revision governs.
-- **Companion:** [ADR-PB-004 Amendment A2](../decisions/ADR-AMENDMENT-PB-004-A2-AUTHORITY-SEARCH-INDEX.md) (**Proposed**). It separates the preserved guarantees from the proposed changes.
+- **Companion:** [ADR-PB-004 Amendment A2](../decisions/ADR-AMENDMENT-PB-004-A2-AUTHORITY-SEARCH-INDEX.md). The owner approved it as the governing architectural amendment, subject to conditions and independent design review (C-121). It separates the preserved guarantees from the accepted relaxations.
+- **Separate finding:** [OBS-IX-1](../security/OBS-IX-1_AUTHORITY_APPEND_ONLY_UPDATE_PRIVILEGE.md), the Authority runtime UPDATE privilege on tables described as append-only.
 - **Restrictions observed:**
   * no schema, worker, API or UI change;
   * no separate Search Service or external engine;
@@ -116,7 +119,10 @@ Naming, indexes, partitioning and growth estimates follow R1 §B.3 to §B.5, wit
 - The migration identity is the AuthorityDb administrator (`AUTHORITY_DB_ADMIN_USER`; `ConnectionStrings__AuthorityDbMigration`).
 - No RLS in AuthorityDb.
 
-**Pre-existing observation, outside this design's scope:** the tables the code calls "append-only" (`security_journal_entries`, `record_manifest_leaves`, …) also receive `UPDATE`. Append-only is therefore enforced by the absence of `DELETE` and by application code, not by privilege. Recorded as **OBS-IX-1** for the independent reviewer; nothing in this design depends on changing it.
+**Pre-existing observation, outside this design's scope:** the tables the code calls "append-only" (`security_journal_entries`, `record_manifest_leaves`, …) also receive `UPDATE`. Append-only is therefore enforced by the absence of `DELETE` and by application code, not by privilege.
+- It is recorded as the separate finding **OBS-IX-1** ([finding](../security/OBS-IX-1_AUTHORITY_APPEND_ONLY_UPDATE_PRIVILEGE.md)) and included in the independent review package.
+- Nothing in this design depends on changing it.
+- No remediation is authorized (C-121).
 
 **Proposed, for `authority_search`:**
 
@@ -247,6 +253,7 @@ This is V1's Authority-side root check, run on the matched records. It costs CPU
   * a business-byte mismatch → **record quarantine** (as today);
   * a posting mismatch → **projection quarantine**.
 - Every finding is journaled (counts only), shown on the Release Security Dashboard health, and raises a Critical alert.
+- Sweep intervals, overdue handling and the resulting detection guarantees: §17.5.
 
 ### 6.6 UI and API representation
 
@@ -324,9 +331,13 @@ As R1 §E.5:
 - page validation on authorization revision, `form_content_revision` and projection `Active`;
 - fresh edit flags at a new pin.
 
+The complete stored-result specification (C-121 condition 3) is §17.3. It supersedes this summary where they differ.
+
 ---
 
 ## 9. C3: scaling beyond 50,000 discoverable records (Tier 2)
+
+> **C-121:** the Tier 2 design is approved **for further review only**. Implementation and enablement are not authorized until its authorization-completeness guarantees (§17.1) have been independently reviewed and separately approved. R-B is conditionally accepted on that basis.
 
 ### 9.1 Why Tier 1 cannot scale, and the options
 
@@ -570,9 +581,36 @@ R1 §H is kept. Revision 2 adds:
 
 ---
 
-## 15. Decision matrix (exact texts, for final approval)
+## 15. Decision matrix
 
-Each decision is proposed verbatim. "Recommend" is Claude's recommendation; the owner decides.
+### 15.1 Owner decisions (C-121, 2026-11-06)
+
+| # | Owner decision | Attached condition (binding) | Where answered |
+|---|---|---|---|
+| IX-D1 | **Approved** | — | — |
+| IX-D2 | **Approved**, subject to the AuthorityDb plaintext-access restrictions | Strict separation of runtime, search-reader, administrator and business identities; exposure through backups, replication, diagnostics and administration documented | §5, §17.4 |
+| IX-D3 | **Approved** under R-A and Amendment A2 | Full verified reads on open and independent reconciliation stay mandatory | §6 |
+| IX-D4 | **Approved** as the initial Tier 1 approach | — | §8 |
+| IX-D5 | **Approved** with bounded retention and authorization revalidation | Stored-result specification | §17.3 |
+| IX-D6 | **Approved** | — | — |
+| IX-D7 | **Approved** with strict separation between search-index quarantine and organization authorization quarantine | S1 organization quarantine always retained; fallback never bypasses it | §17.2 |
+| IX-D8 | **Approved** only where the fallback preserves existing security guarantees and stays within documented limits | Fallback goes through every V1 and S1 gate | §17.2 |
+| IX-D9 | **Approved** as the architectural decision record, subject to review conditions | — | A2 |
+| IX-D10 | **Approved** | — | — |
+| IX-D11 | **Confirmed** | — | — |
+| IX-D12 | **Deferred** | — | — |
+| IX-D13 | Tier 2 design **approved for further review only**; implementation not authorized | Detection of missing authorized records, not only unauthorized additions; independent review and separate approval before implementation or enablement | §17.1 |
+| IX-D14 | **Approved**, subject to documented sweep intervals, failure handling and integrity guarantees | — | §17.5 |
+
+**Relaxations:**
+- R-A: accepted.
+- R-B: conditionally accepted (independent assessment of Tier 2 completeness and SpiceDB equivalence before implementation).
+- R-C: accepted for the Tier 2 design; caps, timeouts and admission must not disclose unauthorized information.
+- R-D: accepted, for explicitly approved unencrypted Public/Internal values only.
+
+### 15.2 Decision texts as proposed in revision 2
+
+The owner's decisions in §15.1 apply to these texts. "Recommend" is Claude's revision 2 recommendation.
 
 | # | Exact decision text | Recommend |
 |---|---|---|
@@ -595,6 +633,8 @@ Each decision is proposed verbatim. "Recommend" is Claude's recommendation; the 
 
 ## 16. Implementation stages and acceptance gates (each stage needs its own authorization)
 
+**No stage IX-1 to IX-7 is authorized (C-121).** IX-0 is in progress: owner decisions are recorded and the independent design review package is prepared but not yet submitted. Tier 2 work (IX-5) additionally needs the separate approval required by §17.1.
+
 | Stage | Content | Exit gate |
 |---|---|---|
 | **IX-0** | Owner decisions IX-D1–D14; A2 accepted; independent **design** review (package as for S1) | Owner approval; reviewer findings dispositioned |
@@ -615,6 +655,242 @@ Each decision is proposed verbatim. "Recommend" is Claude's recommendation; the 
 - IX-38–41: Tier 2 divergence, coupling guard, differential, sweep;
 - IX-42: the runtime `DELETE` grant is confined to derived tables.
 
-R1 §K's acceptance criteria 1–10 remain, extended to the new tests.
+R1 §K's acceptance criteria 1–10 remain, extended to the new tests (and to IX-43 to IX-52 of §17.8).
 
 **Unchanged:** M4-1 stays open pending independent review; M4-2 unauthorized; no push, PR, merge or deploy.
+
+---
+
+## 17. C-121 mandatory security conditions
+
+### 17.1 Condition 1: Tier 2 completeness (detecting missing authorized records)
+
+> **Status:** design for independent review only. Tier 2 is **not** to be implemented or enabled until this section has been independently reviewed and separately approved (C-121).
+
+**Definition.** An authorized record is *missing* when SpiceDB, at the search's snapshot, would allow the caller `discover` on the record and `read` on every predicate-field item, and the record satisfies the predicates, but Tier 2 does not return it because an access row is absent.
+
+- SpiceDB decides every Tier 2 result (§9.3), so **additions** cannot leak.
+- **Missing records** are what this section addresses.
+
+**M1, verified-revision fence (new in revision 3).** The core mechanism.
+
+1. Per organization, `search_access_verification_states` holds:
+   - `access_derived_revision`: updated inline with every derivation;
+   - `access_verified_revision`.
+2. Every security command that changes edges, and every content commit that changes postings of approved fields, records its **affected record set** in `search_access_pending_verifications`, in the same transaction. Each row holds the record id and the authorization revision. Affected sets are computed **conservatively**, as a superset:
+
+   | Command | Affected records |
+   |---|---|
+   | Share change | the share's record |
+   | Ownership transfer | the record and its descendants |
+   | Parent link or unlink | the whole subtree |
+   | Team removal | every record with a row for that team |
+   | Team membership change | none (rows hold the team, not its members) |
+
+3. An Authority verification worker processes pending records once the SpiceDB projection has reached their revision, at an S1-pinned snapshot. For each record it calls:
+   - `LookupSubjects(form_record, discover)` for subject types `user` and `team#participant`;
+   - `LookupSubjects(field_item, read)` for every approved-field posting item.
+
+   It compares the results with the record's access rows. Team rows are compared at team level; user-level results are compared after expanding team rows through the canonical member edges.
+4. **Equal:** the pending rows are removed. `access_verified_revision` advances to the highest revision with no pending record at or below it.
+5. **Not equal:**
+   - first, run the S1 decisive verification (§17.2 Q4);
+   - if S1 is consistent: disable Tier 2 for the organization, rebuild its access postings from the canonical edges and verify them again;
+   - a persisting difference is a derivation defect: Tier 2 stays disabled, a Critical alert is raised and a finding is recorded.
+6. **Query precondition:** a Tier 2 search runs only if `access_verified_revision = authorization_revision` at the pinned snapshot. Otherwise Tier 2 is not used for that search (fallback, §17.2), or the result is `SEARCH_INDEX_NOT_READY`.
+
+**Result of M1.** A Tier 2 result is never computed from access rows that have not been compared with SpiceDB for every record whose edges or postings changed since the last verification. Missing rows caused by a **derivation defect on a changed record** are therefore detected **before** any search can use them.
+
+**M2, full rolling equivalence sweep.**
+- Every record is verified as in M1 at least once per **7 days** (proposed), whether or not it changed.
+- In addition, a user-oriented differential runs: `LookupResources(form_record, discover)` for a rotating set of users, compared with the access-posting principal closure.
+- M2 bounds the remaining gaps:
+  * an incorrect affected-set computation (a changed record that M1 was never told about);
+  * Authority-domain deletion of access rows after verification.
+
+**M3, affected-set correctness tests.** Property-based: for random command sequences, recomputing every record must give exactly the rows produced by recomputing only the declared affected set.
+
+**M4–M6** (from §9.4): property-based differential against SpiceDB; online sampling against Tier 1 for callers with |D| ≤ 50,000; the schema coupling guard.
+
+**Residual after M1–M6** (for the reviewer): missing rows caused by
+- (a) an affected-set defect not caught by M3, or
+- (b) Authority-domain row deletion after verification
+
+are detected by M2 within 7 days, not per query. A divergence in which both SpiceDB and the derivation are wrong in the same way is not a completeness failure under the design's definition: SpiceDB is the decision engine.
+
+**Cost (unmeasured):** `LookupSubjects` calls are proportional to changed records times approved-field items. A record with 250 approved fields changed by a share means about 250 field-item lookups. This is a PERF-01 item and a review question (package Q5).
+
+### 17.2 Condition 2: search-index quarantine versus S1 organization quarantine
+
+| State | Scope | Indexed search | V1 fallback | Page retrieval | Record read and write | Set by | Cleared by |
+|---|---|---|---|---|---|---|---|
+| **S1 organization quarantine** (`IntegrityQuarantineEnabled`, gate `Quarantined`) | Organization | **Refused** 423 `INTEGRITY_QUARANTINE` | **Refused** (the same gate) | **Refused** | Refused (existing S1) | S1 only | G14 recovery only (S1 rules, permanence trigger). **Never** by any search action |
+| Organization gate closed (projection behind, archive pending) | Organization | Refused, retryable (as today) | Refused (the same gate) | Refused, retryable | As today | Existing | Existing |
+| **Search-index quarantine** (`search_projection_states.projection_status_name = Quarantined`) | The organization's search index | Not served (503 `SEARCH_VERIFICATION_UNAVAILABLE`, reason `SEARCH_INDEX_INCONSISTENT`) | Allowed only through the complete V1 path and within V1 limits (IX-D8) | Refused; the snapshot is deleted | **Unaffected** | Search checks and sweeps | Journaled `SearchProjectionRebuild` and a completed rebuild |
+| Record content quarantine | Record | Any search with the record in scope fails (D3 parity) | Same | Same | Record refused (existing) | Verification paths | Existing |
+
+**Rules:**
+- **Q1, evaluation order** on every search and every page:
+  1. organization gate and S1 state;
+  2. search projection state;
+  3. coverage and approvals;
+  4. query.
+
+  A closed or quarantined organization never reaches step 2.
+- **Q2, fallback never bypasses S1.** The V1 fallback is the complete, unmodified V1 path: catalogue under S1 pin and verify, AC-5 and per-record verification. It re-enters step 1 itself. No shortcut, cached decision or stored result is reused across engines.
+- **Q3, independence.**
+  * A search-index quarantine never clears, suppresses, delays or changes the reason of an S1 quarantine, and an S1 quarantine never clears a search-index quarantine.
+  * They live in separate tables, are set and cleared by separate code paths, and raise separate alerts.
+  * `SearchProjectionRebuild` is refused while the organization is S1-quarantined.
+- **Q4, escalation.** A search-side failure that could indicate authorization-projection damage runs the **S1 decisive verification** under the organization lock before it is classified. Such failures are:
+  * a Tier 2 divergence;
+  * a SpiceDB decision that contradicts an access row;
+  * an S1 verify mismatch during a search or a sweep.
+
+  If S1 finds a mismatch, the **existing S1 organization quarantine** applies (same reason codes, journal event and Critical alert). Only when S1 state is consistent is the failure treated as a search-index failure.
+- **Q5, distinct signals.**
+  * Organization quarantine: 423 `INTEGRITY_QUARANTINE`, alert `PROJECTION_INTEGRITY_QUARANTINE` (event 9100).
+  * Search-index quarantine: 503 with reason `SEARCH_INDEX_INCONSISTENT`, a separate alert id (`SEARCH_INDEX_QUARANTINE`, event id assigned at IX-1), **never 423**.
+
+### 17.3 Condition 3: stored search results
+
+**What is stored.**
+- **Snapshot row:** organization, Authority user, session reference, form, engine and tier, authorization revision, content-integrity revision, `form_content_revision`, the approval id per predicate field, created and expiry times, entry count.
+- **Query digest:** SHA-256 over a **per-snapshot random nonce** plus the request. The nonce is held only inside the business API's encrypted cursor, so a database reader cannot brute-force low-entropy predicate values from the digest.
+- **Entries:** position, record id and sort keys.
+- **No values and no predicate values are stored.**
+
+**Expiry and cleanup.**
+
+| Rule | Value (proposed; FD-2) |
+|---|---|
+| Lifetime | Default 5 minutes, maximum 15, absolute (paging does not extend it) |
+| Purge job | Every minute, bounded batches: expired and invalidated snapshots and their entries |
+| On access | An expired snapshot is refused and deleted |
+| On invalidation (any failed page check below) | Deleted immediately |
+| Session end (logout, revocation, tenant switch) | All of that session's snapshots deleted. The Authority holds sessions (`authenticated_sessions`), so the deletion is in the revoking transaction |
+| Organization quarantine or offboarding | Not served; purged |
+
+**Storage and resource limits.**
+
+| Limit | Value (proposed; FD-2) | Refusal |
+|---|---|---|
+| Entries per snapshot | 10,000 (= result cap) | `SEARCH_VERIFICATION_LIMIT` (`results`): depends only on the caller's authorized matches |
+| Live snapshots per user session | 3; a fourth deletes the oldest | none (eviction) |
+| Live entries per Authority instance | 500,000 | `SEARCH_CAPACITY_EXCEEDED` (retryable), identical to today's admission refusal. It reveals aggregate load only, never record data; noted as residual |
+| Footprint | about 60 bytes per entry plus index: about 50 MB at the instance limit | — |
+
+**Page retrieval: reauthorization on every page.** Every step must succeed. Otherwise no page is returned, the snapshot is deleted unless the failure is retryable, and a typed error is returned. **There is never a partial or stale page.**
+
+1. The business API decrypts and binds the cursor (user, session, organization, nonce, offset, expiry), as today.
+2. The snapshot exists, is not expired, and belongs to the same Authority user, session and organization.
+3. The organization gate is open and S1 is not quarantined (§17.2 Q1). S1 pin.
+4. The authorization revision equals the snapshot's (OD-5: any security change invalidates).
+5. **Searchability revalidation:**
+   - every recorded approval id is still Active;
+   - each operator is still approved;
+   - coverage is `Complete`;
+   - `query_fields` is still allowed for the caller at the pinned snapshot.
+
+   This is checked explicitly, so the outcome does not depend on which revision counter an AC-6 command advances.
+6. The projection is `Active`; its revision equals the content-integrity revision; `form_content_revision` is unchanged.
+7. **The page's records are decided again by SpiceDB** at the pinned snapshot: `discover`, and `read` on the record or `field_item#read` on every predicate-field item. A denial invalidates the snapshot. Items are never dropped silently.
+8. I-2 on the page's records.
+9. Edit flags, then S1 verify, then the page is returned.
+
+**Behaviour after a change.**
+
+| Event between pages | Response | Snapshot |
+|---|---|---|
+| Permission revocation (any authorization change) | 409 `SEARCH_SNAPSHOT_CHANGED` | Deleted |
+| Approval withdrawn, classification strengthened, operator narrowed | 409 `SEARCH_SNAPSHOT_CHANGED` (not "field not allowed", so the change is not revealed beyond "restart") | Deleted |
+| Content change in the form | 409 `SEARCH_SNAPSHOT_CHANGED` | Deleted |
+| S1 organization quarantine | 423 `INTEGRITY_QUARANTINE` | Purged |
+| Organization gate closed (not ready) | 503, retryable | Kept until expiry |
+| Search-index quarantine | 503 `SEARCH_INDEX_INCONSISTENT` | Deleted |
+| A page record quarantined | 503 `RECORD_QUARANTINED` | Deleted |
+| Session revoked or logged out | 401 | Deleted |
+| Authority or SpiceDB unavailable | 503, retryable | Kept until expiry |
+
+### 17.4 Condition 4: AuthorityDb identity separation and plaintext exposure
+
+**Identity separation.**
+- The four identity classes of §5.1 (runtime, search reader, administrator, business) use **distinct credentials**: separate secrets locally, and separate Entra workload identities or managed identities in Azure.
+- Administrators use PIM just-in-time and are never used by an application.
+- Business identities have no network route (private endpoint and NSG), and use separate Entra groups and pipelines (PB-11).
+
+**Limit, recorded as UF-5.** The runtime and reader credentials are both held by the Authority process. Reader separation therefore limits what **SQL issued by the query path** can do, not what a compromised Authority process can do. Process-level separation is a reviewer question and owner decision FD-6: a separate Authority search container holding only the reader credential.
+
+**Plaintext exposure inventory.**
+
+| Channel | Approved plaintext present? | Control | Residual |
+|---|---|---|---|
+| Data files, tablespaces | Yes | Encryption at rest (service-managed or CMK); administrator access only | Administrators (R-D) |
+| WAL | Yes | Same; retained per backup policy | Until WAL and backups age out (R-IX-3) |
+| HA standby (zone-redundant, Canada Central) | Yes | Same server security boundary | — |
+| Read replicas | Would be | **Prohibited for AuthorityDb** (Bicep policy and CI check) | — |
+| Logical replication or publication | Would be | **Prohibited**; CI check | — |
+| Automated backups and PITR (7 to 35 days) | Yes | Retention period is the persistence bound; restores only by Authority-domain administrators, in Canada; restored servers time-boxed and deleted with evidence | R-IX-3 |
+| Geo-redundant backups (Canada East) | Yes | PB-10 register | R-IX-3 |
+| Long-term-retention backups, `pg_dump` exports | Would be | **Prohibited** except in the DR runbook, under two-person control | — |
+| Server logs and Azure diagnostic settings (Log Analytics) | Possible via bind parameters, constraint-violation `DETAIL` lines, slow-query logs | §5.3 parameter settings; **`log_error_verbosity = terse`** for the runtime and reader roles; no unique constraint on any value column; workspace in Canada with restricted access | Verified by IX-28 |
+| `pg_stat_statements`, Azure Query Store, `pg_stat_activity` | No (parameterized text with `$n` placeholders) | Parameterized SQL only (§B.3 of R1) | Verified by IX-28 |
+| Temporary files (sort and hash spill) | Transiently | Encrypted storage; `temp_file_limit` | — |
+| `EXPLAIN` and `auto_explain` by administrators | Only if an administrator supplies values | Procedure: generic plans without values; `auto_explain` parameter logging off | Administrator discipline |
+| Memory dumps, platform support access | Possible | Customer Lockbox for production; no crash-dump shipping | Platform operator |
+| Authority application telemetry | No | §5.3 | IX-28 |
+| Development and test stacks | No: synthetic data only | Never production copies | — |
+| Offboarding | Deleted | Disposal transaction and receipt; backups age out | R-IX-3 |
+
+### 17.5 IX-D14 condition: sweep intervals, failure handling and guarantees
+
+| Sweep | Checks | Interval / coverage (proposed; FD-1) | On a finding | On inability to run | Overdue rule |
+|---|---|---|---|---|---|
+| **S-A cheap** | I-1 for the whole organization; withdrawn-field residue; cross-organization rows; anomalies | Every organization, every hour | Search-index quarantine and Critical alert (after the Q4 escalation check where relevant) | Retry with backoff | Warning at 1.5 h; **search-index quarantine** `INTEGRITY_SWEEP_OVERDUE` at 2 h since the last complete pass |
+| **S-B seals** | One MAC verify per entry, ordered by `last_seal_verified_on` | Every entry verified **at least once per 24 h**, rate-limited to the HSM budget | Search-index quarantine, Critical | MAC provider unavailable: paused, retried | Warning at 36 h; quarantine when any entry is unverified for 48 h |
+| **S-C deep** | Re-derive from BusinessDb bytes verified against heads | Every record at least once per **30 days**, plus a daily random sample (≥1% or 1,000 records) | Business mismatch: **record** quarantine (existing). Posting mismatch: search-index quarantine | Builder or HSM unavailable: paused | Warning at 45 days; quarantine at 60 days |
+| **S-D Tier 2** | §17.1 M1 continuous; M2 full | M1 continuous; M2 every record within 7 days | §17.1 | Paused | Tier 2 disabled when M1 lags (fence) or M2 exceeds 14 days |
+
+**Guarantees** (precise; they hold only while no overdue rule has fired; when one fires, the index stops serving):
+
+| Manipulation | Detected |
+|---|---|
+| Authority-domain change that would **add** a match | Never served: I-2 on every query |
+| Authority-domain change or deletion of a posting that would **remove** a match | Within 24 h (S-B) |
+| Entry deletion | Every query (Tier 1) or within 1 h (S-A, Tier 2) |
+| Stale or replayed entry, partial restore, old Authority commit | Every query (I-1) |
+| Derivation defect affecting postings | Within 30 days for every record (S-C), sooner by sample; golden vectors before release |
+| Business-byte tampering | On open (full verified read) and within 30 days (S-C) |
+
+**Evidence:**
+- every completed pass is journaled (counts, duration, oldest verified time) and shown on the Release Security Dashboard;
+- no values are recorded.
+
+**Cost (unmeasured; UF-3):** S-B at the PB-09 envelope is up to 2.5M entries/day, about 29 MAC verifications/s on average, against Managed HSM. PERF-01 must confirm it, or the intervals must be revised by the owner.
+
+### 17.6 Condition 5: OBS-IX-1
+
+Recorded as a separate finding: [OBS-IX-1](../security/OBS-IX-1_AUTHORITY_APPEND_ONLY_UPDATE_PRIVILEGE.md). It is included in the review package (question 12). No remediation is implemented or authorized.
+
+### 17.7 Decisions still requiring owner approval
+
+| # | Decision | Recommendation |
+|---|---|---|
+| FD-1 | Sweep intervals and overdue rules of §17.5, including that an overdue sweep stops the index from serving | Approve |
+| FD-2 | Stored-result limits of §17.3 (lifetime 5/15 min, 3 per session, 10,000 per snapshot, 500,000 per instance) and per-page SpiceDB re-decision | Approve |
+| FD-3 | The verified-revision fence (§17.1 M1) as the Tier 2 completeness mechanism to be assessed by the reviewer | Include in review scope; no implementation |
+| FD-4 | The Q4 escalation rule: search-side signals of authorization damage go through S1's decisive check first | Approve |
+| FD-5 | When the A2 §4 ENC-SR text is applied to the acceptance-test file | After the independent design review, at the start of IX-3 |
+| FD-6 | A separate Authority search container with only the reader credential | Decide after the reviewer's answer to question 1 |
+| FD-7 | OBS-IX-1 severity and remediation path | Decide after the reviewer's answer to question 12 |
+| FD-8 | Reviewer selection and submission of the package | Owner action |
+
+### 17.8 New tests (revision 3)
+
+- IX-43: an S1 quarantine refuses indexed search, the V1 fallback and page retrieval;
+- IX-44: a search-index quarantine leaves record reads and writes working and leaves the S1 state untouched;
+- IX-45: `SearchProjectionRebuild` is refused while the organization is S1-quarantined;
+- IX-46: the Q4 escalation (an injected SpiceDB mismatch during a search results in the S1 quarantine, not only the index quarantine);
+- IX-47 to IX-50: stored results (expiry and purge; per-session eviction; every page-check failure in §17.3, each with its specified code and no partial page; nonce-protected digest);
+- IX-51: overdue sweeps quarantine the index;
+- IX-52 (only if Tier 2 is approved later): fence, affected-set property test and M2 sweep.
