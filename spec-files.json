@@ -144,13 +144,13 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md",
-      "sha256": "44b4f2bb9cbd6dd7bc3ec967e4f7a774e9931c6a0976ad4120feb219a47877da",
-      "bytes": 23343
+      "sha256": "8ed73e5e3f54dc5954878ffa6fb85fe18fbb057c8f268dc1db79a31074589cd4",
+      "bytes": 23824
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "f0c9bfb05fbf8ed4695a7f4632aa26186898226a220fe93e7a95211d8050c132",
-      "bytes": 99798
+      "sha256": "b6c3d0639e637f0c52f256c8c1680230ba6718b5cd5c45c5a8e3862d7e802df4",
+      "bytes": 120058
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -159,8 +159,13 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md",
-      "sha256": "911b319a14def380cae6cdd08109aa1bf7833f7d4752cf059bb2627bfd92ce2e",
-      "bytes": 27502
+      "sha256": "db3998121aae499f21fcf3f90f6bf0c0a895451d2d958ebedb68d9ebf0d443e4",
+      "bytes": 27749
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER1_READINESS_ASSESSMENT.md",
+      "sha256": "01b0a1d75d0d302bbf1969c83acd67e87fab71ff43490fe909bb342faf5a49b3",
+      "bytes": 10006
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -269,8 +274,8 @@
     },
     {
       "path": "docs/decisions/ADR-AMENDMENT-PB-004-A2-AUTHORITY-SEARCH-INDEX.md",
-      "sha256": "8986702e6fc4ec32abc095e770e276834568cb28fd3f2927f19470f84d9a2d30",
-      "bytes": 15500
+      "sha256": "8467e4ca58535cda1a0777baaee7580b1d35b555aad2f7f1a8f97d19f09c7373",
+      "bytes": 15667
     },
     {
       "path": "docs/decisions/ADR-PB-001-CANONICAL-REPOSITORY.md",
@@ -349,8 +354,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "fd3d702e9f6f434cf6d02c568b50d0f164cd379b544bee9512fd488a8fec82f9",
-      "bytes": 213162
+      "sha256": "e2a798fb46581ccc13ee6de0551ef36cae26fd16423b123c14cfa079008dd876",
+      "bytes": 217318
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -448,6 +453,11 @@
       "bytes": 3348
     },
     {
+      "path": "docs/security/AUTHORITY_PRIVILEGE_REMEDIATION_PROPOSAL.md",
+      "sha256": "3a9ef3b6b7838ee3dcd3859bd9e411a9f973670239082fb79528dd27a148d3a8",
+      "bytes": 12003
+    },
+    {
       "path": "docs/security/C7_M4_DEVELOPMENT_INCIDENT_2026-10-29.md",
       "sha256": "02b847a3363e0e92311a7c78597b79c7a4351d911860bdd0021e262c43b5643e",
       "bytes": 9385
@@ -484,8 +494,8 @@
     },
     {
       "path": "docs/security/OBS-IX-1_AUTHORITY_APPEND_ONLY_UPDATE_PRIVILEGE.md",
-      "sha256": "f375fd2e0f6dad230f90f6228aa8521f38e0b0e38065918520731f8b16de8d87",
-      "bytes": 15815
+      "sha256": "dc06c9bc54e1c7f51a04feaf0f6e91582374c97c546980f350d764aca2f20256",
+      "bytes": 16095
     },
     {
       "path": "docs/security/PROJECTION_INTEGRITY_S1_OPERATIONS.md",

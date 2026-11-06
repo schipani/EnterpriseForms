@@ -274,10 +274,11 @@ No runtime stack is needed for a design review.
 | UF-11 | The V1 fallback engine fails its 480-record benchmark (P-S1-1), so fallback limits are lower than V1's nominal 500 | P-S1-1 |
 | UF-12 | `LookupSubjects` cost for the Tier 2 fence scales with changed records × approved fields | Question 5; PERF-01 |
 | UF-13 | Revision 3 stated sweep targets as guarantees. Corrected in C-122: guaranteed bounds are the overdue thresholds (2 h, 48 h, 60 days). C-123 proposes removing the grace (design §17.10) | Question 7 |
-| OR-1 | I-2 is unkeyed; a coordinated rewrite of posting, leaf and head root by the Authority runtime credential passes it (design §6.3 correction) | Questions 3, 12 |
+| OR-1 | I-2 is unkeyed; a coordinated rewrite of posting, leaf and head root by the Authority runtime credential passes it (design §6.3 correction). C-124: binding contract proposed (design §18.1): the new seal message schema `DynamicForms/SearchEntrySeal/v1` and its separate key purpose are **in your scope** | Questions 3, 7, 12 |
 | OR-2 | Four `ContentIntegrityRevision` increment sites; revision equality in I-1 would let one share-editor incident quarantine the index (design §3 note) | Questions 2, 6 |
 | OR-3 | Abort paths of `CommitAsync` commit before the head changes; derivation placement clause | Question 2 |
-| OR-4 | No catalogue-snapshot purge or session binding exists today | Question 8 |
+| OR-4 | No catalogue-snapshot purge or session binding exists today; C-124 requirements in design §18.4 | Question 8 |
+| OBS-IX-1 (C-124) | Provisional High. The remediation proposal reads an INSERT-based path (AP-3: unkeyed journal chain, outbox delta applied by the projector) by which the runtime database credential alone could forge archived, projected history. Not executed | Question 12 |
 
 ## 6. Owner decisions (C-122) and items for your judgment
 

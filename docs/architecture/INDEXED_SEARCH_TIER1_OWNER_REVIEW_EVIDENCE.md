@@ -1,5 +1,6 @@
 # Indexed search (Option C): Tier 1 owner-review evidence (C-123)
 
+- **C-124 update:** OR-1 and OR-2 remain **open** until the owner accepts design §18.1 and §18.2; OR-3 and OR-4 contracts are in §18.3 and §18.4. Current status and the readiness recommendation: `INDEXED_SEARCH_TIER1_READINESS_ASSESSMENT.md`.
 - **Status:** evidence prepared for the project owner's **owner-led architectural and security review** (kind 1 in `docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md`). **The owner's decisions on it are not yet recorded.**
 - **Not** an independent third-party security assessment and not an attestation. Independent assessment remains an outstanding production-readiness requirement.
 - **Prepared by:** Claude (Opus), the design author. The author reviewing its own design is a known limitation; the owner is the reviewer.

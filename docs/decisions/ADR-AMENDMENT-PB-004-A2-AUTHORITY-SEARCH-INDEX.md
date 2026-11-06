@@ -4,6 +4,7 @@
   * Drafted 2026-11-06 under C-120 by Claude (Opus); not an independent review.
   * Relaxations: R-A accepted; R-B conditionally accepted; R-C accepted for the Tier 2 design; R-D accepted (§3).
   * C-122 (2026-11-06): FD-1 to FD-8 decided (design §17.7). No independent review has occurred.
+  * C-124 (2026-11-06): corrected I-2 claim accepted; integrity-binding (design §18.1) and revision-synchronization (§18.2) contracts proposed, open until accepted.
   * C-123 (2026-11-06): owner-led Tier 1 review in progress (`docs/architecture/INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md`). It is not an independent third-party assessment, which remains an outstanding production-readiness requirement.
 - **What this approval does not do:**
   * It does not change `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md`. Under owner decision FD-5 (C-122), the §4 text is applied only after independent review acceptance **and** separate authorization to begin IX-3. The existing tests are not modified now.

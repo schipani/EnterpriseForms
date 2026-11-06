@@ -5,6 +5,7 @@
   * Revision 2 answered C1 to C4.
   * Revision 3 records the owner decisions on IX-D1 to IX-D14 (§15) and answers the five C-121 mandatory conditions (§17). It is the version submitted for independent review: [INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md](INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md).
   * **C-122 (2026-11-06):** the owner decided FD-1 to FD-8 (§17.7). Their attached conditions are specified in §17.9. FD-6 and FD-7 are deferred to the reviewer. **No independent review has occurred.**
+  * **C-124 (2026-11-06):** the owner approved the §17.10 deadline contract with clarifications (§17.10.5) and decided OR-1 to OR-4 and OBS-IX-1 (provisional High). The resulting contracts are in §18. OR-1 and OR-2 stay **open** until the owner accepts §18.1 and §18.2.
   * **C-123 (2026-11-06):** the owner acts as the designated owner reviewer (an owner-led review, **not** an independent third-party assessment; `docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md`). The proposed sweep-deadline decision is in §17.10. The Tier 1 owner-review evidence is `INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md`; its findings OR-1 to OR-4 are marked where they correct this document.
   * **Tier 2 (§9) is approved for further review only.** Neither its implementation nor its enablement is authorized.
   * Prepared by Claude (Opus). This is not an independent review.
@@ -978,7 +979,7 @@ Recorded as a separate finding: [OBS-IX-1](../security/OBS-IX-1_AUTHORITY_APPEND
 
 ### 17.10 C-123 proposed decision: sweep deadlines without grace (UF-13)
 
-> **Status:** owner-proposed decision C-123, recorded with its implementation contract **before any coding**. It supersedes the overdue thresholds of §17.5 and rules R5 to R7 of §17.9.1 once the owner confirms it. Nothing is implemented.
+> **Status:** **approved by the owner with clarifications (C-124)**; the clarifications are binding (§17.10.5). It supersedes the overdue thresholds of §17.5 and rules R5 to R7 of §17.9.1. Nothing is implemented.
 
 #### 17.10.1 Decision as stated by the owner
 
@@ -1018,8 +1019,8 @@ A business-byte mismatch found by S-C remains a **record** quarantine (existing 
 - **D3, suspension.** The evaluation runs every 5 minutes and before every indexed search and page (through the projection-state check). Overdue sets `Suspended` with reason `INTEGRITY_SWEEP_OVERDUE` and the overdue sweep kinds; journaled; High alert.
 - **D4, clearing a suspension.** Automatic, only when D2 no longer holds for **every** overdue kind, recomputed from the unit timestamps. Journaled.
 - **D5, precedence.** `Quarantined` takes precedence over `Suspended`. A Fail during catch-up converts the state to `Quarantined`. A later successful pass never clears a quarantine.
-- **D6, new and rebuilt entries.** An entry sealed in a commit or a verified backfill under the organization lock starts with that time as its S-B timestamp (the seal was computed over bytes verified in the same transaction). A rebuild sets every entry's timestamp the same way. *Owner to confirm:* this treats creation as the first verification.
-- **D7, clock.** Timestamps and evaluation use the Authority clock abstraction. Instance clocks must be NTP-synchronized; the evaluation refuses to clear a suspension if a timestamp lies in the future by more than 1 minute (treated as Inconclusive).
+- **D6, new and rebuilt entries.** An entry sealed in a commit or a verified backfill under the organization lock starts with that time as its S-B timestamp. **C-124:** this counts as the initial verification only after the seal was generated successfully **and** the transaction committed durably; the timestamp is written in that same transaction, so a rolled-back transaction leaves no timestamp. A rebuild sets every entry's timestamp the same way.
+- **D7, clock.** Timestamps and evaluation use the Authority clock abstraction; instance clocks must be NTP-synchronized. **C-124:** a verification timestamp more than 1 minute in the future is Inconclusive (the unit is treated as never verified for deadline purposes). Clock anomalies never extend a deadline and never clear a suspension (§17.10.5).
 - **D8, fallback.** While suspended or quarantined, IX-D8 applies (complete V1 and S1 path, V1 limits).
 
 #### 17.10.3 Consequences to accept
@@ -1039,3 +1040,199 @@ A business-byte mismatch found by S-C remains a **record** quarantine (existing 
 | **IX-59** (new) | A quarantine is not cleared by any number of later successful passes; only by `SearchProjectionRebuild` |
 | **IX-60** (new) | Steady state: a compressed-clock soak run at the scheduling targets never suspends; one entry left unverified suspends the whole organization index at 24 h |
 | PERF-01 | Adds the S-B throughput at the 16 h scheduling target (about 43/s at the envelope) |
+
+#### 17.10.5 C-124 clarifications (binding)
+
+| # | Clarification | Contract effect |
+|---|---|---|
+| K1 | Pass records successful verification for the **exact** required scope | A Pass writes only the timestamp of the unit it verified (one entry, one record, or one complete organization pass). No aggregate or neighbouring unit is touched |
+| K2 | Fail triggers search-index quarantine | As §17.10.2; after the Q4 escalation where it applies |
+| K3 | Inconclusive does not advance the deadline | No timestamp; attempt recorded for observability only |
+| K4 | Overdue scopes suspend indexed search | D3 |
+| K5 | Suspension clears automatically only after **every** overdue scope passes | D4 |
+| K6 | Quarantine cannot clear automatically | D5; only `SearchProjectionRebuild` |
+| K7 | A freshly sealed entry counts as its initial verification only after successful seal generation and durable commit | D6 |
+| K8 | A verification timestamp more than 1 minute in the future is Inconclusive | D7 |
+| K9 | Clock anomalies must not extend deadlines or clear suspension | (a) The evaluation keeps, per organization, the highest time it has observed (`last_evaluation_on`, monotonic) and evaluates deadlines against `max(now, last_evaluation_on)`. A backward clock step therefore never makes an overdue scope current. (b) A forward step can only make scopes overdue sooner (suspend), never clear. (c) Future timestamps are K8. (d) Clearing a suspension also requires `now ≥ last_evaluation_on` |
+
+Tests added for K7 to K9: **IX-69** (seal generated, transaction rolled back → no timestamp; entry not counted), **IX-70** (future timestamp → Inconclusive; suspension not cleared), **IX-71** (backward clock step does not clear a suspension or restore an overdue scope; forward step suspends, never clears).
+
+---
+
+## 18. C-124 contracts (OR-1 to OR-4)
+
+### 18.1 OR-1: integrity-binding contract (open until the owner accepts it)
+
+#### 18.1.1 Corrected claim (accepted, C-124)
+
+Unkeyed hashes over mutable Authority rows (I-1, I-2) are **consistency checks**. They are never represented as protection against compromise of the Authority runtime credential. Only a keyed verification (a MAC checked through the MAC provider) or an external anchor (archive, ledger) can bind data against a writer of AuthorityDb, and only against a writer **without** access to the MAC provider.
+
+#### 18.1.2 Adversaries
+
+| Id | Adversary | Capabilities |
+|---|---|---|
+| AD-B | Business DBA or business credential | No path to AuthorityDb (G08) |
+| AD-1 | Holder of the Authority runtime **database** credential only (stolen credential, or SQL execution as that role) | `SELECT, INSERT, UPDATE` (+ `DELETE` on derived search tables) on AuthorityDb; **no** MAC provider, no SpiceDB key |
+| AD-2 | Compromise of the Authority **process** | Everything AD-1 has, plus the MAC provider (managed identity) and SpiceDB |
+| AD-3 | AuthorityDb administrator | Everything in the database, including DDL; no MAC provider |
+
+#### 18.1.3 Options evaluated
+
+| Option | Mechanism | Binds properties 1–5 | HSM operations | New cryptographic construction? | Assessment |
+|---|---|---|---|---|---|
+| **A. Per-posting row-HMAC verification** | For every predicate-field posting of every displayed record, verify its `source_canonical_bytes` against the leaf `row_signature` through the MAC provider | 1 org and record; 2 operation id (signed column); 3 field id, type (entity kind) and value. **Not** classification, approval, normalized value | Page size P × predicate items per record (≥ 1 per condition; multi-select adds one per option) | **No**: `DynamicForms/RowHmac/v1`, existing vectors | Sound but incomplete (no 3-classification, no 5) and the most HSM operations |
+| **B. Per-record entry-seal verification** | Verify the entry seal (§4 item 2) of every displayed record through the MAC provider; the seal message binds the full derivation (§18.1.4) | 1, 2, 3, 4 (sealed value and normalized value; predicate re-evaluated in process on the verified value), 5 (approval id and operator set at derivation) | **P per page** (one per displayed record) | **Yes, a new signed message schema** under the existing HMAC-SHA-256 primitive and the existing RowHmac v1 encoding rules. It needs a written specification, vectors and explicit review | **Recommended** |
+| C. Keyed index root | An authenticated tree over all entries of a form, its root sealed at each commit; per query, one seal verification and inclusion proofs | Same as B, plus membership of **all** matches (counts) | 1 per query (+1 per page recheck); 1 sign per commit, O(log n) node writes | **Yes, a new authenticated data structure** | Better per-query cost and binds counts, but a new scheme needing dedicated cryptographic review, plus write amplification. **Not for IX-1 to IX-4**; possible later, separately approved |
+| D. Batch verification | Submit many MAC verifications in one provider call | Transport for A or B | Same number of operations, fewer round trips | No | Vault Transit has a batch form; **no batch verify is assumed for Azure Managed HSM** (to be confirmed in PERF-01). Use only as a transport optimization; parallel requests otherwise |
+
+#### 18.1.4 Recommended contract (B), proposed
+
+**Seal message `DynamicForms/SearchEntrySeal/v1`.** Encoded with the RowHmac v1 encoding rules (length-prefixed, typed, explicit nulls; `docs/dynamic-forms/row-integrity-format.md` §3). Only the message schema is new. Fields, in order:
+
+1. domain label, seal schema version, MAC key purpose and key version;
+2. organization id, form definition id, form record id;
+3. committed operation id, committed content revision, committed manifest root;
+4. derivation algorithm version;
+5. for each posting, sorted by (field definition id, manifest item key):
+   - field definition id, manifest item key, entity kind (storage type);
+   - Authority-registered classification and protection mode at derivation;
+   - search approval id and its approved operator set;
+   - SHA-256 of `source_canonical_bytes` (this binds the exact typed value through the existing canonical encoding);
+   - the normalized value for strings;
+6. anomaly markers (for example `EncryptedValuePresent`) per predicate-eligible field, and the posting count.
+
+**Key.** A **separate MAC key purpose** per organization (`SearchEntrySealV1`), not the row-integrity key. This follows the purpose-separation rule of `CLAUDE.md` §4L.3 and §4P. Cost: one more non-exportable key per organization, with rotation. *Owner decision.*
+
+**Verification on every page** (before any record of the page is released):
+1. I-1 for the search (unchanged) and I-2 for every match (CPU; unchanged);
+2. for every record on the page, verify its entry seal through the MAC provider. Any result other than `Valid` fails the whole page:
+   - `Invalid` is a Fail (quarantine, after Q4);
+   - provider unavailable is a 503 with no page;
+3. check the sealed fields against the current state:
+   - sealed operation and revision equal the head (as read in the candidate snapshot);
+   - every predicate field's sealed approval id equals the Active approval;
+   - the request operator ∈ the sealed operator set;
+   - sealed classification and protection equal the current Authority-registered values;
+4. **re-evaluate the request predicate in process** on the sealed (verified) value. The SQL match is a candidate only; a record whose verified value does not satisfy the predicate fails the page (it indicates index damage).
+
+**What B proves, by adversary:**
+
+| Property | AD-B | AD-1 | AD-2 | AD-3 |
+|---|---|---|---|---|
+| 1 Organization and record identity | Structural | **Bound** (seal) | Not bound | Bound (no MAC) |
+| 2 Accepted content version | Structural | Bound to **an** accepted operation. Rolling back the head and the entry together to an older sealed state is **not** detected per query: anti-rollback needs external state | Not bound | As AD-1 |
+| 3 Field id, type, classification, value | Structural | **Bound** | Not bound | Bound |
+| 4 Predicate and matching value | Structural | **Bound** (sealed value + in-process evaluation) | Not bound | Bound |
+| 5 Active approval | Structural | Approval id **at derivation** bound. "Still Active now" is read from mutable state. Reactivating a withdrawn approval **and** replaying sealed entries saved from before the withdrawal is not detected per query | Not bound | As AD-1 |
+
+**Not bound per query, and how they are covered:**
+- freshness (rollback of head and entry together) and current approval state, against AD-1 and AD-3: by the **independent archive reconciliation** (option E of the remediation proposal) comparing heads and approval state with the anchored journal;
+- everything, against AD-2: only by external evidence (archive and ledger) and its reconciliation;
+- **matches not on a displayed page:** they contribute to the count but are checked by I-2 only. Under AD-1 the count can include false matches among records the caller may discover. It discloses no unauthorized record. The count is described as "matches in the Authority index" (§6.6). Option C is the only option that would bind it.
+
+**Optional, for review:** an in-process cache of seal verification results per Authority instance, keyed by (entry id, seal bytes, SHA-256 of the sealed message as re-read), lifetime ≤ the snapshot lifetime. A changed row produces a different digest and therefore a cache miss; a replayed valid seal verifies with or without the cache. It reduces repeated operations across pages and queries and is never shared between instances.
+
+#### 18.1.5 HSM operations (estimates, not measured)
+
+| Event | Operations (B) | Notes |
+|---|---|---|
+| Content commit | 1 MAC **sign** (seal) | In addition to the existing per-item verifications at commit |
+| First page of a query | P MAC **verify** (P = 10, 25, 50 or 100; `FieldSearchLimits.PageSizes`) | I-2 on all matches is CPU only |
+| Each further page | P verify | Same snapshot; page re-authorization of §17.3 |
+| S-B sweep | about 29 verify/s at 24 h, **about 43/s** at the 16 h scheduling target, at the PB-09 envelope | §17.10.3 |
+| Option A instead | P × predicate items | For example 25 records × 3 conditions = 75 per page |
+| V1 today, for comparison | One verify per leaf of every in-scope record (≤ 500 records × leaves) | For example 500 × 50 = 25,000 per search |
+
+Illustration: if 10% of the 50 requests/s PB-09 envelope were search pages at P = 25, that is about 125 verify/s for pages, plus 43/s for S-B, plus one sign per commit. This is an illustration, not a forecast.
+
+**PERF-01 must measure:**
+- MAC verify latency p50/p95/p99 against Azure Managed HSM, single and in parallel groups of 10, 25, 50 and 100;
+- sustained verify throughput per HSM and per Authority instance, and the throttling behaviour (which must surface as 503 with no page, never as a Pass);
+- whether a batch verify exists for the provider in use;
+- commit p95 delta with the seal sign inside the organization lock (IX-1 gate ≤ 20 ms);
+- page latency at each page size with seal verification, with and without the optional cache;
+- S-B at 43/s running concurrently with interactive traffic;
+- recovery after an HSM outage (deadline slack, §17.10.3).
+
+#### 18.1.6 Status
+
+OR-1 is **open** until the owner accepts §18.1.4, including the separate key purpose. The seal message schema needs written vectors (generated at IX-1) and is added to the independent cryptographic review scope (package Q7). Per-page seal verification is a design requirement (C-124); it is **not** a complete mitigation (AD-2; freshness under AD-1 and AD-3).
+
+### 18.2 OR-2: revision-synchronization contract (open until the owner accepts it)
+
+#### 18.2.1 Inventory at `e830d08`
+
+Every write to `organization_authorization_states.content_integrity_revision`, and the journal entry it accompanies:
+
+| # | Site | Operation | Journal event | Head change | Required projection action |
+|---|---|---|---|---|---|
+| W1 | `ContentService.cs` 368 | Content commit | `ContentHeadCommitted` (370) | New head | **Atomic advance** with the derived postings, entry and seal |
+| W2 | `ContentService.cs` 735 | Verified read finds tampered business bytes | `IntegrityVerificationFailed` (737) | Head quarantined | **Atomic advance**, no posting change. The quarantined head is read by I-1 (a search with the record in scope fails, D3 parity). **Not** an index quarantine |
+| W3 | `ContentService.cs` 901 | Historic or projection verified read finds tampering | `IntegrityVerificationFailed` (903) | Head quarantined | As W2 |
+| W4 | `ContentService.cs` 1235 | Share-editor prepare: submitted current snapshot does not match the accepted head | `CurrentSnapshotMismatch` (1237) | **None** | **Atomic advance**, no posting change, no quarantine of anything |
+| W0 | `OrganizationBootstrapService.cs` 77 | Organization creation | — | — | Initial value 0; the projection state starts at 0 |
+
+No other writer exists (grep of all assignments and increments). For comparison, V1 treats any change of this revision during a search as "snapshot changed, retry" (`SearchCatalogueService.cs` 369), never as tampering.
+
+#### 18.2.2 Transaction invariant INV-R
+
+> For every committed AuthorityDb transaction that changes `content_integrity_revision` of an organization from *r* to *r′*, the **same** transaction either:
+> - **(a) advances** `search_projection_states.projection_content_integrity_revision` to *r′*, with exactly the posting changes derived from the content accepted in that transaction (none for W2 to W4); or
+> - **(b) sets `ReconciliationRequired`**, recording *r* as the last synchronized revision.
+>
+> No transaction may change the revision without (a) or (b). A revision mismatch on its own is **never** classified as tampering.
+
+- **`ReconciliationRequired`** is a new projection state, distinct from `Quarantined` and `Suspended`:
+  * not served (503, reason `SEARCH_INDEX_RECONCILING`), fallback per IX-D8;
+  * High alert, not Critical;
+  * cleared automatically by an Authority reconciliation that re-derives or re-verifies the records whose content checkpoints lie between *r* and the current revision, then advances the projection revision;
+  * a Fail found during reconciliation converts it to `Quarantined`.
+
+  All four current sites use (a); (b) exists for future paths (for example G14 replay) that cannot derive atomically.
+- **I-1 correction.** If the projection is `Active` and its revision differs from the organization's, INV-R was bypassed (an old image, out-of-band SQL, a defect). The search fails and the projection is set to `ReconciliationRequired`, **not** `Quarantined`. `Quarantined` is set only by a Fail: mismatching evidence such as a digest, seal, root or posting.
+
+#### 18.2.3 Enforcement
+
+1. **Single code path.** `OrganizationAuthorizationState.ContentIntegrityRevision` loses its public setter. The only way to change it is a domain method that takes a mandatory projection action (advance with derivation result, advance without postings, or reconciliation-required). A new site cannot compile without choosing one.
+2. **Architecture test.** Fails if any code outside that method writes the property, and lists the known call sites (W1 to W4) so an added site is reviewed.
+3. **Database constraint (recommended, defence in depth).** A `DEFERRABLE INITIALLY DEFERRED` constraint trigger on `organization_authorization_states`, owned by the `authority_search` migration: at commit, a changed `content_integrity_revision` requires the projection state of that organization to be either at the new revision or `ReconciliationRequired`. It applies only to organizations that have a projection state row.
+   - **Effect on an old Authority image** (§12.4): its content commits are **refused** at commit (fail closed), instead of silently diverging. This replaces "projection behind, quarantine" in IX-35.
+   - *Owner decision:* accept this availability consequence.
+
+#### 18.2.4 Tests (regression, transactional)
+
+| Test | Assertion |
+|---|---|
+| **IX-63** (revised) | For each of W1 to W4: after commit, projection revision = organization revision; W1 postings present; W2/W3 head quarantined, index `Active`; W4 index `Active`, a subsequent search succeeds |
+| **IX-72** | Legitimate mismatch submissions (W4) repeated many times never quarantine or suspend the index |
+| **IX-73** | Fault injection after the revision change and before commit, at each site: neither revision advances |
+| **IX-74** | Raw SQL as the runtime role changing the revision without the projection update is refused at commit by the constraint trigger |
+| **IX-75** | Architecture test: a new write outside the domain method fails the build; the call-site list matches W1 to W4 |
+| **IX-76** | Active projection with a revision mismatch (simulated bypass) → `ReconciliationRequired`, never `Quarantined`; reconciliation clears it; a Fail during reconciliation quarantines |
+| IX-35 (revised) | Old image: content commit refused by the constraint trigger |
+
+### 18.3 OR-3: commit failure paths (contract, accepted direction C-124)
+
+- Index writes happen **only** on the successful content-acceptance path of `CommitAsync`, after staged-byte verification (302) and the share-editor recheck (308–324), and before the final commit (387). All `authority_search` writes, the seal sign, the entry timestamp (K7) and the W1 projection advance are in that transaction.
+- The abort paths commit the operation state only: expired (248), revision conflict (260), permission revoked (292), record locked (321). They must not write `authority_search` rows or change the projection revision. They do not change `content_integrity_revision` today.
+- A failed or rejected commit publishes no searchable value and does not advance any accepted index state.
+
+**Tests:** IX-61 (each abort path writes nothing in `authority_search`), IX-64 (exception after derivation, before commit → full rollback: no postings, no entry, no seal, no `form_content_revision` change), IX-65 (seal sign failure → commit fails, head unchanged), IX-66 (crash after commit → head and index consistent), **IX-77** (a staged-byte verification failure (`CandidateMismatch`, 303–306) writes nothing).
+
+### 18.4 OR-4: stored-result lifecycle (IX-3 requirements, C-124)
+
+Existing catalogue-snapshot cleanup is **not** relied on (none exists). New requirements for IX-3:
+
+| Requirement | Specification |
+|---|---|
+| Session binding | Snapshot row stores the Authority `authenticated_session_id`; page check 2 requires that session to be unrevoked, unexpired (`session_expires_on`) and within its idle timeout at page time |
+| Expiration | Absolute snapshot expiry (§17.3); session expiry and idle timeout are checked at page time because they are time-based, not transactional |
+| Cross-instance invalidation | §17.9.2 (X1 to X4) |
+| Cleanup | New purge job every minute, bounded batches; new `DELETE` grant limited to result-snapshot tables; deletion in revoking transactions (X2) |
+| Concurrency | Page requests on one snapshot are serialized per snapshot (`FOR UPDATE` on the snapshot row in the runtime-role page transaction) so a deletion and a page cannot interleave into a partial page |
+
+**Tests (IX-3 exit gate):** **IX-78** revocation between pages and during a page; **IX-79** logout and session revocation; **IX-80** session expiry and idle timeout at page time, with no revoking transaction; **IX-81** classification strengthened, approval withdrawn and operator narrowed between pages; **IX-82** concurrent page requests on one snapshot, and a page request concurrent with purge, eviction (fourth snapshot) and revocation: never a partial or mixed page.
+
+### 18.5 New test identifiers (C-124)
+
+IX-69 to IX-82 as above; IX-35 and IX-63 revised.
