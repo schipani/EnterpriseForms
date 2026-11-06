@@ -1156,6 +1156,8 @@ Illustration: if 10% of the 50 requests/s PB-09 envelope were search pages at P 
 
 #### 18.1.6 Status
 
+> **C-125:** the per-record HMAC seal is **not final**. A cost and cryptographic reassessment compares five alternatives: `INDEXED_SEARCH_INTEGRITY_COST_REASSESSMENT.md`. It recommends ES256 seals verified locally with a pinned public key (about 2 remote HSM operations/s instead of about 170/s), plus signed external checkpoints. IX-1 does not begin until the owner decides.
+
 OR-1 is **open** until the owner accepts §18.1.4, including the separate key purpose. The seal message schema needs written vectors (generated at IX-1) and is added to the independent cryptographic review scope (package Q7). Per-page seal verification is a design requirement (C-124); it is **not** a complete mitigation (AD-2; freshness under AD-1 and AD-3).
 
 ### 18.2 OR-2: revision-synchronization contract (open until the owner accepts it)

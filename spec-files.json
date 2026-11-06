@@ -148,9 +148,14 @@
       "bytes": 23824
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_INTEGRITY_COST_REASSESSMENT.md",
+      "sha256": "991508c70757bcede954c32ec5ee5cd5176df8fe07f0f33dd1906eded38fa29b",
+      "bytes": 17755
+    },
+    {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "b6c3d0639e637f0c52f256c8c1680230ba6718b5cd5c45c5a8e3862d7e802df4",
-      "bytes": 120058
+      "sha256": "b99712877fa5e5fd79388b4d80f8da53fb18e94cde2612d351e309ff2e0e6cee",
+      "bytes": 120435
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -164,8 +169,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_TIER1_READINESS_ASSESSMENT.md",
-      "sha256": "01b0a1d75d0d302bbf1969c83acd67e87fab71ff43490fe909bb342faf5a49b3",
-      "bytes": 10006
+      "sha256": "52b6323aae70ca30cc55f3587b01237824bf0e5aa13f240d9b942253a1637bcb",
+      "bytes": 10266
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -354,8 +359,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "e2a798fb46581ccc13ee6de0551ef36cae26fd16423b123c14cfa079008dd876",
-      "bytes": 217318
+      "sha256": "aae380f7049c0e2790f6e85ed472b88cc3e765e9ed822af101b384628e43af94",
+      "bytes": 219980
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

@@ -3,6 +3,7 @@
 - **Kind:** decision package for the owner's next approval (owner-led review; `docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md`). **Not** an independent third-party assessment, which remains an outstanding production-readiness requirement.
 - **Evidence:** design (`INDEXED_SEARCH_PROJECTION_DESIGN.md` §17.10, §18), owner-review evidence (`INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md`), remediation proposal (`../security/AUTHORITY_PRIVILEGE_REMEDIATION_PROPOSAL.md`); source inspection at `e830d08`.
 - **No test has been executed and nothing has been measured.** Every guarantee is a design claim.
+- **C-125 update:** B1 now also depends on the owner's choice between the per-record HMAC seal and the alternatives in `INDEXED_SEARCH_INTEGRITY_COST_REASSESSMENT.md` (recommended: ES256 seals with local verification). IX-1 does not begin until that decision.
 
 ## 1. Owner-review findings
 
