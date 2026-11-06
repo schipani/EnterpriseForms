@@ -1,737 +1,620 @@
-# Indexed search projection (Option C): architecture and security design
+# Indexed search projection (Option C): architecture and security design — revision 2
 
-- **Status:** **Design proposal for owner decision. Nothing here is implemented.** Prepared 2026-11-05 by Claude (Opus) under the owner's design-only authorization of Option C. This is not an independent review.
-- **Scope restrictions observed:**
-  * no schema, worker or API change;
-  * no separate Search Service and no Azure AI Search;
-  * M4-1 not expanded, M4-2 not started;
+- **Status:** **Design for final owner approval. Nothing here is implemented.**
+  * Revision 1 received **conditional architectural approval**, with conditions C1 to C4 (C-120, 2026-11-06).
+  * Revision 2 answers those conditions. It adds a scalable permission tier (§9), per-query integrity checks for returned matches (§6.3) and the exact decision texts (§15).
+  * Prepared by Claude (Opus). This is not an independent review.
+- **Revision 1:** [INDEXED_SEARCH_PROJECTION_DESIGN_R1.md](INDEXED_SEARCH_PROJECTION_DESIGN_R1.md), cited here as "R1 §…". Its sections remain part of the design unless this revision changes them; where they differ, this revision governs.
+- **Companion:** [ADR-PB-004 Amendment A2](../decisions/ADR-AMENDMENT-PB-004-A2-AUTHORITY-SEARCH-INDEX.md) (**Proposed**). It separates the preserved guarantees from the proposed changes.
+- **Restrictions observed:**
+  * no schema, worker, API or UI change;
+  * no separate Search Service or external engine;
+  * M4-1 not expanded, M4-2 unauthorized;
   * no push, PR, merge or deploy.
-- **Working tree:** written on `phase-c8/m4-governance-audit` but **not part of M4-1**. Uncommitted, so it can be moved to its own branch.
-- **Binding sources:**
-  * `CLAUDE.md` §§4C.6, 4H, 4L.5, 4M–4R, 4T.4, 4T.1, 4U;
-  * ADR-PB-004 §7. It requires a separate ADR for any V2 trusted index, and §I maps this design to that ADR's review items;
-  * ADR-PB-009 (capacity targets), ADR-PB-010 (residency), ADR-PB-013 (offboarding);
-  * `docs/architecture/PHASE_C7_ADVANCED_FIELD_SEARCH.md` (D1–D7, OD-1–OD-8, AC-5, AC-6);
-  * `docs/architecture/PHASE_C8_M4_1_DESIGNS_M1_S1.md` (S1);
-  * `docs/architecture/PHASE_C8_M4_1_P_S1_1_SEARCH_OPTIMIZATION_PROPOSAL.md` (O-1–O-4).
-- **Not claimed:**
-  * G06, G19 and G21 stay **OPEN**;
-  * no performance figure in this document is measured, unless it is quoted from existing evidence;
-  * nothing here is production Level 2 evidence.
+- **Branch:** `design/indexed-search-projection`, local only. It was created from `phase-c8/m4-governance-audit` at `e830d08`, because it cites that branch's S1 and P-S1-1 documents.
+- **Not claimed:** G06, G19 and G21 stay **OPEN**. No performance figure here is measured unless quoted from existing evidence. Nothing here is production Level 2 evidence.
 
 ---
 
-## 0. Summary
+## 1. Owner conditions and where they are answered
 
-**The one central decision is where the projection lives.**
-- A projection in **Business PostgreSQL** cannot prove completeness. A hostile business DBA can delete postings, and the omission is undetectable without verifying the whole scope again, which is exactly the cost we are trying to remove.
-- So the proposal places the projection in **PostgreSQL administered by the Authority**: a separate `authority_search` schema in AuthorityDb.
-- The Authority writes it **inside the content-commit transaction**, from the canonical bytes it already verifies at commit (`ContentService.CommitAsync` → `VerifyStagedAgainstLeavesAsync`). It writes postings only for fields with an **Active AC-6 approval**.
-
-**Consequences:**
-
-1. **Trust base unchanged.** Today's V1 search already trusts AuthorityDb's content heads and leaf index. V2 adds postings derived in the same transaction, from bytes verified in that transaction. **Business PostgreSQL leaves the search path entirely.**
-2. **No lag in steady state.** A posting can never be ahead of or behind its head, because both commit together. Index lag exists only while a newly approved field is being backfilled (§C.3).
-3. **No integrity verification at search time.** Search needs **no MAC operation and no HSM call**: integrity was established at commit. Today a 480-record search needs 3,840 HMAC verifications (P-S1-1 §5).
-4. **The Authority stays the only source of permission decisions.**
-   - The candidate population is the caller's SpiceDB `discover` set, read at an S1-pinned snapshot.
-   - Field readability comes from SpiceDB `read`. It is computed for all of the caller's own records independently of the predicate values (§E.3), so counts cannot leak.
-   - The index holds **no permission data**.
-5. **Opening a record is unchanged.** The full verified read (HMAC, complete leaf set, root) still runs.
-
-**One semantics change the owner must decide (IX-D3, §E.7).** Today a search fails when a matching record's business bytes were deleted or altered (ENC-SR-08/09). With the index, the search answers from **Authority-accepted content**. Business-side tampering is then detected:
-- when the record is opened, which is fail-closed with quarantine as today;
-- by the reconciliation sweep (§C.6).
-
-It is no longer detected by the search.
+| Condition | Answer |
+|---|---|
+| C1: AuthorityDb security (privileges, plaintext readers, no arbitrary changes, backup, retention, logging, replication, administration) | §5 |
+| C2: IX-D3 integrity semantics (what changes; full verified reads kept; reconciliation and quarantine kept; no silent omission or addition; ENC-SR-08/09 only after approval; UI wording) | §6, and A2 §3–§4 |
+| C3: scaling beyond 50,000 discoverable records without per-search enumeration; Authority remains the sole decision-maker | §9 |
+| C4: mapping against the existing ADR-PB-004 guarantees, with every relaxation named | §10, and A2 §2–§3 |
+| Deliverable 1: exact texts of IX-D1 to IX-D12 with recommendations | §15 (adds IX-D13 and IX-D14) |
+| Deliverable 2: ADR-PB-004 Amendment A2 | companion file |
+| Deliverable 3: revised threat and security-boundary analysis | §11 |
+| Deliverable 4: the 50,000-plus strategy | §9 |
+| Deliverable 5: recovery, rebuild and rollback | §12 |
+| Deliverable 6: stage plan and acceptance gates | §16 |
 
 ---
 
-## A. Existing implementation assessment
+## 2. Architecture overview
 
-### A.1 Advanced Field Search today (C7 M3)
-
-**Path:** `FieldSearchHandler.SearchAsync` → `TrustedScopeVerifier.VerifyAsync`.
-
-1. **Predicate authorization:** `IFieldSearchPolicyAuthority.GetFieldSearchCapabilitiesAsync`, from AC-6 approvals and `query_fields`. Every condition is checked against it.
-2. **Admission:** 4 searches per instance, 1 per user.
-3. **Catalogue** (`SearchCatalogueService`, Authority):
-   - S1 pin;
-   - SpiceDB `LookupResources(form_record, discover)`, ceiling `MaximumDiscoverableRecords` = 50,000;
-   - intersection with the registry for the form;
-   - heads read in one transaction;
-   - snapshot row and entry vector persisted;
-   - over `MaximumEntries` (500) → `LIMIT_EXCEEDED`, with no entries.
-4. **Per 50-record chunk:**
-   - `IAcceptedRecordItemsReader.ReadAcceptedContentAsync`, one BusinessDb read per record, sequential;
-   - then `VerifyRecordProjectionsAsync`. Inside the Authority, per record: one SpiceDB check for `read`, then `discover`, then field leaves; per-leaf MAC verification (8 per record in the benchmark); complete-set and root checks.
-5. **Snapshot validation** (`ValidateSearchCatalogueAsync`).
-6. **Evaluation in the business API** (`FieldSearchEvaluator`) on decoded, verified rows:
-   - `Evaluable` requires every top-level value of each predicate field to be a readable item;
-   - string comparisons are `OrdinalIgnoreCase` after `Normalize`.
-7. **Sort and cursor:**
-   - in-memory sort on verified metadata;
-   - the complete ordered match list is carried **inside the Data Protection cursor**;
-   - pages are served from the cursor after Authority re-validation.
-8. **Evidence:** `RecordSearchExecutionAsync`. A completed search without evidence is refused.
-
-**Measured cost** (P-S1-1 probe at `f117995`; C7 hosted figures):
-- about 1,006 ms per 50-record Authority batch: 54% MAC, 19% SpiceDB, 27% AuthorityDb reads;
-- about 12 ms per record of BusinessDb reads;
-- 480 records takes about 18 s on the laptop, refused at the 15 s budget;
-- hosted: about 130 verified records/s, Authority CPU-bound.
-
-**Shape: the cost is linear in the discoverable scope, not in the matches.** Every search re-verifies every record the caller can discover in the form.
-
-### A.2 My Records today
-
-**Path:** `ListRecordsHandler` → `AuthorizedRecordEnumerator`.
-- All pages of `DiscoverAuthorizedRecordsAsync` (250 per page) are read at one authorization revision; the business list is capped at 10,000.
-- `q` is a record-id or reference lookup only (`RecordLookupQuery`), not field text.
-- Filters and sorts run on **unverified BusinessDb metadata** (status, form, timestamps, creator), as the handler's own comment says. G06 remains open for that reason.
-
-### A.3 Which O-1 to O-4 items remain necessary under indexed search
-
-| Item | Indexed query path | Still needed for | Recommendation |
-|---|---|---|---|
-| **O-1** batch-level bulk SpiceDB checks in `VerifyProjectionsAsync` | The query path does not use `VerifyProjectionsAsync` | The V1 fallback (§G.2), single-record opens, the backfill builder's verification | **Split O-1.** (a) **Hardening of the bulk-check client:** results mapped by echoed request; a per-item error fails the call. **Required** by V2, which relies on bulk `field_item` checks (§E.3). Implement it with IX-2. (b) **Restructuring `VerifyProjectionsAsync`:** only needed while V1 stays in service. Optional |
-| **O-2** set-based BusinessDb content reads | Not on the query path | **Backfill and rebuild** (§C.3, §C.7), V1 fallback | **Keep.** No authorization change. Reused as the builder's reader |
-| O-3 concurrent MAC verification | Not used at query time | Backfill throughput against Managed HSM | Defer to PERF-01 sizing, as proposed |
-| O-4 batched AuthorityDb reads | Not used at query time | Backfill and V1 | Defer |
-
-**Net effect:** O-1 and O-2 stop being the route to scalability. They remain useful for the V1 fallback and the builder. The P-S1-1 disposition (an open, known-failing benchmark) is unaffected until V2 is accepted.
-
----
-
-## B. PostgreSQL schema (Authority domain)
-
-### B.1 Placement
-
-| Option | Where | Completeness under a hostile business DBA | Lag | Verdict |
-|---|---|---|---|---|
-| C-BIZ | BusinessDb, business worker | **None.** Suppression is undetectable; injection is detectable only by full verification | Async | **Rejected** for Level 2 |
-| **C-AUTH-INLINE** | AuthorityDb, schema `authority_search`, written in the content-commit transaction | **Yes**, relative to Authority-accepted state | **None** | **Recommended** |
-| C-AUTH-ASYNC | A separate PostgreSQL database administered by the Authority, with an asynchronous projector from the content journal | Yes, but only with a watermark and an S1-style marker protocol | Async: fail closed or fall back while behind | Keep as the **future split** if AuthorityDb load requires it. The schema below is designed so it can move |
-| External engine (Azure AI Search, OpenSearch) | Another service | Needs its own completeness proof, ACL trimming and residency review | Async | **Rejected** (§H). Not needed at PB-09 scale |
-
-**Why inline is safe to do now:**
-- the commit path already holds the organization lock;
-- it has already decoded and verified every staged item;
-- it already writes the manifest, leaves, head and checkpoint in one transaction.
-
-Deriving postings adds only row inserts: no new MAC, no new network call.
-
-### B.2 Tables
-
-Naming follows `CLAUDE.md` §0 rules 4 and 5: UUID v7 surrogate PKs named after the entity, multiword snake_case columns. `organization_id` leads every key and every index.
-
-**`search_projection_states`**, one row per organization:
-- `search_projection_state_id` PK, `organization_id` unique;
-- `projection_schema_version`;
-- `projection_status_name`: `Active` | `Rebuilding` | `Quarantined`;
-- `projection_content_integrity_revision`: equal to `organization_authorization_states.content_integrity_revision` after every commit (inline);
-- `projection_status_reason_code`, `projection_modified_on`.
-
-**`search_field_coverages`**, one row per approval:
-- `search_field_coverage_id` PK, `organization_id`, `form_definition_id`, `field_definition_id`, `field_search_approval_id` (FK, unique);
-- `indexed_value_type_name`;
-- `coverage_state_name`: `Building` | `Complete` | `Withdrawn`;
-- `covered_field_classification`, with CHECK `IN ('Public','Internal')`;
-- `coverage_started_on`, `coverage_completed_on`, `coverage_attested_journal_entry_id`, `coverage_withdrawn_on`, `coverage_withdrawal_reason_code`.
-
-**`search_record_entries`**, one row per registered, contentful record:
-- `search_record_entry_id` PK, `organization_id`, `form_definition_id`, `form_record_id` (unique per organization);
-- `indexed_operation_id` and `indexed_content_revision`: must equal the record's current `record_content_heads` row;
-- verified header facts, decoded at commit from the **signed header leaf**: `record_status_name`, `parent_form_record_id`, `created_by_business_user_id`;
-- `record_registered_on`, `head_modified_on`;
-- `indexed_postings_digest`: SHA-256 over the record's canonical sorted posting tuples (§C.6);
-- `entry_written_on`.
-
-**Typed posting tables:**
-- `search_string_postings`, `search_integer_postings`, `search_decimal_postings`, `search_date_postings`, `search_datetime_postings`, `search_boolean_postings`, `search_option_postings`;
-- each has its own PK (for example `search_string_posting_id`);
-- common columns: `organization_id`, `form_definition_id`, `field_definition_id`, `form_record_id`, `manifest_item_id` (the `field_item` id, used for readability checks), `indexed_operation_id`;
-- one typed value column:
-  * `normalized_string_value text COLLATE "C"`: `Normalize(text).ToUpperInvariant()` computed **in .NET by the evaluator's own function**, never by PostgreSQL `lower()`/`upper()` (§B.4). Only the normalized form is stored (minimization);
-  * `integer_value bigint`;
-  * `decimal_value numeric(19,4)`;
-  * `date_value date`;
-  * `datetime_value timestamptz`;
-  * `boolean_value boolean`;
-  * `field_option_id uuid` (one row per selection leaf).
-
-**`search_record_field_anomalies`:**
-- `search_record_field_anomaly_id` PK, `organization_id`, `form_record_id`, `field_definition_id`, `indexed_operation_id`;
-- `anomaly_kind_name` (`EncryptedValuePresent`).
-- It records that an approved field holds an encrypted leaf on that record. The query fails with `PREDICATE_VALUE_ENCRYPTED` (C7 parity, architecture §3.5) and never indexes ciphertext.
-
-**`search_form_states`**, one row per (organization, form):
-- `search_form_state_id` PK, `form_content_revision`;
-- the revision is incremented inline on every commit, registration or lifecycle change of a record of that form;
-- used to validate paging (§E.5).
-
-**`search_result_snapshots`** and **`search_result_snapshot_entries`:**
-- Authority-held ordered match lists for paging (§E.5);
-- they hold record ids and sort keys only, never values;
-- expiry equals the catalogue snapshot (5 to 15 minutes); purged like `search_catalogue_snapshots`.
-
-**Not indexed in V2** (D6 unchanged):
-- repeating-group values (`FormRecordGroupId` not null);
-- related or child predicates;
-- documents and attachment metadata;
-- Confidential and Restricted values, and encrypted leaves;
-- history (only the current accepted revision is indexed);
-- labels and display text.
-
-### B.3 Indexes and candidate queries
-
-| Table | Index | Serves |
-|---|---|---|
-| `search_record_entries` | `(organization_id, form_definition_id, form_record_id)` unique; `(organization_id, form_definition_id, head_modified_on DESC, form_record_id)`; `(organization_id, form_definition_id, record_registered_on, form_record_id)` | Scope join and metadata sort |
-| string | btree `(organization_id, field_definition_id, normalized_string_value, form_record_id)`; GIN `gin_trgm_ops` on `normalized_string_value`, **only for fields approved with `contains`** (§B.4) | `equals`, `startsWith` (`LIKE 'x%'` under `C` collation), `contains` (`LIKE '%x%'`, minimum 3 characters) |
-| integer, decimal, date, datetime | btree `(organization_id, field_definition_id, <value>, form_record_id)` | equality and ranges |
-| boolean | btree `(organization_id, field_definition_id, boolean_value, form_record_id)` | `isTrue`/`isFalse` |
-| option | btree `(organization_id, field_definition_id, field_option_id, form_record_id)` | `is`/`includes` |
-| every posting table | `(organization_id, form_record_id)` | delete and replace at commit, purge |
-
-**Candidate query shape** (one parameterized statement per request, REPEATABLE READ):
-
-```sql
--- Illustrative only. $scope is the caller's readable-for-predicate set from §E.3, passed as uuid[] (unnest) or a temp table.
-WITH scope AS (SELECT unnest($scope::uuid[]) AS form_record_id)
-SELECT e.form_record_id, e.record_status_name, e.parent_form_record_id, e.created_by_business_user_id,
-       e.record_registered_on, e.head_modified_on
-FROM search_record_entries e
-JOIN scope s USING (form_record_id)
-JOIN authority.record_content_heads h
-  ON h.organization_id = e.organization_id AND h.form_record_id = e.form_record_id
- AND h.committed_operation_id = e.indexed_operation_id          -- binding check (defence in depth)
-WHERE e.organization_id = $org AND e.form_definition_id = $form
-  AND <metadata filters on verified header facts>
-  AND EXISTS (SELECT 1 FROM search_string_postings p
-              WHERE p.organization_id = $org AND p.form_record_id = e.form_record_id
-                AND p.field_definition_id = $f1 AND p.indexed_operation_id = e.indexed_operation_id
-                AND p.normalized_string_value LIKE $pattern1 ESCAPE '\')
-  AND ... -- one EXISTS per condition, from a fixed allowlisted template per (value type, operator)
-ORDER BY e.head_modified_on DESC, e.form_record_id DESC;
+```
+ Browser ──► Business API (untrusted for search decisions)
+              │  validates request, capability check, admission
+              │  one private call per search / per page
+              ▼
+ Authority runtime (trusted) ────────────────────────────────────────────────┐
+   Content commit (existing)           Search query (new)                    │
+   ├ verify staged bytes (HMAC, root)  ├ policy: approval + coverage         │
+   ├ head CAS, manifest, checkpoint    ├ S1 pin ─► SpiceDB decisions ◄─ S1 verify
+   └ derive postings + entry seal ┐    ├ candidate SQL (reader role)         │
+                                  ▼    ├ per-match integrity check (§6.3)    │
+   AuthorityDb (separate cluster)      └ result snapshot + evidence          │
+   ├ schema authority        (heads, leaves, journal, edges, approvals)      │
+   └ schema authority_search (entries, postings, coverages, snapshots,       │
+                              access postings [Tier 2])                      │
+ Business PostgreSQL ── never read or written by the search path ────────────┘
+ search-index-builder workload ── submits business bytes for backfill only;
+                                   the Authority verifies and derives
 ```
 
-**Rules:**
-- SQL text comes only from fixed templates chosen by `(value type, operator)`. Field ids, values, bounds and patterns are always parameters. `LIKE` metacharacters in values are escaped. No identifier is ever derived from input.
-- The **consistency guard** runs in the same transaction, over the scope (not the matches). The search fails closed if any record in the scope has:
-  * a contentful head but no entry;
-  * an entry whose `indexed_operation_id` differs from its head;
-  * a quarantined head;
-  * an `EncryptedValuePresent` anomaly on a predicate field.
-- `statement_timeout` and `lock_timeout` are set per transaction. A timeout is `SEARCH_VERIFICATION_LIMIT` (`time`), never partial results.
-
-### B.4 String semantics and parity
-
-- The evaluator uses `Normalize`, then `OrdinalIgnoreCase`. PostgreSQL case functions do not reproduce .NET simple case mapping. Both sides therefore compare **byte-exact** under `COLLATE "C"` on a value normalized once, in .NET, by the same code.
-- The trigram GIN only accelerates `LIKE`. Correctness comes from `LIKE`'s recheck under `C` collation. pg_trgm's locale-dependent character classes can affect index selectivity, never results.
-- Long values: GIN trigram cost grows with text length. The trigram index is created per approved field with `contains`, as a partial index on `field_definition_id`. Size per organization is a PERF-01 measurement. Partial indexes are DDL, so creating them at approval time needs a migration-time strategy (§B.6). The alternative is one shared GIN for all string postings.
-
-### B.5 Partitioning and growth
-
-- **Start unpartitioned.** `organization_id` leads every key.
-- At the PB-09 envelope:
-  * at most 100K records × assumed 20 approved fields ≈ 2M postings per organization;
-  * 25 organizations ≈ 50M posting rows across tables;
-  * very roughly 0.4 to 0.6 KB per posting including indexes, plus trigram GIN on string fields. On the order of **1 GB per fully populated organization** and **25 GB platform-wide**.
-  * These are estimates. PERF-01 replaces them with measurements.
-- **Trigger to revisit:** about 10M rows in one table, or vacuum or bloat measurements. HASH partitioning by `organization_id` uses a fixed partition count, so the runtime role needs no DDL privilege (G08). PKs then become `(search_*_id, organization_id)`.
-- LIST partitioning per organization would make PB-13 disposal a `DETACH`/`DROP`, but it needs runtime DDL. It is not recommended without a separately privileged, journaled partition-management command.
-
-### B.6 Privileges (G08)
-
-- NOLOGIN owner `authority_search_owner` owns the schema.
-- The Authority commit path's role gets `INSERT, DELETE` on postings and entries and `UPDATE` on coverage and state rows. It has no DDL.
-- A **separate read-only role** `authority_search_reader` (its own connection string in the Authority) gets `SELECT` on `authority_search` plus `SELECT` on `record_content_heads` and `authority_resources` only. The query endpoint uses only this role.
-- ENABLE and FORCE RLS on every `authority_search` table, keyed on the transaction-local organization GUC. It is defense in depth, not authorization (`CLAUDE.md` §4Q.3).
-- `postgres-privilege-inventory.sql` and the CI inventory are extended. pgAudit and the logging configuration for the reader role **must not log bind parameters**: `log_parameter_max_length = 0` and `log_parameter_max_length_on_error = 0` for that role, and no `auto_explain` with parameters. Otherwise predicate values reach the logs (T10).
-- Partial trigram indexes per field are not created at runtime. Either (a) one shared trigram GIN, or (b) a JIT migration identity creating them in a reviewed deployment. **Recommendation: (a)**, then measure.
+**Unchanged:**
+- record opening (full verified read);
+- SpiceDB as the permission decision engine under S1;
+- AC-6 approvals;
+- the business API contract (§6.6 adds one optional field).
 
 ---
 
-## C. Projection lifecycle
+## 3. Verified transaction boundaries (C-120 direction 7)
 
-### C.1 Steady state: derivation at commit (inline)
+Verified against the code at `e830d08`:
 
-Inside `ContentService.CommitAsync`, after `VerifyStagedAgainstLeavesAsync` succeeds and before `scope.CommitAsync`:
-
-1. Load the **Active** approvals and coverages for the record's form: `Building` or `Complete`, never `Withdrawn`.
-2. From the verified staged items, take the header leaf and every top-level `FieldValue`/`FieldSelection` leaf whose field has an approval. A leaf that is application-encrypted (by envelope or protection mode, per the Authority-registered field manifest, **not** business metadata, G21) produces an `EncryptedValuePresent` anomaly and no posting.
-3. Delete the record's prior postings, anomalies and entry. Insert the new ones bound to `operationId`.
-4. Compute `indexed_postings_digest`.
-5. Increment `search_form_states.form_content_revision`. Set `search_projection_states.projection_content_integrity_revision = state.ContentIntegrityRevision`.
-
-**Derivation rules:**
-- Derivation is a **pure, versioned function** (`SearchPostingDerivation/v1`) of verified canonical bytes plus the Authority-held approval. It has golden test vectors.
-- Any derivation error **aborts the commit**. Its cost is row inserts only.
-- A commit can therefore not succeed while the projection is wrong. The alternative is to commit and mark the projection `Rebuilding`; that trades availability of search for availability of writes.
-  * **Recommendation:** abort, because derivation is deterministic and local.
-  * **Owner decision IX-D7.**
-
-**Same-transaction rule for other events** that change what search may see:
-- record registration (an entry at revision 0 is not written; pending creations are counted as today);
-- lifecycle change or unregistration: entry and postings deleted;
-- reprotection or deprotection commits (A1): the same derivation, so newly encrypted leaves stop being indexed;
-- quarantine: the head flag is read by the guard; postings stay but are unusable.
-
-Authorization changes (shares, teams, roles, ownership) **do not touch the index**: it holds no permissions.
-
-### C.2 Approval changes
-
-| Event (AC-6 security command) | Same Authority transaction |
-|---|---|
-| Approval becomes Active | Coverage `Building`; journal event `SearchIndexCoverageStarted`. From this commit on, inline derivation includes the field |
-| Withdrawal, or invalidation (classification strengthened, version re-registration that invalidates under AC-6 §4.3, organization floor raised) | Coverage `Withdrawn`; **delete every posting and anomaly of that field**; journal `SearchIndexCoverageWithdrawn`. The capability list stops offering the field in the same revision |
-| Operators narrowed | Nothing is deleted. The query refuses operators not in the current approval (already enforced by AC-6) |
-
-**Residual (R-IX-3):** deleted plaintext remains in WAL, dead tuples (until VACUUM) and AuthorityDb backups until their retention expires. This is the same class of issue as DR-C7-4 (history disposal). A forced `VACUUM` of the affected tables after withdrawal shortens the window but does not remove backups.
-
-### C.3 Backfill for records committed before the approval
-
-Postings cannot be derived without the canonical bytes, and the Authority does not store values. So backfill re-verifies:
-
-1. A separate workload identity **`search-index-builder`** (OD-1 pattern: own credential, network policy and Authority role, operator plane, no user assertion) is triggered by `SearchIndexCoverageStarted`.
-2. The builder asks the Authority for the **organization-scoped population** of the form (the migration-catalogue pattern: all `Active` and `Quarantined` records, never exposed to users). It reads BusinessDb content for records whose entry is missing or older than the approval. It does so set-based (O-2) and submits them in batches.
-3. The Authority verifies each record exactly as `VerifyForProtectionCensusAsync` does: complete leaf set, every HMAC, root, current head. Then it derives postings in its own transaction, conditional on the head being unchanged (CAS on `committed_operation_id`). The builder never supplies postings, only bytes, so **it cannot inject values**: unverifiable bytes are refused. A mismatch quarantines the record exactly as V1 does.
-4. **Completion is attested by the Authority, not claimed by the builder.** Under the organization lock, the Authority checks that every contentful, registered record of the form has an entry at its current head. It then sets coverage `Complete` and journals `SearchIndexCoverageAttested` (counts only). Records committed during the backfill were already indexed inline.
-5. Resumable rounds, an idempotency key per batch, and a bounded rate are configured from PERF-01 Managed HSM limits (8 MAC verifications per record: about 800K for 100K records).
-
-While a coverage is `Building`, the field is **not searchable through the index** (§G.2 fallback rules).
-
-### C.4 Ordering, retries and deduplication
-
-- **Inline:** ordering is the organization lock plus the head CAS. There is no queue, so nothing to reorder or deduplicate.
-- **Builder:**
-  * idempotent per (record, head operation);
-  * a stale submission (the head moved) is refused as `HEAD_CHANGED` and retried from the new head, or skipped when inline derivation has already covered it;
-  * retries use exponential backoff;
-  * a quarantined record blocks `Complete` for that form, which is fail closed and reported to the security administrator.
-
-### C.5 Stale or inconsistent projection
-
-| Detected condition | Where | Response |
+| Fact | Source | Consequence |
 |---|---|---|
-| Entry missing or stale against its head, for a record in a query's scope | Query guard (§B.3) | Search fails `SEARCH_VERIFICATION_UNAVAILABLE` (`SEARCH_INDEX_INCONSISTENT`); projection state set to `Quarantined` under the organization lock after a lock-confirmed re-read (S1 pattern); Critical alert; audit-stream event |
-| `projection_content_integrity_revision` ≠ organization content revision | Query start | Same |
-| `indexed_postings_digest` mismatch | Sweep (§C.6) | Same |
-| Coverage `Building` for a predicate field | Query authorization | `SEARCH_INDEX_NOT_READY` (retryable), or V1 fallback (§G.2) |
+| A content commit runs in **one** `ReadCommitted` transaction (`AuthorityStore.BeginScopeAsync`) that takes `organization_authorization_states … FOR UPDATE` (the organization lock) and `record_content_heads … FOR UPDATE` | `ContentService.CommitAsync`; `AuthorityStore.cs` lines 23, 54, 164 | Postings written in that transaction commit or roll back with the head. Commits within an organization are serialized |
+| The commit verifies the staged canonical bytes (`VerifyStagedAgainstLeavesAsync`) and decodes the header (`RowCanonicalDecoder.Decode`) before writing the manifest, leaves, head, checkpoint and journal entry | `ContentService.cs` 297–389 | The Authority holds verified bytes for exactly the leaves it accepts: the derivation input |
+| Heads change only in `CommitAsync`. Quarantine flags are set in the verification paths (`ContentService.cs` 732, 898). Registration creates the head at revision 0 (`SecurityCommandService.cs` 186) | grep of every write to `CommittedOperationId` and `ContentHeadQuarantined` | Derivation hooks: commit (postings), registration (no posting), quarantine (read by the guard, no posting change) |
+| A read-only `RepeatableRead` scope already exists (`BeginReadOnlySnapshotScopeAsync`) | `AuthorityStore.cs` line 30 | The candidate query runs in one consistent snapshot |
+| Security commands add and remove `authority_relationship_edges` in the command transaction, and commit-time authorization evaluates the canonical edges in C# (`DesiredStateGraph`, CONS-14) | `ContentService.cs` 274–279; `AuthorityStore.GetActiveEdgesAsync` | Precedent for Tier 2: the Authority already decides from its canonical edges, not only from SpiceDB |
+| `canonical_payload_digest` is **unkeyed SHA-256 over the exact canonical bytes** the HMAC authenticates | `trust_authority/MERKLE_RECORD_MANIFEST_PROTOCOL.md` line 57 and the kind-code paragraph after it | A posting carrying its source bytes can be tied to the accepted leaf and root with CPU only, no HSM (§6.3). The digest stays internal: never a search token |
+| SpiceDB teams are flat (`team.participant = member`), and `form_record.read = effective_owner` | `authority.schema.zed` | The Tier 2 principal set is {user} ∪ the user's teams |
 
-**Projection quarantine is scoped to search.**
-- It does **not** close the organization's authorization gate, and record reads and writes continue.
-- It must not be confused with the S1 permanence trigger, which is for authorization integrity.
-- Clearing it requires a journaled `SearchProjectionRebuild` operator command and a completed rebuild (§C.7).
-- **Owner decision IX-D7.**
-
-### C.6 Reconciliation
-
-- **Cheap sweep** (Authority worker, hourly; no HSM, no BusinessDb):
-  * every contentful registered record has exactly one entry at its head;
-  * no entry, posting or anomaly exists for an unregistered, non-Active or other-organization record;
-  * no posting exists for a `Withdrawn` coverage;
-  * recomputed `indexed_postings_digest` equals the stored value;
-  * the projection revision equals the content revision.
-- **Deep sampled sweep** (builder, daily, rate-limited): re-derive postings for a random sample from verified BusinessDb bytes and compare. This catches a derivation bug, or an Authority-domain alteration that also recomputed the digest.
-  * A mismatch is a Critical integrity finding. It quarantines the projection.
-  * A business-byte mismatch quarantines the record, as today.
-- **Evidence:** counts only, journaled, visible on the Release Security Dashboard (PB-12) as health.
-
-### C.7 Rebuild and recovery (G14 interaction)
-
-- **Rebuild** = state `Rebuilding`: delete the organization's projection, set every coverage to `Building`, then run builder rounds and Authority attestation as in §C.3. Search for the organization is index-unavailable until coverage is `Complete` again.
-- **After an AuthorityDb restore and journal replay:**
-  * Postings restored with AuthorityDb are coherent with the restored heads (same database).
-  * Content-journal replay can advance heads, and checkpoint bodies carry no leaf bytes. Those records' entries become stale. The guard detects this, and the projection goes `Rebuilding`.
-  * The postings are **never** treated as evidence for recovering content. They are derived data.
-- **PB-13 offboarding:** delete the organization's rows in the disposal transaction. Exports never read the index.
-- **PB-10:** AuthorityDb now holds customer Public/Internal plaintext. Update the AuthorityDb row of `PB10_DATA_FLOW_RESIDENCY_REGISTER.csv`, covering backups, retention and legal hold.
+**To re-verify at IX-1, before any code:**
+- every path that changes `record_content_heads`, `authority_resources.resource_lifecycle_state` for records, or AC-6 approval states, by an architecture test that fails when a new writer appears without a derivation hook;
+- `ReadCommitted` plus the organization lock gives no anomaly for derivation. All derivation reads are of rows locked or written in the same transaction.
 
 ---
 
-## D. Security architecture
+## 4. Schema (Authority domain, schema `authority_search`)
 
-### D.1 Trust statement
+The tables of R1 §B.2 are kept: `search_projection_states`, `search_field_coverages`, `search_record_entries`, the seven typed posting tables, `search_record_field_anomalies`, `search_form_states`, and `search_result_snapshots` with `search_result_snapshot_entries`.
 
-**Trusted, as today:**
-- the Authority runtime;
-- AuthorityDb and its administrators;
-- SpiceDB, under S1;
-- the MAC provider.
+**Changes in revision 2:**
 
-**Untrusted, as today:**
-- Business PostgreSQL;
-- the business API's inputs.
+1. **Every posting stores `source_canonical_bytes bytea`,** the exact verified canonical bytes of its leaf, together with its `manifest_item_key`.
+   - The typed value column holds the **exact** value. For strings, `normalized_string_value` is kept *in addition*, for matching.
+   - This enables the per-match integrity check (§6.3).
+   - Cost: about the canonical item size (≈ 120 to 400 bytes) per posting.
+   - It adds no new information: the same plaintext, in a second encoding.
+2. **`search_record_entries.entry_seal_signature bytea`** and **`entry_seal_key_version integer`:**
+   - an HMAC-SHA-256 over the entry's canonical sorted posting tuples, organization, record, operation and revision, under a distinct domain-separation label (`DynamicForms/SearchEntrySeal/v1`);
+   - computed with the organization's existing integrity key through the MAC provider, **one sign operation per commit** (IX-D14);
+   - verified by the sweeps, **not per query**.
+3. **Tier 2 access postings, `search_access_postings`** (§9.2). Not created before IX-5.
 
-**New:** Authority administrators can now read approved Public/Internal **values** in `authority_search`, not just their digests.
-- This is a small increase: the Merkle leaf index already holds `CanonicalPayloadDigest` of these low-entropy values, which is dictionary-attackable (MRK confidentiality note).
-- A business DBA can already read the same values (ADR-PB-004 §3).
-- **Owner decision IX-D2.**
+Naming, indexes, partitioning and growth estimates follow R1 §B.3 to §B.5, with two changes:
+- the posting-by-record index `(organization_id, form_record_id, field_definition_id)` becomes the **primary probe index** for Tier 1 (§8.2);
+- the per-field trigram partial indexes are replaced by one shared GIN (§5.4).
 
-### D.2 Threat model
+---
 
-| ID | Threat | Control | Tests |
+## 5. C1: AuthorityDb security
+
+### 5.1 Identities and privileges (current, then proposed)
+
+**Current state at `e830d08`:**
+- Cluster bootstrap (`infrastructure/docker/postgres/init-authority-roles.sh`) creates one LOGIN runtime role (`AUTHORITY_RUNTIME_USER`): `NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`.
+- `AuthorityRuntimeGrants.Apply` (run by the migration identity) grants it `SELECT, INSERT, UPDATE` on every model table. No `DELETE` anywhere. No DDL.
+- The migration identity is the AuthorityDb administrator (`AUTHORITY_DB_ADMIN_USER`; `ConnectionStrings__AuthorityDbMigration`).
+- No RLS in AuthorityDb.
+
+**Pre-existing observation, outside this design's scope:** the tables the code calls "append-only" (`security_journal_entries`, `record_manifest_leaves`, …) also receive `UPDATE`. Append-only is therefore enforced by the absence of `DELETE` and by application code, not by privilege. Recorded as **OBS-IX-1** for the independent reviewer; nothing in this design depends on changing it.
+
+**Proposed, for `authority_search`:**
+
+| Identity | Kind | `authority_search` privileges | Other | Reads indexed plaintext? |
+|---|---|---|---|---|
+| `authority_search_owner` | NOLOGIN, owns the schema and tables | owner | none | n/a (no login) |
+| AuthorityDb administrator / migration identity (Azure: Entra admin, `azure_pg_admin` member, PIM/JIT only) | LOGIN, privileged | DDL through migrations | everything | **Yes**: privileged, audited (§5.3) |
+| Authority runtime role (existing) | LOGIN | `SELECT, INSERT, DELETE` on postings, anomalies, entries and access postings; `SELECT, INSERT, UPDATE` on coverages, states, form states and result snapshots; `DELETE` on expired result snapshots | unchanged | **Yes** (it derives them) |
+| **`authority_search_reader`** (new; separate connection string, used only by the query and page operations) | LOGIN | `SELECT` only on `authority_search`; `SELECT` on `authority.record_content_heads`, `authority_resources`, `record_manifest_commits`, `record_manifest_leaves`, `organization_authorization_states`, `field_search_approvals`, `authority_relationship_edges` | `default_transaction_read_only = on`; no parameter logging (§5.3) | **Yes** (it evaluates predicates) |
+| Business API runtime, business DBA, business worker | other cluster | **none**: no network path, no credential (G08) | none | **No** |
+| `search-index-builder`, `field-protection-verifier` workloads | Authority API clients, **not** database identities | none | none | No (they submit bytes; they receive counts only) |
+| SpiceDB datastore role | its own datastore | none | none | No |
+
+**Rules for the new grants:**
+- The `DELETE` grant is new for the runtime role and is limited to derived tables. A posting replace is delete-then-insert inside the commit; a withdrawal is a purge.
+- `DELETE` is **not** granted on any `authority` table.
+- The `AuthorityRuntimeGrants` table list and its unit test are extended. A new `authority_search` table without a grant entry fails the test, exactly as today.
+- The reader's result-snapshot and evidence writes happen in a **separate** runtime-role transaction after the read. The read is never a write.
+
+### 5.2 No arbitrary changes, no policy bypass
+
+| Path | Control |
+|---|---|
+| Business API writes an index entry | No database path. No Authority operation accepts postings, entries or access rows from a caller. Postings arise only from (a) bytes verified in a content commit, or (b) builder-submitted bytes verified against the current head (`HEAD_CHANGED` refused) |
+| Business API runs a query outside AC-6 policy | The Authority re-checks `query_fields`, the approval id, operator, value type and coverage `Complete` for every condition. A forged request gets the same indistinguishable refusal as today |
+| Builder forges or withholds | Bytes failing the HMAC, leaf-set or root check are refused, and the record is quarantined as in V1. Withholding leaves the coverage `Building`; `Complete` is set only by Authority attestation |
+| Authority runtime bug writes a wrong posting | Golden derivation vectors; the per-match integrity check (§6.3) refuses a match whose posting does not hash to the accepted leaf; sweeps |
+| AuthorityDb administrator edits rows | Outside the Level 2 threat model (`CLAUDE.md` §4M: the Authority and its administrators are trusted). Still: the per-match check (§6.3) prevents false **additions**; seals and sweeps detect **omissions** (§6.4); object-level pgAudit alerts on human access (§5.3) |
+| Old Authority version (rollback) commits without deriving | The projection revision stays behind the content revision; the query refuses; the projection goes `Rebuilding` (§12.4) |
+
+### 5.3 Administrative access, backup, retention, replication, logging
+
+| Concern | Requirement |
+|---|---|
+| Human administrative access | Entra PIM just-in-time for the AuthorityDb administrator, separate from BusinessDb administrators (G08). **pgAudit object audit on `authority_search` for every non-service role**: a `SELECT` by a human session raises an alert. Break-glass is recorded. Customer data in this schema is classified like the Public/Internal business plaintext it copies |
+| Backups and PITR | AuthorityDb backups and geo-backups (Canada East, PB-10) now contain Public/Internal plaintext. The backup retention period becomes the **maximum persistence of withdrawn plaintext** (R-IX-3). Restores for testing are done only in approved Canadian environments, by the same restricted identities. The PB-10 register row for AuthorityDb is updated (IX-1 gate) |
+| Retention and legal hold | Projection rows are derived and have no retention of their own. On withdrawal or offboarding they are deleted immediately; backups age out on the AuthorityDb schedule. A legal hold applies to the business record and its history, never to the index |
+| Replication | HA standby and geo-backups only, in Canada (PB-10). No logical replication or publication of `authority_search`; a CI check refuses one |
+| PostgreSQL logging | For `authority_search_reader` and the runtime role: `log_parameter_max_length = 0`, `log_parameter_max_length_on_error = 0`, `log_statement = none`; `auto_explain` disabled or `auto_explain.log_parameter_max_length = 0`; `pgaudit.log_parameter = off` for these roles. In Azure: server parameters plus role settings, verified by IX-28 (log scan) |
+| Application logging | No predicate value in Authority logs, metrics, traces or problem details; EF Core sensitive-data logging off; OpenTelemetry `db.statement` without bind values |
+| Vacuum and dead tuples | After a withdrawal purge, a forced `VACUUM` of the affected tables. WAL retention follows backup policy |
+| Offboarding (PB-13) | Delete by `organization_id` in the disposal transaction; included in the disposal receipt as "derived search projection deleted" |
+
+### 5.4 Index DDL
+
+Partial trigram indexes per approved field would need runtime DDL. **Rejected.** Use one shared GIN `gin_trgm_ops` on `normalized_string_value`, created by migration, and measure its size. All DDL is migration-only, by the JIT migration identity.
+
+---
+
+## 6. C2: integrity semantics (IX-D3)
+
+### 6.1 What changes, and what does not
+
+| Guarantee | V1 (today) | V2 (indexed) | Change |
 |---|---|---|---|
-| IX-T01 | **Cross-organization leakage** | `organization_id` from the verified DUA binding, never from the request body; leading column of every key and predicate; composite FKs to heads; FORCE RLS on the reader role; snapshots bound to organization, actor and session | IX-01, IX-02 |
-| IX-T02 | **Confidential field exposure** | Postings only for fields with an Active AC-6 approval whose **Authority-registered** classification is Public or Internal and protection is Standard; CHECK on coverage classification; encrypted leaves produce an anomaly and never a posting; business metadata cannot change the derivation input (G21) | IX-03, IX-04, IX-05 |
-| IX-T03 | **Stale searchable values after a classification change** | Coverage withdrawn and postings purged **in the same Authority transaction** as the invalidating command; the query requires an Active approval and `Complete` coverage in its own transaction | IX-06, IX-07 |
-| IX-T04 | **Unauthorized record existence disclosure** (matches, counts, sort, pagination, limits) | The population is the caller's own discover set at an S1-pinned snapshot; predicate-field readability is computed over the caller's records **independently of predicate values** (§E.3); counts come only after that; every limit refusal depends only on the caller's own set sizes; no suggestions, facets, field-value sort or raw counts (D6); an unknown form looks like a non-existent one | IX-08…IX-12 |
-| IX-T05 | **Timing side channel** (query plan cost depends on organization-wide matches outside the caller's scope) | Scope-driven join (scope ⋈ entries ⋈ postings by record); admission limits; no per-match decisions. Residual: low-bandwidth timing (**R-IX-1**) | IX-13 (measure and report) |
-| IX-T06 | **Projection tampering by a business DBA** | No access: separate cluster and roles (G08); no business-written path; the business API never supplies postings | IX-14, IX-15 |
-| IX-T07 | **Projection tampering or partial restore in the Authority domain** (operator error, bug) | Head binding at query time; projection revision check; postings digest; cheap and deep sweeps; projection quarantine; Critical alert | IX-16, IX-17 |
-| IX-T08 | **Replay or rollback** (old postings, or an old AuthorityDb snapshot) | Postings bound to the head operation id; an AuthorityDb rollback is G14's domain (journal replay, ledger checkpoints) and stale entries are then detected; a restore of `authority_search` alone is detected by revision and binding checks | IX-18, IX-19 |
-| IX-T09 | **Authorization change during a search** | S1 pin, decide (all lookups and checks at the exact snapshot), verify, then an AuthorityDb re-read; revision moved → `SEARCH_SNAPSHOT_CHANGED` with one retry, as today; paging re-validates (§E.5); revocation → page 2 refused | IX-20, IX-21 |
-| IX-T10 | **Content change during a search** | One REPEATABLE READ statement sees heads and postings committed atomically; paging invalidated by `form_content_revision` | IX-22 |
-| IX-T11 | **Quarantined organization or record** | Organization gate closed → refused as today (423/503); a quarantined head in scope → whole search fails (D3 parity); projection quarantine → index search unavailable | IX-23, IX-24 |
-| IX-T12 | **Compromised indexing worker** | Steady state has no worker: derivation is in-process. The builder submits **bytes only**, which the Authority verifies against heads, so it cannot inject or alter values; it can only withhold, which leaves coverage `Building` (fail closed). `Complete` is attested by the Authority from the registry. The builder cannot run queries or read results | IX-25, IX-26 |
-| IX-T13 | **Unavailable worker or HSM during backfill** | Coverage stays `Building`; resumable; the query never treats `Building` as complete | IX-27 |
-| IX-T14 | **Predicate values in logs, telemetry or audit** | POST bodies only; no parameter logging on the reader role (§B.6); evidence records field ids and operators only (OD-8) | IX-28 |
-| IX-T15 | **Expensive or abusive queries** | At most 5 AND conditions; `contains` needs at least 3 characters; `statement_timeout`; admission per instance and per user; Authority-side concurrency cap | IX-29 |
-| IX-T16 | **Forged predicate field or operator** | AC-6 capability check in the business API **and again in the Authority query** (field, operator, value type, approval id, coverage) | IX-30 |
-| IX-T17 | **Partial-share inference** (matching on a value the caller cannot read) | Exclusion before evaluation, at item level: every posting item of a predicate field must be readable (C7 `Evaluable` parity) | IX-09, IX-10 |
-| IX-T18 | **Search used as an integrity oracle or bypass** | Search never returns values; opening a record performs the full verified read; ENC-SR-08/09 detection moves to read and sweep (IX-D3) | IX-31, IX-32 |
+| Population comes from the Authority, never from BusinessDb | AC-5 catalogue | Tier 1: the same lookup at the S1 pin. Tier 2: Authority access postings, with every result confirmed by SpiceDB (§9) | Preserved (Tier 1); **changed enumeration mechanism** in Tier 2 (R-B) |
+| Every returned match is evaluated on **Authority-accepted** content | HMAC plus leaf set plus root over BusinessDb bytes | Posting bytes → SHA-256 = accepted leaf digest → recomputed root = head root, **per match** (§6.3) | Preserved; mechanism changed (no HMAC and no BusinessDb at search time) |
+| A BusinessDb actor cannot suppress or inject a match | The full scan detects | **Structurally impossible**: BusinessDb is not on the path | Strengthened |
+| Search detects that BusinessDb bytes of a **matching** record were deleted or altered | Yes: the whole search fails (ENC-SR-08/09) | **No.** Detected when the record is opened (full verified read, quarantine) and by the deep sweep | **Relaxation R-A** |
+| Search detects that bytes of a **non-matching** in-scope record were damaged | Yes: the whole search fails | No (same channels as above) | **Relaxation R-A** |
+| Opening a record performs the full verified read | Yes | **Yes, unchanged** | Preserved |
+| Independent reconciliation and quarantine on tamper | Verification paths and the G19 census | Unchanged, plus the deep sweep re-verifying BusinessDb bytes against heads and quarantining on mismatch (§6.5) | Preserved and extended |
+| Snapshot consistency; revocation invalidates; no mixing of revisions | Catalogue snapshot | S1 pin and verify, authorization revision, `form_content_revision`, Authority-held result snapshots | Preserved |
+| Whole query fails closed on any inconsistency | Yes | Yes (guard, per-match check, divergence) | Preserved |
 
-**Residual risks** (documented, not mitigated):
-- **R-IX-1:** timing residual (IX-T05).
-- **R-IX-2:** Authority administrators read approved plaintext (IX-D2).
-- **R-IX-3:** deleted plaintext persists in WAL and backups until expiry (§C.2).
-- **R-IX-4:** business-byte tampering is not detected by search (IX-D3).
-- **R-IX-5:** the 50,000 discover ceiling limits a single user's searchable scope (§F.4).
-- From C7, unchanged:
-  * a delivered match has already been seen;
-  * the Authority runtime is trusted.
+### 6.2 Which "current integrity" a result means
 
-### D.3 Authority as the sole decision-maker
+**Defined statement** (API scope statement and UI, IX-D3):
 
-- No permission is stored in, derived from or cached by the projection.
-- No SQL evaluation of desired edges (Alternative D, §H).
-- The query endpoint makes its decisions through the S1 `VerifiedProjectionSnapshot` only. It is the same type-level enforcement as every other SpiceDB access.
+> Results reflect the content the Authorization Authority last accepted for each record, at one Authority snapshot. Each returned record's searched values were checked against that accepted content. The business database copy is not checked by search; it is fully verified when you open a record.
 
----
+The UI must **not** call indexed results "verified" or imply the business copy is intact (§6.6).
 
-## E. Search execution
+### 6.3 Per-query integrity checks (no HSM)
 
-### E.1 One Authority call per search
+**I-1, scope guard.** Run on the in-scope set in Tier 1 and on the matched set in Tier 2, in the candidate transaction:
+- the projection is `Active`;
+- `projection_content_integrity_revision` equals the organization content revision;
+- every contentful head has exactly one entry with `indexed_operation_id = committed_operation_id`;
+- no quarantined head;
+- no `EncryptedValuePresent` anomaly on a predicate field;
+- coverage `Complete` for every predicate field.
 
-New private Authority operation: `POST /internal/v1/search/indexed-query`. It uses the business workload credential and the delegated user assertion, and is published only in the Authority's private OpenAPI.
+Any failure fails the whole search and sets the projection to `Quarantined` (lock-confirmed, Critical alert).
 
-The business `FieldSearchHandler` keeps validation, the capability check and admission. It replaces `TrustedScopeVerifier` plus the in-memory evaluation with a single call when the engine is `Indexed` (§G.2).
+**I-2, per-match binding.** For every returned match and every predicate-field posting:
+1. `SHA-256(source_canonical_bytes)` equals `record_manifest_leaves.canonical_payload_digest` of the leaf with the same `manifest_item_key` in the head's current manifest commit;
+2. decoding `source_canonical_bytes` yields the posting's organization, record, field, null group and the exact typed value (and the normalized value recomputes);
+3. the record's leaf set recomputes the Merkle root equal to `record_content_heads.committed_manifest_root`, with `manifest_leaf_count` matching.
 
-Inside the Authority:
+This is V1's Authority-side root check, run on the matched records. It costs CPU only: for 10,000 matches × 50 leaves, about 500,000 SHA-256 operations. Any mismatch fails the whole search and quarantines the projection.
 
-1. **Bind and gate:** bind the actor and organization; gate open; projection `Active`. Otherwise refuse with the existing codes.
-2. **Authorize predicates:**
-   - `query_fields` on the form;
-   - each condition's field has an Active approval, the operator is in that approval, the value type matches;
-   - coverage is `Complete`.
-   - Otherwise the same indistinguishable `SEARCH_FIELD_NOT_ALLOWED` / `SEARCH_OPERATOR_NOT_SUPPORTED`, or `SEARCH_INDEX_NOT_READY`.
-3. **S1 pin.**
-4. **Population** (§E.3).
-5. **Candidate query and consistency guard** (§B.3) in one REPEATABLE READ transaction. It also records `content_integrity_revision` and `form_content_revision`.
-6. **Edit flags for the first page:** one bulk `edit` check at the pinned snapshot, folded in to remove today's separate call.
-7. **S1 verify,** then an AuthorityDb re-read of the authorization revision. If either moved, fail with `SEARCH_SNAPSHOT_CHANGED` (the business retries once, as today).
-8. **Persist and journal:** the result snapshot (§E.5) and `FieldSearchExecuted` evidence (engine `Indexed`, field ids, operators, counts, outcome), **in the same transaction** as the result snapshot. No result is released without evidence. This removes today's separate evidence call and its failure window.
-9. **Return** the first page: ids, verified header facts, edit flags, total count, snapshot id, revisions.
+**Effect:** a returned match is **cryptographically tied to the anchored accepted root** (root → content checkpoint → journal → ledger). No posting can add a match that the accepted content does not support.
 
-### E.2 Calls per search
+### 6.4 Omission and addition: demonstration matrix
 
-| | V1 today (480 records) | V2 indexed |
-|---|---|---|
-| Business → Authority calls | 1 catalogue + 10 verify batches + 1 validate + 1 evidence + 1 edit batch | **1** |
-| BusinessDb reads | 480 | **0** (display names only, as today) |
-| SpiceDB | pin + lookup + about 480 to 1,440 single checks + verify | pin, verify, 2 lookups (paged), ⌈k / B⌉ bulk `field_item` checks (k = items of share-only records, §E.3), 1 bulk `edit` |
-| MAC / HSM operations | 3,840 | **0** |
+| Manipulation | Actor | Addition prevented by | Omission detected by | When |
+|---|---|---|---|---|
+| Delete, alter or inject business rows | business DBA | n/a: search does not read BusinessDb | n/a: search does not read BusinessDb; the record still matches on accepted content | Structural; damage is caught on open and by the deep sweep |
+| Alter a posting value so a non-match matches | Authority domain | **I-2** (bytes, digest, root) | n/a | Every query |
+| Alter or delete a posting so a match disappears | Authority domain | n/a | **Entry seal** (HMAC) mismatch in the cheap sweep; deep-sweep re-derivation | Sweep interval |
+| Delete an entry | Authority domain | n/a | **I-1** (contentful head without entry) | Every query (Tier 1); sweep (Tier 2) |
+| Replay old postings or entry | Authority domain | **I-1** (operation binding) and I-2 | I-1 | Every query |
+| Restore only `authority_search` from an old backup | operator | I-1, I-2 | I-1 (revision) | Every query |
+| Delete or forge Tier 2 access rows | Authority domain | **SpiceDB decision** on every result (fail closed on divergence) | Differential sweep against SpiceDB lookups (§9.4) | Sweep interval |
+| Old Authority version commits without derivation | deployment error | I-1 (revision) | I-1 | Every query |
 
-### E.3 Population and field readability without predicate inference
+**Conclusion, stated precisely:**
+- Against the **Level 2 adversary** (business database administrator or credential), indexed search can neither omit nor add eligible results: structurally, BusinessDb is not consulted.
+- Against manipulation **inside the Authority domain** (outside the Level 2 model):
+  * additions are prevented on every query;
+  * omissions are detected **within a sweep interval, not on every query**, except for entry deletion in Tier 1.
+- V1 has a comparable exposure. An Authority-domain deletion of a registry row silently removes a record from V1's catalogue too.
+- Per-query omission detection for value changes would need a per-query verification of all in-scope seals (IX-D14 option B).
 
-Schema facts (`authority.schema.zed`):
-- `form_record.discover = effective_owner + shared_via->read`;
-- `form_record.read = effective_owner`;
-- `field_item.read = parent_record->effective_owner + shared_via->read`.
+### 6.5 Reconciliation and quarantine (preserved and extended)
 
-Steps, all at the pinned snapshot:
+- **Unchanged:**
+  * the open path quarantines on any HMAC, leaf-set or root mismatch;
+  * the G19 census and protection reconciliation;
+  * S1 quarantine.
+- **Cheap sweep** (hourly; Authority worker; no BusinessDb):
+  * the I-1 checks for the whole organization;
+  * entry seals verified (one MAC verify per entry, rate-limited);
+  * the Tier 2 differential (§9.4).
+- **Deep sweep** (daily, rate-limited; builder):
+  * re-derive postings for a sample, and over each rolling period for every record, from BusinessDb bytes verified against heads;
+  * a business-byte mismatch → **record quarantine** (as today);
+  * a posting mismatch → **projection quarantine**.
+- Every finding is journaled (counts only), shown on the Release Security Dashboard health, and raises a Critical alert.
 
-1. `D` = `LookupResources(form_record, discover, user)`. This is the existing call, with the 50,000 ceiling.
-2. `O` = `LookupResources(form_record, read, user)`: records the caller effectively owns, directly, through a team, or through a parent. **Every field item of these is readable.**
-3. `S` = (`D` \ `O`) restricted to the form: share-only records. The restriction uses `search_record_entries`, not the predicate.
-4. For each record in `S` and each **predicate field**, take every posting `manifest_item_id` of that field. Bulk-check `field_item#read` for all of them, using the O-1-hardened client: echoed-request mapping, per-item error fails the call, chunked below the confirmed SpiceDB maximum (CT-7).
-   - **The checked set depends only on the caller's records and the predicate field ids, never on the predicate values.**
-   - Records lacking a posting for the field have no item to check. They cannot match, exactly as in C7, where a missing value never matches.
-5. The **readable-for-predicate scope** = `O ∩ form` ∪ {r ∈ `S` : every predicate-field posting item of r is readable}. This is the `$scope` of §B.3.
+### 6.6 UI and API representation
 
-**Limits:**
-- All limits are on caller-owned quantities: `|D|`, `|S|` and the item count `k`. Exceeding one returns `SEARCH_VERIFICATION_LIMIT`.
-- The proposed initial limit is `k` ≤ 20,000 items, configurable downwards only, and measured.
-- A refusal reveals the size of the caller's own sets, which the caller can already see in My Records.
-- Nothing about records outside `D` is revealed, so there are no "too broad" refusals based on organization-wide matches.
+- `RecordListItemResponse.projectionVerified` is **`false`** for indexed results. It is `true` today for V1 field-search results, where bytes were verified. A new optional response field `resultBasis` = `AuthorityAcceptedContent` | `VerifiedScan` names the engine.
+- The scope statement carries the §6.2 text. No "verified" badge or wording for indexed results.
+- Opening a record keeps today's verified read and its error states.
+- The PB-14 copy review covers the new text in English and French.
+- The Playwright and Vitest assertions in IX-4 check that no indexed result is labelled as verified.
 
-**Partial readers:** discover-only callers (a share with no field items) end up with an empty `S` contribution. Their results equal C7's, because `Evaluable` excludes them.
+### 6.7 ENC-SR-08/09
 
-### E.4 Sort, count and pagination semantics
-
-- **Sort:** metadata only (`modifiedOn`, `createdOn`, `recordStatus`; `formName` is constant within one form), in SQL, with the total order `… , head_modified_on, form_record_id`. Field-value sort stays excluded (D6).
-- **Count:** the exact number of authorized matches at the snapshot. It never includes, and never reveals, the number of unauthorized matches.
-- **Completeness statement:** "Complete: all N records of this form that you can find were evaluated against their accepted content at one Authority snapshot (indexed)…". The wording changes because records are no longer re-verified at search time (IX-D3).
-
-### E.5 Pagination
-
-- Today the entire ordered match list lives in the Data Protection cursor. That does not scale: 10,000 matches would make a cursor of several hundred KB.
-- **Proposal:** the Authority stores the ordered result as `search_result_snapshot_entries`. These hold ids and sort keys only, expire like the catalogue, and are capped at **10,000 matches**, the same as the My Records ceiling. Above the cap: `SEARCH_VERIFICATION_LIMIT` (`results`), over authorized matches only.
-- The business cursor carries only the snapshot id, offset, query digest, user, session and expiry, still protected by Data Protection.
-
-`POST /internal/v1/search/indexed-query/{snapshotId}/page` re-validates:
-- snapshot owner, organization, actor and expiry;
-- the gate is open and `authorization_revision` is unchanged (OD-5: any security change invalidates);
-- `form_content_revision` is unchanged (any change to a record of the form invalidates; it replaces the per-entry slow path, is cheaper and is at least as strict);
-- the projection is `Active`.
-
-It then returns the slice plus fresh `edit` flags at a newly pinned snapshot.
-
-**The result list is never kept in BusinessDb,** where a DBA could reorder or suppress page entries.
-
-**UX risk:** in a form under continuous edits, page 2 may often return `SEARCH_SNAPSHOT_CHANGED`. This is to be measured. A relaxation (for example, invalidating only when a matched or in-scope record changed) needs a separate approval.
-
-### E.6 My Records (optional, IX-5)
-
-The same machinery answers My Records without field predicates:
-- `D` from the lookup, as today;
-- metadata filters and sort over `search_record_entries` (**verified** header facts instead of unverified BusinessDb columns, which narrows the G06 caveat noted in `ListRecordsHandler`);
-- exact counts;
-- Authority-held paging.
-
-**Kept unchanged:**
-- the UX and response contract;
-- the record-reference lookup (`q`);
-- `includeChildren` and `includeArchived`;
-- unavailable-id reporting, renamed to the precise category: "registered without accepted content".
-
-Form names for display and the `formName` sort stay as today (cosmetic, unsigned) unless the owner prefers the Authority's `FormTitleSnapshot`. This is a separate stage and approval.
-
-### E.7 How the index avoids verification without weakening guarantees
-
-| Guarantee | V1 basis | V2 basis |
-|---|---|---|
-| Content a match is evaluated on is the accepted content | HMAC and leaf-set verification of BusinessDb bytes at search time | Postings derived from the same verification **at commit**, bound to the head operation, read in the same trusted store as the head |
-| No suppressed match | Catalogue-driven scan of the full scope | Catalogue-equivalent scope, plus a guard that every in-scope contentful record has a current entry |
-| No injected match | Catalogue drives; injected rows never read | Index is written only by the Authority; the business never writes it |
-| Rollback | Rows of an old operation fail the head | Postings of an old operation fail the binding check; AuthorityDb rollback is G14 |
-| Business bytes still present and intact | **Checked at search time** | **Not checked at search time**; checked at open and by sweeps (IX-D3) |
-
-The only property V2 gives up is the last row, and it is not a confidentiality or authorization property. The verification rule of §4L.5 ("verify before trusting, rendering, … using in a search predicate") still holds for **business** rows: search no longer consumes any business row. Postings are Authority-held derived state with the same trust as heads and leaf digests.
+- `security_hardening/SEARCH_SECURITY_ACCEPTANCE_TESTS.md` is **not changed** by this revision.
+- The proposed replacement text is in A2 §4. It takes effect only if and when A2 is accepted.
+- Until then, V1 remains the engine those tests describe.
 
 ---
 
-## F. Performance and operational design
+## 7. Projection lifecycle
 
-### F.1 Expected cost model (to be measured; nothing here is measured)
+Unchanged from R1 §C, except as noted below.
 
-| Component | Grows with | Expectation |
-|---|---|---|
-| `LookupResources` × 2 | the caller's discoverable and owned records, organization-wide | Measured today only inside the catalogue: 178 ms at 480. **Unknown at 10K to 50K: PERF-01's main risk** |
-| Bulk `field_item` checks | share-only records × predicate fields × items | 0 for owners; ⌈k / B⌉ calls otherwise |
-| Candidate SQL | scope size, plus selective index scans | Expected tens to low hundreds of ms at 100K with selective predicates; `contains` on broad text is the expensive case |
-| Commit overhead | approved fields per record | A few row deletes and inserts plus GIN pending-list maintenance; target **≤ +15 ms p95 per commit** (proposed) |
-| HSM at search time | none | **0** |
-| HSM at backfill | records × leaves | 8 per record in the benchmark form; about 800K for 100K records, rate-limited |
+- **R1 §C.1 Inline derivation.** Revision 2 adds two things:
+  * the posting's `source_canonical_bytes`;
+  * the entry seal: one MAC sign operation per commit, through the existing provider, in the commit transaction.
 
-### F.2 Benchmarks
-
-**Datasets:**
-- **Records in the form's scope:** 50, 150, 480, 1,000, 10,000, 100,000. The 100K case is one organization at the PB-09 envelope.
-- **Fields per record:** 10, 50 and 250, with 5 and 20 approved.
-- **Predicates:** 1 to 5.
-- **Selectivity:** 0.1%, 10%, 100%.
-- **String length:** short, and up to the field maximum.
-
-**Caller shapes:**
-- owner of all;
-- team owner;
-- share-only full reader;
-- share-only partial reader of 10% of fields;
-- discover-only;
-- callers who discover 100, 1K, 10K and 50K records in a 100K organization.
-
-**Load:**
-- concurrency 1, 4, 8 and 16;
-- concurrent commit load of 0, 5 and 25 commits/s in the same form, which measures paging invalidation and lock contention.
-
-**Measure:**
-- end-to-end p50, p95 and p99, and Authority time by stage (lookups, checks, SQL, persist);
-- SpiceDB calls and items;
-- `EXPLAIN (ANALYZE, BUFFERS)` for every operator template at 10K and 100K;
-- commit p95 with derivation on and off;
-- index and table size per 100K records, and bloat after 1M updates;
-- backfill records/s and HSM ops/s;
-- rebuild time;
-- shadow differential (must be zero);
-- page-2 invalidation rate.
-
-**Targets** (PB-09, unverified objectives):
-- verified search p95 < 3 s at the approved load;
-- record write p95 < 2 s, with derivation's added p95 ≤ 15 ms (proposed);
-- dashboard card < 2 s.
-
-**Environments:**
-- local stacks (relative numbers only);
-- **Azure staging PERF-01 with Managed HSM** decides.
-
-### F.3 Managed HSM implications
-
-- Search: no HSM traffic. This removes the PB-09 / PERF-01 concern raised in P-S1-1 §5 for queries.
-- Backfill and rebuild are the only bulk MAC consumers. They must be throttled below Managed HSM service limits, which are unmeasured and must come from PERF-01. They run as background work with bounded concurrency (O-3 sizing).
-- An HSM outage during a backfill leaves the coverage `Building`. Search on other `Complete` fields is unaffected.
-
-### F.4 Operational behaviour
-
-- **Index lag:** zero for commits by construction. For a new approval, lag equals the backfill duration, surfaced as coverage `Building` with progress counts on the security administrator's Search approvals page.
-- **Alerts** (Critical): projection quarantine; sweep mismatch; derivation error.
-- **Alerts** (Warning): coverage `Building` beyond its SLO; builder failure rate.
-- **Metrics:** meter `AuthorizationAuthority.SearchIndex`.
-- **Known capacity limit (R-IX-5):** a caller whose discover set exceeds 50,000 cannot search. If PB-09 needs single users with 100K-record scope, the options are (a) an Authority-side SQL evaluation of desired edges (Alternative D), or (b) a SpiceDB-side form-scoped permission. **Both need a separate decision.**
+  A MAC-provider failure aborts the commit. That is fail closed, and it is the same dependency the commit already has for verification.
+- **R1 §C.2 Approval changes** and the same-transaction purge on withdrawal or invalidation.
+- **R1 §C.3 Backfill** by `search-index-builder`: bytes only, Authority verification and Authority attestation of `Complete`. Backfilled entries are sealed (one sign per record).
+- **R1 §C.4 Ordering:** organization lock plus head CAS; builder idempotent per (record, operation).
+- **R1 §C.5 Inconsistency:** the response is now **projection quarantine plus fallback** (§12).
+- **R1 §C.6 Sweeps:** extended in §6.5.
 
 ---
 
-## G. Migration and rollout
+## 8. Search execution: Tier 1 (exact, initial)
 
-### G.1 Flags
+### 8.1 Flow
 
-**Business:** `FieldSearch:Engine` = `VerifiedScan` (default; today's path) | `Shadow` | `Indexed`.
-- The startup environment guard is the same as `ExecutionEnabled`: Development and Testing only until the production prerequisites exist.
+The flow is R1 §E.1: one Authority call per search.
 
-**Authority:**
-- `SearchIndex:DerivationEnabled`: write postings at commit; can be on while querying is off;
-- `SearchIndex:QueryEnabled`;
-- `SearchIndex:BuilderEnabled`.
+1. Policy check.
+2. S1 pin.
+3. Population `D` = `LookupResources(form_record, discover)`, and `O` = `LookupResources(form_record, read)`.
+4. Value-independent bulk `field_item#read` checks for share-only records (R1 §E.3).
+5. Candidate SQL with **scope-driven probing** (§8.2).
+6. I-1 and I-2.
+7. First-page edit flags.
+8. S1 verify.
+9. Result snapshot and evidence in one transaction.
+10. Return.
 
-Each flag fails closed and is validated at startup.
+### 8.2 Scope-driven probing (timing without unauthorized dependence)
 
-### G.2 Fallback rules (no silent mixing)
+- The candidate statement drives from the caller's readable-for-predicate scope (R1 §E.3), through a `LATERAL` probe on `(organization_id, form_record_id, field_definition_id)` per scope record.
+- The value index is **not** used by the planner: the plan is fixed with an optimization fence (for example `OFFSET 0`) and per-transaction planner settings. An `EXPLAIN` plan-shape test in IX-3 enforces this.
+- The work is then **O(|scope| × conditions)**, independent of how many records outside the caller's scope match.
+- **This closes R1's timing residual R-IX-1 for Tier 1.** Expected cost: about 50,000 index probes per condition, low hundreds of milliseconds. To be measured.
+- Value-index-driven plans (O(organization-wide matches)) are **prohibited** unless separately approved, because their cost depends on unauthorized data.
 
-- With engine `Indexed`, a search on a field whose coverage is `Building` (or a projection that is `Rebuilding`) may run **V1 only when** the scope is within V1's limits. The response then states the engine (`VerifiedScan`).
-- Otherwise it returns `SEARCH_INDEX_NOT_READY`, which is retryable.
-- One search never combines results from both engines.
-- **Owner decision IX-D8.**
+### 8.3 Limits
 
-### G.3 Shadow comparison
+Tier 1 keeps:
+- the existing 50,000 discover ceiling (**temporary safeguard**, C3);
+- the field-item check ceiling on caller-owned quantities;
+- a 10,000 result cap on authorized matches;
+- `statement_timeout`;
+- admission.
 
-In `Shadow`:
-- the business returns the **V1** result, which remains authoritative for the user;
-- for a bounded sample, it also runs the indexed query under a separate admission slot;
-- it compares the ordered id lists, the total count and the error code;
-- a difference produces evidence (ids and counts only, no values) and a Warning alert.
+Every limit refusal depends only on caller-owned quantities.
 
-**Exit criterion:** zero differences over the full Stage B search shards, the IX adversarial suite and N production-like synthetic searches (N set at approval).
+### 8.4 Pagination
 
-Known **legitimate** differences, excluded from comparison and listed:
-- ENC-SR-08/09 scenarios, where V1 fails and V2 answers (IX-D3);
-- scopes above V1's 500-record limit.
-
-### G.4 Rollback and compatibility
-
-- Flags off → today's path, unchanged. V1 code (`TrustedScopeVerifier`, the evaluator, `VerifyProjectionsAsync`) is retained until V2 is accepted. Removing it needs approval.
-- Schema changes are additive (expand only). The projection is derived data, so it can be truncated or dropped without loss.
-- **The public contract is unchanged:** `FieldSearchResponse`, error codes and the cursor stay opaque. New: one optional `unavailable_reason` value (`SEARCH_INDEX_NOT_READY`) and an engine indicator inside the scope statement.
-- The Authority private OpenAPI gains two operations, published separately.
-- **The index is never authoritative** for record contents (opening a record still verifies) or for access (SpiceDB decides).
+As R1 §E.5:
+- Authority-held result snapshot;
+- page validation on authorization revision, `form_content_revision` and projection `Active`;
+- fresh edit flags at a new pin.
 
 ---
 
-## H. Alternatives
+## 9. C3: scaling beyond 50,000 discoverable records (Tier 2)
 
-| | Alternative | Why not (or not now) |
-|---|---|---|
-| A | V1 verified scan with O-1 to O-4 only | Cost stays linear in the discoverable scope, with 8 HSM operations per record per search. 480 records is about 12 to 13 s at best locally; 100K is not reachable |
-| B | BusinessDb projection as an untrusted accelerator | Cannot detect suppression without the full V1 scan; no completeness |
-| C2 | Separate Authority-administered database, async projector | Better isolation of plaintext from the security journal and independent scaling, but lag, a watermark and marker protocol, and another DR plane. **Future split**, if measured AuthorityDb load requires it |
-| D | Authority SQL evaluation of desired edges instead of SpiceDB lookups | Removes the lookup ceiling, but creates a second evaluator of the permission model alongside SpiceDB (S1 protections, schema drift). Separate decision |
-| E | Azure AI Search, OpenSearch or a separate Search Service | Another trust plane and residency review; ACL trimming and completeness would need proofs this design gets from PostgreSQL in the trusted store. Not justified at the PB-09 envelope (§F.1). Prohibited without owner approval |
-| F | Keyed blind indexes for Confidential values | Excluded by ADR-PB-004 §7; separate ADR |
-| G | Cache of verified heads to skip re-verification (DR-C7-2) | Contrary to §4L.5 ("never cache `RowSignatureValid=true`"). V2 achieves the effect structurally, by deriving at commit, instead of by caching |
-| H | Caching lookup results per (user, authorization revision) | Possible later optimization; it bypasses the per-decision S1 verify. Separate approval |
+### 9.1 Why Tier 1 cannot scale, and the options
 
-## I. ADR-PB-004 §7 review items (the ADR this design needs)
+Tier 1 asks SpiceDB to enumerate everything the caller can discover, organization-wide, on every search: O(|D|) for the lookup. That is fine at hundreds to tens of thousands, but not at 100K, and not as a product limit.
 
-| Item | Answer in this design |
+| Approach | Per-search cost | Leaks via cost or limits? | Verdict |
+|---|---|---|---|
+| Lookup and probe (Tier 1) | O(\|D\|) in SpiceDB plus SQL | No (scope-driven) | Initial; the oracle for Tier 2 |
+| Match-first: organization-wide index hits, then a SpiceDB check on each | O(organization-wide matches) | **Yes**: the cost and the limit reveal unauthorized matches | Rejected |
+| SpiceDB-native filtered lookup | Not available in SpiceDB OSS. A commercial materialization would be an external dependency | — | Rejected |
+| Authenticated index (Merkle B+-tree range proofs) | O(log n + organization-wide matches) | Yes, for the access-filter step | Rejected: novel construction, unreviewed, and does not compose with access filtering |
+| **Access postings** (Authority-maintained, access-scoped, SpiceDB-decided) | **O(caller-authorized matches)** plus small principal expansion | **No**: cost depends only on what the caller may see | **Recommended Tier 2** |
+
+### 9.2 Access postings
+
+`search_access_postings`, one row per (posting, access principal):
+- `search_access_posting_id` PK, `organization_id`, `form_definition_id`, `field_definition_id`, `form_record_id`, `manifest_item_id`, `indexed_operation_id`;
+- `access_principal_kind_name` (`User` | `Team`), `access_principal_entity_id`;
+- `access_path_name` (`Owner` | `ParentOwner` | `Share`), `record_share_id` (null unless `Share`);
+- the typed value columns of the posting (nullable; a CHECK that exactly one is set, matching `indexed_value_type_name`).
+
+**Indexes:**
+- `(organization_id, access_principal_entity_id, field_definition_id, <value column>, form_record_id)`, partial per value type;
+- a GIN (`btree_gin` plus `gin_trgm_ops`) for `contains` on (principal, normalized string);
+- `(organization_id, form_record_id)` for maintenance.
+
+**Derivation:** a pure, versioned function `AccessPostingDerivation/v1` mirrors `authority.schema.zed`:
+
+| zed | Access rows |
 |---|---|
-| Inference or dictionary attacks on low-cardinality values | Plaintext Public/Internal only, already visible to a business DBA; no keyed or deterministic tokens; to users: authorized counts only, no facets or suggestions |
-| Key isolation, lifecycle, rekey | No index keys (no blind index). Integrity keys unchanged; backfill uses existing verification |
-| Consent | AC-6 approval by `administer_security` with a governance reference; PB-08 step-up still required in staging and production |
-| Field-level query authorization | `query_fields`, plus the Authority re-check per condition, plus item-level readability (§E.3) |
-| Revocation | Shares: no index change; snapshot invalidation. Approvals: same-transaction purge |
-| Indexed historical versions | None: only the current accepted revision |
-| Proof of index completeness | Inline derivation with the head CAS; query-time guard over the scope; Authority-attested coverage; sweeps |
-| Leakage budget | R-IX-1 to R-IX-5 |
-| Migration strategy | §G |
+| `form_record.effective_owner = owner + parent->effective_owner` | `Owner` rows for the owner principal on **all** postings of the record; `ParentOwner` rows for the ancestors' owner principals on descendants (bounded nesting) |
+| `field_item.read = parent_record->effective_owner + shared_via->read` and `record_share.read = reader + contributor + manager` | `Share` rows for each recipient principal (user or team) **only on the postings whose `manifest_item_id` the share covers** |
+| `team.participant = member` | Principal = the team; **not** expanded per member. Membership changes touch no rows |
 
-**Recommendation:** record the accepted outcome as **ADR-PB-004 Amendment A2 (V2 trusted index)**. A new ADR number would also work, but A2 keeps the search decisions in one place.
+It is maintained **in the same transaction** as:
+- the security commands that add or remove those edges (registration, ownership transfer, share create, update or revoke, parent link or unlink, unregistration), recomputing the affected records;
+- content commits, giving new postings the record's current principals.
+
+Both run under the organization lock, so the rows are always consistent with the canonical edges at the committed authorization revision.
+
+### 9.3 Tier 2 query
+
+1. Policy check and S1 pin, as in Tier 1.
+2. Principal set `P` = {caller} ∪ {teams with an active `member` edge to the caller}, read from `authority_relationship_edges` in the candidate transaction (index `ix_authority_edges_subject` exists). The transaction reads `authorization_revision` and requires it to equal the pinned marker revision and `projection_applied_revision`.
+3. Candidate SQL: for each condition, access postings with `access_principal_entity_id = ANY(P)` and the value predicate. Records must satisfy all conditions. **Evaluable parity:** for share-only access, no predicate-field posting of the record may lack an access row for `P`. Then join entries for metadata filters and sort. **Cost:** O(caller-accessible postings that match), never organization-wide.
+4. **SpiceDB decides every disclosed result.** For all matches up to the result cap:
+   - a bulk `form_record#discover` check;
+   - a bulk `form_record#read` check;
+   - for those not allowed `read`, a bulk `field_item#read` check on every predicate-field posting item;
+   - all at the pinned snapshot, with the O-1-hardened client.
+   - Any SQL-yes / SpiceDB-no **divergence** fails the whole search (`SEARCH_INDEX_INCONSISTENT`), disables Tier 2 for the organization (falling back to Tier 1) and raises a Critical alert. Divergent results are never silently dropped.
+5. I-1 on the matched records, I-2 per match, S1 verify, snapshot and evidence, as in Tier 1.
+
+**Authority remains the sole decision-maker:**
+- access postings are Authority-held, derived from the Authority's canonical edges, and used **only to narrow candidates**;
+- no result is disclosed without a SpiceDB decision at the S1-verified snapshot;
+- the access rows hold no decision a caller can rely on by itself.
+
+### 9.4 The completeness risk of Tier 2, and its controls
+
+**Over-inclusion** (a row that should not exist) cannot leak: SpiceDB rejects it, and the search fails.
+
+**Under-inclusion** (a missing row) would omit an authorized result. It is not caught per query, because Tier 2 does not enumerate. Controls:
+
+1. **Equivalence by construction.** One derivation function per zed relation, unit-tested relation by relation. A **schema coupling guard**: the derivation embeds the SHA-256 of `authority.schema.zed`; a mismatch at startup disables Tier 2 (fallback to Tier 1), and CI fails until the derivation version is bumped and the differential suite passes.
+2. **Property-based differential tests** (IX-5): random edge graphs (owners, teams, parents, shares with partial field scopes, revocations, transfers). For every user, the Tier 2 candidate set must equal Tier 1's (SpiceDB lookup) set.
+3. **Online differential sampling:** for a configured fraction of Tier 2 searches by callers with |D| ≤ 50,000, run Tier 1 in the background and compare ids and counts. Any difference → Critical alert, Tier 2 disabled for the organization.
+4. **Sweep:** periodic per-user comparison of the access-posting principal closure with `LookupResources`, for all users of each organization over a rolling period, and a rebuild of access postings from canonical edges (no HSM, fast).
+5. **Fallback:** Tier 2 disabled ⇒ Tier 1 within its ceiling, otherwise `SEARCH_INDEX_NOT_READY`.
+
+**Explicit relaxation R-B** (A2 §3): in Tier 2, completeness of the candidate population relies on derivation equivalence plus differential detection, instead of a per-search SpiceDB enumeration. Disclosure safety does not change.
+
+### 9.5 Ceilings after Tier 2
+
+- The 50,000 discover ceiling no longer applies to field search.
+- Remaining bounds:
+  * the result cap (10,000 authorized matches, configurable, measured);
+  * `statement_timeout`;
+  * admission;
+  * the SpiceDB decision volume, which is O(results).
+- A query whose authorized matches exceed the cap returns `SEARCH_VERIFICATION_LIMIT` (`results`). That depends only on the caller's own authorized matches.
 
 ---
 
-## J. Decisions requested
+## 10. C4: mapping against ADR-PB-004
 
-| # | Decision | Recommendation |
+| ADR-PB-004 requirement | V2 | Status |
 |---|---|---|
-| **IX-D1** | Placement: AuthorityDb schema `authority_search`, inline derivation (C-AUTH-INLINE) | Approve |
-| **IX-D2** | Accept that AuthorityDb holds approved Public/Internal plaintext (R-IX-2), and update the PB-10 register | Approve |
-| **IX-D3** | Semantics: search answers from Authority-accepted content; business-byte tampering is detected at open and by sweeps, not by search (R-IX-4); restate the expected outcomes of ENC-SR-08/09 for the indexed engine | Approve, with the amended test text in the ADR |
-| **IX-D4** | Permission strategy of §E.3 (two lookups at the pin, value-independent bulk `field_item` checks with O-1 hardening, caller-only limits) | Approve |
-| **IX-D5** | Authority-held result snapshots (10,000 cap) and `form_content_revision` paging invalidation | Approve; measure the invalidation rate |
-| **IX-D6** | Coverage lifecycle and the `search-index-builder` workload identity (bytes only, Authority attestation) | Approve |
-| **IX-D7** | A derivation error aborts the commit; an inconsistency quarantines **the search projection only**, cleared by a journaled rebuild | Approve |
-| **IX-D8** | Fallback: V1 only within V1 limits and declared in the response; otherwise `SEARCH_INDEX_NOT_READY`; never mixed | Approve |
-| **IX-D9** | ADR vehicle: ADR-PB-004 Amendment A2 | Approve |
-| **IX-D10** | O-1 and O-2 disposition (§A.3): O-1 client hardening with IX-2; O-2 reused for the builder; the O-1 restructuring optional | Approve |
-| **IX-D11** | Unchanged exclusions: no suggestions, autocomplete, facets, field-value sort, repeating groups, children or documents in V2 | Confirm |
-| **IX-D12** | My Records on the index (§E.6) as a separate later stage | Defer the decision to after IX-3 |
+| §4: catalogue from the Authority, not BusinessDb | Tier 1: SpiceDB lookup at the pin. Tier 2: Authority access postings plus a SpiceDB decision per result | Preserved (T1); **R-B** (T2) |
+| §4: apply predicate-field authorization before execution | AC-6 re-check plus item-level readability (`field_item#read`; value-independent in T1, per result in T2) before any result | Preserved |
+| §4: "retrieve and verify every eligible current record/field value … complete only after exhaustive verification at a coherent snapshot" | Verification moved to commit (the same HMAC, leaf-set and root checks). Per query: I-1 over scope (T1) or matches (T2), I-2 per match. BusinessDb bytes not verified at search time | **R-A** (relaxation) |
+| §4: "a BusinessDb index can accelerate fetching candidate bytes but cannot decide or prove the full candidate set" | No BusinessDb index; the Authority index decides | Preserved (stronger) |
+| §4: fail closed if snapshot proof, enumeration or verification fails; no truncated list | I-1, I-2, divergence, S1 verify, limits: all whole-query failures, no partial results | Preserved |
+| §5: bounded; typed refusal before exceeding a limit | Bounded by result cap, timeout and admission; Tier 1 discover ceiling temporary | Preserved; **ceiling semantics changed** (R-C) |
+| §5: narrowing by an untrusted BusinessDb predicate does not establish completeness | No BusinessDb predicates | Preserved |
+| §5: pagination is a snapshot-consistent partition of one verified result set | Authority-held result snapshot, validated per page | Preserved |
+| §5: revocation invalidates pages and cursors; no combining of revisions | Authorization revision and `form_content_revision` checks per page | Preserved |
+| §6: Confidential predicates denied server-side; no leak through timing, errors, counts, sorts, facets | Server-side refusal unchanged; counts only over authorized matches; no facets or value sort (D6); T1 scope-driven and T2 access-scoped costs depend only on caller-visible data | Preserved (R-IX-1 closed for T1; T2 timing is caller-scoped) |
+| §2: only explicitly approved Public/Internal; no Confidential/Restricted search | Postings only for Active approvals, classification CHECK, encrypted leaves never indexed | Preserved |
+| §3: residual exposure to BusinessDb readers | Unchanged; **plus AuthorityDb readers** (§5.1) | **R-D** (extended exposure) |
+| §7: a V2 trusted index needs a separate ADR | A2 | Addressed by A2 |
+| API: data returned only when every item is authorized and integrity-verified | Authorized (SpiceDB) and integrity-bound to the accepted root (I-2); BusinessDb copy not verified | **R-A** (wording in A2) |
+| API: versioned contract, typed error codes, opaque cursor, audit without values | Unchanged codes, plus `SEARCH_INDEX_NOT_READY` and `SEARCH_INDEX_INCONSISTENT` as `unavailable_reason` values; evidence in the result transaction | Preserved |
+| Versioning: strengthening invalidates search projections and purges plaintext replicas | Same-transaction purge on withdrawal or invalidation; backups age out (R-IX-3) | Preserved, with residual R-IX-3 |
 
-## K. Acceptance criteria
+**Relaxations, all explicit:**
+- **R-A:** search-time verification of BusinessDb bytes;
+- **R-B:** Tier 2 enumeration mechanism;
+- **R-C:** ceiling semantics;
+- **R-D:** AuthorityDb plaintext exposure.
 
-The indexed engine may replace V1 for a deployment only when all of the following hold:
+Each is in A2 §3 for acceptance or rejection.
 
-1. **Tests:** IX-01 to IX-32 pass on a fresh security-test stack (real Authority, PostgreSQL × 2, SpiceDB, Vault). So do the existing ENC-SR-01 to 18 (08/09 per IX-D3), AC5, AC6, C7-SEC, S1 RB-01 to 15 and CT-1 to 6, and CT-7.
-2. **Differential:** shadow mode shows zero unexplained differences.
-3. **Derivation:** golden vectors pass; derivation is deterministic across restarts and locales.
-4. **Purge:** withdrawal leaves zero postings in the same transaction, verified by query.
-5. **Coverage:** `Complete` is reachable only through Authority attestation. A withheld record keeps it `Building`.
-6. **Guard:** every injected inconsistency (missing entry, stale entry, digest mismatch, revision drift) yields fail-closed, projection quarantine and a Critical alert, with no result released.
-7. **Logging:** no predicate value appears in Authority, PostgreSQL, pgAudit or telemetry logs (log scan in IX-28).
-8. **Privileges:** the privilege inventory passes. The reader role cannot write, the business roles cannot connect, and RLS is forced.
-9. **Performance:** the benchmarks of §F.2 are recorded. PB-09 targets are met in **Azure staging** (PERF-01), or the failures are recorded as blockers.
-10. **Review:** independent security review of the design and the implementation, and owner approval.
+---
 
-**Test catalogue** (to be detailed at IX-1; names indicative):
-- IX-01, 02: organization isolation (forged organization, RLS through the reader role, pooled connection);
-- IX-03 to 05: confidential and encrypted exclusion, including a forged business classification and an encrypted leaf on an approved field;
-- IX-06, 07: withdrawal purge, and a strengthening race with a concurrent search;
-- IX-08 to 12: non-inference (counts, the limit refusal independent of unauthorized matches, partial reader, discover-only, unknown form);
-- IX-13: timing measurement report;
-- IX-14, 15: a business DBA cannot reach the index; business-supplied postings are impossible;
-- IX-16, 17: Authority-side tamper and partial restore detected;
-- IX-18, 19: replay of an old operation; AuthorityDb restore followed by journal replay → `Rebuilding`;
-- IX-20, 21: revocation mid-search and between pages;
-- IX-22: a commit during a search, and paging invalidation;
-- IX-23, 24: organization and record quarantine;
-- IX-25, 26: builder byte forgery refused; withholding keeps the coverage `Building`;
-- IX-27: HSM or builder outage;
-- IX-28: log scan;
-- IX-29: limits and timeouts;
-- IX-30: forged field, operator or approval id at the Authority;
-- IX-31, 32: ENC-SR-08/09 under IX-D3 (match returned; open fails and quarantines; the sweep detects).
+## 11. Revised threat and security-boundary analysis
 
-## L. Implementation stages (each needs its own authorization)
+### 11.1 Boundaries
 
-| Stage | Content | Gate |
+| Zone | Trust | Holds | Search role |
+|---|---|---|---|
+| Browser | untrusted | nothing sensitive at rest (PB-07) | request |
+| Business API and worker | untrusted for decisions (Level 2) | session, admission | forwards; never decides |
+| BusinessDb | **hostile in the Level 2 model** | record bytes | **not on the search path** |
+| Authority runtime | trusted | keys (via provider), decision logic | decides and derives |
+| AuthorityDb (`authority`, `authority_search`) | trusted; administrators trusted but audited | heads, leaves, journal, edges, approvals, **projection with Public/Internal plaintext** | index and evaluation |
+| SpiceDB | trusted under S1 (rollback detected) | relationship projection | decisions |
+| MAC provider (Vault locally, Managed HSM in production) | trusted | integrity keys | commit and seal only; **none at query** |
+| `search-index-builder` | narrow workload | credential | submits bytes |
+
+### 11.2 Threat table (R1 IX-T01–T18, revised)
+
+| ID | Threat | Control (revision 2 changes in bold) | Tests |
+|---|---|---|---|
+| T01 | Cross-organization leakage | Organization from the DUA binding; leading key; **FORCE RLS on `authority_search` for the reader role**; snapshot binding | IX-01, IX-02 |
+| T02 | Confidential exposure | Active approval with Authority-registered classification Public/Internal and Standard protection; CHECK; encrypted leaves produce an anomaly, never a posting; G21-safe input | IX-03–05 |
+| T03 | Stale values after a classification change | Same-transaction purge; query requires Active and `Complete`; **forced VACUUM**; backups age out (R-IX-3) | IX-06, IX-07 |
+| T04 | Existence disclosure through matches, counts, sort or paging | T1: caller's own sets at the pin, value-independent readability. **T2: access-scoped candidates plus a SpiceDB decision per result.** Counts only after decisions; limits on caller-owned quantities | IX-08–12, **IX-33** |
+| T05 | Timing side channel | **T1: scope-driven plan, independent of unauthorized data (§8.2). T2: cost O(caller-accessible matches).** Value-driven plans prohibited | IX-13 |
+| T06 | Business DBA tampering with the index | No path (G08) | IX-14, IX-15 |
+| T07 | Authority-domain tampering or partial restore | I-1 per query; **I-2 per match**; **entry seals**; sweeps; projection quarantine; **pgAudit on human access** | IX-16, IX-17, **IX-34** |
+| T08 | Replay or rollback | Operation binding (I-1); I-2; G14 for AuthorityDb; **projection revision fence for old Authority versions** | IX-18, IX-19, **IX-35** |
+| T09 | Authorization change during a search | S1 pin and verify; revision checks; paging validation; **T2: candidate transaction revision = pinned marker = projection revision** | IX-20, IX-21 |
+| T10 | Content change during a search | REPEATABLE READ; `form_content_revision` | IX-22 |
+| T11 | Quarantined organization or record | Gate refusal; whole-search failure; projection quarantine scoped to search | IX-23, IX-24 |
+| T12 | Compromised builder | Bytes only, verified; attestation by the Authority | IX-25, IX-26 |
+| T13 | Builder or HSM unavailable | Coverage `Building`; resumable; fallback rules | IX-27 |
+| T14 | Predicate values in logs | **Role-level PostgreSQL parameter-logging settings, pgAudit settings, application logging rules (§5.3)** | IX-28 |
+| T15 | Expensive queries | Limits, timeouts, admission | IX-29 |
+| T16 | Forged predicate | Authority re-check | IX-30 |
+| T17 | Partial-share inference | Item-level Evaluable parity (T1 and T2) | IX-09, IX-10, **IX-36** |
+| T18 | Indexed result taken as proof of business integrity | **§6.6 wording and contract (`projectionVerified=false`, `resultBasis`)**; verified open | IX-31, IX-32, **IX-37** |
+| **T19** | **Tier 2 evaluator divergence** (missing or extra access rows) | Schema coupling guard, property-based differential, online sampling, sweep, SpiceDB decision per result, fail closed on divergence | **IX-38–41** |
+| **T20** | **Runtime role abuse of the new `DELETE` grant** | `DELETE` only on derived `authority_search` tables; deleted entries detected by I-1 and seals; grants test | **IX-42** |
+
+### 11.3 Residual risks
+
+| ID | Risk | Status |
 |---|---|---|
-| **IX-0** | ADR-PB-004 A2 drafted from this design; owner decisions IX-D1 to IX-D12; independent design review | Owner approval |
-| **IX-1** | Authority schema and migrations; `SearchPostingDerivation/v1` with vectors; inline derivation **dark** (written, never queried); coverage lifecycle; purge on withdrawal; cheap sweep; privileges inventory; commit-latency benchmark | IX-03 to 07, 14 to 17 and 28; commit p95 delta |
-| **IX-2** | O-1 client hardening; `search-index-builder` with set-based reads (O-2); Authority attestation; deep sweep; rebuild command | IX-18, 19 and 25 to 27; backfill throughput |
-| **IX-3** | Authority `indexed-query` and `page`; business `Shadow` engine; differential evidence | Zero-difference exit criterion; IX-08 to 13 and 20 to 24 |
-| **IX-4** | `Indexed` engine for Advanced Field Search in Development/Testing; fallback rules; UI scope-statement wording; Stage B shards; local benchmarks 50 to 100K | All IX tests; owner functional acceptance |
-| **IX-5** | (Optional, IX-D12) My Records on verified entries | Separate approval |
-| **IX-6** | Azure staging PERF-01 with Managed HSM; DR rehearsal (rebuild after restore); independent implementation review | Production gate (PB-12 evidence) |
+| R-IX-1 | Timing residual | **Closed for T1** (scope-driven); T2 cost is caller-scoped; any remaining residual measured in IX-13 |
+| R-IX-2 | AuthorityDb readers see approved plaintext (administrators, runtime, reader role, backup restores) | Accept or reject: IX-D2 / R-D |
+| R-IX-3 | Withdrawn plaintext persists in WAL and backups until expiry | Documented; forced VACUUM |
+| R-IX-4 | BusinessDb tampering not detected by search | Accept or reject: IX-D3 / R-A |
+| R-IX-5 | 50,000 discover ceiling | **Temporary (T1 only)**; removed by T2 |
+| R-IX-6 | Authority-domain omission detected by sweep, not per query | Accept, or choose IX-D14 option B |
+| R-IX-7 | T2 under-inclusion between sweeps if the evaluator diverges | Accept or reject: IX-D13 / R-B |
+| From C7, unchanged | Delivered matches have been seen; the Authority runtime is trusted | — |
 
-**Unchanged by this design:**
-- M4-1 stays open pending independent review;
-- the P-S1-1 benchmark remains an open, known-failing performance test until V1 is fixed (O-1/O-2) or retired.
+---
+
+## 12. Recovery, rebuild and rollback
+
+### 12.1 Sources of truth
+
+Every `authority_search` row is **derived**:
+
+| Rows | Rebuilt from | HSM needed |
+|---|---|---|
+| Postings and entries | BusinessDb bytes verified against the accepted heads | Yes: 8 MAC verifications per record (benchmark form) plus 1 seal sign per record |
+| Access postings | Canonical `authority_relationship_edges` plus the postings | No |
+| Coverages | Approvals plus attestation | No |
+| Result snapshots | Disposable | No |
+
+Losing the schema loses **search availability**, never data or authorization state.
+
+### 12.2 Scenarios
+
+| Scenario | Detection | Procedure | Search during recovery |
+|---|---|---|---|
+| Partial loss or corruption of `authority_search` | I-1, I-2 or sweep | Projection `Quarantined` → operator `SearchProjectionRebuild` command (journaled, security administrator, step-up when PB-08 exists) → `Rebuilding`: delete the organization's projection; coverages `Building`; access postings rebuilt from edges (fast); builder rounds; Authority attestation per coverage → `Active` | V1 fallback within V1 limits, else `SEARCH_INDEX_NOT_READY` |
+| AuthorityDb PITR or restore, then G14 journal replay | Replay advances heads whose postings were not restored → I-1 | As above, automatically entering `Rebuilding` after recovery cutover. The recovery runbook gains a "search projection rebuilt" step **before** search is re-enabled | Same |
+| BusinessDb restore (T16-B class) | Opens fail and quarantine records; deep sweep | Index unaffected and remains correct for accepted content; record quarantine as today | Indexed search continues; quarantined records fail any search whose scope contains them (D3 parity) |
+| SpiceDB restore or rollback (T16-S class) | S1 quarantines the organization | G14 procedures; access postings unaffected (derived from AuthorityDb edges) | Organization gate closed → refused |
+| Derivation defect found (wrong posting semantics) | Golden vectors, differential, sweep | New derivation version `v2`; full re-derivation through the builder; old postings never re-signed or "patched" | Fallback |
+| Access-derivation defect or zed schema change | Coupling guard or differential | Tier 2 disabled; rebuild access postings with the new derivation version; differential suite | Tier 1 |
+| Approval withdrawn | — | Same-transaction purge, forced VACUUM | Field no longer offered |
+| Organization offboarded | — | Delete in the disposal transaction | — |
+
+### 12.3 Feature rollback
+
+- **Flags** (R1 §G.1, plus `SearchIndex:Tier2Enabled`):
+  * engine back to `VerifiedScan` → V1 path unchanged; V1 code retained until V2 accepted;
+  * `QueryEnabled=false` → no indexed query;
+  * `DerivationEnabled=false` → derivation stops and the projection is marked `Rebuilding` at the next commit, so stale data can never be queried later.
+- **Schema:** additive (expand only). Dropping `authority_search` loses only derived data.
+- **Contract:** `resultBasis` is optional; old clients ignore it.
+
+### 12.4 Authority version rollback (minimum safe version)
+
+- An Authority older than IX-1 commits content without deriving postings. `projection_content_integrity_revision` then lags. The first query refuses, and the projection goes `Rebuilding` when the current version starts again.
+- The A2 operations note sets IX-1 as the **minimum Authority version** once `DerivationEnabled` has ever been on, as I3 does for S1. Re-enabling after a rollback always rebuilds.
+- An optional hard fence (a `CHECK` that an older binary violates, as S1's `ck_legacy_projection_token_retired`) is evaluated at IX-1.
+
+---
+
+## 13. Performance (to be measured)
+
+The R1 §F benchmark matrix applies, with these additions:
+- **Tier 2:** organizations of 10K, 100K and 250K records; callers with |D| of 1K, 50K, 100K and 250K; result sizes 10, 1K and 10K.
+- **I-2 cost** per match.
+- **Access-posting maintenance cost** per security command (share of 1 to 250 fields; ownership transfer of a record with 250 fields; reparent with nesting).
+- **Seal sign** added to commit p95.
+- **Differential sampling overhead.**
+
+**Expected per-search HSM operations:** 0. **Commit:** plus 1 MAC sign.
+
+**Targets** (PB-09, unverified):
+- verified search p95 < 3 s;
+- write p95 < 2 s, with derivation plus seal ≤ +20 ms p95 (proposed, revised from +15 ms for the seal).
+
+PERF-01 on Azure staging decides.
+
+## 14. Alternatives
+
+R1 §H is kept. Revision 2 adds:
+- match-first checking (rejected, §9.1);
+- authenticated index structures (rejected, §9.1);
+- value-index-driven plans (prohibited without separate approval, §8.2);
+- per-query seal verification of the whole scope (IX-D14 option B);
+- a local, HSM-wrapped index sealing key, which would make per-query seal checks cheap (rejected for now: it introduces a new exportable key class).
+
+---
+
+## 15. Decision matrix (exact texts, for final approval)
+
+Each decision is proposed verbatim. "Recommend" is Claude's recommendation; the owner decides.
+
+| # | Exact decision text | Recommend |
+|---|---|---|
+| **IX-D1** | *Placement.* The trusted search index is a set of tables in schema `authority_search` of the independently administered AuthorityDb. It is written only by the Authority runtime: (a) within the content-commit transaction that accepts the record's content, from the canonical bytes verified in that transaction, and (b) by Authority verification of builder-submitted bytes against the current head. No BusinessDb table, external engine or separate search service is part of the trusted index. | **Approve** |
+| **IX-D2** | *Plaintext in AuthorityDb and privileges.* The owner accepts that AuthorityDb and its backups hold explicitly approved Public/Internal plaintext (R-D), readable by the AuthorityDb administrator (just-in-time, audited), the Authority runtime role and a new SELECT-only `authority_search_reader` role, and by no business identity. The privilege, logging, backup, retention and replication rules of §5 are binding, including the PB-10 register update before IX-1 completes. | **Approve** |
+| **IX-D3** | *Integrity semantics.* Indexed search evaluates the content the Authority last accepted (R-A). Per query, the Authority enforces I-1 (scope guard) and I-2 (every returned match bound by SHA-256 to the accepted leaf and by Merkle root to the accepted head). Opening a record keeps the full verified read. Tampering with business bytes is detected at open and by the reconciliation sweeps, with record quarantine as today. Indexed results are never presented as verification of the business copy (§6.6). ENC-SR-08/09 are replaced by the A2 §4 text only when A2 is accepted. | **Approve, with A2** |
+| **IX-D4** | *Tier 1 permission strategy.* For field search, the population is SpiceDB `discover` and `read` at the S1-pinned snapshot. Field readability for share-only records is checked for all of the caller's records independently of predicate values. Candidate SQL is scope-driven, and value-index-driven plans are prohibited. Every limit refusal depends only on caller-owned quantities. The 50,000 discover ceiling is a temporary safeguard. | **Approve** |
+| **IX-D5** | *Pagination.* Results are held by the Authority as result snapshots (record ids and sort keys, capped at 10,000 authorized matches, expiring with the catalogue snapshot). Every page re-validates the authorization revision, `form_content_revision` and projection state, and computes edit flags at a fresh pinned snapshot. The page-invalidation rate is measured before production. | **Approve** |
+| **IX-D6** | *Coverage and backfill.* A new approval starts coverage `Building`. A separate `search-index-builder` workload identity (OD-1 pattern) submits BusinessDb bytes only. The Authority verifies them against the current head and derives postings. Only the Authority's attestation, under the organization lock, sets `Complete`. Withdrawal or invalidation purges the field's postings in the same transaction. | **Approve** |
+| **IX-D7** | *Failure handling.* A derivation or seal failure aborts the content commit. Any I-1, I-2, seal or divergence failure fails the whole search, quarantines **the search projection only** (not the organization gate) with a Critical alert, and is cleared only by a journaled `SearchProjectionRebuild` and a completed rebuild. | **Approve** |
+| **IX-D8** | *Fallback.* When the index cannot answer (coverage `Building`, projection `Rebuilding` or `Quarantined`, Tier 2 disabled), V1 runs only if the scope is within V1's limits, and the response states the engine; otherwise `SEARCH_INDEX_NOT_READY`. One search never combines engines. | **Approve** |
+| **IX-D9** | *ADR vehicle.* The decisions are recorded as ADR-PB-004 Amendment A2, which lists every preserved guarantee and the relaxations R-A to R-D for explicit acceptance. | **Approve** |
+| **IX-D10** | *O-1 and O-2.* O-1's bulk-client hardening (echoed-request mapping; a per-item error fails the call) is implemented with IX-2 and used by V2. O-2's set-based reader is implemented with IX-2 for the builder and V1. The O-1 restructuring of `VerifyProjectionsAsync` and O-3/O-4 stay deferred. The P-S1-1 benchmark stays an open, known failure until V1 is fixed or retired. | **Approve** |
+| **IX-D11** | *Exclusions.* V2 provides no suggestions, autocomplete, facets, aggregates, field-value sort, repeating-group, child-record or document search, and never indexes encrypted values, ciphertext-derived tokens, blind indexes or document content. Each would need its own decision. | **Confirm** |
+| **IX-D12** | *My Records.* Moving My Records metadata listing to verified index entries (and to Tier 2 entry access) is a separate stage (IX-6) needing its own approval after IX-4. Until then My Records is unchanged. | **Defer** |
+| **IX-D13** (new, C3) | *Tier 2.* For scale beyond Tier 1, the Authority maintains access postings derived from its canonical edges in the same transaction as the commands that change them. They are used only to narrow candidates. Every disclosed result is decided by SpiceDB at the S1-verified snapshot, and a divergence fails the search and disables Tier 2 for the organization. Under-inclusion is controlled by the schema coupling guard, property-based differential tests, online differential sampling and sweeps (R-B). Tier 2 is implemented in IX-5, enabled only after the differential exit criterion, and Tier 1 remains its oracle. | **Approve the design**; implementation per the IX-5 gate |
+| **IX-D14** (new, C2) | *Entry seals.* Each entry carries an HMAC seal made with the organization's existing integrity key, at one MAC sign per commit, verified by the hourly sweep (option A). Option B, verifying all in-scope seals per query, is not adopted because it reintroduces per-search HSM load. Authority-domain omission is therefore detected within the sweep interval (R-IX-6). | **Approve option A** |
+
+---
+
+## 16. Implementation stages and acceptance gates (each stage needs its own authorization)
+
+| Stage | Content | Exit gate |
+|---|---|---|
+| **IX-0** | Owner decisions IX-D1–D14; A2 accepted; independent **design** review (package as for S1) | Owner approval; reviewer findings dispositioned |
+| **IX-1** | Schema and migrations; roles, grants, RLS, logging settings; `SearchPostingDerivation/v1` (golden vectors); inline derivation **dark**; entry seals; coverage lifecycle and purge; cheap sweep; architecture test on head writers; PB-10 register update | IX-01–07, 14–17, 28, 34, 35, 42; commit p95 delta ≤ 20 ms (local, then staging); privilege inventory passes |
+| **IX-2** | O-1 client hardening; O-2 reader; `search-index-builder` and attestation; deep sweep; `SearchProjectionRebuild` | IX-18, 19, 25–27; CT-7; backfill throughput recorded |
+| **IX-3** | Tier 1 `indexed-query` and `page`; I-1, I-2; result snapshots; plan-shape test; business `Shadow` engine | Zero unexplained shadow differences across the Stage B search shards plus N synthetic searches; IX-08–13, 20–24, 33, 36 |
+| **IX-4** | `Indexed` engine for Advanced Field Search (Development/Testing); fallback; UI wording (§6.6) and contract field; Stage B; local benchmarks to 50K | All IX tests through 37; owner functional and **copy** acceptance; P-S1-1 disposition recorded |
+| **IX-5** | Tier 2 access postings (dark → differential → enabled); coupling guard | IX-38–41; property-based differential with 0 differences; online sampling clean over the agreed period; 100K/250K benchmarks |
+| **IX-6** (optional) | My Records on entries / entry access | Separate approval (IX-D12) |
+| **IX-7** | Azure staging PERF-01 (Managed HSM backfill and seal throughput, SpiceDB at scale), DR rehearsal including the projection rebuild after G14 recovery, independent **implementation** review | PB-12 evidence; production gate |
+
+**New test ids** (revision 2):
+- IX-33: Tier 2 counts and limits independent of unauthorized data;
+- IX-34: Authority-domain posting alteration (I-2 and seal);
+- IX-35: old-Authority commit fence;
+- IX-36: multi-select partial share, Evaluable parity;
+- IX-37: UI and contract do not represent indexed results as verified;
+- IX-38–41: Tier 2 divergence, coupling guard, differential, sweep;
+- IX-42: the runtime `DELETE` grant is confined to derived tables.
+
+R1 §K's acceptance criteria 1–10 remain, extended to the new tests.
+
+**Unchanged:** M4-1 stays open pending independent review; M4-2 unauthorized; no push, PR, merge or deploy.

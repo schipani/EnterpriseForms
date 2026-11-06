@@ -143,6 +143,16 @@
       "bytes": 18890
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
+      "sha256": "c030286fd6eb21c7c49051cd210a8994a373ad9b000dd7ea9cf76a1ac3d951c9",
+      "bytes": 56073
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
+      "sha256": "cf96e5108a3fb8e458e5145e8a1a68d633cbdbff25c316dd403c86b3fcfac7db",
+      "bytes": 58591
+    },
+    {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
       "sha256": "ba289a52bf305eff68b87a74e690fce323053bfc9a789dd1e935601ba2b25aa7",
       "bytes": 7852
@@ -248,6 +258,11 @@
       "bytes": 15129
     },
     {
+      "path": "docs/decisions/ADR-AMENDMENT-PB-004-A2-AUTHORITY-SEARCH-INDEX.md",
+      "sha256": "026cddecfe65c544094d8183351eab7896ec477adcf18f04bfab7d06c7f32c13",
+      "bytes": 10743
+    },
+    {
       "path": "docs/decisions/ADR-PB-001-CANONICAL-REPOSITORY.md",
       "sha256": "3a20cf06c6008adff1b20b5c8664c026a031ba73430a16b0f7ca3c68952b466f",
       "bytes": 5551
@@ -324,8 +339,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "37c7246594b1f47151daf4daee7c06b3b8ab196c7f3f690c28e4e99588498caf",
-      "bytes": 199847
+      "sha256": "1584eba861008ead9f923f069d6c3aaf61a3daf9d21893233596a51c82742ec8",
+      "bytes": 202919
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
