@@ -145,6 +145,12 @@ public static class AuthorityErrorCodes
     /// <summary>C-107: the organization already has (or would exceed) the maximum number of active owners.</summary>
     public const string OrganizationOwnerLimit = "ORGANIZATION_OWNER_LIMIT";
     public const string CursorInvalid = "CURSOR_INVALID";
+
+    /// <summary>IX-1: the search index could not be derived for a content commit; the commit is refused (IX-D7, fail closed).</summary>
+    public const string SearchIndexDerivationFailed = "SEARCH_INDEX_DERIVATION_FAILED";
+
+    /// <summary>IX-1: the search entry seal could not be produced with the pinned key; the commit is refused (fail closed).</summary>
+    public const string SearchSealUnavailable = "SEARCH_SEAL_UNAVAILABLE";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

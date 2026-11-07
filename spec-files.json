@@ -153,9 +153,14 @@
       "bytes": 17755
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_IX1_EVIDENCE.md",
+      "sha256": "35ce4bf6ed18dd0577f5ea46c468490be2d808e535990cdb02beb5c3dcf9bd6d",
+      "bytes": 21874
+    },
+    {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "b99712877fa5e5fd79388b4d80f8da53fb18e94cde2612d351e309ff2e0e6cee",
-      "bytes": 120435
+      "sha256": "661afe460d8352cdf6e601b4c67d190bc4ce9867ade28eeae12005396c2f4175",
+      "bytes": 126394
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -359,8 +364,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "aae380f7049c0e2790f6e85ed472b88cc3e765e9ed822af101b384628e43af94",
-      "bytes": 219980
+      "sha256": "a900ab2b59456464cbd0815c9c8357a694b89704d5c121f32d05609d9ca954c0",
+      "bytes": 223032
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -406,6 +411,11 @@
       "path": "docs/dynamic-forms/row-integrity-format.md",
       "sha256": "c75162ac988be343644d988c1f69ffdd14a09cb4185a940e1d67b08783f7bf05",
       "bytes": 14113
+    },
+    {
+      "path": "docs/dynamic-forms/search-entry-seal-format.md",
+      "sha256": "8d275a86db8c5fe2e2f592ab72cfdbdb858de20508cd6c54cd6be9d9e02daa0e",
+      "bytes": 5012
     },
     {
       "path": "docs/governance/PB12_RELEASE_EVIDENCE_SCHEMA.json",
@@ -454,8 +464,8 @@
     },
     {
       "path": "docs/privacy/PB10_DATA_FLOW_RESIDENCY_REGISTER.csv",
-      "sha256": "b9af1a78b380185468d858794369dd024f8aa4d22776a21a4d24e76566fffe88",
-      "bytes": 3348
+      "sha256": "b1f3d154ea127b8a48d2b6c03bc8ac13fd05d9da30b4b10d3870c9f05b073cbb",
+      "bytes": 3646
     },
     {
       "path": "docs/security/AUTHORITY_PRIVILEGE_REMEDIATION_PROPOSAL.md",
@@ -763,6 +773,21 @@
       "bytes": 9193
     },
     {
+      "path": "scripts/measurement/ix1/sealbench/Program.cs",
+      "sha256": "cd17e522d34554442df636a1b19febdca77ee8580db07a03e82634b959d9c15e",
+      "bytes": 2887
+    },
+    {
+      "path": "scripts/measurement/ix1/sealbench/sealbench.csproj",
+      "sha256": "13dcf9ab550529e5986b0bcde15bf4a31e1c475a6951dd9fd178471e2a334800",
+      "bytes": 567
+    },
+    {
+      "path": "scripts/measurement/ix1/vault_sign_bench.py",
+      "sha256": "32d3dfc5226a5505cb8ce92469d8ba7a8b40642ff9f81a433522a21ff34ff7eb",
+      "bytes": 1775
+    },
+    {
       "path": "scripts/validate-specifications.py",
       "sha256": "4723da23ce7c84998b6039c98ede0c598da5beee329cbeb60b1fb59113c84544",
       "bytes": 2993
@@ -946,6 +971,11 @@
       "path": "trust_authority/row-integrity-v1.test-vectors.json",
       "sha256": "7a42ce583f61e7efc7ddf07231074b4baaa3e8acd1481b643df3f8bd98a14899",
       "bytes": 18057
+    },
+    {
+      "path": "trust_authority/search-entry-seal-v1.test-vectors.json",
+      "sha256": "1728c3fc3448591bf68d45790e74939bcac111021fe2f55ca8b271d729ce90d4",
+      "bytes": 47605
     },
     {
       "path": "trust_authority/spicedb.schema.zed",

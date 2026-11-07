@@ -2887,6 +2887,867 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchBooleanPosting", b =>
+                {
+                    b.Property<Guid>("SearchBooleanPostingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_boolean_posting_id");
+
+                    b.Property<bool>("BooleanValue")
+                        .HasColumnType("boolean")
+                        .HasColumnName("boolean_value");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<byte[]>("ManifestItemKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("manifest_item_key");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<byte[]>("SourceCanonicalBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("source_canonical_bytes");
+
+                    b.Property<string>("SourceEntityKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_entity_kind");
+
+                    b.HasKey("SearchBooleanPostingId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "FieldDefinitionId")
+                        .HasDatabaseName("ix_search_boolean_postings_record");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasDatabaseName("ix_search_boolean_postings_entry");
+
+                    b.HasIndex("OrganizationId", "FieldDefinitionId", "BooleanValue", "FormRecordId")
+                        .HasDatabaseName("ix_search_boolean_postings_value");
+
+                    b.ToTable("search_boolean_postings", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_boolean_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchDatePosting", b =>
+                {
+                    b.Property<Guid>("SearchDatePostingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_date_posting_id");
+
+                    b.Property<DateOnly>("DateValue")
+                        .HasColumnType("date")
+                        .HasColumnName("date_value");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<byte[]>("ManifestItemKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("manifest_item_key");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<byte[]>("SourceCanonicalBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("source_canonical_bytes");
+
+                    b.Property<string>("SourceEntityKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_entity_kind");
+
+                    b.HasKey("SearchDatePostingId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "FieldDefinitionId")
+                        .HasDatabaseName("ix_search_date_postings_record");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasDatabaseName("ix_search_date_postings_entry");
+
+                    b.HasIndex("OrganizationId", "FieldDefinitionId", "DateValue", "FormRecordId")
+                        .HasDatabaseName("ix_search_date_postings_value");
+
+                    b.ToTable("search_date_postings", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_date_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchDateTimePosting", b =>
+                {
+                    b.Property<Guid>("SearchDateTimePostingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_date_time_posting_id");
+
+                    b.Property<DateTimeOffset>("DateTimeValue")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("date_time_value");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<byte[]>("ManifestItemKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("manifest_item_key");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<byte[]>("SourceCanonicalBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("source_canonical_bytes");
+
+                    b.Property<string>("SourceEntityKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_entity_kind");
+
+                    b.HasKey("SearchDateTimePostingId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "FieldDefinitionId")
+                        .HasDatabaseName("ix_search_date_time_postings_record");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasDatabaseName("ix_search_date_time_postings_entry");
+
+                    b.HasIndex("OrganizationId", "FieldDefinitionId", "DateTimeValue", "FormRecordId")
+                        .HasDatabaseName("ix_search_date_time_postings_value");
+
+                    b.ToTable("search_date_time_postings", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_date_time_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchDecimalPosting", b =>
+                {
+                    b.Property<Guid>("SearchDecimalPostingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_decimal_posting_id");
+
+                    b.Property<decimal>("DecimalValue")
+                        .HasColumnType("numeric")
+                        .HasColumnName("decimal_value");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<byte[]>("ManifestItemKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("manifest_item_key");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<byte[]>("SourceCanonicalBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("source_canonical_bytes");
+
+                    b.Property<string>("SourceEntityKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_entity_kind");
+
+                    b.HasKey("SearchDecimalPostingId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "FieldDefinitionId")
+                        .HasDatabaseName("ix_search_decimal_postings_record");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasDatabaseName("ix_search_decimal_postings_entry");
+
+                    b.HasIndex("OrganizationId", "FieldDefinitionId", "DecimalValue", "FormRecordId")
+                        .HasDatabaseName("ix_search_decimal_postings_value");
+
+                    b.ToTable("search_decimal_postings", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_decimal_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchFieldCoverage", b =>
+                {
+                    b.Property<Guid>("SearchFieldCoverageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_field_coverage_id");
+
+                    b.Property<DateTimeOffset?>("CoverageCompletedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("coverage_completed_on");
+
+                    b.Property<DateTimeOffset>("CoverageStartedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("coverage_started_on");
+
+                    b.Property<string>("CoverageStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("coverage_state_name");
+
+                    b.Property<string>("CoverageWithdrawalReasonCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("coverage_withdrawal_reason_code");
+
+                    b.Property<DateTimeOffset?>("CoverageWithdrawnOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("coverage_withdrawn_on");
+
+                    b.Property<string>("CoveredFieldClassification")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("covered_field_classification");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<string>("IndexedValueTypeName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("indexed_value_type_name");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("SearchFieldCoverageId");
+
+                    b.HasIndex("FieldSearchApprovalId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_field_coverage_approval");
+
+                    b.HasIndex("OrganizationId", "FormDefinitionId")
+                        .HasDatabaseName("ix_search_field_coverages_form");
+
+                    b.ToTable("search_field_coverages", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_coverage_classification", "covered_field_classification IN ('Public','Internal')");
+
+                            t.HasCheckConstraint("ck_search_coverage_state", "coverage_state_name IN ('Building','Complete','Withdrawn')");
+
+                            t.HasCheckConstraint("ck_search_coverage_value_type", "indexed_value_type_name IN ('String','Integer','Decimal','Date','DateTime','Boolean','Option')");
+
+                            t.HasCheckConstraint("ck_search_coverage_withdrawal", "(coverage_state_name = 'Withdrawn') = (coverage_withdrawn_on IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchFormState", b =>
+                {
+                    b.Property<Guid>("SearchFormStateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_form_state_id");
+
+                    b.Property<long>("FormContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("form_content_revision");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<DateTimeOffset>("FormStateModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("form_state_modified_on");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("SearchFormStateId");
+
+                    b.HasIndex("OrganizationId", "FormDefinitionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_form_state_form");
+
+                    b.ToTable("search_form_states", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_form_state_revision", "form_content_revision >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchIntegerPosting", b =>
+                {
+                    b.Property<Guid>("SearchIntegerPostingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_integer_posting_id");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<long>("IntegerValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("integer_value");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<byte[]>("ManifestItemKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("manifest_item_key");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<byte[]>("SourceCanonicalBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("source_canonical_bytes");
+
+                    b.Property<string>("SourceEntityKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_entity_kind");
+
+                    b.HasKey("SearchIntegerPostingId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "FieldDefinitionId")
+                        .HasDatabaseName("ix_search_integer_postings_record");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasDatabaseName("ix_search_integer_postings_entry");
+
+                    b.HasIndex("OrganizationId", "FieldDefinitionId", "IntegerValue", "FormRecordId")
+                        .HasDatabaseName("ix_search_integer_postings_value");
+
+                    b.ToTable("search_integer_postings", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_integer_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchOptionPosting", b =>
+                {
+                    b.Property<Guid>("SearchOptionPostingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_option_posting_id");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldOptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_option_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<byte[]>("ManifestItemKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("manifest_item_key");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<byte[]>("SourceCanonicalBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("source_canonical_bytes");
+
+                    b.Property<string>("SourceEntityKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_entity_kind");
+
+                    b.HasKey("SearchOptionPostingId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "FieldDefinitionId")
+                        .HasDatabaseName("ix_search_option_postings_record");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasDatabaseName("ix_search_option_postings_entry");
+
+                    b.HasIndex("OrganizationId", "FieldDefinitionId", "FieldOptionId", "FormRecordId")
+                        .HasDatabaseName("ix_search_option_postings_value");
+
+                    b.ToTable("search_option_postings", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_option_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchProjectionState", b =>
+                {
+                    b.Property<Guid>("SearchProjectionStateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_projection_state_id");
+
+                    b.Property<DateTimeOffset?>("LastEvaluationOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_evaluation_on");
+
+                    b.Property<DateTimeOffset?>("LastSuccessfulCheapPassOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_successful_cheap_pass_on");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<long>("ProjectionContentIntegrityRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("projection_content_integrity_revision");
+
+                    b.Property<DateTimeOffset>("ProjectionCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("projection_created_on");
+
+                    b.Property<DateTimeOffset>("ProjectionModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("projection_modified_on");
+
+                    b.Property<int>("ProjectionSchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("projection_schema_version");
+
+                    b.Property<string>("ProjectionStatusName")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("projection_status_name");
+
+                    b.Property<string>("ProjectionStatusReasonCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("projection_status_reason_code");
+
+                    b.Property<long?>("ReconciliationFromRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reconciliation_from_revision");
+
+                    b.Property<string>("SuspendedScopeNames")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("suspended_scope_names");
+
+                    b.Property<bool>("VerificationSuspended")
+                        .HasColumnType("boolean")
+                        .HasColumnName("verification_suspended");
+
+                    b.HasKey("SearchProjectionStateId");
+
+                    b.HasIndex("OrganizationId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_projection_state_org");
+
+                    b.ToTable("search_projection_states", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_projection_reconciliation", "(projection_status_name = 'ReconciliationRequired') = (reconciliation_from_revision IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_search_projection_revision", "projection_content_integrity_revision >= 0 AND projection_schema_version >= 1");
+
+                            t.HasCheckConstraint("ck_search_projection_status", "projection_status_name IN ('Active','ReconciliationRequired','Quarantined')");
+
+                            t.HasCheckConstraint("ck_search_projection_suspension", "verification_suspended = (suspended_scope_names IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", b =>
+                {
+                    b.Property<Guid>("SearchRecordEntryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_record_entry_id");
+
+                    b.PrimitiveCollection<Guid[]>("DerivedFieldSearchApprovalIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("derived_field_search_approval_ids");
+
+                    b.Property<byte[]>("EntrySealSignature")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("entry_seal_signature");
+
+                    b.Property<DateTimeOffset>("EntryWrittenOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("entry_written_on");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<int>("IndexedAnomalyCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("indexed_anomaly_count");
+
+                    b.Property<long>("IndexedContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("indexed_content_revision");
+
+                    b.Property<byte[]>("IndexedManifestRoot")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("indexed_manifest_root");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<int>("IndexedPostingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("indexed_posting_count");
+
+                    b.Property<DateTimeOffset>("LastDeepVerifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_deep_verified_on");
+
+                    b.Property<string>("LastSealAttemptOutcomeCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("last_seal_attempt_outcome_code");
+
+                    b.Property<DateTimeOffset?>("LastSealAttemptedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seal_attempted_on");
+
+                    b.Property<DateTimeOffset>("LastSealVerifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seal_verified_on");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("RecordStatusName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("record_status_name");
+
+                    b.Property<string>("SealKeyName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("seal_key_name");
+
+                    b.Property<int>("SealKeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("seal_key_version");
+
+                    b.Property<int>("SealSchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("seal_schema_version");
+
+                    b.HasKey("SearchRecordEntryId");
+
+                    b.HasAlternateKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasName("uq_search_record_entry_operation");
+
+                    b.HasIndex("OrganizationId", "FormRecordId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_record_entry_record");
+
+                    b.HasIndex("OrganizationId", "LastSealVerifiedOn")
+                        .HasDatabaseName("ix_search_record_entries_seal_check");
+
+                    b.HasIndex("OrganizationId", "FormDefinitionId", "FormRecordId")
+                        .HasDatabaseName("ix_search_record_entries_form");
+
+                    b.ToTable("search_record_entries", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_entry_counts", "indexed_posting_count >= 0 AND indexed_anomaly_count >= 0 AND cardinality(derived_field_search_approval_ids) >= 1");
+
+                            t.HasCheckConstraint("ck_search_entry_head", "octet_length(indexed_manifest_root) = 32 AND indexed_content_revision >= 1");
+
+                            t.HasCheckConstraint("ck_search_entry_seal", "octet_length(entry_seal_signature) = 64 AND seal_key_version >= 1 AND seal_schema_version = 1");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordFieldAnomaly", b =>
+                {
+                    b.Property<Guid>("SearchRecordFieldAnomalyId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_record_field_anomaly_id");
+
+                    b.Property<string>("AnomalyKindName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("anomaly_kind_name");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("SearchRecordFieldAnomalyId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasDatabaseName("ix_search_record_field_anomalies_entry");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "FieldDefinitionId", "AnomalyKindName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_record_field_anomaly");
+
+                    b.ToTable("search_record_field_anomalies", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_anomaly_kind", "anomaly_kind_name IN ('EncryptedValuePresent')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchStringPosting", b =>
+                {
+                    b.Property<Guid>("SearchStringPostingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_string_posting_id");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<byte[]>("ManifestItemKey")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("manifest_item_key");
+
+                    b.Property<string>("NormalizedStringValue")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("normalized_string_value")
+                        .UseCollation("C");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<byte[]>("SourceCanonicalBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("source_canonical_bytes");
+
+                    b.Property<string>("SourceEntityKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_entity_kind");
+
+                    b.HasKey("SearchStringPostingId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "FieldDefinitionId")
+                        .HasDatabaseName("ix_search_string_postings_record");
+
+                    b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasDatabaseName("ix_search_string_postings_entry");
+
+                    b.HasIndex("OrganizationId", "FieldDefinitionId", "NormalizedStringValue", "FormRecordId")
+                        .HasDatabaseName("ix_search_string_postings_value");
+
+                    b.ToTable("search_string_postings", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_string_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SecurityCommands.AuthorityRelationshipEdge", b =>
                 {
                     b.Property<Guid>("AuthorityRelationshipEdgeId")
@@ -3678,6 +4539,145 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PlatformOperatorId")
                         .HasConstraintName("fk_platform_evidence_operator");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchBooleanPosting", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasPrincipalKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_boolean_posting_entry");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchDatePosting", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasPrincipalKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_date_posting_entry");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchDateTimePosting", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasPrincipalKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_date_time_posting_entry");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchDecimalPosting", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasPrincipalKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_decimal_posting_entry");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchFieldCoverage", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval", null)
+                        .WithMany()
+                        .HasForeignKey("FieldSearchApprovalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_field_coverage_approval");
+
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_field_coverage_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchFormState", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_form_state_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchIntegerPosting", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasPrincipalKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_integer_posting_entry");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchOptionPosting", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasPrincipalKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_option_posting_entry");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchProjectionState", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_projection_state_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_record_entry_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordFieldAnomaly", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasPrincipalKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_record_field_anomaly_entry");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchStringPosting", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchRecordEntry", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .HasPrincipalKey("OrganizationId", "FormRecordId", "IndexedOperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_string_posting_entry");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SecurityCommands.AuthorityRelationshipEdge", b =>

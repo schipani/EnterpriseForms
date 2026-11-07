@@ -49,6 +49,10 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
     private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction) : IAuthorityScope
     {
         private bool committed;
+        private SearchIndexStore? searchIndex;
+
+        /// <summary>IX-1: the search index on this scope's context and transaction.</summary>
+        public ISearchIndexStore SearchIndex => searchIndex ??= new SearchIndexStore(context);
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) =>
             context.OrganizationStates.FromSqlInterpolated($"SELECT * FROM authority.organization_authorization_states WHERE organization_id = {organizationId} FOR UPDATE")

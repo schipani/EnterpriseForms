@@ -5,6 +5,7 @@
   * Revision 2 answered C1 to C4.
   * Revision 3 records the owner decisions on IX-D1 to IX-D14 (§15) and answers the five C-121 mandatory conditions (§17). It is the version submitted for independent review: [INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md](INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md).
   * **C-122 (2026-11-06):** the owner decided FD-1 to FD-8 (§17.7). Their attached conditions are specified in §17.9. FD-6 and FD-7 are deferred to the reviewer. **No independent review has occurred.**
+  * **C-126 (2026-11-06):** the owner approved the ES256 architecture (C-125 option 4b) and authorized **IX-1**. ES256 replaces the per-record HMAC seal of §18.1.4; IX-1 was implemented as recorded in §19 and `INDEXED_SEARCH_IX1_EVIDENCE.md`. IX-2 to IX-7 are not authorized; Tier 2 remains design-only.
   * **C-124 (2026-11-06):** the owner approved the §17.10 deadline contract with clarifications (§17.10.5) and decided OR-1 to OR-4 and OBS-IX-1 (provisional High). The resulting contracts are in §18. OR-1 and OR-2 stay **open** until the owner accepts §18.1 and §18.2.
   * **C-123 (2026-11-06):** the owner acts as the designated owner reviewer (an owner-led review, **not** an independent third-party assessment; `docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md`). The proposed sweep-deadline decision is in §17.10. The Tier 1 owner-review evidence is `INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md`; its findings OR-1 to OR-4 are marked where they correct this document.
   * **Tier 2 (§9) is approved for further review only.** Neither its implementation nor its enablement is authorized.
@@ -1156,6 +1157,8 @@ Illustration: if 10% of the 50 requests/s PB-09 envelope were search pages at P 
 
 #### 18.1.6 Status
 
+> **C-126:** the owner replaced the HMAC seal with **ES256** (C-125 option 4b): a dedicated non-exportable signing key, signatures produced by the provider at commit, verification local with the public key pinned in deployment configuration, and a separate key purpose. The bindings of §18.1.4 are unchanged; the signature algorithm and verification path are as `docs/dynamic-forms/search-entry-seal-format.md`. OR-1 is closed by this decision for IX-1 purposes; freshness and current-approval binding remain outside the seal (§18.1.4 table).
+>
 > **C-125:** the per-record HMAC seal is **not final**. A cost and cryptographic reassessment compares five alternatives: `INDEXED_SEARCH_INTEGRITY_COST_REASSESSMENT.md`. It recommends ES256 seals verified locally with a pinned public key (about 2 remote HSM operations/s instead of about 170/s), plus signed external checkpoints. IX-1 does not begin until the owner decides.
 
 OR-1 is **open** until the owner accepts §18.1.4, including the separate key purpose. The seal message schema needs written vectors (generated at IX-1) and is added to the independent cryptographic review scope (package Q7). Per-page seal verification is a design requirement (C-124); it is **not** a complete mitigation (AD-2; freshness under AD-1 and AD-3).
@@ -1238,3 +1241,27 @@ Existing catalogue-snapshot cleanup is **not** relied on (none exists). New requ
 ### 18.5 New test identifiers (C-124)
 
 IX-69 to IX-82 as above; IX-35 and IX-63 revised.
+
+---
+
+## 19. IX-1 implementation record (C-126)
+
+Built on branch `ix-1/authority-search-index` (from `28a6e44`). Evidence, measurements and test results: `INDEXED_SEARCH_IX1_EVIDENCE.md`. Implementation decisions taken within C-126 (for owner acceptance):
+
+| # | Decision | Reason | Effect |
+|---|---|---|---|
+| D-IX1-1 | **One dedicated seal-signing key per environment** (`search-entry-seal-v1`), not one per organization; the organization is bound inside the signed message | C-126 says "a dedicated, non-exportable signing key" and "pinned public key": per-organization keys created at runtime cannot have deployment-pinned public keys | One key compromise affects every organization's seals (the key is non-exportable; an Authority-process compromise already reaches every organization) |
+| D-IX1-2 | The pin is the **full SubjectPublicKeyInfo** in configuration (`SearchIndex:Seal:PinnedKeys`); before the first signature the gate requires the provider's public key to equal the pin, and every signature is verified locally against the pin before it is stored | Pinning by value; detects a provider that signs with another key | Commits on indexed forms fail closed (`SEARCH_SEAL_UNAVAILABLE`) on a pin mismatch |
+| D-IX1-3 | **Withdrawal purges the whole form's index** and returns sibling coverages to Building (R1 §C.2 purged the field only) | Each entry's seal covers all its postings, so removing one field's postings would invalidate every seal; re-signing every entry inside the command would be one remote signature per record | Privacy-preserving superset; availability cost: the form's other searchable fields need backfill (IX-2) after any withdrawal |
+| D-IX1-4 | Search tables are owned by the migration identity, like every `authority` table; no separate NOLOGIN owner role. The reader role `authority_search_reader` is created **NOLOGIN** (no credential) | Ownership transfer to a dedicated role needs membership arrangements beyond IX-1; the reader has no user until IX-3 | No IX-1 property depends on it (the runtime role is not the owner; RLS is forced) |
+| D-IX1-5 | Forced RLS on the **value-bearing** tables only (entries, postings, anomalies); state tables (projection, coverages, form states) without RLS | State tables hold no customer values; the INV-R trigger must read the projection row regardless of the organization binding | The cross-organization residue check still covers postings |
+| D-IX1-6 | `SecurityCommandService.ApplyPlan` **refuses** approval changes from any caller other than `SubmitAsync` | An approval change must start or purge coverage in the same transaction; only `SubmitAsync` does that | Fail closed instead of a silent missing purge |
+| D-IX1-7 | String postings store the normalized value plus the source canonical bytes; no separate exact-value column (revision 2 §4) | Minimization: the exact value is recoverable from the source bytes | None for IX-1; the IX-3 evaluator decodes the source bytes where exact values are needed |
+| D-IX1-8 | One extra `SaveChanges` flush inside every content commit (before the Testing-only crash point) | Makes the crash test meaningful (the index rows are on the server when the crash happens) | One more database round trip per commit, included in the measured commit latency |
+| D-IX1-9 | Disabled mode (the default) creates no coverage or projection rows; a commit in Disabled mode with an existing projection marks it ReconciliationRequired (INV-R option b) | Off by default everywhere except the Testing stack | Existing deployments are unchanged |
+| D-IX1-10 | S-A and S-B hold the organization lock for their batch | A consistent entry-and-postings read without a REPEATABLE READ snapshot per entry | Commits of that organization wait for a batch (measured in the evidence) |
+| D-IX1-11 | S-C (deep comparison with BusinessDb) is IX-2; its deadline is enforced from the derivation time | §17.10 deadline contract | Without IX-2, an organization whose indexed records are not re-committed within 30 days is suspended (Dark mode only; no user effect) |
+| D-IX1-12 | Coverage starts and withdrawals are not journaled separately (the approval command is journaled); quarantine, suspension, resumption and reconciliation are journaled on the audit stream | No new authorization-stream events (the S1 marker depends on one entry per revision) | — |
+| D-IX1-13 | Azure Managed HSM ES256 provider not implemented; the AzureManagedHsm seal provider fails closed | No Azure in IX-1 (the HMAC Managed HSM provider is also not implemented) | Production cannot sign seals (Dark mode is refused outside Development/Testing anyway) |
+| D-IX1-14 | Backfill (IX-2) is not built, so the backfill-race test (IX-67) cannot run | Staged design | Covered at IX-2 |
+| D-IX1-15 | Testing-only stage timing (`IX1-DERIVE-TIMING`, event 9301: reads, derive, sign, writes) through an optional callback on `SearchIndexWriter`, wired only in the Testing environment | The commit-latency gate was missed; the owner needs measured stage shares, not estimates | Identifiers and durations only; absent in every other environment |

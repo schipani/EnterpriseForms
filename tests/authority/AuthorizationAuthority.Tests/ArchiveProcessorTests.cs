@@ -98,6 +98,8 @@ public sealed class ArchiveProcessorTests
 
     private sealed class FakeStore(Guid organizationId) : IAuthorityStore, IAuthorityScope
     {
+        public ISearchIndexStore SearchIndex => throw new NotSupportedException();
+
         public OrganizationAuthorizationState State { get; } = new() { OrganizationId = organizationId };
 
         public List<SecurityJournalEntry> Entries { get; } = [];

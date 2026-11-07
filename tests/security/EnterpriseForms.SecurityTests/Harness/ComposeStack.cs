@@ -48,6 +48,19 @@ public sealed class ComposeStack
     /// database restore from an earlier backup leaves behind (platform journal rows and registry state from before an event). Never
     /// used by product code; exists only on the isolated, disposable security-test stack.
     /// </summary>
+    /// <summary>
+    /// IX-1 (Testing only): runs SQL as the AuthorityDb administrator inside the authority-db container; with
+    /// <paramref name="throwOnError"/> false the psql error text is returned instead of thrown, so a test can assert a refusal
+    /// (a permission denied under <c>SET ROLE</c>, or the INV-R constraint trigger at commit). Never used by product code.
+    /// </summary>
+    public string AuthorityAdministratorSql(string sql, bool throwOnError = true)
+    {
+        var encodedSql = Convert.ToBase64String(Encoding.UTF8.GetBytes(sql));
+        var shell = $"echo {encodedSql} | base64 -d | PGPASSWORD=\"$POSTGRES_PASSWORD\" PGOPTIONS='-c search_path=authority' psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -v ON_ERROR_STOP=1 -qAt";
+        var encodedShell = Convert.ToBase64String(Encoding.UTF8.GetBytes(shell));
+        return Compose($"exec -T authority-db sh -c \"echo {encodedShell} | base64 -d | sh\"", 60, throwOnError);
+    }
+
     public string AuthorityRestoreSimulationSql(string sql)
     {
         var encodedSql = Convert.ToBase64String(Encoding.UTF8.GetBytes(sql));

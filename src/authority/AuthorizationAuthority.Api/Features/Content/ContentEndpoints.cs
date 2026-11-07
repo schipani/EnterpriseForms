@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace AuthorizationAuthority.Api.Features.Content;
 
-public static class ContentEndpoints
+public static partial class ContentEndpoints
 {
     public static IEndpointRouteBuilder MapContentEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -21,10 +21,21 @@ public static class ContentEndpoints
             .WithName("PrepareContentChange")
             .WithSummary("Validates the exact candidate snapshot against the accepted head and the actor's edit scope (or, without a user, the reprotection rules of an effective PublishFormSecurityRevision command), then signs it. Not a generic signing endpoint.");
 
-        group.MapPost("/content-changes/{operationId:guid}/commit", static async Task<Ok<ContentRevision>> (Guid operationId, CommitContentChangeRequest request, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+        group.MapPost("/content-changes/{operationId:guid}/commit", static async Task<Ok<ContentRevision>> (Guid operationId, CommitContentChangeRequest request, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, IHostEnvironment environment, ILoggerFactory loggers, CancellationToken cancellationToken) =>
             {
                 var actor = InternalAuthentication.TryActor(context, validator);
-                return TypedResults.Ok(await service.CommitAsync(actor, operationId, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+                var started = System.Diagnostics.Stopwatch.GetTimestamp();
+                var revision = await service.CommitAsync(actor, operationId, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false);
+                if (environment.IsEnvironment("Testing"))
+                {
+                    // IX-1 measurement (Testing only): Authority-side commit duration, so the search-index cost is measured without
+                    // business-API noise. Identifiers only; no values.
+                    var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                    var logger = loggers.CreateLogger("AuthorizationAuthority.Measurement");
+                    LogCommitTiming(logger, request.FormRecordId, elapsed);
+                }
+
+                return TypedResults.Ok(revision);
             })
             .WithName("CommitContentChange")
             .WithSummary("Proves the staged bytes equal the approved candidate and CAS-advances the trusted content head.");
@@ -62,4 +73,7 @@ public static class ContentEndpoints
 
         return endpoints;
     }
+
+    [LoggerMessage(EventId = 9300, Level = LogLevel.Information, Message = "IX1-COMMIT-TIMING record={FormRecordId} elapsed_ms={ElapsedMilliseconds}")]
+    private static partial void LogCommitTiming(ILogger logger, Guid formRecordId, double elapsedMilliseconds);
 }

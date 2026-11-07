@@ -54,6 +54,8 @@ public sealed class Program
 
         builder.Services.AddAuthorityInfrastructure(builder.Configuration, builder.Environment);
         builder.Services.AddSigningProviderConfiguration(builder.Configuration, builder.Environment);
+        // IX-1 (C-126): Authority-owned search index; Disabled unless configured, Dark (no query path) only in Development/Testing.
+        builder.Services.AddSearchIndex(builder.Configuration, builder.Environment);
         // Phase C5 (D10): field-scoped contributor writes; off unless the deployment sets exactly "true"; refused in Production.
         builder.Services.AddSingleton(AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.Create(
             builder.Configuration[AuthorizationAuthority.Application.Features.Content.ShareContributorWriteSwitch.ConfigurationKey],

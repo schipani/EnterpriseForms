@@ -48,6 +48,9 @@ public static class FaultNames
 
     /// <summary>Testing only: hold the next content commit before it takes the organization lock until released (fault "None") or 60 s pass (Phase C5 revocation races).</summary>
     public const string PauseBeforeContentCommit = "PauseBeforeContentCommit";
+
+    /// <summary>IX-1, testing only: terminate after the search index was derived and sealed inside the content-commit transaction, before it commits (atomicity proof).</summary>
+    public const string CrashAfterSearchIndexDerivation = "CrashAfterSearchIndexDerivation";
 }
 
 /// <summary>Testing only: state of the fault injector (armed fault and number of operations currently held at a pause point).</summary>

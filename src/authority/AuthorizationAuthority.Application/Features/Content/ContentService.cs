@@ -20,8 +20,11 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// commit proves the staged bytes equal the approved candidate and CAS-advances the trusted head, verify compares an
 /// observed projection with the complete accepted leaf index. No generic signing path exists (A9).
 /// </summary>
-public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites)
+public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites, AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator? revisionCoordinator = null)
 {
+    // IX-1 (INV-R): the only way the content-integrity revision advances; without a configured index it still keeps INV-R.
+    private readonly AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator revisions = revisionCoordinator ?? AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator.WithoutIndex;
+
     private const int MaxCandidateItems = 500;
     private static readonly TimeSpan OperationLifetime = TimeSpan.FromMinutes(10);
 
@@ -365,7 +368,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         operation.OperationStateName = ContentOperationStates.Committed;
         operation.OperationCommittedOn = now;
 
-        state.ContentIntegrityRevision++;
+        // W1 (IX-1): derive and seal the record's search index from the bytes verified above, then advance both revisions (INV-R).
+        await revisions.AdvanceForCommitAsync(scope, state, new AuthorizationAuthority.Application.Features.SearchIndex.CommitIndexInput(request.FormRecordId, head, request.StagedItems, now), cancellationToken).ConfigureAwait(false);
+        await scope.FlushAsync(cancellationToken).ConfigureAwait(false); // the index rows are written inside the transaction...
+        faultInjector.CrashIfArmed(FaultNames.CrashAfterSearchIndexDerivation); // ...so a crash here proves they roll back with the head (IX-64)
         var checkpointBody = new ContentCheckpointBody(request.FormRecordId, head.CommittedContentRevision, operationId, Convert.ToHexStringLower(head.CommittedManifestRoot), Convert.ToHexStringLower(commit.ManifestLeafIndexDigest), commit.ManifestLeafCount, operation.CandidateKeyVersion, bound.AuthorityUserId, state.AuthorizationRevision, correlationId);
         var journal = JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "ContentHeadCommitted", checkpointBody, null, operationId, clock);
         scope.AddJournalEntry(journal);
@@ -732,7 +738,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             head.ContentHeadQuarantined = true;
             head.QuarantineReasonCode = failure;
             head.ContentHeadModifiedOn = clock.GetUtcNow();
-            state.ContentIntegrityRevision++;
+            await revisions.AdvanceWithoutIndexChangeAsync(scope, state, cancellationToken).ConfigureAwait(false); // W2 (IX-1, INV-R)
             var incident = new VerifierIntegrityIncidentBody(formRecordId, head.CommittedContentRevision, head.CommittedOperationId, failure, workloadName, scopingSecurityCommandId, correlationId);
             scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
             return Failed(failure, head.CommittedContentRevision, head.CommittedOperationId, quarantined: true);
@@ -898,7 +904,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             head.ContentHeadQuarantined = true;
             head.QuarantineReasonCode = failure;
             head.ContentHeadModifiedOn = clock.GetUtcNow();
-            state.ContentIntegrityRevision++;
+            await revisions.AdvanceWithoutIndexChangeAsync(scope, state, cancellationToken).ConfigureAwait(false); // W3 (IX-1, INV-R)
             var incident = new IntegrityIncidentBody(formRecordId, verifiedRevision, verifiedOperationId, failure, bound.AuthorityUserId, correlationId);
             scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "IntegrityVerificationFailed", incident, null, head.CommittedOperationId, clock));
             return (new VerifyRecordProjectionResult(false, failure, verifiedRevision, verifiedOperationId, state.AuthorizationRevision, [], fullRead, correlationId), true);
@@ -1232,7 +1238,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         var (failure, current) = ContentDeltaRules.BindCurrentSnapshot(request.CurrentItems, accepted, state.OrganizationId);
         if (failure is not null)
         {
-            state.ContentIntegrityRevision++;
+            await revisions.AdvanceWithoutIndexChangeAsync(scope, state, cancellationToken).ConfigureAwait(false); // W4 (IX-1, INV-R)
             var incident = new IntegrityIncidentBody(request.FormRecordId, head.CommittedContentRevision, headOperation, failure, bound.AuthorityUserId, correlationId);
             scope.AddJournalEntry(JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "CurrentSnapshotMismatch", incident, null, headOperation, clock));
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);

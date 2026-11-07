@@ -27,8 +27,20 @@ public static class AuthorityRuntimeGrants
         "organization_owner_recovery_cases", "organization_owner_recovery_subjects", "organization_owner_recovery_approvals", "organization_recovered_owner_probations",
     ];
 
+    /// <summary>IX-1: the NOLOGIN read-only role of the future indexed-search query path (IX-3). Created here; holds no credential.</summary>
+    public const string SearchReaderRole = "authority_search_reader";
+
+    /// <summary>IX-1: columns of search_record_entries the runtime may update (the S-B scope timestamps only; everything else is delete-and-insert).</summary>
+    public static readonly string[] SearchEntryUpdatableColumns = ["last_seal_verified_on", "last_seal_attempted_on", "last_seal_attempt_outcome_code"];
+
+    /// <summary>Tables of schema authority that the search reader may read (design §5.1).</summary>
+    public static readonly string[] SearchReaderAuthorityTables =
+    [
+        "record_content_heads", "authority_resources", "record_manifest_commits", "record_manifest_leaves", "organization_authorization_states", "field_search_approvals", "authority_relationship_edges",
+    ];
+
     /// <summary>Every table the runtime role may touch; a model table missing here is a startup defect caught by the unit test, not in Docker.</summary>
-    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. MutableTables];
+    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables];
 
     public static void Apply(DbContext context, string runtimeRole)
     {
@@ -56,11 +68,60 @@ public static class AuthorityRuntimeGrants
         }
 
         statements.Add($"GRANT SELECT ON {schema}.ef_migrations_history TO {runtimeRole}");
+        statements.AddRange(SearchIndexStatements(runtimeRole));
         foreach (var statement in statements)
         {
 #pragma warning disable EF1002 // identifiers are validated by regex above and come from configuration, never from request input
             context.Database.ExecuteSqlRaw(statement);
 #pragma warning restore EF1002
+        }
+    }
+
+    /// <summary>
+    /// IX-1 (design §5.1, R1 §B.6): grants on schema authority_search. The runtime may insert and delete derived rows but never
+    /// update them (except the S-B timestamps), may maintain state rows, and holds no DDL. The search reader is SELECT-only and
+    /// read-only by default. Neither role's statements, bind parameters or error details reach the server log (§5.3, §17.4).
+    /// </summary>
+    public static IEnumerable<string> SearchIndexStatements(string runtimeRole)
+    {
+        var search = Configurations.SearchIndexSchema.Name;
+        var reader = SearchReaderRole;
+        yield return $"REVOKE ALL ON SCHEMA {search} FROM PUBLIC";
+        yield return $"GRANT USAGE ON SCHEMA {search} TO {runtimeRole}";
+        yield return $"REVOKE ALL ON ALL TABLES IN SCHEMA {search} FROM {runtimeRole}";
+        foreach (var table in Configurations.SearchIndexSchema.DerivedTables)
+        {
+            yield return $"GRANT SELECT, INSERT, DELETE ON {search}.{table} TO {runtimeRole}";
+        }
+
+        yield return $"GRANT UPDATE ({string.Join(", ", SearchEntryUpdatableColumns)}) ON {search}.search_record_entries TO {runtimeRole}";
+        foreach (var table in Configurations.SearchIndexSchema.StateTables)
+        {
+            yield return $"GRANT SELECT, INSERT, UPDATE ON {search}.{table} TO {runtimeRole}";
+        }
+
+        yield return $"REVOKE ALL ON FUNCTION {search}.current_organization_id() FROM PUBLIC";
+        yield return $"GRANT EXECUTE ON FUNCTION {search}.current_organization_id() TO {runtimeRole}";
+        yield return $"REVOKE ALL ON FUNCTION {search}.enforce_content_revision_synchronization() FROM PUBLIC";
+
+        yield return $"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{reader}') THEN CREATE ROLE {reader} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; END $$";
+        yield return $"GRANT USAGE ON SCHEMA {search} TO {reader}";
+        yield return $"GRANT USAGE ON SCHEMA {AuthorityDbContext.SchemaName} TO {reader}";
+        yield return $"REVOKE ALL ON ALL TABLES IN SCHEMA {search} FROM {reader}";
+        yield return $"GRANT SELECT ON ALL TABLES IN SCHEMA {search} TO {reader}";
+        foreach (var table in SearchReaderAuthorityTables)
+        {
+            yield return $"GRANT SELECT ON {AuthorityDbContext.SchemaName}.{table} TO {reader}";
+        }
+
+        yield return $"GRANT EXECUTE ON FUNCTION {search}.current_organization_id() TO {reader}";
+        yield return $"ALTER ROLE {reader} SET default_transaction_read_only = on";
+        foreach (var role in new[] { runtimeRole, reader })
+        {
+            yield return $"ALTER ROLE {role} SET log_parameter_max_length = 0";
+            yield return $"ALTER ROLE {role} SET log_parameter_max_length_on_error = 0";
+            yield return $"ALTER ROLE {role} SET log_error_verbosity = 'terse'";
+            yield return $"ALTER ROLE {role} SET log_statement = 'none'";
         }
     }
 }

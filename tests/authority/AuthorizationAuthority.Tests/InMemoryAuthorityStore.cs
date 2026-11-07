@@ -60,6 +60,11 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<OrganizationRecoveredOwnerProbation> RecoveryProbations { get; } = [];
     public int ScopeCommitCount { get; private set; }
 
+    /// <summary>IX-1: the in-memory search index shared by every scope of this store.</summary>
+    public InMemorySearchIndexStore SearchIndex => searchIndex ??= new InMemorySearchIndexStore(this);
+
+    private InMemorySearchIndexStore? searchIndex;
+
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
 
     /// <summary>Phase C8 AC-9: number of read-only snapshot scopes opened; such a scope refuses to commit.</summary>
@@ -77,6 +82,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     private sealed class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
     {
+        public ISearchIndexStore SearchIndex => s.SearchIndex;
+
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
 
         public Task<OrganizationAuthorizationState?> ReadOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));

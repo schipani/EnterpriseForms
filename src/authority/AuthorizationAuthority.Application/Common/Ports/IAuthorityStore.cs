@@ -31,6 +31,9 @@ public interface IAuthorityStore
 
 public interface IAuthorityScope : IAsyncDisposable
 {
+    /// <summary>IX-1: the Authority-owned search index, in this scope's transaction.</summary>
+    ISearchIndexStore SearchIndex { get; }
+
     /// <summary>SELECT ... FOR UPDATE on the organization state row: serializes every mutation of that organization (A6).</summary>
     Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 

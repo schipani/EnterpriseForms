@@ -66,7 +66,23 @@ services:
       OrganizationOnboarding__ApprovedIdentityIssuers__0: ${TEST_IDP_ISSUER}
       # C-105: accelerated owner recovery waiting period for the isolated test stack (production target 72 hours; Development/Testing minimum 10 s).
       OrganizationOnboarding__RecoveryWaitingPeriodSeconds: "20"
+      # IX-1 (C-126): the Authority-owned search index in Dark mode (derivation, ES256 seals, sweeps; no query path). The seal key is
+      # the SYNTHETIC test key of trust_authority/search-entry-seal-v1.test-vectors.json, imported non-exportable into Vault Transit by
+      # vault-search-seal-init; its public key is pinned here (deployment configuration, never AuthorityDb). Short sweep intervals
+      # for the tests; the C-124 enforcement deadlines (1 h / 24 h / 30 days) are unchanged.
+      SearchIndex__Mode: Dark
+      SearchIndex__CheapSweepIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
+      SearchIndex__DeadlineEvaluationIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
+      SearchIndex__Seal__Provider: VaultTransit
+      SearchIndex__Seal__SigningKeyName: search-entry-seal-v1
+      SearchIndex__Seal__SigningKeyVersion: "1"
+      SearchIndex__Seal__PinnedKeys__0__KeyName: search-entry-seal-v1
+      SearchIndex__Seal__PinnedKeys__0__KeyVersion: "1"
+      SearchIndex__Seal__PinnedKeys__0__SubjectPublicKeyInfoBase64: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDyv2JNCpxP55l+tjRMiii0DX2tgMttFQEyRSAtrujr1YgUC943B5upJ66ksIKwecL6AFoEQSwXOXbl2osaQEjQ==
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
+    depends_on:
+      vault-search-seal-init:
+        condition: service_completed_successfully
     ports: ["127.0.0.1:5190:8080"]   # harness reaches the operator plane and internal contract directly (loopback only)
     # C8 M2 Stage 3: the Platform Console reaches the Authority over its own network (never trust-edge, which the business shares).
     networks: [authority-net, trust-edge, platform-edge]
@@ -120,6 +136,29 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
       CUSTODY_TOKEN: sectest-organization-key-custody-token-0001
+    depends_on:
+      vault-transit-init:
+        condition: service_completed_successfully
+    networks: [authority-net]
+    restart: "no"
+  vault-search-seal-init:
+    # IX-1 (Testing only): imports the SYNTHETIC search-entry-seal test key (published in trust_authority/search-entry-seal-v1.test-vectors.json,
+    # never a production key) into Vault Transit as a non-exportable ecdsa-p256 key, so the pinned public key above is fixed. An existing
+    # key is left untouched. Production uses an EC-HSM P-256 key in Azure Managed HSM (not implemented in IX-1).
+    image: hashicorp/vault:1.20.4
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        if vault read transit/keys/search-entry-seal-v1 >/dev/null 2>&1; then echo "search seal key present"; exit 0; fi
+        printf '%s' "$$SEARCH_SEAL_TEST_KEY" > /tmp/seal-key.b64
+        vault transit import transit/keys/search-entry-seal-v1 @/tmp/seal-key.b64 type=ecdsa-p256 exportable=false allow_plaintext_backup=false >/dev/null
+        rm -f /tmp/seal-key.b64
+        echo "search seal test key imported"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      SEARCH_SEAL_TEST_KEY: MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwmIiV6b38Mm5nbokDkj30eN/n2Lxs9hdRtNS78JBFCOhRANCAAQPK/Yk0KnE/nmX62NEyKKLQNfa2Ay20VATJFIC2u6OvViBQL3jcHm6knrqSwgrB5wvoAWgRBLBc5duXaixpASN
     depends_on:
       vault-transit-init:
         condition: service_completed_successfully

@@ -365,6 +365,8 @@ public sealed class CommandPlannerTests
     /// <summary>In-memory scope: only the lookups the planner needs. Cross-organization lookups return nothing (tenant binding).</summary>
     private sealed class FakeScope(Guid organizationId) : IAuthorityScope
     {
+        public ISearchIndexStore SearchIndex => throw new NotSupportedException();
+
         public List<AuthorityResource> Resources { get; } = [];
 
         public List<IdentityBinding> Bindings { get; } = [];

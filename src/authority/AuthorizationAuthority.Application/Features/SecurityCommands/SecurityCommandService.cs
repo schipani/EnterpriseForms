@@ -9,7 +9,7 @@ using AuthorizationAuthority.Domain.Features.SecurityCommands;
 namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 
 /// <summary>Authoritative security-commit point (CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md §2 "Command sequence").</summary>
-public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate)
+public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null)
 {
     public async Task<OperationStatus> SubmitAsync(VerifiedActor actor, SecurityCommandRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
@@ -73,7 +73,15 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
                 command.CommandReasonText = reasonOverride;
             }
 
+            plan.SearchIndexChangesAppliedByCaller = true;
             ApplyPlan(scope, state, command, plan, bound, request, cancellationToken);
+
+            // IX-1 (C.2): coverage starts, withdrawals and same-transaction purges for this command's approval changes.
+            if (searchIndex is not null)
+            {
+                await searchIndex.ApplyApprovalChangesAsync(scope, state, plan.NewApprovals, plan.ChangedApprovals, command.CommandCreatedOn, cancellationToken).ConfigureAwait(false);
+            }
+
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (AuthorityException ex)
@@ -141,6 +149,12 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
     internal static void ApplyPlan(IAuthorityScope scope, OrganizationAuthorizationState state, SecurityCommand command, CommandPlan plan, BoundActor actor, SecurityCommandRequest request, CancellationToken cancellationToken)
     {
         _ = cancellationToken;
+        if ((plan.NewApprovals.Count > 0 || plan.ChangedApprovals.Count > 0) && !plan.SearchIndexChangesAppliedByCaller)
+        {
+            // IX-1: an approval change must purge or start search coverage in this transaction; only SubmitAsync does that.
+            throw new InvalidOperationException("search approval changes may only be applied through SecurityCommandService.SubmitAsync");
+        }
+
         var now = command.CommandCreatedOn;
         var revision = state.AuthorizationRevision + 1;
         var delta = new List<RelationshipDeltaEntry>();

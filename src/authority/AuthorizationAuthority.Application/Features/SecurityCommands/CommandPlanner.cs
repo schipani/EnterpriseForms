@@ -38,6 +38,9 @@ public sealed class CommandPlan
 
     public List<FieldSearchApproval> ChangedApprovals { get; } = [];
 
+    /// <summary>IX-1: set by the one caller that applies the search-index coverage changes for these approvals in the same transaction.</summary>
+    internal bool SearchIndexChangesAppliedByCaller { get; set; }
+
     /// <summary>The policy whose search_policy_revision advances because field search policy changed under this command.</summary>
     public OrganizationProtectionPolicy? SearchPolicyToAdvance { get; set; }
 
