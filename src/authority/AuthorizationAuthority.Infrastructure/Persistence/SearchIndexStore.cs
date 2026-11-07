@@ -1,5 +1,6 @@
 using System.Data.Common;
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.SearchIndex;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -41,6 +42,100 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
     {
         ArgumentNullException.ThrowIfNull(derived);
         await DeleteRecordIndexAsync(derived.Entry.OrganizationId, derived.Entry.FormRecordId, cancellationToken).ConfigureAwait(false);
+        context.SearchRecordEntries.Add(derived.Entry);
+        context.SearchStringPostings.AddRange(derived.StringPostings);
+        context.SearchIntegerPostings.AddRange(derived.IntegerPostings);
+        context.SearchDecimalPostings.AddRange(derived.DecimalPostings);
+        context.SearchDatePostings.AddRange(derived.DatePostings);
+        context.SearchDateTimePostings.AddRange(derived.DateTimePostings);
+        context.SearchBooleanPostings.AddRange(derived.BooleanPostings);
+        context.SearchOptionPostings.AddRange(derived.OptionPostings);
+        context.SearchRecordFieldAnomalies.AddRange(derived.Anomalies);
+    }
+
+    public async Task<List<FieldSearchApproval>> GetCoveredActiveApprovalsAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken)
+    {
+        // Unsaved coverage or approval changes for this form in the scope (never the case in a content commit) would not be seen
+        // by the SQL predicate below: use the two reads that merge tracked state instead, so the result is the same in every case.
+        var pendingCoverage = context.ChangeTracker.Entries<SearchFieldCoverage>().Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+            && e.Entity.OrganizationId == organizationId && e.Entity.FormDefinitionId == formDefinitionId);
+        var pendingApproval = context.ChangeTracker.Entries<FieldSearchApproval>().Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+            && e.Entity.OrganizationId == organizationId && e.Entity.FormDefinitionId == formDefinitionId);
+        if (pendingCoverage || pendingApproval)
+        {
+            var coverages = (await GetCoveragesAsync(organizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)).Where(c => c.CoverageStateName != SearchCoverageStates.Withdrawn).ToList();
+            var approvals = await context.FieldSearchApprovals.AsTracking().Where(a => a.OrganizationId == organizationId && a.FormDefinitionId == formDefinitionId)
+                .OrderBy(a => a.FieldSearchApprovalId).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && coverages.Any(c => c.FieldSearchApprovalId == a.FieldSearchApprovalId)).ToList();
+        }
+
+        return await context.FieldSearchApprovals.AsTracking()
+            .Where(a => a.OrganizationId == organizationId && a.FormDefinitionId == formDefinitionId && a.ApprovalStateName == FieldSearchApprovalStates.Active
+                        && context.SearchFieldCoverages.Any(c => c.OrganizationId == organizationId && c.FormDefinitionId == formDefinitionId
+                                                                 && c.FieldSearchApprovalId == a.FieldSearchApprovalId && c.CoverageStateName != SearchCoverageStates.Withdrawn))
+            .OrderBy(a => a.FieldSearchApprovalId)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<int> ResetRecordIndexAsync(Guid organizationId, Guid formDefinitionId, Guid formRecordId, bool alwaysAdvanceFormState, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        // One round trip (IX-1 remediation): the transaction-local organization binding first (the RLS policies of the delete
+        // statements and of the rows the commit inserts afterwards read it), then the nine deletes, then the form-state
+        // increment in a data-modifying CTE (executed exactly once, whether or not its output is read).
+        const string sql = """
+            SELECT set_config('authority_search.organization_id', @organization_text, true) IS NOT NULL;
+            DELETE FROM authority_search.search_string_postings WHERE organization_id = @organization_id AND form_record_id = @form_record_id;
+            DELETE FROM authority_search.search_integer_postings WHERE organization_id = @organization_id AND form_record_id = @form_record_id;
+            DELETE FROM authority_search.search_decimal_postings WHERE organization_id = @organization_id AND form_record_id = @form_record_id;
+            DELETE FROM authority_search.search_date_postings WHERE organization_id = @organization_id AND form_record_id = @form_record_id;
+            DELETE FROM authority_search.search_date_time_postings WHERE organization_id = @organization_id AND form_record_id = @form_record_id;
+            DELETE FROM authority_search.search_boolean_postings WHERE organization_id = @organization_id AND form_record_id = @form_record_id;
+            DELETE FROM authority_search.search_option_postings WHERE organization_id = @organization_id AND form_record_id = @form_record_id;
+            DELETE FROM authority_search.search_record_field_anomalies WHERE organization_id = @organization_id AND form_record_id = @form_record_id;
+            WITH deleted AS (DELETE FROM authority_search.search_record_entries WHERE organization_id = @organization_id AND form_record_id = @form_record_id RETURNING 1),
+                 counted AS (SELECT count(*)::int AS deleted_entries FROM deleted),
+                 advanced AS (
+                     INSERT INTO authority_search.search_form_states (search_form_state_id, organization_id, form_definition_id, form_content_revision, form_state_modified_on)
+                     SELECT @search_form_state_id, @organization_id, @form_definition_id, 1, @form_state_modified_on FROM counted WHERE @always_advance OR counted.deleted_entries > 0
+                     ON CONFLICT (organization_id, form_definition_id)
+                     DO UPDATE SET form_content_revision = authority_search.search_form_states.form_content_revision + 1, form_state_modified_on = EXCLUDED.form_state_modified_on
+                     RETURNING 1)
+            SELECT deleted_entries FROM counted;
+            """;
+        await using var command = CreateCommand(sql);
+        var text = command.CreateParameter();
+        text.ParameterName = "organization_text";
+        text.Value = organizationId.ToString("D");
+        command.Parameters.Add(text);
+        AddParameter(command, "organization_id", organizationId);
+        AddParameter(command, "form_record_id", formRecordId);
+        AddParameter(command, "form_definition_id", formDefinitionId);
+        AddParameter(command, "search_form_state_id", Guid.CreateVersion7());
+        var always = command.CreateParameter();
+        always.ParameterName = "always_advance";
+        always.Value = alwaysAdvanceFormState;
+        command.Parameters.Add(always);
+        var modified = command.CreateParameter();
+        modified.ParameterName = "form_state_modified_on";
+        modified.Value = now.ToUniversalTime();
+        command.Parameters.Add(modified);
+        var deleted = -1;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        do
+        {
+            // Result sets: the binding (boolean), eight DELETEs (no columns), the entry count (integer).
+            if (reader.FieldCount > 0 && reader.GetFieldType(0) == typeof(int) && await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                deleted = reader.GetInt32(0);
+            }
+        }
+        while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false));
+        return deleted >= 0 ? deleted : throw new InvalidOperationException("the record index reset returned no entry count");
+    }
+
+    public void AddRecordIndex(DerivedRecordIndex derived)
+    {
+        ArgumentNullException.ThrowIfNull(derived);
         context.SearchRecordEntries.Add(derived.Entry);
         context.SearchStringPostings.AddRange(derived.StringPostings);
         context.SearchIntegerPostings.AddRange(derived.IntegerPostings);
@@ -231,6 +326,7 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
         var connection = context.Database.GetDbConnection();
         var command = connection.CreateCommand();
         command.CommandText = sql;
+        AuthorityCommandCounter.CountRawCommand(); // each command created here is executed once (Testing-only measurement)
         command.Transaction = context.Database.CurrentTransaction?.GetDbTransaction() ?? throw new InvalidOperationException("the search index store requires the scope transaction");
         return command;
     }

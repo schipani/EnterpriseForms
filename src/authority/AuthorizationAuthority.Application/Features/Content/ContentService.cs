@@ -221,10 +221,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
 
         // A reprotection operation is committed by the workload under its command; a user operation by the same user.
         var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, operation.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
+        Guid? registeredFormDefinitionId = null; // the record's form from the Authority registry, reused by the index derivation (IX-1 remediation)
         if (reprotection is null)
         {
             // Atomic cutover (Amendment A1 req. 7): a candidate prepared before a protection command became effective may not commit rows of the old form.
             var recordResource = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, request.FormRecordId, cancellationToken).ConfigureAwait(false);
+            registeredFormDefinitionId = recordResource?.ParentResourceEntityId;
             await EnforceProtectionBarrierAsync(scope, state.OrganizationId, recordResource?.ParentResourceEntityId, request.StagedItems.Select(i => (i.ItemKind, (ReadOnlyMemory<byte>)Convert.FromBase64String(i.CanonicalBytesBase64))), cancellationToken).ConfigureAwait(false);
         }
         if (operation.ActorIdentityBindingId != bound.Binding.IdentityBindingId)
@@ -369,9 +371,15 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         operation.OperationCommittedOn = now;
 
         // W1 (IX-1): derive and seal the record's search index from the bytes verified above, then advance both revisions (INV-R).
-        await revisions.AdvanceForCommitAsync(scope, state, new AuthorizationAuthority.Application.Features.SearchIndex.CommitIndexInput(request.FormRecordId, head, request.StagedItems, now), cancellationToken).ConfigureAwait(false);
-        await scope.FlushAsync(cancellationToken).ConfigureAwait(false); // the index rows are written inside the transaction...
-        faultInjector.CrashIfArmed(FaultNames.CrashAfterSearchIndexDerivation); // ...so a crash here proves they roll back with the head (IX-64)
+        await revisions.AdvanceForCommitAsync(scope, state, new AuthorizationAuthority.Application.Features.SearchIndex.CommitIndexInput(request.FormRecordId, head, request.StagedItems, now, registeredFormDefinitionId), cancellationToken).ConfigureAwait(false);
+        if (faultInjector.IsArmed(FaultNames.CrashAfterSearchIndexDerivation))
+        {
+            // Testing only (D-IX1-8, revised by the IX-1 remediation): with the crash point armed, the queued index rows are first
+            // written inside the transaction, so the crash proves they roll back with the head (IX-64). Unarmed, they are written
+            // by the commit's final SaveChanges in the same transaction, which saves one round trip.
+            await scope.FlushAsync(cancellationToken).ConfigureAwait(false);
+            faultInjector.CrashIfArmed(FaultNames.CrashAfterSearchIndexDerivation);
+        }
         var checkpointBody = new ContentCheckpointBody(request.FormRecordId, head.CommittedContentRevision, operationId, Convert.ToHexStringLower(head.CommittedManifestRoot), Convert.ToHexStringLower(commit.ManifestLeafIndexDigest), commit.ManifestLeafCount, operation.CandidateKeyVersion, bound.AuthorityUserId, state.AuthorizationRevision, correlationId);
         var journal = JournalChain.Append(state, JournalStreamNames.Content, state.ContentIntegrityRevision, "ContentHeadCommitted", checkpointBody, null, operationId, clock);
         scope.AddJournalEntry(journal);

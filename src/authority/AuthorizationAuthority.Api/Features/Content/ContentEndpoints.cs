@@ -24,15 +24,29 @@ public static partial class ContentEndpoints
         group.MapPost("/content-changes/{operationId:guid}/commit", static async Task<Ok<ContentRevision>> (Guid operationId, CommitContentChangeRequest request, HttpContext context, ContentService service, DelegatedUserAssertionValidator validator, IHostEnvironment environment, ILoggerFactory loggers, CancellationToken cancellationToken) =>
             {
                 var actor = InternalAuthentication.TryActor(context, validator);
+                var measuring = environment.IsEnvironment("Testing");
+                var commands = measuring ? AuthorizationAuthority.Infrastructure.Persistence.AuthorityCommandCounter.Start() : null;
                 var started = System.Diagnostics.Stopwatch.GetTimestamp();
-                var revision = await service.CommitAsync(actor, operationId, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false);
-                if (environment.IsEnvironment("Testing"))
+                ContentRevision revision;
+                try
                 {
-                    // IX-1 measurement (Testing only): Authority-side commit duration, so the search-index cost is measured without
-                    // business-API noise. Identifiers only; no values.
+                    revision = await service.CommitAsync(actor, operationId, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    if (measuring)
+                    {
+                        AuthorizationAuthority.Infrastructure.Persistence.AuthorityCommandCounter.Stop();
+                    }
+                }
+
+                if (commands is not null)
+                {
+                    // IX-1 measurement (Testing only): Authority-side commit duration and AuthorityDb command count, so the
+                    // search-index cost is measured without business-API noise. Identifiers and numbers only; no values.
                     var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
                     var logger = loggers.CreateLogger("AuthorizationAuthority.Measurement");
-                    LogCommitTiming(logger, request.FormRecordId, elapsed);
+                    LogCommitTiming(logger, request.FormRecordId, elapsed, commands.Commands);
                 }
 
                 return TypedResults.Ok(revision);
@@ -74,6 +88,6 @@ public static partial class ContentEndpoints
         return endpoints;
     }
 
-    [LoggerMessage(EventId = 9300, Level = LogLevel.Information, Message = "IX1-COMMIT-TIMING record={FormRecordId} elapsed_ms={ElapsedMilliseconds}")]
-    private static partial void LogCommitTiming(ILogger logger, Guid formRecordId, double elapsedMilliseconds);
+    [LoggerMessage(EventId = 9300, Level = LogLevel.Information, Message = "IX1-COMMIT-TIMING record={FormRecordId} elapsed_ms={ElapsedMilliseconds} db_commands={DatabaseCommands}")]
+    private static partial void LogCommitTiming(ILogger logger, Guid formRecordId, double elapsedMilliseconds, int databaseCommands);
 }

@@ -50,6 +50,8 @@ public sealed class SearchIndexTests
         public Guid Org { get; } = Guid.CreateVersion7();
         public Guid Form { get; } = Ids.Form;
         public Guid Owner { get; } = Guid.CreateVersion7();
+        public Guid Contributor { get; } = Guid.CreateVersion7();
+        public Guid ContributorBindingId { get; } = Guid.CreateVersion7();
         public Guid StringField { get; } = Guid.CreateVersion7();
         public Guid IntegerField { get; } = Guid.CreateVersion7();
         public Guid OptionField { get; } = Guid.CreateVersion7();
@@ -71,7 +73,7 @@ public sealed class SearchIndexTests
         private readonly ECDsa sealKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         private readonly LocalSearchSealSigner signer;
 
-        public Harness(ISearchSealSigner? signerOverride = null, byte[]? pinnedSpki = null)
+        public Harness(ISearchSealSigner? signerOverride = null, byte[]? pinnedSpki = null, bool contributorWrites = false)
         {
             var mac = new LocalHmacProvider();
             mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
@@ -87,10 +89,11 @@ public sealed class SearchIndexTests
             Verifier = new SearchSealVerifier(sealOptions);
             Gate = new SearchSealSigningGate(signerOverride ?? signer, Verifier);
             Writer = new SearchIndexWriter(Options, Gate);
-            Content = new ContentService(Store, mac, TestProjection.Verifier(Store, spice), new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(false, testingOverrideAllowed: true), new ContentRevisionCoordinator(Writer, TimeProvider.System));
+            Content = new ContentService(Store, mac, TestProjection.Verifier(Store, spice), new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(contributorWrites, testingOverrideAllowed: true), new ContentRevisionCoordinator(Writer, TimeProvider.System));
             Sweep = new SearchIndexSweepService(Store, Writer, Verifier, Options, Clock, Alerts);
             Store.Organizations.Add(new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous }.WithJournalDigest());
             Store.Bindings.Add(new IdentityBinding { IdentityBindingId = Guid.CreateVersion7(), OrganizationId = Org, AuthorityUserId = Owner, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = Owner.ToString("D"), IdentityBindingEnabled = true });
+            Store.Bindings.Add(new IdentityBinding { IdentityBindingId = ContributorBindingId, OrganizationId = Org, AuthorityUserId = Contributor, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = Contributor.ToString("D"), IdentityBindingEnabled = true });
             Store.Keys.Add(new IntegrityKeyRegistration { IntegrityKeyRegistrationId = Guid.CreateVersion7(), OrganizationId = Org, ProviderName = "LocalDevelopment", ProviderKeyName = "org-key", CurrentSigningKeyVersion = 1, MinimumVerificationKeyVersion = 1 });
         }
 
@@ -139,9 +142,20 @@ public sealed class SearchIndexTests
             return record;
         }
 
-        public List<Row> Rows(Guid record, string text = "  Case Ref ", long number = 42)
+        /// <summary>Mirrors CommandPlanner.CreateShare edges: the record and one field item shared with the contributor.</summary>
+        public void ShareFieldWithContributor(Guid record, Guid item)
         {
-            var occurrence = Guid.CreateVersion7();
+            var share = Guid.CreateVersion7();
+            void Edge(string resourceType, Guid resource, string relation, string subjectType, Guid subject) =>
+                Store.Edges.Add(new AuthorityRelationshipEdge { AuthorityRelationshipEdgeId = Guid.CreateVersion7(), OrganizationId = Org, ResourceTypeName = resourceType, ResourceEntityId = resource, RelationshipName = relation, SubjectTypeName = subjectType, SubjectEntityId = subject, SubjectRelationName = string.Empty });
+            Edge(ResourceTypeNames.FormRecord, record, "shared_via", ResourceTypeNames.RecordShare, share);
+            Edge(ResourceTypeNames.RecordShare, share, "contributor", ResourceTypeNames.User, Contributor);
+            Edge(ResourceTypeNames.FieldItem, item, "shared_via", ResourceTypeNames.RecordShare, share);
+        }
+
+        public List<Row> Rows(Guid record, string text = "  Case Ref ", long number = 42, Guid? groupOccurrence = null)
+        {
+            var occurrence = groupOccurrence ?? Guid.CreateVersion7();
             return
             [
                 Header(Org, record, "Submitted"), Text(Org, record, StringField, Item(record, 1), text), Integer(Org, record, IntegerField, Item(record, 2), number),
@@ -380,6 +394,59 @@ public sealed class SearchIndexTests
         Assert.Equal("FIRST", Assert.Single(h.Index.Postings.OfType<SearchStringPosting>()).NormalizedStringValue);
         Assert.Equal(revision, h.State.ContentIntegrityRevision);
         Assert.Equal(revision, h.Projection.ProjectionContentIntegrityRevision);
+    }
+
+    [Fact]
+    public async Task ARecordLockedAtCommitWritesNothingToTheIndex()
+    {
+        // IX-61, record-locked path (OR-3). The commit-time lock check (RECORD_LOCKED_BEFORE_COMMIT) sits behind the prepare-time
+        // check and the head compare-and-swap, so normal calls cannot reach it. It is reached here by simulating an operation
+        // whose prepare-time check was bypassed: the owner prepares an edit of one field of a Submitted record; the stored
+        // operation is then given the share-editor classification (Update of the shared field only, everything else Unchanged)
+        // and re-bound to a contributor who holds a valid share on that field.
+        using var h = new Harness(contributorWrites: true);
+        await h.ApproveStandardFieldsAsync();
+        var record = h.Record();
+        var occurrence = Guid.CreateVersion7();
+        await h.WriteAsync(record, h.Rows(record, "first", groupOccurrence: occurrence));
+        var revision = h.State.ContentIntegrityRevision;
+        var formRevision = h.Index.FormStates.Single().FormContentRevision;
+        var entry = h.Entry(record).SearchRecordEntryId;
+        h.ShareFieldWithContributor(record, h.Item(record, 1));
+        var (operation, staged) = await h.PrepareAsync(record, h.Rows(record, "locked edit", groupOccurrence: occurrence));
+        h.Store.Operations.Single(o => o.ContentChangeOperationId == operation).ActorIdentityBindingId = h.ContributorBindingId;
+        foreach (var leaf in h.Store.CandidateLeaves.Where(l => l.ContentChangeOperationId == operation))
+        {
+            leaf.MutationKindName = leaf.ManifestItemId == h.Item(record, 1) ? ContentMutationKinds.Update : ContentMutationKinds.Unchanged;
+        }
+
+        var ex = await Assert.ThrowsAsync<AuthorityException>(() => h.Content.CommitAsync(new VerifiedActor(Issuer, h.Contributor.ToString("D"), "test"), operation, new CommitContentChangeRequest(h.Org, record, staged), Guid.CreateVersion7(), CancellationToken.None));
+        Assert.True(ex.ErrorCode == AuthorityErrorCodes.RecordNotEditable, ex.ErrorCode + ": " + ex.Detail + " / " + h.Store.Operations.Single(o => o.ContentChangeOperationId == operation).OperationQuarantineReasonCode);
+        Assert.Equal("RECORD_LOCKED_BEFORE_COMMIT", h.Store.Operations.Single(o => o.ContentChangeOperationId == operation).OperationQuarantineReasonCode);
+        Assert.Equal(entry, h.Entry(record).SearchRecordEntryId);
+        Assert.Equal("FIRST", Assert.Single(h.Index.Postings.OfType<SearchStringPosting>()).NormalizedStringValue);
+        Assert.Equal(formRevision, h.Index.FormStates.Single().FormContentRevision);
+        Assert.Equal(revision, h.State.ContentIntegrityRevision);
+        Assert.Equal(revision, h.Projection.ProjectionContentIntegrityRevision);
+    }
+
+    [Fact]
+    public async Task ACommitUsesOneResetCommandAndTheRegisteredFormFromTheCommit()
+    {
+        // IX-1 remediation: a derivation writes the record index through one reset (binding, delete, form-state increment) and
+        // queues the new rows; a commit without coverage resets only to remove a stale entry (nothing to remove here).
+        using var h = new Harness();
+        await h.ApproveStandardFieldsAsync();
+        var record = h.Record();
+        await h.WriteAsync(record);
+        Assert.Equal([(h.Org, record, true)], h.Index.Resets);
+        Assert.Equal([h.Org], h.Index.BoundOrganizations.Distinct());
+        Assert.Equal(1, h.Index.FormStates.Single().FormContentRevision);
+
+        await h.WriteAsync(record, h.Rows(record, "second"));
+        Assert.Equal(2, h.Index.Resets.Count);
+        Assert.Equal(2, h.Index.FormStates.Single().FormContentRevision);
+        Assert.Equal("SECOND", Assert.Single(h.Index.Postings.OfType<SearchStringPosting>()).NormalizedStringValue);
     }
 
     // ---- Coverage lifecycle -----------------------------------------------------------------------------------------------

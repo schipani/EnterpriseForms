@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.SearchIndex;
 
 namespace AuthorizationAuthority.Application.Common.Ports;
@@ -71,6 +72,23 @@ public interface ISearchIndexStore
 
     /// <summary>Deletes the record's entry, postings and anomalies, then inserts <paramref name="derived"/>.</summary>
     Task ReplaceRecordIndexAsync(DerivedRecordIndex derived, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// IX-1 remediation, content commit (W1): the form's approvals that are Active and have a coverage other than Withdrawn,
+    /// ordered by approval id, in one read. Same result as <see cref="GetCoveragesAsync"/> plus the Authority approvals filtered
+    /// in memory.
+    /// </summary>
+    Task<List<FieldSearchApproval>> GetCoveredActiveApprovalsAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// IX-1 remediation, content commit (W1), one command: binds the organization context (RLS), deletes the record's entry,
+    /// postings and anomalies, and increments the form's index revision when <paramref name="alwaysAdvanceFormState"/> is true
+    /// or an entry was deleted. Returns the number of entries deleted (0 or 1).
+    /// </summary>
+    Task<int> ResetRecordIndexAsync(Guid organizationId, Guid formDefinitionId, Guid formRecordId, bool alwaysAdvanceFormState, DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>Queues a derived record index for insertion by the scope's next write (after <see cref="ResetRecordIndexAsync"/>).</summary>
+    void AddRecordIndex(DerivedRecordIndex derived);
 
     /// <summary>Deletes the record's entry, postings and anomalies; returns the number of entries deleted (0 or 1).</summary>
     Task<int> DeleteRecordIndexAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);

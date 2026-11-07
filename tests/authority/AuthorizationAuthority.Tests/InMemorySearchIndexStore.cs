@@ -1,4 +1,5 @@
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.SearchIndex;
 
 namespace AuthorizationAuthority.Tests;
@@ -38,6 +39,35 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
     public async Task ReplaceRecordIndexAsync(DerivedRecordIndex derived, CancellationToken cancellationToken)
     {
         await DeleteRecordIndexAsync(derived.Entry.OrganizationId, derived.Entry.FormRecordId, cancellationToken).ConfigureAwait(false);
+        Entries.Add(derived.Entry);
+        Postings.AddRange(derived.AllPostings);
+        Anomalies.AddRange(derived.Anomalies);
+    }
+
+    public Task<List<FieldSearchApproval>> GetCoveredActiveApprovalsAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+        Task.FromResult(s.Approvals.Where(a => a.OrganizationId == organizationId && a.FormDefinitionId == formDefinitionId && a.ApprovalStateName == FieldSearchApprovalStates.Active
+                                               && Coverages.Any(c => c.OrganizationId == organizationId && c.FormDefinitionId == formDefinitionId && c.FieldSearchApprovalId == a.FieldSearchApprovalId && c.CoverageStateName != SearchCoverageStates.Withdrawn))
+            .OrderBy(a => a.FieldSearchApprovalId).ToList());
+
+    /// <summary>Calls recorded by <see cref="ResetRecordIndexAsync"/> (organization, record, always-advance flag).</summary>
+    public List<(Guid OrganizationId, Guid FormRecordId, bool AlwaysAdvance)> Resets { get; } = [];
+
+    public async Task<int> ResetRecordIndexAsync(Guid organizationId, Guid formDefinitionId, Guid formRecordId, bool alwaysAdvanceFormState, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        Resets.Add((organizationId, formRecordId, alwaysAdvanceFormState));
+        await BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        var deleted = await DeleteRecordIndexAsync(organizationId, formRecordId, cancellationToken).ConfigureAwait(false);
+        if (alwaysAdvanceFormState || deleted > 0)
+        {
+            await BumpFormStateAsync(organizationId, formDefinitionId, now, cancellationToken).ConfigureAwait(false);
+        }
+
+        return deleted;
+    }
+
+    public void AddRecordIndex(DerivedRecordIndex derived)
+    {
+        ArgumentNullException.ThrowIfNull(derived);
         Entries.Add(derived.Entry);
         Postings.AddRange(derived.AllPostings);
         Anomalies.AddRange(derived.Anomalies);

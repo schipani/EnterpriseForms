@@ -369,23 +369,25 @@ public sealed class SearchIndexFoundationTests(StageBFixture fixture)
         var indexedRecords = await CreateManyAsync(indexed);
         var plainRecords = await CreateManyAsync(plain);
         var logs = fixture.Stack.Logs("authority", 50000);
-        List<double> Timings(IEnumerable<Guid> records)
+        (List<double> Timings, List<double> Commands) Timings(IEnumerable<Guid> records)
         {
             var wanted = records.Skip(5).Select(r => r.ToString("D")).ToHashSet(StringComparer.Ordinal);
             var values = new List<double>();
-            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(logs, @"IX1-COMMIT-TIMING record=([0-9a-f-]{36}) elapsed_ms=([0-9.,]+)"))
+            var commands = new List<double>();
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(logs, @"IX1-COMMIT-TIMING record=([0-9a-f-]{36}) elapsed_ms=([0-9.,]+) db_commands=([0-9]+)"))
             {
                 if (wanted.Contains(m.Groups[1].Value))
                 {
                     values.Add(double.Parse(m.Groups[2].Value.Replace(',', '.'), CultureInfo.InvariantCulture));
+                    commands.Add(double.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture));
                 }
             }
 
-            return values.Order().ToList();
+            return (values.Order().ToList(), commands.Order().ToList());
         }
 
-        var withIndex = Timings(indexedRecords);
-        var without = Timings(plainRecords);
+        var (withIndex, indexedCommands) = Timings(indexedRecords);
+        var (without, plainCommands) = Timings(plainRecords);
         Assert.True(withIndex.Count >= 30 && without.Count >= 30, $"timing lines found: {withIndex.Count} indexed, {without.Count} plain");
         static double Q(List<double> s, double p) => s[Math.Min(s.Count - 1, (int)(p * s.Count))];
         var wantedIndexed = indexedRecords.Skip(5).Select(r => r.ToString("D")).ToHashSet(StringComparer.Ordinal);
@@ -408,7 +410,7 @@ public sealed class SearchIndexFoundationTests(StageBFixture fixture)
         }
 
         Assert.True(stages["sign"].Count >= 30, $"stage timing lines found: {stages["sign"].Count}");
-        var stageReport = stages.ToDictionary(kv => kv.Key, kv => new { p50_ms = Math.Round(Q(kv.Value, 0.50), 2), p95_ms = Math.Round(Q(kv.Value, 0.95), 2) }, StringComparer.Ordinal);
+        var stageReport = stages.ToDictionary(kv => kv.Key, kv => new { p50_ms = Math.Round(Q(kv.Value, 0.50), 2), p95_ms = Math.Round(Q(kv.Value, 0.95), 2), p99_ms = Math.Round(Q(kv.Value, 0.99), 2) }, StringComparer.Ordinal);
         var report = new
         {
             environment = "local Docker security-test stack, Vault Transit dev ecdsa-p256; Authority-side ContentService.CommitAsync duration from the Testing-only IX1-COMMIT-TIMING log; sequential record creation, first 5 per form excluded",
@@ -416,6 +418,11 @@ public sealed class SearchIndexFoundationTests(StageBFixture fixture)
             indexed_p50_ms = Math.Round(Q(withIndex, 0.50), 2), indexed_p95_ms = Math.Round(Q(withIndex, 0.95), 2),
             plain_p50_ms = Math.Round(Q(without, 0.50), 2), plain_p95_ms = Math.Round(Q(without, 0.95), 2),
             delta_p50_ms = Math.Round(Q(withIndex, 0.50) - Q(without, 0.50), 2), delta_p95_ms = Math.Round(Q(withIndex, 0.95) - Q(without, 0.95), 2),
+            indexed_p99_ms = Math.Round(Q(withIndex, 0.99), 2), plain_p99_ms = Math.Round(Q(without, 0.99), 2),
+            delta_p99_ms = Math.Round(Q(withIndex, 0.99) - Q(without, 0.99), 2),
+            p99_note = "with 35 samples p99 is the maximum sample",
+            indexed_db_commands = new { min = indexedCommands.Min(), median = Q(indexedCommands, 0.50), max = indexedCommands.Max() },
+            plain_db_commands = new { min = plainCommands.Min(), median = Q(plainCommands, 0.50), max = plainCommands.Max() },
             gate_p95_delta_ms = 20,
             indexed_stage_breakdown = stageReport,
             stage_note = "stages are inside the index derivation only; the commit's extra flush (D-IX1-8), the projection-state read and the deferred INV-R trigger are outside them",

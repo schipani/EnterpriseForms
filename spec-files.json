@@ -154,13 +154,13 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX1_EVIDENCE.md",
-      "sha256": "35ce4bf6ed18dd0577f5ea46c468490be2d808e535990cdb02beb5c3dcf9bd6d",
-      "bytes": 21874
+      "sha256": "859fea3b9ade6d5c4afcdf5e69dc80561c466100a089d85c27c2fdc75378956f",
+      "bytes": 49723
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "661afe460d8352cdf6e601b4c67d190bc4ce9867ade28eeae12005396c2f4175",
-      "bytes": 126394
+      "sha256": "d05f28f885f3adc528c4a587c81120f1120e549525dce407e34f0ea64fdf0b5f",
+      "bytes": 127569
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -364,8 +364,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "a900ab2b59456464cbd0815c9c8357a694b89704d5c121f32d05609d9ca954c0",
-      "bytes": 223032
+      "sha256": "7ef289c4e0bdb4c43c3a7fbb0e7de91ccacddd1841ed66a3bd36dc3f6049f3a8",
+      "bytes": 227618
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

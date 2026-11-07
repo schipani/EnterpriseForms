@@ -33,6 +33,10 @@ public static class AuthorityInfrastructureRegistration
         services.AddDbContextFactory<AuthorityDbContext>(options =>
         {
             options.UseNpgsql(connectionString ?? "Host=unconfigured.invalid;Database=unconfigured;Username=unconfigured;Password=unconfigured", npgsql => npgsql.MigrationsHistoryTable("ef_migrations_history", AuthorityDbContext.SchemaName));
+            if (environment.IsEnvironment("Testing"))
+            {
+                options.AddInterceptors(new AuthorityCommandCountingInterceptor()); // IX-1 measurement only (round-trip counts)
+            }
         });
         services.AddSingleton<IAuthorityStore, AuthorityStore>();
 

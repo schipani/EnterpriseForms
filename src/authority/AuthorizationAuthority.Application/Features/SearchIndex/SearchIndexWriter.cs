@@ -28,7 +28,9 @@ public static class SearchEntrySealBuilder
 }
 
 /// <summary>What the commit hands the index: the record, its new head and the staged bytes just verified.</summary>
-public sealed record CommitIndexInput(Guid FormRecordId, RecordContentHead Head, IReadOnlyList<StagedContentItem> VerifiedItems, DateTimeOffset Now);
+/// <param name="RegisteredFormDefinitionId">The record's form from the Authority registry when the commit already read it (IX-1
+/// remediation: saves a second read of the same registry row); null makes the derivation read it.</param>
+public sealed record CommitIndexInput(Guid FormRecordId, RecordContentHead Head, IReadOnlyList<StagedContentItem> VerifiedItems, DateTimeOffset Now, Guid? RegisteredFormDefinitionId = null);
 
 /// <summary>
 /// IX-1: writes the Authority-owned search index inside the transactions that change what it may contain.
@@ -52,23 +54,17 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
         ArgumentNullException.ThrowIfNull(input);
         var index = scope.SearchIndex;
         var started = System.Diagnostics.Stopwatch.GetTimestamp();
-        await index.BindOrganizationAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
-        var record = await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, input.FormRecordId, cancellationToken).ConfigureAwait(false);
-        if (record?.ParentResourceEntityId is not { } formDefinitionId)
-        {
-            throw SearchPostingDerivationV1.Failure("the record has no registered form");
-        }
+        // IX-1 remediation: the registry row the commit already read is reused (the same Authority source, not a business input).
+        var formDefinitionId = input.RegisteredFormDefinitionId
+                               ?? (await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, input.FormRecordId, cancellationToken).ConfigureAwait(false))?.ParentResourceEntityId
+                               ?? throw SearchPostingDerivationV1.Failure("the record has no registered form");
 
-        var coverages = (await index.GetCoveragesAsync(state.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)).Where(c => c.CoverageStateName != SearchCoverageStates.Withdrawn).ToList();
-        var activeApprovals = (await scope.GetFieldSearchApprovalsAsync(state.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false))
-            .Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && coverages.Any(c => c.FieldSearchApprovalId == a.FieldSearchApprovalId)).ToList();
+        // One read: the form's Active approvals that have a coverage other than Withdrawn (previously two reads).
+        var activeApprovals = await index.GetCoveredActiveApprovalsAsync(state.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false);
         if (activeApprovals.Count == 0)
         {
-            if (await index.DeleteRecordIndexAsync(state.OrganizationId, input.FormRecordId, cancellationToken).ConfigureAwait(false) > 0)
-            {
-                await index.BumpFormStateAsync(state.OrganizationId, formDefinitionId, input.Now, cancellationToken).ConfigureAwait(false);
-            }
-
+            // One command: organization binding, removal of any entry, form-state increment only if an entry was removed.
+            await index.ResetRecordIndexAsync(state.OrganizationId, formDefinitionId, input.FormRecordId, alwaysAdvanceFormState: false, input.Now, cancellationToken).ConfigureAwait(false);
             return false;
         }
 
@@ -113,8 +109,10 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
 
         var signed = System.Diagnostics.Stopwatch.GetTimestamp();
         entry.EntrySealSignature = signature.Signature;
-        await index.ReplaceRecordIndexAsync(ToRows(entry, content), cancellationToken).ConfigureAwait(false);
-        await index.BumpFormStateAsync(state.OrganizationId, formDefinitionId, input.Now, cancellationToken).ConfigureAwait(false);
+        // One command: organization binding (RLS), removal of the previous entry, form-state increment. The new rows are queued
+        // and written by the commit's final SaveChanges, in the same transaction (previously four round trips).
+        await index.ResetRecordIndexAsync(state.OrganizationId, formDefinitionId, input.FormRecordId, alwaysAdvanceFormState: true, input.Now, cancellationToken).ConfigureAwait(false);
+        index.AddRecordIndex(ToRows(entry, content));
         if (stageTimingSink is not null)
         {
             var written = System.Diagnostics.Stopwatch.GetTimestamp();
