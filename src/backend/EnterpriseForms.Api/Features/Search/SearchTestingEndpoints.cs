@@ -33,17 +33,13 @@ public static class SearchTestingEndpoints
             {
                 // Bearer callers of the test harness have no cookie session; they name an Authority session they registered for the same
                 // identity (the Authority refuses any session of another identity, so this cannot borrow one). Testing environment only.
-                var context = BusinessAuthentication.RequireContext(http);
-                if (context.SessionDigestBase64 is null && http.Request.Headers["X-Testing-Session-Digest"].ToString() is { Length: > 0 } digest)
-                {
-                    context = context with { SessionDigestBase64 = digest };
-                }
+                var context = SearchTestingSession.Context(http);
 
                 var (response, failure, comparison) = await handler.ExecuteAsync(context, request, forceShadow: true, cancellationToken).ConfigureAwait(false);
                 http.Response.Headers.CacheControl = "no-store";
                 if (comparison is null)
                 {
-                    return TypedResults.Problem(title: "SHADOW_NOT_ENABLED", statusCode: 409, detail: "FieldSearch:Engine is not Shadow");
+                    return TypedResults.Problem(title: "SHADOW_NOT_ENABLED", statusCode: 409, detail: "FieldSearch:Engine is neither Shadow nor Indexed");
                 }
 
                 return TypedResults.Ok(new FieldSearchShadowTestingResponse(response?.TotalCount, failure is null ? null : failure.ErrorCode + ((failure.UnavailableReason ?? failure.LimitKind) is { } detail ? ":" + detail : string.Empty),

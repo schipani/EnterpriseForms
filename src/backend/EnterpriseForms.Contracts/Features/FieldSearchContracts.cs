@@ -66,6 +66,12 @@ public sealed record FieldSearchPageRequest(string? Cursor);
 /// A complete, verified result page (returned only when every eligible record was authenticated at one snapshot; anything
 /// else is a typed failure, never a partial page). Rows reuse the My Records item so results render in the same table.
 /// </summary>
+/// <remarks>
+/// IX-4 (design §6.6): <c>ResultBasis</c> names the engine. <c>VerifiedScan</c>: every record in scope was read and verified at search
+/// time (rows carry <c>ProjectionVerified=true</c>). <c>AuthorityAcceptedContent</c>: the Authority's index evaluated the content it
+/// last accepted for each record; the business copy was not checked by the search (rows carry <c>ProjectionVerified=false</c>) and
+/// is fully verified when a record is opened. Optional; older clients ignore it.
+/// </remarks>
 public sealed record FieldSearchResponse(
     IReadOnlyList<RecordListItemResponse> Items,
     int TotalCount,
@@ -76,7 +82,8 @@ public sealed record FieldSearchResponse(
     string Completeness,
     string ScopeStatement,
     string? ContinuationToken = null,
-    string? PreviousToken = null);
+    string? PreviousToken = null,
+    string? ResultBasis = null);
 
 /// <summary>
 /// Testing environment only (Phase C7 M1 proof, never part of the published API): outcome and cost of verifying the caller's

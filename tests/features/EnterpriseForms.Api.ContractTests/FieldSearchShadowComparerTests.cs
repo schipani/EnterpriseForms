@@ -148,7 +148,8 @@ public sealed class FieldSearchShadowComparerTests
     public void TheEngineSettingIsValidatedAndShadowIsADevelopmentAndTestingCapability()
     {
         new FieldSearchLimits { Engine = FieldSearchLimits.EngineShadow }.Validate();
-        Assert.Throws<InvalidOperationException>(() => new FieldSearchLimits { Engine = "Indexed" }.Validate());
+        // C-133: Indexed became a valid engine with IX-4 (Development/Testing only: IndexedFieldSearchEngineTests); others stay refused.
+        Assert.Throws<InvalidOperationException>(() => new FieldSearchLimits { Engine = "Tier2" }.Validate());
         Assert.Throws<InvalidOperationException>(() => new FieldSearchLimits { ShadowSamplePercent = 101 }.Validate());
         new FieldSearchLimits { Engine = FieldSearchLimits.EngineShadow }.ValidateEnvironment("Testing");
         Assert.Throws<InvalidOperationException>(() => new FieldSearchLimits { Engine = FieldSearchLimits.EngineShadow }.ValidateEnvironment("Production"));

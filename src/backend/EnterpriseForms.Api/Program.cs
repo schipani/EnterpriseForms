@@ -89,6 +89,8 @@ public sealed class Program
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchAdmission>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.IFieldSearchShadowObserver, EnterpriseForms.Api.Features.Search.FieldSearchShadowLogging>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchShadowComparer>(); // IX-3 (inactive unless Engine=Shadow)
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.IFieldSearchEngineObserver, EnterpriseForms.Api.Features.Search.FieldSearchEngineLogging>();
+        builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchIndexedEngine>(); // IX-4 (inactive unless Engine=Indexed)
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.Verification.TrustedScopeVerifier>();
         builder.Services.Configure<DocumentProcessingHostOptions>(builder.Configuration.GetSection(DocumentProcessingHostOptions.SectionName));

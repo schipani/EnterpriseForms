@@ -5,6 +5,7 @@
 export { AdvancedFieldSearch, type AdvancedFieldSearchProps } from "./components/AdvancedFieldSearch";
 export { MAX_CONDITIONS_V1, operatorLabel, toFieldSearchRequest, type ConditionDraft, type SearchFilters } from "./components/conditionModel";
 export { presentSearchFailure, type SearchFailure } from "./components/searchFailure";
+export { resultBasisCopy, resultBasisOf, type ResultBasis } from "./components/resultBasis";
 export { ENCRYPTED_NOT_SEARCHABLE, FieldSearchSection, fieldSearchKey } from "./components/FieldSearchSection";
 export { FieldSearchersCard } from "./components/FieldSearchersCard";
 export { SearchApprovalsPage } from "./pages/SearchApprovalsPage";

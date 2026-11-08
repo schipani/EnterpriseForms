@@ -49,6 +49,9 @@ public sealed class FieldSearchShadowComparer(FieldSearchLimits limits, IIndexed
 
     public bool Enabled => limits.Engine == FieldSearchLimits.EngineShadow;
 
+    /// <summary>The Testing endpoint may force a comparison under either engine that has the indexed path (Shadow or Indexed).</summary>
+    public bool CanCompare(bool force) => Enabled || (force && limits.Engine == FieldSearchLimits.EngineIndexed);
+
     /// <param name="force">Testing endpoint: compare even when the sample would skip this search.</param>
     public async Task<FieldSearchShadowComparison> CompareAsync(RequestContext context, FieldSearchRequest request, FieldSearchV1Outcome v1, bool force, CancellationToken cancellationToken)
     {
@@ -56,7 +59,7 @@ public sealed class FieldSearchShadowComparer(FieldSearchLimits limits, IIndexed
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(v1);
         var started = clock.GetTimestamp();
-        if (!Enabled)
+        if (!CanCompare(force))
         {
             return Report(Skipped("ENGINE_NOT_SHADOW", started));
         }
@@ -175,7 +178,7 @@ public sealed class FieldSearchShadowComparer(FieldSearchLimits limits, IIndexed
         "SEARCH_FIELD_NOT_ALLOWED" => SearchErrorCodes.FieldNotAllowed,
         "SEARCH_OPERATOR_NOT_SUPPORTED" => SearchErrorCodes.OperatorNotSupported,
         "RECORD_QUARANTINED" => SearchErrorCodes.VerificationUnavailable + ":RECORD_QUARANTINED",
-        "INTEGRITY_QUARANTINE" => SearchErrorCodes.VerificationUnavailable + ":INTEGRITY_QUARANTINE",
+        "INTEGRITY_QUARANTINE" => SearchErrorCodes.VerificationUnavailable + ":RECORD_QUARANTINED", // V1 maps an organization quarantine to this reason (TrustedScopeVerifier)
         _ => indexedError,
     };
 

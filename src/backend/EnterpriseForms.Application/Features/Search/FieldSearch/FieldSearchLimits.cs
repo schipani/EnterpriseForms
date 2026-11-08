@@ -54,10 +54,13 @@ public sealed class FieldSearchLimits
 
     public const string EngineShadow = "Shadow";
 
+    public const string EngineIndexed = "Indexed";
+
     /// <summary>
-    /// IX-3 (design R1 §G.1): <c>VerifiedScan</c> (default; V1 only) or <c>Shadow</c> (V1 answers the user; for a sample of searches
-    /// the Authority's indexed query also runs, under its own admission slot, and the two are compared — ids and counts only).
-    /// <c>Indexed</c> is IX-4 and refused. Shadow is a Development/Testing capability, like the execution gate.
+    /// IX-3/IX-4 (design R1 §G.1): <c>VerifiedScan</c> (default; V1 only), <c>Shadow</c> (V1 answers the user; for a sample of searches
+    /// the Authority's indexed query also runs, under its own admission slot, and the two are compared — ids and counts only) or
+    /// <c>Indexed</c> (IX-4: the Authority's indexed engine answers searches made with a browser session, with the V1 fallback of
+    /// IX-D8). Shadow and Indexed are Development/Testing capabilities, like the execution gate.
     /// </summary>
     public string Engine { get; set; } = EngineVerifiedScan;
 
@@ -92,9 +95,9 @@ public sealed class FieldSearchLimits
             throw new InvalidOperationException("FieldSearch admission limits: 1..64 concurrent searches, 1..8 per user, wait 0..10000 ms");
         }
 
-        if (Engine is not (EngineVerifiedScan or EngineShadow))
+        if (Engine is not (EngineVerifiedScan or EngineShadow or EngineIndexed))
         {
-            throw new InvalidOperationException("FieldSearch:Engine must be VerifiedScan or Shadow (the Indexed engine is IX-4 and not authorized)");
+            throw new InvalidOperationException("FieldSearch:Engine must be VerifiedScan, Shadow or Indexed");
         }
 
         if (ShadowSamplePercent is < 0 or > 100 || MaximumConcurrentShadowSearches is < 1 or > 16 || ShadowMaximumSeconds is < 1 or > 30)
@@ -111,9 +114,9 @@ public sealed class FieldSearchLimits
             throw new InvalidOperationException($"FieldSearch:ExecutionEnabled is a development/test capability and must not be set in the {environmentName} environment (PB-08 and independent review outstanding). Refusing to start.");
         }
 
-        if (Engine == EngineShadow && environmentName is not ("Development" or "Testing"))
+        if (Engine is EngineShadow or EngineIndexed && environmentName is not ("Development" or "Testing"))
         {
-            throw new InvalidOperationException($"FieldSearch:Engine=Shadow is a development/test capability (IX-3) and must not be set in the {environmentName} environment. Refusing to start.");
+            throw new InvalidOperationException($"FieldSearch:Engine={Engine} is a development/test capability (IX-3, IX-4) and must not be set in the {environmentName} environment. Refusing to start.");
         }
     }
 }

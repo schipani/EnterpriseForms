@@ -1919,7 +1919,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and verified at one snapshot; otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Each condition is first authorized against the Authority's capabilities (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED). Phase C7 M3: executed only where the fail-closed execution gate is on (isolated Development/Testing); otherwise 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED). Overload: 503 SEARCH_VERIFICATION_UNAVAILABLE (SEARCH_CAPACITY_EXCEEDED, retryable). */
+        /** Advanced field search over one selected form: up to five conditions combined with AND, each on a field from the capability list with an allowed operator and a typed invariant value, plus the My Records metadata filters. A result is returned only when every eligible record was independently enumerated and evaluated at one snapshot — verified record by record (resultBasis VerifiedScan) or, with the IX-4 indexed engine, evaluated on the content the Authority last accepted for each record (resultBasis AuthorityAcceptedContent; the business copy is verified when a record is opened); otherwise a typed failure (SEARCH_FIELD_NOT_ALLOWED, SEARCH_OPERATOR_NOT_SUPPORTED, SEARCH_VERIFICATION_LIMIT, SEARCH_SNAPSHOT_CHANGED, SEARCH_VERIFICATION_UNAVAILABLE), never a partial page. Each condition is first authorized against the Authority's capabilities (422 SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED). Phase C7 M3: executed only where the fail-closed execution gate is on (isolated Development/Testing); otherwise 503 SEARCH_VERIFICATION_UNAVAILABLE (TRUSTED_SEARCH_NOT_ENABLED). Overload: 503 SEARCH_VERIFICATION_UNAVAILABLE (SEARCH_CAPACITY_EXCEEDED, retryable). */
         post: operations["SearchFormRecordsByFieldValues"];
         delete?: never;
         options?: never;
@@ -2860,6 +2860,7 @@ export interface components {
             scopeStatement: string;
             continuationToken?: null | string;
             previousToken?: null | string;
+            resultBasis?: null | string;
         };
         FieldSearchStatusResponse: {
             /** Format: uuid */

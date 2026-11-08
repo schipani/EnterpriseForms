@@ -245,8 +245,11 @@ services:
       DataProtection__KeyRingDirectory: /keyring
       # Phase C7 M3: verified field-value search execution (fail-closed gate; refused at startup outside Development/Testing).
       FieldSearch__ExecutionEnabled: "true"
-      # IX-3: V1 answers; for searches made with a browser session the indexed engine is compared (ids and counts only; R1 §G.3).
-      FieldSearch__Engine: ${IX3_FIELD_SEARCH_ENGINE:-Shadow}
+      # IX-4 (C-133): the Authority's indexed engine answers searches made with a browser session (or, Testing only, a bearer caller
+      # naming its Authority session with X-Testing-Session-Digest); the complete V1 path answers when the index cannot (IX-D8) and
+      # for bearer callers without a session. The IX-3 shadow comparison stays available through the Testing endpoint.
+      # FIELD_SEARCH_ENGINE=Shadow or VerifiedScan selects the IX-3 or V1 behaviour.
+      FieldSearch__Engine: ${FIELD_SEARCH_ENGINE:-Indexed}
       Testing__StackIdentity: enterpriseforms-security-test
       # Phase C8 (D8-16): shortened reconciliation windows, permitted in Testing only (the hosts refuse them elsewhere).
       TeamMembershipReconciliation__InFlightWindowSeconds: "6"

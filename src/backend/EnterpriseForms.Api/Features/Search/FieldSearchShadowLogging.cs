@@ -35,3 +35,12 @@ public sealed partial class FieldSearchShadowLogging(ILogger<FieldSearchShadowLo
     [LoggerMessage(EventId = 9332, Level = LogLevel.Debug, Message = "IX3-SHADOW Skipped reason={Reason}")]
     private static partial void LogSkipped(ILogger logger, string reason);
 }
+
+/// <summary>IX-4 engine evidence: a V1 fallback (IX-D8) is logged with the index's reason and the V1 outcome only — no ids, values or predicates.</summary>
+public sealed partial class FieldSearchEngineLogging(ILogger<FieldSearchEngineLogging> logger) : IFieldSearchEngineObserver
+{
+    public void FallbackToVerifiedScan(string indexReason, string outcome) => LogFallback(logger, indexReason, outcome);
+
+    [LoggerMessage(EventId = 9333, Level = LogLevel.Information, Message = "IX4-ENGINE fallback index_reason={IndexReason} verified_scan_outcome={Outcome}")]
+    private static partial void LogFallback(ILogger logger, string indexReason, string outcome);
+}
