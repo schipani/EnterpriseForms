@@ -227,6 +227,38 @@ public sealed class ProjectionIntegrityTests
         Assert.Single(h.QuarantineEvents);
     }
 
+    /// <summary>
+    /// C-133 PD-3: the quarantine commit also deletes stored search results (trigger), so it can fail. A failed commit is never
+    /// reported as a quarantine or as success: the original exception propagates (the request is refused), a Critical
+    /// QUARANTINE_NOT_COMMITTED alert is raised instead of the quarantine alert, and the next decision observes the persistent
+    /// mismatch again and commits the quarantine (retry).
+    /// </summary>
+    [Fact]
+    public async Task AQuarantineThatCannotBeCommittedIsRefusedAlertedAndRetriedByTheNextDecision()
+    {
+        var h = new Harness();
+        var foreignDigest = new byte[32];
+        foreignDigest[3] = 0x33;
+        h.Spice.Markers = _ => Harness.Of(ProjectionMarker.SubjectId(h.Org, 8, foreignDigest));
+        h.Store.FailNextCommit = new InvalidOperationException("simulated failure of the stored-result deletion");
+
+        var failed = await Assert.ThrowsAsync<InvalidOperationException>(h.PinAsync);
+        Assert.Equal("simulated failure of the stored-result deletion", failed.Message); // never converted into a 423 or a success
+        Assert.Equal(0, h.Spice.DecisionReads); // nothing was decided or released
+        var alert = Assert.Single(h.Alerts.Raised);
+        Assert.Equal((ProjectionIntegrityVerifier.QuarantineNotCommittedAlertKind, "Critical", h.Org), (alert.AlertKind, alert.Severity, alert.OrganizationId));
+        Assert.Contains(ProjectionIntegrityReasons.MarkerAhead, alert.Summary, StringComparison.Ordinal);
+
+        // Retry: the mismatch is persistent state; the next decision confirms it again and this time the quarantine commits.
+        h.State.IntegrityQuarantineEnabled = false; // the in-memory store does not roll back; AuthorityDb does (Docker PD-3 test)
+        h.State.IntegrityQuarantineReasonCode = null;
+        var retried = await Assert.ThrowsAsync<AuthorityException>(h.PinAsync);
+        Assert.Equal((AuthorityErrorCodes.IntegrityQuarantine, 423), (retried.ErrorCode, retried.HttpStatusCode));
+        Assert.True(h.State.IntegrityQuarantineEnabled);
+        Assert.Equal(ProjectionIntegrityReasons.MarkerAhead, h.State.IntegrityQuarantineReasonCode);
+        Assert.Equal([ProjectionIntegrityVerifier.QuarantineNotCommittedAlertKind, ProjectionIntegrityVerifier.QuarantineAlertKind], h.Alerts.Raised.Select(a => a.AlertKind));
+    }
+
     [Fact]
     public async Task ARestoreBetweenThePinAndTheDecisionIsCaughtByTheVerifyRead()
     {

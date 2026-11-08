@@ -41,6 +41,9 @@ public static class ProjectionIntegrityOutcomes
     public const string SnapshotError = "snapshot_error";
     public const string TokenMismatch = "token_mismatch";
     public const string Unavailable = "unavailable";
+
+    /// <summary>C-133 PD-3: a confirmed mismatch whose quarantine transaction failed (retried by the next decision or check).</summary>
+    public const string QuarantineNotCommitted = "quarantine_not_committed";
 }
 
 /// <summary>

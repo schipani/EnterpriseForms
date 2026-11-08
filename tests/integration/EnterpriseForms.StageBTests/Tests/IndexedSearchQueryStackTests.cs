@@ -691,6 +691,81 @@ public sealed class IndexedSearchQueryStackTests(StageBFixture fixture)
         Assert.Equal(0, Snapshots(w.S.OrganizationId));
     }
 
+    /// <summary>
+    /// C-133 PD-3: an S1 organization quarantine whose stored-result deletion fails (X2, trigger in the quarantine transaction) is
+    /// never reported as success and releases nothing: the transaction rolls back (organization not quarantined, snapshot kept),
+    /// the page, a new indexed search and the V1 path are all refused, the failure raises a Critical alert, and once the deletion
+    /// can succeed the next request commits the quarantine (423) and the snapshots are deleted. The mismatch is an AuthorityDb
+    /// state naming a foreign journal history at the same authorization revision, so the page reaches its S1 pin (the
+    /// snapshot's revision check passes) and the quarantine is attempted on the page path itself.
+    /// </summary>
+    [Fact]
+    public async Task PD3AnS1QuarantineWhoseSnapshotDeletionFailsReleasesNothingAndIsRetried()
+    {
+        var w = await WorkspaceAsync("ix3-pd3");
+        for (var i = 0; i < 12; i++)
+        {
+            await CreateAsync(w, Values($"PD-{i:D2}", i, "2026-02-02", "open", false));
+        }
+
+        await WaitCompleteAsync(w);
+        var clerk = await SessionAsync(w, w.S.Clerk);
+        var nonce = Nonce();
+        var query = Query(w, [Cond(w.Reference, "startsWith", "String", "PD-")]);
+        var first = await IndexedAsync(w, clerk, nonce, query);
+        Assert.Equal(12, first.Root.GetProperty("total_count").GetInt32());
+        var snapshot = SnapshotId(first);
+        var org = w.S.OrganizationId;
+        var runtime = Scalar("SELECT rolname FROM pg_roles WHERE rolname NOT LIKE 'pg_%' AND rolcanlogin AND NOT rolsuper AND rolname NOT LIKE 'authority_search_reader%' ORDER BY rolname LIMIT 1;");
+        string Quarantine() => Scalar($"SELECT integrity_quarantine_enabled::text || '|' || coalesce(integrity_quarantine_reason_code, '') FROM organization_authorization_states WHERE organization_id = '{org:D}';");
+        var alert = $"SECURITY ALERT {ProjectionIntegrityAlertNotCommitted} organization {org:D}";
+        try
+        {
+            fixture.Stack.AuthorityAdministratorSql($"REVOKE DELETE ON authority_search.search_result_snapshots FROM {runtime};");
+            // The AuthorityDb state names another journal history at the same revision (a restore from a foreign backup): the gate
+            // and the snapshot's revision check (check 4) still pass, so the page reaches its S1 pin, which confirms the mismatch.
+            fixture.Stack.AuthorityAdministratorSql($"UPDATE organization_authorization_states SET latest_security_journal_digest = decode(repeat('ab', 32), 'hex') WHERE organization_id = '{org:D}';");
+            Assert.Equal(1, Snapshots(org));
+
+            // The page: its S1 pin confirms the mismatch and the quarantine transaction fails on the deletion (alerted on this request).
+            int Alerts() => fixture.Stack.Logs("authority", 20000).Split('\n').Count(l => l.Contains(alert, StringComparison.Ordinal));
+            var alertsBefore = Alerts();
+            var page = await PageAsync(w, clerk, nonce, query, snapshot, 10);
+            Assert.True(Alerts() > alertsBefore, "the failed quarantine of the page request raised the Critical alert");
+            Assert.False(page.IsSuccess, page.Body);
+            Assert.True((int)page.Status >= 500, page.Body); // a store failure (503 AUTHORITY_NOT_READY), never 200 or 423
+            Assert.DoesNotContain("form_record_id", page.Body, StringComparison.Ordinal);
+            Assert.Equal("false|", Quarantine()); // rolled back: no partial quarantine was committed
+            Assert.Equal(1, Snapshots(org)); // and nothing of it either
+
+            // A new indexed search and the complete V1 path are refused the same way (no data, no success).
+            var search = await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/search/indexed-query", TestIdentity.WorkloadToken(),
+                new { organization_id = org, session_digest_base64 = clerk.Digest, query_nonce_base64 = Nonce(), query }, w.S.Token(clerk.User));
+            Assert.False(search.IsSuccess, search.Body);
+            Assert.DoesNotContain("form_record_id", search.Body, StringComparison.Ordinal);
+            var v1 = await fixture.Api.PostAsync("/api/v1/form-records/field-search", w.S.Token(w.S.Clerk), new { formDefinitionId = w.FormId, conditions = new[] { new { fieldDefinitionId = w.Reference, @operator = "startsWith", valueType = "String", value = "PD-" } }, pageSize = 25 });
+            Assert.False(v1.IsSuccess, v1.Body);
+            Assert.DoesNotContain("formRecordId", v1.Body, StringComparison.Ordinal);
+            Assert.Equal("false|", Quarantine());
+
+            // Observable: a Critical alert names the failed quarantine (organization id only; no subject or record ids).
+            Assert.Contains(alert, fixture.Stack.Logs("authority", 5000), StringComparison.Ordinal);
+        }
+        finally
+        {
+            fixture.Stack.AuthorityAdministratorSql($"GRANT DELETE ON authority_search.search_result_snapshots TO {runtime};");
+        }
+
+        // Retry: the next request confirms the persistent mismatch again and the quarantine commits, deleting the snapshots.
+        var retried = await PageAsync(w, clerk, nonce, query, snapshot, 10);
+        AssertNoPage(retried, "INTEGRITY_QUARANTINE");
+        Assert.Equal("true|PROJECTION_FOREIGN_HISTORY", Quarantine());
+        Assert.Equal(0, Snapshots(org));
+        Assert.Equal("INTEGRITY_QUARANTINE", (await IndexedAsync(w, clerk, Nonce(), query)).ErrorCode);
+    }
+
+    private const string ProjectionIntegrityAlertNotCommitted = "PROJECTION_INTEGRITY_QUARANTINE_NOT_COMMITTED";
+
     /// <summary>IX-82: concurrent page requests on one snapshot, racing a revocation, each return a complete correct page or a typed refusal — never a partial or mixed page.</summary>
     [Fact]
     public async Task IX82ConcurrentPagesRacingARevocationAreCompleteOrRefusedNeverPartial()

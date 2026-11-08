@@ -19,6 +19,7 @@
 param(
   [Parameter(Mandatory)][ValidateSet(1, 2, 3)][int]$Level,
   [string]$Class,          # Level 2: xunit class filter for the Stage B integration project (e.g. DocumentTests)
+  [switch]$ExcludeBenchmarks,  # Level 2 -Class: skip [Trait("Category", "Benchmark")] tests (C-133 R-29)
   [string]$Spec,           # Level 2: Playwright spec name filter (e.g. designer-ux)
   [switch]$Browser,        # Level 2: also run the full Playwright suite
   [switch]$NoRebuild,      # Level 2: reuse the running stack as-is (UI-only edits; Vite already hot-reloads)
@@ -32,6 +33,11 @@ $docker = Join-Path $root 'infrastructure/docker'
 $web = Join-Path $root 'src/frontend'
 $compose = @('compose', '-f', 'compose.yaml', '-f', 'compose.security-test.yaml', '--env-file', '.env')
 $timings = [System.Collections.Generic.List[string]]::new()
+# C-133 R-28: every .NET test step writes an xUnit TRX report (names, messages, stack traces) under artifacts/test-runs/<run id>/.
+$runId = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$evidence = Join-Path $root "artifacts/test-runs/$runId"
+$report = @('--results-directory', $evidence, '--report-xunit-trx')
+Write-Host "Test run id: $runId (evidence: $evidence)"
 $stageBAuthorized = $StageBReleaseAuthorization -match '^[A-Za-z0-9][A-Za-z0-9 ._:/#()-]{2,119}$'
 if ($stageBAuthorized) { Write-Host "Stage B release run authorized by: $StageBReleaseAuthorization" -ForegroundColor Yellow }
 if ($Level -eq 2 -and (($Browser) -or -not ($Class -or $Spec)) -and -not $stageBAuthorized) {
@@ -64,7 +70,7 @@ function StackUpAll {
 try {
   if ($Level -eq 1) {
     Step '.NET build + unit/architecture/contract tests' {
-      InDir $root { dotnet test --solution EnterpriseForms.All.slnx -c Release -- --minimum-expected-tests 10 }
+      InDir $root { dotnet test --solution EnterpriseForms.All.slnx -c Release -- --minimum-expected-tests 10 @report }
     }
     Step 'Frontend lint + typecheck' { InDir $web { npm run lint; if ($LASTEXITCODE -eq 0) { npm run typecheck } } }
     Step 'Frontend unit tests' { InDir $web { if ($Full) { npm run test } else { npx vitest run --changed --passWithNoTests } } }
@@ -79,7 +85,8 @@ try {
       Step 'Stage B integration tests' {
         InDir $root {
           $filter = if ($Class) { @('--filter-class', "*$Class*") } else { @() }
-          dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release -- --minimum-expected-tests $(if ($Class) { 1 } else { 10 }) @filter
+          if ($Class -and $ExcludeBenchmarks) { $filter += @('--filter-not-trait', 'Category=Benchmark') }
+          dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release -- --minimum-expected-tests $(if ($Class) { 1 } else { 10 }) @filter @report
         }
       }
     }

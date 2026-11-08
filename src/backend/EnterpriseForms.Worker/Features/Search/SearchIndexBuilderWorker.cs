@@ -45,6 +45,11 @@ public sealed partial class SearchIndexBuilderWorker(SearchIndexBuilderWorkflow 
 
         public void CredentialRefused(string pass, string errorCode) => LogCredentialRefused(logger, pass, errorCode);
 
+        public void PersistentFailure(string pass, SearchIndexBuilderEscalation.Escalation escalation, SearchIndexBuilderFailureKind lastKind, string exceptionType, string errorCode) =>
+            LogPersistent(logger, pass, escalation.Trigger, escalation.ConsecutiveFailures, escalation.UnexpectedFailures, escalation.Duration, lastKind, exceptionType, errorCode);
+
+        public void Recovered(string pass, int failures, TimeSpan duration) => LogRecovered(logger, pass, failures, duration);
+
         [LoggerMessage(Level = LogLevel.Information, Message = "Search index builder not configured in this host; idle (fail closed).")]
         private static partial void LogIdle(ILogger logger);
 
@@ -62,6 +67,12 @@ public sealed partial class SearchIndexBuilderWorker(SearchIndexBuilderWorkflow 
 
         [LoggerMessage(EventId = 9313, Level = LogLevel.Error, Message = "Search index builder {Pass} pass failed unexpectedly ({ExceptionType} {ErrorCode}); failure {Failures}, retry in {RetrySeconds} s.")]
         private static partial void LogUnexpected(ILogger logger, string pass, string exceptionType, string errorCode, int failures, double retrySeconds);
+
+        [LoggerMessage(EventId = 9315, Level = LogLevel.Critical, Message = "IX-BUILDER-PERSISTENT-FAILURE pass={Pass} trigger={Trigger} failures={Failures} unexpected={Unexpected} duration={Duration} last_kind={LastKind} last_exception={ExceptionType} last_code={ErrorCode}. The builder keeps retrying at the capped backoff; no index work completes until a pass succeeds. Repeated at most hourly while it continues.")]
+        private static partial void LogPersistent(ILogger logger, string pass, string trigger, int failures, int unexpected, TimeSpan duration, SearchIndexBuilderFailureKind lastKind, string exceptionType, string errorCode);
+
+        [LoggerMessage(EventId = 9316, Level = LogLevel.Information, Message = "IX-BUILDER-RECOVERED pass={Pass} after failures={Failures} duration={Duration}: a pass completed successfully after an escalated failure.")]
+        private static partial void LogRecovered(ILogger logger, string pass, int failures, TimeSpan duration);
 
         [LoggerMessage(EventId = 9314, Level = LogLevel.Critical, Message = "Search index builder stopped: the Authority refuses the builder credential during the {Pass} pass ({ErrorCode}). Fail closed; restart the Worker with a valid credential.")]
         private static partial void LogCredentialRefused(ILogger logger, string pass, string errorCode);

@@ -43,9 +43,9 @@ public sealed class ProjectionIntegrityMonitor(IAuthorityStore store, ISpiceDbPr
                     continue;
                 }
 
-                verifier.RecordQuarantine(scope, state, ProjectionIntegrityReasons.SchemaMissing, [], [], "transition", Guid.CreateVersion7());
-                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-                verifier.RaiseQuarantineAlert(organizationId, ProjectionIntegrityReasons.SchemaMissing, Guid.CreateVersion7());
+                var schemaCorrelation = Guid.CreateVersion7();
+                verifier.RecordQuarantine(scope, state, ProjectionIntegrityReasons.SchemaMissing, [], [], "transition", schemaCorrelation);
+                await verifier.CommitQuarantineAsync(scope, organizationId, ProjectionIntegrityReasons.SchemaMissing, "transition", schemaCorrelation, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
@@ -66,8 +66,7 @@ public sealed class ProjectionIntegrityMonitor(IAuthorityStore store, ISpiceDbPr
             {
                 var correlationId = Guid.CreateVersion7();
                 verifier.RecordQuarantine(scope, state, reason, observed, observed, "transition", correlationId);
-                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-                verifier.RaiseQuarantineAlert(organizationId, reason, correlationId);
+                await verifier.CommitQuarantineAsync(scope, organizationId, reason, "transition", correlationId, cancellationToken).ConfigureAwait(false);
             }
         }
 

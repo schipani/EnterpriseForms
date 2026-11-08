@@ -38,6 +38,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<SearchCatalogueSnapshotEntry> SnapshotEntries { get; } = [];
 
     public List<AuthenticatedSession> Sessions { get; } = [];
+
+    /// <summary>C-133 PD-3 fault injection: the next commit throws this exception (once).</summary>
+    public Exception? FailNextCommit { get; set; }
     public List<PublishedFormVersion> PublishedVersions { get; } = [];
     public List<FieldSearchApproval> Approvals { get; } = [];
     public List<OrganizationProtectionPolicy> Policies { get; } = [];
@@ -570,6 +573,12 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
             if (readOnly)
             {
                 throw new InvalidOperationException("read-only snapshot scope cannot commit");
+            }
+
+            if (s.FailNextCommit is { } failure)
+            {
+                s.FailNextCommit = null;
+                throw failure;
             }
 
             s.ScopeCommitCount++;

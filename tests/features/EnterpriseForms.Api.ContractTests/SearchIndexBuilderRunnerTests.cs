@@ -61,6 +61,15 @@ public sealed class SearchIndexBuilderRunnerTests
             Failures.Add((pass, kind, exceptionType, errorCode, consecutiveFailures, retryIn));
 
         public void CredentialRefused(string pass, string errorCode) => Refusals.Add(pass + ":" + errorCode);
+
+        public List<(string Pass, SearchIndexBuilderEscalation.Escalation Escalation, SearchIndexBuilderFailureKind Kind, string Type, string Code)> Escalations { get; } = [];
+
+        public List<(string Pass, int Failures)> Recoveries { get; } = [];
+
+        public void PersistentFailure(string pass, SearchIndexBuilderEscalation.Escalation escalation, SearchIndexBuilderFailureKind lastKind, string exceptionType, string errorCode) =>
+            Escalations.Add((pass, escalation, lastKind, exceptionType, errorCode));
+
+        public void Recovered(string pass, int failures, TimeSpan duration) => Recoveries.Add((pass, failures));
     }
 
     private static SearchIndexBuilderOptions Options() => new() { BackfillIntervalSeconds = 1, DeepSweepIntervalSeconds = 86_400, MaximumRecordsPerSecond = 1000 };
@@ -168,6 +177,100 @@ public sealed class SearchIndexBuilderRunnerTests
         var observer = new RecordingObserver();
         Assert.Equal(SearchIndexBuilderStopReason.NotConfigured, await Runner(new ScriptedPasses { IsConfigured = false }, observer).RunAsync(Ct));
         Assert.True(observer.IdleReported);
+    }
+
+    // ---- C-133 PD-4: escalation of a continuing failure ----------------------------------------------------------------
+
+    private static readonly DateTimeOffset T0 = new(2026, 11, 8, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void FiveUnexpectedFailuresEscalateOnceAnHourUntilASuccessResetsTheRun()
+    {
+        var escalation = new SearchIndexBuilderEscalation();
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.Null(escalation.Failed(SearchIndexBuilderFailureKind.Unexpected, T0.AddMinutes(i)));
+        }
+
+        var fifth = escalation.Failed(SearchIndexBuilderFailureKind.Unexpected, T0.AddMinutes(4));
+        Assert.Equal(new SearchIndexBuilderEscalation.Escalation(SearchIndexBuilderEscalation.TriggerUnexpectedFailures, 5, 5, TimeSpan.FromMinutes(4)), fifth);
+        Assert.Null(escalation.Failed(SearchIndexBuilderFailureKind.Unexpected, T0.AddMinutes(9))); // rate-limited: same run, < 1 h
+        Assert.Null(escalation.Failed(SearchIndexBuilderFailureKind.Unexpected, T0.AddMinutes(63))); // 59 min after the escalation
+        var again = escalation.Failed(SearchIndexBuilderFailureKind.Unexpected, T0.AddMinutes(64)); // 60 min after it
+        Assert.NotNull(again);
+        Assert.Equal((8, 8), (again.ConsecutiveFailures, again.UnexpectedFailures));
+
+        var recovered = escalation.Succeeded(T0.AddMinutes(70));
+        Assert.Equal((8, TimeSpan.FromMinutes(70)), recovered);
+        // A new run starts from zero: four failures do not escalate, the fifth does at once (a new condition, not rate-limited).
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.Null(escalation.Failed(SearchIndexBuilderFailureKind.Unexpected, T0.AddMinutes(71 + i)));
+        }
+
+        Assert.NotNull(escalation.Failed(SearchIndexBuilderFailureKind.Unexpected, T0.AddMinutes(75)));
+    }
+
+    [Fact]
+    public void ThirtyMinutesOfContinuingFailureEscalateEvenWhenEveryFailureIsTransient()
+    {
+        var escalation = new SearchIndexBuilderEscalation();
+        Assert.Null(escalation.Failed(SearchIndexBuilderFailureKind.Transient, T0));
+        Assert.Null(escalation.Failed(SearchIndexBuilderFailureKind.Transient, T0.AddMinutes(10)));
+        Assert.Null(escalation.Failed(SearchIndexBuilderFailureKind.Transient, T0.AddMinutes(29)));
+        var escalated = escalation.Failed(SearchIndexBuilderFailureKind.Transient, T0.AddMinutes(30));
+        Assert.Equal(new SearchIndexBuilderEscalation.Escalation(SearchIndexBuilderEscalation.TriggerFailureDuration, 4, 0, TimeSpan.FromMinutes(30)), escalated);
+        Assert.Null(escalation.Failed(SearchIndexBuilderFailureKind.Transient, T0.AddMinutes(85)));
+        Assert.NotNull(escalation.Failed(SearchIndexBuilderFailureKind.Transient, T0.AddMinutes(90)));
+    }
+
+    [Fact]
+    public void TransientFailuresDoNotResetTheUnexpectedCountAndASuccessWithoutEscalationIsSilent()
+    {
+        var escalation = new SearchIndexBuilderEscalation();
+        foreach (var (kind, minute) in new[] { (SearchIndexBuilderFailureKind.Unexpected, 0), (SearchIndexBuilderFailureKind.Unexpected, 1), (SearchIndexBuilderFailureKind.Transient, 2), (SearchIndexBuilderFailureKind.Unexpected, 3), (SearchIndexBuilderFailureKind.Unexpected, 4) })
+        {
+            Assert.Null(escalation.Failed(kind, T0.AddMinutes(minute)));
+        }
+
+        Assert.Equal(SearchIndexBuilderEscalation.TriggerUnexpectedFailures, escalation.Failed(SearchIndexBuilderFailureKind.Unexpected, T0.AddMinutes(5))?.Trigger);
+        Assert.NotNull(escalation.Succeeded(T0.AddMinutes(6)));
+
+        var quiet = new SearchIndexBuilderEscalation();
+        Assert.Null(quiet.Failed(SearchIndexBuilderFailureKind.Unexpected, T0));
+        Assert.Null(quiet.Succeeded(T0.AddMinutes(1))); // no escalation, so no recovery event
+        Assert.Null(quiet.Succeeded(T0.AddMinutes(2)));
+    }
+
+    [Fact]
+    public async Task TheRunnerEscalatesPersistentUnexpectedFailuresKeepsRetryingAndReportsTheRecovery()
+    {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        var observer = new RecordingObserver();
+        var script = Enumerable.Range(0, 6).Select(i => Throws(new InvalidOperationException("defect " + i)))
+            .Append(_ => Task.FromResult(EmptyPass))
+            .Append(_ => { stop.Cancel(); return Task.FromResult(EmptyPass); })
+            .ToArray();
+        var passes = new ScriptedPasses(script);
+        Assert.Equal(SearchIndexBuilderStopReason.Cancelled, await Runner(passes, observer).RunAsync(stop.Token));
+        Assert.Equal(8, passes.Calls); // never stopped by the escalation
+        Assert.Equal([1, 2, 3, 4, 5, 6], observer.Failures.Select(f => f.Failures)); // the backoff sequence is unchanged
+        Assert.Equal([20, 40, 80, 80, 80, 80], observer.Failures.Select(f => f.RetryIn.TotalMilliseconds));
+        var escalated = Assert.Single(observer.Escalations); // the sixth failure is within the hour: not repeated
+        Assert.Equal(("backfill", SearchIndexBuilderEscalation.TriggerUnexpectedFailures, 5, SearchIndexBuilderFailureKind.Unexpected, "InvalidOperationException"),
+            (escalated.Pass, escalated.Escalation.Trigger, escalated.Escalation.UnexpectedFailures, escalated.Kind, escalated.Type));
+        Assert.Equal([("backfill", 6)], observer.Recoveries);
+        Assert.Equal(2, observer.Completed); // the successful pass after the failures, then the last one
+    }
+
+    [Fact]
+    public async Task ARefusedCredentialStillStopsWithoutAnEscalationEvent()
+    {
+        var observer = new RecordingObserver();
+        var passes = new ScriptedPasses(Throws(new InvalidOperationException("one")), Throws(new AuthorityClientException("FORBIDDEN", 403, false, null)));
+        Assert.Equal(SearchIndexBuilderStopReason.CredentialRefused, await Runner(passes, observer).RunAsync(Ct));
+        Assert.Empty(observer.Escalations);
+        Assert.Empty(observer.Recoveries);
     }
 
     // ---- workflow: a failed backfill never reaches the attestation of its form --------------------------------------

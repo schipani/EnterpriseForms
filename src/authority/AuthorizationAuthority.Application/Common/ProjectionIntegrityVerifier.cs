@@ -28,6 +28,9 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
 
     public const string QuarantineAlertKind = "PROJECTION_INTEGRITY_QUARANTINE";
 
+    /// <summary>C-133 PD-3: a confirmed mismatch whose quarantine could not be committed (the request is refused; the next decision or check retries).</summary>
+    public const string QuarantineNotCommittedAlertKind = "PROJECTION_INTEGRITY_QUARANTINE_NOT_COMMITTED";
+
     /// <summary>
     /// M1. Precondition: the caller evaluated the gate on <paramref name="state"/>. <paramref name="organizationLocked"/> is true
     /// when the caller holds the organization row lock (then <paramref name="state"/> is the locked, tracked row and a confirmed
@@ -243,6 +246,33 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
             correlationId), clock);
     }
 
+    /// <summary>
+    /// Commits a quarantine recorded with <see cref="RecordQuarantine"/> in <paramref name="scope"/> and raises its alert. C-133 PD-3:
+    /// the commit also deletes the organization's stored search results (FD-2 X2, trigger), so it can fail. A failed commit leaves
+    /// nothing committed (the organization is not quarantined, its stored results remain) and is never reported as success: a
+    /// Critical alert and a metric are raised, and the exception is rethrown unchanged, so the caller's request is refused (503) and
+    /// releases nothing. The mismatch is persistent state (SpiceDB against AuthorityDb), so the next decision on the organization,
+    /// or the periodic check, observes it again and retries the quarantine; until one commits, every decision is refused.
+    /// </summary>
+    public async Task CommitQuarantineAsync(IAuthorityScope scope, Guid organizationId, string reason, string phase, Guid correlationId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        try
+        {
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            metrics.Outcome(ProjectionIntegrityOutcomes.QuarantineNotCommitted);
+            alerts.Raise(new SecurityAlert(QuarantineNotCommittedAlertKind, "Critical", organizationId, correlationId, null,
+                "a confirmed SpiceDB projection mismatch (" + reason + ", phase " + phase + ") could not be committed as an organization quarantine (" + ex.GetType().Name
+                + "); the request was refused, nothing was released, and the next decision or periodic check retries the quarantine", correlationId));
+            throw;
+        }
+
+        RaiseQuarantineAlert(organizationId, reason, correlationId);
+    }
+
     /// <summary>Raised after the quarantine commit; fixed summary, no subject, resource or permission identifiers.</summary>
     public void RaiseQuarantineAlert(Guid organizationId, string reason, Guid correlationId)
     {
@@ -368,8 +398,7 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
 
             var scope = ownScope ?? callerScope;
             RecordQuarantine(scope, locked, reason, observedMarkers, confirmed, phase, correlationId);
-            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-            RaiseQuarantineAlert(locked.OrganizationId, reason, correlationId);
+            await CommitQuarantineAsync(scope, locked.OrganizationId, reason, phase, correlationId, cancellationToken).ConfigureAwait(false);
             throw AuthorityException.Quarantined("organization quarantined");
         }
         finally
