@@ -1,6 +1,6 @@
 # Indexed search (Option C): IX-3 follow-ups and IX-4 implementation evidence report (C-133)
 
-- **Status:** the IX-3 follow-ups (`e0e320c`) and IX-4 (`e0a36ed`) are committed (signed, local) on branch `ix-1/authority-search-index`, on top of IX-3 (`cb48ba7`) and the ruleset follow-up (`6428710`); this report is the third commit. Returned for owner acceptance. **One open acceptance blocker: the plan-shape finding (§6.1; design §22.4; PD-9).** **C-135 update: PD-9 remediated and verified (§10); IX-4 returned for conditional acceptance.** **Not accepted, not independently reviewed, not pushed, not merged, not deployed.** Stage B intentionally not run (C-131).
+- **Status:** the IX-3 follow-ups (`e0e320c`) and IX-4 (`e0a36ed`) are committed (signed, local) on branch `ix-1/authority-search-index`, on top of IX-3 (`cb48ba7`) and the ruleset follow-up (`6428710`); this report is the third commit. Returned for owner acceptance. **One open acceptance blocker: the plan-shape finding (§6.1; design §22.4; PD-9).** **C-135 update: PD-9 remediated and verified (§10); IX-4 returned for conditional acceptance.** **C-136:** bounded seal sweep (§11). **C-137:** IX-4 conditionally accepted at `37ba4f5`; R-39 scheduling verified, R-37 measured, IX-5 stopped at its readiness step (§12). **Not accepted, not independently reviewed, not pushed, not merged, not deployed.** Stage B intentionally not run (C-131).
 - **Authorization:** C-133 (owner, 2026-11-08, message headed "C-132"): conditional acceptance of IX-3; decisions PD-1 to PD-5; authorization of **IX-4** within the approved design. C-134 (owner, 2026-11-08): completion instructions; PD-6 approved with conditions, PD-7 approved, PD-8 provisionally approved; the 50,000-record seeding not to be started. IX-5 to IX-7, Tier 2, OBS-IX-1, R6, G14 and M4-2 unauthorized.
 - **Data:** synthetic only. The `Indexed` engine is refused at startup outside Development/Testing; the persistent development stack is unchanged (`VerifiedScan`); the security-test stack defaults to `Indexed`.
 - **Kind:** implementation evidence for an owner-led review. Not an independent assessment; no attestation is created or implied.
@@ -242,7 +242,7 @@ R-01 to R-29 are carried from the IX-3 report. Changes: R-22 closed for IX-3 dev
 | R-21 | Stage B search shards (IX-3 exit gate) | Not run; synthetic part accepted for development (PD-1) | Next owner-authorized release run |
 | R-22 | N for synthetic searches | **Closed for IX-3 development acceptance only** (PD-2: N = 600); production threshold needs separate approval | — |
 | R-23 | IX-54 with two Authority instances (multi-instance snapshot invalidation) | Partial | **IX-7** (or a second Authority instance in the stack) |
-| R-24 | IX-33 (Tier 2 counts and limits) | Assigned to IX-5 (PD-5); **not completed** | **IX-5** |
+| R-24 | IX-33 (Tier 2 counts and limits) | Assigned to IX-5 (PD-5); **not completed**: IX-5 stopped at the readiness step (C-137, R-40) | **IX-5** |
 | R-25 | Builder escalation | **Implemented** (PD-4) | — |
 | R-26 | Page-invalidation rate under continuous edits | Unmeasured | **IX-7** |
 | R-27 | PB-14 copy review (English and French) | Copy implemented in English; French drafts §8; **PB-14 not complete** | Owner and PB-14 review |
@@ -251,13 +251,16 @@ R-01 to R-29 are carried from the IX-3 report. Changes: R-22 closed for IX-3 dev
 | R-30 | Stage B on the IX-4 code (all groups, browser suite, `Engine=Indexed`) | **Not executed** (PD-7) | Next owner-authorized release run |
 | R-31 | Per-organization failure isolation in the builder | Deferred (§1.4) | Operational improvement, separate approval |
 | R-32 | Plan-shape guarantee on PostgreSQL 18 (§6.1) | **Remediated (C-135, §10):** value-keyed posting indexes dropped; plan-shape test passes on existing and fresh databases; owner acceptance pending | Owner acceptance |
-| R-33 | Availability failures (business 10 s timeout) in the local benchmark (§4) | Root cause identified (§10.3); **remediated locally (C-136, §11):** the longest S-B lock hold is 0.69–0.76 s (was 9.6–10.3 s on the same data); search max 2.1 s (was 9.8 s). **Not closed:** no timeout occurred in this measurement in any configuration (the baseline included), so a lower timeout rate is not demonstrated; other organization-lock holders not measured | Owner review; staging confirmation (IX-7) |
+| R-33 | Availability failures (business 10 s timeout) in the local benchmark (§4) | **Mitigated, not closed (C-137 owner decision).** Bounded seal transactions (C-136, §11): longest S-B lock hold 0.69–0.76 s; search max 2.1 s; no timeout in the bounded runs, so no lower rate demonstrated. C-137 §12.4: other organization-lock holders now measured for record creation (waits p50 ≈ 360 ms at 1,000 records under the 10 s test sweep) | **IX-7**: search and save latency with sweeps, builder and other lock holders active; timeout rates on representative data |
 | R-34 | Local benchmarks at 10,000 and 50,000 records, and the discover-ceiling refusal | **Not run** (budget guard; C-134 deferral); not passed, not waived | Separately authorized performance validation |
 | R-35 | P-S1-1 benchmark ran during IX-3 contrary to C-132 (§6.3) | Recorded; prevented by the Benchmark trait | — |
-| R-36 | Seal-pass lock hold also applies in production (default 2,000 entries per pass every 15 minutes) | **Remediated in code (C-136):** a pass runs in transactions of `SealCheckTransactionSize` (default 50); the production lock hold per transaction scales with the per-entry cost (local ES256 with the pinned key, no HSM call) | IX-7 measurement on Azure |
-| R-37 | Ingestion serialization per organization (authorization-revision CAS, projection and archive gate, whole-graph load per command) (§10.4) | **Open**; 944 s per 1,000 records preserved; C-136 serial seeding 1,000 records in 506 s (1.98 records/s) with the bounded sweep; design recommendation `RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md` (not implemented) | **Owner decision** |
-| R-38 | Tier 2 index design must not reintroduce a value-keyed index on a record-probed table (PostgreSQL 18 skip scan) | Recorded (design §22.5) | **IX-5** review |
-| R-39 | The bounded seal pass verifies ≈ 17 % fewer entries per second (more transactions); in the security-test stack a 1,000-entry pass (≈ 12 s locked in total) now exceeds the 10 s sweep interval, so passes run back to back there | Recorded; production interval 900 s, deadline 24 h | IX-7 sizing |
+| R-36 | Seal-pass lock hold also applies in production (default 2,000 entries per pass every 15 minutes) | **Fixed in code (C-136), staging validation outstanding (C-137):** transactions of `SealCheckTransactionSize` (default 50, retained) | **IX-7** measurement on Azure |
+| R-37 | Ingestion serialization per organization (authorization-revision CAS, organization gate until Effective, lock waits, graph load per command) | **Open; measured (C-137, §12.4):** serial p50 327 ms at 100 records, 1,845 ms at 1,000 (≈ 0.9 s lock waits; graph load 7 ms); concurrency 4 gives no gain. A/B comparison and revised recommendation (A for bulk; B deferred as a scaling item) in `RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md` §7; nothing implemented. 5,000 records not run (R-41) | **Owner decision** |
+| R-38 | Tier 2 index design must not reintroduce a value-keyed index on a record-probed table (PostgreSQL 18 skip scan) | **Reviewed (C-137):** the §9.2 access-posting indexes are value-keyed and the table is also probed by record, including the caller-facing Evaluable-parity check; options A/B/C (`INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md` §5); recommendation C measured first, then B, not A; no index created | **Owner decision IX5-D2**, independent review |
+| R-39 | The bounded seal pass verifies ≈ 17 % fewer entries per second; a pass longer than the interval makes passes run back to back | **Accepted development tradeoff, risk open (C-137).** Verified: no overlapping passes within one instance (`SweepSchedulingTests`); deadlines re-evaluated at query time, so late scheduling never extends acceptance; observed ≈ 90 % lock duty cycle for a 1,040-entry organization at the 10 s test interval (§12.2); no lease across Authority instances (duplicated work, correctness unchanged) | **IX-7** sweep throughput, scheduling and lease decision |
+| R-40 | IX-5 (Tier 2) implementation | **Not started beyond the readiness assessment (C-137):** the approved specification (IX-D13, R-B, §17.1, FD-3) requires an independent review of §17.1 and a separate approval before implementation; FD-8: no review has occurred. Decisions IX5-D1 to IX5-D6 requested | **Owner decision IX5-D1**; independent review (FD-8) |
+| R-41 | R-37 measurement at 5,000 records | **Not run** (≈ 1.5–2 h of seeding, over the 30-minute limit; would mostly measure R-39 at the test interval) | Owner approval, with the sweep configuration for the run |
+| R-42 | Per-organization sweep lease across Authority instances | Not present; duplicated sweep work with more than one instance (design §23.2) | **IX-7** |
 
 ## 8. French drafts for the PB-14 copy review (not approved; not in the application)
 
@@ -399,3 +402,82 @@ Not implemented. Recommendation: `docs/architecture/RECORD_REGISTRATION_THROUGHP
 - Not run: Stage B, the 480-record benchmarks, the 10K and 50K benchmarks.
 - IX-5 not started.
 
+
+## 12. C-137: IX-4 conditional closure, R-39 scheduling, R-37 measurement, IX-5 readiness
+
+### 12.1 Owner decision recorded
+
+IX-4 conditionally accepted (`37ba4f5`); R-33 mitigated, not closed; R-36 fixed in code, staging validation outstanding; R-37 measurement only; R-39 an accepted development tradeoff, risk open; IX-5 within its approved specification (decision log C-137; design §23). Owner-led; not an independent assessment.
+
+### 12.2 R-39: no overlapping passes
+
+`SweepSchedulingTests.APassLongerThanTheIntervalIsFollowedBackToBackAndNeverOverlapsTheNextPass` runs the real `SearchIndexSweepLoop` against the in-memory store with a 1 s interval and a seal pass of ≈ 1.35 s: at most one seal selection was in progress at any time, and at least two complete passes ran (passes back to back). Analysis (design §23.2): one sequential loop per Authority instance; queries re-evaluate deadlines themselves, so delayed scheduling never extends acceptance; across instances there is no lease (duplicated work, correctness unchanged); continuous execution in the security-test stack observed directly after the measurement below: for the 1,040-entry organization, passes ended ≈ 11.5 s apart and each held the lock for 10.4–13.9 s in total (21 transactions, longest 0.67–1.34 s), a lock **duty cycle of about 90 %**.
+
+### 12.3 R-37: instrumentation
+
+Diagnostics off unless `Diagnostics:OperationTiming` (Development/Testing only; startup refusal elsewhere, tested in both hosts): business event 7310 (record-creation phases, status polls, outcome), Authority events 9306 (security command: organization-lock wait, graph load and edge count, plan, commit, outcome) and 9307 (content prepare and commit: lock wait, duration, outcome). Archive and projection waits come from AuthorityDb timestamps (`command_created_on` → `journal_archived_on` → `command_effective_on`). No payload, value, actor or record identifier is logged. Tests: `OperationTimingTests` (Authority: committed, replayed and refused outcomes reported, revision unchanged by observing; registration only in Development/Testing) and `OperationTimingSeamTests` (business).
+
+### 12.4 R-37: bounded measurement (`RecordRegistrationThroughputMeasurementTests`, run `20261108-175237-3e14cb8b`, 857 s, AC power)
+
+Fresh security-test stack, images rebuilt from the working tree on `37ba4f5`; one synthetic organization, one approved Internal search field (each content commit also derives and seals an index entry); seal sweeps active (10 s interval, transaction size 50). 1,040 records created through the public API. Each window: 40 creations serially, then 40 at concurrency 4. Report: `artifacts/r-37/record-registration.json`.
+
+| Window | Records/s | Client p50 / p95 (ms) | Attempts mean (max) | Refusals |
+|---|---|---|---|---|
+| 60→100, serial | 2.62 | 330 / 472 | 1 (1) | none |
+| 100→140, concurrency 4 | 2.57 | 1,330 / 3,134 | 7.8 (19) | 252 `AUTHORITY_NOT_READY`, 20 `STALE_AUTHORIZATION_REVISION` |
+| 960→1,000, serial | 0.65 | 1,847 / 2,798 | 1 (1) | none |
+| 1,000→1,040, concurrency 4 | 0.74 | 5,100 / 7,641 | 16.7 (33) | 580 `AUTHORITY_NOT_READY`, 47 `STALE_AUTHORIZATION_REVISION` |
+
+**Phase split, serial windows (p50 ms; business phases per creation, Authority phases per call):**
+
+| Phase | ≈ 100 records | ≈ 1,000 records |
+|---|---|---|
+| Form load, validation, fingerprint, business row, head projection | 14 | 14 |
+| Permission check (create) | 16 | 17 |
+| Permission check returning the authorization revision | 15 | 16 |
+| `RegisterRecord` submit (round trip) | 14 | 387 |
+| — of which organization-lock wait | 1.5 | 364 |
+| — graph load (edges) | 1.4 (165) | 7.2 (1,965) |
+| — plan / commit | 2.1 / 4.7 | 3.3 / 7.6 |
+| Effective wait seen by the business API (status polls p50) | 164 (2) | 513 (4) |
+| — Authority: created → archived | 123 | 46 |
+| — Authority: archived → projected and Effective | 24 | 438 |
+| Content head read | 19 | 21 |
+| Content prepare + commit (business view) | 72 | 709 |
+| — prepare lock wait / commit lock wait | 1.6 / 1.5 | 172 / 359 |
+| **Total** | **327** | **1,845** |
+
+**Findings:**
+1. **At 1,000 records the time is organization-lock waiting, not graph loading.** About 0.9 s of the 1.85 s median is spent waiting for the lock in the security command, content prepare and content commit, plus the projection step's own wait (archived → Effective grew from 24 to 438 ms). The sweep's ≈ 90 % lock duty cycle at this size (§12.2) explains a mean wait of about half a 0.7 s transaction. The graph load is linear in edges (≈ 4 µs per edge: 1.4 ms at 165 edges, 7–10 ms at about 2,000) and is ≈ 0.5 % of the creation time at 1,000 records.
+2. **The duty cycle is an artefact of the security-test sweep interval (10 s)**, not of production (900 s; at most `SealCheckBatchSize` = 2,000 entries per pass, ≈ 24 s locked per 900 s, about 3 %). The measurement therefore over-states lock contention relative to production settings and was not repeated with a longer interval (C-137 §2: no interval change for benchmarks).
+3. **Small-organization floor (≈ 330 ms):** about half is the Effective wait — the archive step (≈ 120 ms, including the work loop's 250 ms idle poll) and projection (≈ 25 ms), observed by the business API through status polls with backoff (60, 90, 135 ms…) — then the content prepare and commit (≈ 70 ms) and three Authority round trips for decisions and the head (≈ 50 ms).
+4. **Concurrency adds no throughput** (2.62 → 2.57 and 0.65 → 0.74 records/s): while one registration is not yet Effective, the organization gate refuses other protected operations (`AUTHORITY_NOT_READY`, the majority of refusals, including content prepares and commits), and concurrent registrations collide on the revision compare-and-swap (`STALE_AUTHORIZATION_REVISION`). This is the intended fail-closed serialization (CROSS_SYSTEM_CONSISTENCY_PROTOCOL), not a defect.
+
+**Not run:** 5,000 records. Seeding the extra ≈ 4,000 records at ≈ 0.5–0.65 records/s would take about 1.5–2 hours, over the 30-minute limit (C-137 §4); at that size the security-test sweep would hold the lock continuously, so the run would mostly measure R-39. Needs owner approval, preferably with a decision on the sweep configuration for the run.
+
+### 12.5 Focused tests (C-137 §6; final code)
+
+| Suite | Result |
+|---|---|
+| Authority unit (`AuthorizationAuthority.Tests`), including `SweepSchedulingTests` and `OperationTimingTests` | 452/452 |
+| Architecture | 95/95 |
+| Integrity | 60/60 |
+| Contract (`EnterpriseForms.Api.ContractTests`), including `OperationTimingSeamTests` | 575/575 |
+| Docker, rebuilt images: `SearchIndexFoundationTests` | 9/9 (`20261108-180949-723db388`) |
+| `SearchIndexBuilderStackTests` | 11/11 (`20261108-181336-eb46ad1b`) |
+| `IndexedSearchQueryStackTests` (plan shape, PD-9, PD-3, shadow comparison) | 21/21 (`20261108-181908-da3ef439`) |
+| `IndexedFieldSearchEngineStackTests` | 5/5 (`20261108-182812-ea2ae5e1`) |
+| SEC-P01..P12 Stage A suite (the security-command and content paths were instrumented) | 13/13 (the evidence validator was not run) |
+| R-37 measurement (Benchmark) | 1/1 (`20261108-175237-3e14cb8b`) |
+
+**Not run:** Stage B (release-only, C-131; R-30), the 480-record benchmarks, the 10K/50K benchmarks (R-34), the 5,000-record R-37 window (R-41), Playwright (no UI change), any Tier 2 test (none exists; R-24, R-40).
+
+### 12.6 Security invariants
+
+The diagnostics observe and never decide: no decision, ordering, transaction boundary, revision check or Effective gate changed (the business handler's split submit and wait is the body of `SubmitAndAwaitAsync`); the observers are absent unless configured and refused outside Development/Testing; nothing confidential is logged. The SEC-P suite and the IX Docker classes pass unchanged on the instrumented code. No Tier 2 table, index or query path exists.
+
+### 12.7 Status
+
+- IX-4: conditionally accepted (C-137).
+- R-33 open (mitigated); R-36 staging outstanding; R-37 open (measured; recommendation revised); R-38 reviewed, owner decision IX5-D2; R-39 open (accepted tradeoff; scheduling verified); R-40 to R-42 new.
+- IX-5: readiness assessment only (`INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md`); awaiting IX5-D1. IX-6 and IX-7 not started.

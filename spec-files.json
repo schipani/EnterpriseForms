@@ -169,13 +169,18 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "f35357391a060f484a4910ffa2a6db0605606d70c14402c7e58c4c8ccac54ba4",
-      "bytes": 52721
+      "sha256": "1fd850761bdbfa9104af54807f45fd529090a10db205bc744720d0e9e37e5d2e",
+      "bytes": 62702
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
+      "sha256": "07614e4d93abe776a9918c722cc2dce52684ccdb1e6a116f939e72a869f30cf1",
+      "bytes": 13782
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "e29fb3bda2e347e3b2d9dd78763138625d29b8bbd9b4d4b8033e3cc379655735",
-      "bytes": 179426
+      "sha256": "8426c737b7a61dfe2d828856083ba2f03c535f4bf50c20a5c8a63f78600fdd50",
+      "bytes": 184479
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -289,8 +294,8 @@
     },
     {
       "path": "docs/architecture/RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md",
-      "sha256": "e9b460bdf72eb1399d35a7827cc70b3adaf444853e2aae157af726cc36dea161",
-      "bytes": 6747
+      "sha256": "1e6a957d0c58413a3fa56b46022088607548c4d8c6bc00f4fa2f3f7a1b976ad7",
+      "bytes": 12521
     },
     {
       "path": "docs/data-lifecycle/PB13_IMPORT_EXPORT_OFFBOARDING_STANDARD.md",
@@ -384,8 +389,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "18928b19e3dd313e5bcfb5b943eed2623c1784e809599f8545adcf44df0e03fb",
-      "bytes": 241891
+      "sha256": "88fc596dc7d72f149d238f64c201892254f8b44bc54ea7f055663c140d19dd68",
+      "bytes": 244300
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -549,8 +554,8 @@
     },
     {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
-      "sha256": "819d9cd41b56f9ca3ac75e8857027bafee2e62679b0cab8fa54d45e3e4069aef",
-      "bytes": 12289
+      "sha256": "fac8ffc14ecf0971f62f1f8d3a21e51df987b4ef33b204c630114349fffab521",
+      "bytes": 12370
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",
