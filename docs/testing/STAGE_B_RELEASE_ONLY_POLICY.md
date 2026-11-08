@@ -48,10 +48,31 @@ All seven groups remain defined, assigned and discoverable: forms-documents, aut
 | Developer scripts | `stage-b.ps1 -Group/-All`, `test.ps1 -Level 2` (unfiltered or `-Browser`) and `-Level 3` ran Stage B | They refuse (or skip, for Level 3) without an explicit release authorization; `-Class` and `-Spec` stay available |
 | `ci.yml` | Builds (does not run) the Stage B project and runs the group checker's self-tests | Unchanged: compilation keeps the suite healthy without running it |
 
-## 5. Owner actions required (not technically enforced yet)
+## 5. Repository settings
 
-1. **Live branch ruleset.** Remove the required status check "Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e" from live ruleset 25341169, to match `.github/rulesets/main-branch-protection.json`. Until then, every pull request to `main` waits for a check that no longer runs. This is a repository-administration change; it was not made here (no push, no settings change).
-2. **Owner-only execution.** `workflow_dispatch` lets anyone with write access start the workflow, so owner-only execution is **not** enforced today. To enforce it, create the environment `stage-b-release` (Settings → Environments) with the owner as required reviewer; every run then waits for the owner's approval before any stack starts. GitHub supports required reviewers for environments in public repositories. Until that is configured, the policy relies on the required authorization reference and on review.
+### 5.1 Live branch ruleset (done, C-132, 2026-11-07)
+
+On the owner's instruction (C-132), the required status check "Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e" was removed from live ruleset 25341169 through the GitHub API (repository administrator credential), to match `.github/rulesets/main-branch-protection.json`. It was read back and compared with the state before the change:
+- the only difference is that one required status check;
+- unchanged: the four required `ci` checks, strict status checks, deletion and non-fast-forward protection, required signatures, linear history, the pull-request rule (thread resolution, stale-review dismissal), no bypass actors, enforcement active, target `refs/heads/main`.
+
+The first API update also replaced the em dash in the ruleset **name** with mojibake (an encoding fault in the update script). The name was restored by a second update about a minute later and verified byte for byte. No protection was off at any point.
+
+Until `b282cbb` reaches `main`, the old workflow on `main` still starts Stage B on pull requests. It is no longer required, so its result does not block a merge.
+
+### 5.2 Owner-only execution (not enforced yet: owner action)
+
+`workflow_dispatch` lets anyone with write access start the workflow, so owner-only execution is **not** enforced today. The environment `stage-b-release` does not exist yet. GitHub creates an environment automatically, without protection rules, the first time a job references it, so it must be created and configured **before** the first dispatch.
+
+Steps (repository Settings → Environments → New environment):
+1. Name: `stage-b-release` (exactly; the `plan` job references it).
+2. **Required reviewers:** add the owner (`schipani`). Every run then pauses at the `plan` job until the owner approves it. All other jobs need `plan`, so no stack or runner starts before the approval.
+3. **Prevent self-review:** leave **off**. The owner dispatches release runs and must be able to approve them. Runs dispatched by anyone else still wait for the owner.
+4. **Allow administrators to bypass configured protection rules:** turn **off**, if the setting is offered, so the approval cannot be skipped.
+5. **Deployment branches and tags:** "No restriction", or "Selected branches and tags" if release runs should be limited to named release branches.
+6. **Environment secrets and variables:** none. Stage B uses synthetic credentials only.
+
+Verification after configuring: `gh api repos/schipani/EnterpriseForms/environments/stage-b-release` shows a `required_reviewers` protection rule naming the owner. Until that check passes, the policy relies on the required authorization reference and on review, and owner-only execution must not be described as enforced.
 
 ## 6. Security coverage that now runs only at release
 

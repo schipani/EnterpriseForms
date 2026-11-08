@@ -38,7 +38,7 @@ CI (`stage-b-integration.yml`): `plan` builds once, runs `--list-tests` and fail
 
 ### Merge protection
 
-**C-131 (2026-11-07):** the Stage B aggregate `Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e` is **no longer a required pull-request check**: Stage B no longer runs on pull requests. It was removed from `.github/rulesets/main-branch-protection.json`. **Owner action:** remove it from live ruleset 25341169 too; until then pull requests to `main` wait for a check that never reports. The four `ci` checks remain required.
+**C-131 (2026-11-07):** the Stage B aggregate `Designer, parent-child, documents (real ClamAV), authorization, tamper regression, browser e2e` is **no longer a required pull-request check**: Stage B no longer runs on pull requests. It was removed from `.github/rulesets/main-branch-protection.json`. It was also removed from live ruleset 25341169 on 2026-11-07 (C-132; read back, only that check changed). The four `ci` checks remain required.
 
 History: from 2026-11-04 to C-131 the aggregate was a required check in the ruleset file and in live ruleset 25341169, and ran on every pull request to `main`.
 

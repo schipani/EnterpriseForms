@@ -369,8 +369,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "71cd69a63ea204e28cf9a47dcd24d08cb053f04fc491dc39d937690a0d0e5faf",
-      "bytes": 233375
+      "sha256": "5949a3e377dd116cdbc2ade8dcfb3b1bf69f08d8d61fadbfde9f1477e1333c01",
+      "bytes": 234787
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -534,8 +534,8 @@
     },
     {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
-      "sha256": "6b7624ebe8325161bcf628468ef7e031bea5c25ab59f2c9318ce975e0039779b",
-      "bytes": 11036
+      "sha256": "5441b053b4b7fabd5df19e41366f7f7d95132a83626907ba570b45628ead6a2f",
+      "bytes": 11010
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",
@@ -574,8 +574,8 @@
     },
     {
       "path": "docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md",
-      "sha256": "b495d43c2794f12139c79d788b36d3a2513953c60779897b215f3758442ca440",
-      "bytes": 7452
+      "sha256": "98777826b8f6369ada765a58bd40001f5598eb3085779d07dfdd7be91fbc296a",
+      "bytes": 9290
     },
     {
       "path": "docs/ui/C1_DESIGNER_UX_IMPLEMENTATION_BRIEF.md",
