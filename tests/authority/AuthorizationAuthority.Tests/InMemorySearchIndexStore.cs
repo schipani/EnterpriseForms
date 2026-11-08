@@ -18,6 +18,8 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
     public List<SearchRecordFieldAnomaly> Anomalies { get; } = [];
     public List<SearchFormState> FormStates { get; } = [];
     public List<Guid> BoundOrganizations { get; } = [];
+    public List<SearchResultSnapshot> ResultSnapshots { get; } = [];
+    public List<SearchResultSnapshotEntry> ResultSnapshotEntries { get; } = [];
 
     public Task BindOrganizationAsync(Guid organizationId, CancellationToken cancellationToken)
     {
@@ -186,6 +188,62 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
 
     public Task<List<SearchRecordEntry>> GetRandomEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
         Task.FromResult(Entries.Where(e => e.OrganizationId == organizationId && !RecordQuarantined(e)).OrderBy(_ => Random.Shared.Next()).Take(limit).ToList());
+
+    public void AddResultSnapshot(SearchResultSnapshot snapshot, IReadOnlyList<SearchResultSnapshotEntry> entries)
+    {
+        ResultSnapshots.Add(snapshot);
+        ResultSnapshotEntries.AddRange(entries);
+    }
+
+    public Task<SearchResultSnapshot?> FindResultSnapshotAsync(Guid searchResultSnapshotId, CancellationToken cancellationToken) =>
+        Task.FromResult(ResultSnapshots.FirstOrDefault(r => r.SearchResultSnapshotId == searchResultSnapshotId));
+
+    public Task<SearchResultSnapshot?> MarkResultSnapshotServedAsync(Guid searchResultSnapshotId, DateTimeOffset servedOn, CancellationToken cancellationToken)
+    {
+        var snapshot = ResultSnapshots.FirstOrDefault(r => r.SearchResultSnapshotId == searchResultSnapshotId);
+        if (snapshot is not null)
+        {
+            snapshot.LastPageServedOn = servedOn;
+        }
+
+        return Task.FromResult(snapshot);
+    }
+
+    public Task<List<SearchResultSnapshotEntry>> GetResultSnapshotEntriesAsync(Guid searchResultSnapshotId, int offset, int count, CancellationToken cancellationToken) =>
+        Task.FromResult(ResultSnapshotEntries.Where(e => e.SearchResultSnapshotId == searchResultSnapshotId).OrderBy(e => e.ResultEntryPosition).Skip(offset).Take(count).ToList());
+
+    public Task<int> DeleteResultSnapshotAsync(Guid searchResultSnapshotId, CancellationToken cancellationToken)
+    {
+        ResultSnapshotEntries.RemoveAll(e => e.SearchResultSnapshotId == searchResultSnapshotId);
+        return Task.FromResult(ResultSnapshots.RemoveAll(r => r.SearchResultSnapshotId == searchResultSnapshotId));
+    }
+
+    public Task<int> EvictSessionSnapshotsAsync(Guid authenticatedSessionId, int keep, CancellationToken cancellationToken)
+    {
+        var evicted = ResultSnapshots.Where(r => r.AuthenticatedSessionId == authenticatedSessionId).OrderByDescending(r => r.SnapshotCreatedOn).ThenByDescending(r => r.SearchResultSnapshotId).Skip(Math.Max(0, keep)).Select(r => r.SearchResultSnapshotId).ToList();
+        foreach (var id in evicted)
+        {
+            ResultSnapshotEntries.RemoveAll(e => e.SearchResultSnapshotId == id);
+            ResultSnapshots.RemoveAll(r => r.SearchResultSnapshotId == id);
+        }
+
+        return Task.FromResult(evicted.Count);
+    }
+
+    public Task<long> CountLiveResultEntriesAsync(string creatingInstanceName, DateTimeOffset now, CancellationToken cancellationToken) =>
+        Task.FromResult(ResultSnapshots.Where(r => r.CreatingInstanceName == creatingInstanceName && r.SnapshotExpiresOn > now).Sum(r => (long)r.ResultEntryCount));
+
+    public Task<int> PurgeResultSnapshotsAsync(DateTimeOffset now, int batchSize, CancellationToken cancellationToken)
+    {
+        var purged = ResultSnapshots.Where(r => r.SnapshotExpiresOn <= now).Take(batchSize).Select(r => r.SearchResultSnapshotId).ToList();
+        foreach (var id in purged)
+        {
+            ResultSnapshotEntries.RemoveAll(e => e.SearchResultSnapshotId == id);
+            ResultSnapshots.RemoveAll(r => r.SearchResultSnapshotId == id);
+        }
+
+        return Task.FromResult(purged.Count);
+    }
 
     public Task RecordDeepCheckAsync(Guid searchRecordEntryId, DateTimeOffset? verifiedOn, DateTimeOffset attemptedOn, string outcomeCode, CancellationToken cancellationToken)
     {

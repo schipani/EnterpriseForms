@@ -21,6 +21,7 @@ public static class MigrateCommand
         var configuration = new ConfigurationBuilder().AddEnvironmentVariables().AddCommandLine(args).Build();
         var connectionString = configuration.GetConnectionString("AuthorityDbMigration") ?? configuration.GetConnectionString("AuthorityDb");
         var runtimeRole = configuration["Database:RuntimeRoleName"] ?? "authority_runtime";
+        var searchReaderLogin = configuration["Database:SearchReaderLoginName"]; // IX-3; absent: no indexed query path
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             Console.Error.WriteLine("ConnectionStrings__AuthorityDbMigration is required for --migrate");
@@ -31,8 +32,8 @@ public static class MigrateCommand
         var options = new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql(connectionString, n => n.MigrationsHistoryTable("ef_migrations_history", AuthorityDbContext.SchemaName)).Options;
         using var context = new AuthorityDbContext(options);
         context.Database.Migrate();
-        AuthorityRuntimeGrants.Apply(context, runtimeRole);
-        Console.WriteLine($"Authority migrations applied; runtime grants applied to role '{runtimeRole}'.");
+        AuthorityRuntimeGrants.Apply(context, runtimeRole, searchReaderLogin);
+        Console.WriteLine($"Authority migrations applied; runtime grants applied to role '{runtimeRole}'" + (string.IsNullOrEmpty(searchReaderLogin) ? "." : $"; search reader login '{searchReaderLogin}'."));
         return true;
     }
 }

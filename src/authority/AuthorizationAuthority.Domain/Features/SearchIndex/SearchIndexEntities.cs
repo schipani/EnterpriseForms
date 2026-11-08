@@ -157,6 +157,97 @@ public sealed class SearchRecordEntry
     public DateTimeOffset? LastDeepAttemptedOn { get; set; }
 
     public string? LastDeepAttemptOutcomeCode { get; set; }
+
+    /// <summary>
+    /// IX-3 (design R1 §B.2, D-IX3-1): the exact verified canonical bytes of the record's header leaf, so a query can bind the
+    /// header facts below to the accepted manifest (SHA-256 = the header leaf's payload digest) exactly as I-2 binds postings.
+    /// Null only on entries derived before IX-3 (derivation version 1), which are re-derived before any coverage is Complete.
+    /// </summary>
+    public byte[]? HeaderSourceCanonicalBytes { get; set; }
+
+    /// <summary>IX-3: the parent record of a child record, decoded from the verified header at derivation (null: top-level record).</summary>
+    public Guid? ParentFormRecordId { get; set; }
+
+    /// <summary>IX-3: the creating business user, decoded from the verified header at derivation (display only).</summary>
+    public Guid? CreatedByBusinessUserId { get; set; }
+
+    /// <summary>IX-3: 1 = IX-1/IX-2 derivation (no header facts); 2 = with the verified header facts above.</summary>
+    public int EntryDerivationVersion { get; set; } = 1;
+}
+
+/// <summary>
+/// IX-3 (design §17.3, §18.4, R1 §E.5): an Authority-held ordered result of one indexed search, for paging. Record ids and
+/// positions only: no values, no predicate values. The query digest covers a per-snapshot random nonce that only the business
+/// API holds (inside its encrypted cursor), so a database reader cannot brute-force low-entropy predicates from it.
+/// </summary>
+public sealed class SearchResultSnapshot
+{
+    public Guid SearchResultSnapshotId { get; set; }
+
+    public Guid OrganizationId { get; set; }
+
+    public Guid RequestingAuthorityUserId { get; set; }
+
+    public Guid AuthenticatedSessionId { get; set; }
+
+    public Guid FormDefinitionId { get; set; }
+
+    public string SearchEngineName { get; set; } = SearchEngineNames.Indexed;
+
+    public string SearchTierName { get; set; } = SearchTierNames.Tier1;
+
+    public long SnapshotAuthorizationRevision { get; set; }
+
+    public long SnapshotContentIntegrityRevision { get; set; }
+
+    public long SnapshotFormContentRevision { get; set; }
+
+    public Guid[] PredicateFieldDefinitionIds { get; set; } = [];
+
+    public Guid[] PredicateFieldSearchApprovalIds { get; set; } = [];
+
+    public string[] PredicateOperatorNames { get; set; } = [];
+
+    public byte[] QueryDigest { get; set; } = [];
+
+    public int ResultEntryCount { get; set; }
+
+    public DateTimeOffset SnapshotCreatedOn { get; set; }
+
+    public DateTimeOffset SnapshotExpiresOn { get; set; }
+
+    public string CreatingInstanceName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// IX-3 (D-IX3-2): set by the final transaction of each served page. The update takes the row lock that serializes a page with
+    /// any deletion of the snapshot (§18.4) and needs only this column's UPDATE privilege; nothing else of a snapshot is ever updated.
+    /// </summary>
+    public DateTimeOffset? LastPageServedOn { get; set; }
+}
+
+public sealed class SearchResultSnapshotEntry
+{
+    public Guid SearchResultSnapshotEntryId { get; set; }
+
+    public Guid SearchResultSnapshotId { get; set; }
+
+    public Guid OrganizationId { get; set; }
+
+    public int ResultEntryPosition { get; set; }
+
+    public Guid FormRecordId { get; set; }
+
+    public Guid IndexedOperationId { get; set; }
+}
+
+public static class SearchEngineNames
+{
+    public const string Indexed = "Indexed";
+}
+
+public static class SearchTierNames
+{
+    public const string Tier1 = "Tier1";
 }
 
 /// <summary>Columns shared by the typed posting tables. A posting is one indexed value of one manifest item.</summary>

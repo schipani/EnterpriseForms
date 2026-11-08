@@ -157,4 +157,33 @@ public interface ISearchIndexStore
 
     /// <summary>Column-limited update of the S-C timestamps of one entry (verified time only on a passing comparison, §17.10 D1).</summary>
     Task RecordDeepCheckAsync(Guid searchRecordEntryId, DateTimeOffset? verifiedOn, DateTimeOffset attemptedOn, string outcomeCode, CancellationToken cancellationToken);
+
+    // ---- IX-3: result snapshots (design §17.3, §18.4). Ids and positions only. ----------------------------------------
+
+    void AddResultSnapshot(SearchResultSnapshot snapshot, IReadOnlyList<SearchResultSnapshotEntry> entries);
+
+    Task<SearchResultSnapshot?> FindResultSnapshotAsync(Guid searchResultSnapshotId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Records that a page is being served (UPDATE of the served-on column): the row lock serializes page requests on one snapshot
+    /// with its deletion (§18.4). Returns the snapshot, or null when it no longer exists.
+    /// </summary>
+    Task<SearchResultSnapshot?> MarkResultSnapshotServedAsync(Guid searchResultSnapshotId, DateTimeOffset servedOn, CancellationToken cancellationToken);
+
+    Task<List<SearchResultSnapshotEntry>> GetResultSnapshotEntriesAsync(Guid searchResultSnapshotId, int offset, int count, CancellationToken cancellationToken);
+
+    Task<int> DeleteResultSnapshotAsync(Guid searchResultSnapshotId, CancellationToken cancellationToken);
+
+    /// <summary>Deletes the session's oldest snapshots so that at most <paramref name="keep"/> remain (a fourth evicts the oldest).</summary>
+    Task<int> EvictSessionSnapshotsAsync(Guid authenticatedSessionId, int keep, CancellationToken cancellationToken);
+
+    /// <summary>Live (unexpired) result entries created by one Authority instance (capacity guard only, X3).</summary>
+    Task<long> CountLiveResultEntriesAsync(string creatingInstanceName, DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The purge job (§18.4): at most <paramref name="batchSize"/> snapshots that are expired, of a quarantined organization, of an
+    /// older authorization revision, of a projection that is not Active or is suspended, or of a revoked, expired, idle or missing
+    /// session. Rows locked by a page request in progress are skipped (the next run deletes them).
+    /// </summary>
+    Task<int> PurgeResultSnapshotsAsync(DateTimeOffset now, int batchSize, CancellationToken cancellationToken);
 }

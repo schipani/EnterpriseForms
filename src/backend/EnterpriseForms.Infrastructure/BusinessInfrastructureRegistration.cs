@@ -53,6 +53,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<IBrowserSessionStateAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IFieldSearchPolicyAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<ISearchIndexAdministrationAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // IX-2 rebuild
+        services.AddSingleton<IIndexedSearchAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // IX-3 indexed query (Shadow)
         services.AddSingleton<ISecurityAdministratorAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IOrganizationRosterAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IOwnerRecoveryNoticeAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());

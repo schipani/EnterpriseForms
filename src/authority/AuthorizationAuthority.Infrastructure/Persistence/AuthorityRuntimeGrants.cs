@@ -43,14 +43,22 @@ public static class AuthorityRuntimeGrants
     ];
 
     /// <summary>Every table the runtime role may touch; a model table missing here is a startup defect caught by the unit test, not in Docker.</summary>
-    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables];
+    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables, .. Configurations.SearchIndexSchema.ResultTables];
 
-    public static void Apply(DbContext context, string runtimeRole)
+    /// <param name="searchReaderLogin">IX-3: the LOGIN user of the indexed-search query path (created by the cluster bootstrap with its
+    /// own credential, never by a migration); it is made a member of <see cref="SearchReaderRole"/> and gets the reader's role settings.
+    /// Null or empty: no reader login (the query path is then unconfigured and fails closed).</param>
+    public static void Apply(DbContext context, string runtimeRole, string? searchReaderLogin = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (!System.Text.RegularExpressions.Regex.IsMatch(runtimeRole, "^[a-z_][a-z0-9_]{0,62}$"))
         {
             throw new ArgumentException("runtime role must be a plain lowercase identifier", nameof(runtimeRole));
+        }
+
+        if (!string.IsNullOrEmpty(searchReaderLogin) && (!System.Text.RegularExpressions.Regex.IsMatch(searchReaderLogin, "^[a-z_][a-z0-9_]{0,62}$") || searchReaderLogin == runtimeRole || searchReaderLogin == SearchReaderRole))
+        {
+            throw new ArgumentException("the search reader login must be a plain lowercase identifier distinct from the runtime role and the reader role", nameof(searchReaderLogin));
         }
 
         var schema = AuthorityDbContext.SchemaName;
@@ -72,6 +80,10 @@ public static class AuthorityRuntimeGrants
 
         statements.Add($"GRANT SELECT ON {schema}.ef_migrations_history TO {runtimeRole}");
         statements.AddRange(SearchIndexStatements(runtimeRole));
+        if (!string.IsNullOrEmpty(searchReaderLogin))
+        {
+            statements.AddRange(SearchReaderLoginStatements(searchReaderLogin));
+        }
         foreach (var statement in statements)
         {
 #pragma warning disable EF1002 // identifiers are validated by regex above and come from configuration, never from request input
@@ -103,6 +115,15 @@ public static class AuthorityRuntimeGrants
             yield return $"GRANT SELECT, INSERT, UPDATE ON {search}.{table} TO {runtimeRole}";
         }
 
+        // IX-3 (§18.4): result snapshots are inserted and deleted (expiry, invalidation, eviction). The only update is the page's
+        // served-on timestamp (D-IX3-2), which also gives the row-lock privilege the purge's FOR UPDATE SKIP LOCKED needs.
+        foreach (var table in Configurations.SearchIndexSchema.ResultTables)
+        {
+            yield return $"GRANT SELECT, INSERT, DELETE ON {search}.{table} TO {runtimeRole}";
+        }
+
+        yield return $"GRANT UPDATE (last_page_served_on) ON {search}.search_result_snapshots TO {runtimeRole}";
+
         yield return $"REVOKE ALL ON FUNCTION {search}.current_organization_id() FROM PUBLIC";
         yield return $"GRANT EXECUTE ON FUNCTION {search}.current_organization_id() TO {runtimeRole}";
         yield return $"REVOKE ALL ON FUNCTION {search}.enforce_content_revision_synchronization() FROM PUBLIC";
@@ -126,5 +147,19 @@ public static class AuthorityRuntimeGrants
             yield return $"ALTER ROLE {role} SET log_error_verbosity = 'terse'";
             yield return $"ALTER ROLE {role} SET log_statement = 'none'";
         }
+    }
+
+    /// <summary>
+    /// IX-3 (design §5.1, D-IX1-4): the reader's LOGIN user. Role settings are per login role, so the read-only default and the
+    /// logging settings are applied to the login user too. It must not hold any other role (checked by the privilege test).
+    /// </summary>
+    public static IEnumerable<string> SearchReaderLoginStatements(string searchReaderLogin)
+    {
+        yield return $"GRANT {SearchReaderRole} TO {searchReaderLogin}";
+        yield return $"ALTER ROLE {searchReaderLogin} SET default_transaction_read_only = on";
+        yield return $"ALTER ROLE {searchReaderLogin} SET log_parameter_max_length = 0";
+        yield return $"ALTER ROLE {searchReaderLogin} SET log_parameter_max_length_on_error = 0";
+        yield return $"ALTER ROLE {searchReaderLogin} SET log_error_verbosity = 'terse'";
+        yield return $"ALTER ROLE {searchReaderLogin} SET log_statement = 'none'";
     }
 }

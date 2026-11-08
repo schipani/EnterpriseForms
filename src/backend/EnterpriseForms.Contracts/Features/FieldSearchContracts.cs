@@ -100,6 +100,9 @@ public sealed record SearchScopeVerificationResponse(
 public sealed record SearchScopeVerificationRequest(Guid FormDefinitionId);
 
 /// <summary>IX-2 Testing only: O-2 parity of the per-record and the set-based content reader over the caller's own catalogue (counts only).</summary>
+/// <summary>IX-3 (Testing only): V1's answer and the shadow comparison for one search — ids and counts only, never values.</summary>
+public sealed record FieldSearchShadowTestingResponse(int? VerifiedScanTotal, string? VerifiedScanError, string Classification, string? SkippedReason, int? IndexedTotal, string? IndexedError, int? FirstDifferingPosition, long ShadowElapsedMilliseconds);
+
 public sealed record AcceptedContentReaderParityResponse(int RecordsCompared, int ItemsCompared, int ValuesCompared, int Mismatches, double PerRecordMilliseconds, double SetBasedMilliseconds);
 
 // ---- Phase C7 M2 (AC-6): search approval configuration (Form Designer "Search" section). Decisions are the Authority's.

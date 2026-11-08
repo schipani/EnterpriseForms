@@ -28,7 +28,7 @@ namespace EnterpriseForms.Application.Features.Search.FieldSearch;
 /// </para>
 /// </summary>
 public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPolicyAuthority policy, TrustedScopeVerifier verifier, FieldSearchAdmission admission,
-    IAuthorizationAuthorityClient authority, IOpaqueCursorProtector cursors, IRecordDisplayDirectory directory, TimeProvider clock)
+    IAuthorizationAuthorityClient authority, IOpaqueCursorProtector cursors, IRecordDisplayDirectory directory, TimeProvider clock, FieldSearchShadowComparer? shadow = null)
 {
     public const string ConditionJoinAnd = "And";
 
@@ -70,6 +70,22 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
     /// <summary>Authorizes every condition against the Authority's capabilities, then (gate on) runs the verified search.</summary>
     public async Task<FieldSearchResponse> SearchAsync(RequestContext context, FieldSearchRequest? request, CancellationToken cancellationToken)
     {
+        var (response, failure, _) = await ExecuteAsync(context, request, forceShadow: false, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+        }
+
+        return response!;
+    }
+
+    /// <summary>
+    /// IX-3: the V1 search exactly as before; with <c>FieldSearch:Engine=Shadow</c> the indexed engine is then compared (R1 §G.3).
+    /// V1's answer or failure is returned unchanged; the comparison never alters it. Validation and predicate-authorization
+    /// refusals are thrown directly (nothing executed, nothing to compare).
+    /// </summary>
+    public async Task<(FieldSearchResponse? Response, SearchException? Failure, FieldSearchShadowComparison? Shadow)> ExecuteAsync(RequestContext context, FieldSearchRequest? request, bool forceShadow, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(context);
         FieldSearchRequestValidator.Validate(request, limits);
         var conditions = request!.Conditions ?? [];
@@ -100,6 +116,30 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
             throw SearchException.TrustedSearchNotEnabled();
         }
 
+        FieldSearchResponse? response = null;
+        SearchException? failure = null;
+        List<Guid>? orderedIds = null;
+        try
+        {
+            (response, orderedIds) = await ExecuteVerifiedAsync(context, request!, conditions, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SearchException ex)
+        {
+            failure = ex;
+        }
+
+        FieldSearchShadowComparison? comparison = null;
+        if (shadow is { Enabled: true })
+        {
+            comparison = await shadow.CompareAsync(context, request!, failure is null ? FieldSearchV1Outcome.Success(orderedIds!) : FieldSearchV1Outcome.Failure(failure), forceShadow, cancellationToken).ConfigureAwait(false);
+        }
+
+        return (response, failure, comparison);
+    }
+
+    /// <summary>The V1 verified scan (Phase C7 M3), unchanged; the admission slot is released before any shadow comparison.</summary>
+    private async Task<(FieldSearchResponse Response, List<Guid> OrderedIds)> ExecuteVerifiedAsync(RequestContext context, FieldSearchRequest request, IReadOnlyList<FieldSearchCondition> conditions, CancellationToken cancellationToken)
+    {
         var prepared = FieldSearchEvaluator.Prepare(conditions, limits);
         using var lease = await admission.AdmitAsync(context.LocalUserId, cancellationToken).ConfigureAwait(false);
         var started = clock.GetTimestamp();
@@ -145,7 +185,7 @@ public sealed class FieldSearchHandler(FieldSearchLimits limits, IFieldSearchPol
                         + ". Conditions are evaluated only on values you can read; repeating sections, related records, documents and encrypted fields are not searched.";
         var cursor = new FieldSearchCursor(context.OrganizationId, context.LocalUserId, request.FormDefinitionId, scope.SearchCatalogueSnapshotId, scope.AuthorizationRevision, Digest(request), request.PageSize,
             scope.SnapshotExpiresOn, statement, ordered);
-        return await PageResponseAsync(context, cursor, 0, cancellationToken).ConfigureAwait(false);
+        return (await PageResponseAsync(context, cursor, 0, cancellationToken).ConfigureAwait(false), ordered.Select(m => m.FormRecordId).ToList());
     }
 
     /// <summary>

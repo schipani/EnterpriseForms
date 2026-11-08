@@ -380,6 +380,14 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
             return (SweepUnitOutcome.Fail, "HEADER_FACT_MISMATCH");
         }
 
+        // IX-3 (D-IX3-1): a version 2 entry's header bytes and decoded facts are compared too.
+        if (entry.EntryDerivationVersion >= 2
+            && (entry.HeaderSourceCanonicalBytes is null || !entry.HeaderSourceCanonicalBytes.AsSpan().SequenceEqual(derived.HeaderSourceCanonicalBytes)
+                || entry.ParentFormRecordId != derived.ParentFormRecordId || entry.CreatedByBusinessUserId != derived.CreatedByUserId))
+        {
+            return (SweepUnitOutcome.Fail, "HEADER_FACT_MISMATCH");
+        }
+
         if (derived.Postings.Count != stored.Postings.Count || derived.Postings.Count != entry.IndexedPostingCount)
         {
             return (SweepUnitOutcome.Fail, "POSTING_SET_MISMATCH");
@@ -424,7 +432,9 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
     {
         ArgumentNullException.ThrowIfNull(head);
         ArgumentNullException.ThrowIfNull(requiredApprovalIds);
-        return entry is not null && head.CommittedOperationId == entry.IndexedOperationId && head.CommittedContentRevision == entry.IndexedContentRevision
+        // IX-3 (D-IX3-1): an entry of an older derivation version is not "indexed": the builder re-derives it, attestation waits for it.
+        return entry is not null && entry.EntryDerivationVersion >= SearchPostingDerivationV1.CurrentEntryDerivationVersion
+               && head.CommittedOperationId == entry.IndexedOperationId && head.CommittedContentRevision == entry.IndexedContentRevision
                && head.CommittedManifestRoot.AsSpan().SequenceEqual(entry.IndexedManifestRoot) && requiredApprovalIds.All(entry.DerivedFieldSearchApprovalIds.Contains);
     }
 

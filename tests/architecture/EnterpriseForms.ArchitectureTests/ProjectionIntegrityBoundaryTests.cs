@@ -55,6 +55,7 @@ public sealed partial class ProjectionIntegrityBoundaryTests
                 "AuthorizationAuthority.Application/Features/Authorization/PermissionCheckService.cs",
                 "AuthorizationAuthority.Application/Features/Catalogue/SearchCatalogueService.cs",
                 "AuthorizationAuthority.Application/Features/Content/ContentService.cs",
+                "AuthorizationAuthority.Application/Features/SearchIndex/IndexedSearchService.cs", // IX-3: search and page, each pinned and completed
             ],
             consumers.Select(c => c.Path).Order(StringComparer.Ordinal).ToList());
         foreach (var (path, text) in consumers)

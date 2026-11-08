@@ -2871,6 +2871,79 @@
         }
       }
     },
+    "/internal/v1/search/indexed-query": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-3 Tier 1: one indexed field search over the caller's discoverable records of one form, at one S1-pinned snapshot. The scope guard (I-1), value-independent field-item checks for share-only records, a scope-driven candidate statement, the per-match binding (I-2) and the seal check of the first page run before anything is released; the ordered result is held by the Authority as a session-bound snapshot (record ids only) committed with its execution evidence. 409 SEARCH_SNAPSHOT_CHANGED, 422 SEARCH_VERIFICATION_LIMIT / SEARCH_FIELD_NOT_ALLOWED / SEARCH_OPERATOR_NOT_SUPPORTED, 423 INTEGRITY_QUARANTINE (organization), 503 SEARCH_INDEX_NOT_READY / SEARCH_INDEX_INCONSISTENT / SEARCH_INDEX_VERIFICATION_OVERDUE / RECORD_QUARANTINED. Results reflect Authority-accepted content, not a verification of the business copy.",
+        "operationId": "IndexedFieldSearch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndexedSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexedSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search/indexed-query/{snapshotId}/page": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-3: another page of the caller's own snapshot, re-authorized completely (§17.3 checks 1-9: snapshot, user, session and query digest; gate and S1; authorization revision; approvals, operators, coverage and query_fields; projection and form state; a fresh SpiceDB decision for every page record; I-2 and the seal; edit flags; S1 verify). Any failure returns no page; non-retryable failures delete the snapshot.",
+        "operationId": "IndexedFieldSearchPage",
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndexedSearchPageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexedSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/organizations/roster": {
       "post": {
         "tags": [
@@ -4036,6 +4109,314 @@
             "type": "string"
           },
           "subject_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "IndexedSearchCondition": {
+        "required": [
+          "field_definition_id",
+          "operator",
+          "value_type",
+          "value",
+          "lower_bound",
+          "upper_bound"
+        ],
+        "type": "object",
+        "properties": {
+          "field_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operator": {
+            "type": "string"
+          },
+          "value_type": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lower_bound": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "upper_bound": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "IndexedSearchItem": {
+        "required": [
+          "form_record_id",
+          "record_status_name",
+          "parent_form_record_id",
+          "created_by_business_user_id",
+          "record_registered_on",
+          "content_head_modified_on",
+          "editable"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "record_status_name": {
+            "type": "string"
+          },
+          "parent_form_record_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "created_by_business_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "record_registered_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "content_head_modified_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "editable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "IndexedSearchPageRequest": {
+        "required": [
+          "organization_id",
+          "session_digest_base64",
+          "query_nonce_base64",
+          "query",
+          "offset"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session_digest_base64": {
+            "type": "string"
+          },
+          "query_nonce_base64": {
+            "type": "string"
+          },
+          "query": {
+            "$ref": "#/components/schemas/IndexedSearchQuery"
+          },
+          "offset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "IndexedSearchQuery": {
+        "required": [
+          "form_definition_id",
+          "conditions",
+          "record_status",
+          "include_children",
+          "include_archived",
+          "sort_by",
+          "sort_direction",
+          "page_size"
+        ],
+        "type": "object",
+        "properties": {
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexedSearchCondition"
+            }
+          },
+          "record_status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "include_children": {
+            "type": "boolean"
+          },
+          "include_archived": {
+            "type": "boolean"
+          },
+          "sort_by": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sort_direction": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "page_size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "IndexedSearchRequest": {
+        "required": [
+          "organization_id",
+          "session_digest_base64",
+          "query_nonce_base64",
+          "query"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session_digest_base64": {
+            "type": "string"
+          },
+          "query_nonce_base64": {
+            "type": "string"
+          },
+          "query": {
+            "$ref": "#/components/schemas/IndexedSearchQuery"
+          }
+        }
+      },
+      "IndexedSearchResponse": {
+        "required": [
+          "search_result_snapshot_id",
+          "form_definition_id",
+          "total_count",
+          "offset",
+          "page_size",
+          "items",
+          "scope_record_count",
+          "records_without_content",
+          "authorization_revision",
+          "content_integrity_revision",
+          "form_content_revision",
+          "snapshot_expires_on",
+          "result_basis",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "search_result_snapshot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "page_size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexedSearchItem"
+            }
+          },
+          "scope_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "records_without_content": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content_integrity_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "form_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "snapshot_expires_on": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result_basis": {
+            "type": "string"
+          },
+          "correlation_id": {
             "type": "string",
             "format": "uuid"
           }

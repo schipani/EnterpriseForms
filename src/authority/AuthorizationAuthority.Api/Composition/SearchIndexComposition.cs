@@ -1,5 +1,6 @@
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Application.Features.SearchIndex;
+using AuthorizationAuthority.Infrastructure.Persistence;
 using AuthorizationAuthority.Infrastructure.Signing;
 
 namespace AuthorizationAuthority.Api.Composition;
@@ -58,6 +59,36 @@ public static class SearchIndexComposition
         if (options.Mode == SearchIndexMode.Dark)
         {
             services.AddHostedService<SearchIndexSweepLoop>();
+        }
+
+        // IX-3: the Tier 1 query path. Off by default; Development/Testing only; needs the index (Dark) and its own reader credential.
+        var query = configuration.GetSection(IndexedSearchOptions.SectionName).Get<IndexedSearchOptions>() ?? new IndexedSearchOptions();
+        IndexedSearchOptions.Validate(query);
+        var readerConnection = configuration.GetConnectionString("AuthoritySearchReader");
+        if (query.QueryEnabled)
+        {
+            if (!developmentOrTesting)
+            {
+                throw new InvalidOperationException("SearchIndex:Query:QueryEnabled is permitted only in Development or Testing in IX-3.");
+            }
+
+            if (options.Mode != SearchIndexMode.Dark)
+            {
+                throw new InvalidOperationException("SearchIndex:Query:QueryEnabled requires SearchIndex:Mode=Dark (the index must be maintained).");
+            }
+
+            if (string.IsNullOrWhiteSpace(readerConnection) || string.Equals(readerConnection, configuration.GetConnectionString("AuthorityDb"), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("SearchIndex:Query:QueryEnabled requires ConnectionStrings:AuthoritySearchReader, distinct from the runtime connection (design §5.1).");
+            }
+        }
+
+        services.AddSingleton(query);
+        services.AddSingleton<ISearchQueryReader>(_ => new SearchQueryReader(query.QueryEnabled ? readerConnection : null, query));
+        services.AddSingleton<IndexedSearchService>();
+        if (query.QueryEnabled)
+        {
+            services.AddHostedService<SearchResultSnapshotPurgeLoop>();
         }
 
         return services;
@@ -196,4 +227,46 @@ internal static partial class SearchIndexTimingLog
 {
     [LoggerMessage(EventId = 9301, Level = LogLevel.Information, Message = "IX1-DERIVE-TIMING record={FormRecordId} reads_ms={Reads} derive_ms={Derive} sign_ms={Sign} writes_ms={Writes}")]
     public static partial void Stages(ILogger logger, Guid formRecordId, double reads, double derive, double sign, double writes);
+}
+
+/// <summary>
+/// IX-3 (§18.4): the result-snapshot purge job. Every <see cref="IndexedSearchOptions.PurgeIntervalSeconds"/> (default one minute):
+/// expired and invalidated snapshots in bounded batches. Deletion in the invalidating transactions (triggers) is the first line;
+/// this job removes what expiry, session timeouts and skipped (locked) rows leave behind. Counts only in the log.
+/// </summary>
+public sealed partial class SearchResultSnapshotPurgeLoop(IndexedSearchService service, IndexedSearchOptions options, TimeProvider clock, ILogger<SearchResultSnapshotPurgeLoop> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                var deleted = await service.PurgeAsync(stoppingToken).ConfigureAwait(false);
+                if (deleted > 0)
+                {
+                    LogPurged(logger, deleted);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogPurgeFailed(logger, ex.GetType().Name);
+            }
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(options.PurgeIntervalSeconds), clock, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    [LoggerMessage(EventId = 9320, Level = LogLevel.Information, Message = "IX3-SNAPSHOT-PURGE deleted={Deleted}")]
+    private static partial void LogPurged(ILogger logger, int deleted);
+
+    [LoggerMessage(EventId = 9321, Level = LogLevel.Warning, Message = "Search result snapshot purge failed ({ExceptionType}); retried at the next interval.")]
+    private static partial void LogPurgeFailed(ILogger logger, string exceptionType);
 }

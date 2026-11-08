@@ -9,6 +9,14 @@ services:
     tmpfs: [/var/lib/postgresql]
   authority-db:
     tmpfs: [/var/lib/postgresql]
+    environment:
+      # IX-3 (design §5.1): the SELECT-only indexed-search reader login, synthetic credential for this isolated stack only. The cluster
+      # bootstrap creates it; the migration step makes it a member of authority_search_reader. Other stacks set nothing (no query path).
+      AUTHORITY_SEARCH_READER_USER: authority_search_reader_login
+      AUTHORITY_SEARCH_READER_PASSWORD: sectest-search-reader-only-0001
+  authority-migrate:
+    environment:
+      Database__SearchReaderLoginName: authority_search_reader_login
   spicedb-db:
     tmpfs: [/var/lib/postgresql]
   azurite:
@@ -84,6 +92,12 @@ services:
       SearchIndex__Seal__PinnedKeys__0__KeyName: search-entry-seal-v1
       SearchIndex__Seal__PinnedKeys__0__KeyVersion: "1"
       SearchIndex__Seal__PinnedKeys__0__SubjectPublicKeyInfoBase64: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDyv2JNCpxP55l+tjRMiii0DX2tgMttFQEyRSAtrujr1YgUC943B5upJ66ksIKwecL6AFoEQSwXOXbl2osaQEjQ==
+      # IX-3: the Tier 1 query path (Testing only), on its own SELECT-only reader credential (never the runtime one). A test may
+      # recreate the authority with a shorter snapshot lifetime (default 300 s) to exercise expiry.
+      SearchIndex__Query__QueryEnabled: "true"
+      SearchIndex__Query__SnapshotLifetimeSeconds: ${IX3_SNAPSHOT_LIFETIME_SECONDS:-300}
+      SearchIndex__Query__PurgeIntervalSeconds: "5"
+      ConnectionStrings__AuthoritySearchReader: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=authority_search_reader_login;Password=sectest-search-reader-only-0001
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     depends_on:
       vault-search-seal-init:
@@ -231,6 +245,8 @@ services:
       DataProtection__KeyRingDirectory: /keyring
       # Phase C7 M3: verified field-value search execution (fail-closed gate; refused at startup outside Development/Testing).
       FieldSearch__ExecutionEnabled: "true"
+      # IX-3: V1 answers; for searches made with a browser session the indexed engine is compared (ids and counts only; R1 §G.3).
+      FieldSearch__Engine: ${IX3_FIELD_SEARCH_ENGINE:-Shadow}
       Testing__StackIdentity: enterpriseforms-security-test
       # Phase C8 (D8-16): shortened reconciliation windows, permitted in Testing only (the hosts refuse them elsewhere).
       TeamMembershipReconciliation__InFlightWindowSeconds: "6"

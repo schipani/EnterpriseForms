@@ -3532,10 +3532,20 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("search_record_entry_id");
 
+                    b.Property<Guid?>("CreatedByBusinessUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_business_user_id");
+
                     b.PrimitiveCollection<Guid[]>("DerivedFieldSearchApprovalIds")
                         .IsRequired()
                         .HasColumnType("uuid[]")
                         .HasColumnName("derived_field_search_approval_ids");
+
+                    b.Property<int>("EntryDerivationVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("entry_derivation_version");
 
                     b.Property<byte[]>("EntrySealSignature")
                         .IsRequired()
@@ -3553,6 +3563,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("FormRecordId")
                         .HasColumnType("uuid")
                         .HasColumnName("form_record_id");
+
+                    b.Property<byte[]>("HeaderSourceCanonicalBytes")
+                        .HasColumnType("bytea")
+                        .HasColumnName("header_source_canonical_bytes");
 
                     b.Property<int>("IndexedAnomalyCount")
                         .HasColumnType("integer")
@@ -3605,6 +3619,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
 
+                    b.Property<Guid?>("ParentFormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_form_record_id");
+
                     b.Property<string>("RecordStatusName")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -3643,6 +3661,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.ToTable("search_record_entries", "authority_search", t =>
                         {
                             t.HasCheckConstraint("ck_search_entry_counts", "indexed_posting_count >= 0 AND indexed_anomaly_count >= 0 AND cardinality(derived_field_search_approval_ids) >= 1");
+
+                            t.HasCheckConstraint("ck_search_entry_derivation", "entry_derivation_version IN (1, 2) AND (entry_derivation_version = 1 OR (octet_length(header_source_canonical_bytes) > 0 AND created_by_business_user_id IS NOT NULL))");
 
                             t.HasCheckConstraint("ck_search_entry_head", "octet_length(indexed_manifest_root) = 32 AND indexed_content_revision >= 1");
 
@@ -3695,6 +3715,163 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.ToTable("search_record_field_anomalies", "authority_search", t =>
                         {
                             t.HasCheckConstraint("ck_search_anomaly_kind", "anomaly_kind_name IN ('EncryptedValuePresent')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchResultSnapshot", b =>
+                {
+                    b.Property<Guid>("SearchResultSnapshotId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_result_snapshot_id");
+
+                    b.Property<Guid>("AuthenticatedSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("authenticated_session_id");
+
+                    b.Property<string>("CreatingInstanceName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("creating_instance_name");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<DateTimeOffset?>("LastPageServedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_page_served_on");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.PrimitiveCollection<Guid[]>("PredicateFieldDefinitionIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("predicate_field_definition_ids");
+
+                    b.PrimitiveCollection<Guid[]>("PredicateFieldSearchApprovalIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("predicate_field_search_approval_ids");
+
+                    b.PrimitiveCollection<string[]>("PredicateOperatorNames")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("predicate_operator_names");
+
+                    b.Property<byte[]>("QueryDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("query_digest");
+
+                    b.Property<Guid>("RequestingAuthorityUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requesting_authority_user_id");
+
+                    b.Property<int>("ResultEntryCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_entry_count");
+
+                    b.Property<string>("SearchEngineName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("search_engine_name");
+
+                    b.Property<string>("SearchTierName")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("search_tier_name");
+
+                    b.Property<long>("SnapshotAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("snapshot_authorization_revision");
+
+                    b.Property<long>("SnapshotContentIntegrityRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("snapshot_content_integrity_revision");
+
+                    b.Property<DateTimeOffset>("SnapshotCreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("snapshot_created_on");
+
+                    b.Property<DateTimeOffset>("SnapshotExpiresOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("snapshot_expires_on");
+
+                    b.Property<long>("SnapshotFormContentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("snapshot_form_content_revision");
+
+                    b.HasKey("SearchResultSnapshotId");
+
+                    b.HasIndex("CreatingInstanceName")
+                        .HasDatabaseName("ix_search_result_snapshots_instance");
+
+                    b.HasIndex("SnapshotExpiresOn")
+                        .HasDatabaseName("ix_search_result_snapshots_expiry");
+
+                    b.HasIndex("AuthenticatedSessionId", "SnapshotCreatedOn")
+                        .HasDatabaseName("ix_search_result_snapshots_session");
+
+                    b.HasIndex("OrganizationId", "FormDefinitionId")
+                        .HasDatabaseName("ix_search_result_snapshots_form");
+
+                    b.HasIndex("OrganizationId", "SnapshotAuthorizationRevision")
+                        .HasDatabaseName("ix_search_result_snapshots_revision");
+
+                    b.ToTable("search_result_snapshots", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_result_snapshot_counts", "result_entry_count BETWEEN 0 AND 10000 AND snapshot_expires_on > snapshot_created_on");
+
+                            t.HasCheckConstraint("ck_search_result_snapshot_digest", "octet_length(query_digest) = 32");
+
+                            t.HasCheckConstraint("ck_search_result_snapshot_engine", "search_engine_name = 'Indexed' AND search_tier_name = 'Tier1'");
+
+                            t.HasCheckConstraint("ck_search_result_snapshot_predicates", "cardinality(predicate_field_definition_ids) BETWEEN 1 AND 5 AND cardinality(predicate_field_search_approval_ids) = cardinality(predicate_field_definition_ids) AND cardinality(predicate_operator_names) = cardinality(predicate_field_definition_ids)");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchResultSnapshotEntry", b =>
+                {
+                    b.Property<Guid>("SearchResultSnapshotEntryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_result_snapshot_entry_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<int>("ResultEntryPosition")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_entry_position");
+
+                    b.Property<Guid>("SearchResultSnapshotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_result_snapshot_id");
+
+                    b.HasKey("SearchResultSnapshotEntryId");
+
+                    b.HasIndex("SearchResultSnapshotId", "ResultEntryPosition")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_result_snapshot_entry_position");
+
+                    b.ToTable("search_result_snapshot_entries", "authority_search", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_result_snapshot_entry_position", "result_entry_position >= 0");
                         });
                 });
 
@@ -4697,6 +4874,27 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_search_record_field_anomaly_entry");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchResultSnapshot", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_result_snapshot_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchResultSnapshotEntry", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.SearchIndex.SearchResultSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("SearchResultSnapshotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_result_snapshot_entry_snapshot");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchStringPosting", b =>

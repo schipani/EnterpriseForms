@@ -24,6 +24,9 @@ public static class SearchIndexSchema
 
     public static readonly string[] StateTables = ["search_projection_states", "search_field_coverages", "search_form_states"];
 
+    /// <summary>IX-3: result snapshots. The runtime inserts and deletes them (never updates); no values are stored.</summary>
+    public static readonly string[] ResultTables = ["search_result_snapshots", "search_result_snapshot_entries"];
+
     public static readonly string[] PostingTables = DerivedTables.Where(t => t.EndsWith("_postings", StringComparison.Ordinal)).ToArray();
 }
 
@@ -91,6 +94,7 @@ public sealed class SearchRecordEntryConfiguration : IEntityTypeConfiguration<Se
         builder.Property(e => e.SealKeyName).HasMaxLength(100);
         builder.Property(e => e.LastSealAttemptOutcomeCode).HasMaxLength(64);
         builder.Property(e => e.LastDeepAttemptOutcomeCode).HasMaxLength(64);
+        builder.Property(e => e.EntryDerivationVersion).HasDefaultValue(1);
         builder.HasAlternateKey(e => new { e.OrganizationId, e.FormRecordId, e.IndexedOperationId }).HasName("uq_search_record_entry_operation");
         builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId }).IsUnique().HasDatabaseName("uq_search_record_entry_record");
         builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId, e.FormRecordId }).HasDatabaseName("ix_search_record_entries_form");
@@ -101,7 +105,52 @@ public sealed class SearchRecordEntryConfiguration : IEntityTypeConfiguration<Se
             t.HasCheckConstraint("ck_search_entry_seal", "octet_length(entry_seal_signature) = 64 AND seal_key_version >= 1 AND seal_schema_version = 1");
             t.HasCheckConstraint("ck_search_entry_head", "octet_length(indexed_manifest_root) = 32 AND indexed_content_revision >= 1");
             t.HasCheckConstraint("ck_search_entry_counts", "indexed_posting_count >= 0 AND indexed_anomaly_count >= 0 AND cardinality(derived_field_search_approval_ids) >= 1");
+            // IX-3 (D-IX3-1): version 2 entries carry the verified header bytes and the creator decoded from them.
+            t.HasCheckConstraint("ck_search_entry_derivation", "entry_derivation_version IN (1, 2) AND (entry_derivation_version = 1 OR (octet_length(header_source_canonical_bytes) > 0 AND created_by_business_user_id IS NOT NULL))");
         });
+    }
+}
+
+/// <summary>IX-3 (§17.3, §18.4): Authority-held result snapshots. Ids and positions only; no RLS (no values, D-IX1-5 precedent).</summary>
+public sealed class SearchResultSnapshotConfiguration : IEntityTypeConfiguration<SearchResultSnapshot>
+{
+    public void Configure(EntityTypeBuilder<SearchResultSnapshot> builder)
+    {
+        builder.MapSnakeCase("search_result_snapshots");
+        builder.ToTable("search_result_snapshots", SearchIndexSchema.Name);
+        builder.HasKey(e => e.SearchResultSnapshotId);
+        builder.Property(e => e.SearchEngineName).HasMaxLength(20);
+        builder.Property(e => e.SearchTierName).HasMaxLength(10);
+        builder.Property(e => e.CreatingInstanceName).HasMaxLength(100);
+        builder.Property(e => e.PredicateFieldDefinitionIds).HasColumnName("predicate_field_definition_ids").HasColumnType("uuid[]");
+        builder.Property(e => e.PredicateFieldSearchApprovalIds).HasColumnName("predicate_field_search_approval_ids").HasColumnType("uuid[]");
+        builder.Property(e => e.PredicateOperatorNames).HasColumnName("predicate_operator_names").HasColumnType("text[]");
+        builder.HasIndex(e => new { e.OrganizationId, e.SnapshotAuthorizationRevision }).HasDatabaseName("ix_search_result_snapshots_revision");
+        builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId }).HasDatabaseName("ix_search_result_snapshots_form");
+        builder.HasIndex(e => new { e.AuthenticatedSessionId, e.SnapshotCreatedOn }).HasDatabaseName("ix_search_result_snapshots_session");
+        builder.HasIndex(e => e.SnapshotExpiresOn).HasDatabaseName("ix_search_result_snapshots_expiry");
+        builder.HasIndex(e => e.CreatingInstanceName).HasDatabaseName("ix_search_result_snapshots_instance");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_search_result_snapshot_org").OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_search_result_snapshot_engine", "search_engine_name = 'Indexed' AND search_tier_name = 'Tier1'");
+            t.HasCheckConstraint("ck_search_result_snapshot_digest", "octet_length(query_digest) = 32");
+            t.HasCheckConstraint("ck_search_result_snapshot_counts", "result_entry_count BETWEEN 0 AND 10000 AND snapshot_expires_on > snapshot_created_on");
+            t.HasCheckConstraint("ck_search_result_snapshot_predicates", "cardinality(predicate_field_definition_ids) BETWEEN 1 AND 5 AND cardinality(predicate_field_search_approval_ids) = cardinality(predicate_field_definition_ids) AND cardinality(predicate_operator_names) = cardinality(predicate_field_definition_ids)");
+        });
+    }
+}
+
+public sealed class SearchResultSnapshotEntryConfiguration : IEntityTypeConfiguration<SearchResultSnapshotEntry>
+{
+    public void Configure(EntityTypeBuilder<SearchResultSnapshotEntry> builder)
+    {
+        builder.MapSnakeCase("search_result_snapshot_entries");
+        builder.ToTable("search_result_snapshot_entries", SearchIndexSchema.Name);
+        builder.HasKey(e => e.SearchResultSnapshotEntryId);
+        builder.HasIndex(e => new { e.SearchResultSnapshotId, e.ResultEntryPosition }).IsUnique().HasDatabaseName("uq_search_result_snapshot_entry_position");
+        builder.HasOne<SearchResultSnapshot>().WithMany().HasForeignKey(e => e.SearchResultSnapshotId).HasConstraintName("fk_search_result_snapshot_entry_snapshot").OnDelete(DeleteBehavior.Cascade);
+        builder.ToTable(t => t.HasCheckConstraint("ck_search_result_snapshot_entry_position", "result_entry_position >= 0"));
     }
 }
 

@@ -116,6 +116,7 @@ public sealed class Program
         if (app.Environment.IsEnvironment("Testing"))
         {
             app.MapTestStackIdentityEndpoints();
+            AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchTestingEndpoints(app); // IX-3 plan-shape test
         }
 
         app.MapAuthorizationEndpoints();
@@ -131,6 +132,7 @@ public sealed class Program
         app.MapSessionEndpoints();
         app.MapFieldSearchEndpoints();
         AuthorizationAuthority.Api.Features.SearchIndex.SearchIndexBuilderEndpoints.MapSearchIndexBuilderEndpoints(app);
+        AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchEndpoints(app); // IX-3
         AuthorizationAuthority.Api.Features.Membership.MembershipEndpoints.MapMembershipEndpoints(app);
 
         app.Run();

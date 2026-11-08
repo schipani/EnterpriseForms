@@ -14,7 +14,12 @@ namespace AuthorizationAuthority.Application.Features.SearchIndex;
 public sealed record DerivedPosting(Guid FieldDefinitionId, Guid FieldSearchApprovalId, byte[] ManifestItemKey, Guid ManifestItemId, string EntityKind, string ValueType, byte[] SourceCanonicalBytes, byte[] SourceCanonicalDigest, SearchSealValue Value);
 
 /// <summary>The output of <see cref="SearchPostingDerivationV1.Derive"/> for one record at one verified head.</summary>
-public sealed record DerivedRecordContent(string RecordStatusName, IReadOnlyList<DerivedPosting> Postings, IReadOnlyList<SearchSealAnomaly> Anomalies);
+/// <param name="HeaderSourceCanonicalBytes">IX-3 (D-IX3-1): the verified header leaf bytes the header facts were decoded from.</param>
+public sealed record DerivedRecordContent(string RecordStatusName, IReadOnlyList<DerivedPosting> Postings, IReadOnlyList<SearchSealAnomaly> Anomalies,
+    byte[] HeaderSourceCanonicalBytes, Guid? ParentFormRecordId, Guid CreatedByUserId);
+
+/// <summary>IX-3: the header facts a query needs (decoded from verified header bytes only).</summary>
+public sealed record DerivedHeaderFacts(Guid FormDefinitionId, string RecordStatusName, Guid? ParentFormRecordId, Guid CreatedByUserId);
 
 /// <summary>
 /// IX-1 (design R1 §C.1, revision 2 §4): <c>SearchPostingDerivation/v1</c>, a pure function of the canonical bytes the content
@@ -30,6 +35,9 @@ public sealed record DerivedRecordContent(string RecordStatusName, IReadOnlyList
 public static class SearchPostingDerivationV1
 {
     public const string Version = "SearchPostingDerivation/v1";
+
+    /// <summary>IX-3 (D-IX3-1): entries carry the verified header facts. Older entries are re-derived before a coverage is Complete.</summary>
+    public const int CurrentEntryDerivationVersion = 2;
 
     private static readonly Dictionary<string, string> EntityKindByValueType = new(StringComparer.Ordinal)
     {
@@ -71,6 +79,8 @@ public static class SearchPostingDerivationV1
         }
 
         string? recordStatus = null;
+        DerivedHeaderFacts? header = null;
+        byte[]? headerBytes = null;
         var postings = new List<DerivedPosting>();
         var anomalies = new HashSet<(Guid Field, string Kind)>();
         foreach (var item in verifiedItems)
@@ -95,12 +105,14 @@ public static class SearchPostingDerivationV1
             switch (item.ItemKind)
             {
                 case ManifestItemKind.RecordHeader:
-                    if (document.Header.EntityKind != HeaderEntityKind || Uuid(document, "form_definition_id") != formDefinitionId)
+                    header = HeaderFacts(document);
+                    if (header.FormDefinitionId != formDefinitionId)
                     {
                         throw Failure("the record header does not belong to the record's registered form");
                     }
 
-                    recordStatus = document.Column("record_status")?.AsText() ?? throw Failure("the record header has no status");
+                    recordStatus = header.RecordStatusName;
+                    headerBytes = bytes;
                     break;
                 case ManifestItemKind.FieldValue:
                 case ManifestItemKind.FieldSelection:
@@ -146,7 +158,7 @@ public static class SearchPostingDerivationV1
             }
         }
 
-        if (recordStatus is null)
+        if (recordStatus is null || header is null || headerBytes is null)
         {
             throw Failure("the verified snapshot has no record header");
         }
@@ -157,7 +169,46 @@ public static class SearchPostingDerivationV1
             postings.RemoveAll(p => p.FieldDefinitionId == encryptedField);
         }
 
-        return new DerivedRecordContent(recordStatus, postings, anomalies.Select(a => new SearchSealAnomaly(a.Field, a.Kind)).ToList());
+        return new DerivedRecordContent(recordStatus, postings, anomalies.Select(a => new SearchSealAnomaly(a.Field, a.Kind)).ToList(), headerBytes, header.ParentFormRecordId, header.CreatedByUserId);
+    }
+
+    /// <summary>
+    /// IX-3: decodes the header facts from verified header bytes (form_records v2 has no parent column: a top-level record).
+    /// Throws the derivation failure on anything that is not a well-formed record header.
+    /// </summary>
+    public static DerivedHeaderFacts HeaderFacts(byte[] headerCanonicalBytes)
+    {
+        ArgumentNullException.ThrowIfNull(headerCanonicalBytes);
+        RowCanonicalDocument document;
+        try
+        {
+            document = RowCanonicalDecoder.Decode(headerCanonicalBytes);
+        }
+        catch (IntegrityFormatException)
+        {
+            throw Failure("header bytes do not decode");
+        }
+
+        return HeaderFacts(document);
+    }
+
+    private static DerivedHeaderFacts HeaderFacts(RowCanonicalDocument document)
+    {
+        if (document.Header.EntityKind != HeaderEntityKind)
+        {
+            throw Failure("the header item is not a record header");
+        }
+
+        try
+        {
+            var status = document.Column("record_status")?.AsText() ?? throw Failure("the record header has no status");
+            var parent = document.Column("parent_form_record_id") is { IsNull: false } column ? column.AsUuid() : null;
+            return new DerivedHeaderFacts(Uuid(document, "form_definition_id"), status, parent, Uuid(document, "created_by_user_id"));
+        }
+        catch (IntegrityFormatException)
+        {
+            throw Failure("a header column does not decode");
+        }
     }
 
     /// <summary>

@@ -163,9 +163,14 @@
       "bytes": 29311
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_IX3_EVIDENCE.md",
+      "sha256": "e7b2dde7133303e51547145400172ba3f447878b04651b3aa262b2e4fa112d43",
+      "bytes": 25420
+    },
+    {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "fe7c51d08b5361d2c9e640eaad2c2dc6c669d9112d159497e99b6214508cb2c5",
-      "bytes": 141261
+      "sha256": "9b6b4b3ace77579d4ca1eab46a3bdf764aea4c19b3204fb7cdb830b26dc6d5af",
+      "bytes": 152734
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",

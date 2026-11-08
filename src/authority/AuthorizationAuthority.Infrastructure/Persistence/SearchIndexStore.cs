@@ -384,6 +384,60 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
     public Task<List<SearchRecordEntry>> GetRandomEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
         DeepCountedEntries(organizationId).OrderBy(_ => EF.Functions.Random()).Take(limit).ToListAsync(cancellationToken);
 
+    public void AddResultSnapshot(SearchResultSnapshot snapshot, IReadOnlyList<SearchResultSnapshotEntry> entries)
+    {
+        context.SearchResultSnapshots.Add(snapshot);
+        context.SearchResultSnapshotEntries.AddRange(entries);
+    }
+
+    public Task<SearchResultSnapshot?> FindResultSnapshotAsync(Guid searchResultSnapshotId, CancellationToken cancellationToken) =>
+        context.SearchResultSnapshots.AsNoTracking().FirstOrDefaultAsync(s => s.SearchResultSnapshotId == searchResultSnapshotId, cancellationToken);
+
+    public async Task<SearchResultSnapshot?> MarkResultSnapshotServedAsync(Guid searchResultSnapshotId, DateTimeOffset servedOn, CancellationToken cancellationToken)
+    {
+        var updated = await context.SearchResultSnapshots.Where(s => s.SearchResultSnapshotId == searchResultSnapshotId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastPageServedOn, servedOn), cancellationToken).ConfigureAwait(false);
+        return updated == 0 ? null : await FindResultSnapshotAsync(searchResultSnapshotId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<List<SearchResultSnapshotEntry>> GetResultSnapshotEntriesAsync(Guid searchResultSnapshotId, int offset, int count, CancellationToken cancellationToken) =>
+        context.SearchResultSnapshotEntries.AsNoTracking().Where(e => e.SearchResultSnapshotId == searchResultSnapshotId)
+            .OrderBy(e => e.ResultEntryPosition).Skip(offset).Take(count).ToListAsync(cancellationToken);
+
+    public Task<int> DeleteResultSnapshotAsync(Guid searchResultSnapshotId, CancellationToken cancellationToken) =>
+        context.SearchResultSnapshots.Where(s => s.SearchResultSnapshotId == searchResultSnapshotId).ExecuteDeleteAsync(cancellationToken);
+
+    public async Task<int> EvictSessionSnapshotsAsync(Guid authenticatedSessionId, int keep, CancellationToken cancellationToken)
+    {
+        var evicted = await context.SearchResultSnapshots.AsNoTracking().Where(s => s.AuthenticatedSessionId == authenticatedSessionId)
+            .OrderByDescending(s => s.SnapshotCreatedOn).ThenByDescending(s => s.SearchResultSnapshotId).Skip(Math.Max(0, keep)).Select(s => s.SearchResultSnapshotId)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return evicted.Count == 0 ? 0 : await context.SearchResultSnapshots.Where(s => evicted.Contains(s.SearchResultSnapshotId)).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<long> CountLiveResultEntriesAsync(string creatingInstanceName, DateTimeOffset now, CancellationToken cancellationToken) =>
+        await context.SearchResultSnapshots.AsNoTracking().Where(s => s.CreatingInstanceName == creatingInstanceName && s.SnapshotExpiresOn > now)
+            .SumAsync(s => (long)s.ResultEntryCount, cancellationToken).ConfigureAwait(false);
+
+    public Task<int> PurgeResultSnapshotsAsync(DateTimeOffset now, int batchSize, CancellationToken cancellationToken) =>
+        context.Database.ExecuteSqlInterpolatedAsync($"""
+            DELETE FROM authority_search.search_result_snapshots
+            WHERE search_result_snapshot_id IN (
+                SELECT s.search_result_snapshot_id
+                FROM authority_search.search_result_snapshots s
+                LEFT JOIN authority.organization_authorization_states o ON o.organization_id = s.organization_id
+                LEFT JOIN authority_search.search_projection_states p ON p.organization_id = s.organization_id
+                LEFT JOIN authority.authenticated_sessions a ON a.authenticated_session_id = s.authenticated_session_id
+                WHERE s.snapshot_expires_on <= {now}
+                   OR o.organization_id IS NULL OR o.integrity_quarantine_enabled OR o.authorization_revision > s.snapshot_authorization_revision
+                   OR p.projection_status_name IS DISTINCT FROM 'Active' OR p.verification_suspended
+                   OR a.authenticated_session_id IS NULL OR a.session_revoked_on IS NOT NULL OR a.session_expires_on <= {now}
+                   OR {now} - a.session_last_seen_on > make_interval(secs => a.session_idle_timeout_seconds)
+                ORDER BY s.snapshot_expires_on
+                LIMIT {batchSize}
+                FOR UPDATE OF s SKIP LOCKED)
+            """, cancellationToken);
+
     public Task RecordDeepCheckAsync(Guid searchRecordEntryId, DateTimeOffset? verifiedOn, DateTimeOffset attemptedOn, string outcomeCode, CancellationToken cancellationToken)
     {
         // Column-limited: the runtime role holds UPDATE on the S-B and S-C timestamp columns of search_record_entries only.

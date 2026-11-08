@@ -116,6 +116,7 @@ public sealed partial class SearchIndexBoundaryTests
         Assert.Equal(
             [
                 "AuthorizationAuthority.Application/Features/SearchIndex/ContentRevisionCoordinator.cs",
+                "AuthorizationAuthority.Application/Features/SearchIndex/IndexedSearchService.cs", // IX-3: result snapshots and projection-state checks
                 "AuthorizationAuthority.Application/Features/SearchIndex/SearchIndexBuilderService.cs",
                 "AuthorizationAuthority.Application/Features/SearchIndex/SearchIndexSweepService.cs",
                 "AuthorizationAuthority.Application/Features/SearchIndex/SearchIndexWriter.cs",
@@ -179,7 +180,7 @@ public sealed partial class SearchIndexBoundaryTests
         var options = new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql("Host=model-only.invalid;Database=unused;Username=unused;Password=unused").Options;
         using var context = new AuthorityDbContext(options);
         var searchTables = context.Model.GetEntityTypes().Where(e => e.GetSchema() == SearchIndexSchema.Name).Select(e => e.GetTableName()!).ToHashSet(StringComparer.Ordinal);
-        Assert.Equal(SearchIndexSchema.DerivedTables.Concat(SearchIndexSchema.StateTables).Order(StringComparer.Ordinal), searchTables.Order(StringComparer.Ordinal));
+        Assert.Equal(SearchIndexSchema.DerivedTables.Concat(SearchIndexSchema.StateTables).Concat(SearchIndexSchema.ResultTables).Order(StringComparer.Ordinal), searchTables.Order(StringComparer.Ordinal));
         var violations = ModelNamingValidator.Validate(context.Model).Where(v => searchTables.Any(t => v.ObjectName == t || v.ObjectName.StartsWith(t + ".", StringComparison.Ordinal))).ToList();
         Assert.True(violations.Count == 0, string.Join(Environment.NewLine, violations.Select(v => $"{v.ObjectName}: {v.RuleCode} ({v.Detail})")));
     }
@@ -208,11 +209,63 @@ public sealed partial class SearchIndexBoundaryTests
             Assert.Contains($"GRANT SELECT, INSERT, DELETE ON authority_search.{table} TO runtime_role", statements);
         }
 
-        Assert.Single(statements, s => s.StartsWith("GRANT UPDATE", StringComparison.Ordinal) || s.Contains(", UPDATE", StringComparison.Ordinal) && s.Contains("search_record_entries", StringComparison.Ordinal));
+        Assert.Single(statements, s => (s.StartsWith("GRANT UPDATE", StringComparison.Ordinal) || s.Contains(", UPDATE", StringComparison.Ordinal)) && SearchIndexSchema.DerivedTables.Any(t => s.Contains("." + t + " ", StringComparison.Ordinal)));
+        // IX-3 (D-IX3-2): the only other UPDATE in the search schema is the result snapshot's served-on column.
+        Assert.Equal(
+            ["GRANT UPDATE (last_seal_verified_on, last_seal_attempted_on, last_seal_attempt_outcome_code, last_deep_verified_on, last_deep_attempted_on, last_deep_attempt_outcome_code) ON authority_search.search_record_entries TO runtime_role",
+             "GRANT UPDATE (last_page_served_on) ON authority_search.search_result_snapshots TO runtime_role"],
+            statements.Where(s => s.StartsWith("GRANT UPDATE", StringComparison.Ordinal)).ToList());
+        Assert.DoesNotContain(statements, s => s.Contains(", UPDATE", StringComparison.Ordinal) && SearchIndexSchema.ResultTables.Any(t => s.Contains("." + t + " ", StringComparison.Ordinal)));
         // IX-2 adds the S-C scope timestamp and its observability attempt (§17.10 R3) to the column-limited grant; nothing else.
         Assert.Contains("GRANT UPDATE (last_seal_verified_on, last_seal_attempted_on, last_seal_attempt_outcome_code, last_deep_verified_on, last_deep_attempted_on, last_deep_attempt_outcome_code) ON authority_search.search_record_entries TO runtime_role", statements);
         Assert.DoesNotContain(statements, s => s.Contains("DELETE", StringComparison.Ordinal) && SearchIndexSchema.StateTables.Any(t => s.Contains(t, StringComparison.Ordinal)));
         Assert.Contains("ALTER ROLE authority_search_reader SET default_transaction_read_only = on", statements);
         Assert.DoesNotContain(statements, s => s.Contains("authority_search_reader", StringComparison.Ordinal) && Regex.IsMatch(s, @"\b(INSERT|UPDATE|DELETE)\b"));
+    }
+    /// <summary>
+    /// IX-3 (§5.1, §8.2, IX-56): the query path's SQL runs only on the reader login (its own connection string, refused when equal to
+    /// the runtime one); the candidate statement exists only in the reader; the service that runs page checks holds no
+    /// instance-local cache or mutable static state, so an invalidation committed through any instance applies everywhere.
+    /// </summary>
+    [Fact]
+    public void TheIndexedQueryUsesTheReaderLoginAndHoldsNoInstanceLocalState()
+    {
+        var composition = File.ReadAllText(RepositoryPaths.Combine("src", "authority", "AuthorizationAuthority.Api", "Composition", "SearchIndexComposition.cs"));
+        Assert.Contains("GetConnectionString(\"AuthoritySearchReader\")", composition, StringComparison.Ordinal);
+        Assert.Contains("distinct from the runtime connection", composition, StringComparison.Ordinal);
+        Assert.Equal(["AuthorizationAuthority.Api/Composition/SearchIndexComposition.cs"], Matching(new Regex(@"new SearchQueryReader\(")));
+        Assert.Equal(["AuthorizationAuthority.Infrastructure/Persistence/SearchQueryReader.cs"], Matching(new Regex(@"unnest\(@scope::uuid\[\]\)")));
+        Assert.Contains("AuthorizationAuthority.Infrastructure/Persistence/SearchQueryReader.cs", Matching(new Regex(@"SET TRANSACTION READ ONLY")));
+
+        var service = typeof(IndexedSearchService);
+        var instanceFields = service.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.All(instanceFields, f => Assert.True(f.IsInitOnly || f.Name.StartsWith('<'), $"{f.Name} is mutable instance state"));
+        Assert.DoesNotContain(instanceFields, f => f.FieldType.Name.Contains("Dictionary", StringComparison.Ordinal) || f.FieldType.Name.Contains("Cache", StringComparison.Ordinal) || f.FieldType.Name.Contains("Concurrent", StringComparison.Ordinal));
+        var staticFields = service.GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).Where(f => !f.IsLiteral).ToList();
+        Assert.All(staticFields, f => Assert.True(f.IsInitOnly && (f.FieldType == typeof(string[]) || f.FieldType == typeof(string)), $"{f.Name} is mutable static state"));
+        Assert.DoesNotContain(service.GetConstructors().Single().GetParameters(), p => p.ParameterType.Name.Contains("Cache", StringComparison.Ordinal));
+    }
+
+    /// <summary>IX-3 (FD-2 X1/X2, D-IX3-3): the invalidating events delete result snapshots in their own transactions, by trigger, on the exact tables.</summary>
+    [Fact]
+    public void TheIx3MigrationInstallsTheSnapshotInvalidationTriggersOnTheInvalidatingTables()
+    {
+        var migration = File.ReadAllText(Directory.EnumerateFiles(RepositoryPaths.Combine("src", "authority", "AuthorizationAuthority.Infrastructure", "Persistence", "Migrations"), "*_AuthoritySearchIndexIx3.cs").Single());
+        foreach (var (trigger, table) in new[]
+                 {
+                     ("trg_search_result_snapshots_organization_state", "ON authority.organization_authorization_states"),
+                     ("trg_search_result_snapshots_projection_state", "ON authority_search.search_projection_states"),
+                     ("trg_search_result_snapshots_approval", "ON authority.field_search_approvals"),
+                     ("trg_search_result_snapshots_coverage", "ON authority_search.search_field_coverages"),
+                     ("trg_search_result_snapshots_session", "ON authority.authenticated_sessions"),
+                 })
+        {
+            var at = migration.IndexOf("CREATE TRIGGER " + trigger, StringComparison.Ordinal);
+            Assert.True(at >= 0, trigger);
+            Assert.Contains(table, migration.Substring(at, 400), StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("SECURITY DEFINER", migration, StringComparison.Ordinal);
+        Assert.Contains("UPDATE authority_search.search_field_coverages SET coverage_state_name = 'Building' WHERE coverage_state_name = 'Complete'", migration, StringComparison.Ordinal);
     }
 }

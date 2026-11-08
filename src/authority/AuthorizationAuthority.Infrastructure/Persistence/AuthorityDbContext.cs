@@ -120,6 +120,10 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<SearchFormState> SearchFormStates => Set<SearchFormState>();
 
+    public DbSet<SearchResultSnapshot> SearchResultSnapshots => Set<SearchResultSnapshot>();
+
+    public DbSet<SearchResultSnapshotEntry> SearchResultSnapshotEntries => Set<SearchResultSnapshotEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
