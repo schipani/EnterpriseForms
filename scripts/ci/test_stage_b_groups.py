@@ -49,6 +49,14 @@ def passing(cls: str, n: int) -> list[tuple[str, str]]:
 
 
 class CoverageTests(unittest.TestCase):
+    def test_group_selection_for_release_runs(self) -> None:
+        # C-131: a release run may select one, several or all groups; unknown names are refused, nothing is silently dropped.
+        self.assertEqual([g["name"] for g in sbg.select_groups(MANIFEST, "all")[0]], ["alpha", "beta"])
+        self.assertEqual([g["name"] for g in sbg.select_groups(MANIFEST, None)[0]], ["alpha", "beta"])
+        self.assertEqual([g["name"] for g in sbg.select_groups(MANIFEST, " beta ")[0]], ["beta"])
+        self.assertEqual([g["name"] for g in sbg.select_groups(MANIFEST, "beta,alpha")[0]], ["alpha", "beta"])
+        self.assertEqual(sbg.select_groups(MANIFEST, "alpha,gamma")[1], ["gamma"])
+
     def test_complete_assignment_passes(self) -> None:
         self.assertEqual(sbg.check_coverage(MANIFEST, DISCOVERED), [])
 

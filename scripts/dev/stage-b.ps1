@@ -2,12 +2,15 @@
 .SYNOPSIS
   Run Stage B integration tests by group (the same groups CI shards on; see docs/testing/FAST_FEEDBACK_TESTING.md).
 
+  STAGE B IS RELEASE-ONLY (permanent owner policy C-131, docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md): -Group and -All run
+  Stage B and are refused unless -ReleaseAuthorization names the owner's explicit release-testing authorization. -Class runs one
+  named test class as a FOCUSED development test of the change at hand; it is not a Stage B run. -List only lists.
+
 .EXAMPLE
   scripts/dev/stage-b.ps1 -List                          # group names, titles and test counts
-  scripts/dev/stage-b.ps1 -Group search-catalogue        # one group (the stack is started only if it is not already running)
-  scripts/dev/stage-b.ps1 -Class DocumentTests           # one test class (must belong to a group; the check is the same)
-  scripts/dev/stage-b.ps1 -All                           # every group, one after another, on one stack
-  scripts/dev/stage-b.ps1 -Group records-lifecycle -Fresh  # recreate the disposable sectest stack first (down -v)
+  scripts/dev/stage-b.ps1 -Class DocumentTests           # FOCUSED: one test class directly affected by the change (development)
+  scripts/dev/stage-b.ps1 -Group search-catalogue -ReleaseAuthorization C-1xx   # RELEASE ONLY: one group, owner-authorized
+  scripts/dev/stage-b.ps1 -All -Fresh -ReleaseAuthorization C-1xx               # RELEASE ONLY: every group on a clean stack
 
   The disposable stack uses the `enterpriseforms-sectest` compose project only. This script never touches the dev stack,
   its volumes or any Vite server; stop the dev stack yourself first (both pin the same subnets).
@@ -19,7 +22,8 @@ param(
   [string]$Class,
   [switch]$All,
   [switch]$Fresh,      # down -v on the sectest project before starting (clean state; slower)
-  [switch]$Rebuild     # `up --build` even when the stack is already running
+  [switch]$Rebuild,    # `up --build` even when the stack is already running
+  [string]$ReleaseAuthorization  # C-131: the owner's release-testing authorization reference; required for -Group and -All
 )
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '../..')
@@ -55,6 +59,13 @@ if ($List) {
   Tool @('plan', '--list', $listing)   # also verifies that every class is assigned to exactly one group
   exit $LASTEXITCODE
 }
+
+if (($Group -or $All) -and -not ($ReleaseAuthorization -match '^[A-Za-z0-9][A-Za-z0-9 ._:/#()-]{2,119}$')) {
+  Write-Host 'Stage B is release-only (owner policy C-131): -Group and -All require -ReleaseAuthorization <owner authorization reference>.' -ForegroundColor Red
+  Write-Host 'For development, run the directly affected class with -Class <Name> (a focused test, not a Stage B run).'
+  exit 2
+}
+if ($Group -or $All) { Write-Host "Stage B release run authorized by: $ReleaseAuthorization" -ForegroundColor Yellow }
 
 $selected = @()
 if ($All) { $selected = @(Tool @('list') | ForEach-Object { ($_ -split '\s+')[0] }) }

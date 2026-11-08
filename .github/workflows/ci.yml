@@ -60,7 +60,7 @@ jobs:
         run: git diff --exit-code -- contracts/openapi
       - name: Build the Stage A security test project (compiles only; runs in security-gate-a against the Docker stack)
         run: dotnet build tests/security/EnterpriseForms.SecurityTests/EnterpriseForms.SecurityTests.csproj --no-restore -c Release
-      - name: Build the Stage B integration test project (compiles only; runs in stage-b-integration against the Docker stack)
+      - name: Build the Stage B integration test project (compiles only; Stage B runs only in the release-only, manually dispatched stage-b-integration, C-131)
         run: dotnet build tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release
       - name: Test-result accounting self-tests (lost, overwritten, stale, empty and failed TRX files are detected)
         run: python -m unittest scripts/ci/test_test_results.py scripts/ci/test_stage_b_groups.py

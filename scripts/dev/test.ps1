@@ -7,7 +7,13 @@
   scripts/dev/test.ps1 -Level 2 -Browser              # keeps the Docker stack running; targeted real-stack tests
   scripts/dev/test.ps1 -Level 2 -Class DocumentTests  # one integration test class
   scripts/dev/test.ps1 -Level 2 -Spec designer-ux     # one Playwright spec file
-  scripts/dev/test.ps1 -Level 3                       # full pre-merge verification from clean state (no filters exist)
+  scripts/dev/test.ps1 -Level 3                       # full development verification; Stage B steps skipped (C-131)
+  scripts/dev/test.ps1 -Level 3 -StageBReleaseAuthorization C-1xx   # RELEASE ONLY: also the Stage B integration and browser steps
+
+  STAGE B IS RELEASE-ONLY (permanent owner policy C-131, docs/testing/STAGE_B_RELEASE_ONLY_POLICY.md). The whole Stage B
+  integration suite (Level 2 without -Class/-Spec, Level 3) and the full Playwright suite (Level 2 -Browser, Level 3) run only with
+  -StageBReleaseAuthorization naming the owner's explicit release-testing authorization. Level 2 -Class and -Spec stay focused
+  development tests.
 #>
 [CmdletBinding()]
 param(
@@ -16,7 +22,8 @@ param(
   [string]$Spec,           # Level 2: Playwright spec name filter (e.g. designer-ux)
   [switch]$Browser,        # Level 2: also run the full Playwright suite
   [switch]$NoRebuild,      # Level 2: reuse the running stack as-is (UI-only edits; Vite already hot-reloads)
-  [switch]$Full            # Level 1: run the whole vitest suite instead of only changed files
+  [switch]$Full,           # Level 1: run the whole vitest suite instead of only changed files
+  [string]$StageBReleaseAuthorization  # C-131: owner release-testing authorization reference; required for any Stage B run
 )
 $ErrorActionPreference = 'Stop'
 # Forward slashes work on Windows and Linux PowerShell alike (the script also runs on hosted Linux runners: level3-script.yml).
@@ -25,6 +32,13 @@ $docker = Join-Path $root 'infrastructure/docker'
 $web = Join-Path $root 'src/frontend'
 $compose = @('compose', '-f', 'compose.yaml', '-f', 'compose.security-test.yaml', '--env-file', '.env')
 $timings = [System.Collections.Generic.List[string]]::new()
+$stageBAuthorized = $StageBReleaseAuthorization -match '^[A-Za-z0-9][A-Za-z0-9 ._:/#()-]{2,119}$'
+if ($stageBAuthorized) { Write-Host "Stage B release run authorized by: $StageBReleaseAuthorization" -ForegroundColor Yellow }
+if ($Level -eq 2 -and (($Browser) -or -not ($Class -or $Spec)) -and -not $stageBAuthorized) {
+  Write-Host 'Stage B is release-only (owner policy C-131): Level 2 without -Class/-Spec, or with -Browser, runs Stage B and requires -StageBReleaseAuthorization.' -ForegroundColor Red
+  Write-Host 'For development, name the directly affected integration class (-Class X) or Playwright spec (-Spec y).'
+  exit 2
+}
 
 function Step([string]$Name, [scriptblock]$Body) {
   $clock = [System.Diagnostics.Stopwatch]::StartNew()
@@ -112,13 +126,19 @@ try {
         if ($LASTEXITCODE -eq 0) { python security_validation/validate_security_evidence.py artifacts/security/gate-a-evidence.json }
       }
     }
-    # The Stage B stack must start from empty volumes: a stack reused after the tamper tests can quarantine (ARCHIVE_BODY_MISMATCH).
-    Step 'Stage B: clean stack' { Stack @('down', '-v', '--remove-orphans') }
-    Step 'Stage B: start full stack' { StackUpAll }
-    Step 'Stage B: integration tests' {
-      InDir $root { dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release --results-directory artifacts/stage-b/test-results --report-xunit-trx -- --minimum-expected-tests 10 }
+    if ($stageBAuthorized) {
+      # The Stage B stack must start from empty volumes: a stack reused after the tamper tests can quarantine (ARCHIVE_BODY_MISMATCH).
+      Step 'Stage B: clean stack' { Stack @('down', '-v', '--remove-orphans') }
+      Step 'Stage B: start full stack' { StackUpAll }
+      Step 'Stage B: integration tests' {
+        InDir $root { dotnet test --project tests/integration/EnterpriseForms.StageBTests/EnterpriseForms.StageBTests.csproj -c Release --results-directory artifacts/stage-b/test-results --report-xunit-trx -- --minimum-expected-tests 10 }
+      }
+      Step 'Stage B: Playwright (all projects)' { InDir $web { $env:API_TARGET = 'http://127.0.0.1:5180'; npx playwright test } }
     }
-    Step 'Stage B: Playwright (all projects)' { InDir $web { $env:API_TARGET = 'http://127.0.0.1:5180'; npx playwright test } }
+    else {
+      Write-Host "`n=== Stage B skipped: release-only (owner policy C-131). It was NOT run and is NOT reported as passed." -ForegroundColor Yellow
+      $timings.Add('     -  Stage B (not run: release-only, C-131)')
+    }
     Step 'Tear down (clean state)' { Stack @('down', '-v', '--remove-orphans') }
   }
 }
