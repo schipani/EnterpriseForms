@@ -120,8 +120,8 @@ public interface ISearchIndexStore
 
     Task<SearchFormState?> FindFormStateAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
 
-    /// <summary>Entries ordered by oldest seal verification first (S-B).</summary>
-    Task<List<SearchRecordEntry>> GetEntriesForSealCheckAsync(Guid organizationId, int limit, CancellationToken cancellationToken);
+    /// <summary>Entries ordered by oldest seal verification first (S-B), excluding <paramref name="excluding"/> (entries already attempted in the current pass).</summary>
+    Task<List<SearchRecordEntry>> GetEntriesForSealCheckAsync(Guid organizationId, int limit, IReadOnlyCollection<Guid> excluding, CancellationToken cancellationToken);
 
     Task<StoredRecordIndex?> GetStoredRecordIndexAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken);
 

@@ -18,7 +18,9 @@ public enum SweepUnitOutcome
     Inconclusive = 3,
 }
 
-public sealed record SweepPassResult(string Sweep, SweepUnitOutcome Outcome, int UnitsPassed, int UnitsInconclusive, string? FindingCode);
+/// <summary>C-136: <paramref name="Transactions"/> locked transactions of the pass; the longest and total organization-lock hold (milliseconds).</summary>
+public sealed record SweepPassResult(string Sweep, SweepUnitOutcome Outcome, int UnitsPassed, int UnitsInconclusive, string? FindingCode,
+    int Transactions = 0, double LongestTransactionMilliseconds = 0, double TotalTransactionMilliseconds = 0);
 
 public sealed record DeadlineEvaluationResult(bool Suspended, IReadOnlyList<string> OverdueScopes, bool Changed);
 
@@ -50,6 +52,15 @@ public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWr
 
     /// <summary>S-A for one organization.</summary>
     public async Task<SweepPassResult> RunCheapPassAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        // C-136: S-A is one locked transaction (unchanged); its duration is reported for the lock-hold measurement.
+        var started = clock.GetTimestamp();
+        var result = await RunCheapPassCoreAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        var milliseconds = Math.Round(clock.GetElapsedTime(started).TotalMilliseconds, 1);
+        return result with { Transactions = 1, LongestTransactionMilliseconds = milliseconds, TotalTransactionMilliseconds = milliseconds };
+    }
+
+    private async Task<SweepPassResult> RunCheapPassCoreAsync(Guid organizationId, CancellationToken cancellationToken)
     {
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
@@ -119,47 +130,86 @@ public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWr
         return new SweepPassResult(CheapSweep, SweepUnitOutcome.Pass, 1, 0, null);
     }
 
-    /// <summary>S-B for one organization: at most <see cref="SearchIndexOptions.SealCheckBatchSize"/> entries, oldest verification first.</summary>
+    /// <summary>
+    /// S-B for one organization: at most <see cref="SearchIndexOptions.SealCheckBatchSize"/> entries per pass, oldest verification first,
+    /// in transactions of at most <see cref="SearchIndexOptions.SealCheckTransactionSize"/> entries (C-136, R-33/R-36). Each transaction
+    /// takes the organization lock, re-reads the projection state and the approvals, verifies its entries against the heads current
+    /// under that lock, records each entry's outcome and commits; the lock is released between transactions, so commits and searches
+    /// wait at most one transaction. The unit of completion is unchanged: an entry's verification timestamp is written only when that
+    /// entry passes, in the transaction that verified it (§17.10.5 K7); the deadlines are evaluated from those per-entry timestamps,
+    /// so a pass interrupted between transactions (cancellation, a failure, a crash) advances only the entries it actually verified
+    /// and never reports the rest as verified. A Fail quarantines the index and ends the pass; a projection that is quarantined (or
+    /// gone) at the start of a transaction ends the pass as Inconclusive. Entries attempted in this pass are not selected again
+    /// (an Inconclusive entry keeps its old timestamp and would otherwise be re-selected).
+    /// </summary>
     public async Task<SweepPassResult> RunSealPassAsync(Guid organizationId, CancellationToken cancellationToken)
     {
-        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
-        var state = await scope.LockOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
-        var index = scope.SearchIndex;
-        var projection = state is null ? null : await index.FindProjectionStateAsync(organizationId, cancellationToken).ConfigureAwait(false);
-        if (state is null || projection is null || projection.ProjectionStatusName == SearchProjectionStatuses.Quarantined)
-        {
-            return new SweepPassResult(SealSweep, SweepUnitOutcome.Inconclusive, 0, 0, projection is null ? "NOT_INDEXED" : "QUARANTINED");
-        }
+        var limit = Math.Max(1, options.SealCheckBatchSize);
+        var transactionSize = Math.Clamp(options.SealCheckTransactionSize, 1, limit);
+        var attempted = new HashSet<Guid>();
+        int passed = 0, inconclusive = 0, transactions = 0;
+        double longest = 0, total = 0;
+        SweepPassResult Result(SweepUnitOutcome outcome, string? code) => new(SealSweep, outcome, passed, inconclusive, code, transactions, Math.Round(longest, 1), Math.Round(total, 1));
 
-        await index.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
-        var approvals = (await scope.GetFieldSearchApprovalsAsync(organizationId, null, cancellationToken).ConfigureAwait(false)).ToDictionary(a => a.FieldSearchApprovalId);
-        var entries = await index.GetEntriesForSealCheckAsync(organizationId, Math.Max(1, options.SealCheckBatchSize), cancellationToken).ConfigureAwait(false);
-        int passed = 0, inconclusive = 0;
-        foreach (var entry in entries)
+        while (attempted.Count < limit)
         {
-            var now = clock.GetUtcNow();
-            var (outcome, code) = await VerifyEntryAsync(scope, entry, approvals, cancellationToken).ConfigureAwait(false);
-            switch (outcome)
+            cancellationToken.ThrowIfCancellationRequested(); // between transactions: nothing of the next batch has been written
+            var started = clock.GetTimestamp();
+            await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+            var state = await scope.LockOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+            var index = scope.SearchIndex;
+            var projection = state is null ? null : await index.FindProjectionStateAsync(organizationId, cancellationToken).ConfigureAwait(false);
+            if (state is null || projection is null || projection.ProjectionStatusName == SearchProjectionStatuses.Quarantined)
             {
-                case SweepUnitOutcome.Pass:
-                    await index.RecordSealCheckAsync(entry.SearchRecordEntryId, now, now, "VALID", cancellationToken).ConfigureAwait(false);
-                    passed++;
-                    break;
-                case SweepUnitOutcome.Inconclusive:
-                    await index.RecordSealCheckAsync(entry.SearchRecordEntryId, null, now, code, cancellationToken).ConfigureAwait(false);
-                    inconclusive++;
-                    break;
-                default:
-                    await index.RecordSealCheckAsync(entry.SearchRecordEntryId, null, now, code, cancellationToken).ConfigureAwait(false);
-                    Quarantine(scope, state, projection, code, now);
-                    await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-                    RaiseQuarantine(organizationId, code);
-                    return new SweepPassResult(SealSweep, SweepUnitOutcome.Fail, passed, inconclusive, code);
+                return Result(SweepUnitOutcome.Inconclusive, projection is null ? "NOT_INDEXED" : "QUARANTINED");
             }
+
+            await index.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+            var approvals = (await scope.GetFieldSearchApprovalsAsync(organizationId, null, cancellationToken).ConfigureAwait(false)).ToDictionary(a => a.FieldSearchApprovalId);
+            var entries = await index.GetEntriesForSealCheckAsync(organizationId, Math.Min(transactionSize, limit - attempted.Count), attempted, cancellationToken).ConfigureAwait(false);
+            if (entries.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var entry in entries)
+            {
+                attempted.Add(entry.SearchRecordEntryId);
+                var now = clock.GetUtcNow();
+                var (outcome, code) = await VerifyEntryAsync(scope, entry, approvals, cancellationToken).ConfigureAwait(false);
+                switch (outcome)
+                {
+                    case SweepUnitOutcome.Pass:
+                        await index.RecordSealCheckAsync(entry.SearchRecordEntryId, now, now, "VALID", cancellationToken).ConfigureAwait(false);
+                        passed++;
+                        break;
+                    case SweepUnitOutcome.Inconclusive:
+                        await index.RecordSealCheckAsync(entry.SearchRecordEntryId, null, now, code, cancellationToken).ConfigureAwait(false);
+                        inconclusive++;
+                        break;
+                    default:
+                        await index.RecordSealCheckAsync(entry.SearchRecordEntryId, null, now, code, cancellationToken).ConfigureAwait(false);
+                        Quarantine(scope, state, projection, code, now);
+                        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        Account(started);
+                        RaiseQuarantine(organizationId, code);
+                        return Result(SweepUnitOutcome.Fail, code);
+                }
+            }
+
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            Account(started);
         }
 
-        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-        return new SweepPassResult(SealSweep, inconclusive > 0 ? SweepUnitOutcome.Inconclusive : SweepUnitOutcome.Pass, passed, inconclusive, inconclusive > 0 ? "SOME_UNITS_INCONCLUSIVE" : null);
+        return Result(inconclusive > 0 ? SweepUnitOutcome.Inconclusive : SweepUnitOutcome.Pass, inconclusive > 0 ? "SOME_UNITS_INCONCLUSIVE" : null);
+
+        void Account(long started)
+        {
+            var milliseconds = clock.GetElapsedTime(started).TotalMilliseconds;
+            transactions++;
+            total += milliseconds;
+            longest = Math.Max(longest, milliseconds);
+        }
     }
 
     /// <summary>Verifies one stored entry exactly (S-B). Never repairs anything.</summary>

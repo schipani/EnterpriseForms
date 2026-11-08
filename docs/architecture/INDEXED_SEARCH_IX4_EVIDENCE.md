@@ -251,12 +251,13 @@ R-01 to R-29 are carried from the IX-3 report. Changes: R-22 closed for IX-3 dev
 | R-30 | Stage B on the IX-4 code (all groups, browser suite, `Engine=Indexed`) | **Not executed** (PD-7) | Next owner-authorized release run |
 | R-31 | Per-organization failure isolation in the builder | Deferred (§1.4) | Operational improvement, separate approval |
 | R-32 | Plan-shape guarantee on PostgreSQL 18 (§6.1) | **Remediated (C-135, §10):** value-keyed posting indexes dropped; plan-shape test passes on existing and fresh databases; owner acceptance pending | Owner acceptance |
-| R-33 | Availability failures (business 10 s timeout) in the local benchmark (§4) | **Root cause identified (§10.3):** the S-B seal pass holds the organization lock for one 2,000-entry batch (≈ 15.5 s at 1,000 entries); **open** until remediated | **Owner decision** (bounded seal-pass transactions recommended) |
+| R-33 | Availability failures (business 10 s timeout) in the local benchmark (§4) | Root cause identified (§10.3); **remediated locally (C-136, §11):** the longest S-B lock hold is 0.69–0.76 s (was 9.6–10.3 s on the same data); search max 2.1 s (was 9.8 s). **Not closed:** no timeout occurred in this measurement in any configuration (the baseline included), so a lower timeout rate is not demonstrated; other organization-lock holders not measured | Owner review; staging confirmation (IX-7) |
 | R-34 | Local benchmarks at 10,000 and 50,000 records, and the discover-ceiling refusal | **Not run** (budget guard; C-134 deferral); not passed, not waived | Separately authorized performance validation |
 | R-35 | P-S1-1 benchmark ran during IX-3 contrary to C-132 (§6.3) | Recorded; prevented by the Benchmark trait | — |
-| R-36 | Seal-pass lock hold also applies in production (default 2,000 entries per pass every 15 minutes): organization-wide waits for searches and commits during a pass (§10.3) | Not remediated | **Owner decision**; IX-7 measurement |
-| R-37 | Ingestion serialization per organization (authorization-revision CAS, projection and archive gate, whole-graph load per command) (§10.4) | Not remediated; 944 s per 1,000 records preserved as measured | **Owner decision** (design option for batched registration) |
+| R-36 | Seal-pass lock hold also applies in production (default 2,000 entries per pass every 15 minutes) | **Remediated in code (C-136):** a pass runs in transactions of `SealCheckTransactionSize` (default 50); the production lock hold per transaction scales with the per-entry cost (local ES256 with the pinned key, no HSM call) | IX-7 measurement on Azure |
+| R-37 | Ingestion serialization per organization (authorization-revision CAS, projection and archive gate, whole-graph load per command) (§10.4) | **Open**; 944 s per 1,000 records preserved; C-136 serial seeding 1,000 records in 506 s (1.98 records/s) with the bounded sweep; design recommendation `RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md` (not implemented) | **Owner decision** |
 | R-38 | Tier 2 index design must not reintroduce a value-keyed index on a record-probed table (PostgreSQL 18 skip scan) | Recorded (design §22.5) | **IX-5** review |
+| R-39 | The bounded seal pass verifies ≈ 17 % fewer entries per second (more transactions); in the security-test stack a 1,000-entry pass (≈ 12 s locked in total) now exceeds the 10 s sweep interval, so passes run back to back there | Recorded; production interval 900 s, deadline 24 h | IX-7 sizing |
 
 ## 8. French drafts for the PB-14 copy review (not approved; not in the application)
 
@@ -344,4 +345,57 @@ Stage B; the 480-record benchmarks; the 10,000 and 50,000-record benchmarks; no 
 ### 10.6 Recommendation
 
 IX-4 is **ready for conditional owner acceptance**: the PD-9 blocker is remediated structurally and verified on PostgreSQL 18 on an existing and a fresh database, with the plan-shape test unchanged and passing. Conditions to record: R-33/R-36 (seal-pass lock hold; remediation proposal awaiting approval), R-37 (ingestion serialization), R-30 and R-34 (Stage B and the 50K benchmark, deferred), R-27 (PB-14), and the carried production items (Managed HSM, signed external checkpoints, independent review, OBS-IX-1/R6, G14, the 20 ms p95 gate FAIL, cross-language vectors). No production readiness implied; IX-5 not started; Stage B not executed.
+
+## 11. C-136: bounded seal-sweep transactions (R-33/R-36)
+
+### 11.1 Change
+
+Design §22.7: the S-B pass runs in transactions of `SealCheckTransactionSize` entries (default 50), each under the organization lock and committed separately; entries already attempted in the pass are not re-selected; projection state and approvals are re-read per transaction; cancellation is checked between transactions; per-entry timestamps remain the only unit of completion. Event 9305 logs the S-A and S-B lock hold. Files: `SearchIndexSweepService.cs`, `SearchIndexOptions.cs`, `ISearchIndexStore.cs`, `SearchIndexStore.cs` (selection with exclusion), `SearchIndexComposition.cs` (validation, logging), `compose.security-test.yaml` (`IX4_SEAL_TRANSACTION_SIZE`), tests below. No migration.
+
+### 11.2 Focused tests (C-136 §4)
+
+| # | Requirement | Test | Result |
+|---|---|---|---|
+| 1 | Search during active sweeps | Measurement (§11.3): 40 searches per configuration while passes ran; IX-3 and IX-4 classes on the bounded sweep | 120/120 answered; classes pass |
+| 2 | Saves during active sweeps | Measurement: 1,000 seeding saves and 10 saves per configuration while passes ran | All succeeded |
+| 3 | Record mutation between batches | Unit `ARecordCommittedBetweenTransactionsIsVerifiedAgainstItsNewHead` | Pass |
+| 4 | Organization quarantine during a sweep | S1 is independent of S-B (§17.2 Q3): the pass neither reads nor changes it; unit `AFailInALaterTransactionQuarantinesTheIndex…` asserts S1 untouched; `ProjectionIntegrityRollbackTests` were not affected by this change (not re-run) | Pass (unit) |
+| 5 | Record (and index) quarantine during a sweep | Unit `AQuarantineBetweenTransactionsEndsThePassAsInconclusiveWithoutVerifyingTheRest`; record-quarantine handling inside an entry is the unchanged `VerifyEntryAsync`, covered by IX-1/IX-2 classes (re-run: 9/9, 11/11) | Pass |
+| 6 | Cancellation and restart | Units `AnInterruptionBetweenTransactionsAdvancesOnlyTheCommittedEntriesAndTheNextPassResumes`, `ACancellationRequestedBetweenTransactionsStopsBeforeTheNextOne`; real restarts: the Authority was recreated three times during the measurement while passes ran | Pass |
+| 7 | Failed batch and retry | Unit `AFailInALaterTransactionQuarantinesTheIndexAndAdvancesOnlyTheEntriesVerifiedBefore`; interruption test (a transaction that throws writes nothing; the next pass resumes) | Pass |
+| 8 | Incomplete sweep crossing a deadline | Unit `ADeadlineIsEvaluatedFromTheOldestUnverifiedEntryOfAnInterruptedPass` (S-B overdue, index suspended) | Pass |
+| 9 | Completion across transactions | Units `APassVerifiesEveryEntryOnceInBoundedTransactions` (7 entries, 3 transactions, each entry once), `AnInconclusiveEntryIsNotSelectedAgainInTheSamePassAndKeepsItsTimestamp` | Pass |
+| 10 | Indexed-query invariants | `IndexedSearchQueryStackTests` 21/21 (plan shape, PD-9, PD-3, shadow 600/600), `IndexedFieldSearchEngineStackTests` 5/5 | Pass |
+
+Suites on the final code: Authority 444/444 (8 new), architecture 95/95, integrity 60/60, contract 569/569 (`artifacts/test-runs/c136-*`). Docker on rebuilt images: `SearchIndexFoundationTests` 9/9 (`20261108-093920-07ab43d9`), `SearchIndexBuilderStackTests` 11/11 (`20261108-094228-688f1d3f`), `IndexedSearchQueryStackTests` 21/21 (`20261108-094710-83ffa7dd`), `IndexedFieldSearchEngineStackTests` 5/5 (`20261108-095635-87dff64e`).
+
+### 11.3 Bounded measurement (`SealSweepLockMeasurementTests`, run `20261108-095801-76a077b9`, 759 s, AC power)
+
+The 1,000-record dataset of the IX-4 benchmark was not available (removed by the C-135 fresh-database verification), so one synthetic organization of 1,000 records was created serially: **506 s, 1.98 records/s, save p50 363 ms, p95 1,841 ms**. Then, for each transaction size, the Authority alone was recreated with it and measured over at least two sweep cycles (sweep every 10 s in this stack). Lock hold is the duration of each locked S-B transaction for this organization (event 9305).
+
+| S-B transaction size | Passes | Transactions per pass | Longest locked transaction (ms) | Locked time per pass (ms) | Entries/s | Searches (40) | Search p50 / p95 / max (ms) | Saves (10) p50 / p95 (ms) |
+|---|---|---|---|---|---|---|---|---|
+| 2,000 (former single transaction) | 3 | 1 | 9,564 / 10,277 (p50 / max) | 9,564–10,277 | 102.8 | 40 answered, 0 timeouts | 462 / 2,023 / **9,843** | 387 / 1,150 |
+| 200 | 3 | 6 | 2,213 / 2,551 | 10,332–10,352 | 99.8 | 40 answered, 0 timeouts | 488 / 2,200 / 2,504 | 527 / 4,254 |
+| **50 (default)** | 2 | 21 | **685 / 762** | 11,027–12,563 | 84.8 | 40 answered, 0 timeouts | 504 / 1,198 / **2,135** | 838 / 2,863 |
+
+S-A (cheap pass) held the lock 20–44 ms in every configuration.
+
+**Comparison with the C-135 baseline** (≈ 15.5 s sampled lock hold; 2 of 40 searches failed, run on the earlier 1,000-record organization):
+- **Lock contention is bounded:** the longest organization-lock hold of the seal sweep fell by a factor of about 13 (≈ 10 s → < 0.8 s on the same data), below the business API's 10 s timeout by an order of magnitude; the worst search latency during sweeps fell from 9.8 s to 2.1 s.
+- **Timeout rate not demonstrated:** this time no search timed out in any configuration, the single-transaction baseline included (its worst search, 9.8 s, came within 0.2 s of the timeout). 40 searches per configuration cannot show a change in a ≈ 5 % failure rate. R-33 is therefore reported as **mitigated, not closed**.
+- **Costs:** about 17 % lower verification throughput and a longer pass; save latency during sweeps is noisy at 10 saves per configuration and does not show a consistent effect (saves also wait on projection and archive, R-37).
+- **Remaining sources of search latency** (max 2.1 s at size 50): not attributed in this run; other organization-lock holders (commits, the builder, deadline evaluation) were not sampled.
+
+### 11.4 R-37
+
+Not implemented. Recommendation: `docs/architecture/RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md` (measure the split first; then option B — restrict the command planner's graph read — and option A — a bounded batched registration command for bulk ingestion; never relax the Effective wait).
+
+### 11.5 Status
+
+- R-33: mitigated (bounded lock hold measured); open for owner review and staging confirmation.
+- R-36: remediated in code; production sizing at IX-7.
+- R-37: open (recommendation only). R-39 new (throughput cost, back-to-back passes in the security-test stack).
+- Not run: Stage B, the 480-record benchmarks, the 10K and 50K benchmarks.
+- IX-5 not started.
 

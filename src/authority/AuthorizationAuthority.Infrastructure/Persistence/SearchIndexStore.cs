@@ -214,8 +214,12 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
     public Task<SearchFormState?> FindFormStateAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
         context.SearchFormStates.AsNoTracking().FirstOrDefaultAsync(s => s.OrganizationId == organizationId && s.FormDefinitionId == formDefinitionId, cancellationToken);
 
-    public Task<List<SearchRecordEntry>> GetEntriesForSealCheckAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
-        context.SearchRecordEntries.AsNoTracking().Where(e => e.OrganizationId == organizationId).OrderBy(e => e.LastSealVerifiedOn).ThenBy(e => e.SearchRecordEntryId).Take(limit).ToListAsync(cancellationToken);
+    public Task<List<SearchRecordEntry>> GetEntriesForSealCheckAsync(Guid organizationId, int limit, IReadOnlyCollection<Guid> excluding, CancellationToken cancellationToken)
+    {
+        var excluded = excluding.ToArray();
+        return context.SearchRecordEntries.AsNoTracking().Where(e => e.OrganizationId == organizationId && !excluded.Contains(e.SearchRecordEntryId))
+            .OrderBy(e => e.LastSealVerifiedOn).ThenBy(e => e.SearchRecordEntryId).Take(limit).ToListAsync(cancellationToken);
+    }
 
     public async Task<StoredRecordIndex?> GetStoredRecordIndexAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
     {

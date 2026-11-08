@@ -106,6 +106,11 @@ public static class SearchIndexComposition
             throw new InvalidOperationException("SearchIndex:Mode=Dark is permitted only in Development or Testing in IX-1.");
         }
 
+        if (options.SealCheckTransactionSize < 1 || options.SealCheckTransactionSize > options.SealCheckBatchSize)
+        {
+            throw new InvalidOperationException("SearchIndex:SealCheckTransactionSize must be 1..SealCheckBatchSize (C-136).");
+        }
+
         if (options.CheapSweepIntervalSeconds < 1 || options.DeadlineEvaluationIntervalSeconds < 1 || options.SealCheckBatchSize < 1
             || options.CheapPassDeadlineSeconds < 1 || options.SealVerificationDeadlineSeconds < 1 || options.DeepVerificationDeadlineSeconds < 1 || options.FutureTimestampToleranceSeconds < 0)
         {
@@ -181,6 +186,7 @@ public sealed partial class SearchIndexSweepLoop(SearchIndexSweepService sweep, 
                         var cheap = await sweep.RunCheapPassAsync(organization, stoppingToken).ConfigureAwait(false);
                         var seals = await sweep.RunSealPassAsync(organization, stoppingToken).ConfigureAwait(false);
                         LogPass(logger, organization, cheap.Outcome, cheap.FindingCode, seals.Outcome, seals.UnitsPassed, seals.UnitsInconclusive, seals.FindingCode);
+                        LogLockHold(logger, organization, cheap.LongestTransactionMilliseconds, seals.Transactions, seals.LongestTransactionMilliseconds, seals.TotalTransactionMilliseconds);
                     }
 
                     nextSweep = now.AddSeconds(options.CheapSweepIntervalSeconds);
@@ -218,6 +224,10 @@ public sealed partial class SearchIndexSweepLoop(SearchIndexSweepService sweep, 
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Search index sweep for {OrganizationId}: S-A {CheapOutcome} ({CheapFinding}); S-B {SealOutcome}, passed {Passed}, inconclusive {Inconclusive} ({SealFinding}).")]
     private static partial void LogPass(ILogger logger, Guid organizationId, SweepUnitOutcome cheapOutcome, string? cheapFinding, SweepUnitOutcome sealOutcome, int passed, int inconclusive, string? sealFinding);
+
+    /// <summary>C-136: organization-lock hold of the sweep (milliseconds of each locked transaction; counts only).</summary>
+    [LoggerMessage(EventId = 9305, Level = LogLevel.Information, Message = "IX4-SWEEP-LOCK organization={OrganizationId} s_a_ms={CheapMs} s_b_transactions={Transactions} s_b_longest_ms={LongestMs} s_b_total_ms={TotalMs}")]
+    private static partial void LogLockHold(ILogger logger, Guid organizationId, double cheapMs, int transactions, double longestMs, double totalMs);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Search index sweep pass failed ({ExceptionType}); deadlines keep running.")]
     private static partial void LogFailure(ILogger logger, string exceptionType);

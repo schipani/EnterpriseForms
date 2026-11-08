@@ -108,8 +108,17 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
     public Task<SearchFormState?> FindFormStateAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
         Task.FromResult(FormStates.FirstOrDefault(f => f.OrganizationId == organizationId && f.FormDefinitionId == formDefinitionId));
 
-    public Task<List<SearchRecordEntry>> GetEntriesForSealCheckAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
-        Task.FromResult(Entries.Where(e => e.OrganizationId == organizationId).OrderBy(e => e.LastSealVerifiedOn).ThenBy(e => e.SearchRecordEntryId).Take(limit).ToList());
+    /// <summary>C-136 test hook: invoked before each seal-check selection (one per S-B transaction), e.g. to change state between batches.</summary>
+    public Action<int>? BeforeSealCheckSelection { get; set; }
+
+    public int SealCheckSelections { get; private set; }
+
+    public Task<List<SearchRecordEntry>> GetEntriesForSealCheckAsync(Guid organizationId, int limit, IReadOnlyCollection<Guid> excluding, CancellationToken cancellationToken)
+    {
+        BeforeSealCheckSelection?.Invoke(SealCheckSelections);
+        SealCheckSelections++;
+        return Task.FromResult(Entries.Where(e => e.OrganizationId == organizationId && !excluding.Contains(e.SearchRecordEntryId)).OrderBy(e => e.LastSealVerifiedOn).ThenBy(e => e.SearchRecordEntryId).Take(limit).ToList());
+    }
 
     public Task<StoredRecordIndex?> GetStoredRecordIndexAsync(Guid organizationId, Guid formRecordId, CancellationToken cancellationToken)
     {

@@ -25,6 +25,13 @@ public sealed class SearchIndexOptions
     /// <summary>S-B: entries verified per organization per pass (local ES256; ordered oldest first).</summary>
     public int SealCheckBatchSize { get; set; } = 2000;
 
+    /// <summary>
+    /// C-136 (R-33/R-36): entries verified per S-B <b>transaction</b>. Each transaction holds the organization lock only for its own
+    /// entries and commits; the pass continues in further transactions up to <see cref="SealCheckBatchSize"/>. Chosen from the C-136
+    /// lock-hold measurement (evidence §11); 1 to <see cref="SealCheckBatchSize"/>.
+    /// </summary>
+    public int SealCheckTransactionSize { get; set; } = 50;
+
     /// <summary>§17.10 enforcement deadlines (C-124, no grace).</summary>
     public int CheapPassDeadlineSeconds { get; set; } = 3600;
 
