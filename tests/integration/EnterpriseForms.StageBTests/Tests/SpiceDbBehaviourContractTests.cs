@@ -11,7 +11,11 @@ namespace EnterpriseForms.StageBTests.Tests;
 /// CT-1 the marker read returns its <c>read_at</c>; CT-2 a zero-match read streams nothing; CT-3 exact-snapshot decisions echo
 /// the snapshot (<c>checked_at</c>, <c>looked_up_at</c>); CT-4 <c>at_least_as_fresh</c> silently accepts foreign and future
 /// tokens (why the ZedToken is never integrity evidence); CT-5 the exact-snapshot error classes; CT-6 a marker CAS and its
-/// relationship change are atomic under concurrent snapshot reads. The probe runs in a container on the authority network.
+/// relationship change are atomic under concurrent snapshot reads. IX-2 adds IX2-CT-07 (P-S1-1 §4, O-1): the
+/// CheckBulkPermissions per-request item maximum (accepted requests are complete and echo each item in order; larger requests
+/// are refused, never truncated; the Authority's chunk size is accepted). CT-7 stays reserved for S1 Design B §2.11 (dump
+/// restore, not implemented); the IX-2 test was renamed IX2-CT-07 by owner decision C-129.
+/// The probe runs in a container on the authority network.
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
 public sealed class SpiceDbBehaviourContractTests(StageBFixture fixture)
@@ -35,6 +39,7 @@ public sealed class SpiceDbBehaviourContractTests(StageBFixture fixture)
     [InlineData("CT-4")]
     [InlineData("CT-5")]
     [InlineData("CT-6")]
+    [InlineData("IX2-CT-07")]
     public void TheSpiceDbBehaviourTheProtocolReliesOnHolds(string contract)
     {
         probeOutput ??= fixture.Stack.SpiceDbProbe(ProbeDirectory(), string.Empty, 300, throwOnError: false);

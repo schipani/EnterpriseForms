@@ -52,12 +52,14 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<IAuthorizationAuthorityClient>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IBrowserSessionStateAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IFieldSearchPolicyAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
+        services.AddSingleton<ISearchIndexAdministrationAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>()); // IX-2 rebuild
         services.AddSingleton<ISecurityAdministratorAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IOrganizationRosterAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<IOwnerRecoveryNoticeAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<ITestStackIdentityAuthority>(sp => sp.GetRequiredService<AuthorityHttpClient>());
         services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IRecordDisplayDirectory, EnterpriseForms.Application.Features.FormRecords.Ports.RecordDisplayDirectory>();
         services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearchPolicy.FieldSearchPolicyHandlers>();
+        services.AddSingleton<EnterpriseForms.Application.Features.Search.IndexBuilder.SearchIndexAdministrationHandler>();
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AuthorityCommandAwaiter>();

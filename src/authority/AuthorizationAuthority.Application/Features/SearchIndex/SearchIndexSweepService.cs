@@ -69,10 +69,13 @@ public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWr
             // INV-R option (b): bring the index back to the current revision. Entries whose head moved without derivation are
             // deleted (nothing is re-derived here; no bytes are held) and their forms' coverages return to Building.
             var forms = await index.DeleteEntriesNotAtHeadAsync(organizationId, cancellationToken).ConfigureAwait(false);
-            foreach (var coverage in (await index.GetCoveragesAsync(organizationId, null, cancellationToken).ConfigureAwait(false)).Where(c => forms.Contains(c.FormDefinitionId) && c.CoverageStateName == SearchCoverageStates.Complete))
+            // IX-2: every Complete coverage returns to Building, not only those with a deleted entry: a record committed while
+            // derivation was bypassed may have no entry at all, and Complete may be re-established only by a fresh attestation.
+            foreach (var coverage in (await index.GetCoveragesAsync(organizationId, null, cancellationToken).ConfigureAwait(false)).Where(c => c.CoverageStateName == SearchCoverageStates.Complete))
             {
                 coverage.CoverageStateName = SearchCoverageStates.Building;
                 coverage.CoverageCompletedOn = null;
+                coverage.CoverageAttestedJournalEntryId = null;
             }
 
             foreach (var form in forms)
@@ -267,6 +270,14 @@ public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWr
 
         projection.LastEvaluationOn = evaluationTime;
         var changed = false;
+        if (timestamps.DeepDeadlineExcludedEntryCount != projection.DeepDeadlineExcludedEntryCount)
+        {
+            // D-IX2-7 rule 6: any change of the set excluded because of record quarantine is evidence-bearing (journal and alert).
+            AuditJournal.Append(scope, state, "SearchIndexDeepDeadlineExclusionChanged", new { organization_id = organizationId, previous_excluded_entries = projection.DeepDeadlineExcludedEntryCount, excluded_entries = timestamps.DeepDeadlineExcludedEntryCount, evaluated_on = evaluationTime }, clock);
+            alerts.Raise(new SecurityAlert("SEARCH_INDEX_DEEP_EXCLUSION_CHANGED", "Warning", organizationId, Guid.Empty, null,
+                $"Entries excluded from the deep-sweep deadline because their record is quarantined changed from {projection.DeepDeadlineExcludedEntryCount} to {timestamps.DeepDeadlineExcludedEntryCount}.", Guid.NewGuid()));
+            projection.DeepDeadlineExcludedEntryCount = timestamps.DeepDeadlineExcludedEntryCount;
+        }
         if (overdue.Count > 0)
         {
             var names = string.Join(",", overdue);
@@ -321,7 +332,9 @@ public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWr
                 overdue.Add(SealSweep);
             }
 
-            if (Exceeded(timestamps.OldestDeepVerifiedOn, timestamps.NewestDeepVerifiedOn, options.DeepVerificationDeadlineSeconds))
+            // D-IX2-7 (C-129): entries of Authority-quarantined records are not counted for the S-C deadline. When every entry is
+            // excluded there is no S-C unit to be overdue. S-A and S-B still cover every entry (exclusion is never verification).
+            if (timestamps.DeepEntriesCounted > 0 && Exceeded(timestamps.OldestDeepVerifiedOn, timestamps.NewestDeepVerifiedOn, options.DeepVerificationDeadlineSeconds))
             {
                 overdue.Add(DeepSweep);
             }
@@ -342,15 +355,9 @@ public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWr
         _ => false,
     };
 
-    private void Quarantine(IAuthorityScope scope, OrganizationAuthorizationState state, SearchProjectionState projection, string code, DateTimeOffset now)
-    {
-        // A Fail (§17.10.2): the search index only, never the organization (S1 is untouched); cleared only by a rebuild (IX-2).
-        projection.ProjectionStatusName = SearchProjectionStatuses.Quarantined;
-        projection.ProjectionStatusReasonCode = code;
-        projection.ProjectionModifiedOn = now;
-        AuditJournal.Append(scope, state, "SearchIndexQuarantined", new { organization_id = state.OrganizationId, reason_code = code, quarantined_on = now }, clock);
-    }
+    // A Fail (§17.10.2): the search index only, never the organization (S1 is untouched); cleared only by SearchProjectionRebuild.
+    private void Quarantine(IAuthorityScope scope, OrganizationAuthorizationState state, SearchProjectionState projection, string code, DateTimeOffset now) =>
+        SearchIndexStateTransitions.Quarantine(scope, state, projection, code, now, clock);
 
-    private void RaiseQuarantine(Guid organizationId, string code) =>
-        alerts.Raise(new SecurityAlert("SEARCH_INDEX_QUARANTINE", "Critical", organizationId, Guid.Empty, null, "Search index integrity finding " + code + "; the index is quarantined (organization access unaffected).", Guid.NewGuid()));
+    private void RaiseQuarantine(Guid organizationId, string code) => SearchIndexStateTransitions.RaiseQuarantine(alerts, organizationId, code);
 }

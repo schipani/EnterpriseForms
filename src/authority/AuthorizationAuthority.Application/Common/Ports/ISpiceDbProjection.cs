@@ -59,7 +59,16 @@ public interface ISpiceDbProjection
     /// </summary>
     Task<SpiceDbCheckOutcome> CheckAsync(SpiceDbCheck check, VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Bulk form of <see cref="CheckAsync"/>. IX-2 O-1: results are mapped by the request each result echoes (a mismatch or a
+    /// count difference throws <see cref="SpiceDbUnavailableException"/>), and large calls are split at the same snapshot, never
+    /// truncated. A per-item error is <see cref="SpiceDbCheckOutcome.Unknown"/> (existing behaviour, never allowed).
+    /// </summary>
     Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkAsync(IReadOnlyList<SpiceDbCheck> checks, VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken);
+
+    /// <summary>IX-2 O-1 strict form for V2 (IX-3): as <see cref="CheckBulkAsync"/>, and a per-item error fails the whole call (unavailable).</summary>
+    Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkStrictAsync(IReadOnlyList<SpiceDbCheck> checks, VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("this SpiceDB projection does not implement the strict bulk check");
 
     /// <summary>
     /// Every resource the subject holds the permission on (unconditionally), at exactly the snapshot's pin, enumerated

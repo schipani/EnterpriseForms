@@ -167,6 +167,31 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
         return new StagedSnapshot(header, rows, items);
     }
 
+    /// <summary>
+    /// IX-2 O-2: <see cref="ReadStagedAsync"/> for several (record, operation) pairs in one scope with one query per row table.
+    /// Each snapshot equals the per-record one (same rows, same order, same canonical encoding); equality is tested.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<(Guid FormRecordId, Guid OperationId), StagedSnapshot>> ReadStagedBatchAsync(IReadOnlyCollection<(Guid FormRecordId, Guid OperationId)> pairs, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pairs);
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var staged = await scope.GetStagedContentBatchAsync(pairs.Select(p => (p.FormRecordId, p.OperationId)).ToList(), cancellationToken).ConfigureAwait(false);
+        var snapshots = new Dictionary<(Guid, Guid), StagedSnapshot>(staged.Count);
+        foreach (var (key, (header, rows)) in staged)
+        {
+            var items = new List<StagedContentItem>(rows.Count + 1);
+            if (header is not null)
+            {
+                items.Add(ToStaged(header));
+            }
+
+            items.AddRange(rows.Select(ToStaged));
+            snapshots[(key.FormRecordId, key.ContentChangeOperationId)] = new StagedSnapshot(header, rows, items);
+        }
+
+        return snapshots;
+    }
+
     private static StagedContentItem ToStaged(ISignedContentRow row) =>
         new((ManifestItemKind)row.ItemKindCode, row.ItemId, Convert.ToBase64String(BusinessSignedSchemas.Encode(row, (uint)row.RowSignatureKeyVersion)), Convert.ToBase64String(row.RowSignature));
 

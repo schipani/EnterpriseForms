@@ -1,4 +1,5 @@
-// C8 M4 S1 SpiceDB behavioural contract probe (Design B revision 2 §2.2, §2.11: CT-1..CT-6). Runs in a container on the
+// C8 M4 S1 SpiceDB behavioural contract probe (Design B revision 2 §2.2, §2.11: CT-1..CT-6), plus IX-2 IX2-CT-07 (P-S1-1 §4
+// O-1: the CheckBulkPermissions per-request item maximum). CT-7 stays reserved for S1 Design B §2.11 (C-129). Runs in a container on the
 // security-test stack's authority network. Writes only relationships of a fresh random probe organization. Prints one line per
 // contract ("CT-n PASS|FAIL detail"); exit code 0 only when all pass. Security-test stack only.
 using System.Globalization;
@@ -199,12 +200,80 @@ var readers = Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
 await Task.WhenAll(readers.Append(writer));
 Record("CT-6", violations == 0 && observations > 20, $"observations={observations} violations={violations} final_step={step}");
 
+// IX2-CT-07 (IX-2, O-1): the per-request item maximum of CheckBulkPermissions. Every accepted request returns exactly one result per
+// item, each echoing the issued item at its position (no truncation, no reordering); a request above the maximum is refused with
+// an error status. The Authority's configured chunk size (BULK_CHECK_CAP, default 100) must be accepted.
+var cap = int.Parse(Environment.GetEnvironmentVariable("BULK_CHECK_CAP") ?? "100", CultureInfo.InvariantCulture);
+using var bulkChannel = GrpcChannel.ForAddress(endpoint, new GrpcChannelOptions { MaxReceiveMessageSize = 256 * 1024 * 1024, MaxSendMessageSize = 256 * 1024 * 1024 });
+var bulkClient = new PermissionsService.PermissionsServiceClient(bulkChannel);
+var bulkExact = new Consistency { AtExactSnapshot = new ZedToken { Token = written } };
+async Task<(bool Accepted, bool Complete, string Detail)> BulkAsync(int size)
+{
+    var request = new CheckBulkPermissionsRequest { Consistency = bulkExact };
+    for (var i = 0; i < size; i++)
+    {
+        request.Items.Add(new CheckBulkPermissionsRequestItem { Resource = new ObjectReference { ObjectType = "organization", ObjectId = org }, Permission = "view_audit", Subject = new SubjectReference { Object = new ObjectReference { ObjectType = "user", ObjectId = "ct7-" + i.ToString(CultureInfo.InvariantCulture) } } });
+    }
+
+    try
+    {
+        var response = await bulkClient.CheckBulkPermissionsAsync(request, new CallOptions(headers, DateTime.UtcNow.AddSeconds(60)));
+        var complete = response.Pairs.Count == size && response.Pairs.Select((p, i) => p.Request.Subject.Object.ObjectId == "ct7-" + i.ToString(CultureInfo.InvariantCulture) && p.Request.Permission == "view_audit" && p.ResponseCase == CheckBulkPermissionsPair.ResponseOneofCase.Item).All(ok => ok);
+        return (true, complete, $"pairs={response.Pairs.Count}");
+    }
+    catch (RpcException ex)
+    {
+        return (false, false, ex.StatusCode + ": " + ex.Status.Detail);
+    }
+}
+
+var capResult = await BulkAsync(cap);
+int lastAccepted = 0, firstRefused = 0;
+var allComplete = capResult.Accepted && capResult.Complete;
+string refusal = "none";
+for (var size = 100; size <= 51_200; size *= 2)
+{
+    var outcome = await BulkAsync(size);
+    if (!outcome.Accepted)
+    {
+        firstRefused = size;
+        refusal = outcome.Detail;
+        break;
+    }
+
+    allComplete &= outcome.Complete;
+    lastAccepted = size;
+}
+
+if (firstRefused > 0 && lastAccepted > 0)
+{
+    // Binary search between the last accepted and the first refused size.
+    while (firstRefused - lastAccepted > 1)
+    {
+        var middle = lastAccepted + ((firstRefused - lastAccepted) / 2);
+        var outcome = await BulkAsync(middle);
+        if (outcome.Accepted)
+        {
+            allComplete &= outcome.Complete;
+            lastAccepted = middle;
+        }
+        else
+        {
+            firstRefused = middle;
+            refusal = outcome.Detail;
+        }
+    }
+}
+
+Record("IX2-CT-07", allComplete && cap <= (lastAccepted == 0 ? 0 : lastAccepted) && (firstRefused == 0 || firstRefused > cap),
+    $"configured_cap={cap} cap_accepted={capResult.Accepted} every_accepted_complete={allComplete} maximum_accepted={lastAccepted} first_refused={(firstRefused == 0 ? "none up to 51200" : firstRefused.ToString(CultureInfo.InvariantCulture))} refusal=[{refusal}]");
+
 foreach (var (id, pass, detail) in results)
 {
     Console.WriteLine($"{id} {(pass ? "PASS" : "FAIL")} {detail}");
 }
 
-return results.All(r => r.Pass) && results.Count == 6 ? 0 : 1;
+return results.All(r => r.Pass) && results.Count == 7 ? 0 : 1;
 
 static async Task<(T Value, string? Error)> TryAsync<T>(Func<Task<T>> action)
 {

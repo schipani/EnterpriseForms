@@ -122,6 +122,22 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
         }
     }
 
+    /// <summary>IX-2 O-1 strict bulk decision (V2, IX-3): a per-item error fails the call like an outage, with the same S1 handling.</summary>
+    public async Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkStrictAsync(VerifiedProjectionSnapshot snapshot, IReadOnlyList<SpiceDbCheck> checks, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        snapshot.RequireOpen();
+        try
+        {
+            return await spiceDb.CheckBulkStrictAsync(checks, snapshot, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is SpiceDbSnapshotException or SpiceDbSchemaMissingException or SpiceDbUnavailableException)
+        {
+            await DecisionReadFailedAsync(snapshot, ex, cancellationToken).ConfigureAwait(false);
+            throw; // unreachable
+        }
+    }
+
     public async Task<IReadOnlyList<string>> LookupResourcesAsync(VerifiedProjectionSnapshot snapshot, string resourceType, string permission, string subjectType, string subjectId, int maximumResults, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(snapshot);

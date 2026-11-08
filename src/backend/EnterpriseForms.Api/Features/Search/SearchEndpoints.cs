@@ -63,6 +63,17 @@ public static class SearchEndpoints
             .WithSummary("Phase C7 M3: for security administrators (administer_security) only — the organization's forms with an Authority-registered published version, their registered title and version, field and approval counts. Search approval administration without Designer or record access; 403 for everyone else.")
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
+        organization.MapPost("/search-index/rebuild", static async Task<Ok<SearchProjectionRebuildResponse>> (SearchProjectionRebuildRequest request, HttpContext http, EnterpriseForms.Application.Features.Search.IndexBuilder.SearchIndexAdministrationHandler handler, CancellationToken cancellationToken) =>
+            {
+                http.Response.Headers.CacheControl = "no-store";
+                return TypedResults.Ok(await handler.RebuildAsync(BusinessAuthentication.RequireContext(http), request, cancellationToken).ConfigureAwait(false));
+            })
+            .WithName("RebuildSearchProjection")
+            .WithSummary("IX-2 SearchProjectionRebuild, security administrators (administer_security) only: the Authority purges the organization's search index, returns every searchable-field coverage to Building and marks the index Rebuilding, journaled with the reason code. The only way to clear a search-index quarantine; the index serves nothing until it has been rebuilt and attested. Refused (423) while the organization's authorization is quarantined; 404 SEARCH_INDEX_NOT_PRESENT where no index is maintained. Step-up (PB-08) not yet available.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status423Locked);
+
         designer.MapGet("/field-search", static async Task<Ok<FieldSearchConfigurationResponse>> (Guid formDefinitionId, HttpContext http, FieldSearchPolicyHandlers handlers, CancellationToken cancellationToken) =>
             {
                 http.Response.Headers.CacheControl = "no-store";

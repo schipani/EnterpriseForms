@@ -151,6 +151,12 @@ public static class AuthorityErrorCodes
 
     /// <summary>IX-1: the search entry seal could not be produced with the pinned key; the commit is refused (fail closed).</summary>
     public const string SearchSealUnavailable = "SEARCH_SEAL_UNAVAILABLE";
+
+    /// <summary>IX-2: the organization has no search index, or this deployment does not maintain one (Disabled mode).</summary>
+    public const string SearchIndexNotPresent = "SEARCH_INDEX_NOT_PRESENT";
+
+    /// <summary>IX-2: the search index is quarantined; only a SearchProjectionRebuild clears it (IX-D7). Never an organization quarantine.</summary>
+    public const string SearchIndexQuarantined = "SEARCH_INDEX_QUARANTINED";
 }
 
 /// <summary>Thrown by application services; mapped to an ErrorResponse by the host. Never carries secrets or protected values.</summary>

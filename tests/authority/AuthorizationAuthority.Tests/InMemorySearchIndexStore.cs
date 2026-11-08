@@ -142,7 +142,11 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
         var noCoverage = entries.Count(e => e.DerivedFieldSearchApprovalIds.Any(a => !Coverages.Any(c => c.OrganizationId == organizationId && c.FormDefinitionId == e.FormDefinitionId && c.FieldSearchApprovalId == a && c.CoverageStateName != SearchCoverageStates.Withdrawn)));
         var crossOrganization = rows.Count(p => p.Item4 is { } approvalId && (s.Approvals.FirstOrDefault(a => a.FieldSearchApprovalId == approvalId) is not { } found || found.OrganizationId != p.OrganizationId || found.FormDefinitionId != p.FormDefinitionId));
         var unsealed = entries.Count(e => e.EntrySealSignature.Length != 64);
-        return Task.FromResult(new CheapSweepFindings(notAtHead, inactive, unbound, withdrawn, noCoverage, crossOrganization, unsealed));
+        var missing = Coverages.Where(c => c.OrganizationId == organizationId && c.CoverageStateName == SearchCoverageStates.Complete)
+            .Sum(c => s.Resources.Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == "form_record" && r.ParentResourceEntityId == c.FormDefinitionId && r.ResourceLifecycleState is "Active" or "Quarantined")
+                .Count(r => s.Heads.FirstOrDefault(h => h.OrganizationId == organizationId && h.FormRecordId == r.ResourceEntityId) is { CommittedContentRevision: > 0, CommittedOperationId: { } operation }
+                            && !entries.Any(e => e.FormRecordId == r.ResourceEntityId && e.IndexedOperationId == operation && e.DerivedFieldSearchApprovalIds.Contains(c.FieldSearchApprovalId))));
+        return Task.FromResult(new CheapSweepFindings(notAtHead, inactive, unbound, withdrawn, noCoverage, crossOrganization, unsealed, missing));
     }
 
     public async Task<IReadOnlyList<Guid>> DeleteEntriesNotAtHeadAsync(Guid organizationId, CancellationToken cancellationToken)
@@ -156,11 +160,53 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
         return stale.Select(e => e.FormDefinitionId).Distinct().ToList();
     }
 
+    public Task<List<SearchBuildingForm>> GetBuildingFormsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(Coverages.Where(c => c.CoverageStateName == SearchCoverageStates.Building)
+            .Join(Projections.Where(p => p.ProjectionStatusName != SearchProjectionStatuses.Quarantined), c => c.OrganizationId, p => p.OrganizationId, (c, p) => (c, p))
+            .GroupBy(x => (x.c.OrganizationId, x.c.FormDefinitionId, x.p.ProjectionStatusName))
+            .OrderBy(g => g.Key.OrganizationId).ThenBy(g => g.Key.FormDefinitionId)
+            .Select(g => new SearchBuildingForm(g.Key.OrganizationId, g.Key.FormDefinitionId, g.Count(), g.Key.ProjectionStatusName)).ToList());
+
+    public Task<List<SearchRecordEntry>> GetFormEntriesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken) =>
+        Task.FromResult(Entries.Where(e => e.OrganizationId == organizationId && e.FormDefinitionId == formDefinitionId && (formRecordIds is null || formRecordIds.Contains(e.FormRecordId))).OrderBy(e => e.FormRecordId).ToList());
+
+    public Task<int> PurgeOrganizationIndexAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        Postings.RemoveAll(p => p.OrganizationId == organizationId);
+        Anomalies.RemoveAll(a => a.OrganizationId == organizationId);
+        return Task.FromResult(Entries.RemoveAll(e => e.OrganizationId == organizationId));
+    }
+
+    private bool RecordQuarantined(SearchRecordEntry e) =>
+        s.Heads.Any(h => h.OrganizationId == e.OrganizationId && h.FormRecordId == e.FormRecordId && h.ContentHeadQuarantined)
+        || s.Resources.Any(r => r.OrganizationId == e.OrganizationId && r.ResourceTypeName == "form_record" && r.ResourceEntityId == e.FormRecordId && r.ResourceLifecycleState == "Quarantined");
+
+    public Task<List<SearchRecordEntry>> GetEntriesForDeepCheckAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
+        Task.FromResult(Entries.Where(e => e.OrganizationId == organizationId && !RecordQuarantined(e)).OrderBy(e => e.LastDeepVerifiedOn).ThenBy(e => e.SearchRecordEntryId).Take(limit).ToList());
+
+    public Task<List<SearchRecordEntry>> GetRandomEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
+        Task.FromResult(Entries.Where(e => e.OrganizationId == organizationId && !RecordQuarantined(e)).OrderBy(_ => Random.Shared.Next()).Take(limit).ToList());
+
+    public Task RecordDeepCheckAsync(Guid searchRecordEntryId, DateTimeOffset? verifiedOn, DateTimeOffset attemptedOn, string outcomeCode, CancellationToken cancellationToken)
+    {
+        var entry = Entries.Single(e => e.SearchRecordEntryId == searchRecordEntryId);
+        if (verifiedOn is { } verified)
+        {
+            entry.LastDeepVerifiedOn = verified;
+        }
+
+        entry.LastDeepAttemptedOn = attemptedOn;
+        entry.LastDeepAttemptOutcomeCode = outcomeCode;
+        return Task.CompletedTask;
+    }
+
     public Task<SearchScopeTimestamps> GetScopeTimestampsAsync(Guid organizationId, CancellationToken cancellationToken)
     {
         var entries = Entries.Where(e => e.OrganizationId == organizationId).ToList();
+        var counted = entries.Where(e => !RecordQuarantined(e)).ToList();
         return Task.FromResult(entries.Count == 0
-            ? new SearchScopeTimestamps(0, null, null, null, null)
-            : new SearchScopeTimestamps(entries.Count, entries.Min(e => e.LastSealVerifiedOn), entries.Max(e => e.LastSealVerifiedOn), entries.Min(e => e.LastDeepVerifiedOn), entries.Max(e => e.LastDeepVerifiedOn)));
+            ? new SearchScopeTimestamps(0, null, null, null, null, 0, 0)
+            : new SearchScopeTimestamps(entries.Count, entries.Min(e => e.LastSealVerifiedOn), entries.Max(e => e.LastSealVerifiedOn),
+                counted.Count == 0 ? null : counted.Min(e => e.LastDeepVerifiedOn), counted.Count == 0 ? null : counted.Max(e => e.LastDeepVerifiedOn), counted.Count, entries.Count - counted.Count));
     }
 }

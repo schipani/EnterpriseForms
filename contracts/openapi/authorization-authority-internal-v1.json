@@ -2664,6 +2664,213 @@
         }
       }
     },
+    "/internal/v1/search-index-builder/work": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-2 (builder workload only): forms with a Building coverage whose search index is not quarantined, and the organizations that have a search index (deep-sweep scheduling). Identifiers and counts only.",
+        "operationId": "GetSearchIndexBuilderWork",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndexBuilderWorkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-index-builder/population": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-2 (builder workload only): a page (record id order, at most 500) of the form's registered population with accepted heads, quarantine flags and whether the record still needs an entry under the current coverages. The first page of a round is journaled on the audit stream (counts only). 409 SEARCH_INDEX_QUARANTINED while quarantined.",
+        "operationId": "ReadSearchIndexPopulation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIndexPopulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndexPopulationPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-index-builder/backfill": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-2 (builder workload only): 1..50 records' observed business bytes. Each is verified like a G19 census against the head the builder expects (complete leaf set, every HMAC, root, archive receipt; tampering quarantines the record), then postings are derived from the verified bytes and sealed, under the organization lock and conditional on the head (HEAD_CHANGED otherwise). Idempotent per record, head and coverage set. Provider outages fail the whole call (503, nothing written).",
+        "operationId": "BackfillSearchIndex",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIndexBackfillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndexBackfillResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-index-builder/attestation": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-2 (builder workload only): the Authority attests the form's Building coverages from its own registry, heads and entries under the organization lock, journaled before return. Complete only when every contentful registered record has an entry at its head under every coverage and none is quarantined.",
+        "operationId": "AttestSearchIndexCoverage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIndexAttestationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndexAttestation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-index-builder/deep-sweep/work": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-2 S-C (builder workload only): entries chosen by the Authority for deep comparison — oldest deep verification first plus the Authority's own random sample.",
+        "operationId": "GetSearchIndexDeepSweepWork",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIndexDeepSweepWorkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndexDeepSweepWorkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-index-builder/deep-sweep/verify": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-2 S-C (builder workload only): 1..50 entries; the submitted bytes are verified against the head, postings re-derived and compared with the stored rows. Pass writes the entry's S-C timestamp; a posting mismatch quarantines the search index; unverifiable business bytes quarantine the record and the unit is Inconclusive.",
+        "operationId": "DeepVerifySearchIndex",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIndexDeepVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndexDeepVerifyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/search-index/rebuild": {
+      "post": {
+        "tags": [
+          "SearchIndex"
+        ],
+        "summary": "IX-2 SearchProjectionRebuild (delegated Security Administrator, administer_security on the S1 path): purges the organization's search index, returns every coverage to Building and sets Rebuilding, journaled on the audit stream. The only way a search-index quarantine is cleared; refused (423) while the organization is quarantined. Step-up (PB-08) not yet available.",
+        "operationId": "RebuildSearchProjection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchProjectionRebuildRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchProjectionRebuildResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/organizations/roster": {
       "post": {
         "tags": [
@@ -9342,6 +9549,635 @@
           }
         }
       },
+      "SearchIndexAttestation": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "coverage_complete",
+          "incomplete_reason_code",
+          "registered_record_count",
+          "contentful_record_count",
+          "indexed_record_count",
+          "missing_record_count",
+          "quarantined_record_count",
+          "pending_creation_record_count",
+          "coverages_completed",
+          "projection_status_name",
+          "attestation_journal_entry_id",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "coverage_complete": {
+            "type": "boolean"
+          },
+          "incomplete_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registered_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "contentful_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "indexed_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "missing_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quarantined_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pending_creation_record_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "coverages_completed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projection_status_name": {
+            "type": "string"
+          },
+          "attestation_journal_entry_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchIndexAttestationRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchIndexBackfillItem": {
+        "required": [
+          "form_record_id",
+          "expected_committed_operation_id",
+          "observed_items"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_committed_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observed_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StagedContentItem"
+            }
+          }
+        }
+      },
+      "SearchIndexBackfillRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchIndexBackfillItem"
+            }
+          }
+        }
+      },
+      "SearchIndexBackfillResponse": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "results",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchIndexBackfillResult"
+            }
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchIndexBackfillResult": {
+        "required": [
+          "form_record_id",
+          "outcome",
+          "committed_content_revision",
+          "committed_operation_id",
+          "record_quarantined"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "record_quarantined": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SearchIndexBuilderWorkResponse": {
+        "required": [
+          "building_forms",
+          "indexed_organization_ids",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "building_forms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchIndexBuildingForm"
+            }
+          },
+          "indexed_organization_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchIndexBuildingForm": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "building_coverage_count",
+          "projection_status_name"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "building_coverage_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projection_status_name": {
+            "type": "string"
+          }
+        }
+      },
+      "SearchIndexDeepSweepWorkItem": {
+        "required": [
+          "form_record_id",
+          "form_definition_id",
+          "indexed_operation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "indexed_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchIndexDeepSweepWorkRequest": {
+        "required": [
+          "organization_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "oldest_limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 50
+          },
+          "sample_limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 0
+          }
+        }
+      },
+      "SearchIndexDeepSweepWorkResponse": {
+        "required": [
+          "organization_id",
+          "entries",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchIndexDeepSweepWorkItem"
+            }
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchIndexDeepVerifyRequest": {
+        "required": [
+          "organization_id",
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchIndexBackfillItem"
+            }
+          }
+        }
+      },
+      "SearchIndexDeepVerifyResponse": {
+        "required": [
+          "organization_id",
+          "results",
+          "projection_status_name",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchIndexDeepVerifyResult"
+            }
+          },
+          "projection_status_name": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchIndexDeepVerifyResult": {
+        "required": [
+          "form_record_id",
+          "unit_outcome",
+          "outcome_code",
+          "record_quarantined"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_outcome": {
+            "type": "string"
+          },
+          "outcome_code": {
+            "type": "string"
+          },
+          "record_quarantined": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SearchIndexPopulationEntry": {
+        "required": [
+          "form_record_id",
+          "committed_content_revision",
+          "committed_operation_id",
+          "content_head_quarantined",
+          "resource_quarantined",
+          "needs_indexing"
+        ],
+        "type": "object",
+        "properties": {
+          "form_record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "committed_content_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "committed_operation_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "content_head_quarantined": {
+            "type": "boolean"
+          },
+          "resource_quarantined": {
+            "type": "boolean"
+          },
+          "needs_indexing": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SearchIndexPopulationPage": {
+        "required": [
+          "organization_id",
+          "form_definition_id",
+          "entries",
+          "next_after_form_record_id",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchIndexPopulationEntry"
+            }
+          },
+          "next_after_form_record_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SearchIndexPopulationRequest": {
+        "required": [
+          "organization_id",
+          "form_definition_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "after_form_record_id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 500
+          }
+        }
+      },
+      "SearchProjectionRebuildRequest": {
+        "required": [
+          "organization_id",
+          "rebuild_reason_code"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rebuild_reason_code": {
+            "type": "string"
+          }
+        }
+      },
+      "SearchProjectionRebuildResponse": {
+        "required": [
+          "organization_id",
+          "previous_projection_status_name",
+          "previous_status_reason_code",
+          "projection_status_name",
+          "entries_purged",
+          "coverages_returned_to_building",
+          "authorization_revision",
+          "correlation_id"
+        ],
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previous_projection_status_name": {
+            "type": "string"
+          },
+          "previous_status_reason_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "projection_status_name": {
+            "type": "string"
+          },
+          "entries_purged": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "coverages_returned_to_building": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "authorization_revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SecurityAdministratorCandidate": {
         "required": [
           "authority_user_id",
@@ -10238,6 +11074,9 @@
     },
     {
       "name": "FieldSearch"
+    },
+    {
+      "name": "SearchIndex"
     }
   ]
 }

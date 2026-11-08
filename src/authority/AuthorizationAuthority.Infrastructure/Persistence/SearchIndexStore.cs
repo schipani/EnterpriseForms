@@ -274,7 +274,15 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
                  SELECT 1 FROM authority_search.search_field_coverages c WHERE c.organization_id = @organization_id AND c.form_definition_id = e.form_definition_id AND c.field_search_approval_id = a.approval_id AND c.coverage_state_name <> 'Withdrawn')))::int,
               (SELECT count(*) FROM rows p LEFT JOIN authority.field_search_approvals a ON a.field_search_approval_id = p.field_search_approval_id
                  WHERE p.field_search_approval_id IS NOT NULL AND (a.organization_id IS DISTINCT FROM p.organization_id OR a.form_definition_id IS DISTINCT FROM p.form_definition_id))::int,
-              (SELECT count(*) FROM entries e WHERE octet_length(e.entry_seal_signature) <> 64)::int
+              (SELECT count(*) FROM entries e WHERE octet_length(e.entry_seal_signature) <> 64)::int,
+              (SELECT count(*) FROM authority_search.search_field_coverages c
+                 JOIN authority.authority_resources r ON r.organization_id = c.organization_id AND r.resource_type_name = 'form_record'
+                      AND r.parent_resource_entity_id = c.form_definition_id AND r.resource_lifecycle_state IN ('Active','Quarantined')
+                 JOIN authority.record_content_heads h ON h.organization_id = r.organization_id AND h.form_record_id = r.resource_entity_id
+                      AND h.committed_content_revision > 0 AND h.committed_operation_id IS NOT NULL
+                WHERE c.organization_id = @organization_id AND c.coverage_state_name = 'Complete'
+                  AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.form_record_id = r.resource_entity_id AND e.indexed_operation_id = h.committed_operation_id
+                                    AND c.field_search_approval_id = ANY (e.derived_field_search_approval_ids)))::int
             """;
         await using var command = CreateCommand(sql);
         AddParameter(command, "organization_id", organizationId);
@@ -284,7 +292,7 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
             throw new InvalidOperationException("cheap sweep query returned no row");
         }
 
-        return new CheapSweepFindings(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetInt32(6));
+        return new CheapSweepFindings(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7));
     }
 
     public async Task<IReadOnlyList<Guid>> DeleteEntriesNotAtHeadAsync(Guid organizationId, CancellationToken cancellationToken)
@@ -308,17 +316,82 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
         var count = await rows.CountAsync(cancellationToken).ConfigureAwait(false);
         if (count == 0)
         {
-            return new SearchScopeTimestamps(0, null, null, null, null);
+            return new SearchScopeTimestamps(0, null, null, null, null, 0, 0);
         }
 
         var aggregate = await rows.GroupBy(_ => 1).Select(g => new
         {
             OldestSeal = g.Min(e => e.LastSealVerifiedOn),
             NewestSeal = g.Max(e => e.LastSealVerifiedOn),
-            OldestDeep = g.Min(e => e.LastDeepVerifiedOn),
-            NewestDeep = g.Max(e => e.LastDeepVerifiedOn),
         }).FirstAsync(cancellationToken).ConfigureAwait(false);
-        return new SearchScopeTimestamps(count, aggregate.OldestSeal, aggregate.NewestSeal, aggregate.OldestDeep, aggregate.NewestDeep);
+
+        // D-IX2-7: the S-C deadline counts only entries whose record is not quarantined in the Authority (current head and
+        // registry rows of AuthorityDb, never business data). Exclusion writes nothing and is reported as a count.
+        var counted = DeepCountedEntries(organizationId);
+        var included = await counted.CountAsync(cancellationToken).ConfigureAwait(false);
+        DateTimeOffset? oldestDeep = null, newestDeep = null;
+        if (included > 0)
+        {
+            var deep = await counted.GroupBy(_ => 1).Select(g => new { Oldest = g.Min(e => e.LastDeepVerifiedOn), Newest = g.Max(e => e.LastDeepVerifiedOn) }).FirstAsync(cancellationToken).ConfigureAwait(false);
+            (oldestDeep, newestDeep) = (deep.Oldest, deep.Newest);
+        }
+
+        return new SearchScopeTimestamps(count, aggregate.OldestSeal, aggregate.NewestSeal, oldestDeep, newestDeep, included, count - included);
+    }
+
+    /// <summary>D-IX2-7: entries of records that are neither head-quarantined nor registry-quarantined in the Authority.</summary>
+    private IQueryable<SearchRecordEntry> DeepCountedEntries(Guid organizationId) =>
+        context.SearchRecordEntries.AsNoTracking().Where(e => e.OrganizationId == organizationId
+            && !context.ContentHeads.Any(h => h.OrganizationId == e.OrganizationId && h.FormRecordId == e.FormRecordId && h.ContentHeadQuarantined)
+            && !context.Resources.Any(r => r.OrganizationId == e.OrganizationId && r.ResourceTypeName == "form_record" && r.ResourceEntityId == e.FormRecordId && r.ResourceLifecycleState == "Quarantined"));
+
+    public Task<List<SearchBuildingForm>> GetBuildingFormsAsync(CancellationToken cancellationToken) =>
+        (from c in context.SearchFieldCoverages.AsNoTracking()
+         join p in context.SearchProjectionStates.AsNoTracking() on c.OrganizationId equals p.OrganizationId
+         where c.CoverageStateName == SearchCoverageStates.Building && p.ProjectionStatusName != SearchProjectionStatuses.Quarantined
+         group c by new { c.OrganizationId, c.FormDefinitionId, p.ProjectionStatusName } into g
+         orderby g.Key.OrganizationId, g.Key.FormDefinitionId
+         select new SearchBuildingForm(g.Key.OrganizationId, g.Key.FormDefinitionId, g.Count(), g.Key.ProjectionStatusName)).ToListAsync(cancellationToken);
+
+    public Task<List<SearchRecordEntry>> GetFormEntriesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken)
+    {
+        var query = context.SearchRecordEntries.AsNoTracking().Where(e => e.OrganizationId == organizationId && e.FormDefinitionId == formDefinitionId);
+        if (formRecordIds is not null)
+        {
+            var ids = formRecordIds.ToList();
+            query = query.Where(e => ids.Contains(e.FormRecordId));
+        }
+
+        return query.OrderBy(e => e.FormRecordId).ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> PurgeOrganizationIndexAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        await context.SearchStringPostings.Where(p => p.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await context.SearchIntegerPostings.Where(p => p.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await context.SearchDecimalPostings.Where(p => p.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await context.SearchDatePostings.Where(p => p.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await context.SearchDateTimePostings.Where(p => p.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await context.SearchBooleanPostings.Where(p => p.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await context.SearchOptionPostings.Where(p => p.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await context.SearchRecordFieldAnomalies.Where(p => p.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        return await context.SearchRecordEntries.Where(e => e.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<List<SearchRecordEntry>> GetEntriesForDeepCheckAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
+        DeepCountedEntries(organizationId).OrderBy(e => e.LastDeepVerifiedOn).ThenBy(e => e.SearchRecordEntryId).Take(limit).ToListAsync(cancellationToken);
+
+    public Task<List<SearchRecordEntry>> GetRandomEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken) =>
+        DeepCountedEntries(organizationId).OrderBy(_ => EF.Functions.Random()).Take(limit).ToListAsync(cancellationToken);
+
+    public Task RecordDeepCheckAsync(Guid searchRecordEntryId, DateTimeOffset? verifiedOn, DateTimeOffset attemptedOn, string outcomeCode, CancellationToken cancellationToken)
+    {
+        // Column-limited: the runtime role holds UPDATE on the S-B and S-C timestamp columns of search_record_entries only.
+        var code = outcomeCode.Length > 64 ? outcomeCode[..64] : outcomeCode;
+        var rows = context.SearchRecordEntries.Where(e => e.SearchRecordEntryId == searchRecordEntryId);
+        return verifiedOn is { } verified
+            ? rows.ExecuteUpdateAsync(s => s.SetProperty(e => e.LastDeepVerifiedOn, verified).SetProperty(e => e.LastDeepAttemptedOn, attemptedOn).SetProperty(e => e.LastDeepAttemptOutcomeCode, code), cancellationToken)
+            : rows.ExecuteUpdateAsync(s => s.SetProperty(e => e.LastDeepAttemptedOn, attemptedOn).SetProperty(e => e.LastDeepAttemptOutcomeCode, code), cancellationToken);
     }
 
     private DbCommand CreateCommand(string sql)

@@ -154,13 +154,18 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX1_EVIDENCE.md",
-      "sha256": "859fea3b9ade6d5c4afcdf5e69dc80561c466100a089d85c27c2fdc75378956f",
-      "bytes": 49723
+      "sha256": "05a5faeb7c20d3914e59f8ed66172097f1cd8a52fd2ea37e2179dfd4c4eff041",
+      "bytes": 51973
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX2_EVIDENCE.md",
+      "sha256": "645ff824aa121566b50028f723afc37728fb9f416185b4dd084afa6b23e2f63b",
+      "bytes": 29311
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "d05f28f885f3adc528c4a587c81120f1120e549525dce407e34f0ea64fdf0b5f",
-      "bytes": 127569
+      "sha256": "fe7c51d08b5361d2c9e640eaad2c2dc6c669d9112d159497e99b6214508cb2c5",
+      "bytes": 141261
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -244,8 +249,8 @@
     },
     {
       "path": "docs/architecture/PHASE_C8_M4_1_P_S1_1_SEARCH_OPTIMIZATION_PROPOSAL.md",
-      "sha256": "3cfde00495dd6d6b3da4afb1eb8e60c6d571264b42dadcf9c5fa54a1bd6b2c83",
-      "bytes": 13150
+      "sha256": "b4433b4e0022add724e291c25435decaa41894b7b72f552c6b789a76408b74b2",
+      "bytes": 13295
     },
     {
       "path": "docs/architecture/PHASE_C8_M4_1_REVIEW_AND_REMEDIATION.md",
@@ -364,8 +369,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "7ef289c4e0bdb4c43c3a7fbb0e7de91ccacddd1841ed66a3bd36dc3f6049f3a8",
-      "bytes": 227618
+      "sha256": "98a348cc3bbe89e5ca941681f533f1841bb14dd530c2a1d390b458a878e20c5c",
+      "bytes": 231492
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

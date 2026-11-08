@@ -116,7 +116,7 @@ So no plausible per-call change accounts for several seconds.
 - **Response mapping:** the client currently maps results by position. O-1 would also require each response pair's echoed `request` to equal the issued item: resource type and id, permission and subject. A mismatch or a count difference fails the call as provider-unavailable (503, no quarantine).
 - **Per-item errors:** today a per-item error becomes `Unknown`, which is treated as "not allowed". In this verification path the record then reads as unavailable. That is fail-closed, but it reports an outage as a missing record. O-1 would fail the whole call (503) instead. Other callers keep today's behaviour unless separately approved.
 
-**Item limit:** a batch has at most 50 records, so the `read` and `discover` calls have at most 50 items each. The field-leaf call is chunked below a configured cap. SpiceDB's per-request item maximum must be confirmed by a new contract test (CT-7). Going over the limit is an error, never a truncation.
+**Item limit:** a batch has at most 50 records, so the `read` and `discover` calls have at most 50 items each. The field-leaf call is chunked below a configured cap. SpiceDB's per-request item maximum must be confirmed by a new contract test (CT-7). Going over the limit is an error, never a truncation. *(C-130: implemented in IX-2 as **IX2-CT-07**; CT-7 stays reserved for S1 Design B §2.11. Confirmed maximum on SpiceDB v1.56.2: 10,000 items.)*
 
 **Tests required:**
 - RB-01 to RB-15 and CT-1 to CT-6 unchanged and passing;

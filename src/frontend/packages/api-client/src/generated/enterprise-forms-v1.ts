@@ -2029,6 +2029,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organization/search-index/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** IX-2 SearchProjectionRebuild, security administrators (administer_security) only: the Authority purges the organization's search index, returns every searchable-field coverage to Building and marks the index Rebuilding, journaled with the reason code. The only way to clear a search-index quarantine; the index serves nothing until it has been rebuilt and attested. Refused (423) while the organization's authorization is quarantined; 404 SEARCH_INDEX_NOT_PRESENT where no index is maintained. Step-up (PB-08) not yet available. */
+        post: operations["RebuildSearchProjection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/security/incidents": {
         parameters: {
             query?: never;
@@ -3716,6 +3733,18 @@ export interface components {
             /** Format: int64 */
             expectedDraftRevision: number | string;
             layoutJson: string;
+        };
+        SearchProjectionRebuildRequest: {
+            rebuildReasonCode: null | string;
+        };
+        SearchProjectionRebuildResponse: {
+            previousProjectionStatus: string;
+            previousStatusReasonCode: null | string;
+            projectionStatus: string;
+            /** Format: int32 */
+            entriesPurged: number | string;
+            /** Format: int32 */
+            coveragesReturnedToBuilding: number | string;
         };
         SecurityAdministratorCandidateResponse: {
             /** Format: uuid */
@@ -7953,6 +7982,57 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RebuildSearchProjection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchProjectionRebuildRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchProjectionRebuildResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Locked */
+            423: {
                 headers: {
                     [name: string]: unknown;
                 };

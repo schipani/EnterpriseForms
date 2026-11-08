@@ -30,8 +30,11 @@ public static class AuthorityRuntimeGrants
     /// <summary>IX-1: the NOLOGIN read-only role of the future indexed-search query path (IX-3). Created here; holds no credential.</summary>
     public const string SearchReaderRole = "authority_search_reader";
 
-    /// <summary>IX-1: columns of search_record_entries the runtime may update (the S-B scope timestamps only; everything else is delete-and-insert).</summary>
-    public static readonly string[] SearchEntryUpdatableColumns = ["last_seal_verified_on", "last_seal_attempted_on", "last_seal_attempt_outcome_code"];
+    /// <summary>
+    /// IX-1/IX-2: columns of search_record_entries the runtime may update — the S-B and (IX-2) S-C scope timestamps and their
+    /// observability attempts only; everything else is delete-and-insert.
+    /// </summary>
+    public static readonly string[] SearchEntryUpdatableColumns = ["last_seal_verified_on", "last_seal_attempted_on", "last_seal_attempt_outcome_code", "last_deep_verified_on", "last_deep_attempted_on", "last_deep_attempt_outcome_code"];
 
     /// <summary>Tables of schema authority that the search reader may read (design §5.1).</summary>
     public static readonly string[] SearchReaderAuthorityTables =

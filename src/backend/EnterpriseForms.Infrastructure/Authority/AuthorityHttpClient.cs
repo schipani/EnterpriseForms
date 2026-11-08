@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority, ISearchIndexAdministrationAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -128,6 +128,9 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
 
     public Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken) =>
         SendAsync<AuthorityFieldSearchAdministration>(HttpMethod.Post, "internal/v1/field-search/administration", user, query, null, cancellationToken);
+
+    public Task<AuthoritySearchProjectionRebuild> RebuildSearchProjectionAsync(DelegatedUserContext user, SearchProjectionRebuildCommand command, CancellationToken cancellationToken) =>
+        SendAsync<AuthoritySearchProjectionRebuild>(HttpMethod.Post, "internal/v1/search-index/rebuild", user, command, null, cancellationToken);
 
     public Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken) =>
         SendAsync<System.Text.Json.JsonElement>(HttpMethod.Post, $"internal/v1/search-catalogue/{searchCatalogueSnapshotId:D}/executions", user, evidence, null, cancellationToken);

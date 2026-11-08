@@ -31,21 +31,41 @@ public sealed class SearchIndexTests
 {
     private const string Issuer = "https://issuer.test";
 
-    private sealed class ManualClock(DateTimeOffset start) : TimeProvider
+    internal sealed class ManualClock(DateTimeOffset start) : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = start;
 
         public override DateTimeOffset GetUtcNow() => Now;
     }
 
-    private sealed class RecordingAlerts : ISecurityAlertSink
+    internal sealed class RecordingAlerts : ISecurityAlertSink
     {
         public List<SecurityAlert> Raised { get; } = [];
 
         public void Raise(SecurityAlert alert) => Raised.Add(alert);
     }
 
-    private sealed class Harness : IDisposable
+    /// <summary>IX-2: a MAC provider that can be switched to unavailable (IX-27 provider outage during backfill).</summary>
+    internal sealed class SwitchableMac(IIntegrityMacProvider inner) : IIntegrityMacProvider
+    {
+        public bool Unavailable { get; set; }
+
+        public string ProviderName => inner.ProviderName;
+
+        public Task<IntegrityMacResult> SignAsync(IntegrityKeyReference keyReference, ReadOnlyMemory<byte> canonicalPayload, CancellationToken cancellationToken) =>
+            Unavailable ? throw new IntegrityProviderUnavailableException("test outage") : inner.SignAsync(keyReference, canonicalPayload, cancellationToken);
+
+        public Task<bool> VerifyAsync(IntegrityKeyReference keyReference, ReadOnlyMemory<byte> canonicalPayload, ReadOnlyMemory<byte> expectedMac, CancellationToken cancellationToken) =>
+            Unavailable ? throw new IntegrityProviderUnavailableException("test outage") : inner.VerifyAsync(keyReference, canonicalPayload, expectedMac, cancellationToken);
+
+        public Task<int> ProvisionKeyAsync(Guid organizationId, string keyPurpose, string providerKeyName, CancellationToken cancellationToken) => inner.ProvisionKeyAsync(organizationId, keyPurpose, providerKeyName, cancellationToken);
+
+        public Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken) => inner.ProbeAsync(cancellationToken);
+
+        public Task<IntegrityKeyInspection> InspectKeyAsync(string providerKeyName, CancellationToken cancellationToken) => inner.InspectKeyAsync(providerKeyName, cancellationToken);
+    }
+
+    internal sealed class Harness : IDisposable
     {
         public Guid Org { get; } = Guid.CreateVersion7();
         public Guid Form { get; } = Ids.Form;
@@ -70,15 +90,27 @@ public sealed class SearchIndexTests
         public RecordingAlerts Alerts { get; } = new();
         public SearchIndexSweepService Sweep { get; }
         public Dictionary<Guid, List<StagedContentItem>> Accepted { get; } = [];
+
+        /// <summary>IX-2: the SpiceDB double (decisions answer from its Allowed set), the MAC switch, and the builder and rebuild services.</summary>
+        public SearchCatalogueTests.SpiceDb Spice { get; }
+
+        public SwitchableMac Mac { get; }
+
+        public SearchIndexBuilderService Builder { get; }
+
+        public SearchProjectionRebuildService Rebuild { get; }
+
         private readonly ECDsa sealKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         private readonly LocalSearchSealSigner signer;
 
         public Harness(ISearchSealSigner? signerOverride = null, byte[]? pinnedSpki = null, bool contributorWrites = false)
         {
-            var mac = new LocalHmacProvider();
-            mac.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
+            var local = new LocalHmacProvider();
+            local.ProvisionKeyAsync(Org, IntegrityKeyPurposes.RowIntegrityV1, "org-key", CancellationToken.None).GetAwaiter().GetResult();
+            var mac = Mac = new SwitchableMac(local);
             var spice = DispatchProxy.Create<ISpiceDbProjection, SearchCatalogueTests.SpiceDb>();
-            ((SearchCatalogueTests.SpiceDb)(object)spice).Markers = org => TestProjection.MarkerFor(Store.Organizations.Single(o => o.OrganizationId == org));
+            Spice = (SearchCatalogueTests.SpiceDb)(object)spice;
+            Spice.Markers = org => TestProjection.MarkerFor(Store.Organizations.Single(o => o.OrganizationId == org));
             var sealOptions = new SearchSealOptions
             {
                 Provider = SearchSealProviderKind.LocalDevelopment,
@@ -89,8 +121,11 @@ public sealed class SearchIndexTests
             Verifier = new SearchSealVerifier(sealOptions);
             Gate = new SearchSealSigningGate(signerOverride ?? signer, Verifier);
             Writer = new SearchIndexWriter(Options, Gate);
-            Content = new ContentService(Store, mac, TestProjection.Verifier(Store, spice), new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(contributorWrites, testingOverrideAllowed: true), new ContentRevisionCoordinator(Writer, TimeProvider.System));
+            var projectionVerifier = TestProjection.Verifier(Store, spice);
+            Content = new ContentService(Store, mac, projectionVerifier, new NoOpFaultInjector(), TimeProvider.System, new ShareContributorWriteSwitch(contributorWrites, testingOverrideAllowed: true), new ContentRevisionCoordinator(Writer, TimeProvider.System));
             Sweep = new SearchIndexSweepService(Store, Writer, Verifier, Options, Clock, Alerts);
+            Builder = new SearchIndexBuilderService(Store, Content, Writer, Options, Clock, Alerts);
+            Rebuild = new SearchProjectionRebuildService(Store, new AuthorizationAuthority.Application.Features.Authorization.PermissionCheckService(Store, projectionVerifier), Options, Clock);
             Store.Organizations.Add(new OrganizationAuthorizationState { OrganizationId = Org, AuthorizationRevision = 7, ProjectionAppliedRevision = 7, ProjectionZedToken = "zed-7", CheckpointEnforcementModeName = CheckpointEnforcementModes.Asynchronous }.WithJournalDigest());
             Store.Bindings.Add(new IdentityBinding { IdentityBindingId = Guid.CreateVersion7(), OrganizationId = Org, AuthorityUserId = Owner, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = Owner.ToString("D"), IdentityBindingEnabled = true });
             Store.Bindings.Add(new IdentityBinding { IdentityBindingId = ContributorBindingId, OrganizationId = Org, AuthorityUserId = Contributor, IdentityIssuerUri = Issuer, IdentitySubjectIdentifier = Contributor.ToString("D"), IdentityBindingEnabled = true });

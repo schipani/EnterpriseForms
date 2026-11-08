@@ -47,7 +47,18 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
     public SearchIndexMode Mode => options.Mode;
 
     /// <summary>Derives the record's index at its new head. Returns false when nothing applies (no projection, or no coverage for the form).</summary>
-    public async Task<bool> DeriveOnCommitAsync(IAuthorityScope scope, OrganizationAuthorizationState state, CommitIndexInput input, CancellationToken cancellationToken)
+    public Task<bool> DeriveOnCommitAsync(IAuthorityScope scope, OrganizationAuthorizationState state, CommitIndexInput input, CancellationToken cancellationToken) =>
+        DeriveAtHeadAsync(scope, state, input, stageTimingSink, cancellationToken);
+
+    /// <summary>
+    /// IX-2 backfill (IX-D1 (b)): derives the record's index at its current head from bytes the Authority has just verified
+    /// against that head (<c>ContentService.VerifyWorkloadObservedContentAsync</c>, under the organization lock, in this scope).
+    /// The same derivation, seal and write as a commit; the content revision does not change (nothing was committed).
+    /// </summary>
+    public Task<bool> DeriveForBackfillAsync(IAuthorityScope scope, OrganizationAuthorizationState state, CommitIndexInput input, CancellationToken cancellationToken) =>
+        DeriveAtHeadAsync(scope, state, input, null, cancellationToken);
+
+    private async Task<bool> DeriveAtHeadAsync(IAuthorityScope scope, OrganizationAuthorizationState state, CommitIndexInput input, Action<Guid, SearchDerivationStageTimings>? timingSink, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(state);
@@ -113,10 +124,10 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
         // and written by the commit's final SaveChanges, in the same transaction (previously four round trips).
         await index.ResetRecordIndexAsync(state.OrganizationId, formDefinitionId, input.FormRecordId, alwaysAdvanceFormState: true, input.Now, cancellationToken).ConfigureAwait(false);
         index.AddRecordIndex(ToRows(entry, content));
-        if (stageTimingSink is not null)
+        if (timingSink is not null)
         {
             var written = System.Diagnostics.Stopwatch.GetTimestamp();
-            stageTimingSink(input.FormRecordId, new SearchDerivationStageTimings(
+            timingSink(input.FormRecordId, new SearchDerivationStageTimings(
                 System.Diagnostics.Stopwatch.GetElapsedTime(started, readsDone).TotalMilliseconds,
                 System.Diagnostics.Stopwatch.GetElapsedTime(readsDone, derived).TotalMilliseconds,
                 System.Diagnostics.Stopwatch.GetElapsedTime(derived, signed).TotalMilliseconds,
@@ -233,6 +244,7 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
         {
             sibling.CoverageStateName = SearchCoverageStates.Building;
             sibling.CoverageCompletedOn = null;
+            sibling.CoverageAttestedJournalEntryId = null;
         }
 
         await index.BumpFormStateAsync(coverage.OrganizationId, coverage.FormDefinitionId, now, cancellationToken).ConfigureAwait(false);

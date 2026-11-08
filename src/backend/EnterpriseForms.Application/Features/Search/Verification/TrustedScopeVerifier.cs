@@ -66,9 +66,11 @@ public sealed class TrustedScopeVerifier(IAuthorizationAuthorityClient authority
             {
                 var items = new List<BatchVerificationItem>(chunk.Length);
                 var contents = new Dictionary<Guid, AcceptedRecordContent>(chunk.Length);
+                // IX-2 O-2 (IX-D10): the chunk's content is read set-based; the bytes stay untrusted until the Authority verifies them.
+                var read = await records.ReadAcceptedContentBatchAsync(chunk.Select(e => (e.FormRecordId, e.CommittedOperationId!.Value)).ToList(), deadline.Token).ConfigureAwait(false);
                 foreach (var entry in chunk)
                 {
-                    var content = await records.ReadAcceptedContentAsync(entry.FormRecordId, entry.CommittedOperationId!.Value, deadline.Token).ConfigureAwait(false);
+                    var content = read[entry.FormRecordId];
                     bytes += content.Items.Sum(i => ((long)i.CanonicalBytesBase64.Length * 3 / 4) + ((long)i.RowSignatureBase64.Length * 3 / 4));
                     if (bytes > limits.MaximumVerifiedBytes)
                     {
@@ -76,7 +78,7 @@ public sealed class TrustedScopeVerifier(IAuthorizationAuthorityClient authority
                     }
 
                     contents[entry.FormRecordId] = content;
-                    items.Add(new BatchVerificationItem(entry.FormRecordId, entry.CommittedOperationId.Value, content.Items));
+                    items.Add(new BatchVerificationItem(entry.FormRecordId, entry.CommittedOperationId!.Value, content.Items));
                 }
 
                 calls++;

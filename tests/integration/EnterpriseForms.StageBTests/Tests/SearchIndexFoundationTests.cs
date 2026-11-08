@@ -130,7 +130,9 @@ public sealed class SearchIndexFoundationTests(StageBFixture fixture)
         }
 
         var org = w.S.OrganizationId;
-        Assert.Equal(3, int.Parse(Scalar($"SELECT count(*) FROM authority_search.search_field_coverages WHERE organization_id = '{org:D}' AND coverage_state_name = 'Building';"), CultureInfo.InvariantCulture));
+        // IX-2: the running builder may already have attested the coverages Complete (every record was indexed inline); Complete
+        // is reachable only with an attestation journal entry. Before IX-2 this asserted Building only.
+        Assert.Equal(3, int.Parse(Scalar($"SELECT count(*) FROM authority_search.search_field_coverages WHERE organization_id = '{org:D}' AND (coverage_state_name = 'Building' OR (coverage_state_name = 'Complete' AND coverage_attested_journal_entry_id IS NOT NULL));"), CultureInfo.InvariantCulture));
         Assert.Equal("3", Scalar($"SELECT count(*) FROM authority_search.search_record_entries e JOIN record_content_heads h ON h.organization_id = e.organization_id AND h.form_record_id = e.form_record_id AND h.committed_operation_id = e.indexed_operation_id AND h.committed_content_revision = e.indexed_content_revision AND h.committed_manifest_root = e.indexed_manifest_root WHERE e.organization_id = '{org:D}' AND octet_length(e.entry_seal_signature) = 64 AND e.seal_key_name = 'search-entry-seal-v1';"));
         Assert.Equal(["REF-0 ALPHA", "REF-1 ALPHA", "REF-2 ALPHA"], Sql($"SELECT normalized_string_value FROM authority_search.search_string_postings WHERE organization_id = '{org:D}' ORDER BY 1;").Split('\n', StringSplitOptions.RemoveEmptyEntries));
         Assert.Equal("3", Scalar($"SELECT count(*) FROM authority_search.search_integer_postings WHERE organization_id = '{org:D}';"));
@@ -299,11 +301,16 @@ public sealed class SearchIndexFoundationTests(StageBFixture fixture)
         await CreateAsync(w, Values("Withdraw Two", 2, "closed"));
         var org = w.S.OrganizationId;
         Assert.Equal("2", Scalar($"SELECT count(*) FROM authority_search.search_record_entries WHERE organization_id = '{org:D}';"));
+        var before = Scalar("SELECT now()::text;");
         var withdrawn = await fixture.Api.PostAsync($"/api/v1/form-definitions/{w.FormId:D}/fields/{w.Reference:D}/search-approval/withdraw", w.S.Token(w.S.Administrator), new { reason = "IX-1 withdrawal test" });
         Assert.True(withdrawn.IsSuccess, withdrawn.Body);
-        Assert.Equal("0|0|0", Scalar($"SELECT (SELECT count(*) FROM authority_search.search_record_entries WHERE organization_id = '{org:D}') || '|' || (SELECT count(*) FROM authority_search.search_string_postings WHERE organization_id = '{org:D}') || '|' || (SELECT count(*) FROM authority_search.search_integer_postings WHERE organization_id = '{org:D}');"));
+        // IX-2: the builder may re-derive the form for its remaining coverages within seconds, so the purge is proven by what can
+        // survive it: no row of the withdrawn approval or field, no string posting at all (the withdrawn field is the only string
+        // field approved), and only entries written after the withdrawal (re-derived from verified bytes). Before IX-2 this asserted
+        // an empty index.
+        Assert.Equal("0|0|0", Scalar($"SELECT (SELECT count(*) FROM authority_search.search_record_entries WHERE organization_id = '{org:D}' AND (entry_written_on <= '{before}'::timestamptz OR '{w.Approvals[w.Reference]:D}' = ANY (derived_field_search_approval_ids))) || '|' || (SELECT count(*) FROM authority_search.search_string_postings WHERE organization_id = '{org:D}') || '|' || (SELECT count(*) FROM authority_search.search_integer_postings WHERE organization_id = '{org:D}' AND field_search_approval_id = '{w.Approvals[w.Reference]:D}');"));
         Assert.Equal("Withdrawn", Scalar($"SELECT coverage_state_name FROM authority_search.search_field_coverages WHERE field_search_approval_id = '{w.Approvals[w.Reference]:D}';"));
-        Assert.Equal("2", Scalar($"SELECT count(*) FROM authority_search.search_field_coverages WHERE organization_id = '{org:D}' AND coverage_state_name = 'Building';"));
+        Assert.Equal("2", Scalar($"SELECT count(*) FROM authority_search.search_field_coverages WHERE organization_id = '{org:D}' AND (coverage_state_name = 'Building' OR (coverage_state_name = 'Complete' AND coverage_attested_journal_entry_id IS NOT NULL AND coverage_completed_on > '{before}'::timestamptz));"));
     }
 
     /// <summary>

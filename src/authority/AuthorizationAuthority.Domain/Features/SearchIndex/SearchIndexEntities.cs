@@ -13,7 +13,7 @@ public sealed class SearchProjectionState
 
     public int ProjectionSchemaVersion { get; set; } = 1;
 
-    /// <summary><see cref="SearchProjectionStatuses"/>: Active, ReconciliationRequired or Quarantined.</summary>
+    /// <summary><see cref="SearchProjectionStatuses"/>: Active, ReconciliationRequired, Quarantined or (IX-2) Rebuilding.</summary>
     public string ProjectionStatusName { get; set; } = SearchProjectionStatuses.Active;
 
     public string? ProjectionStatusReasonCode { get; set; }
@@ -32,6 +32,13 @@ public sealed class SearchProjectionState
     /// <summary>§17.10 D1: written only when every S-A check passed for the whole organization.</summary>
     public DateTimeOffset? LastSuccessfulCheapPassOn { get; set; }
 
+    /// <summary>
+    /// D-IX2-7 (C-129): the number of entries excluded from the S-C deadline at the last deadline evaluation because their record
+    /// is quarantined in the Authority (head or registry). A change is journaled and alerted, so an unexpected quarantine-state
+    /// change is detectable. Exclusion is never verification: no timestamp is written for an excluded entry.
+    /// </summary>
+    public int DeepDeadlineExcludedEntryCount { get; set; }
+
     /// <summary>§17.10.5 K9: the highest evaluation time observed (monotonic); a backward clock step never makes a scope current.</summary>
     public DateTimeOffset? LastEvaluationOn { get; set; }
 
@@ -45,6 +52,13 @@ public static class SearchProjectionStatuses
     public const string Active = "Active";
     public const string ReconciliationRequired = "ReconciliationRequired";
     public const string Quarantined = "Quarantined";
+
+    /// <summary>
+    /// IX-2 (design §12.2, R1 §C.7): set only by a journaled <c>SearchProjectionRebuild</c>. The organization's index was purged
+    /// and every coverage returned to Building; the builder re-derives and the Authority attests. Leaves for Active only when
+    /// every non-withdrawn coverage of the organization is Complete again. A Fail during the rebuild quarantines.
+    /// </summary>
+    public const string Rebuilding = "Rebuilding";
 }
 
 /// <summary>IX-1: one row per searchability approval the index derives postings for. Created Building; Complete is set only by Authority attestation (IX-2).</summary>
@@ -75,6 +89,9 @@ public sealed class SearchFieldCoverage
     public DateTimeOffset? CoverageWithdrawnOn { get; set; }
 
     public string? CoverageWithdrawalReasonCode { get; set; }
+
+    /// <summary>IX-2 (R1 §B.2): the audit-stream journal entry of the Authority attestation that set Complete; null otherwise.</summary>
+    public Guid? CoverageAttestedJournalEntryId { get; set; }
 }
 
 public static class SearchCoverageStates
@@ -135,6 +152,11 @@ public sealed class SearchRecordEntry
     public DateTimeOffset? LastSealAttemptedOn { get; set; }
 
     public string? LastSealAttemptOutcomeCode { get; set; }
+
+    /// <summary>IX-2 §17.10 R3 for S-C: observability only; never counts as completion.</summary>
+    public DateTimeOffset? LastDeepAttemptedOn { get; set; }
+
+    public string? LastDeepAttemptOutcomeCode { get; set; }
 }
 
 /// <summary>Columns shared by the typed posting tables. A posting is one indexed value of one manifest item.</summary>

@@ -41,9 +41,10 @@ public sealed class SearchProjectionStateConfiguration : IEntityTypeConfiguratio
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_search_projection_state_org").OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_search_projection_status", "projection_status_name IN ('Active','ReconciliationRequired','Quarantined')");
+            t.HasCheckConstraint("ck_search_projection_status", "projection_status_name IN ('Active','ReconciliationRequired','Quarantined','Rebuilding')");
             t.HasCheckConstraint("ck_search_projection_reconciliation", "(projection_status_name = 'ReconciliationRequired') = (reconciliation_from_revision IS NOT NULL)");
             t.HasCheckConstraint("ck_search_projection_suspension", "verification_suspended = (suspended_scope_names IS NOT NULL)");
+            t.HasCheckConstraint("ck_search_projection_deep_exclusions", "deep_deadline_excluded_entry_count >= 0");
             t.HasCheckConstraint("ck_search_projection_revision", "projection_content_integrity_revision >= 0 AND projection_schema_version >= 1");
         });
     }
@@ -62,10 +63,14 @@ public sealed class SearchFieldCoverageConfiguration : IEntityTypeConfiguration<
         builder.Property(e => e.CoverageWithdrawalReasonCode).HasMaxLength(64);
         builder.HasIndex(e => e.FieldSearchApprovalId).IsUnique().HasDatabaseName("uq_search_field_coverage_approval");
         builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId }).HasDatabaseName("ix_search_field_coverages_form");
+        builder.HasIndex(e => e.CoverageAttestedJournalEntryId).HasDatabaseName("ix_search_field_coverages_attestation");
         builder.HasOne<FieldSearchApproval>().WithMany().HasForeignKey(e => e.FieldSearchApprovalId).HasConstraintName("fk_search_field_coverage_approval").OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_search_field_coverage_org").OnDelete(DeleteBehavior.Restrict);
+        // IX-2: Complete names the audit-stream attestation that set it (defence in depth; the Authority alone writes either).
+        builder.HasOne<AuthorizationAuthority.Domain.Features.Journal.SecurityJournalEntry>().WithMany().HasForeignKey(e => e.CoverageAttestedJournalEntryId).HasConstraintName("fk_search_field_coverage_attestation").OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(t =>
         {
+            t.HasCheckConstraint("ck_search_coverage_attestation", "coverage_state_name <> 'Complete' OR (coverage_attested_journal_entry_id IS NOT NULL AND coverage_completed_on IS NOT NULL)");
             t.HasCheckConstraint("ck_search_coverage_state", "coverage_state_name IN ('Building','Complete','Withdrawn')");
             t.HasCheckConstraint("ck_search_coverage_classification", "covered_field_classification IN ('Public','Internal')");
             t.HasCheckConstraint("ck_search_coverage_value_type", "indexed_value_type_name IN ('String','Integer','Decimal','Date','DateTime','Boolean','Option')");
@@ -85,6 +90,7 @@ public sealed class SearchRecordEntryConfiguration : IEntityTypeConfiguration<Se
         builder.Property(e => e.RecordStatusName).HasMaxLength(40);
         builder.Property(e => e.SealKeyName).HasMaxLength(100);
         builder.Property(e => e.LastSealAttemptOutcomeCode).HasMaxLength(64);
+        builder.Property(e => e.LastDeepAttemptOutcomeCode).HasMaxLength(64);
         builder.HasAlternateKey(e => new { e.OrganizationId, e.FormRecordId, e.IndexedOperationId }).HasName("uq_search_record_entry_operation");
         builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId }).IsUnique().HasDatabaseName("uq_search_record_entry_record");
         builder.HasIndex(e => new { e.OrganizationId, e.FormDefinitionId, e.FormRecordId }).HasDatabaseName("ix_search_record_entries_form");

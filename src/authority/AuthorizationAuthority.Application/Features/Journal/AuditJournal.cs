@@ -11,13 +11,16 @@ namespace AuthorizationAuthority.Application.Features.Journal;
 /// </summary>
 public static class AuditJournal
 {
-    public static void Append(IAuthorityScope scope, OrganizationAuthorizationState locked, string eventKind, object body, TimeProvider clock)
+    /// <returns>The appended entry (IX-2: coverage attestations reference it).</returns>
+    public static SecurityJournalEntry Append(IAuthorityScope scope, OrganizationAuthorizationState locked, string eventKind, object body, TimeProvider clock)
     {
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(locked);
         ArgumentNullException.ThrowIfNull(clock);
         locked.AuditJournalRevision++;
         locked.StateModifiedOn = clock.GetUtcNow();
-        scope.AddJournalEntry(JournalChain.Append(locked, JournalStreamNames.Audit, locked.AuditJournalRevision, eventKind, body, null, null, clock));
+        var entry = JournalChain.Append(locked, JournalStreamNames.Audit, locked.AuditJournalRevision, eventKind, body, null, null, clock);
+        scope.AddJournalEntry(entry);
+        return entry;
     }
 }

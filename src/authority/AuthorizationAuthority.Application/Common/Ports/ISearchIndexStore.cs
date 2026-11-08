@@ -23,6 +23,11 @@ public sealed record DerivedRecordIndex(
 public sealed record StoredRecordIndex(SearchRecordEntry Entry, IReadOnlyList<SearchPostingBase> Postings, IReadOnlyList<SearchRecordFieldAnomaly> Anomalies);
 
 /// <summary>Counts of S-A set checks over one organization (each must be zero for a passing cheap sweep).</summary>
+/// <param name="RecordsMissingFromCompleteCoverage">
+/// IX-2 (R1 §C.6 first check): contentful registered records of a form whose coverage is Complete that have no entry at their
+/// head derived under that coverage's approval. Complete is set only by attestation, after which every commit derives inline,
+/// so a missing entry is an Authority-domain omission (a Fail).
+/// </param>
 public sealed record CheapSweepFindings(
     int EntriesNotAtHead,
     int EntriesForInactiveOrMissingRecords,
@@ -30,10 +35,11 @@ public sealed record CheapSweepFindings(
     int RowsOfWithdrawnCoverage,
     int EntriesWithoutActiveCoverage,
     int RowsOfAnotherOrganization,
-    int EntriesWithoutSeal)
+    int EntriesWithoutSeal,
+    int RecordsMissingFromCompleteCoverage = 0)
 {
     public bool Clean => EntriesNotAtHead == 0 && EntriesForInactiveOrMissingRecords == 0 && RowsNotBoundToEntry == 0 && RowsOfWithdrawnCoverage == 0
-                         && EntriesWithoutActiveCoverage == 0 && RowsOfAnotherOrganization == 0 && EntriesWithoutSeal == 0;
+                         && EntriesWithoutActiveCoverage == 0 && RowsOfAnotherOrganization == 0 && EntriesWithoutSeal == 0 && RecordsMissingFromCompleteCoverage == 0;
 
     public string FirstFindingCode() =>
         EntriesNotAtHead > 0 ? "ENTRY_NOT_AT_HEAD"
@@ -43,11 +49,24 @@ public sealed record CheapSweepFindings(
         : EntriesWithoutActiveCoverage > 0 ? "ENTRY_WITHOUT_COVERAGE"
         : RowsOfAnotherOrganization > 0 ? "CROSS_ORGANIZATION_ROW"
         : EntriesWithoutSeal > 0 ? "ENTRY_WITHOUT_SEAL"
+        : RecordsMissingFromCompleteCoverage > 0 ? "COMPLETE_COVERAGE_MISSING_ENTRY"
         : "NONE";
 }
 
-/// <summary>Oldest and newest scope timestamps of an organization's entries (deadline evaluation, design §17.10).</summary>
-public sealed record SearchScopeTimestamps(int EntryCount, DateTimeOffset? OldestSealVerifiedOn, DateTimeOffset? NewestSealVerifiedOn, DateTimeOffset? OldestDeepVerifiedOn, DateTimeOffset? NewestDeepVerifiedOn);
+/// <summary>IX-2: one form with coverage still to be built (builder work list; identifiers and counts only).</summary>
+public sealed record SearchBuildingForm(Guid OrganizationId, Guid FormDefinitionId, int BuildingCoverageCount, string ProjectionStatusName);
+
+/// <summary>
+/// Oldest and newest scope timestamps of an organization's entries (deadline evaluation, design §17.10). The S-B values cover
+/// every entry. The S-C values cover only entries of records that are not quarantined in the Authority (D-IX2-7, C-129):
+/// <paramref name="DeepDeadlineExcludedEntryCount"/> entries were left out, <paramref name="DeepDeadlineEntryCount"/> counted.
+/// </summary>
+public sealed record SearchScopeTimestamps(int EntryCount, DateTimeOffset? OldestSealVerifiedOn, DateTimeOffset? NewestSealVerifiedOn, DateTimeOffset? OldestDeepVerifiedOn, DateTimeOffset? NewestDeepVerifiedOn,
+    int DeepDeadlineEntryCount = -1, int DeepDeadlineExcludedEntryCount = 0)
+{
+    /// <summary>Entries counted for the S-C deadline (all entries when the store does not report the exclusion).</summary>
+    public int DeepEntriesCounted => DeepDeadlineEntryCount < 0 ? EntryCount : DeepDeadlineEntryCount;
+}
 
 /// <summary>
 /// IX-1: the Authority-owned search index (schema <c>authority_search</c>). Obtained from an <see cref="IAuthorityScope"/>, so
@@ -118,4 +137,24 @@ public interface ISearchIndexStore
     Task<IReadOnlyList<Guid>> DeleteEntriesNotAtHeadAsync(Guid organizationId, CancellationToken cancellationToken);
 
     Task<SearchScopeTimestamps> GetScopeTimestampsAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    // ---- IX-2: backfill, attestation, deep sweep, rebuild --------------------------------------------------------------
+
+    /// <summary>Forms (across organizations) with a Building coverage whose projection is not Quarantined (builder work list).</summary>
+    Task<List<SearchBuildingForm>> GetBuildingFormsAsync(CancellationToken cancellationToken);
+
+    /// <summary>The entries of a form; restricted to <paramref name="formRecordIds"/> when given.</summary>
+    Task<List<SearchRecordEntry>> GetFormEntriesAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken);
+
+    /// <summary>Deletes every entry, posting and anomaly of the organization (SearchProjectionRebuild); returns the entries deleted.</summary>
+    Task<int> PurgeOrganizationIndexAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>S-C: entries of records not quarantined in the Authority (D-IX2-7), ordered by oldest deep verification first.</summary>
+    Task<List<SearchRecordEntry>> GetEntriesForDeepCheckAsync(Guid organizationId, int limit, CancellationToken cancellationToken);
+
+    /// <summary>S-C: a uniformly random sample of the organization's entries of non-quarantined records (chosen by the Authority, never by the builder).</summary>
+    Task<List<SearchRecordEntry>> GetRandomEntriesAsync(Guid organizationId, int limit, CancellationToken cancellationToken);
+
+    /// <summary>Column-limited update of the S-C timestamps of one entry (verified time only on a passing comparison, §17.10 D1).</summary>
+    Task RecordDeepCheckAsync(Guid searchRecordEntryId, DateTimeOffset? verifiedOn, DateTimeOffset attemptedOn, string outcomeCode, CancellationToken cancellationToken);
 }

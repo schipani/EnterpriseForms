@@ -1,6 +1,7 @@
 # Indexed search (Option C): IX-1 implementation evidence report (C-126)
 
 - **Status:** IX-1 implemented on local branch `ix-1/authority-search-index`.
+  * **C-129 (2026-11-07): the owner conditionally accepted IX-1 at signed local commit `af6eaf3`** (section 7). The acceptance is limited to the implemented and tested IX-1 foundation and is not an unconditional security, performance or production-readiness approval. The 20 ms p95 gate stays **FAIL**, carried to IX-7 (ST-PERF-1 to ST-PERF-7). The statements below that say IX-1 is not accepted describe the state before C-129.
   * C-127: the owner **conditionally accepted** IX-1 for functional and security progress and **withheld final acceptance** until the 20 ms p95 commit-latency gate is met.
   * The remediation the owner authorized is in section 6, and the gate is **still not met** (section 6.4).
   * C-128: the owner **approved the completed round-trip optimization**, directed that no further speculative local optimization be made, kept the 20 ms p95 requirement unchanged and recorded that the local evidence does not establish it. The gate status stays **FAIL**.
@@ -581,3 +582,17 @@ Everything recorded as deferred is still deferred; nothing is marked complete.
    - Signed external checkpoints stay mandatory before real-data use.
 
 Acceptance is the owner's decision; this document does not record it.
+
+## 7. C-129 owner decision (2026-11-07)
+
+Recorded as stated by the owner; owner-led, not an independent assessment.
+
+1. **Conditional acceptance of IX-1 at `af6eaf3`**, limited to the implemented and tested IX-1 foundation. Not an unconditional security, performance or production-readiness approval.
+2. **Accepted evidence:**
+   - the functional, unit, architecture, contract, integration and SEC-P results of sections 2 and 6.7;
+   - the reduction from six to two additional AuthorityDb commands per commit (section 6);
+   - the battery-powered regression **and** the separate AC-powered search-catalogue rerun, both as recorded in section 6.7. The full Stage B run is **not** an uninterrupted clean pass: the search-catalogue benchmark failed at 480 records on battery (before the critical-battery sleep) and passed only in the separate AC-powered rerun of the class.
+3. **Performance exception:** the 20 ms p95 incremental commit-latency requirement remains **FAIL**. The threshold is unchanged and the gate is not reclassified. It is carried to the mandatory IX-7 Azure staging gate ST-PERF-1 to ST-PERF-7 (section 6.6), measured under representative Azure conditions with the production-intended Managed HSM signer. A failed staging gate blocks production readiness. No further local optimization is required now; IX-1 performance optimization is not reopened without new evidence or owner authorization.
+4. **IX-2 authorized** (implementation only; see `INDEXED_SEARCH_IX2_EVIDENCE.md`). IX-3 to IX-7 unauthorized; Tier 2 design-only; M4-1 open; OBS-IX-1 remediation and R6 separate and unauthorized; M4-2, G14 and RCF-1 unauthorized; synthetic data only; no push, PR, merge or deployment.
+
+The outstanding items of section 6.8 are carried in the traceable register of the IX-2 evidence report (section 6 there).

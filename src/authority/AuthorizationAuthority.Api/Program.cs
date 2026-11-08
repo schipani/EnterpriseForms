@@ -130,6 +130,7 @@ public sealed class Program
         AuthorizationAuthority.Api.Features.PlatformOperators.OwnerRecoveryEndpoints.MapOwnerRecoveryEndpoints(app);
         app.MapSessionEndpoints();
         app.MapFieldSearchEndpoints();
+        AuthorizationAuthority.Api.Features.SearchIndex.SearchIndexBuilderEndpoints.MapSearchIndexBuilderEndpoints(app);
         AuthorizationAuthority.Api.Features.Membership.MembershipEndpoints.MapMembershipEndpoints(app);
 
         app.Run();

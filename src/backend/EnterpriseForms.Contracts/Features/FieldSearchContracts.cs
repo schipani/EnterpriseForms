@@ -99,6 +99,9 @@ public sealed record SearchScopeVerificationResponse(
 
 public sealed record SearchScopeVerificationRequest(Guid FormDefinitionId);
 
+/// <summary>IX-2 Testing only: O-2 parity of the per-record and the set-based content reader over the caller's own catalogue (counts only).</summary>
+public sealed record AcceptedContentReaderParityResponse(int RecordsCompared, int ItemsCompared, int ValuesCompared, int Mismatches, double PerRecordMilliseconds, double SetBasedMilliseconds);
+
 // ---- Phase C7 M2 (AC-6): search approval configuration (Form Designer "Search" section). Decisions are the Authority's.
 
 /// <summary>
@@ -133,3 +136,9 @@ public sealed record FieldSearchAdministrationFormResponse(Guid FormDefinitionId
 
 /// <summary><c>ApprovalOperational</c> false (with <c>ApprovalUnavailableReason</c>) where approvals cannot be accepted (production and staging until PB-08).</summary>
 public sealed record FieldSearchAdministrationResponse(bool PlaintextSearchPermitted, bool ApprovalOperational, string ApprovalUnavailableReason, IReadOnlyList<FieldSearchAdministrationFormResponse> Forms);
+
+/// <summary>IX-2 SearchProjectionRebuild: an upper-case reason code (3..64 characters: A-Z, 0-9, _), journaled with the request.</summary>
+public sealed record SearchProjectionRebuildRequest(string? RebuildReasonCode);
+
+/// <summary>IX-2: the index state before and after the rebuild request (Rebuilding until the builder and the Authority's attestations complete).</summary>
+public sealed record SearchProjectionRebuildResponse(string PreviousProjectionStatus, string? PreviousStatusReasonCode, string ProjectionStatus, int EntriesPurged, int CoveragesReturnedToBuilding);

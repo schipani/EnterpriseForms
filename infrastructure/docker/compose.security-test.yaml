@@ -40,6 +40,11 @@ services:
       Identity__Reconciler__Issuer: enterpriseforms-team-membership-reconciler
       Identity__Reconciler__Audience: authorization-authority-reconciler
       Identity__Reconciler__SharedKeyBase64: ${RECONCILER_TESTING_AUTHORITY_KEY:-cmVjb25jaWxlci10ZXN0LW9ubHktc2hhcmVkLWtleS0wMDAwMDA=}
+      # IX-2 (IX-D6): synthetic search-index builder credential for this isolated stack only (TestIdentity.SearchIndexBuilderToken
+      # mirrors it). Other stacks set nothing, so the builder plane is unreachable there (fail closed).
+      Identity__SearchIndexBuilder__Issuer: enterpriseforms-search-index-builder
+      Identity__SearchIndexBuilder__Audience: authorization-authority-search-index-builder
+      Identity__SearchIndexBuilder__SharedKeyBase64: c2VhcmNoLWluZGV4LWJ1aWxkZXItdGVzdC1vbmx5LWtleS0wMDAwMDA=
       # Phase C7 M2 (AC-6, OD-7): development-only synthetic step-up for search approvals. The Authority refuses to start
       # with this outside Development/Testing or without the synthetic TestIdentityProvider; every other stack leaves it
       # unset (Unavailable), so approvals are refused there until PB-08 step-up exists.
@@ -277,6 +282,14 @@ services:
       TeamMembershipReconciler__Issuer: enterpriseforms-team-membership-reconciler
       TeamMembershipReconciler__Audience: authorization-authority-reconciler
       TeamMembershipReconciler__SharedKeyBase64: ${RECONCILER_TESTING_WORKER_KEY:-cmVjb25jaWxlci10ZXN0LW9ubHktc2hhcmVkLWtleS0wMDAwMDA=}
+      # IX-2 (IX-D6): the same synthetic search-index builder credential as the authority above, for the Worker only (the API
+      # never gets it). IX-27 recreates the worker with IX2_BUILDER_KEY set to a key the Authority does not accept (builder outage).
+      SearchIndexBuilder__Issuer: ${IX2_BUILDER_ISSUER:-enterpriseforms-search-index-builder}
+      SearchIndexBuilder__Audience: authorization-authority-search-index-builder
+      SearchIndexBuilder__SharedKeyBase64: ${IX2_BUILDER_KEY:-c2VhcmNoLWluZGV4LWJ1aWxkZXItdGVzdC1vbmx5LWtleS0wMDAwMDA=}
+      SearchIndexBuilder__BackfillIntervalSeconds: ${IX2_BUILDER_BACKFILL_INTERVAL_SECONDS:-3}
+      SearchIndexBuilder__DeepSweepIntervalSeconds: ${IX2_BUILDER_DEEP_SWEEP_INTERVAL_SECONDS:-86400}
+      SearchIndexBuilder__MaximumRecordsPerSecond: ${IX2_BUILDER_RECORDS_PER_SECOND:-1000}
       # Phase C8 (D8-16): shortened reconciliation windows, Testing only.
       TeamMembershipReconciliation__InFlightWindowSeconds: "6"
       TeamMembershipReconciliation__BackoffSeconds: "1"

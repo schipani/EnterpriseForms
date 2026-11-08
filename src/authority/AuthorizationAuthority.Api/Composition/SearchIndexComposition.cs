@@ -53,6 +53,8 @@ public static class SearchIndexComposition
         });
         services.AddSingleton<ContentRevisionCoordinator>();
         services.AddSingleton<SearchIndexSweepService>();
+        services.AddSingleton<SearchIndexBuilderService>(); // IX-2: builder plane (every call refused unless Dark)
+        services.AddSingleton<SearchProjectionRebuildService>();
         if (options.Mode == SearchIndexMode.Dark)
         {
             services.AddHostedService<SearchIndexSweepLoop>();

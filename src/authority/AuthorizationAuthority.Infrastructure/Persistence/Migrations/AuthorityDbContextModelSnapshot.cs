@@ -3182,6 +3182,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("search_field_coverage_id");
 
+                    b.Property<Guid?>("CoverageAttestedJournalEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("coverage_attested_journal_entry_id");
+
                     b.Property<DateTimeOffset?>("CoverageCompletedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("coverage_completed_on");
@@ -3235,6 +3239,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasKey("SearchFieldCoverageId");
 
+                    b.HasIndex("CoverageAttestedJournalEntryId")
+                        .HasDatabaseName("ix_search_field_coverages_attestation");
+
                     b.HasIndex("FieldSearchApprovalId")
                         .IsUnique()
                         .HasDatabaseName("uq_search_field_coverage_approval");
@@ -3244,6 +3251,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("search_field_coverages", "authority_search", t =>
                         {
+                            t.HasCheckConstraint("ck_search_coverage_attestation", "coverage_state_name <> 'Complete' OR (coverage_attested_journal_entry_id IS NOT NULL AND coverage_completed_on IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_search_coverage_classification", "covered_field_classification IN ('Public','Internal')");
 
                             t.HasCheckConstraint("ck_search_coverage_state", "coverage_state_name IN ('Building','Complete','Withdrawn')");
@@ -3440,6 +3449,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("search_projection_state_id");
 
+                    b.Property<int>("DeepDeadlineExcludedEntryCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("deep_deadline_excluded_entry_count");
+
                     b.Property<DateTimeOffset?>("LastEvaluationOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_evaluation_on");
@@ -3500,11 +3513,13 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("search_projection_states", "authority_search", t =>
                         {
+                            t.HasCheckConstraint("ck_search_projection_deep_exclusions", "deep_deadline_excluded_entry_count >= 0");
+
                             t.HasCheckConstraint("ck_search_projection_reconciliation", "(projection_status_name = 'ReconciliationRequired') = (reconciliation_from_revision IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_search_projection_revision", "projection_content_integrity_revision >= 0 AND projection_schema_version >= 1");
 
-                            t.HasCheckConstraint("ck_search_projection_status", "projection_status_name IN ('Active','ReconciliationRequired','Quarantined')");
+                            t.HasCheckConstraint("ck_search_projection_status", "projection_status_name IN ('Active','ReconciliationRequired','Quarantined','Rebuilding')");
 
                             t.HasCheckConstraint("ck_search_projection_suspension", "verification_suspended = (suspended_scope_names IS NOT NULL)");
                         });
@@ -3559,6 +3574,15 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.Property<int>("IndexedPostingCount")
                         .HasColumnType("integer")
                         .HasColumnName("indexed_posting_count");
+
+                    b.Property<string>("LastDeepAttemptOutcomeCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("last_deep_attempt_outcome_code");
+
+                    b.Property<DateTimeOffset?>("LastDeepAttemptedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_deep_attempted_on");
 
                     b.Property<DateTimeOffset>("LastDeepVerifiedOn")
                         .HasColumnType("timestamp with time zone")
@@ -4587,6 +4611,12 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchFieldCoverage", b =>
                 {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Journal.SecurityJournalEntry", null)
+                        .WithMany()
+                        .HasForeignKey("CoverageAttestedJournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_search_field_coverage_attestation");
+
                     b.HasOne("AuthorizationAuthority.Domain.Features.FieldSearch.FieldSearchApproval", null)
                         .WithMany()
                         .HasForeignKey("FieldSearchApprovalId")

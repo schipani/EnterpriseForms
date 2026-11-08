@@ -37,6 +37,9 @@ public sealed partial class SearchIndexBoundaryTests
     [GeneratedRegex(@"\brevisions\.(AdvanceForCommitAsync|AdvanceWithoutIndexChangeAsync)\s*\(")]
     private static partial Regex CoordinatorCall();
 
+    [GeneratedRegex(@"\.DeriveForBackfillAsync\s*\(")]
+    private static partial Regex BackfillDerivation();
+
     [GeneratedRegex(@"\bISearchSealSigner\b")]
     private static partial Regex SignerUse();
 
@@ -109,13 +112,65 @@ public sealed partial class SearchIndexBoundaryTests
     [Fact]
     public void OnlyTheSearchIndexFeatureTouchesTheSearchSchema()
     {
+        // IX-2 adds the builder plane (backfill, attestation, deep sweep) and SearchProjectionRebuild, both in the same feature.
         Assert.Equal(
             [
                 "AuthorizationAuthority.Application/Features/SearchIndex/ContentRevisionCoordinator.cs",
+                "AuthorizationAuthority.Application/Features/SearchIndex/SearchIndexBuilderService.cs",
                 "AuthorizationAuthority.Application/Features/SearchIndex/SearchIndexSweepService.cs",
                 "AuthorizationAuthority.Application/Features/SearchIndex/SearchIndexWriter.cs",
+                "AuthorizationAuthority.Application/Features/SearchIndex/SearchProjectionRebuildService.cs",
             ],
             Matching(SearchIndexAccess()));
+    }
+
+    /// <summary>IX-2 (IX-D1 (b), IX-D6): a backfill derives only from bytes the Authority has just verified against the head, in the builder service alone.</summary>
+    [Fact]
+    public void BackfillDerivesOnlyAfterTheWorkloadVerificationAndOnlyInTheBuilderService()
+    {
+        Assert.Equal(["AuthorizationAuthority.Application/Features/SearchIndex/SearchIndexBuilderService.cs"], Matching(BackfillDerivation()));
+        var service = AuthoritySources().Single(s => s.Path.EndsWith("Features/SearchIndex/SearchIndexBuilderService.cs", StringComparison.Ordinal)).Text;
+        var start = service.IndexOf("public async Task<SearchIndexBackfillResponse> BackfillAsync(", StringComparison.Ordinal);
+        var end = service.IndexOf("public async Task<SearchIndexAttestation> AttestAsync(", StringComparison.Ordinal);
+        Assert.True(start > 0 && end > start);
+        var body = service[start..end];
+        var verify = body.IndexOf("content.VerifyWorkloadObservedContentAsync(", StringComparison.Ordinal);
+        var refusal = body.IndexOf("if (!verification.Verified)", StringComparison.Ordinal);
+        var derive = body.IndexOf("writer.DeriveForBackfillAsync(", StringComparison.Ordinal);
+        Assert.True(verify > 0 && refusal > verify && derive > refusal, "derivation must follow the verification and its refusal branch");
+        Assert.Equal(1, Regex.Count(body, @"writer\.DeriveForBackfillAsync\("));
+        Assert.Contains("verification.Head!", body, StringComparison.Ordinal); // the head is the verified one, never a builder value
+    }
+
+    /// <summary>IX-2: the builder's requests carry identifiers and bytes only — never a posting, entry, seal, coverage state or value.</summary>
+    [Fact]
+    public void BuilderRequestsCarryNoIndexRowsSealsOrStates()
+    {
+        var requests = typeof(AuthorizationAuthority.Contracts.V1.SearchIndexBackfillRequest).Assembly.GetTypes()
+            .Where(t => t.Namespace == "AuthorizationAuthority.Contracts.V1" && t.Name.StartsWith("SearchIndex", StringComparison.Ordinal) && (t.Name.EndsWith("Request", StringComparison.Ordinal) || t.Name.EndsWith("Item", StringComparison.Ordinal)) && !t.Name.EndsWith("WorkItem", StringComparison.Ordinal))
+            .ToList();
+        Assert.Equal(["SearchIndexAttestationRequest", "SearchIndexBackfillItem", "SearchIndexBackfillRequest", "SearchIndexDeepSweepWorkRequest", "SearchIndexDeepVerifyRequest", "SearchIndexPopulationRequest"], requests.Select(t => t.Name).Order(StringComparer.Ordinal));
+        var allowed = new[] { typeof(Guid), typeof(Guid?), typeof(int), typeof(IReadOnlyList<AuthorizationAuthority.Contracts.V1.StagedContentItem>), typeof(IReadOnlyList<AuthorizationAuthority.Contracts.V1.SearchIndexBackfillItem>) };
+        foreach (var property in requests.SelectMany(t => t.GetProperties()))
+        {
+            Assert.True(allowed.Contains(property.PropertyType), $"{property.DeclaringType!.Name}.{property.Name} has type {property.PropertyType.Name}");
+            Assert.DoesNotMatch("(?i)posting|entry|seal|coverage|value|status|complete", property.Name);
+        }
+    }
+
+    /// <summary>IX-2: the builder plane demands the builder credential, and the builder port is registered by the Worker host alone.</summary>
+    [Fact]
+    public void TheBuilderPlaneIsSeparatedLikeTheVerifierPlane()
+    {
+        var endpoints = AuthoritySources().Single(s => s.Path.EndsWith("Features/SearchIndex/SearchIndexBuilderEndpoints.cs", StringComparison.Ordinal)).Text;
+        Assert.Contains("MapGroup(InternalApi.Prefix + \"/search-index-builder\").WithTags(\"SearchIndex\").RequireAuthorization(InternalAuthentication.SearchIndexBuilderPolicy)", endpoints, StringComparison.Ordinal);
+        Assert.Contains("MapGroup(InternalApi.Prefix + \"/search-index\").WithTags(\"SearchIndex\").RequireAuthorization(InternalAuthentication.WorkloadPolicy)", endpoints, StringComparison.Ordinal);
+        var backend = RepositoryPaths.Combine("src", "backend");
+        var registrations = Directory.EnumerateFiles(backend, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal) && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(f => File.ReadAllText(f).Contains(".AddSearchIndexBuilder(", StringComparison.Ordinal))
+            .Select(f => Path.GetRelativePath(backend, f).Replace('\\', '/')).ToList();
+        Assert.Equal(["EnterpriseForms.Worker/Program.cs"], registrations);
     }
 
     [Fact]
@@ -154,7 +209,8 @@ public sealed partial class SearchIndexBoundaryTests
         }
 
         Assert.Single(statements, s => s.StartsWith("GRANT UPDATE", StringComparison.Ordinal) || s.Contains(", UPDATE", StringComparison.Ordinal) && s.Contains("search_record_entries", StringComparison.Ordinal));
-        Assert.Contains("GRANT UPDATE (last_seal_verified_on, last_seal_attempted_on, last_seal_attempt_outcome_code) ON authority_search.search_record_entries TO runtime_role", statements);
+        // IX-2 adds the S-C scope timestamp and its observability attempt (§17.10 R3) to the column-limited grant; nothing else.
+        Assert.Contains("GRANT UPDATE (last_seal_verified_on, last_seal_attempted_on, last_seal_attempt_outcome_code, last_deep_verified_on, last_deep_attempted_on, last_deep_attempt_outcome_code) ON authority_search.search_record_entries TO runtime_role", statements);
         Assert.DoesNotContain(statements, s => s.Contains("DELETE", StringComparison.Ordinal) && SearchIndexSchema.StateTables.Any(t => s.Contains(t, StringComparison.Ordinal)));
         Assert.Contains("ALTER ROLE authority_search_reader SET default_transaction_read_only = on", statements);
         Assert.DoesNotContain(statements, s => s.Contains("authority_search_reader", StringComparison.Ordinal) && Regex.IsMatch(s, @"\b(INSERT|UPDATE|DELETE)\b"));

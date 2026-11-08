@@ -26,6 +26,12 @@ public sealed class SpiceDbOptions
 
     /// <summary>Results per LookupResources page; enumeration continues with cursors until exhausted (C-28).</summary>
     public int LookupPageSize { get; set; } = 1000;
+
+    /// <summary>
+    /// IX-2 O-1: items per CheckBulkPermissions request; larger calls are split into several requests at the same pinned
+    /// snapshot, never truncated. Must stay at or below the server maximum confirmed by contract test IX2-CT-07 (P-S1-1 §4).
+    /// </summary>
+    public int BulkCheckMaximumItems { get; set; } = 100;
 }
 
 /// <summary>
@@ -41,6 +47,7 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
     private readonly Lazy<(GrpcChannel Channel, PermissionsService.PermissionsServiceClient Permissions, SchemaService.SchemaServiceClient Schema, Metadata Headers)> connection;
     private readonly TimeSpan timeout;
     private readonly int lookupPageSize;
+    private readonly int bulkCheckMaximumItems;
     private readonly string? configurationError;
 
     public SpiceDbProjectionClient(IOptions<SpiceDbOptions> options)
@@ -54,6 +61,12 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
 
         timeout = TimeSpan.FromSeconds(Math.Max(1, value.TimeoutSeconds));
         lookupPageSize = Math.Clamp(value.LookupPageSize, 1, 10_000);
+        if (value.BulkCheckMaximumItems < 1)
+        {
+            throw new InvalidOperationException("SpiceDb:BulkCheckMaximumItems must be positive (IX-2 O-1; confirmed below the server maximum by IX2-CT-07).");
+        }
+
+        bulkCheckMaximumItems = value.BulkCheckMaximumItems;
         connection = new Lazy<(GrpcChannel, PermissionsService.PermissionsServiceClient, SchemaService.SchemaServiceClient, Metadata)>(() =>
         {
             if (configurationError is not null)
@@ -227,58 +240,54 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         return outcomes[0];
     }
 
-    public async Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkAsync(IReadOnlyList<SpiceDbCheck> checks, VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken)
+    /// <summary>
+    /// Existing semantics (a per-item error is <see cref="SpiceDbCheckOutcome.Unknown"/>), with the IX-2 O-1 hardening that applies
+    /// to every caller: results are mapped by echoed request (a mismatch or a count difference fails the call as unavailable) and
+    /// calls above <see cref="SpiceDbOptions.BulkCheckMaximumItems"/> are split at the same snapshot, never truncated.
+    /// </summary>
+    public Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkAsync(IReadOnlyList<SpiceDbCheck> checks, VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken) =>
+        CheckBulkCoreAsync(checks, snapshot, BulkItemErrorPolicy.ReportUnknown, cancellationToken);
+
+    /// <summary>IX-2 O-1 strict form (for V2, IX-3): as <see cref="CheckBulkAsync"/>, and any per-item error fails the whole call.</summary>
+    public Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkStrictAsync(IReadOnlyList<SpiceDbCheck> checks, VerifiedProjectionSnapshot snapshot, CancellationToken cancellationToken) =>
+        CheckBulkCoreAsync(checks, snapshot, BulkItemErrorPolicy.FailCall, cancellationToken);
+
+    private async Task<IReadOnlyList<SpiceDbCheckOutcome>> CheckBulkCoreAsync(IReadOnlyList<SpiceDbCheck> checks, VerifiedProjectionSnapshot snapshot, BulkItemErrorPolicy itemErrors, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(checks);
         ArgumentNullException.ThrowIfNull(snapshot);
         snapshot.RequireOpen();
-        var request = new CheckBulkPermissionsRequest { Consistency = new Consistency { AtExactSnapshot = new ZedToken { Token = snapshot.Pin } } };
-        foreach (var check in checks)
+        var outcomes = new List<SpiceDbCheckOutcome>(checks.Count);
+        foreach (var chunk in SpiceDbBulkCheckMapping.Chunk(checks, bulkCheckMaximumItems))
         {
-            request.Items.Add(new CheckBulkPermissionsRequestItem
+            var request = new CheckBulkPermissionsRequest { Consistency = new Consistency { AtExactSnapshot = new ZedToken { Token = snapshot.Pin } } };
+            foreach (var check in chunk)
             {
-                Resource = new ObjectReference { ObjectType = check.ResourceType, ObjectId = check.ResourceId },
-                Permission = check.Permission,
-                Subject = new SubjectReference { Object = new ObjectReference { ObjectType = check.SubjectType, ObjectId = check.SubjectId } },
-            });
-        }
-
-        try
-        {
-            var response = await Permissions.CheckBulkPermissionsAsync(request, Options(cancellationToken)).ConfigureAwait(false);
-            if (!string.Equals(response.CheckedAt?.Token, snapshot.Pin, StringComparison.Ordinal))
-            {
-                throw new SpiceDbSnapshotException(SpiceDbSnapshotFailure.TokenMismatch, "checked_at differs from the pinned snapshot");
-            }
-
-            var outcomes = new List<SpiceDbCheckOutcome>(checks.Count);
-            foreach (var pair in response.Pairs)
-            {
-                if (pair.ResponseCase != CheckBulkPermissionsPair.ResponseOneofCase.Item)
+                request.Items.Add(new CheckBulkPermissionsRequestItem
                 {
-                    outcomes.Add(SpiceDbCheckOutcome.Unknown);
-                    continue;
-                }
-
-                outcomes.Add(pair.Item.Permissionship switch
-                {
-                    CheckPermissionResponse.Types.Permissionship.HasPermission => SpiceDbCheckOutcome.Allowed,
-                    CheckPermissionResponse.Types.Permissionship.NoPermission => SpiceDbCheckOutcome.Denied,
-                    _ => SpiceDbCheckOutcome.Unknown,
+                    Resource = new ObjectReference { ObjectType = check.ResourceType, ObjectId = check.ResourceId },
+                    Permission = check.Permission,
+                    Subject = new SubjectReference { Object = new ObjectReference { ObjectType = check.SubjectType, ObjectId = check.SubjectId } },
                 });
             }
 
-            if (outcomes.Count != checks.Count)
+            try
             {
-                throw new SpiceDbUnavailableException("bulk check returned a different number of results");
-            }
+                var response = await Permissions.CheckBulkPermissionsAsync(request, Options(cancellationToken)).ConfigureAwait(false);
+                if (!string.Equals(response.CheckedAt?.Token, snapshot.Pin, StringComparison.Ordinal))
+                {
+                    throw new SpiceDbSnapshotException(SpiceDbSnapshotFailure.TokenMismatch, "checked_at differs from the pinned snapshot");
+                }
 
-            return outcomes;
+                outcomes.AddRange(SpiceDbBulkCheckMapping.Map(chunk, response.Pairs, itemErrors));
+            }
+            catch (RpcException ex)
+            {
+                throw Classify(ex, "CheckBulkPermissions");
+            }
         }
-        catch (RpcException ex)
-        {
-            throw Classify(ex, "CheckBulkPermissions");
-        }
+
+        return outcomes;
     }
 
     public async Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, VerifiedProjectionSnapshot snapshot, int maximumResults, CancellationToken cancellationToken)
