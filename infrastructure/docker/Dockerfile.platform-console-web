@@ -1,6 +1,6 @@
 # Platform Console web image (C8 M2 Stage 4): static SPA + nginx that proxies /console-api to the Platform Console BFF on the same
 # origin (so the BFF cookie, CSRF and Origin checks all hold). Separate image and origin from the business web app.
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /src
 COPY src/frontend/package.json src/frontend/package-lock.json ./
 COPY src/frontend/apps/platform-console/package.json apps/platform-console/
