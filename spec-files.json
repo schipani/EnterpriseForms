@@ -168,9 +168,14 @@
       "bytes": 25420
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
+      "sha256": "4412bea09ead4d367529b42ed363d7a910e077824e34ecaea50ccc71650e2349",
+      "bytes": 36794
+    },
+    {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "9b6b4b3ace77579d4ca1eab46a3bdf764aea4c19b3204fb7cdb830b26dc6d5af",
-      "bytes": 152734
+      "sha256": "cf28471bddb098a842892d81b0285da7f0725c245ce97d1eb2c29a765503b92f",
+      "bytes": 169932
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -374,8 +379,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "5949a3e377dd116cdbc2ade8dcfb3b1bf69f08d8d61fadbfde9f1477e1333c01",
-      "bytes": 234787
+      "sha256": "9ffc19a2c692226ef0c74406f533689d02f61ba08c8ed596db9d5f76fb8b1770",
+      "bytes": 238852
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -539,8 +544,8 @@
     },
     {
       "path": "docs/testing/FAST_FEEDBACK_TESTING.md",
-      "sha256": "5441b053b4b7fabd5df19e41366f7f7d95132a83626907ba570b45628ead6a2f",
-      "bytes": 11010
+      "sha256": "c7acd0606b4f36af6d20c3f29520dc34e880edd737143ef4c77fc98044885d81",
+      "bytes": 12152
     },
     {
       "path": "docs/testing/PB07_REQUEST_UPLOAD_ACCEPTANCE_TESTS.md",
@@ -729,13 +734,13 @@
     },
     {
       "path": "scripts/dev/stage-b.ps1",
-      "sha256": "da42e859e061f4e62e9fe7ca35c0da7fa80661ab95c4f9a5cd03ab0b34cb38e5",
-      "bytes": 5230
+      "sha256": "b163d1146b5036dd4193a1d37316fe372f3af312f307037490bd1df96c6c4960",
+      "bytes": 7305
     },
     {
       "path": "scripts/dev/test.ps1",
-      "sha256": "aee1ef63728b31006579ba0c12957e4926744de38b0465e666f033ca4e91820d",
-      "bytes": 9418
+      "sha256": "1f1d7e6dd1494f35bdafb3ae56aae1e51296f8c74e24964f93f9c20c8e0b69f4",
+      "bytes": 10060
     },
     {
       "path": "scripts/devstack/devstack.py",
