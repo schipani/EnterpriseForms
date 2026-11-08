@@ -9,7 +9,7 @@ using AuthorizationAuthority.Domain.Features.SecurityCommands;
 namespace AuthorizationAuthority.Application.Features.SecurityCommands;
 
 /// <summary>Authoritative security-commit point (CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md §2 "Command sequence").</summary>
-public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null)
+public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector faultInjector, TimeProvider clock, FieldSearchApprovalGate approvalGate, AuthorizationAuthority.Application.Features.SearchIndex.SearchIndexWriter? searchIndex = null, IOperationTimingObserver? timing = null)
 {
     public async Task<OperationStatus> SubmitAsync(VerifiedActor actor, SecurityCommandRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
@@ -20,9 +20,16 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
         // after the original commit observes a newer authorization revision; the precondition is enforced separately below.
         var requestDigest = CanonicalJson.Digest(CanonicalJson.SerializeBytes(request with { ExpectedAuthorizationRevision = 0 }));
 
+        // C-137 (R-37): phase durations for the optional diagnostics observer (no effect on the command).
+        var timer = new LockTiming();
+        double graphMs = 0, planMs = 0, commitMs = 0;
+        var edgeCount = 0;
+        void Report(string outcome) => timing?.SecurityCommand(new SecurityCommandTiming(request.OrganizationId, request.CommandKind.ToString(), outcome, timer.LockedMilliseconds ?? 0, graphMs, edgeCount, planMs, commitMs, timer.ElapsedMilliseconds));
+
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        timer.Locked();
         var bound = await ActorResolver.BindAsync(scope, state.OrganizationId, actor, cancellationToken).ConfigureAwait(false);
 
         var existing = await scope.FindCommandByIdempotencyKeyAsync(state.OrganizationId, idempotencyKey, cancellationToken).ConfigureAwait(false);
@@ -33,7 +40,9 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
                 throw new AuthorityException(AuthorityErrorCodes.IdempotencyConflict, 409, false, "idempotency key reused with a different request or actor");
             }
 
-            return await ToStatusAsync(scope, state, existing, cancellationToken).ConfigureAwait(false);
+            var replayed = await ToStatusAsync(scope, state, existing, cancellationToken).ConfigureAwait(false);
+            Report("Replayed");
+            return replayed;
         }
 
         var command = new SecurityCommand
@@ -65,7 +74,12 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
                 throw new AuthorityException(AuthorityErrorCodes.StaleAuthorizationRevision, 409, false, "expected_authorization_revision is stale");
             }
 
-            var graph = new DesiredStateGraph(await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false));
+            var graphStarted = timer.ElapsedMilliseconds;
+            var edges = await scope.GetActiveEdgesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
+            edgeCount = edges.Count;
+            var graph = new DesiredStateGraph(edges);
+            graphMs = timer.ElapsedMilliseconds - graphStarted;
+            var planStarted = timer.ElapsedMilliseconds;
             var plan = await CommandPlanner.PlanAsync(scope, state.OrganizationId, bound, request, graph, cancellationToken, approvalGate, command.CommandCreatedOn).ConfigureAwait(false);
             command.CommandPayloadJson = plan.NormalizedPayloadJson;
             if (plan.CommandReasonOverride is { } reasonOverride)
@@ -82,7 +96,10 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
                 await searchIndex.ApplyApprovalChangesAsync(scope, state, plan.NewApprovals, plan.ChangedApprovals, command.CommandCreatedOn, cancellationToken).ConfigureAwait(false);
             }
 
+            planMs = timer.ElapsedMilliseconds - planStarted;
+            var commitStarted = timer.ElapsedMilliseconds;
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            commitMs = timer.ElapsedMilliseconds - commitStarted;
         }
         catch (AuthorityException ex)
         {
@@ -120,9 +137,11 @@ public sealed class SecurityCommandService(IAuthorityStore store, IFaultInjector
                 AuditJournal.Append(scope, state, "MembershipCommandRejected", new { security_command_id = command.SecurityCommandId, command_kind = request.CommandKind.ToString(), actor_identity_binding_id = bound.Binding.IdentityBindingId, rejection_reason = ex.ErrorCode, correlation_id = correlationId }, clock);
             }
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            Report(ex.ErrorCode);
             throw;
         }
 
+        Report("Committed");
         faultInjector.CrashIfArmed(FaultNames.CrashAfterJournalCommit);
         return await ToStatusAsync(scope, state, command, cancellationToken).ConfigureAwait(false);
     }

@@ -88,6 +88,9 @@ services:
       # C-136 (R-33/R-36): entries per S-B transaction (organization lock released between transactions); the measurement recreates
       # the authority with other values.
       SearchIndex__SealCheckTransactionSize: ${IX4_SEAL_TRANSACTION_SIZE:-50}
+      # C-137 (R-37): phase-duration diagnostics (durations and counts only) for bounded measurements; off unless a test recreates
+      # the container with R37_OPERATION_TIMING=true (Development/Testing only; refused at startup elsewhere).
+      Diagnostics__OperationTiming: ${R37_OPERATION_TIMING:-false}
       SearchIndex__DeadlineEvaluationIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
       SearchIndex__Seal__Provider: VaultTransit
       SearchIndex__Seal__SigningKeyName: search-entry-seal-v1
@@ -253,6 +256,8 @@ services:
       # for bearer callers without a session. The IX-3 shadow comparison stays available through the Testing endpoint.
       # FIELD_SEARCH_ENGINE=Shadow or VerifiedScan selects the IX-3 or V1 behaviour.
       FieldSearch__Engine: ${FIELD_SEARCH_ENGINE:-Indexed}
+      # C-137 (R-37): record-creation phase durations (see the authority service); off unless R37_OPERATION_TIMING=true.
+      Diagnostics__OperationTiming: ${R37_OPERATION_TIMING:-false}
       Testing__StackIdentity: enterpriseforms-security-test
       # Phase C8 (D8-16): shortened reconciliation windows, permitted in Testing only (the hosts refuse them elsewhere).
       TeamMembershipReconciliation__InFlightWindowSeconds: "6"

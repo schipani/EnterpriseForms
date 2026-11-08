@@ -68,6 +68,8 @@ public sealed class Program
             builder.Configuration.GetValue<bool>(EnterpriseForms.Application.Features.FormRecords.Lifecycle.LifecycleTestingHooks.ConfigurationKey), builder.Environment.EnvironmentName));
         builder.Services.AddBusinessAuthentication(builder.Configuration, builder.Environment);
         builder.Services.AddWriteFaultInjection(builder.Configuration, builder.Environment);
+        // C-137 (R-37): optional phase-duration diagnostics of record creation; off unless configured, Development/Testing only.
+        builder.Services.AddOperationTiming(builder.Configuration, builder.Environment);
         builder.Services.AddBusinessDataProtection(builder.Configuration);
         // My Records cursors (C-29) use the host's Data Protection key ring, like the session cookie; only the API serves lists.
         builder.Services.AddSingleton<EnterpriseForms.Application.Common.IOpaqueCursorProtector, DataProtectionCursorProtector>();

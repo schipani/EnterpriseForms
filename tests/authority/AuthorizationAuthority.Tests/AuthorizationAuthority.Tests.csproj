@@ -15,5 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Application/AuthorizationAuthority.Application.csproj" />
     <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Infrastructure/AuthorizationAuthority.Infrastructure.csproj" />
+    <!-- C-137 (R-39): the sweep scheduler (SearchIndexSweepLoop) is hosted in the Api composition. -->
+    <ProjectReference Include="../../../src/authority/AuthorizationAuthority.Api/AuthorizationAuthority.Api.csproj" />
   </ItemGroup>
 </Project>

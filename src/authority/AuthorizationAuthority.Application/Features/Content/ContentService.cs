@@ -20,7 +20,7 @@ namespace AuthorizationAuthority.Application.Features.Content;
 /// commit proves the staged bytes equal the approved candidate and CAS-advances the trusted head, verify compares an
 /// observed projection with the complete accepted leaf index. No generic signing path exists (A9).
 /// </summary>
-public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites, AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator? revisionCoordinator = null)
+public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider macProvider, ProjectionIntegrityVerifier verifier, IFaultInjector faultInjector, TimeProvider clock, ShareContributorWriteSwitch contributorWrites, AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator? revisionCoordinator = null, IOperationTimingObserver? timing = null)
 {
     // IX-1 (INV-R): the only way the content-integrity revision advances; without a configured index it still keeps INV-R.
     private readonly AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator revisions = revisionCoordinator ?? AuthorizationAuthority.Application.Features.SearchIndex.ContentRevisionCoordinator.WithoutIndex;
@@ -41,6 +41,30 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     public async Task<PreparedContentOperation> PrepareAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var timer = new LockTiming();
+        var outcome = "Completed";
+        try
+        {
+            return await PrepareCoreAsync(actor, request, idempotencyKey, correlationId, timer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityException ex)
+        {
+            outcome = ex.ErrorCode;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = ex.GetType().Name;
+            throw;
+        }
+        finally
+        {
+            timing?.ContentOperation(new ContentOperationTiming(request.OrganizationId, "Prepare", outcome, timer.LockedMilliseconds ?? 0, timer.ElapsedMilliseconds));
+        }
+    }
+
+    private async Task<PreparedContentOperation> PrepareCoreAsync(VerifiedActor? actor, PrepareContentChangeRequest request, string idempotencyKey, Guid correlationId, LockTiming timer, CancellationToken cancellationToken)
+    {
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 128)
         {
             throw AuthorityException.Invalid("Idempotency-Key must be 8..128 characters");
@@ -51,6 +75,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        timer.Locked();
         var (bound, reprotection) = await ResolveActorAsync(scope, state, actor, request.ReprotectionCommandId, cancellationToken).ConfigureAwait(false);
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
@@ -204,6 +229,30 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     public async Task<ContentRevision> CommitAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var timer = new LockTiming();
+        var outcome = "Completed";
+        try
+        {
+            return await CommitCoreAsync(actor, operationId, request, correlationId, timer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (AuthorityException ex)
+        {
+            outcome = ex.ErrorCode;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            outcome = ex.GetType().Name;
+            throw;
+        }
+        finally
+        {
+            timing?.ContentOperation(new ContentOperationTiming(request.OrganizationId, "Commit", outcome, timer.LockedMilliseconds ?? 0, timer.ElapsedMilliseconds));
+        }
+    }
+
+    private async Task<ContentRevision> CommitCoreAsync(VerifiedActor? actor, Guid operationId, CommitContentChangeRequest request, Guid correlationId, LockTiming timer, CancellationToken cancellationToken)
+    {
 
         // Testing only (no-op elsewhere): holds a commit before it takes the organization lock, so integration tests can
         // revoke a grant between prepare and commit deterministically (Phase C5 revocation-race tests).
@@ -211,6 +260,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
         var state = await scope.LockOrganizationAsync(request.OrganizationId, cancellationToken).ConfigureAwait(false)
                     ?? throw AuthorityException.NotRegistered("organization is not registered");
+        timer.Locked();
         OrganizationGate.RequireOpen(await OrganizationGate.EvaluateAsync(scope, state, cancellationToken).ConfigureAwait(false));
 
         var operation = await scope.FindOperationAsync(operationId, cancellationToken).ConfigureAwait(false);

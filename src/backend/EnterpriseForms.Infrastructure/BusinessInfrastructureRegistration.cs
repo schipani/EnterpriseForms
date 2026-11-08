@@ -66,6 +66,8 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<AuthorityCommandAwaiter>();
         // Every host gets the no-op fault seam; only the Testing API host replaces it (TestingWriteFaults, F-C7-01).
         services.TryAddSingleton<EnterpriseForms.Application.Common.IWriteFaultInjector>(EnterpriseForms.Application.Common.NoWriteFaults.Instance);
+        // C-137 (R-37): every host gets the no-op timing sink; only a Development/Testing API host replaces it (TestingOperationTiming).
+        services.TryAddSingleton<EnterpriseForms.Application.Common.IOperationTimingSink>(EnterpriseForms.Application.Common.NoOperationTiming.Instance);
         services.AddSingleton<RecordCandidateStager>();
         services.AddSingleton<EnterpriseForms.Application.Features.FormRecords.Ports.IAcceptedRecordItemsReader, EnterpriseForms.Application.Features.FormRecords.Ports.AcceptedRecordItemsReader>();
         services.AddSingleton<VerifiedRecordReader>();
