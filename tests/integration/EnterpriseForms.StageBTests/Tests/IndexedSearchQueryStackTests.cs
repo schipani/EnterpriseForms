@@ -458,6 +458,144 @@ public sealed class IndexedSearchQueryStackTests(StageBFixture fixture)
         }
     }
 
+    private static readonly (string Table, string Column)[] PostingValueColumns =
+    [
+        ("search_string_postings", "normalized_string_value"), ("search_integer_postings", "integer_value"), ("search_decimal_postings", "decimal_value"),
+        ("search_date_postings", "date_value"), ("search_date_time_postings", "date_time_value"), ("search_boolean_postings", "boolean_value"), ("search_option_postings", "field_option_id"),
+    ];
+
+    /// <summary>
+    /// C-135 PD-9 (design §8.2, §22.4), alongside the unchanged plan-shape test above:
+    /// <list type="number">
+    /// <item>structural — every non-primary posting index is a B-tree keyed (organization_id, form_record_id, …) and contains no value
+    /// column (no B-tree value index, no trigram GIN), so no plan can skip-scan a value index;</item>
+    /// <item>plans under different value distributions (unique, two values, skewed, Boolean and option) and planner statistics
+    /// (as analyzed; n_distinct forced low; n_distinct forced all-distinct; statistics target 1), each with EXPLAIN (ANALYZE, BUFFERS):
+    /// the existing node and index rules, and every posting access is an index condition on the record;</item>
+    /// <item>an indicator (not a proof) that the probe's work does not grow with out-of-scope data: shared buffers of a fixed 5-record
+    /// scope before and after 120 out-of-scope records with distinct values are added.</item>
+    /// </list>
+    /// The plans and buffers are written to artifacts/ix-4/pd9-plans.json.
+    /// </summary>
+    [Fact]
+    public async Task PD9NoPostingIndexIsValueKeyedAndPlansStayRecordScopedAcrossDistributionsAndStatistics()
+    {
+        // 1. Structural.
+        var definitions = Sql("""
+            SELECT i.relname || '|' || am.amname || '|' || x.indisprimary || '|' || pg_get_indexdef(i.oid)
+            FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid JOIN pg_class t ON t.oid = x.indrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace JOIN pg_am am ON am.oid = i.relam
+            WHERE n.nspname = 'authority_search' AND t.relname LIKE 'search\_%\_postings' ORDER BY 1;
+            """).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Assert.Equal(PostingValueColumns.Length * 3, definitions.Length); // primary key, record probe index, entry index per table
+        foreach (var line in definitions.Where(l => l.Split('|')[2] is "false" or "f"))
+        {
+            var parts = line.Split('|', 4);
+            Assert.Equal("btree", parts[1]);
+            Assert.Contains("(organization_id, form_record_id, ", parts[3], StringComparison.Ordinal);
+            Assert.DoesNotContain(PostingValueColumns, c => parts[3].Contains(c.Column, StringComparison.Ordinal));
+            Assert.True(parts[0].EndsWith("_postings_record", StringComparison.Ordinal) || parts[0].EndsWith("_postings_entry", StringComparison.Ordinal), line);
+        }
+
+        // 2. Distributions: unique references, two exhibit counts, a skewed hearing date, Boolean and option values.
+        var w = await WorkspaceAsync("ix4-pd9");
+        var records = new List<Guid>();
+        for (var i = 0; i < 40; i++)
+        {
+            records.Add(await CreateAsync(w, Values($"P9-{i:D4}", i % 2, i < 36 ? "2026-07-07" : $"2026-0{1 + (i % 9)}-0{1 + (i % 8)}", i % 5 == 0 ? "closed" : "open", i % 3 == 0)));
+        }
+
+        await WaitCompleteAsync(w);
+        var smallScope = records.Take(5).ToList();
+        object[][] matrix =
+        [
+            [Cond(w.Reference, "equals", "String", "P9-0003")], [Cond(w.Reference, "startsWith", "String", "P9-00")], [Cond(w.Reference, "contains", "String", "-00")],
+            [Cond(w.Count, "equals", "Integer", "1")], [Cond(w.Count, "between", "Integer", null, "0", "1")], [Cond(w.Hearing, "equals", "Date", "2026-07-07")],
+            [Cond(w.Status, "is", "Option", w.Open.ToString("D"))], [Cond(w.Urgent, "isTrue", "Boolean")],
+            [Cond(w.Reference, "startsWith", "String", "P9-"), Cond(w.Count, "equals", "Integer", "0"), Cond(w.Status, "includes", "Option", w.Closed.ToString("D"))],
+        ];
+
+        var evidence = new List<object>();
+        async Task<long> PlanAsync(string scenario, IReadOnlyList<Guid> scope, object[] conditions)
+        {
+            var plan = await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/testing/search/candidate-plan", TestIdentity.WorkloadToken(),
+                new { organization_id = w.S.OrganizationId, scope_record_ids = scope, query = Query(w, conditions), analyze = true });
+            Assert.True(plan.IsSuccess, plan.Body);
+            var json = plan.Root.GetProperty("plan_json").GetString()!;
+            var nodes = new List<JsonElement>();
+            void Walk(JsonElement node)
+            {
+                nodes.Add(node);
+                if (node.TryGetProperty("Plans", out var children))
+                {
+                    foreach (var child in children.EnumerateArray())
+                    {
+                        Walk(child);
+                    }
+                }
+            }
+
+            Walk(JsonDocument.Parse(json).RootElement[0].GetProperty("Plan"));
+            var types = nodes.Select(n => n.GetProperty("Node Type").GetString()!).ToList();
+            Assert.DoesNotContain(types, t => t is "Hash Join" or "Merge Join" or "Bitmap Heap Scan" or "Bitmap Index Scan" or "Hash" or "Seq Scan");
+            Assert.Contains("Function Scan", types);
+            var indexNodes = nodes.Where(n => n.TryGetProperty("Index Name", out _)).ToList();
+            Assert.All(indexNodes, n =>
+            {
+                var index = n.GetProperty("Index Name").GetString()!;
+                Assert.True(index.EndsWith("_postings_record", StringComparison.Ordinal) || index.EndsWith("_postings_entry", StringComparison.Ordinal) || index.StartsWith("uq_search_record_entry", StringComparison.Ordinal), $"{scenario}: unexpected index {index}\n{json}");
+                Assert.Contains("form_record_id", n.GetProperty("Index Cond").GetString()!, StringComparison.Ordinal); // every index access is keyed by the record
+            });
+            long Blocks(JsonElement n) => (n.TryGetProperty("Shared Hit Blocks", out var h) ? h.GetInt64() : 0) + (n.TryGetProperty("Shared Read Blocks", out var r) ? r.GetInt64() : 0);
+            var root = JsonDocument.Parse(json).RootElement[0].GetProperty("Plan");
+            var buffers = Blocks(root);
+            evidence.Add(new { scenario, scope = scope.Count, conditions = conditions.Length, buffers, indexes = indexNodes.Select(n => n.GetProperty("Index Name").GetString()).Distinct().Order().ToList(), node_types = types.Distinct().Order().ToList() });
+            return buffers;
+        }
+
+        string Statistics(string clause) => string.Join(" ", PostingValueColumns.Select(c => $"ALTER TABLE authority_search.{c.Table} ALTER COLUMN {c.Column} {clause};"));
+        var analyze = string.Join(" ", PostingValueColumns.Select(c => $"ANALYZE authority_search.{c.Table};"));
+        try
+        {
+            foreach (var (scenario, setup) in new[]
+            {
+                ("analyzed", ""),
+                ("n_distinct_low", Statistics("SET (n_distinct = 2)")),
+                ("n_distinct_all_distinct", Statistics("SET (n_distinct = -1)")),
+                ("statistics_target_1", Statistics("RESET (n_distinct)") + " " + Statistics("SET STATISTICS 1")),
+            })
+            {
+                fixture.Stack.AuthorityAdministratorSql(setup + " " + analyze);
+                foreach (var conditions in matrix)
+                {
+                    await PlanAsync(scenario, records, conditions);
+                    await PlanAsync(scenario, smallScope, conditions);
+                }
+            }
+
+            // 3. Indicator: the small scope's work before and after out-of-scope records with many distinct values are added.
+            fixture.Stack.AuthorityAdministratorSql(Statistics("RESET (n_distinct)") + " " + Statistics("SET STATISTICS -1") + " " + analyze);
+            object[] probe = [Cond(w.Reference, "startsWith", "String", "P9-00")];
+            var before = await PlanAsync("indicator_before", smallScope, probe);
+            for (var i = 0; i < 120; i++)
+            {
+                await CreateAsync(w, Values($"P9-{1000 + i:D4}-{Guid.NewGuid():N}", 100 + i, $"2027-0{1 + (i % 9)}-1{i % 9}", "open", i % 2 == 0));
+            }
+
+            await WaitCompleteAsync(w);
+            fixture.Stack.AuthorityAdministratorSql(analyze);
+            var after = await PlanAsync("indicator_after_120_out_of_scope", smallScope, probe);
+            Assert.True(after <= before * 2 + 20, $"the 5-record probe read {before} blocks before and {after} after out-of-scope records were added");
+        }
+        finally
+        {
+            fixture.Stack.AuthorityAdministratorSql(Statistics("RESET (n_distinct)") + " " + Statistics("SET STATISTICS -1") + " " + analyze);
+        }
+
+        Directory.CreateDirectory(Path.Combine(ComposeStack.RepositoryRoot, "artifacts", "ix-4"));
+        await File.WriteAllTextAsync(Path.Combine(ComposeStack.RepositoryRoot, "artifacts", "ix-4", "pd9-plans.json"), JsonSerializer.Serialize(new { measured_on = DateTimeOffset.UtcNow, git_commit = ComposeStack.GitCommit(), indexes = definitions, plans = evidence }, Indented), Ct);
+    }
+
     /// <summary>IX-20, IX-78: a revocation between pages deletes the organization's older snapshots in its own transaction; the next page is refused.</summary>
     [Fact]
     public async Task IX20IX78ARevocationBetweenPagesDeletesTheSnapshotAndRefusesThePage()

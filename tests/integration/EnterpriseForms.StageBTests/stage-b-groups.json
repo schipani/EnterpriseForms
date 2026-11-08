@@ -31,7 +31,7 @@
     {
       "name": "search-execution",
       "title": "Field Search Execution and Benchmark",
-      "classes": ["FieldSearchExecutionTests", "SearchIndexFoundationTests", "IndexedSearchQueryStackTests", "IndexedFieldSearchEngineStackTests", "IndexedSearchLocalBenchmarkTests"]
+      "classes": ["FieldSearchExecutionTests", "SearchIndexFoundationTests", "IndexedSearchQueryStackTests", "IndexedFieldSearchEngineStackTests", "IndexedSearchLocalBenchmarkTests", "IndexedSearchTimeoutDiagnosticsTests"]
     },
     {
       "name": "protection-reconciliation",

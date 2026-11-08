@@ -39,14 +39,15 @@ public static class IndexedSearchEndpoints
     public static IEndpointRouteBuilder MapIndexedSearchTestingEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost(InternalApi.Prefix + "/testing/search/candidate-plan", static async Task<Ok<CandidatePlanResponse>> (CandidatePlanRequest request, IndexedSearchService service, CancellationToken cancellationToken) =>
-                TypedResults.Ok(new CandidatePlanResponse(await service.ExplainCandidatePlanAsync(request.OrganizationId, request.ScopeRecordIds, request.Query, cancellationToken).ConfigureAwait(false))))
+                TypedResults.Ok(new CandidatePlanResponse(await service.ExplainCandidatePlanAsync(request.OrganizationId, request.ScopeRecordIds, request.Query, cancellationToken, request.Analyze).ConfigureAwait(false))))
             .WithTags("SearchIndex")
             .RequireAuthorization(InternalAuthentication.WorkloadPolicy)
             .WithName("TestingIndexedCandidatePlan");
         return endpoints;
     }
 
-    public sealed record CandidatePlanRequest(Guid OrganizationId, IReadOnlyList<Guid> ScopeRecordIds, IndexedSearchQuery Query);
+    /// <param name="Analyze">C-135 (PD-9): EXPLAIN (ANALYZE, BUFFERS) instead of the plan only.</param>
+    public sealed record CandidatePlanRequest(Guid OrganizationId, IReadOnlyList<Guid> ScopeRecordIds, IndexedSearchQuery Query, bool Analyze = false);
 
     public sealed record CandidatePlanResponse(string PlanJson);
 }

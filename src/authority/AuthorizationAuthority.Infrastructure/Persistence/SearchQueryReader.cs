@@ -150,11 +150,11 @@ public sealed class SearchQueryReader(string? readerConnectionString, IndexedSea
             return result;
         }).ConfigureAwait(false);
 
-        public async Task<string> ExplainCandidatesAsync(Guid formDefinitionId, IReadOnlyCollection<Guid> scope, IReadOnlyList<PreparedIndexedCondition> conditions, SearchMetadataFilter filter, int limit, CancellationToken cancellationToken) => await Guard(async () =>
+        public async Task<string> ExplainCandidatesAsync(Guid formDefinitionId, IReadOnlyCollection<Guid> scope, IReadOnlyList<PreparedIndexedCondition> conditions, SearchMetadataFilter filter, int limit, bool analyze, CancellationToken cancellationToken) => await Guard(async () =>
         {
             await SetCandidatePlannerAsync(true, cancellationToken).ConfigureAwait(false);
             var plan = new StringBuilder();
-            await using (var command = CandidateCommand("EXPLAIN (FORMAT JSON, COSTS FALSE) ", formDefinitionId, scope, conditions, filter, limit))
+            await using (var command = CandidateCommand(analyze ? "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " : "EXPLAIN (FORMAT JSON, COSTS FALSE) ", formDefinitionId, scope, conditions, filter, limit))
             {
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))

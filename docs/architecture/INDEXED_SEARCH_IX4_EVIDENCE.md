@@ -1,6 +1,6 @@
 # Indexed search (Option C): IX-3 follow-ups and IX-4 implementation evidence report (C-133)
 
-- **Status:** the IX-3 follow-ups (`e0e320c`) and IX-4 (`e0a36ed`) are committed (signed, local) on branch `ix-1/authority-search-index`, on top of IX-3 (`cb48ba7`) and the ruleset follow-up (`6428710`); this report is the third commit. Returned for owner acceptance. **One open acceptance blocker: the plan-shape finding (§6.1; design §22.4; PD-9).** **Not accepted, not independently reviewed, not pushed, not merged, not deployed.** Stage B intentionally not run (C-131).
+- **Status:** the IX-3 follow-ups (`e0e320c`) and IX-4 (`e0a36ed`) are committed (signed, local) on branch `ix-1/authority-search-index`, on top of IX-3 (`cb48ba7`) and the ruleset follow-up (`6428710`); this report is the third commit. Returned for owner acceptance. **One open acceptance blocker: the plan-shape finding (§6.1; design §22.4; PD-9).** **C-135 update: PD-9 remediated and verified (§10); IX-4 returned for conditional acceptance.** **Not accepted, not independently reviewed, not pushed, not merged, not deployed.** Stage B intentionally not run (C-131).
 - **Authorization:** C-133 (owner, 2026-11-08, message headed "C-132"): conditional acceptance of IX-3; decisions PD-1 to PD-5; authorization of **IX-4** within the approved design. C-134 (owner, 2026-11-08): completion instructions; PD-6 approved with conditions, PD-7 approved, PD-8 provisionally approved; the 50,000-record seeding not to be started. IX-5 to IX-7, Tier 2, OBS-IX-1, R6, G14 and M4-2 unauthorized.
 - **Data:** synthetic only. The `Indexed` engine is refused at startup outside Development/Testing; the persistent development stack is unchanged (`VerifiedScan`); the security-test stack defaults to `Indexed`.
 - **Kind:** implementation evidence for an owner-led review. Not an independent assessment; no attestation is created or implied.
@@ -250,10 +250,13 @@ R-01 to R-29 are carried from the IX-3 report. Changes: R-22 closed for IX-3 dev
 | R-29 | `FieldSearchExecutionTests` functional tests on new code | **Executed** 13/13 without the benchmark; the 480-record benchmark itself not run | Benchmark: next authorized performance or release run |
 | R-30 | Stage B on the IX-4 code (all groups, browser suite, `Engine=Indexed`) | **Not executed** (PD-7) | Next owner-authorized release run |
 | R-31 | Per-organization failure isolation in the builder | Deferred (§1.4) | Operational improvement, separate approval |
-| R-32 | Plan-shape guarantee on PostgreSQL 18 (§6.1) | **Open blocker** | **PD-9** |
-| R-33 | Availability failures (SpiceDB call cancellations, business 10 s timeout) in the local benchmark (§4) | Not investigated | **IX-7** or owner decision |
+| R-32 | Plan-shape guarantee on PostgreSQL 18 (§6.1) | **Remediated (C-135, §10):** value-keyed posting indexes dropped; plan-shape test passes on existing and fresh databases; owner acceptance pending | Owner acceptance |
+| R-33 | Availability failures (business 10 s timeout) in the local benchmark (§4) | **Root cause identified (§10.3):** the S-B seal pass holds the organization lock for one 2,000-entry batch (≈ 15.5 s at 1,000 entries); **open** until remediated | **Owner decision** (bounded seal-pass transactions recommended) |
 | R-34 | Local benchmarks at 10,000 and 50,000 records, and the discover-ceiling refusal | **Not run** (budget guard; C-134 deferral); not passed, not waived | Separately authorized performance validation |
 | R-35 | P-S1-1 benchmark ran during IX-3 contrary to C-132 (§6.3) | Recorded; prevented by the Benchmark trait | — |
+| R-36 | Seal-pass lock hold also applies in production (default 2,000 entries per pass every 15 minutes): organization-wide waits for searches and commits during a pass (§10.3) | Not remediated | **Owner decision**; IX-7 measurement |
+| R-37 | Ingestion serialization per organization (authorization-revision CAS, projection and archive gate, whole-graph load per command) (§10.4) | Not remediated; 944 s per 1,000 records preserved as measured | **Owner decision** (design option for batched registration) |
+| R-38 | Tier 2 index design must not reintroduce a value-keyed index on a record-probed table (PostgreSQL 18 skip scan) | Recorded (design §22.5) | **IX-5** review |
 
 ## 8. French drafts for the PB-14 copy review (not approved; not in the application)
 
@@ -268,7 +271,7 @@ R-01 to R-29 are carried from the IX-3 report. Changes: R-22 closed for IX-3 dev
 | A searched field holds protected values — A record in this form holds an encrypted value in a field you searched, so this search cannot give a complete answer and no results are shown — this does not mean nothing matched. | Un champ recherché contient des valeurs protégées — Un dossier de ce formulaire contient une valeur chiffrée dans un champ recherché; cette recherche ne peut donc pas donner de réponse complète et aucun résultat n'est affiché, ce qui ne signifie pas qu'aucun dossier ne correspond. |
 | Too many matching records — More records match than one search can return, so no results are shown. Narrow the search: choose a status or add another condition. | Trop de dossiers correspondants — Plus de dossiers correspondent qu'une recherche ne peut en retourner; aucun résultat n'est donc affiché. Précisez la recherche : choisissez un statut ou ajoutez une condition. |
 
-## 9. Recommendation
+## 9. Recommendation (C-134; superseded by §10.6)
 
 IX-4 is **not ready for unconditional acceptance**. One blocker:
 
@@ -285,3 +288,60 @@ Recommended owner actions:
 3. keep R-30, R-33 and R-34 open for release and performance validation.
 
 No production readiness is implied. IX-5 was not started. Stage B was not executed.
+
+## 10. C-135: PD-9 remediation, R-33 and ingestion diagnostics
+
+### 10.1 PD-9 change
+
+- **Indexes removed (8):** `ix_search_string_postings_value`, `ix_search_integer_postings_value`, `ix_search_decimal_postings_value`, `ix_search_date_postings_value`, `ix_search_date_time_postings_value`, `ix_search_boolean_postings_value`, `ix_search_option_postings_value` (B-tree, organization_id, field_definition_id, value, form_record_id) and `ix_search_string_postings_trigram` (GIN on normalized_string_value).
+- **Dependency verification:** design §22.5 — no approved Tier 1 query, maintenance path, constraint, integrity or authorization check uses them; Tier 2 does not expect them. No dependency found, so no alternatives were needed.
+- **Migration:** `20261108133232_AuthoritySearchIndexIx4DropValueIndexes` (forward-only, `DROP INDEX IF EXISTS`; `Down` refuses). Model snapshot updated; earlier migrations unchanged; no data changed.
+- **Code:** model configuration (value indexes removed, documented as forbidden); Testing-only `analyze` option on the candidate-plan endpoint (`EXPLAIN (ANALYZE, BUFFERS)`); no product query changed (the probe template is the IX-3 template, unchanged).
+- **Not done (by instruction):** no replacement index, no global planner setting, no hint, no change to the plan-shape assertions, classification rules, PD-3, PD-4, PD-6, PD-7 or PD-8.
+
+### 10.2 PD-9 verification (PostgreSQL 18.0)
+
+| Step | Database | Result | Run id |
+|---|---|---|---|
+| Unchanged plan-shape test **before** the migration | existing (long-lived) | **Fails** (`ix_search_string_postings_value`, skip scan) — reproduces the finding | direct run, 27 s |
+| Migration applied | existing | `ef_migrations_history` latest `20261108133232_AuthoritySearchIndexIx4DropValueIndexes`; posting indexes 21 (3 × 7), value or trigram 0 | — |
+| `IndexedSearchQueryStackTests` (unchanged plan-shape test, new PD-9 test, PD-3, shadow differential and the rest) | existing | **21/21** | `20261108-083828-47dc879f` |
+| `IndexedFieldSearchEngineStackTests` | existing | **5/5** | `20261108-084901-666148db` |
+| Migration applied | **fresh** (`down -v`) | same history entry; value or trigram 0; 21 | — |
+| `IndexedSearchQueryStackTests` | fresh | **21/21**; shadow differential 600/600, 0 unexplained differences | `20261108-090221-dd321893` |
+| `IndexedFieldSearchEngineStackTests` | fresh | **5/5** | `20261108-091331-499ca115` |
+| Authority unit / architecture / contract / integrity | — | **436/436, 95/95, 569/569, 60/60** (architecture adds `NoPostingIndexIsKeyedOnAValueColumn`) | `artifacts/test-runs/pd9-*` |
+
+**Plans** (`artifacts/ix-4/pd9-plans.json`, both databases): 74 `EXPLAIN (ANALYZE, BUFFERS)` plans each — 9 predicate shapes (string equals, prefix, contains; integer equals, between; skewed date; option is; boolean; a three-condition AND) × 2 scopes (40 and 5 records) × 4 statistics scenarios (as analyzed; `n_distinct = 2`; `n_distinct = -1`; statistics target 1, each followed by `ANALYZE`), plus the indicator. Data: unique references, two exhibit counts, a 90 % skewed date, Boolean and option values. In every plan: node types only Limit, Nested Loop, Function Scan (the scope), Subquery Scan, Result, Index Scan; indexes only `…_postings_record` and `uq_search_record_entry_record`; every index condition includes `form_record_id`. No skip scan of any value index is possible: none exists. Indicator (5-record scope, shared buffers before and after 120 out-of-scope records with distinct values): existing database 35 → 30, fresh database 20 → 30 (B-tree growth from a near-empty table); an indicator, not a proof.
+
+**Residual (stated, C-135 §3):** the guarantee is now structural for value access; the remaining record-keyed probe still relies on the IX-3 per-statement removal of hash, merge, bitmap and sequential plans, which is part of the approved §8.2 design. A future index added to a posting table would be caught by the architecture test (model) and the PD-9 structural check (database).
+
+### 10.3 R-33: search timeouts (bounded diagnostics)
+
+| Probe | Workload | Result |
+|---|---|---|
+| Small organization (`IndexedSearchTimeoutDiagnosticsTests`, run `20261108-085147-9fc4c5df`) | 170 records; 40 searches right after ingestion, 40 after 60 s quiet | 80/80 answered; p50 ≈ 200 ms, max 2.4 s |
+| Existing 1,000-record benchmark organization (two runs, no seeding) | 40 sequential searches each | **2/40 failed in each run** (503 `AUTHORITY_UNAVAILABLE` at ≈ 10 s); answered p50 584 and 619 ms; searches queued behind a failure 3.6 to 7.1 s |
+| Lock holder sampling (`pg_stat_activity`, `pg_blocking_pids`, every 0.3 s) | during the second probe | one Authority transaction **idle in transaction / active for up to 15.7 s**, reading entries and postings and updating `last_seal_verified_on` (the S-B seal pass), holding the organization row; waiting sessions on `organization_authorization_states … FOR UPDATE` (Lock:transactionid, tuple) |
+
+**Answers to C-135 §4:**
+- *What consumes the 10 s:* waiting for the organization lock in the search's final transaction while the seal pass holds it.
+- *Why SpiceDB calls reach a timeout:* they do not time out on their own; the business API's 10 s timeout cancels the Authority request and its in-flight SpiceDB call is reported as Cancelled.
+- *Enumeration, batching, pooling:* not the cause in these probes (Authority-side elapsed of completed searches p50 ≈ 400 ms; `SpiceDb:LookupPageSize=20` in the security-test stack adds round trips but no timeout); database contention is (organization row lock).
+- *Concurrent load:* not required (sequential searches, no ingestion).
+- *Latency figures:* the original benchmark's p95 included failed runs (§4); the current reports separate answered and all runs.
+- *Retries:* the engine retries only on a changed snapshot or not-ready pin, never on a timeout, so no amplification from search; ingestion retries do amplify load (below).
+- *Remediation recommendation:* design §22.6 (bounded seal-pass transactions); no timeout change; not implemented.
+
+### 10.4 Ingestion
+
+Preserved: 944 s for 1,000 records (§4). Diagnostic (170 records): 20 records serially at 2.48/s (p50 367 ms); 150 at concurrency 4 at 2.41/s (p50 1,555 ms; p50 7 attempts; 124 `STALE_AUTHORIZATION_REVISION`, 812 `AUTHORITY_NOT_READY`). Likely bottleneck: the per-organization authorization revision (every creation is a revision-bound security command, then gated on projection and archive), plus the whole-graph read per command (cost grows with organization size) and the seal-pass lock waits. Next step: design §22.6 (not implemented).
+
+### 10.5 Not run
+
+Stage B; the 480-record benchmarks; the 10,000 and 50,000-record benchmarks; no other long benchmark (the diagnostics took 162 s and about 60 s per probe).
+
+### 10.6 Recommendation
+
+IX-4 is **ready for conditional owner acceptance**: the PD-9 blocker is remediated structurally and verified on PostgreSQL 18 on an existing and a fresh database, with the plan-shape test unchanged and passing. Conditions to record: R-33/R-36 (seal-pass lock hold; remediation proposal awaiting approval), R-37 (ingestion serialization), R-30 and R-34 (Stage B and the 50K benchmark, deferred), R-27 (PB-14), and the carried production items (Managed HSM, signed external checkpoints, independent review, OBS-IX-1/R6, G14, the 20 ms p95 gate FAIL, cross-language vectors). No production readiness implied; IX-5 not started; Stage B not executed.
+

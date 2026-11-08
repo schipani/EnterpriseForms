@@ -2950,9 +2950,6 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
                         .HasDatabaseName("ix_search_boolean_postings_entry");
 
-                    b.HasIndex("OrganizationId", "FieldDefinitionId", "BooleanValue", "FormRecordId")
-                        .HasDatabaseName("ix_search_boolean_postings_value");
-
                     b.ToTable("search_boolean_postings", "authority_search", t =>
                         {
                             t.HasCheckConstraint("ck_search_boolean_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
@@ -3021,9 +3018,6 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
                         .HasDatabaseName("ix_search_date_postings_entry");
-
-                    b.HasIndex("OrganizationId", "FieldDefinitionId", "DateValue", "FormRecordId")
-                        .HasDatabaseName("ix_search_date_postings_value");
 
                     b.ToTable("search_date_postings", "authority_search", t =>
                         {
@@ -3094,9 +3088,6 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
                         .HasDatabaseName("ix_search_date_time_postings_entry");
 
-                    b.HasIndex("OrganizationId", "FieldDefinitionId", "DateTimeValue", "FormRecordId")
-                        .HasDatabaseName("ix_search_date_time_postings_value");
-
                     b.ToTable("search_date_time_postings", "authority_search", t =>
                         {
                             t.HasCheckConstraint("ck_search_date_time_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
@@ -3165,9 +3156,6 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
                         .HasDatabaseName("ix_search_decimal_postings_entry");
-
-                    b.HasIndex("OrganizationId", "FieldDefinitionId", "DecimalValue", "FormRecordId")
-                        .HasDatabaseName("ix_search_decimal_postings_value");
 
                     b.ToTable("search_decimal_postings", "authority_search", t =>
                         {
@@ -3361,9 +3349,6 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
                         .HasDatabaseName("ix_search_integer_postings_entry");
 
-                    b.HasIndex("OrganizationId", "FieldDefinitionId", "IntegerValue", "FormRecordId")
-                        .HasDatabaseName("ix_search_integer_postings_value");
-
                     b.ToTable("search_integer_postings", "authority_search", t =>
                         {
                             t.HasCheckConstraint("ck_search_integer_posting_source", "octet_length(manifest_item_key) = 17 AND octet_length(source_canonical_bytes) > 0");
@@ -3432,9 +3417,6 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
                         .HasDatabaseName("ix_search_option_postings_entry");
-
-                    b.HasIndex("OrganizationId", "FieldDefinitionId", "FieldOptionId", "FormRecordId")
-                        .HasDatabaseName("ix_search_option_postings_value");
 
                     b.ToTable("search_option_postings", "authority_search", t =>
                         {
@@ -3939,9 +3921,6 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrganizationId", "FormRecordId", "IndexedOperationId")
                         .HasDatabaseName("ix_search_string_postings_entry");
-
-                    b.HasIndex("OrganizationId", "FieldDefinitionId", "NormalizedStringValue", "FormRecordId")
-                        .HasDatabaseName("ix_search_string_postings_value");
 
                     b.ToTable("search_string_postings", "authority_search", t =>
                         {

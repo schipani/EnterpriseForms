@@ -205,6 +205,13 @@ public abstract class SearchPostingConfiguration<TPosting> : IEntityTypeConfigur
         ConfigureValue(builder);
     }
 
+    /// <summary>
+    /// The value column and its constraints only. C-135 (PD-9): posting tables carry **no index on a value column**. The only
+    /// indexes are the record probe index and the entry index, both keyed (organization_id, form_record_id, …), so every posting
+    /// read is per record. A value-keyed index (the IX-1 B-tree value indexes and the trigram GIN index, dropped by migration
+    /// AuthoritySearchIndexIx4DropValueIndexes) would let the planner serve the per-record probe by a PostgreSQL 18 skip scan whose
+    /// cost depends on the organization-wide value distribution (design §8.2, §22.4). Adding one needs a separate approval.
+    /// </summary>
     protected abstract void ConfigureValue(EntityTypeBuilder<TPosting> builder);
 }
 
@@ -218,7 +225,6 @@ public sealed class SearchStringPostingConfiguration : SearchPostingConfiguratio
     {
         builder.HasKey(e => e.SearchStringPostingId);
         builder.Property(e => e.NormalizedStringValue).UseCollation("C");
-        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId, e.NormalizedStringValue, e.FormRecordId }).HasDatabaseName("ix_search_string_postings_value");
     }
 }
 
@@ -231,7 +237,6 @@ public sealed class SearchIntegerPostingConfiguration : SearchPostingConfigurati
     protected override void ConfigureValue(EntityTypeBuilder<SearchIntegerPosting> builder)
     {
         builder.HasKey(e => e.SearchIntegerPostingId);
-        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId, e.IntegerValue, e.FormRecordId }).HasDatabaseName("ix_search_integer_postings_value");
     }
 }
 
@@ -245,7 +250,6 @@ public sealed class SearchDecimalPostingConfiguration : SearchPostingConfigurati
     {
         builder.HasKey(e => e.SearchDecimalPostingId);
         builder.Property(e => e.DecimalValue).HasColumnType("numeric");
-        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId, e.DecimalValue, e.FormRecordId }).HasDatabaseName("ix_search_decimal_postings_value");
     }
 }
 
@@ -259,7 +263,6 @@ public sealed class SearchDatePostingConfiguration : SearchPostingConfiguration<
     {
         builder.HasKey(e => e.SearchDatePostingId);
         builder.Property(e => e.DateValue).HasColumnName("date_value").HasColumnType("date");
-        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId, e.DateValue, e.FormRecordId }).HasDatabaseName("ix_search_date_postings_value");
     }
 }
 
@@ -272,7 +275,6 @@ public sealed class SearchDateTimePostingConfiguration : SearchPostingConfigurat
     protected override void ConfigureValue(EntityTypeBuilder<SearchDateTimePosting> builder)
     {
         builder.HasKey(e => e.SearchDateTimePostingId);
-        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId, e.DateTimeValue, e.FormRecordId }).HasDatabaseName("ix_search_date_time_postings_value");
     }
 }
 
@@ -285,7 +287,6 @@ public sealed class SearchBooleanPostingConfiguration : SearchPostingConfigurati
     protected override void ConfigureValue(EntityTypeBuilder<SearchBooleanPosting> builder)
     {
         builder.HasKey(e => e.SearchBooleanPostingId);
-        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId, e.BooleanValue, e.FormRecordId }).HasDatabaseName("ix_search_boolean_postings_value");
     }
 }
 
@@ -298,6 +299,5 @@ public sealed class SearchOptionPostingConfiguration : SearchPostingConfiguratio
     protected override void ConfigureValue(EntityTypeBuilder<SearchOptionPosting> builder)
     {
         builder.HasKey(e => e.SearchOptionPostingId);
-        builder.HasIndex(e => new { e.OrganizationId, e.FieldDefinitionId, e.FieldOptionId, e.FormRecordId }).HasDatabaseName("ix_search_option_postings_value");
     }
 }

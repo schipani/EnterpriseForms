@@ -174,6 +174,33 @@ public sealed partial class SearchIndexBoundaryTests
         Assert.Equal(["EnterpriseForms.Worker/Program.cs"], registrations);
     }
 
+    /// <summary>
+    /// C-135 (PD-9, design §8.2, §22.4): no posting-table index in the model is keyed on a value column. Every posting index must lead
+    /// with (organization_id, form_record_id), so the per-record candidate probe cannot be served by a skip scan of a value index.
+    /// The migration AuthoritySearchIndexIx4DropValueIndexes is forward-only and also drops the raw-SQL trigram index.
+    /// </summary>
+    [Fact]
+    public void NoPostingIndexIsKeyedOnAValueColumn()
+    {
+        var options = new DbContextOptionsBuilder<AuthorityDbContext>().UseNpgsql("Host=model-only.invalid;Database=unused;Username=unused;Password=unused").Options;
+        using var context = new AuthorityDbContext(options);
+        var postings = context.Model.GetEntityTypes().Where(e => e.GetSchema() == SearchIndexSchema.Name && (e.GetTableName() ?? string.Empty).EndsWith("_postings", StringComparison.Ordinal)).ToList();
+        Assert.Equal(7, postings.Count);
+        foreach (var entity in postings)
+        {
+            foreach (var index in entity.GetIndexes())
+            {
+                var columns = index.Properties.Select(p => p.GetColumnName()).ToList();
+                Assert.True(columns.Count >= 2 && columns[0] == "organization_id" && columns[1] == "form_record_id", $"{entity.GetTableName()}.{index.GetDatabaseName()}: ({string.Join(", ", columns)})");
+                Assert.DoesNotContain(columns, c => c is "normalized_string_value" or "integer_value" or "decimal_value" or "date_value" or "date_time_value" or "boolean_value" or "field_option_id");
+            }
+        }
+
+        var migration = File.ReadAllText(Directory.EnumerateFiles(RepositoryPaths.Combine("src", "authority", "AuthorizationAuthority.Infrastructure", "Persistence", "Migrations"), "*_AuthoritySearchIndexIx4DropValueIndexes.cs").Single());
+        Assert.Contains("ix_search_string_postings_trigram", migration, StringComparison.Ordinal);
+        Assert.Contains("throw new NotSupportedException", migration, StringComparison.Ordinal); // forward-only
+    }
+
     [Fact]
     public void SearchSchemaTablesFollowTheNamingRules()
     {

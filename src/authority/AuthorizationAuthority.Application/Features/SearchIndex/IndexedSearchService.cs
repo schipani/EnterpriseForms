@@ -405,14 +405,14 @@ public sealed class IndexedSearchService(
     /// Testing only (plan-shape test, design §8.2): the PostgreSQL plan of the candidate statement for a given scope and query, on
     /// the reader connection, without executing it. Mapped only in the Testing environment; synthetic data only.
     /// </summary>
-    public async Task<string> ExplainCandidatePlanAsync(Guid organizationId, IReadOnlyList<Guid> scope, IndexedSearchQuery query, CancellationToken cancellationToken)
+    public async Task<string> ExplainCandidatePlanAsync(Guid organizationId, IReadOnlyList<Guid> scope, IndexedSearchQuery query, CancellationToken cancellationToken, bool analyze = false)
     {
         RequireAvailable();
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(query);
         var conditions = IndexedSearchPredicates.Prepare(query.Conditions, options);
         await using var read = await reader.BeginAsync(organizationId, cancellationToken).ConfigureAwait(false);
-        return await read.ExplainCandidatesAsync(query.FormDefinitionId, scope, conditions, new SearchMetadataFilter(query.RecordStatus, query.IncludeChildren, query.IncludeArchived), options.MaximumResults + 1, cancellationToken).ConfigureAwait(false);
+        return await read.ExplainCandidatesAsync(query.FormDefinitionId, scope, conditions, new SearchMetadataFilter(query.RecordStatus, query.IncludeChildren, query.IncludeArchived), options.MaximumResults + 1, analyze, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>§18.4 purge job: expired and invalidated snapshots, bounded batches. Returns the number deleted.</summary>

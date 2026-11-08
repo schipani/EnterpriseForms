@@ -39,7 +39,8 @@ public interface ISearchQuerySession : IAsyncDisposable
     Task<IReadOnlyList<Guid>> FindCandidatesAsync(Guid formDefinitionId, IReadOnlyCollection<Guid> scope, IReadOnlyList<PreparedIndexedCondition> conditions, SearchMetadataFilter filter, int limit, CancellationToken cancellationToken);
 
     /// <summary>Testing only (plan-shape test, §8.2): the JSON EXPLAIN of the candidate statement, without executing it.</summary>
-    Task<string> ExplainCandidatesAsync(Guid formDefinitionId, IReadOnlyCollection<Guid> scope, IReadOnlyList<PreparedIndexedCondition> conditions, SearchMetadataFilter filter, int limit, CancellationToken cancellationToken);
+    /// <param name="analyze">C-135 (PD-9): <c>EXPLAIN (ANALYZE, BUFFERS)</c> — executes the read-only candidate statement and reports actual rows and buffers (Testing only).</param>
+    Task<string> ExplainCandidatesAsync(Guid formDefinitionId, IReadOnlyCollection<Guid> scope, IReadOnlyList<PreparedIndexedCondition> conditions, SearchMetadataFilter filter, int limit, bool analyze, CancellationToken cancellationToken);
 
     /// <summary>
     /// Binding data for I-2 and the seal check: entry, postings (of <paramref name="fieldIds"/>, or every field when null),
