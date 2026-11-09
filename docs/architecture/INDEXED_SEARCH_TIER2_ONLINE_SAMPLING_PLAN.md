@@ -2,6 +2,7 @@
 
 - **Status:** **proposal for review, not an approved gate.** C-138 §4 names 14 consecutive days with zero unexplained differences as the initial candidate. The independent reviewer is asked to assess the period and the coverage. Nothing is implemented, and no production or real-data run is implied. Prepared by Claude (Opus); not an independent assessment.
 - **Design basis:** §9.4 control 3 (M5): online sampling against Tier 1; §16 IX-5 exit gate ("online sampling clean over the agreed period").
+- **C-139:** §7A adds the B2 comparisons, scenarios S-23 to S-28 and value-row positive controls. Still a proposal.
 
 ## 1. What a sample is
 
@@ -120,6 +121,36 @@ No field values, predicate values, record ids or user ids appear in exported evi
 - **Pre-production:** sample 100 % of eligible searches.
 - **Production (if ever approved):** a configured fraction with a minimum daily count. The production fraction and period need a separate owner decision.
 - **Placement:** the sampling environment must be a non-production environment with continuous synthetic workload: Azure staging under IX-7, or a long-running local stack. C-138 does not start IX-7. A clean period there is evidence for **that implementation under that workload**, not for production traffic.
+
+## 7A. C-139 additions (B2 preferred for review; still a proposal, not an approved gate)
+
+**Comparison under B2.** In addition to the population and result comparison of §1:
+- the per-condition candidate set, after the parity rule, is compared with Tier 1's readable-for-predicate scope filtered by the same predicate, at the same pin;
+- for 1 % of samples, the matched records' value rows are re-derived from the sealed postings and verified access rows (an online M2-V spot check).
+
+**Additional scenarios (minimum occurrences in the period):**
+
+| # | Scenario | Minimum |
+|---|---|---|
+| S-23 | Multi-path field readability: the items of one field readable only through different principals (direct share + team share); searches by the recipient (UF-23) | 100 |
+| S-24 | Content commits that change the item count of a shared multi-select field (`field_item_count`), including adding an unshared selection | 200 |
+| S-25 | `ApproveFieldSearch` and `WithdrawFieldSearch` with value-row backfill and purge; searches during backfill must use Tier 1 for that field (UF-24) | 10 each |
+| S-26 | Records crossing the fan-out cap (D-5) in both directions; searches over high-fan-out records through the C path | 20 |
+| S-27 | Membership churn under F-1: `AddTeamMember` and `RemoveTeamMember` at high rate, with searches by affected and unaffected members between commands | 1,000 |
+| S-28 | Overlapping direct and team access, revoking one path while the other remains | 200 |
+
+**Population:**
+- at least one organization with thousands of users and hundreds of teams;
+- records shared with many principals (above and below the cap);
+- callers in every \|D\| band of S-21, including whole-organization callers.
+
+**Positive controls for value rows:**
+- a test-only deletion of one value row of a matching item;
+- a wrong `field_item_count`.
+
+Each must be reported as a Difference (or an M2-V Fail) within the same day.
+
+**Unchanged:** the period (14 days), the exit criteria (§5) and the evidence rules (§6) are still proposals for the reviewer (TQ-3).
 
 ## 8. Questions for the reviewer
 

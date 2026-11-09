@@ -6,6 +6,7 @@
   * dataset creation is separate from query measurement;
   * any bulk-registration mechanism stays gated under R-37;
   * synthetic data only.
+- **C-139:** §5A adds the fan-out dimensions, the 1M position and B2's effect on creation and storage. Still design only.
 
 ## 1. Purpose
 
@@ -146,6 +147,37 @@ Scaled to the §3 shape (≈ 15 leaves per record, 4 to 5 times the leaves; edge
 | 250K | ≈ 30 to 45 GB | ≈ 100 to 150 GB |
 
 Tier 2 tables add about 0.1 GB (option C) or about 1 GB (option B) at 250K (annex A §3.10). P0 replaces these estimates with measured figures.
+
+## 5A. C-139 additions (fan-out dimensions; B2 preferred for review)
+
+**Dataset shape additions** (proposed; the 100K and 250K acceptance gates are unchanged, and no new mandatory threshold is introduced):
+
+| Dimension | Addition | Purpose |
+|---|---|---|
+| Fan-out organization | One additional 100K organization with 2,000 users and 200 teams (team sizes 2 to 500). This exceeds PB-09's 500 users per organization, so it is a **stress shape**, not a gate | Large `P`, membership churn (annex B S-27) |
+| Records shared with many principals | 0.1 % of records with 50 to 300 shares (users and teams), on both sides of the D-5 cap | Value-row amplification (UF-26), C-path fallback |
+| Multi-path field readability | 1 % of shared records whose field items are covered by different principals (direct + team shares) | Parity (UF-23) |
+| Multi-select item counts | Shared multi-select fields with 1 to 10 selections, some unshared | `field_item_count`; the UF-25 Tier 1 observation |
+| Approved fields | A second parent form with 50 approved fields | The high-fields case (annex A §13.2) |
+
+**1M records:**
+- not proposed for seeding in IX-5;
+- creation through the trusted path is roughly four times the 250K estimate, and is infeasible without D4-2 and D4-3;
+- the 1M figures in annex A §13 are extrapolations only.
+
+**B2 effect on creation.**
+- Every content commit also writes value rows (≈ 13 per record in the base case, more for shared records) under the organization lock.
+- P0 measures this delta at 1,000 records, if a Tier 2 dark build exists by then (IX-5a, separately authorized).
+- Otherwise, datasets are created before Tier 2 exists, and Tier 2 tables are **built afterwards by the Tier 2 rebuild path** (from edges and sealed postings), then verified by a full M2 (E, S, V) in P2.
+
+**B2 storage, added to §5.4** (annex A §13.2, base case):
+- ≈ 0.3 GB at 100K and ≈ 0.8 GB at 250K for both Tier 2 tables;
+- ≈ 0.5–1.5 GB for the fan-out organization: between the base and heavy-sharing cases at 100K, with the 0.1 % high-fan-out records adding about 0.1 GB at most if D-5 is off.
+
+**Unchanged:**
+- no seeding and no benchmark (C-139 §9);
+- R-43 (persistent Vault);
+- R-37 gating of bulk registration.
 
 ## 6. Approvals and prerequisites (summary)
 

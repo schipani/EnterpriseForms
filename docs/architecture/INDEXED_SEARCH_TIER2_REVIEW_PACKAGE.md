@@ -7,8 +7,14 @@
   * Owner reviews to date (C-123, C-129, C-133, C-136, C-137) were **owner-led**.
   * Nothing here is a finding of an independent party, an approval or a certification. Statements marked "claim" are the design's claims, to be tested.
 - **Review object:** the Tier 2 **design** (design §9, §17.1; A2 R-B, R-C) as refined by annexes A to E. **No Tier 2 code exists.** Tier 1 (IX-1 to IX-4) **is implemented** and conditionally owner-accepted for development (C-137). It is Tier 2's oracle and fallback, and its code is reviewable.
-- **Baseline:** local branch `ix-1/authority-search-index` at the commit that adds this package (on top of `1868e16`). Not pushed.
-- **Implementation still needs a separate owner approval after the review** (C-138 §2).
+- **Baseline:** local branch `ix-1/authority-search-index` at the commit that adds this package (on top of `1868e16`), revised under C-139 on top of `f7886b0`. Not pushed.
+- **C-139 architecture direction (owner, 2026-11-09; owner-led, not an independent review):**
+  * Option B is preferred **for independent review**, with separate access and searchable-value structures;
+  * Option C is the comparison baseline and possible fallback;
+  * Option A remains rejected.
+
+  This is an architecture direction, not implementation approval, and it is **not** an independent security review. Under it, annex A §6–§15 evaluates B1 (canonical values), B2 (access-scoped values) and C. The design author's reading: B1 rejected, B2 preferred under conditions SAFE-1 to SAFE-11, C baseline and fallback.
+- **Implementation still needs a separate owner approval after the review** (C-138 §2, C-139 §8).
 
 ## 1. Documents
 
@@ -17,7 +23,7 @@
 | [INDEXED_SEARCH_PROJECTION_DESIGN.md](INDEXED_SEARCH_PROJECTION_DESIGN.md) §9, §17.1, §17.2, §17.5, §17.10, §22.4–§22.5, §23 | Normative design; the Tier 1 implementation record |
 | [ADR-AMENDMENT-PB-004-A2-AUTHORITY-SEARCH-INDEX.md](../decisions/ADR-AMENDMENT-PB-004-A2-AUTHORITY-SEARCH-INDEX.md) | R-B (completeness by derivation equivalence) and R-C (caps) |
 | [INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md](INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md) | Scope, dependencies, Tier 1 guarantees, R-38 findings, invariants (C-137) |
-| **Annex A** [INDEXED_SEARCH_TIER2_INDEX_ARCHITECTURE_ASSESSMENT.md](INDEXED_SEARCH_TIER2_INDEX_ARCHITECTURE_ASSESSMENT.md) | Option C against Option B (A rejected) |
+| **Annex A** [INDEXED_SEARCH_TIER2_INDEX_ARCHITECTURE_ASSESSMENT.md](INDEXED_SEARCH_TIER2_INDEX_ARCHITECTURE_ASSESSMENT.md) | §1–§5: Option C against Option B (A rejected; C-138). §6–§15 (C-139): access index, the command-impact matrix over all contract kinds, B1/B2/C comparison, the sharing correctness matrix, the scaling model and the safety conditions |
 | **Annex B** [INDEXED_SEARCH_TIER2_ONLINE_SAMPLING_PLAN.md](INDEXED_SEARCH_TIER2_ONLINE_SAMPLING_PLAN.md) | Proposed 14-day online sampling plan |
 | **Annex C** [INDEXED_SEARCH_TIER2_BENCHMARK_DATA_DESIGN.md](INDEXED_SEARCH_TIER2_BENCHMARK_DATA_DESIGN.md) | 100K/250K synthetic dataset design |
 | **Annex D** [INDEXED_SEARCH_TIER2_FULL_SWEEP_ASSESSMENT.md](INDEXED_SEARCH_TIER2_FULL_SWEEP_ASSESSMENT.md) | Seven-day full-sweep (M2) risk assessment |
@@ -45,6 +51,7 @@ Tier 1 enumerates the caller's discoverable records in SpiceDB on every search (
 | **PD-9 (C-135):** PostgreSQL 18 used a B-tree skip scan of a value-keyed index for a record-scoped probe; no setting disables skip scans; the value-keyed posting indexes were dropped | The §9.2 access-posting indexes (value-keyed, on a table also probed by record) are exposed to the same failure (R-38). Hence annex A |
 | R-37 measurement (C-137) | 100K/250K datasets cannot be created through the trusted path in practical time without R-37 changes (annex C) |
 | Design-author findings UF-14 to UF-21 (§9) | New items for the reviewer |
+| **C-139 owner direction:** Option B preferred for review with separate access and value structures | Annex A §6–§15: B1 rejected (timing), B2 preferred under SAFE-1 to SAFE-11, C baseline and fallback; findings UF-22 to UF-27; questions TQ-13 to TQ-20 |
 
 ## 4. Proposed design under review (summary)
 
@@ -52,14 +59,14 @@ Tier 1 enumerates the caller's discoverable records in SpiceDB on every search (
    - **IX-5a, dark:** derivation and M1 bookkeeping; never serves;
    - **IX-5b, differential:** dark plus sampling and M2;
    - **IX-5c, enabled.**
-2. **Index architecture:** Option C (access enumeration, no value columns; structural variant C-S) evaluated first; Option B (split value table and record table) second; Option A rejected. **Not selected** (annex A).
+2. **Index architecture (C-139):** **B2 preferred for review.** B2 is a principal-leading access index (C's table) plus a physically separate, principal-leading, access-scoped value index, with controlled duplication rules D-1 to D-6 and the multi-path parity rule (annex A §10). C is the baseline and fallback (the access index alone, with the Tier 1 record probe). B1 (canonical values with a later authorization intersection) is rejected for timing (annex A §9). A remains rejected. **Not selected** (annex A §15).
 3. **Derivation:** `AccessPostingDerivation/v1` mirrors `authority.schema.zed` relation by relation:
    - `form_record.effective_owner`, `discover`;
    - `field_item.read`;
    - `record_share.read`;
    - `team.participant` (teams are kept as principals and never expanded per member).
 
-   It runs inside every edge-writing security command (and, under B, inside content commits, builder backfill and purge), under the organization lock, at the committed revision.
+   It runs inside every edge-writing security command (and, under B2, value-row derivation runs inside content commits, builder backfill and purge), under the organization lock, at the committed revision. The command-by-command effect is annex A §8.
 4. **M1 fence:** affected records are written to `search_access_pending_verifications` in the same transaction. A verifier compares them with `LookupSubjects` at an S1-pinned snapshot (annex E). Tier 2 serves only when `access_verified_revision = authorization_revision` at the pin.
 5. **M2:** every record re-verified within 7 days (proposed), plus a user differential. Annex D proposes splitting it into M2-E (24 h edge re-derivation) and M2-S (7-day SpiceDB comparison).
 6. **Query:**
@@ -104,6 +111,11 @@ Tier 1 enumerates the caller's discoverable records in SpiceDB on every search (
 | T2-13 | Fence starvation (Tier 2 never usable under write load), pushing large callers to `SEARCH_INDEX_NOT_READY` | Fallback | An availability risk (UF-18) |
 | T2-14 | Derivation failure blocks security commands, a trusted-path availability risk | Dark-stage measurement; a kill switch that stops Tier 2 use without leaving stale rows trusted | UF-20, TQ-12 |
 | T2-15 | Cross-tenant rows | `organization_id` keys, RLS, principals from the organization's edges, S-A cross-organization check | As Tier 1 |
+| T2-16 | Planner statistics (histograms, most-common values, n_distinct, visibility state) cover unauthorized principals and other organizations, and shape plan choice (C-139) | SAFE-1 to SAFE-3 (one index, one single-table statement per condition: no plan choice for statistics to act on); SAFE-4 per-organization partitions | Reviewer judgment (UF-22). Buffer-cache effects are a general residual, as in Tier 1 |
+| T2-17 | Omission through multi-path field readability (items readable only through different principals) | Parity by `field_item_count` and distinct `FieldItemRead` items across `P` (annex A §10.3) | M3 vectors needed (UF-23) |
+| T2-18 | B2 value row tampered (Authority domain) to add or drop a candidate | Predicate re-evaluation on the I-2-bound posting (addition); M2-V daily re-derivation (omission); `indexed_operation_id` binding | Omission window 24 h, as Tier 1 S-B |
+| T2-19 | Value-row amplification for records shared with many principals: storage, write latency under the organization lock | D-1 to D-5 (fan-out cap with C-path fallback); D-6 | Availability and cost (UF-26) |
+| T2-20 | Tier 1 share-only check set and `items` limit depend on the presence and count of items the caller cannot read (implemented Tier 1) | B2 parity avoids it for Tier 2; Tier 1 unchanged | Reviewer and owner (UF-25) |
 
 ## 6. Authorization and completeness invariants (to be proven by the reviewer's assessment and later by tests)
 
@@ -120,6 +132,10 @@ Tier 1 enumerates the caller's discoverable records in SpiceDB on every search (
 | INV-T2-09 | Verification timestamps are written only on Pass, for the exact unit (§17.10 D1, K1 to K9) |
 | INV-T2-10 | Tier 1's I-1, I-2, seals, sweeps, deadlines and plan structure are unchanged |
 | INV-T2-11 | No access row contains plaintext (option C). Under B, value rows are covered by the INV-T2-06 key rule, predicate re-evaluation and a value-consistency control |
+| INV-T2-12 | (B2) Every value row (p, r, f, i) exists **iff** p reads item i through a single path (effective owner, or a share covering i), f has an Active approval with complete coverage, and the row's `indexed_operation_id` equals r's Tier 1 entry. `field_item_count` equals the number of f's posting items at that operation |
+| INV-T2-13 | (B2) A share-only candidate is evaluable for f iff the distinct items of f readable through `P` equal `field_item_count` (Tier 1 parity, R1 §E.3) |
+| INV-T2-14 | (B2) No match is disclosed unless every predicate re-evaluates true on the I-2-bound Tier 1 posting |
+| INV-T2-15 | Every implemented command kind has a declared Tier 2 affected-set rule (annex A §8). A kind without one fails the architecture test; empty-affected-set kinds may advance `access_verified_revision` only under F-1 |
 
 ## 7. PostgreSQL 18 timing risks (summary; detail in annex A §2, §3.7)
 
@@ -128,6 +144,8 @@ Tier 1 enumerates the caller's discoverable records in SpiceDB on every search (
 3. **GIN (btree_gin + trigram)** intersects posting lists of independent keys. The trigram list is organization-wide, so it is not bounded by principal (UF-15). It also needs bitmap scans, which are prohibited per statement.
 4. **Generic plans, statistics drift, parallel plans and JIT** change plans without code changes. That is why the guarantee must be structural, with a plan-shape test across distributions and statistics as regression evidence only (C-135: a passing plan is not proof of every plan).
 5. **Residual:** the Tier 1 probe still depends on per-statement settings (no hash, merge, bitmap or sequential scan) for its record-keyed access, as accepted in IX-4.
+6. **Statistics and plan choice (C-139, UF-22):** table statistics are computed over every principal and, without partitions, every organization. Even when every available plan is bounded by the caller's rows, statistics choose **which** plan runs. B2 removes the choice structurally: one index per table, one single-table statement per condition, intersection in the application (SAFE-1 to SAFE-3). Per-organization LIST partitions (SAFE-4) isolate statistics and visibility state per organization.
+7. **Canonical value indexes (B1):** any value-leading index on a table a caller statement reads lets the planner drive from unauthorized values, or skip-scan it for record probes (PD-9). B1 is rejected on this ground (annex A §9).
 
 ## 8. SpiceDB consistency requirements
 
@@ -154,6 +172,31 @@ Tier 1 enumerates the caller's discoverable records in SpiceDB on every search (
 | UF-20 | §12.4 minimum-safe-version fencing must cover Tier 2: an Authority version without derivation would commit edges with no access rows and no pending verifications | Annex A §3.9 |
 | UF-21 | "Tier 2 disabled for the organization" is not a specified state: who sets and clears it, how it is journaled, and its precedence with `Quarantined`, `Suspended` and S1 | Annex A §3.6 |
 
+**Added under C-139:**
+
+| ID | Finding | Where |
+|---|---|---|
+| UF-22 | **Planner statistics are shared** across principals and, without partitions, across organizations. Structural bounds hold for each plan, but statistics select the plan. Mitigation: one index per table, one single-table statement per condition, application-side intersection (SAFE-1 to SAFE-3), and per-organization partitions (SAFE-4). Needs the reviewer's judgment on sufficiency | Annex A §10.5, §13.7 |
+| UF-23 | **Multi-path field readability:** a caller can read the items of one field through different principals (direct share and team share). Per-principal completeness would omit records Tier 1 and SpiceDB include. Rule: per-item rows plus a stored `field_item_count`, compared with the distinct readable items across `P` | Annex A §10.3 |
+| UF-24 | **Correction:** under the split design (B2), approvals, withdrawals and reclassification change no access row, so they do not reopen the SpiceDB fence. Value rows are verified by re-derivation, and availability is gated by value-row coverage. Annex A §3.2, §3.10 and annex E §5 overstated B's verification cost | Annex A §6.2 |
+| UF-25 | **Implemented Tier 1 (for the reviewer and owner; no change made):** the share-only check set (`ReadPredicateItemsAsync`; R1 §E.3) is every posting item of each predicate field, including items the caller cannot read. Its size, which drives the number of `field_item#read` checks and the `items` limit (`MaximumShareOnlyItems`), therefore depends on the presence and count of values in fields the caller can discover but not read (for example, the number of selected options of an unshared multi-select). It is independent of predicate values, as R1 §E.3 states. The statement that limits are "caller-owned quantities" is imprecise for these items | `IndexedSearchService.cs` at `f7886b0`, lines 114–132 (search) and 331–334 (page); `SearchQueryReader.ReadPredicateItemsAsync` |
+| UF-26 | **Value-row amplification:** a record shared with many principals multiplies value rows (and content-commit writes under the organization lock) by its path-principal count. Proposed fan-out cap D-5, with C-path fallback for high-fan-out records | Annex A §10.2, §13.3 |
+| UF-27 | **FD-5 boundary:** B2 adds value-row writes inside Tier 1's writer transactions (W1 content commit, builder). Tier 1 query behaviour is unchanged, but FD-5 ("no change to Tier 1 behaviour" in IX-5) needs an explicit owner decision for these additive writes. C changes only the five edge-writing commands | Annex A §10.1, SAFE-11 |
+
+**Status of the C-138 findings (C-139 §5; none closed or waived):**
+
+| Finding | Status after C-139 |
+|---|---|
+| UF-14 command impact | **Proposed resolution:** per-command matrix over every contract kind (annex A §8), with `UpdateShareScope` declared but unimplemented and no record-deletion command; INV-T2-15 architecture test. Open until reviewed and tested (M3) |
+| UF-15 organization-wide trigram | **Proposed resolution:** no GIN in any option; `contains` as a secondary condition or a principal-bound scan; trigram B-tree deferred (TQ-17). Open |
+| UF-16 value-copy integrity | **Proposed resolution:** INV-T2-14 (predicate re-evaluation), M2-V (24 h), `indexed_operation_id` binding. Open |
+| UF-17 `LookupSubjects` limits, duplicates, 2 × (1 + F) | Unchanged API facts. Edge-informed F reduces calls (annex A §13.6; TQ-8). E-6 (deployed version) still missing. Open |
+| UF-18 fence starvation and S-D grace | **Proposed:** F-1 (empty affected sets advance the fence) and F-2 (inline verification, bounded wait; TQ-15); S-D without grace (annex D). Open |
+| UF-19 persistent signing keys for datasets | Unchanged; R-43. Open |
+| UF-20 minimum-safe-version fencing | Unchanged; now also covers value rows (SAFE-10). Open |
+| UF-21 Tier 2 disabled state | Unchanged; now also covers value rows. Open |
+| Dataset preparation throughput (R-37) | Unchanged; annex C; B2 adds content-commit work (UF-26, UF-27). Open |
+
 The FD-8 package's UF-1 to UF-13 and OR-1 to OR-4 remain. UF-2 (Tier 2 completeness not independently assessed) is the subject of this package; UF-12 is refined by UF-17.
 
 ## 10. Failure scenarios and required behaviour
@@ -179,7 +222,12 @@ The FD-8 package's UF-1 to UF-13 and OR-1 to OR-4 remain. UF-2 (Tier 2 completen
 | FS-17 | Caller with very large `|D|` (option C) | Bounded by `statement_timeout` and admission; a refusal depends only on the caller's own `|D|` |
 | FS-18 | Two Authority instances run the verifier | Idempotent per record and revision; no lease today (R-42) means duplicated work. To be specified |
 | FS-19 | The kill switch turns derivation off | Tier 2 marked not maintained (journaled); re-enabling requires a rebuild and a full M2 |
-| FS-20 | Field approval change (option B) | Every record of the form pending; the fence is closed until verified |
+| FS-20 | Field approval change (option B) | ~~Every record of the form pending; the fence is closed until verified~~ **C-139 (UF-24), for B2:** no access row changes; the builder backfills or purges value rows; the field is not used by Tier 2 until value coverage is complete (Tier 1 serves it meanwhile) |
+| FS-21 | (B2) Value row disagrees with the I-2-bound posting at query time | Divergence: the search fails (`SEARCH_INDEX_INCONSISTENT`), Q4 first, then Tier 2 disabled for the organization and value rows rebuilt |
+| FS-22 | (B2) M2-V finds a missing or extra value row | Fail per §17.10 classes: S1 first; Tier 2 disabled; rebuild from postings and verified access rows |
+| FS-23 | (B2) A content commit fails in value-row derivation | The commit aborts (as FS-01 for commands): a record-save availability risk; dark-stage measurement before enablement |
+| FS-24 | (B2) A record exceeds the fan-out cap K | Marked high-fan-out, its value rows removed in the same transaction; its candidates come from the C path; the transition is journaled |
+| FS-25 | Fence closed when a search arrives (F-2) | Wait up to the bounded time; still closed ⇒ Tier 1 within its ceiling, otherwise `SEARCH_INDEX_NOT_READY` |
 
 ## 11. Rollback strategy
 
@@ -196,7 +244,7 @@ Not rolled back, ever: authorization revisions, revocations, journal entries, S1
 
 | Stage | Exit gate |
 |---|---|
-| IX-5a dark | Unit and contract tests for the derivation, relation by relation, against zed; golden vectors; M3 affected-set property tests (per command kind, UF-14); architecture tests (INV-T2-03 every edge-writing command derives; INV-T2-06 index keying; no GIN; no value column under C); fault injection FS-01, FS-11, FS-12, FS-19; security-command latency and lock-hold delta measured (R-37 interaction); SEC-P and IX-1 to IX-4 suites unchanged and passing |
+| IX-5a dark | Unit and contract tests for the derivation, relation by relation, against zed; golden vectors; M3 affected-set property tests (per command kind, UF-14); architecture tests (INV-T2-03 every edge-writing command derives; INV-T2-06 index keying; no GIN; no value column under C); fault injection FS-01, FS-11, FS-12, FS-19; security-command latency and lock-hold delta measured (R-37 interaction); SEC-P and IX-1 to IX-4 suites unchanged and passing. **C-139 additions:** INV-T2-15 command-matrix architecture test. If B2 is approved: INV-T2-12 to 14 golden vectors; multi-path parity vectors (UF-23); M2-V; content-commit latency and lock-hold delta (UF-27); fan-out transitions (FS-24); SAFE-1 to SAFE-3 architecture tests |
 | IX-5b differential | IX-38 (divergence), IX-39 (coupling guard), IX-40 (property-based differential, 0 differences), IX-41 (M2), IX-52 (fence, affected sets, M2); annex E outcome-class tests; plan-shape tests across distributions on PostgreSQL 18; IX-33 (counts and limits); online sampling per annex B (period subject to review) |
 | IX-5c enabled | 100K and 250K benchmarks on datasets prepared per annex C (verified after restore); PB-09 search targets reported (not assumed); fence-lag and verifier throughput measured; independent review findings dispositioned; owner approval |
 | Production | IX-7 (Azure staging, Managed HSM, PERF-01, DR with G14), independent implementation review, PB-12 evidence. **Not in IX-5** |
@@ -217,6 +265,14 @@ Not rolled back, ever: authorization revisions, revocations, journal entries, S1
 | TQ-10 | Behaviour for records whose subject count exceeds the client limit | E |
 | TQ-11 | Verification at the projection revision under concurrent commands | E |
 | TQ-12 | Trusted-path change: is aborting security commands on derivation failure the right trade? Kill-switch semantics; minimum-safe-version fencing | A §3.9 |
+| TQ-13 | (C-139) Do you agree that B1, canonical values with an authorization intersection, cannot meet the timing invariants on PostgreSQL 18 in any value-first or mixed-index form, and is rejected? Is any B1 variant (for example B1-G access classes) worth pursuing? | A §9 |
+| TQ-14 | Are SAFE-1 to SAFE-11 sufficient for B2? In particular: does "one index, one single-table statement per condition" remove the statistics channel (UF-22)? Are per-organization partitions required? | A §10.5 |
+| TQ-15 | Fence availability: F-1 (empty affected sets advance the fence), and F-2 (inline verification with a bounded search wait, which reveals recent organization security activity)? | A §12 |
+| TQ-16 | Multi-path parity: is the `field_item_count` rule (annex A §10.3) correct and complete against the zed union semantics, including multi-select fields and repeating groups? | A §10.3 |
+| TQ-17 | `contains`: is a secondary-condition or principal-bound-scan strategy acceptable for V1 Tier 2, or is a principal-leading trigram B-tree needed (storage × value length)? | A §10.4 |
+| TQ-18 | Fan-out cap D-5: is a C-path fallback for high-fan-out records acceptable, and what K? | A §10.2 |
+| TQ-19 | UF-25 (implemented Tier 1): is the dependence of the share-only check set and the `items` limit on unreadable items acceptable? If not, what change is appropriate (outside IX-5 scope, FD-5)? | §9 |
+| TQ-20 | Value consistency: is M2-V at 24 h plus per-match re-evaluation sufficient, or should value rows carry a seal? | A §10.5, D |
 
 ## 14. Evidence the reviewer will need
 
@@ -234,6 +290,9 @@ Not rolled back, ever: authorization revisions, revocations, journal entries, S1
 | E-10 | `LookupSubjects` latency and throughput (PERF-01) | **No:** IX-5b and IX-7 |
 | E-11 | Online sampling evidence | **No:** IX-5b |
 | E-12 | G14 recovery behaviour | **No:** G14 not implemented (UF-10) |
+| E-13 | Command-impact matrix verified against `CommandPlanner*.cs` (annex A §8) | Design author's reading only; **reviewer to confirm** |
+| E-14 | B2 value-row and access-row cardinality and write cost at 100K/250K (annex A §13) | **No:** estimates only; annex C datasets and IX-5a measurement |
+| E-15 | Plan-shape and statistics-sensitivity evidence for B2 statements, including with per-organization partitions | **No:** IX-5a/b |
 
 ## 15. Findings, verdict and attestation
 
@@ -241,10 +300,10 @@ Use the FD-8 package §8 template (ID, question, severity Critical/High/Medium/L
 
 Verdict (reviewer's choice):
 - **Tier 2 design:** acceptable for separate approval / acceptable with conditions / not acceptable.
-- **Index architecture:** C / B / neither, with conditions.
+- **Index architecture:** B2 / C / neither, with conditions. B1: rejection confirmed, or the variant to pursue.
 - **M2 interval and online sampling period:** acceptable / change required.
 
-Attestation: as FD-8 package §9, naming this package's commit and scope (TQ-1 to TQ-12, annexes A to E).
+Attestation: as FD-8 package §9, naming this package's commit and scope (TQ-1 to TQ-20, annexes A to E).
 
 ## 16. After the review
 

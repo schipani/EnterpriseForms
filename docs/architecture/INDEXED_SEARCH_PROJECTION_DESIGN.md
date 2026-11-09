@@ -1537,3 +1537,33 @@ The approved IX-5 specification (§16, §9 box, §17.1 status, IX-D13, R-B, FD-3
 - UF-21: the "Tier 2 disabled" state is unspecified.
 
 §9 and §17.1 stay as approved for review. Any change follows the review findings and a separate owner decision.
+
+## 25. C-139 record: Tier 2 architecture direction
+
+**Owner direction (C-139, 2026-11-09; owner-led, not an independent assessment, not implementation approval).**
+- Option B is preferred for independent review, with logically and physically separate access and searchable-value structures.
+- Option C remains the comparison baseline and possible fallback.
+- Option A remains rejected unless separately approved.
+- The independent-review prerequisite of IX-D13, R-B, §17.1, FD-3 and C-138 IX5-D1 is unchanged.
+
+**Refinement prepared for the reviewer** (annex A §6–§15 of [INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md](INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md); not submitted, no review has occurred):
+- **B1** (canonical values with an authorization intersection) is rejected for timing. A value-first or mixed-index plan reads unauthorized values, and PostgreSQL 18 may skip-scan a value-keyed index for record probes (PD-9). Its only safe form is record-driven, which is Option C.
+- **B2**, a principal-leading access-scoped value index beside the access index, is the design author's preferred candidate under SAFE-1 to SAFE-11. Those conditions are:
+  * one index per table;
+  * one single-table statement per condition;
+  * per-organization partitions;
+  * predicate re-evaluation on sealed postings;
+  * the multi-path parity rule;
+  * M2-V;
+  * the FD-5 decision.
+- **C** is the baseline and fallback. Its table is B2's access index.
+
+**Design-author findings against this document** (package §9; dispositioned after the review, not changed here):
+- UF-22: planner statistics are shared across principals and organizations;
+- UF-23: §9.3's "Evaluable parity" must count distinct readable items across `P` (multi-path);
+- UF-24: §17.1's affected-set treatment of approvals does not apply to a split design;
+- UF-25: the implemented Tier 1 share-only check set (R1 §E.3, IX-D4) depends on the presence and count of unreadable items;
+- UF-26: value-row amplification;
+- UF-27: the FD-5 boundary for value-row writes in Tier 1 writer transactions.
+
+§9 and §17.1 stay as approved for review. Any change follows the review findings and a separate owner decision.

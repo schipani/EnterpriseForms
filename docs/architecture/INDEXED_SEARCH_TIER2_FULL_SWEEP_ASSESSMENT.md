@@ -1,6 +1,7 @@
 # Tier 2 full equivalence sweep (M2): seven-day interval risk assessment (C-138 IX5-D5; review annex D)
 
 - **Status:** risk assessment for the independent reviewer. **No production default is changed; no sweep exists.** Prepared by Claude (Opus) under C-138 §6; not an independent assessment.
+- **C-139:** §4A adds M2-V for B2's value rows.
 - **Proposal under assessment:** design §17.1 M2 and §17.5 S-D. Every record is verified at least once per **7 days** against SpiceDB, plus a rotating user differential. Tier 2 is disabled when M2 exceeds **14 days**.
 
 ## 1. What M2 is for (and what it is not for)
@@ -63,6 +64,33 @@ With the split, the omission window for the residual classes falls from 7 to 14 
 - seven days is a reasonable cycle for M2-S, provided M2-E bounds the residual classes at 24 h;
 - S-D should follow the §17.10 no-grace contract;
 - the 14-day threshold should be removed.
+
+## 4A. C-139: sweep composition under B2 (proposal; no production default changed)
+
+B2 adds value rows. Their faults are not visible to the SpiceDB comparison, which compares principals only. The proposed composition:
+
+| Part | Compares | Catches | Cost (annex A §13.6) | Proposed deadline (no grace, §17.10 classes) |
+|---|---|---|---|---|
+| M2-E | Access rows with re-derivation from canonical edges | Affected-set defects; Authority-domain deletion or insertion of access rows | SQL only, O(A) | 24 h |
+| **M2-V** (B2 only) | Value rows with re-derivation from sealed Tier 1 postings (I-2-verified) and M2-E-verified access rows, including `field_item_count` and `indexed_operation_id` | Missing, extra or altered value rows (UF-16, T2-18); stale `field_item_count` (UF-23); fan-out transitions not applied | SQL only, O(V): ≈ 13M rows at 1M records in the base case; estimated tens of minutes per day in bounded transactions, **unmeasured** | 24 h, aligned with Tier 1 S-B |
+| M2-S | Access rows with `LookupSubjects`, plus the user differential | Derivation semantics against zed; edge and SpiceDB divergence (S1 first) | ≈ 2.5 to 116 lookups/s, depending on N and F | 7 days |
+
+**Order within a cycle:**
+1. M2-E before M2-V, because value rows are re-derived from access rows that must themselves be verified.
+2. M2-S independently.
+
+A Fail in any part runs the S1 decisive verification first (Q4), then disables Tier 2 for the organization (the UF-21 state).
+
+**Status of the C-138 findings in this annex (C-139 §5; not waived):**
+- the 14-day disable threshold remains inconsistent with the no-grace rule (finding 1);
+- the 7-day window remains weaker than Tier 1's 24 h for the residual classes, unless M2-E is adopted (finding 2).
+
+The design author's reading is unchanged:
+- adopt M2-E and M2-V at 24 h and M2-S at 7 days;
+- apply §17.10 without grace;
+- remove the 14-day threshold.
+
+These are reviewer and owner decisions (TQ-4, TQ-5, TQ-20).
 
 ## 5. Questions for the reviewer
 

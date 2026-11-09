@@ -1,6 +1,7 @@
 # Tier 2 verifier: SpiceDB `LookupSubjects` client interface and cost model (C-138 IX5-D6; review annex E)
 
 - **Status:** interface proposal and cost model. **No client code exists; nothing was implemented or measured.** Prepared by Claude (Opus) under C-138 §7; not an independent assessment.
+- **C-139:** §5A corrects the option B approval cost for the split design (UF-24) and adds the B2 and fence-rule costs.
 - **Purpose:** M1 (the verified-revision fence) and M2 (the full rolling sweep) of design §17.1 compare a record's access rows with the subjects SpiceDB says can access it. `ISpiceDbProjection` today offers Check, CheckBulk, CheckBulkStrict and LookupResources only.
 
 ## 1. SpiceDB facts (vendored API, SpiceDB v1.56.2 era: `authzed/api` commit `3270b082`)
@@ -142,6 +143,19 @@ Notation:
 - p50 and p95 per lookup as a function of the subject count;
 - maximum sustainable `c` per SpiceDB node at the PB-09 envelope;
 - the impact on concurrent search Check and LookupResources latency.
+
+## 5A. C-139 corrections and B2 cost (proposal; no client implemented)
+
+1. **Approvals under B2 (UF-24).** The row "Field approval or withdrawal on a form of R records (option B only): R × 2(1 + F)" in §5 does **not** apply to the split design. Approvals change no access row. Value rows are verified by re-derivation (M2-V), not by `LookupSubjects`. For B2 the cost is zero lookups, plus builder SQL work.
+2. **Value rows add no lookups.** `LookupSubjects` verifies access rows only, under B2 exactly as under C. The verification load is identical for both options: §5's formulas with F as defined below.
+3. **F: two definitions** (TQ-8):
+   - *independent oracle*: every field item of the record (base case F ≈ 11);
+   - *edge-informed*: only items with a `shared_via` edge in the canonical edges (base case F ≈ 2), since every other item's `field_item#read` subject set equals `effective_owner`, which the record-level lookup already verifies.
+
+   The edge-informed form uses the canonical edges to choose what to verify. It is cheaper but less independent: a derivation defect that also hides an edge from the selection would not be examined.
+4. **Empty affected sets (F-1, annex A §12):** membership, role, form-user, searcher and policy commands cause **no** lookups.
+5. **Inline verification (F-2):** per command, 2 (1 + F) lookups at the command's revision. `RegisterRecord` has F = 0 (no items), so 2 lookups.
+6. **Scale (annex A §13.6):** M2-S at 1M records is ≈ 10 to 116 lookups/s over 7 days, depending on F. PERF-01 must still measure the sustainable rate and the per-lookup latency as a function of subject count (teams with hundreds of members expand to hundreds of `user` subjects).
 
 ## 6. Open questions for the reviewer
 
