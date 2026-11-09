@@ -14,7 +14,13 @@
   * Option A remains rejected.
 
   This is an architecture direction, not implementation approval, and it is **not** an independent security review. Under it, annex A §6–§15 evaluates B1 (canonical values), B2 (access-scoped values) and C. The design author's reading: B1 rejected, B2 preferred under conditions SAFE-1 to SAFE-11, C baseline and fallback.
-- **Implementation still needs a separate owner approval after the review** (C-138 §2, C-139 §8).
+- **C-140 (owner, 2026-11-09; owner-led, not an independent review):**
+  * B2 is the preferred Tier 2 architecture **for the independent review**; C is the baseline and fallback; Tier 2 is not implemented;
+  * six proposed decisions (FD-5 amendment, copy cap, partitions, command impact, no revealing search delays, sweep composition), recorded in §14A;
+  * UF-25 investigated and reproduced (Tier 1; [INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md](INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md)).
+
+  **This is not IX-5 implementation approval.**
+- **Implementation still needs a separate owner approval after the review** (C-138 §2, C-139 §8, C-140).
 
 ## 1. Documents
 
@@ -28,6 +34,7 @@
 | **Annex C** [INDEXED_SEARCH_TIER2_BENCHMARK_DATA_DESIGN.md](INDEXED_SEARCH_TIER2_BENCHMARK_DATA_DESIGN.md) | 100K/250K synthetic dataset design |
 | **Annex D** [INDEXED_SEARCH_TIER2_FULL_SWEEP_ASSESSMENT.md](INDEXED_SEARCH_TIER2_FULL_SWEEP_ASSESSMENT.md) | Seven-day full-sweep (M2) risk assessment |
 | **Annex E** [INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md](INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md) | `LookupSubjects` client interface and cost model |
+| [INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md](INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md) | C-140: UF-25 reproduction (implemented Tier 1), impact assessment, proposed correction U-1 and regression requirements |
 | [INDEXED_SEARCH_IX4_EVIDENCE.md](INDEXED_SEARCH_IX4_EVIDENCE.md) §7, §10–§12 | The register (R-01 to R-44) and the measurements cited |
 | [RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md](RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md) §7 | Ingestion findings (dataset feasibility) |
 | `src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/authority.schema.zed` | The permission model the derivation must mirror |
@@ -179,9 +186,10 @@ Tier 1 enumerates the caller's discoverable records in SpiceDB on every search (
 | UF-22 | **Planner statistics are shared** across principals and, without partitions, across organizations. Structural bounds hold for each plan, but statistics select the plan. Mitigation: one index per table, one single-table statement per condition, application-side intersection (SAFE-1 to SAFE-3), and per-organization partitions (SAFE-4). Needs the reviewer's judgment on sufficiency | Annex A §10.5, §13.7 |
 | UF-23 | **Multi-path field readability:** a caller can read the items of one field through different principals (direct share and team share). Per-principal completeness would omit records Tier 1 and SpiceDB include. Rule: per-item rows plus a stored `field_item_count`, compared with the distinct readable items across `P` | Annex A §10.3 |
 | UF-24 | **Correction:** under the split design (B2), approvals, withdrawals and reclassification change no access row, so they do not reopen the SpiceDB fence. Value rows are verified by re-derivation, and availability is gated by value-row coverage. Annex A §3.2, §3.10 and annex E §5 overstated B's verification cost | Annex A §6.2 |
-| UF-25 | **Implemented Tier 1 (for the reviewer and owner; no change made):** the share-only check set (`ReadPredicateItemsAsync`; R1 §E.3) is every posting item of each predicate field, including items the caller cannot read. Its size, which drives the number of `field_item#read` checks and the `items` limit (`MaximumShareOnlyItems`), therefore depends on the presence and count of values in fields the caller can discover but not read (for example, the number of selected options of an unshared multi-select). It is independent of predicate values, as R1 §E.3 states. The statement that limits are "caller-owned quantities" is imprecise for these items | `IndexedSearchService.cs` at `f7886b0`, lines 114–132 (search) and 331–334 (page); `SearchQueryReader.ReadPredicateItemsAsync` |
-| UF-26 | **Value-row amplification:** a record shared with many principals multiplies value rows (and content-commit writes under the organization lock) by its path-principal count. Proposed fan-out cap D-5, with C-path fallback for high-fan-out records | Annex A §10.2, §13.3 |
+| UF-25 | **Implemented Tier 1 (for the reviewer and owner; no change made):** the share-only check set (`ReadPredicateItemsAsync`; R1 §E.3) is every posting item of each predicate field, including items the caller cannot read. Its size, which drives the number of `field_item#read` checks and the `items` limit (`MaximumShareOnlyItems`), therefore depends on the presence and count of values in fields the caller can discover but not read (for example, the number of selected options of an unshared multi-select). It is independent of predicate values, as R1 §E.3 states. The statement that limits are "caller-owned quantities" is imprecise for these items. **C-140: reproduced on the stack for direct, team and overlapping shares** (refusal 200 → 422 with a limit of 2; +42 ms p50 for 1,000 unauthorized items, informational; results unchanged). Correction U-1 proposed, not implemented ([INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md](INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md)) | `IndexedSearchService.cs` at `f7886b0`, lines 114–132 (search) and 331–334 (page); `SearchQueryReader.ReadPredicateItemsAsync` |
+| UF-26 | **Value-row amplification:** a record shared with many principals multiplies value rows (and content-commit writes under the organization lock) by its path-principal count. Proposed fan-out cap D-5, with C-path fallback for high-fan-out records. **C-140:** cap of 100 principals evaluated, with counting rules; the C-path fallback is withdrawn (UF-28) | Annex A §10.2, §13.3; §14A.3 |
 | UF-27 | **FD-5 boundary:** B2 adds value-row writes inside Tier 1's writer transactions (W1 content commit, builder). Tier 1 query behaviour is unchanged, but FD-5 ("no change to Tier 1 behaviour" in IX-5) needs an explicit owner decision for these additive writes. C changes only the five edge-writing commands | Annex A §10.1, SAFE-11 |
+| UF-28 | **(C-140) Overflow channel:** serving records above the copy cap through the C path makes the caller's search work depend on how many of their discoverable records exceed the cap, i.e. on share counts the caller is not authorized to see (the UF-25 class). D-5's overflow path is withdrawn; refuse at the cap or apply no cap | §14A.3 |
 
 **Status of the C-138 findings (C-139 §5; none closed or waived):**
 
@@ -226,8 +234,8 @@ The FD-8 package's UF-1 to UF-13 and OR-1 to OR-4 remain. UF-2 (Tier 2 completen
 | FS-21 | (B2) Value row disagrees with the I-2-bound posting at query time | Divergence: the search fails (`SEARCH_INDEX_INCONSISTENT`), Q4 first, then Tier 2 disabled for the organization and value rows rebuilt |
 | FS-22 | (B2) M2-V finds a missing or extra value row | Fail per §17.10 classes: S1 first; Tier 2 disabled; rebuild from postings and verified access rows |
 | FS-23 | (B2) A content commit fails in value-row derivation | The commit aborts (as FS-01 for commands): a record-save availability risk; dark-stage measurement before enablement |
-| FS-24 | (B2) A record exceeds the fan-out cap K | Marked high-fan-out, its value rows removed in the same transaction; its candidates come from the C path; the transition is journaled |
-| FS-25 | Fence closed when a search arrives (F-2) | Wait up to the bounded time; still closed ⇒ Tier 1 within its ceiling, otherwise `SEARCH_INDEX_NOT_READY` |
+| FS-24 | (B2) A record would exceed the copy cap | ~~Marked high-fan-out, value rows removed, C-path candidates~~ **C-140 (UF-28):** the C-path overflow is withdrawn. Under O-1 the `CreateShare` is refused with a typed error to the grantor; under O-2 there is no cap (§14A.3) |
+| FS-25 | Fence closed when a search arrives | ~~Wait up to the bounded time~~ **C-140 decision 5:** no wait. Immediate fallback to Tier 1 within its ceiling, otherwise `SEARCH_INDEX_NOT_READY` |
 
 ## 11. Rollback strategy
 
@@ -273,6 +281,10 @@ Not rolled back, ever: authorization revisions, revocations, journal entries, S1
 | TQ-18 | Fan-out cap D-5: is a C-path fallback for high-fan-out records acceptable, and what K? | A §10.2 |
 | TQ-19 | UF-25 (implemented Tier 1): is the dependence of the share-only check set and the `items` limit on unreadable items acceptable? If not, what change is appropriate (outside IX-5 scope, FD-5)? | §9 |
 | TQ-20 | Value consistency: is M2-V at 24 h plus per-match re-evaluation sufficient, or should value rows carry a seal? | A §10.5, D |
+| TQ-21 | (C-140) Copy cap: are the counting rules of §14A.3 right? Overflow O-1 (refuse at the cap), O-2 (no cap), or another option without a search-side channel (UF-28)? | §14A.3 |
+| TQ-22 | Partitions: is SAFE-3 sufficient without per-organization partitions? If partitions are required, is the privileged provisioning step at onboarding acceptable (G08, PB-13)? | §14A.4 |
+| TQ-23 | Is the immediate Tier 2 → Tier 1 fallback on a closed fence observable as organization activity, and is that acceptable (decision 5)? | §14A.5 |
+| TQ-24 | UF-25 (implemented Tier 1): is correction U-1 (U-1a interim or U-1b complete) sound and sufficient, and are RQ-1 to RQ-8 the right regression requirements? Should the result-level effect (§4.3 of the UF-25 document) stay as specified? | UF-25 document |
 
 ## 14. Evidence the reviewer will need
 
@@ -294,6 +306,140 @@ Not rolled back, ever: authorization revisions, revocations, journal entries, S1
 | E-14 | B2 value-row and access-row cardinality and write cost at 100K/250K (annex A §13) | **No:** estimates only; annex C datasets and IX-5a measurement |
 | E-15 | Plan-shape and statistics-sensitivity evidence for B2 statements, including with per-organization partitions | **No:** IX-5a/b |
 
+## 14A. C-140 owner decisions and the resulting review requirements
+
+**Owner decisions (C-140, 2026-11-09; owner-led, not an independent review, not IX-5 implementation approval).**
+- C-139 (`22732d8`) accepted.
+- **B2 is the preferred Tier 2 architecture for the independent review;** C is the baseline and fallback.
+- Tier 2 is not to be implemented.
+- Six proposed decisions are recorded below. **None waives an existing security gate.**
+
+### 14A.1 B2 security assumptions (for the reviewer)
+
+B2 is safe only if **all** of SAFE-1 to SAFE-11 hold (annex A §10.5):
+- the structural keying and the single-statement rule (SAFE-1 to SAFE-3);
+- per-organization statistics isolation, or an accepted alternative (SAFE-4, §14A.4);
+- no authority in value rows (SAFE-5);
+- multi-path parity (SAFE-6);
+- value consistency (SAFE-7, SAFE-8);
+- the plaintext inventory (SAFE-9);
+- fencing and the disabled state (SAFE-10);
+- the FD-5 amendment (SAFE-11, §14A.2).
+
+B2 additionally assumes:
+- the Authority domain is trusted (Level 2);
+- SpiceDB at the S1-verified pin is the authorization oracle;
+- canonical edges and SpiceDB are equivalent whenever S1 is consistent.
+
+**Unresolved PostgreSQL timing risks:**
+- UF-22, statistics and plan choice: mitigated structurally, needs the reviewer's judgment;
+- the per-statement planner settings Tier 1 already relies on;
+- buffer-cache and visibility effects (general residual);
+- `contains` (UF-15, TQ-17);
+- the overflow-path channel UF-28 (§14A.3).
+
+**Multi-path authorization correctness:** annex A §10.3 (INV-T2-13, TQ-16), and the same distinct-items rule in the proposed UF-25 correction ([INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md](INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md)).
+
+**SpiceDB verification cost and `LookupSubjects` behaviour:**
+- annex E §1 (no limit, no cursor, no bulk, duplicates), §5 and §5A;
+- evidence E-6 (deployed-version behaviour) and E-10 (PERF-01) are still missing.
+
+**Integrity and completeness:**
+- INV-T2-01 to INV-T2-15;
+- M1, M2-E, M2-V, M2-S (§14A.6, annex D §4A);
+- predicate re-evaluation (INV-T2-14);
+- fail closed throughout (§10).
+
+### 14A.2 FD-5 amendment (decision 1): draft for the review, not approved
+
+**Proposed text.**
+- **Scope.** IX-5 may add Tier 2 maintenance (access-row and value-row derivation and writes) inside the Tier 1 writer transactions:
+  * the W1 content commit (`ContentRevisionCoordinator`);
+  * builder backfill, purge and rebuild;
+  * the five edge-writing security commands.
+- **Conditions:**
+  * **A1:** Tier 1 query behaviour, postings, entries, seals, sweeps, deadlines and plan structure are unchanged (INV-T2-10).
+  * **A2:** Tier 2 maintenance is behind a configuration switch, off by default, and Testing/Development-only until separately approved.
+  * **A3:** a Tier 2 derivation failure never aborts, delays beyond a measured bound, or changes the outcome of a Tier 1 commit or of a security command. The Tier 2 work runs under a savepoint. On failure it is rolled back to the savepoint, and the same transaction marks Tier 2 **not maintained** for the organization (journaled, the UF-21 state). Tier 2 then stays unused until a rebuild and a full M2 succeed. *(This replaces FS-01/FS-23's "the command aborts" for the record-save and command paths; it is the reviewer's choice between the two, TQ-12.)*
+  * **A4:** the organization-lock hold and latency delta of each affected path is measured at IX-5a and reported against PB-09. No new threshold is introduced without owner approval.
+  * **A5:** golden comparison tests prove that Tier 1 outputs (postings, entries, seals, journal entries, revisions) are byte-identical with Tier 2 maintenance on and off.
+  * **A6:** minimum-safe-version fencing (UF-20) covers the switch.
+- **Not authorized by the amendment:** any change to Tier 1 transaction behaviour now (C-140 decision 1), and any Tier 2 query use.
+
+### 14A.3 Copy cap (decision 2): 100 principals per record, evaluated, not enforced
+
+**How principals are counted (proposed):**
+- A **principal** is a user or a team. A team counts once, however many members it has (D-1).
+- **Path principals of an item:** the effective-owner principal, plus each distinct share recipient whose share covers the item.
+  * The same principal reached through two shares counts once. Value rows are keyed by (principal, item), not by share, so a revocation removes a row only when no other share of that principal still covers the item. Rows are re-derived from edges.
+  * Different principals (a user and a team the user belongs to) count separately: they are separate rows, and the union happens at query time.
+- **Record count** = the number of distinct path principals over the record's **approved-field** items. Discover-only shares and shares covering only unapproved fields produce no value rows and do not count. They still produce access rows, which are never capped.
+- **Field-specific permissions** change the row count (Σ over items of path principals), not the principal count. The value-row total per record (≤ 100 × F_a × k̄ at the cap) is reported as a secondary figure.
+
+**At the candidate of 100** (base case, annex A §13): about 0.1 % of records in the heavy-sharing scenario exceed it; in the base case essentially none. Unmeasured.
+
+**Overflow behaviour (new finding UF-28).** Annex A's D-5 (high-fan-out records served by the C path) makes the caller's search work depend on how many of their discoverable records are shared with more than K principals. Those share counts are not authorized to a recipient, so this is the same class of channel as UF-25. **D-5 as proposed in annex A is therefore withdrawn as a recommendation.** The alternatives, for the owner and reviewer:
+
+| Option | Behaviour | Security | Cost |
+|---|---|---|---|
+| O-1 Refuse at the cap | `CreateShare` that would exceed the cap is refused with a typed error, visible to the grantor (owner or manager), who is entitled to manage access | No search-side channel | A product limit on sharing |
+| O-2 No cap | Value rows for every path principal | No channel | Storage grows with sharing (annex A §13.2) |
+| O-3 Organization-level switch | The organization (or form) leaves B2 for C when any record exceeds K | The switch depends on organization-wide sharing: a coarse channel | Simple |
+
+The design author's reading: O-1 or O-2. Not enforced; no decision.
+
+### 14A.4 Partitions (decision 3): tenant isolation required; per-organization partitions evaluated
+
+- **Required (unchanged from Tier 1):** `organization_id` leading every key, RLS, and principals from the organization's own edges. Partitions are **not** what provides tenant isolation. They address statistics isolation (UF-22) and per-organization maintenance.
+- **Per-organization LIST partitions, viability:**
+
+| Factor | Assessment |
+|---|---|
+| Creating a partition per new organization | Needs DDL at onboarding. The runtime identity has no DDL rights (G08). It needs a privileged provisioning step (JIT migration identity, or a pre-provisioning job), which is a new operational dependency on the onboarding path (PB-13) |
+| Partition count | First release ≈ 25 organizations (PB-09): viable. Hundreds: planning and lock overhead to be measured. Thousands: likely not advisable without measurement |
+| Offboarding (PB-13) | Advantage: detach or drop one organization's partition |
+| Statistics | Isolated per organization: removes the cross-organization part of UF-22 only, not the cross-principal part (still handled by SAFE-3) |
+
+- **Alternative:** fixed HASH partitions (for example 32 or 64) by `organization_id`. No per-organization DDL, but organizations share statistics within a partition.
+- **The design author's reading:**
+  * SAFE-3, which leaves the planner no choice, is the primary control;
+  * LIST partitions are viable for the first-release scale only with a privileged provisioning workflow;
+  * HASH partitions, or none, at larger scale, if the reviewer accepts SAFE-3 as sufficient (TQ-14).
+- Not decided.
+
+### 14A.5 Security commands and fence (decisions 4 and 5)
+
+- **Decision 4.** Tier 2 may remain usable after a command **provably** not affecting its indexed authorization dependencies. Annex A §8 is the complete impact analysis over every contract kind. The proof obligations are:
+  * the INV-T2-15 architecture test (every implemented kind has a declared rule);
+  * an M3 property test that, for each empty-affected-set kind, the derived access rows and value rows are identical before and after the command;
+  * F-1 only when no pending verification exists.
+- **Decision 5.** **No search delay that reveals unrelated organization security activity.** F-2's bounded search wait (annex A §12) is withdrawn. Inline verification after a command may still shorten fence lag, but a search that finds the fence closed **falls back immediately** to Tier 1 within its ceiling, otherwise `SEARCH_INDEX_NOT_READY`. FS-25 is changed accordingly.
+- **Residual (for the reviewer):** whether the immediate fallback is itself observable. Tier 1 and Tier 2 costs differ, and the fence state depends on organization-wide command activity. The design author notes this as the same question as F-3 (TQ-7, TQ-15). The fallback is served by the complete Tier 1 path, whose own cost depends only on the caller's records, apart from UF-25 (which the proposed correction removes).
+
+### 14A.6 Full sweep (decision 6): daily local reconciliation and 7-day SpiceDB verification, no grace
+
+Evaluated against the existing requirements (annex D §2, §4A):
+
+| Requirement | M2-E and M2-V daily, M2-S 7 days, no grace |
+|---|---|
+| §17.10 no-grace deadlines (C-123, C-124) | Consistent: the deadlines are the comparison values, with the D1 to D8 outcome classes and per-record timestamps |
+| Tier 1 S-B 24 h for posting changes and deletions | Consistent: M2-E and M2-V bound access-row and value-row omissions at 24 h |
+| Tier 1 S-C 30 days for derivation defects | Consistent: M2-S at 7 days is stricter |
+| Revocation and freshness | Not M2's role (per query and M1) |
+| Availability | An overrun disables Tier 2 (fallback to Tier 1), without grace |
+
+The 14-day disable threshold of §17.5 S-D would be removed. **Proposal only;** production defaults unchanged.
+
+### 14A.7 Production-scale sharing workloads
+
+Annex A §13 (estimates):
+- base, heavy-sharing and high-field cases at 100K, 250K and 1M records per organization;
+- 2.5M records across organizations;
+- the fan-out dataset shape (annex C §5A);
+- online sampling scenarios S-23 to S-28 (annex B §7A).
+
+All are unmeasured. The 100K and 250K gates are unchanged.
+
 ## 15. Findings, verdict and attestation
 
 Use the FD-8 package §8 template (ID, question, severity Critical/High/Medium/Low/Info, finding, evidence, recommendation, design response) with the TQ numbers. Per-question decisions: accept, accept with conditions, or reject with a required change.
@@ -303,7 +449,7 @@ Verdict (reviewer's choice):
 - **Index architecture:** B2 / C / neither, with conditions. B1: rejection confirmed, or the variant to pursue.
 - **M2 interval and online sampling period:** acceptable / change required.
 
-Attestation: as FD-8 package §9, naming this package's commit and scope (TQ-1 to TQ-20, annexes A to E).
+Attestation: as FD-8 package §9, naming this package's commit and scope (TQ-1 to TQ-24, annexes A to E, the UF-25 document).
 
 ## 16. After the review
 

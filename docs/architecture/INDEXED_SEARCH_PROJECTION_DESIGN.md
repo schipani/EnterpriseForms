@@ -1567,3 +1567,24 @@ The approved IX-5 specification (§16, §9 box, §17.1 status, IX-D13, R-B, FD-3
 - UF-27: the FD-5 boundary for value-row writes in Tier 1 writer transactions.
 
 §9 and §17.1 stay as approved for review. Any change follows the review findings and a separate owner decision.
+
+## 26. C-140 record: B2 for review; UF-25 investigation
+
+**Owner decisions (C-140, 2026-11-09; owner-led, not an independent assessment, not IX-5 implementation approval).**
+- B2 is the preferred Tier 2 architecture for the independent review; C is the baseline and fallback; Tier 2 is not implemented.
+- Proposed decisions, recorded in the review package §14A:
+  1. a narrowly scoped FD-5 amendment (draft A1 to A6, with no change to Tier 1 transaction behaviour now);
+  2. a copy cap of 100 principals per record, evaluated, not enforced;
+  3. tenant isolation required, per-organization partitions evaluated;
+  4. Tier 2 may stay usable only after commands proven not to affect its dependencies;
+  5. no search delay that reveals unrelated security activity (F-2's wait withdrawn);
+  6. daily local reconciliation plus 7-day SpiceDB verification without grace, evaluated.
+- None waives a security gate.
+
+**UF-25** ([INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md](INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md)) is **reproduced** on the security-test stack for direct, team and overlapping shares. Tier 1's share-only check set and the `items` limit (R1 §E.3, IX-D4, as implemented) depend on the presence and number of items the caller cannot read; the results do not.
+- The proposed correction U-1 (readable candidates from the caller's own share edges, SpiceDB confirmation, an O(1) item count per record and field, limit on readable items) keeps the evaluable scope identical. It is **not implemented**: it changes the approved R1 §E.3 behaviour and awaits owner review of its design and regression requirements RQ-1 to RQ-8.
+- The result-level effect of the parity rule (an unshared item added to a partly shared field removes the record from results) is the specified semantics and is unchanged.
+
+**New finding UF-28:** a C-path overflow for records above the copy cap would make search work depend on unauthorized share counts; withdrawn.
+
+R1 §E.3, §9 and §17.1 stay as approved. Any change follows the owner's decision and, for Tier 2, the independent review.

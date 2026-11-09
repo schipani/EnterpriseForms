@@ -169,18 +169,18 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "3a5f3d9dde5b75375add4fcb64a1ba3d78735eabc9460be95b76ae2e582febd1",
-      "bytes": 69480
+      "sha256": "b5fd1ba849da4b0144d2fb819f154112e84b186f9887e5eef5295b9cc63a1cbe",
+      "bytes": 72047
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
-      "sha256": "ab171e54cc47eb99a0eec4dcc2e7cbb3920521701969bf56fdbe8366c153bae0",
-      "bytes": 14648
+      "sha256": "5c0b638725b0916c35dc1f7c1baa12cc41ef73c840bfdb9236d12e94d8474c7d",
+      "bytes": 14977
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "01fb7759b414bba3a7d37e29f88c69628313c3f627e93fbb670a9501bfc74a6f",
-      "bytes": 188128
+      "sha256": "45899972e8ab0ba5a9466e4d8b5360d56b8e9ca2b31b1200d15ef7f4c3f9da98",
+      "bytes": 190207
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -209,8 +209,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_TIER2_INDEX_ARCHITECTURE_ASSESSMENT.md",
-      "sha256": "e917e885c60f1ec3ac03c6e563322eb3c2bfe622a4f6736abe8f58e255ff7b79",
-      "bytes": 58189
+      "sha256": "d0f42ef826802cdab34e85f0980d69d957c2ffcb757ba5c3618575c502a3b72d",
+      "bytes": 58552
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md",
@@ -224,8 +224,13 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md",
-      "sha256": "1a2f9d6628bfacdf4604b5485151a6aa7f563c1bb21b589c85ab740c14c3ca2a",
-      "bytes": 38575
+      "sha256": "dc33af7c34feef3b61c2eb7fb9206cd88b8895f020174eb5fb9c716ac27f2608",
+      "bytes": 51718
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md",
+      "sha256": "2a3204f76f0cfcca56ae078ddd596ca676ad6a80bf5aa597ea1190dbb1839f2a",
+      "bytes": 16720
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -419,8 +424,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "add48c9f4eadb2e8397f68d372d62fb74da0d5be48938949031baffdce36eb02",
-      "bytes": 250289
+      "sha256": "ed2945bcb1ada438645b0c67ca435aff8696ef3716166af960c876f9de7233ba",
+      "bytes": 253621
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

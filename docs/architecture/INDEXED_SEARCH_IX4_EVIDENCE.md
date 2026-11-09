@@ -263,7 +263,8 @@ R-01 to R-29 are carried from the IX-3 report. Changes: R-22 closed for IX-3 dev
 | R-42 | Per-organization sweep lease across Authority instances | Not present; duplicated sweep work with more than one instance (design §23.2). Applies to the Tier 2 verifier too (package FS-18) | **IX-7** |
 | R-43 | 100K/250K benchmark dataset prerequisites (IX-5 exit gate) | **Designed, not seeded (C-138, annex C):** creation through the trusted path estimated at ≈ 30–60 h (100K) and ≈ 120–200 h (250K) serially without R-37 changes; Vault dev mode (in-memory) prevents a reusable snapshot, so a persistent-Vault benchmark overlay is needed; ≈ 40–60 GB (100K) and ≈ 100–150 GB (250K) disk estimated from measured 58 KB/record; P0 1,000-record pilot proposed | Owner approvals (pilot, overlay, sweep setting, R-37 options, multi-day runs) |
 | R-44 | Design-author findings for the Tier 2 reviewer (UF-14 to UF-21): affected-set table does not match the command catalogue; GIN not bounded by principal; option B value-copy integrity; `LookupSubjects` without limit, cursor or bulk; fence starvation and S-D grace; Vault dev mode; minimum-safe-version fencing for Tier 2; unspecified Tier 2 disabled state | **Open; recorded in the review package §9 (C-138)**; not independent findings; no remediation implemented. **C-139:** proposed resolutions recorded for UF-14 (per-command matrix, INV-T2-15), UF-15 (no GIN, `contains` strategy), UF-16 (INV-T2-14, M2-V) and UF-18 (fence rules F-1/F-2); **none closed or waived** | Independent review, then owner decisions |
-| R-45 | C-139 design-author findings (UF-22 to UF-27): planner statistics shared across principals and organizations; multi-path field-readability parity; correction of option B's approval-verification cost for the split design; **implemented Tier 1** share-only check set and `items` limit depend on unreadable items (UF-25); value-row amplification and fan-out cap; FD-5 boundary for B2 writes in Tier 1 writer transactions | **Open (C-139);** recorded in the review package §9; not independent findings; no code changed (UF-25 concerns implemented Tier 1 and needs a reviewer and owner decision) | Independent review, then owner decisions |
+| R-45 | C-139 design-author findings (UF-22 to UF-27): planner statistics shared across principals and organizations; multi-path field-readability parity; correction of option B's approval-verification cost for the split design; **implemented Tier 1** share-only check set and `items` limit depend on unreadable items (UF-25); value-row amplification and fan-out cap; FD-5 boundary for B2 writes in Tier 1 writer transactions | **Open (C-139); C-140:** UF-28 added (C-path overflow channel; D-5 overflow withdrawn); UF-25 reproduced and moved to R-46; recorded in the review package §9; not independent findings; no code changed (UF-25 concerns implemented Tier 1 and needs a reviewer and owner decision) | Independent review, then owner decisions |
+| R-46 | **UF-25, implemented Tier 1:** the share-only check set and the `items` limit (R1 §E.3) depend on the presence and number of items the caller cannot read; results do not | **Open; reproduced (C-140, evidence §15):** for direct, team and overlapping shares, refusal 200 → 422 with a test-only limit of 2; check set 1 → 4; +42 ms p50 for 1,000 unauthorized items (informational, battery). Impact Low to Medium. Correction U-1 proposed with RQ-1 to RQ-8; **not implemented** (it changes approved R1 §E.3) | Owner review of the U-1 design and regression requirements, then implementation and tests; independent review (TQ-24) |
 
 ## 8. French drafts for the PB-14 copy review (not approved; not in the application)
 
@@ -507,3 +508,19 @@ The diagnostics observe and never decide: no decision, ordering, transaction bou
   * Stage B not executed; IX-6 and IX-7 not started;
   * no push, PR, merge or deploy.
 - **Register:** R-38 and R-44 updated; R-45 added; nothing closed or waived. Every scaling figure in annex A §13 is an estimate or extrapolation unless stated as measured.
+
+## 15. C-140: B2 for review; UF-25 investigation
+
+- **Owner decisions (C-140, owner-led; not an independent review, not IX-5 implementation approval):** B2 preferred for the independent review; C baseline and fallback; six proposed decisions recorded in the review package §14A, none waiving a gate (decision log C-140).
+- **UF-25 (implemented Tier 1) reproduced**, focused class `IndexedSearchShareOnlyItemChannelTests` (C-131 focused development class; not a Stage B run):
+  * runs `20261109-054439-3d97fe06` (1/1) and `20261109-054736-a619042e` (2/2), on the security-test stack at `22732d8` plus the test-only compose variable;
+  * the Authority was recreated with `MaximumShareOnlyItems = 2` for the deterministic test and restored to 20,000 (verified).
+- **Results, identical for direct, team and overlapping shares:**
+  * the check set grew from 1 to 4 items while the caller's readable items stayed at 1;
+  * the same query by the same caller went from 200 to 422 `SEARCH_VERIFICATION_LIMIT` (`items`);
+  * with the default limit, results were unchanged;
+  * the parity rule's result-level effect was observed (an added unshared selection removes a partly shared record).
+- **Informational timing** (Benchmark trait, single run, **on battery**): p50 119.6 → 162.1 ms and minimum 100.2 → 132.5 ms for 1,001 versus 1 checked items, with identical results.
+- **Correction U-1** proposed with RQ-1 to RQ-8 (`INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md`); **not implemented** (it changes approved R1 §E.3 behaviour).
+- **Not done:** no Tier 2 code, tables or migrations; no product code change; no large seeding or benchmarks; Stage B not run; no IX-6/IX-7; not submitted to a reviewer; no push, PR, merge or deploy.
+- **Register:** R-45 updated; R-46 added (UF-25 Tier 1 channel); nothing closed or waived.
