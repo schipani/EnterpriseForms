@@ -1520,3 +1520,20 @@ Optional diagnostics, off unless `Diagnostics:OperationTiming` is set, accepted 
 
 The approved IX-5 specification (§16, §9 box, §17.1 status, IX-D13, R-B, FD-3) requires an independent review of the Tier 2 completeness design and a separate approval **before implementation**; FD-8 records that no review has occurred, and C-123 that Tier 2 is not accepted. C-137 was not treated as satisfying or waiving that precondition. The pre-implementation review requested by C-137 §5 is `INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md`: scope and dependencies (including the missing `LookupSubjects` client), the Tier 1 guarantees, the R-38 index findings (the §9.2 access-posting indexes are value-keyed and the same table is probed by record, including in the caller-facing Evaluable-parity check; options A/B/C, recommendation C measured first, then B, not A), the invariants, and decisions IX5-D1 to IX5-D6. **No Tier 2 code, schema or test was written.**
 
+
+## 24. C-138 record: Tier 2 review-first and review preparation
+
+**Owner decision (C-138, 2026-11-08; owner-led, not an independent assessment).** IX5-D1: review-first. The independent-review prerequisite of IX-D13, R-B, §17.1 and FD-3 is preserved and **no exception is granted for a dark Tier 2 implementation**. IX5-D2 to IX5-D6: evaluation and design work only. Production defaults (including the S-D intervals of §17.5) are unchanged.
+
+**Prepared for the independent reviewer** (not submitted; no review has occurred): [INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md](INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md), with annexes A (Option C versus B; A rejected), B (online sampling proposal), C (100K/250K datasets), D (M2 interval) and E (`LookupSubjects`).
+
+**Design-author findings against this document** (package §9; to be dispositioned after the review, not changed here):
+- UF-14: the §17.1 affected-set table does not match the command catalogue;
+- UF-15: the §9.2 GIN index is not bounded by principal;
+- UF-16: option B value copies need predicate re-evaluation and a value-consistency control;
+- UF-17: §17.1 undercounts the `LookupSubjects` calls (2 × (1 + F) per record);
+- UF-18: fence starvation, and the S-D 14-day threshold is inconsistent with §17.10;
+- UF-20: §12.4 fencing must cover Tier 2;
+- UF-21: the "Tier 2 disabled" state is unspecified.
+
+§9 and §17.1 stay as approved for review. Any change follows the review findings and a separate owner decision.

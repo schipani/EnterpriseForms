@@ -1,6 +1,7 @@
 # IX-5 (Tier 2) pre-implementation readiness assessment (C-137 §5)
 
 - **Status:** assessment for owner decision. **No Tier 2 code, schema or migration has been written.** Prepared by Claude (Opus) under C-137 §5 for an owner-led review; not an independent assessment, and no independent review of Tier 2 has occurred.
+- **C-138 (2026-11-08):** accepted by the owner (owner-led). IX5-D1 decided review-first, with no exception for a dark implementation; IX5-D2 to IX5-D6 approved as evaluation or design work only. The review preparation is [INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md](INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md) and its annexes A to E. IX-5 is not implemented and not accepted.
 - **Branch / base:** `ix-1/authority-search-index`, after `37ba4f5`.
 - **Conclusion in one line:** the approved IX-5 specification requires an independent review of the Tier 2 completeness design (§17.1) and a separate approval **before implementation**; that review has not taken place, so implementing IX-5 now would need an owner decision this assessment does not presume. Implementation therefore stopped at the readiness step (C-137 §5: "stop and request owner approval before implementing that portion").
 
