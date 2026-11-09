@@ -103,6 +103,9 @@ services:
       SearchIndex__Query__QueryEnabled: "true"
       SearchIndex__Query__SnapshotLifetimeSeconds: ${IX3_SNAPSHOT_LIFETIME_SECONDS:-300}
       SearchIndex__Query__PurgeIntervalSeconds: "5"
+      # C-140 UF-25: the share-only items limit (code default 20,000, unchanged here). Only the focused UF-25 test recreates the
+      # authority with a small value and restores it afterwards.
+      SearchIndex__Query__MaximumShareOnlyItems: ${IX_SHARE_ONLY_ITEM_LIMIT:-20000}
       ConnectionStrings__AuthoritySearchReader: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=authority_search_reader_login;Password=sectest-search-reader-only-0001
     restart: unless-stopped          # SEC-P09: the process terminates at the armed crash point and is restarted here
     depends_on:
