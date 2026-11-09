@@ -2,6 +2,7 @@
 
 - **Status:** **Ready for submission to a qualified human reviewer independent of the implementation (C-121; owner decisions FD-1 to FD-8 recorded in C-122). NOT REVIEWED. NOT SUBMITTED. No review attestation exists.**
 - **C-123:** the owner is conducting an **owner-led** Tier 1 review (`INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md`). It is **not** an independent third-party assessment and does not replace this package. Independent assessment remains an outstanding production-readiness requirement (`docs/governance/REVIEW_AND_AUTHORIZATION_WORKFLOW.md`). Its findings OR-1 to OR-4 are listed in §5 for your examination; you must not rely on them.
+- **C-138 (2026-11-08):** the owner approved review-first for Tier 2 (IX5-D1): no Tier 2 implementation before this review and a separate owner approval. The Tier 2 subject (question 5, J-6) is expanded in the supplement [INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md](INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md) and its annexes A to E, prepared against the implemented Tier 1 (branch `ix-1/authority-search-index`). A reviewer receives both packages. **Still not submitted; no review has occurred.**
 - **Independence notice:**
   * This package was written by the design agent (Claude).
   * Neither Claude nor the project owner is an independent reviewer.

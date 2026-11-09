@@ -144,8 +144,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md",
-      "sha256": "8ed73e5e3f54dc5954878ffa6fb85fe18fbb057c8f268dc1db79a31074589cd4",
-      "bytes": 23824
+      "sha256": "5ec1dfa18827e6df4a3b6a7efaff7ff374657081ec3b1a502ca42265ed286873",
+      "bytes": 24314
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_INTEGRITY_COST_REASSESSMENT.md",
@@ -196,6 +196,36 @@
       "path": "docs/architecture/INDEXED_SEARCH_TIER1_READINESS_ASSESSMENT.md",
       "sha256": "52b6323aae70ca30cc55f3587b01237824bf0e5aa13f240d9b942253a1637bcb",
       "bytes": 10266
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_BENCHMARK_DATA_DESIGN.md",
+      "sha256": "2351efa16182c09b902bfa020620e9803ba10cf10b3e87fb1a611f7d208cd0d9",
+      "bytes": 10020
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_FULL_SWEEP_ASSESSMENT.md",
+      "sha256": "03ccaa36675870c591ee4836fe7be7141e8a1faff6608010314f90d15408de62",
+      "bytes": 7152
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_INDEX_ARCHITECTURE_ASSESSMENT.md",
+      "sha256": "3408360aeef2262028af1f579cccb191d53c2b1c3a535d5d73b2ef560fa70a95",
+      "bytes": 19830
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md",
+      "sha256": "a1ae3987af9915f54fd075e2660aa668f22226cd219747b296faacdd4d4c90fd",
+      "bytes": 12720
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_ONLINE_SAMPLING_PLAN.md",
+      "sha256": "e1353868f149e8482826a6e7ff94da1b5f0c26032b230d64a759aa338b5d7dd7",
+      "bytes": 8864
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md",
+      "sha256": "9ca3d86fb8b48f27b685163e3e1db28670352afe8419ac057f07a0ca0c58d879",
+      "bytes": 26735
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
