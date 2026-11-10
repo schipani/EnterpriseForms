@@ -26,6 +26,13 @@ if (args.Length == 2 && args[0] == "marker")
     return 0;
 }
 
+if (args.Length >= 1 && args[0] is "ix5-lookup" or "ix5-perf")
+{
+    // IX-5 evidence plans P-1 (E-6) and P-2 (PERF-01), C-146: LookupSubjects on the deployed SpiceDB version. Separate mode, so
+    // the CT-1..IX2-CT-07 contract run and its exit code are unchanged.
+    return await Ix5LookupSubjectsAsync(args[0] == "ix5-perf");
+}
+
 var org = Guid.NewGuid().ToString("D");
 var results = new List<(string Id, bool Pass, string Detail)>();
 void Record(string id, bool pass, string detail) => results.Add((id, pass, detail));
@@ -274,6 +281,196 @@ foreach (var (id, pass, detail) in results)
 }
 
 return results.All(r => r.Pass) && results.Count == 7 ? 0 : 1;
+
+// IX-5 P-1/P-2 (C-146). Fixture in a fresh random namespace: for N in 1, 10, 100, 500 a team of N members, a record owned by one
+// user, a record_share whose readers are the team (via participant) and the team's first member directly, and a field_item of
+// the record shared through it. Plus one field_item with no relationship. Checks the annex E §1 assumptions.
+async Task<int> Ix5LookupSubjectsAsync(bool perf)
+{
+    var ns = Guid.NewGuid().ToString("N")[..12];
+    string Id(string kind, int n, int i = -1) => i < 0 ? $"{kind}-{ns}-{n}" : $"{kind}-{ns}-{n}-{i}";
+    var sizes = new[] { 1, 10, 100, 500 };
+    RelationshipUpdate Upd(RelationshipUpdate.Types.Operation op, string type, string id, string relation, string subjectType, string subjectId, string subjectRelation = "") => new()
+    {
+        Operation = op,
+        Relationship = new Relationship
+        {
+            Resource = new ObjectReference { ObjectType = type, ObjectId = id },
+            Relation = relation,
+            Subject = new SubjectReference { Object = new ObjectReference { ObjectType = subjectType, ObjectId = subjectId }, OptionalRelation = subjectRelation },
+        },
+    };
+    var touch = RelationshipUpdate.Types.Operation.Touch;
+    var write = new WriteRelationshipsRequest();
+    foreach (var n in sizes)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            write.Updates.Add(Upd(touch, "team", Id("t", n), "member", "user", Id("m", n, i)));
+        }
+
+        write.Updates.Add(Upd(touch, "form_record", Id("r", n), "owner", "user", Id("owner", n)));
+        write.Updates.Add(Upd(touch, "record_share", Id("s", n), "reader", "team", Id("t", n), "participant"));
+        write.Updates.Add(Upd(touch, "record_share", Id("s", n), "reader", "user", Id("m", n, 0)));
+        write.Updates.Add(Upd(touch, "field_item", Id("f", n), "parent_record", "form_record", Id("r", n)));
+        write.Updates.Add(Upd(touch, "field_item", Id("f", n), "shared_via", "record_share", Id("s", n)));
+    }
+
+    var pin = (await client.WriteRelationshipsAsync(write, new CallOptions(headers, DateTime.UtcNow.AddSeconds(60)))).WrittenAt.Token;
+    var atPin = new Consistency { AtExactSnapshot = new ZedToken { Token = pin } };
+
+    LookupSubjectsRequest Lookup(string fieldItem, Consistency consistency, string subjectType = "user", string subjectRelation = "") => new()
+    {
+        Consistency = consistency,
+        Resource = new ObjectReference { ObjectType = "field_item", ObjectId = fieldItem },
+        Permission = "read",
+        SubjectObjectType = subjectType,
+        OptionalSubjectRelation = subjectRelation,
+        WildcardOption = LookupSubjectsRequest.Types.WildcardOption.ExcludeWildcards,
+    };
+
+    async Task<(List<LookupSubjectsResponse> Messages, string? Error)> RunAsync(LookupSubjectsRequest request, DateTime? deadline = null)
+    {
+        var messages = new List<LookupSubjectsResponse>();
+        try
+        {
+            using var call = client.LookupSubjects(request, new CallOptions(headers, deadline ?? DateTime.UtcNow.AddSeconds(60)));
+            await foreach (var message in call.ResponseStream.ReadAllAsync())
+            {
+                messages.Add(message);
+            }
+
+            return (messages, null);
+        }
+        catch (RpcException ex)
+        {
+            return (messages, ex.StatusCode + ": " + ex.Status.Detail);
+        }
+    }
+
+    if (perf)
+    {
+        return await Ix5PerfAsync(sizes, n => Lookup(Id("f", n), atPin), RunAsync);
+    }
+
+    var lines = new List<(string Id, bool Pass, string Detail)>();
+
+    // IX5-CT-08: optional_concrete_limit is refused (annex E: "currently unimplemented ... will return an error"); a cursor-less
+    // request returns the full set. Pass = the server neither honours nor silently applies a limit.
+    var limited = Lookup(Id("f", 100), atPin);
+    limited.OptionalConcreteLimit = 5;
+    var (limitedMessages, limitedError) = await RunAsync(limited);
+    lines.Add(("IX5-CT-08", limitedError is not null && limitedMessages.Count == 0,
+        $"limit=5 error=[{limitedError ?? "none"}] messages={limitedMessages.Count} cursor_present={limitedMessages.Any(m => m.AfterResultCursor is not null)}"));
+
+    // IX5-CT-09: duplicates and permissionship. The first member is reachable directly and through the team. Records how often it
+    // appears; pass = every message is HAS_PERMISSION and no subject appears with two different permissionships.
+    var (dupMessages, dupError) = await RunAsync(Lookup(Id("f", 10), atPin));
+    var dupCount = dupMessages.Count(m => m.Subject.SubjectObjectId == Id("m", 10, 0));
+    var conflicting = dupMessages.GroupBy(m => m.Subject.SubjectObjectId).Any(g => g.Select(m => m.Subject.Permissionship).Distinct().Count() > 1);
+    lines.Add(("IX5-CT-09", dupError is null && !conflicting && dupMessages.All(m => m.Subject.Permissionship == LookupPermissionship.HasPermission),
+        $"dual_path_subject_occurrences={dupCount} messages={dupMessages.Count} distinct={dupMessages.Select(m => m.Subject.SubjectObjectId).Distinct().Count()} conflicting_permissionship={conflicting} error=[{dupError ?? "none"}]"));
+
+    // IX5-CT-10: team expansion is complete for user lookups (N members + owner, distinct), every message's looked_up_at equals
+    // the pin, no wildcard, and two calls return the same set.
+    var expansion = new List<string>();
+    var expansionPass = true;
+    foreach (var n in sizes)
+    {
+        var (first, e1) = await RunAsync(Lookup(Id("f", n), atPin));
+        var (second, e2) = await RunAsync(Lookup(Id("f", n), atPin));
+        var distinct = first.Select(m => m.Subject.SubjectObjectId).ToHashSet(StringComparer.Ordinal);
+        var expected = Enumerable.Range(0, n).Select(i => Id("m", n, i)).Append(Id("owner", n)).ToHashSet(StringComparer.Ordinal);
+        var pinned = first.All(m => m.LookedUpAt?.Token == pin);
+        var sameSet = distinct.SetEquals(second.Select(m => m.Subject.SubjectObjectId));
+        var sameOrder = first.Select(m => m.Subject.SubjectObjectId).SequenceEqual(second.Select(m => m.Subject.SubjectObjectId));
+        var ok = e1 is null && e2 is null && distinct.SetEquals(expected) && pinned && sameSet && !distinct.Contains("*");
+        expansionPass &= ok;
+        expansion.Add($"N={n}:messages={first.Count},distinct={distinct.Count},expected={expected.Count},pinned={pinned},same_set={sameSet},same_order={sameOrder}");
+    }
+
+    lines.Add(("IX5-CT-10", expansionPass, string.Join(' ', expansion)));
+
+    // IX5-CT-11: a team-scoped lookup (subject type team, relation participant) returns the team itself, not its members, and
+    // a user lookup never returns a team. Needed by B2's "no expansion of teams into individual members".
+    var (teams, teamError) = await RunAsync(Lookup(Id("f", 500), atPin, "team", "participant"));
+    var teamIds = teams.Select(m => m.Subject.SubjectObjectId).ToList();
+    var (users500, _) = await RunAsync(Lookup(Id("f", 500), atPin));
+    lines.Add(("IX5-CT-11", teamError is null && teamIds.Count == 1 && teamIds[0] == Id("t", 500) && users500.All(m => !m.Subject.SubjectObjectId.StartsWith("t-", StringComparison.Ordinal)),
+        $"team_lookup_messages={teams.Count} returned=[{string.Join(',', teamIds.Select(t => t == Id("t", 500) ? "the-team" : "other"))}] error=[{teamError ?? "none"}]"));
+
+    // IX5-CT-12: snapshot isolation across a revocation. Remove the team from the N=100 share; the pin still shows 101 users,
+    // the new revision 2 (owner + direct reader), and fully consistent equals the new revision.
+    var revoke = new WriteRelationshipsRequest();
+    revoke.Updates.Add(Upd(RelationshipUpdate.Types.Operation.Delete, "record_share", Id("s", 100), "reader", "team", Id("t", 100), "participant"));
+    var after = (await client.WriteRelationshipsAsync(revoke, Options())).WrittenAt.Token;
+    var (beforeMessages, b) = await RunAsync(Lookup(Id("f", 100), atPin));
+    var (afterMessages, a) = await RunAsync(Lookup(Id("f", 100), new Consistency { AtExactSnapshot = new ZedToken { Token = after } }));
+    var (fullMessages, fc) = await RunAsync(Lookup(Id("f", 100), new Consistency { FullyConsistent = true }));
+    int Distinct(List<LookupSubjectsResponse> m) => m.Select(x => x.Subject.SubjectObjectId).Distinct().Count();
+    lines.Add(("IX5-CT-12", b is null && a is null && fc is null && Distinct(beforeMessages) == 101 && Distinct(afterMessages) == 2 && Distinct(fullMessages) == 2 && afterMessages.All(m => m.LookedUpAt?.Token == after),
+        $"at_pin={Distinct(beforeMessages)} at_revocation={Distinct(afterMessages)} fully_consistent={Distinct(fullMessages)}"));
+
+    // IX5-CT-13: an expired deadline ends the stream with an error status, never a silently truncated OK stream.
+    var (deadlineMessages, deadlineError) = await RunAsync(Lookup(Id("f", 500), atPin), DateTime.UtcNow.AddMilliseconds(1));
+    lines.Add(("IX5-CT-13", deadlineError is not null, $"error=[{deadlineError ?? "none"}] messages_before_error={deadlineMessages.Count}"));
+
+    // IX5-CT-14: a field item with no relationship streams no message and ends OK.
+    var (emptyMessages, emptyError) = await RunAsync(Lookup("f-" + ns + "-none", atPin));
+    lines.Add(("IX5-CT-14", emptyError is null && emptyMessages.Count == 0, $"messages={emptyMessages.Count} error=[{emptyError ?? "none"}]"));
+
+    foreach (var (id, pass, detail) in lines)
+    {
+        Console.WriteLine($"{id} {(pass ? "PASS" : "FAIL")} {detail}");
+    }
+
+    return lines.All(l => l.Pass) ? 0 : 1;
+}
+
+// P-2 (PERF-01, local only): 200 lookups per subject count, then 60 s sustained at concurrency 1, 4 and 16 on the N=100 item.
+static async Task<int> Ix5PerfAsync(int[] sizes, Func<int, LookupSubjectsRequest> request, Func<LookupSubjectsRequest, DateTime?, Task<(List<LookupSubjectsResponse> Messages, string? Error)>> run)
+{
+    static double Q(List<double> s, double p) => s.Count == 0 ? double.NaN : s[Math.Min(s.Count - 1, (int)(p * s.Count))];
+    foreach (var n in sizes)
+    {
+        var timings = new List<double>();
+        var errors = 0;
+        for (var i = 0; i < 200; i++)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var (_, error) = await run(request(n), null);
+            timings.Add(watch.Elapsed.TotalMilliseconds);
+            errors += error is null ? 0 : 1;
+        }
+
+        timings.Sort();
+        Console.WriteLine(FormattableString.Invariant($"IX5-PERF latency subjects={n + 1} calls=200 errors={errors} p50_ms={Q(timings, 0.50):F2} p95_ms={Q(timings, 0.95):F2} p99_ms={Q(timings, 0.99):F2}"));
+    }
+
+    foreach (var concurrency in new[] { 1, 4, 16 })
+    {
+        var timings = new System.Collections.Concurrent.ConcurrentBag<double>();
+        var errors = 0;
+        var end = DateTime.UtcNow.AddSeconds(60);
+        await Task.WhenAll(Enumerable.Range(0, concurrency).Select(async _ =>
+        {
+            while (DateTime.UtcNow < end)
+            {
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                var (_, error) = await run(request(100), null);
+                timings.Add(watch.Elapsed.TotalMilliseconds);
+                if (error is not null)
+                {
+                    Interlocked.Increment(ref errors);
+                }
+            }
+        }));
+        var sorted = timings.Order().ToList();
+        Console.WriteLine(FormattableString.Invariant($"IX5-PERF sustained subjects=101 concurrency={concurrency} seconds=60 calls={sorted.Count} rate_per_s={sorted.Count / 60.0:F1} errors={errors} p50_ms={Q(sorted, 0.50):F2} p95_ms={Q(sorted, 0.95):F2}"));
+    }
+
+    return 0;
+}
 
 static async Task<(T Value, string? Error)> TryAsync<T>(Func<Task<T>> action)
 {

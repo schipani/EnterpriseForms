@@ -1,6 +1,6 @@
 # Indexed search IX-5: bounded evidence plans (C-144)
 
-**Status (2026-11-10):** plans only. **Nothing in this document has been run.** Each plan needs owner authorization before it is executed. None generates the 100K/250K datasets (R-43), runs Stage B, or implements Tier 2. Results feed the open evidence rows E-6, E-10 and E-14 (review package §14) and the gates in §14B; they do not replace the independent review.
+**Status (2026-11-10, C-146):** C-146 authorized completing P-1 to P-6. **P-1 and P-3 are complete (§R); P-2, P-4, P-5 and P-6 are not run** (the host was on battery, and timing needs AC power). Originally (C-144) plans only. None generates the 100K/250K datasets (R-43), runs Stage B, or implements Tier 2. Results feed the open evidence rows E-6, E-10 and E-14 (review package §14) and the gates in §14B; they do not replace the independent review.
 
 **Common rules for every plan:**
 - security-test stack only (`-Fresh`), synthetic data, never the dev stack;
@@ -110,3 +110,73 @@
 - Staging or production numbers.
 - The 100K/250K datasets (R-43, a separate approval).
 - Closure of R-02, PERF-01, UF-25 or any other gate. Each result is recorded against its register row; nothing is closed or waived by running a plan.
+
+## R. Results (C-146)
+
+Local Docker security-test stack, synthetic data, SpiceDB v1.56.2. Not staging. Raw output under `artifacts/ix-5/` (not versioned).
+
+### R.1 P-1 (E-6): complete, 7/7 PASS
+
+Probe mode `ix5-lookup` (`tests/integration/EnterpriseForms.SpiceDbContractProbe/Program.cs`). The fixture uses teams of 1, 10, 100 and 500 members.
+
+| Check | Result |
+|---|---|
+| IX5-CT-08 limit | `optional_concrete_limit` is **refused** (`Unimplemented: concrete limit is not yet supported`), with no partial stream. Annex E holds: the client must enforce its own maximum |
+| IX5-CT-09 duplicates | A user reachable directly and through a team appeared **once**, with no conflicting permissionship. The API still does not guarantee uniqueness, so the client must keep de-duplicating |
+| IX5-CT-10 expansion | User lookups returned exactly N + 1 distinct subjects for every N up to 501. Every `looked_up_at` equalled the pin, and two calls returned the same set and order |
+| IX5-CT-11 team-scoped | A lookup with subject type `team` and relation `participant` returned **the team only, not its 500 members**. B2's team principals (D-1) can therefore be verified without member expansion |
+| IX5-CT-12 snapshot | After a team revocation, the pin still showed 101 subjects; the new revision and fully consistent reads showed 2 |
+| IX5-CT-13 deadline | An expired deadline ended with `DeadlineExceeded`, never a truncated OK stream |
+| IX5-CT-14 empty | Zero messages, OK status |
+
+### R.2 P-3 (E-14): counts complete
+
+Read-only SQL over all live Tier 1 postings and canonical edges of the stack: 461 records in 51 organizations, produced by the existing tests.
+
+| Measure | Value |
+|---|---|
+| Tier 1 value rows | 1,715 |
+| B2 value rows (one per posting × reading principal, teams not expanded) | 1,813 |
+| Overall copy factor | 1.057 |
+| Per-record copy factor | p50 1.0, p95 1.67, p99 2.0, max 3.0 |
+| Postings with no reading principal | 0 |
+| Team-membership edges copied | 0 of 4 (D-1) |
+
+The counting is structural. For an item, the copy factor is 1 (effective owner) plus the distinct share principals covering it, **independent of team size and record count**. The sharing profiles therefore follow exactly:
+
+| Profile | Copy factor |
+|---|---|
+| Owner only | 1 |
+| 5 direct shares of every item | 6 |
+| One share to a team of 100 or 500 | 2 |
+
+Write amplification per command (rows touched are value rows of the affected items):
+
+| Command | Rows written |
+|---|---|
+| Create or revoke a share of K items | K items' value rows, for one principal |
+| Team-member add or remove | 0 |
+| Ownership transfer | every item's rows, for the old and the new owner |
+
+The seeded 1,000/5,000-record runs would only replay this arithmetic, so they were not run. Large-scale distributions need the R-43 datasets.
+
+### R.3 FD-5-ALT input check (journal content)
+
+- `SecurityCommandCommitted` journal bodies carry `relationship_delta` (every touched or deleted edge, including each share's per-item `field_item#shared_via` allow-list) and `committed_authorization_revision`.
+- `ContentHeadCommitted` bodies carry the content revision, root and leaf digest, but **not values**.
+
+Consequences:
+- The IX-5a access projection can be derived from the journal alone.
+- The IX-5b value rows must read the accepted content (Tier 1 sealed postings or the accepted leaf index) at the journaled content revision.
+
+### R.4 Not run
+
+| Plan | Why | Needed before |
+|---|---|---|
+| P-2 | Timing; host on battery. The probe mode `ix5-perf` is ready | IX-5c |
+| P-4 | Timing; needs a new focused stack test | IX-5c |
+| P-5 | Timing; host on battery | IX-5a acceptance (commit latency unchanged) |
+| P-6 | Timing; host on battery | IX-5c |
+
+**No result exposes a security defect or invalidates a design assumption.** TQ-6 (item identity stability) remains unverified; it is the first IX-5a deliverable.
+
