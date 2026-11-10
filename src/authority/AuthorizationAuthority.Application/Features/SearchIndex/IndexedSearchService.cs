@@ -40,7 +40,8 @@ public sealed class IndexedSearchService(
     SearchIndexOptions indexOptions,
     IndexedSearchOptions options,
     ISecurityAlertSink alerts,
-    TimeProvider clock)
+    TimeProvider clock,
+    IIndexedSearchProbe? probe = null)
 {
     public const string Engine = "Indexed";
 
@@ -111,29 +112,14 @@ public sealed class IndexedSearchService(
                 scopeCount = scopeFacts.Count;
                 withoutContent = scopeFacts.Count - contentful.Count;
 
-                // R1 §E.3: the readable-for-predicate scope. Owned records: every item readable. Share-only records: every posting item of
-                // every predicate field must be readable; the checked set depends on the caller's records and the field ids only.
-                var shareOnly = contentful.Where(r => !ownedIds.Contains(r.FormRecordId)).Select(r => r.FormRecordId).ToList();
-                var items = await read.ReadPredicateItemsAsync(shareOnly, fields, cancellationToken).ConfigureAwait(false);
-                if (items.Count > options.MaximumShareOnlyItems)
-                {
-                    throw Limit("items");
-                }
-
-                var denied = new HashSet<Guid>();
-                foreach (var chunk in items.Chunk(1000))
-                {
-                    var outcomes = await verifier.CheckBulkStrictAsync(pin, chunk.Select(i => new SpiceDbCheck(ResourceTypeNames.FieldItem, i.ManifestItemId.ToString("D"), "read", ResourceTypeNames.User, subject)).ToList(), cancellationToken).ConfigureAwait(false);
-                    for (var i = 0; i < chunk.Length; i++)
-                    {
-                        if (outcomes[i] != SpiceDbCheckOutcome.Allowed)
-                        {
-                            denied.Add(chunk[i].FormRecordId);
-                        }
-                    }
-                }
-
-                var readableScope = contentful.Where(r => !denied.Contains(r.FormRecordId)).Select(r => r.FormRecordId).ToList();
+                // R1 §E.3: the readable-for-predicate scope. Owned records: every item readable. Share-only records: every indexed item
+                // of every predicate field must be readable. C-141 (UF-25, U-1b): decided from the caller's own grants and the accepted
+                // per-field item counts, so no item the caller cannot read is enumerated, checked or counted against the limit.
+                var predicateFields = PredicateFields(conditions, approvalIds);
+                var approvalByField = ApprovalByField(predicateFields);
+                var shareOnly = contentful.Where(r => !ownedIds.Contains(r.FormRecordId)).ToList();
+                var shareDecision = await EvaluateShareOnlyAsync(read, pin, subject, bound.AuthorityUserId, organizationId, shareOnly, predicateFields, enforceLimit: true, "indexed-search", correlationId, cancellationToken).ConfigureAwait(false);
+                var readableScope = contentful.Where(r => ownedIds.Contains(r.FormRecordId) || shareDecision.Evaluable.Contains(r.FormRecordId)).Select(r => r.FormRecordId).ToList();
                 var filter = new SearchMetadataFilter(query.RecordStatus, query.IncludeChildren, query.IncludeArchived);
                 var candidates = await read.FindCandidatesAsync(query.FormDefinitionId, readableScope, conditions, filter, options.MaximumResults + 1, cancellationToken).ConfigureAwait(false);
                 if (candidates.Count > options.MaximumResults)
@@ -152,6 +138,13 @@ public sealed class IndexedSearchService(
                     if (!verified.Bound || !MetadataMatches(query, verified.Header!))
                     {
                         throw await QuarantineIndexAsync(organizationId, verified.FindingCode ?? "MATCH_METADATA_MISMATCH", cancellationToken).ConfigureAwait(false);
+                    }
+
+                    // C-141: a share-only match must have been decided on bound data: its bound predicate postings are exactly its stored
+                    // count and every one was confirmed readable. For an honest match these are readable items only.
+                    if (!ownedIds.Contains(id) && ShareOnlyReadability.VerifyBoundRecord(binding!, approvalByField, shareDecision.ConfirmedItemsByRecord.GetValueOrDefault(id)) is { } shareFinding)
+                    {
+                        throw await QuarantineIndexAsync(organizationId, shareFinding, cancellationToken).ConfigureAwait(false);
                     }
 
                     var record = facts1[id];
@@ -327,15 +320,30 @@ public sealed class IndexedSearchService(
                     throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("access changed since the search"), cancellationToken).ConfigureAwait(false);
                 }
 
-                var shareOnly = ids.Where((_, i) => readAll[i] != SpiceDbCheckOutcome.Allowed).ToList();
-                var items = await read.ReadPredicateItemsAsync(shareOnly, valueTypes.Keys.ToList(), cancellationToken).ConfigureAwait(false);
-                if (items.Count > 0)
+                // C-141 (UF-25, U-1b): the page's share-only records are re-decided exactly as the search decided them, from the caller's
+                // own grants and the accepted item counts (the same rule; no limit on a page, as before).
+                var shareOnlyIds = ids.Where((_, i) => readAll[i] != SpiceDbCheckOutcome.Allowed).ToList();
+                var times = (await read.ReadScopeAsync(query.FormDefinitionId, ids, [], cancellationToken).ConfigureAwait(false)).ToDictionary(r => r.FormRecordId);
+                if (ids.Any(id => !times.ContainsKey(id)))
                 {
-                    var outcomes = await verifier.CheckBulkStrictAsync(pin, items.Select(i => new SpiceDbCheck(ResourceTypeNames.FieldItem, i.ManifestItemId.ToString("D"), "read", ResourceTypeNames.User, subject)).ToList(), cancellationToken).ConfigureAwait(false);
-                    if (outcomes.Any(o => o != SpiceDbCheckOutcome.Allowed))
-                    {
-                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("access changed since the search"), cancellationToken).ConfigureAwait(false);
-                    }
+                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("records of the form changed since the search"), cancellationToken).ConfigureAwait(false);
+                }
+
+                var predicateFields = PredicateFields(conditions, approvals);
+                var approvalByField = ApprovalByField(predicateFields);
+                ShareOnlyDecision pageDecision;
+                try
+                {
+                    pageDecision = await EvaluateShareOnlyAsync(read, pin, subject, bound.AuthorityUserId, organizationId, shareOnlyIds.Select(id => times[id]).ToList(), predicateFields, enforceLimit: false, "indexed-search-page", correlationId, cancellationToken).ConfigureAwait(false);
+                }
+                catch (AuthorityException ex) when (ex.ErrorCode == IndexedSearchErrorCodes.IndexNotReady)
+                {
+                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, ex, cancellationToken).ConfigureAwait(false);
+                }
+
+                if (shareOnlyIds.Any(id => !pageDecision.Evaluable.Contains(id)))
+                {
+                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("access changed since the search"), cancellationToken).ConfigureAwait(false);
                 }
 
                 var bindings = (await read.ReadBindingDataAsync(ids, valueTypes.Keys.ToList(), cancellationToken).ConfigureAwait(false)).ToDictionary(b => b.Entry.FormRecordId);
@@ -353,10 +361,14 @@ public sealed class IndexedSearchService(
                         throw await QuarantineIndexAsync(organizationId, verified.FindingCode ?? "MATCH_METADATA_MISMATCH", cancellationToken).ConfigureAwait(false);
                     }
 
+                    if (shareOnlyIds.Contains(id) && ShareOnlyReadability.VerifyBoundRecord(binding!, approvalByField, pageDecision.ConfirmedItemsByRecord.GetValueOrDefault(id)) is { } shareFinding)
+                    {
+                        throw await QuarantineIndexAsync(organizationId, shareFinding, cancellationToken).ConfigureAwait(false);
+                    }
+
                     headers[id] = verified.Header!;
                 }
 
-                var times = (await read.ReadScopeAsync(query.FormDefinitionId, ids, [], cancellationToken).ConfigureAwait(false)).ToDictionary(r => r.FormRecordId);
                 page = await VerifyPageAsync(read, pin, subject, organizationId, ids, conditions, valueTypes, facts.Approvals, cancellationToken).ConfigureAwait(false);
                 page = page.Select(item => item with
                 {
@@ -478,6 +490,75 @@ public sealed class IndexedSearchService(
         return ids.Select((id, i) => new IndexedSearchItem(id, string.Empty, null, Guid.Empty, default, default, edit[i] == SpiceDbCheckOutcome.Allowed)).ToList();
     }
 
+    /// <summary>
+    /// C-141 (UF-25, U-1b): the share-only readability step (R1 §E.3 semantics, unchanged). Validates the accepted item counts of
+    /// every share-only record, reads the candidates from the caller's own grants, enforces the item limit on those candidates only,
+    /// confirms every candidate with SpiceDB at the pin and decides evaluability by distinct-item count equality. Any failure refuses
+    /// the whole search with nothing released: a version 2 entry is 503 not ready (retryable); a contradiction is an index finding;
+    /// a SpiceDB denial of a candidate is escalated by Q4 (FD-4): the S1 decisive verification first (it quarantines the organization
+    /// on a projection mismatch), then, with S1 consistent, a search-index quarantine.
+    /// </summary>
+    private async Task<ShareOnlyDecision> EvaluateShareOnlyAsync(ISearchQuerySession read, VerifiedProjectionSnapshot pin, string subject, Guid authorityUserId, Guid organizationId,
+        IReadOnlyList<SearchScopeRecordFacts> shareOnly, IReadOnlyList<PredicateFieldApproval> predicateFields, bool enforceLimit, string path, Guid correlationId, CancellationToken cancellationToken)
+    {
+        var approvalByField = ApprovalByField(predicateFields);
+        var counts = shareOnly.Select(r => new ShareOnlyRecordCounts(r.FormRecordId, r.EntryIndexedOperationId is null ? null : r.EntryDerivationVersion, r.EntryDerivedFieldSearchApprovalIds, r.EntryDerivedFieldItemCounts)).ToList();
+        if (counts.Count == 0)
+        {
+            probe?.ShareOnlyStep(correlationId, new ShareOnlyProbeObservation(path, 0, 0, 0, 0, "DECIDED"));
+            return ShareOnlyReadability.Decide(counts, approvalByField, []);
+        }
+
+        if (ShareOnlyReadability.ValidateCounts(counts, approvalByField) is { } refused)
+        {
+            probe?.ShareOnlyStep(correlationId, new ShareOnlyProbeObservation(path, counts.Count, 0, 0, 0, refused.FindingCode!));
+            throw refused.Outcome == ShareOnlyOutcome.NotReady
+                ? NotReady("the search index is being upgraded; try again shortly")
+                : await QuarantineIndexAsync(organizationId, refused.FindingCode!, cancellationToken).ConfigureAwait(false);
+        }
+
+        var candidates = await read.ReadShareReadableItemsAsync(authorityUserId, counts.Select(c => c.FormRecordId).ToList(), predicateFields, options.MaximumShareOnlyItems, cancellationToken).ConfigureAwait(false);
+        if (enforceLimit && candidates.Count > options.MaximumShareOnlyItems)
+        {
+            probe?.ShareOnlyStep(correlationId, new ShareOnlyProbeObservation(path, counts.Count, candidates.Count, 0, 0, "LIMIT_ITEMS"));
+            throw Limit("items");
+        }
+
+        var checks = 0;
+        foreach (var chunk in candidates.Chunk(1000))
+        {
+            var outcomes = await verifier.CheckBulkStrictAsync(pin, chunk.Select(i => new SpiceDbCheck(ResourceTypeNames.FieldItem, i.ManifestItemId.ToString("D"), "read", ResourceTypeNames.User, subject)).ToList(), cancellationToken).ConfigureAwait(false);
+            checks += chunk.Length;
+            if (outcomes.Any(o => o != SpiceDbCheckOutcome.Allowed))
+            {
+                probe?.ShareOnlyStep(correlationId, new ShareOnlyProbeObservation(path, counts.Count, candidates.Count, checks, 0, "CANDIDATE_DENIED"));
+                // Q4 (§17.2, FD-4): a SpiceDB decision contradicts an access row of the same authorization revision.
+                if (!await verifier.CompleteAsync(pin, path + "-q4", cancellationToken).ConfigureAwait(false))
+                {
+                    throw Changed("authorization state moved during the search");
+                }
+
+                throw await QuarantineIndexAsync(organizationId, "SHARE_CANDIDATE_DENIED_BY_PROJECTION", cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        var decision = ShareOnlyReadability.Decide(counts, approvalByField, candidates);
+        probe?.ShareOnlyStep(correlationId, new ShareOnlyProbeObservation(path, counts.Count, candidates.Count, checks, decision.Evaluable.Count, decision.FindingCode ?? "DECIDED"));
+        if (decision.Outcome != ShareOnlyOutcome.Decided)
+        {
+            throw await QuarantineIndexAsync(organizationId, decision.FindingCode!, cancellationToken).ConfigureAwait(false);
+        }
+
+        return decision;
+    }
+
+    /// <summary>The distinct predicate fields with their value type and the condition's current Active approval.</summary>
+    private static List<PredicateFieldApproval> PredicateFields(IReadOnlyList<PreparedIndexedCondition> conditions, Guid[] approvalIds) =>
+        conditions.Select((c, i) => new PredicateFieldApproval(c.FieldDefinitionId, c.ValueType, approvalIds[i])).DistinctBy(f => f.FieldDefinitionId).ToList();
+
+    private static Dictionary<Guid, Guid> ApprovalByField(IReadOnlyList<PredicateFieldApproval> predicateFields) =>
+        predicateFields.ToDictionary(f => f.FieldDefinitionId, f => f.FieldSearchApprovalId);
+
     /// <summary>I-1 (§6.3, R1 §B.3) over the in-scope set D ∩ form, at the reader snapshot.</summary>
     private async Task GuardScopeAsync(Guid organizationId, IReadOnlyList<SearchScopeRecordFacts> scopeFacts, CancellationToken cancellationToken)
     {
@@ -504,8 +585,10 @@ public sealed class IndexedSearchService(
             {
                 finding = "SCOPE_ENTRY_NOT_AT_HEAD";
             }
-            else if (contentful && record.EntryDerivationVersion < SearchPostingDerivationV1.CurrentEntryDerivationVersion)
+            else if (contentful && record.EntryDerivationVersion < SearchPostingDerivationV1.HeaderFactsEntryDerivationVersion)
             {
+                // Version 2 entries (no item counts, C-141) are not a finding here: only a share-only decision needs the counts, and it
+                // refuses them as not ready (ShareOnlyReadability.ValidateCounts) until the derivation upgrade has re-derived them.
                 finding = "SCOPE_ENTRY_DERIVATION_OUTDATED";
             }
             else if (!contentful && record.EntryIndexedOperationId is not null)

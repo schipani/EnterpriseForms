@@ -33,7 +33,9 @@ public static class IndexedSearchBinding
             return Fail("MATCH_ENTRY_NOT_AT_HEAD");
         }
 
-        if (entry.EntryDerivationVersion < SearchPostingDerivationV1.CurrentEntryDerivationVersion || entry.HeaderSourceCanonicalBytes is not { Length: > 0 } headerBytes)
+        // C-141: a version 2 entry is still bound here (header facts present); its missing item counts are the share-only
+        // readability step's concern (refused as not ready), never a binding failure.
+        if (entry.EntryDerivationVersion < SearchPostingDerivationV1.HeaderFactsEntryDerivationVersion || entry.HeaderSourceCanonicalBytes is not { Length: > 0 } headerBytes)
         {
             return Fail("MATCH_ENTRY_DERIVATION_OUTDATED");
         }

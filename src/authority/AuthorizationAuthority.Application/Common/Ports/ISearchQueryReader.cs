@@ -28,8 +28,15 @@ public interface ISearchQuerySession : IAsyncDisposable
     /// </summary>
     Task<IReadOnlyList<SearchScopeRecordFacts>> ReadScopeAsync(Guid formDefinitionId, IReadOnlyCollection<Guid> discoverableRecordIds, IReadOnlyCollection<Guid> predicateFieldIds, CancellationToken cancellationToken);
 
-    /// <summary>Posting item ids of the predicate fields for the given records (R1 §E.3 step 4): ids only, never values.</summary>
-    Task<IReadOnlyList<(Guid FormRecordId, Guid FieldDefinitionId, Guid ManifestItemId)>> ReadPredicateItemsAsync(IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<Guid> predicateFieldIds, CancellationToken cancellationToken);
+    /// <summary>
+    /// C-141 (UF-25, U-1b): the share-only readability candidates. Starting from the caller (never from a record or a posting):
+    /// the caller's active team memberships, the record shares whose reader/contributor/manager subject is the caller or one of
+    /// those teams, those shares' records among <paramref name="formRecordIds"/>, and the field items shared through them; each
+    /// joined by item id to a current posting (bound to the record's current entry) of a predicate field under its approval. Every
+    /// read is keyed by the caller's own grants, so no item the caller cannot read is touched. Distinct (record, field, item) rows;
+    /// at most <paramref name="limit"/> + 1 rows per posting table. Ids only, never values.
+    /// </summary>
+    Task<IReadOnlyList<ShareReadableItem>> ReadShareReadableItemsAsync(Guid authorityUserId, IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<PredicateFieldApproval> predicateFields, int limit, CancellationToken cancellationToken);
 
     /// <summary>
     /// The candidate statement (§8.2): driven from <paramref name="scope"/> by a per-record probe on the posting-by-record index,
@@ -75,7 +82,12 @@ public sealed record SearchScopeRecordFacts(
     string? EntryRecordStatusName,
     Guid? EntryParentFormRecordId,
     Guid? EntryCreatedByBusinessUserId,
-    bool PredicateFieldEncrypted);
+    bool PredicateFieldEncrypted,
+    Guid[]? EntryDerivedFieldSearchApprovalIds = null,
+    int[]? EntryDerivedFieldItemCounts = null);
+
+/// <summary>C-141: one predicate field of a search, with its approved value type (the posting table) and current Active approval.</summary>
+public sealed record PredicateFieldApproval(Guid FieldDefinitionId, string ValueType, Guid FieldSearchApprovalId);
 
 /// <summary>One manifest leaf as the Authority recorded it (the accepted content of the record's current commit).</summary>
 public sealed record SearchManifestLeafFacts(byte[] ManifestItemKey, byte ManifestItemKindCode, Guid ManifestItemId, byte[] CanonicalPayloadDigest, byte[] RowSignature);

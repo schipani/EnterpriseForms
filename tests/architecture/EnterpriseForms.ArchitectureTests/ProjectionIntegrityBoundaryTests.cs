@@ -61,7 +61,9 @@ public sealed partial class ProjectionIntegrityBoundaryTests
         foreach (var (path, text) in consumers)
         {
             var pins = Regex.Count(text, @"\bverifier\.PinAsync\s*\(");
-            var completes = Regex.Count(text, @"\bverifier\.CompleteAsync\s*\(");
+            // C-141: the Q4 escalation (design §17.2, FD-4) completes the same pin a second time on a failure path whose decision is
+            // never used (the S1 decisive verification before a SpiceDB contradiction is classified); it is not a pin's completion.
+            var completes = Regex.Count(text, @"\bverifier\.CompleteAsync\s*\(") - Regex.Count(text, @"\bverifier\.CompleteAsync\s*\(\s*pin\s*,\s*path\s*\+\s*""-q4""");
             Assert.True(pins > 0 && pins == completes, $"{path}: {pins} pins and {completes} completes; every pinned snapshot must be verified before its decision is used");
         }
     }

@@ -50,6 +50,22 @@ public sealed class SearchQueryReader(string? readerConnectionString, IndexedSea
     {
         private static readonly string[] ScopeStates = [ResourceLifecycleStates.Active, ResourceLifecycleStates.Quarantined];
 
+        /// <summary>authority.schema.zed: <c>record_share#read = reader + contributor + manager</c>.</summary>
+        private static readonly string[] ShareReadRoles = ["reader", "contributor", "manager"];
+
+        /// <summary>The posting table of an approved value type: a fixed allowlist, never an identifier from input.</summary>
+        private static string PostingTable(string valueType) => valueType switch
+        {
+            "String" => "search_string_postings",
+            "Integer" => "search_integer_postings",
+            "Decimal" => "search_decimal_postings",
+            "Date" => "search_date_postings",
+            "DateTime" => "search_date_time_postings",
+            "Boolean" => "search_boolean_postings",
+            "Option" => "search_option_postings",
+            _ => throw new InvalidOperationException("no posting table for the value type"),
+        };
+
         public async Task<SearchQueryStateFacts> ReadStateAsync(Guid formDefinitionId, CancellationToken cancellationToken) => await Guard(async () =>
         {
             var state = await context.OrganizationStates.AsNoTracking().FirstOrDefaultAsync(o => o.OrganizationId == organizationId, cancellationToken).ConfigureAwait(false);
@@ -90,38 +106,84 @@ public sealed class SearchQueryReader(string? readerConnectionString, IndexedSea
                     EntryCreator = e == null ? null : e.CreatedByBusinessUserId,
                     Encrypted = e != null && context.SearchRecordFieldAnomalies.Any(a => a.OrganizationId == organizationId && a.FormRecordId == r.ResourceEntityId
                                                                                          && a.IndexedOperationId == e.IndexedOperationId && fields.Contains(a.FieldDefinitionId)),
+                    EntryApprovals = e == null ? null : e.DerivedFieldSearchApprovalIds,
+                    EntryCounts = e == null ? null : e.DerivedFieldItemCounts,
                 }).ToListAsync(cancellationToken).ConfigureAwait(false);
             return rows.Select(x => new SearchScopeRecordFacts(x.ResourceEntityId, x.ResourceLifecycleState, x.ResourceRegisteredOn, x.Revision, x.Operation, x.Quarantined, x.Modified,
-                x.EntryOperation, x.EntryVersion, x.EntryStatus, x.EntryParent, x.EntryCreator, x.Encrypted)).ToList();
+                x.EntryOperation, x.EntryVersion, x.EntryStatus, x.EntryParent, x.EntryCreator, x.Encrypted, x.EntryApprovals, x.EntryCounts)).ToList();
         }).ConfigureAwait(false);
 
-        public async Task<IReadOnlyList<(Guid FormRecordId, Guid FieldDefinitionId, Guid ManifestItemId)>> ReadPredicateItemsAsync(IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<Guid> predicateFieldIds, CancellationToken cancellationToken) => await Guard(async () =>
+        public async Task<IReadOnlyList<ShareReadableItem>> ReadShareReadableItemsAsync(Guid authorityUserId, IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<PredicateFieldApproval> predicateFields, int limit, CancellationToken cancellationToken) => await Guard(async () =>
         {
             var ids = formRecordIds.ToArray();
-            var fields = predicateFieldIds.ToArray();
-            var result = new List<(Guid, Guid, Guid)>();
-            if (ids.Length == 0)
+            var result = new List<ShareReadableItem>();
+            if (ids.Length == 0 || predicateFields.Count == 0)
             {
                 return result;
             }
 
-            // Ids only. The postings are bound to the record's current entry (its indexed operation).
-            foreach (var table in Configurations.SearchIndexSchema.PostingTables)
+            // C-141 (UF-25, U-1b). Every edge read uses ix_authority_edges_subject (organization, subject type, subject id, relation)
+            // and starts from the caller: its teams, its shares (as reader, contributor or manager, directly or through a team), those
+            // shares' records in the requested set, the items shared through them. Postings are probed per candidate item on the
+            // record index (organization, record, field, item), so no posting the caller cannot read is visited; the entry join binds
+            // each posting to the record's current entry. Ids only. The relation literals mirror authority.schema.zed (record_share
+            // read = reader + contributor + manager; team participant = member); SpiceDB confirms every candidate afterwards.
+            foreach (var group in predicateFields.GroupBy(f => f.ValueType, StringComparer.Ordinal))
             {
+                var table = PostingTable(group.Key);
                 await using var command = Command($"""
-                    SELECT p.form_record_id, p.field_definition_id, p.manifest_item_id
-                    FROM authority_search.{table} p
+                    WITH member_teams AS (
+                        SELECT m.resource_entity_id AS team_id
+                        FROM authority.authority_relationship_edges m
+                        WHERE m.organization_id = @org AND m.subject_type_name = 'user' AND m.subject_entity_id = @user AND m.relationship_name = 'member'
+                          AND m.resource_type_name = 'team' AND m.subject_relation_name = '' AND m.removed_by_security_command_id IS NULL
+                    ), caller_shares AS (
+                        SELECT r.resource_entity_id AS record_share_id
+                        FROM authority.authority_relationship_edges r
+                        WHERE r.organization_id = @org AND r.subject_type_name = 'user' AND r.subject_entity_id = @user AND r.relationship_name = ANY(@roles)
+                          AND r.resource_type_name = 'record_share' AND r.subject_relation_name = '' AND r.removed_by_security_command_id IS NULL
+                        UNION
+                        SELECT r.resource_entity_id
+                        FROM member_teams t
+                        JOIN authority.authority_relationship_edges r
+                          ON r.organization_id = @org AND r.subject_type_name = 'team' AND r.subject_entity_id = t.team_id AND r.relationship_name = ANY(@roles)
+                         AND r.resource_type_name = 'record_share' AND r.subject_relation_name = 'participant' AND r.removed_by_security_command_id IS NULL
+                    ), scoped_shares AS (
+                        SELECT DISTINCT s.record_share_id, f.resource_entity_id AS form_record_id
+                        FROM caller_shares s
+                        JOIN authority.authority_relationship_edges f
+                          ON f.organization_id = @org AND f.subject_type_name = 'record_share' AND f.subject_entity_id = s.record_share_id AND f.relationship_name = 'shared_via'
+                         AND f.resource_type_name = 'form_record' AND f.subject_relation_name = '' AND f.removed_by_security_command_id IS NULL
+                        WHERE f.resource_entity_id = ANY(@ids)
+                    ), shared_items AS (
+                        SELECT DISTINCT s.form_record_id, i.resource_entity_id AS manifest_item_id
+                        FROM scoped_shares s
+                        JOIN authority.authority_relationship_edges i
+                          ON i.organization_id = @org AND i.subject_type_name = 'record_share' AND i.subject_entity_id = s.record_share_id AND i.relationship_name = 'shared_via'
+                         AND i.resource_type_name = 'field_item' AND i.subject_relation_name = '' AND i.removed_by_security_command_id IS NULL
+                    )
+                    SELECT p.form_record_id, p.field_definition_id, p.manifest_item_id, p.field_search_approval_id
+                    FROM shared_items c
+                    JOIN LATERAL (
+                        SELECT q.form_record_id, q.field_definition_id, q.manifest_item_id, q.field_search_approval_id, q.indexed_operation_id
+                        FROM authority_search.{table} q
+                        WHERE q.organization_id = @org AND q.form_record_id = c.form_record_id AND q.field_definition_id = ANY(@fields)
+                          AND q.manifest_item_id = c.manifest_item_id
+                    ) p ON true
                     JOIN authority_search.search_record_entries e
-                      ON e.organization_id = p.organization_id AND e.form_record_id = p.form_record_id AND e.indexed_operation_id = p.indexed_operation_id
-                    WHERE p.organization_id = @org AND p.form_record_id = ANY(@ids) AND p.field_definition_id = ANY(@fields)
+                      ON e.organization_id = @org AND e.form_record_id = p.form_record_id AND e.indexed_operation_id = p.indexed_operation_id
+                    LIMIT @limit
                     """);
                 command.Parameters.AddWithValue("org", organizationId);
+                command.Parameters.AddWithValue("user", authorityUserId);
+                command.Parameters.AddWithValue("roles", ShareReadRoles);
                 command.Parameters.AddWithValue("ids", ids);
-                command.Parameters.AddWithValue("fields", fields);
+                command.Parameters.AddWithValue("fields", group.Select(f => f.FieldDefinitionId).ToArray());
+                command.Parameters.AddWithValue("limit", Math.Max(1, limit + 1));
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    result.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2)));
+                    result.Add(new ShareReadableItem(reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2), reader.GetGuid(3)));
                 }
             }
 

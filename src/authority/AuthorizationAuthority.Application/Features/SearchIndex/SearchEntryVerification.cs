@@ -83,6 +83,13 @@ public static class SearchEntryVerification
                 return (SweepUnitOutcome.Fail, "ENTRY_COUNT_MISMATCH");
             }
 
+            // C-141 (UF-25): the per-field item counts are a function of the postings the seal binds; recounted here, so a changed
+            // count fails with the seal check (keyed) exactly like a changed posting count.
+            if (!SearchFieldItemCounts.MatchPostings(entry, derived.Select(p => p.FieldSearchApprovalId)))
+            {
+                return (SweepUnitOutcome.Fail, "ENTRY_FIELD_ITEM_COUNT_MISMATCH");
+            }
+
             var message = SearchEntrySealBuilder.Message(entry, bound, derived, sealAnomalies);
             return verifier.Verify(entry.SealKeyName, entry.SealKeyVersion, message, entry.EntrySealSignature) switch
             {

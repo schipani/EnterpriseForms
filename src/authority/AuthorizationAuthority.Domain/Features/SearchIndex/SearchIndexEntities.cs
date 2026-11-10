@@ -171,8 +171,20 @@ public sealed class SearchRecordEntry
     /// <summary>IX-3: the creating business user, decoded from the verified header at derivation (display only).</summary>
     public Guid? CreatedByBusinessUserId { get; set; }
 
-    /// <summary>IX-3: 1 = IX-1/IX-2 derivation (no header facts); 2 = with the verified header facts above.</summary>
+    /// <summary>
+    /// IX-3: 1 = IX-1/IX-2 derivation (no header facts); 2 = with the verified header facts above; 3 (C-141, UF-25) = also with
+    /// <see cref="DerivedFieldItemCounts"/>.
+    /// </summary>
     public int EntryDerivationVersion { get; set; } = 1;
+
+    /// <summary>
+    /// C-141 (UF-25, U-1b): for each approval in <see cref="DerivedFieldSearchApprovalIds"/> (same position), the number of
+    /// postings this entry holds for that approval's field — the accepted total item count of the field at
+    /// <see cref="IndexedOperationId"/>. Written in the derivation transaction with the postings; never updated. A pure function of
+    /// the sealed posting list, verified against it wherever the seal is verified (S-B, every served page record), re-derived by
+    /// S-C and checked by S-A. Null on entries of derivation version 1 and 2 only.
+    /// </summary>
+    public int[]? DerivedFieldItemCounts { get; set; }
 }
 
 /// <summary>

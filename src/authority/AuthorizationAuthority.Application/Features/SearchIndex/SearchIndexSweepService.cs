@@ -114,6 +114,37 @@ public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWr
             return new SweepPassResult(CheapSweep, SweepUnitOutcome.Inconclusive, 0, 0, "RECONCILIATION_REQUIRED");
         }
 
+        // C-141 (UF-25): derivation upgrade 2 → 3. A Complete coverage of a form that still has version 2 entries (written before the
+        // item counts existed) returns to Building; the builder re-derives those entries from bytes the Authority verifies and only a
+        // fresh attestation re-establishes Complete. Until then indexed search answers 503 not ready for those fields. Nothing is
+        // re-derived, re-signed or repaired here; the change is journaled and alerted. A version 2 entry that carries counts is not
+        // an upgrade: the cheap checks below report it as a finding.
+        var upgrading = await index.GetFormsAwaitingDerivationUpgradeAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        if (upgrading.Count > 0)
+        {
+            var returned = 0;
+            foreach (var coverage in (await index.GetCoveragesAsync(organizationId, null, cancellationToken).ConfigureAwait(false))
+                     .Where(c => c.CoverageStateName == SearchCoverageStates.Complete && upgrading.Contains(c.FormDefinitionId)))
+            {
+                coverage.CoverageStateName = SearchCoverageStates.Building;
+                coverage.CoverageCompletedOn = null;
+                coverage.CoverageAttestedJournalEntryId = null;
+                returned++;
+            }
+
+            foreach (var form in upgrading)
+            {
+                await index.BumpFormStateAsync(organizationId, form, now, cancellationToken).ConfigureAwait(false);
+            }
+
+            AuditJournal.Append(scope, state, "SearchIndexDerivationUpgradeStarted", new
+            {
+                organization_id = organizationId, from_derivation_version = SearchPostingDerivationV1.HeaderFactsEntryDerivationVersion, to_derivation_version = SearchPostingDerivationV1.CurrentEntryDerivationVersion,
+                forms = upgrading.Count, coverages_building = returned,
+            }, clock);
+            alerts.Raise(new SecurityAlert("SEARCH_INDEX_DERIVATION_UPGRADE", "Medium", organizationId, Guid.Empty, null, "Search index entries predate the item counts; coverages returned to Building for re-derivation.", Guid.NewGuid()));
+        }
+
         var findings = await index.RunCheapChecksAsync(organizationId, cancellationToken).ConfigureAwait(false);
         if (!findings.Clean)
         {

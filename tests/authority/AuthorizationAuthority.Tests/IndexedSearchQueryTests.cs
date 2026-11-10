@@ -162,6 +162,7 @@ public sealed class IndexedSearchQueryTests
             SearchRecordEntryId = Guid.CreateVersion7(), OrganizationId = Org, FormDefinitionId = Ids.Form, FormRecordId = record, IndexedOperationId = op, IndexedContentRevision = 1, IndexedManifestRoot = root,
             RecordStatusName = content.RecordStatusName, HeaderSourceCanonicalBytes = content.HeaderSourceCanonicalBytes, ParentFormRecordId = content.ParentFormRecordId, CreatedByBusinessUserId = content.CreatedByUserId,
             EntryDerivationVersion = SearchPostingDerivationV1.CurrentEntryDerivationVersion, DerivedFieldSearchApprovalIds = approvals.Select(a => a.FieldSearchApprovalId).ToArray(),
+            DerivedFieldItemCounts = SearchFieldItemCounts.Derive(approvals.Select(a => a.FieldSearchApprovalId).ToArray(), content.Postings.Select(p => p.FieldSearchApprovalId)),
             IndexedPostingCount = content.Postings.Count, SealKeyName = "k", SealKeyVersion = 1, EntrySealSignature = new byte[64],
         };
         var rowsIndex = SearchIndexWriter.ToRows(entry, content);
@@ -249,6 +250,7 @@ public sealed class IndexedSearchQueryTests
             SearchRecordEntryId = e.SearchRecordEntryId, OrganizationId = e.OrganizationId, FormDefinitionId = e.FormDefinitionId, FormRecordId = e.FormRecordId, IndexedOperationId = e.IndexedOperationId,
             IndexedContentRevision = e.IndexedContentRevision, IndexedManifestRoot = e.IndexedManifestRoot, RecordStatusName = e.RecordStatusName, HeaderSourceCanonicalBytes = e.HeaderSourceCanonicalBytes,
             ParentFormRecordId = e.ParentFormRecordId, CreatedByBusinessUserId = e.CreatedByBusinessUserId, EntryDerivationVersion = e.EntryDerivationVersion, DerivedFieldSearchApprovalIds = e.DerivedFieldSearchApprovalIds,
+            DerivedFieldItemCounts = e.DerivedFieldItemCounts,
             IndexedPostingCount = e.IndexedPostingCount, SealKeyName = e.SealKeyName, SealKeyVersion = e.SealKeyVersion, EntrySealSignature = e.EntrySealSignature,
         };
         change(copy);
@@ -256,15 +258,20 @@ public sealed class IndexedSearchQueryTests
     }
 
     [Fact]
-    public void TheDerivationRecordsVersion2HeaderFactsAndOlderEntriesAreNotIndexedAtTheHead()
+    public void TheDerivationRecordsVersion3HeaderFactsAndItemCountsAndOlderEntriesAreNotIndexedAtTheHead()
     {
         var b = Build();
-        Assert.Equal(2, b.Data.Entry.EntryDerivationVersion);
+        Assert.Equal(3, b.Data.Entry.EntryDerivationVersion);
         Assert.NotNull(b.Data.Entry.HeaderSourceCanonicalBytes);
+        Assert.NotNull(b.Data.Entry.DerivedFieldItemCounts);
         var head = new RecordContentHead { CommittedOperationId = b.Data.Entry.IndexedOperationId, CommittedContentRevision = 1, CommittedManifestRoot = b.Data.HeadManifestRoot };
         var required = b.Data.Entry.DerivedFieldSearchApprovalIds.ToHashSet();
         Assert.True(SearchIndexBuilderService.IsIndexedAtHead(b.Data.Entry, head, required));
+        // C-141: version 2 (header facts, no item counts) and version 1 entries are re-derived by the builder before attestation.
+        Assert.False(SearchIndexBuilderService.IsIndexedAtHead(Copy(b.Data.Entry, e => { e.EntryDerivationVersion = 2; e.DerivedFieldItemCounts = null; }), head, required));
         Assert.False(SearchIndexBuilderService.IsIndexedAtHead(Copy(b.Data.Entry, e => e.EntryDerivationVersion = 1), head, required));
+        // A version 2 entry is still bound by I-2 (its header facts are present); only the share-only step needs the counts.
+        Assert.True(Verify(b, b.Data with { Entry = Copy(b.Data.Entry, e => { e.EntryDerivationVersion = 2; e.DerivedFieldItemCounts = null; }) }).Bound);
     }
 
     // ---- candidate templates, digest, sort, options, grants ------------------------------------------------------------------

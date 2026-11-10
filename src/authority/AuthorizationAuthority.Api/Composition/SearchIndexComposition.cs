@@ -85,6 +85,13 @@ public static class SearchIndexComposition
 
         services.AddSingleton(query);
         services.AddSingleton<ISearchQueryReader>(_ => new SearchQueryReader(query.QueryEnabled ? readerConnection : null, query));
+        if (environment.IsEnvironment("Testing"))
+        {
+            // C-141 (RQ-2): the share-only step probe exists in the Testing environment alone; elsewhere the service receives null.
+            services.AddSingleton<AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchTestingProbe>();
+            services.AddSingleton<IIndexedSearchProbe>(sp => sp.GetRequiredService<AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchTestingProbe>());
+        }
+
         services.AddSingleton<IndexedSearchService>();
         if (query.QueryEnabled)
         {

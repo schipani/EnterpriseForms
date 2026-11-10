@@ -265,6 +265,9 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
                 UNION ALL SELECT organization_id, form_definition_id, form_record_id, indexed_operation_id, field_search_approval_id FROM authority_search.search_boolean_postings WHERE organization_id = @organization_id
                 UNION ALL SELECT organization_id, form_definition_id, form_record_id, indexed_operation_id, field_search_approval_id FROM authority_search.search_option_postings WHERE organization_id = @organization_id
                 UNION ALL SELECT organization_id, form_definition_id, form_record_id, indexed_operation_id, NULL::uuid FROM authority_search.search_record_field_anomalies WHERE organization_id = @organization_id
+            ), posting_counts AS (
+                SELECT form_record_id, indexed_operation_id, field_search_approval_id, count(*)::int AS posting_count
+                FROM rows WHERE field_search_approval_id IS NOT NULL GROUP BY form_record_id, indexed_operation_id, field_search_approval_id
             )
             SELECT
               (SELECT count(*) FROM entries e LEFT JOIN authority.record_content_heads h ON h.organization_id = e.organization_id AND h.form_record_id = e.form_record_id
@@ -286,7 +289,15 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
                       AND h.committed_content_revision > 0 AND h.committed_operation_id IS NOT NULL
                 WHERE c.organization_id = @organization_id AND c.coverage_state_name = 'Complete'
                   AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.form_record_id = r.resource_entity_id AND e.indexed_operation_id = h.committed_operation_id
-                                    AND c.field_search_approval_id = ANY (e.derived_field_search_approval_ids)))::int
+                                    AND c.field_search_approval_id = ANY (e.derived_field_search_approval_ids)))::int,
+              -- C-141 (UF-25): item counts present exactly from version 3, aligned with the approvals, and equal to the entry's postings.
+              (SELECT count(DISTINCT e.form_record_id) FROM entries e
+                 LEFT JOIN LATERAL unnest(e.derived_field_search_approval_ids, e.derived_field_item_counts) u(approval_id, item_count) ON e.entry_derivation_version >= 3
+                 LEFT JOIN posting_counts pc ON pc.form_record_id = e.form_record_id AND pc.indexed_operation_id = e.indexed_operation_id AND pc.field_search_approval_id = u.approval_id
+                WHERE (e.entry_derivation_version < 3 AND e.derived_field_item_counts IS NOT NULL)
+                   OR (e.entry_derivation_version >= 3 AND (e.derived_field_item_counts IS NULL
+                       OR cardinality(e.derived_field_item_counts) <> cardinality(e.derived_field_search_approval_ids)
+                       OR u.item_count IS DISTINCT FROM COALESCE(pc.posting_count, 0))))::int
             """;
         await using var command = CreateCommand(sql);
         AddParameter(command, "organization_id", organizationId);
@@ -296,8 +307,14 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
             throw new InvalidOperationException("cheap sweep query returned no row");
         }
 
-        return new CheapSweepFindings(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7));
+        return new CheapSweepFindings(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7), reader.GetInt32(8));
     }
+
+    public async Task<IReadOnlyList<Guid>> GetFormsAwaitingDerivationUpgradeAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        await context.SearchRecordEntries.AsNoTracking()
+            .Where(e => e.OrganizationId == organizationId && e.EntryDerivationVersion == 2 && e.DerivedFieldItemCounts == null
+                        && context.SearchFieldCoverages.Any(c => c.OrganizationId == organizationId && c.FormDefinitionId == e.FormDefinitionId && c.CoverageStateName == SearchCoverageStates.Complete))
+            .Select(e => e.FormDefinitionId).Distinct().OrderBy(f => f).ToListAsync(cancellationToken).ConfigureAwait(false);
 
     public async Task<IReadOnlyList<Guid>> DeleteEntriesNotAtHeadAsync(Guid organizationId, CancellationToken cancellationToken)
     {

@@ -86,6 +86,7 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
 
         var readsDone = System.Diagnostics.Stopwatch.GetTimestamp();
         var content = SearchPostingDerivationV1.Derive(state.OrganizationId, formDefinitionId, input.FormRecordId, input.VerifiedItems, activeApprovals);
+        var derivedApprovalIds = activeApprovals.Select(a => a.FieldSearchApprovalId).OrderBy(id => id).ToArray();
         var entry = new SearchRecordEntry
         {
             SearchRecordEntryId = Guid.CreateVersion7(),
@@ -100,7 +101,9 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
             ParentFormRecordId = content.ParentFormRecordId,
             CreatedByBusinessUserId = content.CreatedByUserId,
             EntryDerivationVersion = SearchPostingDerivationV1.CurrentEntryDerivationVersion,
-            DerivedFieldSearchApprovalIds = activeApprovals.Select(a => a.FieldSearchApprovalId).OrderBy(id => id).ToArray(),
+            DerivedFieldSearchApprovalIds = derivedApprovalIds,
+            // C-141 (UF-25): the accepted total item count of each derived field, from the same postings, in the same row.
+            DerivedFieldItemCounts = SearchFieldItemCounts.Derive(derivedApprovalIds, content.Postings.Select(p => p.FieldSearchApprovalId)),
             IndexedPostingCount = content.Postings.Count,
             IndexedAnomalyCount = content.Anomalies.Count,
             SealKeyName = signingGate.KeyName,

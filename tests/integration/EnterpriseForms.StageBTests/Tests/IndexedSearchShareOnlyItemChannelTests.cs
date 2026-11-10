@@ -10,13 +10,13 @@ using Xunit;
 namespace EnterpriseForms.StageBTests.Tests;
 
 /// <summary>
-/// C-140 UF-25 reproduction (investigation only; Tier 1 behaviour is unchanged by this class). Tier 1's readable-for-predicate
-/// scope (design R1 §E.3) bulk-checks <c>field_item#read</c> on <b>every</b> posting item of each predicate field of the caller's
-/// share-only records, including items the caller cannot read, and applies the <c>items</c> limit
-/// (<c>SearchIndex:Query:MaximumShareOnlyItems</c>) to that count. These tests establish, on the real security-test stack, whether
-/// content the caller is not authorized to read changes observable search behaviour: the refusal (deterministic, with a small
-/// limit set only for this test), the work and latency (informational; Benchmark trait), and the results (which must not change).
-/// Synthetic data only. A focused development test class (C-131), not a Stage B group run.
+/// UF-25 on the real security-test stack. C-140 reproduced the defect: Tier 1's share-only readability step (design R1 §E.3)
+/// bulk-checked <c>field_item#read</c> on every posting item of each predicate field, including items the caller cannot read, and
+/// applied the <c>items</c> limit to that count. C-141 corrects it (U-1b): the candidates come from the caller's own grants, the
+/// limit counts them only, and evaluability compares distinct confirmed items with the accepted per-field item count. These are the
+/// RQ-1…RQ-8 regression tests: hidden content changes neither the item checks (Testing-only probe) nor the refusal; results and the
+/// partially-shared-field semantics are unchanged; revocation and team membership narrow the candidates; tampered, stale or missing
+/// counts and a SpiceDB contradiction fail closed. Synthetic data only. A focused development test class (C-131), not Stage B.
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
 public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture)
@@ -28,11 +28,15 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
 
     private sealed record Session(string Digest, TestUser User);
 
+    private sealed record Probe(int ShareOnlyRecords, int CandidateItems, int ItemChecksIssued, int EvaluableRecords, string OutcomeCode);
+
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private string Scalar(string sql) => fixture.Stack.AuthorityObserverSql(sql).Trim().Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? string.Empty;
+
+    private string Projection(Guid org) => Scalar($"SELECT projection_status_name || '|' || coalesce(projection_status_reason_code, '') FROM authority_search.search_projection_states WHERE organization_id = '{org:D}';");
 
     // ---- workspace ---------------------------------------------------------------------------------------------------------
 
@@ -126,15 +130,16 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         }
     }
 
-    /// <summary>Shares the listed fields of the record with the Reader along the workspace's path (overlapping: a direct and a team share).</summary>
-    private async Task ShareAsync(Ws w, Guid record, params string[] fieldKeys)
+    /// <summary>Shares the listed fields with the Reader along <paramref name="path"/> (overlapping: a direct and a team share). Returns the share ids.</summary>
+    private async Task<List<Guid>> ShareViaAsync(Ws w, Guid record, string? path, params string[] fieldKeys)
     {
-        var recipients = w.Path switch
+        var recipients = (path ?? w.Path) switch
         {
             "direct" => new (Guid? User, Guid? Team)[] { (w.S.Reader.AuthorityUserId, null) },
             "team" => new (Guid? User, Guid? Team)[] { (null, w.TeamId) },
             _ => new (Guid? User, Guid? Team)[] { (w.S.Reader.AuthorityUserId, null), (null, w.TeamId) },
         };
+        var ids = new List<Guid>();
         foreach (var (user, team) in recipients)
         {
             for (var attempt = 0; ; attempt++)
@@ -142,6 +147,7 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
                 var share = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = user, recipientTeamId = team, recipientRole = "Reader", fieldKeys });
                 if (share.IsSuccess)
                 {
+                    ids.Add(share.Root.GetProperty("recordShareId").GetGuid());
                     break;
                 }
 
@@ -151,11 +157,37 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         }
 
         Assert.True((await w.S.WaitProjectionAsync(w.S.Reader, record, TimeSpan.FromSeconds(40))).IsSuccess);
+        return ids;
     }
 
-    private async Task WaitCompleteAsync(Ws w, int coverages = 3)
+    private Task<List<Guid>> ShareAsync(Ws w, Guid record, params string[] fieldKeys) => ShareViaAsync(w, record, null, fieldKeys);
+
+    /// <summary>Posting items of the field on the record that a share whose reader is the Reader reaches (the readable items, from the Authority's canonical edges).</summary>
+    private int ReadableItems(Ws w, Guid record, Guid field) => int.Parse(Scalar(
+        $"SELECT count(DISTINCT p.manifest_item_id) FROM authority_search.search_option_postings p " +
+        $"JOIN authority_relationship_edges i ON i.organization_id = p.organization_id AND i.resource_type_name = 'field_item' AND i.resource_entity_id = p.manifest_item_id AND i.relationship_name = 'shared_via' AND i.removed_by_security_command_id IS NULL " +
+        $"JOIN authority_relationship_edges r ON r.organization_id = p.organization_id AND r.resource_type_name = 'record_share' AND r.resource_entity_id = i.subject_entity_id AND r.subject_type_name = 'user' AND r.subject_entity_id = '{w.S.Reader.AuthorityUserId:D}' AND r.removed_by_security_command_id IS NULL " +
+        $"WHERE p.organization_id = '{w.S.OrganizationId:D}' AND p.form_record_id = '{record:D}' AND p.field_definition_id = '{field:D}';"), CultureInfo.InvariantCulture);
+
+    private async Task RevokeAsync(Ws w, Guid record, Guid share)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(300);
+        for (var attempt = 0; ; attempt++)
+        {
+            var revoked = await fixture.Api.PostAsync($"/api/v1/form-records/{record:D}/shares/{share:D}/revoke", w.S.Token(w.S.Clerk), new { });
+            if (revoked.IsSuccess)
+            {
+                await w.S.WaitGateReadyAsync();
+                return;
+            }
+
+            Assert.True(attempt < 30 && revoked.ErrorCode is "AUTHORITY_NOT_READY" or "COMMAND_PENDING" or "STALE_AUTHORIZATION_REVISION", "revoke failed: " + revoked.Body);
+            await Task.Delay(300, Ct);
+        }
+    }
+
+    private async Task WaitCompleteAsync(Ws w, int coverages = 3, int seconds = 300)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
         string last;
         do
         {
@@ -171,7 +203,7 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         Assert.Fail("coverages not Complete: " + last);
     }
 
-    /// <summary>The posting items of a field over the given records at their indexed operations: exactly the set Tier 1 checks for share-only records.</summary>
+    /// <summary>All posting items of a field over the records (readable or not): evidence that the hidden content exists in the index.</summary>
     private int PostingItems(Ws w, Guid field, IEnumerable<Guid> records) => int.Parse(Scalar(
         $"SELECT count(*) FROM authority_search.search_option_postings p JOIN authority_search.search_record_entries e ON e.organization_id = p.organization_id AND e.form_record_id = p.form_record_id AND e.indexed_operation_id = p.indexed_operation_id " +
         $"WHERE p.organization_id = '{w.S.OrganizationId:D}' AND p.field_definition_id = '{field:D}' AND p.form_record_id IN ({string.Join(",", records.Select(r => $"'{r:D}'"))});"), CultureInfo.InvariantCulture);
@@ -185,6 +217,15 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
             await Task.Delay(500, Ct);
         }
     }
+
+    private Guid ActiveApproval(Guid field) => Guid.Parse(Scalar($"SELECT field_search_approval_id FROM field_search_approvals WHERE field_definition_id = '{field:D}' AND approval_state_name = 'Active';"));
+
+    /// <summary>The stored item count of the field on the record's entry (C-141), as the Authority wrote it.</summary>
+    private int StoredCount(Ws w, Guid record, Guid field) => int.Parse(Scalar(
+        $"SELECT derived_field_item_counts[array_position(derived_field_search_approval_ids, '{ActiveApproval(field):D}'::uuid)] FROM authority_search.search_record_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{record:D}';"), CultureInfo.InvariantCulture);
+
+    private void SetStoredCount(Ws w, Guid record, Guid field, int count) => fixture.Stack.AuthorityAdministratorSql(
+        $"SELECT set_config('authority_search.organization_id', '{w.S.OrganizationId:D}', false); UPDATE authority_search.search_record_entries SET derived_field_item_counts[array_position(derived_field_search_approval_ids, '{ActiveApproval(field):D}'::uuid)] = {count} WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{record:D}';");
 
     /// <summary>The Reader's authorized projection of the record lists no value of the field (the content is not authorized to the Reader).</summary>
     private static async Task AssertReaderCannotReadAsync(Ws w, Guid record, string fieldKey)
@@ -206,23 +247,41 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
 
     private static object Cond(Guid field, string op, Guid option) => new { field_definition_id = field, @operator = op, value_type = "Option", value = option.ToString("D"), lower_bound = (string?)null, upper_bound = (string?)null };
 
+    private static object CountEquals(Guid field, int value) => new { field_definition_id = field, @operator = "equals", value_type = "Integer", value = value.ToString(CultureInfo.InvariantCulture), lower_bound = (string?)null, upper_bound = (string?)null };
+
     private static object Query(Ws w, object condition) =>
         new { form_definition_id = w.FormId, conditions = new[] { condition }, record_status = (string?)null, include_children = false, include_archived = false, sort_by = (string?)null, sort_direction = (string?)null, page_size = 50 };
 
-    private async Task<HttpResult> IndexedAsync(Ws w, Session session, object query)
+    /// <summary>One search; returns the result and the probe of its (last) attempt.</summary>
+    private async Task<(HttpResult Result, Probe? Probe)> IndexedAsync(Ws w, Session session, object query)
     {
         for (var attempt = 0; ; attempt++)
         {
             var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            var correlation = Guid.CreateVersion7();
             var result = await fixture.Authority.SendAsync(HttpMethod.Post, "/internal/v1/search/indexed-query", TestIdentity.WorkloadToken(),
-                new { organization_id = w.S.OrganizationId, session_digest_base64 = session.Digest, query_nonce_base64 = nonce, query }, w.S.Token(session.User));
+                new { organization_id = w.S.OrganizationId, session_digest_base64 = session.Digest, query_nonce_base64 = nonce, query }, w.S.Token(session.User), correlationId: correlation);
             if (result.IsSuccess || attempt >= 30 || result.ErrorCode is not ("AUTHORITY_NOT_READY" or "SEARCH_SNAPSHOT_CHANGED"))
             {
-                return result;
+                return (result, await ProbeAsync(correlation));
             }
 
             await Task.Delay(400, Ct);
         }
+    }
+
+    private async Task<Probe?> ProbeAsync(Guid correlation)
+    {
+        var probe = await fixture.Authority.SendAsync(HttpMethod.Get, $"/internal/v1/testing/search/share-only-probe/{correlation:D}", TestIdentity.WorkloadToken(), null);
+        if (probe.Status == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        Assert.True(probe.IsSuccess, probe.Body);
+        var last = probe.Root.EnumerateArray().Last();
+        int Int(string name) => last.GetProperty(name).GetInt32();
+        return new Probe(Int("share_only_records"), Int("candidate_items"), Int("item_checks_issued"), Int("evaluable_records"), last.GetProperty("outcome_code").GetString()!);
     }
 
     private static List<Guid> Ids(HttpResult result)
@@ -231,11 +290,10 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         return result.Root.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("form_record_id").GetGuid()).Order().ToList();
     }
 
-    private static void AssertItemsRefusal(HttpResult result)
+    private static void AssertRefused(HttpResult result, string code)
     {
         Assert.False(result.IsSuccess, result.Body);
-        Assert.Equal("SEARCH_VERIFICATION_LIMIT", result.ErrorCode);
-        Assert.Contains("items", result.Body, StringComparison.Ordinal);
+        Assert.Equal(code, result.ErrorCode);
         Assert.DoesNotContain("form_record_id", result.Body, StringComparison.Ordinal);
     }
 
@@ -245,20 +303,20 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         fixture.Stack.Compose("up -d --no-deps --force-recreate --wait authority", 300);
     }
 
-    // ---- UF-25: deterministic reproduction ------------------------------------------------------------------------------------
+    // ---- RQ-2, RQ-5, RQ-8: hidden content, the limit and the semantics ----------------------------------------------------------
 
     private sealed record Case(Ws W, Guid Control, Guid[] ShareOnly, Guid PartialTags);
 
     /// <summary>
-    /// With an items limit of 2, the Reader's search on <c>case_status</c> succeeds while the share-only records hold no status value,
-    /// and is refused (<c>SEARCH_VERIFICATION_LIMIT</c>, <c>items</c>) once the owner writes a status the Reader is not authorized to
-    /// read, although nothing the Reader is authorized for changed. With the default limit the results are identical before and
-    /// after. Reproduced for a direct share, a team share and overlapping direct and team shares. Also records the result-level
-    /// effect of the parity rule (a new unshared selection removes a record from the Reader's results), which a fix of the
-    /// work/limit channel must preserve unless the owner changes the search semantics.
+    /// The inverse of the C-140 reproduction. With an items limit of 2, the Reader's search on <c>case_status</c> succeeds before and
+    /// after the owner writes statuses the Reader cannot read into three share-only records, with the same single item check
+    /// (probe) although the index now holds four status items for those records. The limit still refuses a search whose
+    /// <i>readable</i> candidates exceed it. With the default limit the results are identical, and a partially shared multi-select
+    /// still drops out of the results once the owner adds a selection the Reader cannot read (R1 §E.3 semantics, RQ-8). Direct
+    /// share, team share, and overlapping direct and team shares (distinct items counted once).
     /// </summary>
     [Fact]
-    public async Task UF25UnauthorizedItemsChangeTheItemsRefusalButNotTheResults()
+    public async Task UF25HiddenItemsChangeNeitherTheItemChecksNorTheRefusalAndResultsAreUnchanged()
     {
         var cases = new List<Case>();
         var evidence = new List<object>();
@@ -268,7 +326,6 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
             foreach (var path in new[] { "direct", "team", "overlapping" })
             {
                 var w = await WorkspaceAsync(path);
-                // Control: readable status and tags. Share-only records: only exhibit_count shared; no status value yet. Partial: tags shared.
                 var control = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "1", ["case_status"] = "open", ["topic_tags"] = "t01" });
                 var shareOnly = new Guid[3];
                 for (var i = 0; i < shareOnly.Length; i++)
@@ -288,16 +345,13 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
                 var reader = await SessionAsync(w, w.S.Reader);
                 var statusOpen = Query(w, Cond(w.Status, "is", w.Open));
 
-                // Before: one status item in the Reader's share-only scope (the control's), within the limit of 2.
-                var before = await IndexedAsync(w, reader, statusOpen);
+                var (before, probeBefore) = await IndexedAsync(w, reader, statusOpen);
                 Assert.Equal([control], Ids(before));
+                Assert.Equal(new Probe(5, 1, 1, 5, "DECIDED"), probeBefore); // one readable status item (also through two paths: counted once)
                 var itemsBefore = PostingItems(w, w.Status, [control, partial, .. shareOnly]);
-                Assert.Equal(1, itemsBefore);
-                // Before the owner adds an unshared selection, the partially shared record matches on its readable selection t01.
                 var tagsT01 = Query(w, Cond(w.Tags, "includes", w.TagOptions["t01"]));
-                Assert.Equal(new[] { control, partial }.Order().ToList(), Ids(await IndexedAsync(w, reader, tagsT01)));
+                Assert.Equal(new[] { control, partial }.Order().ToList(), Ids((await IndexedAsync(w, reader, tagsT01)).Result));
 
-                // The owner writes "open" into the share-only records' status: content the Reader is not authorized to read.
                 foreach (var record in shareOnly)
                 {
                     await EditAsync(w, record, new(StringComparer.Ordinal) { ["case_status"] = "open" });
@@ -307,25 +361,32 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
                 foreach (var record in shareOnly)
                 {
                     await AssertReaderCannotReadAsync(w, record, "case_status");
+                    Assert.Equal(1, StoredCount(w, record, w.Status)); // the accepted total now counts the hidden status
                 }
 
-                // After: the same query by the same caller, with unchanged authorization, is refused on the items limit.
-                var after = await IndexedAsync(w, reader, statusOpen);
-                AssertItemsRefusal(after);
-                // The owner adds a selection to the partially shared multi-select (a new item is never shared automatically, §4H).
+                var (after, probeAfter) = await IndexedAsync(w, reader, statusOpen);
+                Assert.Equal([control], Ids(after)); // C-140: 422 SEARCH_VERIFICATION_LIMIT (items) here
+                Assert.Equal(new Probe(5, 1, 1, 2, "DECIDED"), probeAfter); // same check count; the three records are no longer evaluable on status
+
+                // RQ-5: the limit counts readable candidates. exhibit_count is readable on all five records: 5 > 2.
+                var (limited, limitedProbe) = await IndexedAsync(w, reader, Query(w, CountEquals(w.Count, 1)));
+                AssertRefused(limited, "SEARCH_VERIFICATION_LIMIT");
+                Assert.Contains("items", limited.Body, StringComparison.Ordinal);
+                // The reader stops at limit + 1 candidates (it never reads more than it needs to refuse); no item check is issued.
+                Assert.Equal(new Probe(5, SmallLimit + 1, 0, 0, "LIMIT_ITEMS"), limitedProbe);
+
                 await EditAsync(w, partial, new(StringComparer.Ordinal) { ["topic_tags"] = "t01,t02" });
                 await WaitPostingItemsAsync(w, w.Tags, [partial], 2);
-                await AssertReaderCannotReadAsync(w, shareOnly[0], "case_status");
                 cases.Add(new Case(w, control, shareOnly, partial));
                 evidence.Add(new
                 {
                     path,
                     items_limit = SmallLimit,
-                    status_items_in_reader_scope_before = itemsBefore,
-                    status_items_in_reader_scope_after = PostingItems(w, w.Status, [control, partial, .. shareOnly]),
-                    readable_status_items_for_reader = 1,
-                    before = new { http = (int)before.Status, results = Ids(before).Count },
-                    after = new { http = (int)after.Status, error_code = after.ErrorCode },
+                    status_posting_items_in_reader_scope_before = itemsBefore,
+                    status_posting_items_in_reader_scope_after = PostingItems(w, w.Status, [control, partial, .. shareOnly]),
+                    before = new { http = (int)before.Status, results = Ids(before).Count, probe = probeBefore },
+                    after = new { http = (int)after.Status, results = Ids(after).Count, probe = probeAfter },
+                    readable_limit_refusal = new { http = (int)limited.Status, error_code = limited.ErrorCode, probe = limitedProbe },
                 });
             }
         }
@@ -334,22 +395,21 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
             RecreateAuthority(null);
         }
 
-        // Default limit: results do not depend on the unauthorized status values; the parity rule's result-level effect is recorded.
         var semantics = new List<object>();
         foreach (var c in cases)
         {
             var reader = await SessionAsync(c.W, c.W.S.Reader);
-            Assert.Equal([c.Control], Ids(await IndexedAsync(c.W, reader, Query(c.W, Cond(c.W.Status, "is", c.W.Open)))));
-            var tagged = Ids(await IndexedAsync(c.W, reader, Query(c.W, Cond(c.W.Tags, "includes", c.W.TagOptions["t01"]))));
-            // The Reader can still read the partial record's shared selection t01, but the record is no longer evaluable for topic_tags
-            // because a selection the Reader cannot read now exists (R1 §E.3 parity, unchanged Tier 1 semantics).
-            Assert.Equal([c.Control], tagged);
-            semantics.Add(new { path = c.W.Path, status_is_open = "control only (unchanged by unauthorized values)", tags_includes_t01_after_unshared_selection_added = "control only (partial record excluded by parity)" });
+            Assert.Equal([c.Control], Ids((await IndexedAsync(c.W, reader, Query(c.W, Cond(c.W.Status, "is", c.W.Open)))).Result));
+            // RQ-8: the partial record's readable selection t01 is unchanged, but it is not evaluable once an unreadable selection exists.
+            var (tagged, probe) = await IndexedAsync(c.W, reader, Query(c.W, Cond(c.W.Tags, "includes", c.W.TagOptions["t01"])));
+            Assert.Equal([c.Control], Ids(tagged));
+            Assert.Equal(2, probe!.ItemChecksIssued); // the control's t01 and the partial record's t01: never the hidden t02
+            semantics.Add(new { path = c.W.Path, status_is_open = "control only", tags_includes_t01_after_unshared_selection_added = "control only (partial record excluded, R1 §E.3)", tags_item_checks = probe.ItemChecksIssued });
         }
 
-        await WriteAsync("uf25-reproduction.json", new Dictionary<string, object?>
+        await WriteAsync("uf25-regression.json", new Dictionary<string, object?>
         {
-            ["kind"] = "C-140 UF-25 reproduction: Tier 1 share-only items limit and unauthorized content (focused, local Docker, synthetic)",
+            ["kind"] = "C-141 UF-25 regression (U-1b): share-only item checks and items limit independent of unauthorized content (focused, local Docker, synthetic)",
             ["measured_on"] = DateTimeOffset.UtcNow,
             ["git_commit"] = ComposeStack.GitCommit(),
             ["cases"] = evidence,
@@ -357,12 +417,170 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         });
     }
 
-    // ---- UF-25: work and latency (informational) --------------------------------------------------------------------------------
+    // ---- Revocation and team membership --------------------------------------------------------------------------------------
 
     /// <summary>
-    /// Informational measurement, no timing assertion: the Reader's search latency on <c>topic_tags</c> with no unreadable selections in
-    /// the share-only scope, then after the owner writes 40 selections into each of 25 share-only records (1,000 posting items the
-    /// Reader cannot read, each of which Tier 1 bulk-checks). Results must be identical; the latency difference is reported.
+    /// The candidates follow the caller's current grants at the pinned revision: revoking one of two overlapping paths keeps the
+    /// record (the other path still reaches the same items, counted once); revoking the only path removes it; removing the Reader
+    /// from the team removes every record reached only through the team.
+    /// </summary>
+    [Fact]
+    public async Task RevocationAndTeamMembershipChangesNarrowTheCandidatesAndTheResults()
+    {
+        var w = await WorkspaceAsync("overlapping");
+        var direct = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "1", ["case_status"] = "open" });
+        var team = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "2", ["case_status"] = "open" });
+        var both = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "3", ["case_status"] = "open" });
+        var directShare = (await ShareViaAsync(w, direct, "direct", "case_status")).Single();
+        await ShareViaAsync(w, team, "team", "case_status");
+        var bothShares = await ShareViaAsync(w, both, "overlapping", "case_status");
+        await WaitCompleteAsync(w);
+        var reader = await SessionAsync(w, w.S.Reader);
+        var query = Query(w, Cond(w.Status, "is", w.Open));
+
+        var (all, probe) = await IndexedAsync(w, reader, query);
+        Assert.Equal(new[] { direct, team, both }.Order().ToList(), Ids(all));
+        Assert.Equal(3, probe!.ItemChecksIssued); // "both" is reached by two paths: one item, one check
+
+        await RevokeAsync(w, both, bothShares[0]); // its direct share; the team share remains
+        (all, probe) = await IndexedAsync(w, reader, query);
+        Assert.Equal(new[] { direct, team, both }.Order().ToList(), Ids(all));
+        Assert.Equal(3, probe!.ItemChecksIssued);
+
+        await RevokeAsync(w, direct, directShare);
+        (all, probe) = await IndexedAsync(w, reader, query);
+        Assert.Equal(new[] { team, both }.Order().ToList(), Ids(all));
+        Assert.Equal(2, probe!.ItemChecksIssued);
+
+        var removed = await fixture.Api.PostAsync($"/api/v1/teams/{w.TeamId:D}/members/{w.S.Reader.AuthorityUserId:D}/remove", w.S.Token(w.S.Designer), new { });
+        Assert.True(removed.IsSuccess, removed.Body);
+        await w.S.WaitGateReadyAsync();
+        var (none, noneProbe) = await IndexedAsync(w, reader, query);
+        Assert.True(none.IsSuccess, none.Body);
+        Assert.Empty(Ids(none));
+        Assert.True(noneProbe is null or { ItemChecksIssued: 0 }, "no candidate after the membership removal");
+    }
+
+    // ---- RQ-4: stale, missing and contradictory metadata; Q4 -------------------------------------------------------------------
+
+    /// <summary>
+    /// A count lowered so that a partially readable record looks completely readable is caught on the bound match before anything is
+    /// released (index quarantined, 503 SEARCH_INDEX_INCONSISTENT, the organization itself not quarantined). A count raised on a
+    /// completely readable record cannot be told apart from a partial share at query time (that would require reading the hidden
+    /// items): the record is excluded, and the cheap sweep S-A quarantines the index within its interval.
+    /// </summary>
+    [Fact]
+    public async Task TamperedItemCountsFailClosed()
+    {
+        // Lowered: P has t01 (shared) and t02 (not shared); its tags count is set to 1.
+        var w = await WorkspaceAsync("direct");
+        var p = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "1", ["topic_tags"] = "t01" });
+        await ShareAsync(w, p, "exhibit_count", "topic_tags");
+        await EditAsync(w, p, new(StringComparer.Ordinal) { ["topic_tags"] = "t01,t02" });
+        await WaitPostingItemsAsync(w, w.Tags, [p], 2);
+        await WaitCompleteAsync(w);
+        var reader = await SessionAsync(w, w.S.Reader);
+        var tags = Query(w, Cond(w.Tags, "includes", w.TagOptions["t01"]));
+        Assert.Empty(Ids((await IndexedAsync(w, reader, tags)).Result));
+        Assert.Equal(2, StoredCount(w, p, w.Tags));
+        Assert.Equal(1, ReadableItems(w, p, w.Tags)); // t01 kept its item id through the edit and is still shared; t02 is not
+        SetStoredCount(w, p, w.Tags, 1);
+        var (lowered, _) = await IndexedAsync(w, reader, tags);
+        AssertRefused(lowered, "SEARCH_INDEX_INCONSISTENT");
+        Assert.StartsWith("Quarantined|", Projection(w.S.OrganizationId), StringComparison.Ordinal);
+        Assert.Equal("f", Scalar($"SELECT integrity_quarantine_enabled FROM organization_authorization_states WHERE organization_id = '{w.S.OrganizationId:D}';"));
+
+        // Raised: Q is completely readable on tags; its count is set to 2.
+        var w2 = await WorkspaceAsync("direct");
+        var q = await CreateAsync(w2, new(StringComparer.Ordinal) { ["exhibit_count"] = "1", ["topic_tags"] = "t01" });
+        await ShareAsync(w2, q, "exhibit_count", "topic_tags");
+        await WaitCompleteAsync(w2);
+        var reader2 = await SessionAsync(w2, w2.S.Reader);
+        var tags2 = Query(w2, Cond(w2.Tags, "includes", w2.TagOptions["t01"]));
+        Assert.Equal([q], Ids((await IndexedAsync(w2, reader2, tags2)).Result));
+        SetStoredCount(w2, q, w2.Tags, 2);
+        var deadline = DateTime.UtcNow.AddSeconds(90);
+        string state;
+        while (!(state = Projection(w2.S.OrganizationId)).StartsWith("Quarantined|", StringComparison.Ordinal))
+        {
+            Assert.True(DateTime.UtcNow < deadline, "S-A did not quarantine the index: " + state);
+            await Task.Delay(1000, Ct);
+        }
+
+        Assert.Contains("FIELD_ITEM_COUNT_MISMATCH", state, StringComparison.Ordinal); // S-A, or S-B if its pass came first
+        AssertRefused((await IndexedAsync(w2, reader2, tags2)).Result, "SEARCH_INDEX_INCONSISTENT");
+    }
+
+    /// <summary>
+    /// An entry of the image before C-141 (derivation version 2, no counts) in the Reader's share-only scope: the search is refused as
+    /// not ready (503, retryable), never answered without counts; S-A's derivation upgrade returns the form's coverages to Building
+    /// (journaled), the builder re-derives the entry from verified bytes at version 3, and the same search then returns the same
+    /// result.
+    /// </summary>
+    [Fact]
+    public async Task AnEntryWithoutCountsIsNotReadyUntilTheDerivationUpgradeReDerivesIt()
+    {
+        var w = await WorkspaceAsync("direct");
+        var r = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "1", ["case_status"] = "open" });
+        await ShareAsync(w, r, "exhibit_count", "case_status");
+        await WaitCompleteAsync(w);
+        var reader = await SessionAsync(w, w.S.Reader);
+        var query = Query(w, Cond(w.Status, "is", w.Open));
+        Assert.Equal([r], Ids((await IndexedAsync(w, reader, query)).Result));
+
+        fixture.Stack.AuthorityAdministratorSql($"SELECT set_config('authority_search.organization_id', '{w.S.OrganizationId:D}', false); UPDATE authority_search.search_record_entries SET entry_derivation_version = 2, derived_field_item_counts = NULL WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{r:D}';");
+        var (refused, _) = await IndexedAsync(w, reader, query);
+        AssertRefused(refused, "SEARCH_INDEX_NOT_READY"); // the share-only step (version 2) or, once S-A ran, the coverage
+
+        var deadline = DateTime.UtcNow.AddSeconds(120);
+        string Version() => Scalar($"SELECT entry_derivation_version FROM authority_search.search_record_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{r:D}';");
+        while (Scalar($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND journal_event_kind = 'SearchIndexDerivationUpgradeStarted';") == "0" || Version() != "3")
+        {
+            Assert.True(DateTime.UtcNow < deadline, "the derivation upgrade did not re-derive the entry (version " + Version() + ")");
+            await Task.Delay(1000, Ct);
+        }
+
+        await WaitCompleteAsync(w, seconds: 180);
+        Assert.Equal("3", Scalar($"SELECT entry_derivation_version FROM authority_search.search_record_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{r:D}';"));
+        Assert.Equal(1, StoredCount(w, r, w.Status));
+        Assert.NotEqual("0", Scalar($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND journal_event_kind = 'SearchIndexDerivationUpgradeStarted';"));
+        Assert.Equal([r], Ids((await IndexedAsync(w, await SessionAsync(w, w.S.Reader), query)).Result));
+        Assert.StartsWith("Active|", Projection(w.S.OrganizationId), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Q4 (FD-4): SpiceDB denies a candidate that the Authority's canonical edges grant at the same revision (a projection tuple
+    /// removed out of band in SpiceDB's datastore, made visible by a later unrelated write). The S1 decisive verification runs
+    /// first (the markers agree), then the search index is quarantined; nothing is released and the organization is not quarantined.
+    /// </summary>
+    [Fact]
+    public async Task ASpiceDbDenialOfAGrantedCandidateIsEscalatedAndFailsClosed()
+    {
+        var w = await WorkspaceAsync("direct");
+        var r = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "1", ["case_status"] = "open" });
+        await ShareAsync(w, r, "exhibit_count", "case_status");
+        var other = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "2" });
+        await WaitCompleteAsync(w);
+        var reader = await SessionAsync(w, w.S.Reader);
+        var query = Query(w, Cond(w.Status, "is", w.Open));
+        Assert.Equal([r], Ids((await IndexedAsync(w, reader, query)).Result));
+
+        var item = Guid.Parse(Scalar($"SELECT manifest_item_id FROM authority_search.search_option_postings WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{r:D}' AND field_definition_id = '{w.Status:D}';"));
+        fixture.Stack.SpiceDbDatastoreSimulationShell($"psql -v ON_ERROR_STOP=1 -qAt -c \"UPDATE relation_tuple SET deleted_xid = pg_current_xact_id() WHERE namespace = 'field_item' AND object_id = '{item:D}' AND relation = 'shared_via' AND deleted_xid = '9223372036854775807'::xid8;\"");
+        await ShareAsync(w, other, "exhibit_count"); // an unrelated security command: a new SpiceDB revision that sees the removal
+        var (escalated, probe) = await IndexedAsync(w, reader, query);
+        AssertRefused(escalated, "SEARCH_INDEX_INCONSISTENT");
+        Assert.Equal("CANDIDATE_DENIED", probe!.OutcomeCode);
+        Assert.Equal("Quarantined|SHARE_CANDIDATE_DENIED_BY_PROJECTION", Projection(w.S.OrganizationId));
+        Assert.Equal("f", Scalar($"SELECT integrity_quarantine_enabled FROM organization_authorization_states WHERE organization_id = '{w.S.OrganizationId:D}';"));
+    }
+
+    // ---- RQ-7: work and latency (informational, AC power) ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Informational measurement, no timing assertion: the Reader's search latency on <c>topic_tags</c> with no unreadable selections
+    /// in the share-only scope, then after the owner writes 40 selections into each of 25 share-only records (1,000 posting items the
+    /// Reader cannot read). Results must be identical and, since C-141, the item checks must be identical (probe).
     /// </summary>
     [Fact]
     [Trait("Category", "Benchmark")]
@@ -386,22 +604,24 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         var reader = await SessionAsync(w, w.S.Reader);
         var query = Query(w, Cond(w.Tags, "includes", w.TagOptions["t01"]));
 
-        async Task<(List<double> Ms, List<Guid> Ids)> MeasureAsync()
+        async Task<(List<double> Ms, List<Guid> Ids, HashSet<int> Checks)> MeasureAsync()
         {
             await IndexedAsync(w, reader, query); // warm-up, not counted
             var times = new List<double>();
+            var checks = new HashSet<int>();
             List<Guid>? ids = null;
             for (var n = 0; n < searches; n++)
             {
                 var clock = Stopwatch.StartNew();
-                var result = await IndexedAsync(w, reader, query);
+                var (result, probe) = await IndexedAsync(w, reader, query);
                 times.Add(clock.Elapsed.TotalMilliseconds);
+                checks.Add(probe!.ItemChecksIssued);
                 var current = Ids(result);
                 Assert.True(ids is null || ids.SequenceEqual(current));
                 ids = current;
             }
 
-            return (times, ids!);
+            return (times, ids!, checks);
         }
 
         var scope = shareOnly.Append(control).ToList();
@@ -418,6 +638,8 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
         var after = await MeasureAsync();
         Assert.Equal([control], before.Ids);
         Assert.Equal(before.Ids, after.Ids);
+        Assert.Equal([1], before.Checks);
+        Assert.Equal(before.Checks, after.Checks);
 
         static object Stats(List<double> ms)
         {
@@ -428,18 +650,20 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
 
         await WriteAsync("uf25-work.json", new Dictionary<string, object?>
         {
-            ["kind"] = "C-140 UF-25 informational latency: Tier 1 share-only check set with and without unauthorized items (focused, local Docker, synthetic; client-measured round trips to the Authority)",
+            ["kind"] = "UF-25 informational latency: Tier 1 share-only step with and without unauthorized items (focused, local Docker, synthetic; client-measured round trips to the Authority)",
             ["measured_on"] = DateTimeOffset.UtcNow,
             ["git_commit"] = ComposeStack.GitCommit(),
             ["power_line_status"] = PowerLineStatus(),
             ["share_only_records"] = records,
-            ["posting_items_checked_before"] = itemsBefore,
-            ["posting_items_checked_after"] = PostingItems(w, w.Tags, scope),
+            ["posting_items_in_scope_before"] = itemsBefore,
+            ["posting_items_in_scope_after"] = PostingItems(w, w.Tags, scope),
+            ["item_checks_before"] = before.Checks.Single(),
+            ["item_checks_after"] = after.Checks.Single(),
             ["readable_items_for_reader"] = 1,
             ["before"] = Stats(before.Ms),
             ["after"] = Stats(after.Ms),
             ["results_identical"] = true,
-            ["note"] = "Informational only: local single-node stack, no repetition across runs; the difference includes the SpiceDB bulk field_item#read checks on the unauthorized items and the posting reads. Not a gate.",
+            ["note"] = "Informational only: local single-node stack, one run of 21 searches per phase; not a constant-time claim and not a gate.",
         });
     }
 

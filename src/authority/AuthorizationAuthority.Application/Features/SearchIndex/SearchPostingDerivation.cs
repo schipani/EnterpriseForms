@@ -36,8 +36,21 @@ public static class SearchPostingDerivationV1
 {
     public const string Version = "SearchPostingDerivation/v1";
 
-    /// <summary>IX-3 (D-IX3-1): entries carry the verified header facts. Older entries are re-derived before a coverage is Complete.</summary>
-    public const int CurrentEntryDerivationVersion = 2;
+    /// <summary>
+    /// The derivation version every new entry is written at, and the one attestation and the builder require. 3 (C-141, UF-25):
+    /// entries also carry the per-field item counts. Older entries are re-derived before a coverage is Complete.
+    /// </summary>
+    public const int CurrentEntryDerivationVersion = 3;
+
+    /// <summary>IX-3 (D-IX3-1): the first version with the verified header facts. Below it, an entry in a query scope is an I-1 finding.</summary>
+    public const int HeaderFactsEntryDerivationVersion = 2;
+
+    /// <summary>
+    /// C-141 (UF-25): the first version with <see cref="SearchRecordEntry.DerivedFieldItemCounts"/>. A version 2 entry is still
+    /// bound (I-2) and sealed, but cannot answer a share-only readability question: such a search is refused as not ready
+    /// (retryable) until the derivation upgrade (S-A) and the builder have re-derived it.
+    /// </summary>
+    public const int FieldItemCountEntryDerivationVersion = 3;
 
     private static readonly Dictionary<string, string> EntityKindByValueType = new(StringComparer.Ordinal)
     {

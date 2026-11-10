@@ -90,6 +90,7 @@ public sealed class SearchRecordEntryConfiguration : IEntityTypeConfiguration<Se
         builder.ToTable("search_record_entries", SearchIndexSchema.Name);
         builder.HasKey(e => e.SearchRecordEntryId);
         builder.Property(e => e.DerivedFieldSearchApprovalIds).HasColumnName("derived_field_search_approval_ids").HasColumnType("uuid[]");
+        builder.Property(e => e.DerivedFieldItemCounts).HasColumnName("derived_field_item_counts").HasColumnType("integer[]");
         builder.Property(e => e.RecordStatusName).HasMaxLength(40);
         builder.Property(e => e.SealKeyName).HasMaxLength(100);
         builder.Property(e => e.LastSealAttemptOutcomeCode).HasMaxLength(64);
@@ -106,7 +107,12 @@ public sealed class SearchRecordEntryConfiguration : IEntityTypeConfiguration<Se
             t.HasCheckConstraint("ck_search_entry_head", "octet_length(indexed_manifest_root) = 32 AND indexed_content_revision >= 1");
             t.HasCheckConstraint("ck_search_entry_counts", "indexed_posting_count >= 0 AND indexed_anomaly_count >= 0 AND cardinality(derived_field_search_approval_ids) >= 1");
             // IX-3 (D-IX3-1): version 2 entries carry the verified header bytes and the creator decoded from them.
-            t.HasCheckConstraint("ck_search_entry_derivation", "entry_derivation_version IN (1, 2) AND (entry_derivation_version = 1 OR (octet_length(header_source_canonical_bytes) > 0 AND created_by_business_user_id IS NOT NULL))");
+            t.HasCheckConstraint("ck_search_entry_derivation", "entry_derivation_version IN (1, 2, 3) AND (entry_derivation_version = 1 OR (octet_length(header_source_canonical_bytes) > 0 AND created_by_business_user_id IS NOT NULL))");
+            // C-141 (UF-25): version 3 entries carry one non-negative item count per derived approval; older entries carry none.
+            t.HasCheckConstraint("ck_search_entry_field_item_counts",
+                "(entry_derivation_version < 3 AND derived_field_item_counts IS NULL) OR (entry_derivation_version >= 3 AND derived_field_item_counts IS NOT NULL"
+                + " AND cardinality(derived_field_item_counts) = cardinality(derived_field_search_approval_ids) AND array_position(derived_field_item_counts, NULL) IS NULL"
+                + " AND 0 <= ALL (derived_field_item_counts))");
         });
     }
 }
@@ -197,7 +203,10 @@ public abstract class SearchPostingConfiguration<TPosting> : IEntityTypeConfigur
         builder.MapSnakeCase(TableName);
         builder.ToTable(TableName, SearchIndexSchema.Name);
         builder.Property(e => e.SourceEntityKind).HasMaxLength(40);
-        builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId, e.FieldDefinitionId }).HasDatabaseName($"ix_search_{ShortName}_postings_record");
+        // C-141 (UF-25): the record probe index ends with the item id, so the share-only readability step probes one posting per
+        // candidate item (organization, record, field, item) and never visits a posting the caller cannot read. Still record-keyed
+        // (PD-9); the candidate statement's (organization, record, field) probe is its prefix. No value column.
+        builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId, e.FieldDefinitionId, e.ManifestItemId }).HasDatabaseName($"ix_search_{ShortName}_postings_record");
         builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId, e.IndexedOperationId }).HasDatabaseName($"ix_search_{ShortName}_postings_entry");
         builder.HasOne<SearchRecordEntry>().WithMany().HasForeignKey(e => new { e.OrganizationId, e.FormRecordId, e.IndexedOperationId })
             .HasPrincipalKey(e => new { e.OrganizationId, e.FormRecordId, e.IndexedOperationId }).HasConstraintName($"fk_search_{ShortName}_posting_entry").OnDelete(DeleteBehavior.Restrict);

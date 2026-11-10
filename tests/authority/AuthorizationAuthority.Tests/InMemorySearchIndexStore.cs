@@ -1,4 +1,5 @@
 using AuthorizationAuthority.Application.Common.Ports;
+using AuthorizationAuthority.Application.Features.SearchIndex;
 using AuthorizationAuthority.Domain.Features.FieldSearch;
 using AuthorizationAuthority.Domain.Features.SearchIndex;
 
@@ -157,8 +158,14 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
             .Sum(c => s.Resources.Where(r => r.OrganizationId == organizationId && r.ResourceTypeName == "form_record" && r.ParentResourceEntityId == c.FormDefinitionId && r.ResourceLifecycleState is "Active" or "Quarantined")
                 .Count(r => s.Heads.FirstOrDefault(h => h.OrganizationId == organizationId && h.FormRecordId == r.ResourceEntityId) is { CommittedContentRevision: > 0, CommittedOperationId: { } operation }
                             && !entries.Any(e => e.FormRecordId == r.ResourceEntityId && e.IndexedOperationId == operation && e.DerivedFieldSearchApprovalIds.Contains(c.FieldSearchApprovalId))));
-        return Task.FromResult(new CheapSweepFindings(notAtHead, inactive, unbound, withdrawn, noCoverage, crossOrganization, unsealed, missing));
+        var countMismatch = entries.Count(e => !SearchFieldItemCounts.MatchPostings(e, Postings.Where(p => p.OrganizationId == organizationId && p.FormRecordId == e.FormRecordId && p.IndexedOperationId == e.IndexedOperationId).Select(p => p.FieldSearchApprovalId)));
+        return Task.FromResult(new CheapSweepFindings(notAtHead, inactive, unbound, withdrawn, noCoverage, crossOrganization, unsealed, missing, countMismatch));
     }
+
+    public Task<IReadOnlyList<Guid>> GetFormsAwaitingDerivationUpgradeAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Guid>>(Entries.Where(e => e.OrganizationId == organizationId && e.EntryDerivationVersion == 2 && e.DerivedFieldItemCounts is null
+                                                               && Coverages.Any(c => c.OrganizationId == organizationId && c.FormDefinitionId == e.FormDefinitionId && c.CoverageStateName == SearchCoverageStates.Complete))
+            .Select(e => e.FormDefinitionId).Distinct().Order().ToList());
 
     public async Task<IReadOnlyList<Guid>> DeleteEntriesNotAtHeadAsync(Guid organizationId, CancellationToken cancellationToken)
     {

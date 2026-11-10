@@ -43,6 +43,13 @@ public static class IndexedSearchEndpoints
             .WithTags("SearchIndex")
             .RequireAuthorization(InternalAuthentication.WorkloadPolicy)
             .WithName("TestingIndexedCandidatePlan");
+
+        // C-141 (RQ-2): the share-only step of a search, by the correlation id the caller sent (counts and a code only).
+        endpoints.MapGet(InternalApi.Prefix + "/testing/search/share-only-probe/{correlationId:guid}", static Results<Ok<IReadOnlyList<ShareOnlyProbeObservation>>, NotFound> (Guid correlationId, IndexedSearchTestingProbe probe) =>
+                probe.Find(correlationId) is { Count: > 0 } observations ? TypedResults.Ok(observations) : TypedResults.NotFound())
+            .WithTags("SearchIndex")
+            .RequireAuthorization(InternalAuthentication.WorkloadPolicy)
+            .WithName("TestingIndexedShareOnlyProbe");
         return endpoints;
     }
 

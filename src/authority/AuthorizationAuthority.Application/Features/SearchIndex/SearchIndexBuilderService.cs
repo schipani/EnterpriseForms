@@ -393,6 +393,12 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
             return (SweepUnitOutcome.Fail, "POSTING_SET_MISMATCH");
         }
 
+        // C-141 (UF-25): the stored per-field item counts equal those re-derived from the verified bytes.
+        if (!SearchFieldItemCounts.MatchPostings(entry, derived.Postings.Select(p => p.FieldSearchApprovalId)))
+        {
+            return (SweepUnitOutcome.Fail, "FIELD_ITEM_COUNT_MISMATCH");
+        }
+
         var expected = derived.Postings.ToDictionary(p => (Convert.ToHexStringLower(p.ManifestItemKey), p.FieldSearchApprovalId));
         foreach (var posting in stored.Postings)
         {

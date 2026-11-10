@@ -36,10 +36,12 @@ public sealed record CheapSweepFindings(
     int EntriesWithoutActiveCoverage,
     int RowsOfAnotherOrganization,
     int EntriesWithoutSeal,
-    int RecordsMissingFromCompleteCoverage = 0)
+    int RecordsMissingFromCompleteCoverage = 0,
+    int EntriesWithFieldItemCountMismatch = 0)
 {
     public bool Clean => EntriesNotAtHead == 0 && EntriesForInactiveOrMissingRecords == 0 && RowsNotBoundToEntry == 0 && RowsOfWithdrawnCoverage == 0
-                         && EntriesWithoutActiveCoverage == 0 && RowsOfAnotherOrganization == 0 && EntriesWithoutSeal == 0 && RecordsMissingFromCompleteCoverage == 0;
+                         && EntriesWithoutActiveCoverage == 0 && RowsOfAnotherOrganization == 0 && EntriesWithoutSeal == 0 && RecordsMissingFromCompleteCoverage == 0
+                         && EntriesWithFieldItemCountMismatch == 0;
 
     public string FirstFindingCode() =>
         EntriesNotAtHead > 0 ? "ENTRY_NOT_AT_HEAD"
@@ -50,6 +52,7 @@ public sealed record CheapSweepFindings(
         : RowsOfAnotherOrganization > 0 ? "CROSS_ORGANIZATION_ROW"
         : EntriesWithoutSeal > 0 ? "ENTRY_WITHOUT_SEAL"
         : RecordsMissingFromCompleteCoverage > 0 ? "COMPLETE_COVERAGE_MISSING_ENTRY"
+        : EntriesWithFieldItemCountMismatch > 0 ? "ENTRY_FIELD_ITEM_COUNT_MISMATCH"
         : "NONE";
 }
 
@@ -129,6 +132,13 @@ public interface ISearchIndexStore
     Task RecordSealCheckAsync(Guid searchRecordEntryId, DateTimeOffset? verifiedOn, DateTimeOffset attemptedOn, string outcomeCode, CancellationToken cancellationToken);
 
     Task<CheapSweepFindings> RunCheapChecksAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// C-141 (UF-25): forms of the organization with a Complete coverage and at least one entry written at derivation version 2
+    /// without item counts (an entry of the image before C-141). The S-A derivation upgrade returns their coverages to Building.
+    /// A version 2 entry that carries counts is not listed: S-A reports it as a finding.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetFormsAwaitingDerivationUpgradeAsync(Guid organizationId, CancellationToken cancellationToken);
 
     /// <summary>
     /// ReconciliationRequired only: deletes (with their postings and anomalies) the entries whose indexed operation is no longer
