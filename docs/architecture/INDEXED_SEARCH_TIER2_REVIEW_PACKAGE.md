@@ -7,7 +7,7 @@
   * Owner reviews to date (C-123, C-129, C-133, C-136, C-137) were **owner-led**.
   * Nothing here is a finding of an independent party, an approval or a certification. Statements marked "claim" are the design's claims, to be tested.
 - **Review object:** the Tier 2 **design** (design §9, §17.1; A2 R-B, R-C) as refined by annexes A to E. **No Tier 2 code exists.** Tier 1 (IX-1 to IX-4) **is implemented** and conditionally owner-accepted for development (C-137). It is Tier 2's oracle and fallback, and its code is reviewable.
-- **Baseline:** local branch `ix-1/authority-search-index` at the commit that adds this package (on top of `1868e16`), revised under C-139 on top of `f7886b0`. Not pushed.
+- **Baseline (C-144):** local branch `ix-1/authority-search-index`, not pushed. Latest code: `b4e2088` (C-143, R-52). Latest review documents before C-144: `8def00b`. **The revision under review is the signed commit that records C-144 in the decision log** (it adds this line, TQ-25 to TQ-27 and the evidence plans); the owner gives the reviewer that hash, and the attestation names it. History: first added on top of `1868e16`, revised under C-139 on top of `f7886b0`.
 - **C-139 architecture direction (owner, 2026-11-09; owner-led, not an independent review):**
   * Option B is preferred **for independent review**, with separate access and searchable-value structures;
   * Option C is the comparison baseline and possible fallback;
@@ -75,6 +75,7 @@
 | **Annex E** [INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md](INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md) | `LookupSubjects` client interface and cost model |
 | [INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md](INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md) | C-140: UF-25 reproduction, impact assessment, correction U-1 and regression requirements; C-141: U-1b implementation, RQ-1 to RQ-8 results and residuals (§8) |
 | [INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md](INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md) | C-143: cover note, the decisions requiring independent assessment |
+| [INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md](INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md) | C-144: bounded plans P-1 to P-6 for the missing evidence (E-6, PERF-01, copy amplification, sharing workload, R-02, sweeps); **not run** |
 | [INDEXED_SEARCH_IX4_EVIDENCE.md](INDEXED_SEARCH_IX4_EVIDENCE.md) §7, §10–§12, §15–§18 | The register (R-01 to R-52) and the measurements cited |
 | [RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md](RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md) §7 | Ingestion findings (dataset feasibility) |
 | `src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/authority.schema.zed` | The permission model the derivation must mirror |
@@ -325,6 +326,9 @@ Not rolled back, ever: authorization revisions, revocations, journal entries, S1
 | TQ-22 | Partitions: is SAFE-3 sufficient without per-organization partitions? If partitions are required, is the privileged provisioning step at onboarding acceptable (G08, PB-13)? | §14A.4 |
 | TQ-23 | Is the immediate Tier 2 → Tier 1 fallback on a closed fence observable as organization activity, and is that acceptable (decision 5)? | §14A.5 |
 | TQ-24 | UF-25 (implemented Tier 1): is correction U-1b as implemented under C-141 sound and sufficient (count integrity by recount against the sealed postings, the 2→3 upgrade path, the residual of §8.6), and are RQ-1 to RQ-8 and their results the right regression evidence? Should the result-level effect (§4.3 of the UF-25 document) stay as specified? | UF-25 document |
+| TQ-25 | (C-144) FD-5-ALT as a whole: does journal-only maintenance with compare-and-set checkpoints, digest continuity and readiness at exact revision equality guarantee that Tier 2 never serves a revoked grant, an unaccepted content revision or a replayed journal segment, including across crashes, restores and concurrent maintainers? | §14A.2 |
+| TQ-26 | (C-144) R-47: is delayed detection of an inflated stored field-item count (detected by the S-B/S-C recount and the page seal, not at search time) acceptable without a signature-format change, given what it can and cannot affect before detection? | UF-25 document §8.6, §9 |
+| TQ-27 | (C-144) R-52: is suppressing an unchanged incomplete attestation by its journal-recorded state digest correct (no suppressed state change, no false attestation, no quarantine bypass, correct across instances and restarts), and is trusting the latest journal body digest acceptable? | §14C |
 
 ## 14. Evidence the reviewer will need
 
@@ -345,6 +349,8 @@ Not rolled back, ever: authorization revisions, revocations, journal entries, S1
 | E-13 | Command-impact matrix verified against `CommandPlanner*.cs` (annex A §8) | Design author's reading only; **reviewer to confirm** |
 | E-14 | B2 value-row and access-row cardinality and write cost at 100K/250K (annex A §13) | **No:** estimates only; annex C datasets and IX-5a measurement |
 | E-15 | Plan-shape and statistics-sensitivity evidence for B2 statements, including with per-organization partitions | **No:** IX-5a/b |
+
+Bounded plans for E-6, E-10 (PERF-01), E-14, the sharing workload, R-02 and the sweep deadlines: [INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md](INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md) (C-144; not run, each needs owner authorization).
 
 ## 14A. C-140 owner decisions and the resulting review requirements
 
@@ -547,7 +553,7 @@ B2 remains the preferred architecture and C the comparison baseline. **The indep
 
 | # | Decision or evidence | Status |
 |---|---|---|
-| 1 | Independent security and architecture review of this package (TQ-1 to TQ-24, annexes A to E, the UF-25 document) | **Not started** |
+| 1 | Independent security and architecture review of this package (TQ-1 to TQ-27, annexes A to E, the UF-25 document) | **Not started** |
 | 2 | FD-5: FD-5-ALT (§14A.2) accepted as the maintenance model, including its checkpoint design and the TQ-23 fallback-timing residual | **Approved as the preferred design for review (C-143)**; not approved for implementation |
 | 3 | Copy amplification: measured value-row and write bounds; no cap approved (§14A.3) | Open; no arbitrary cap without evidence (C-143) |
 | 4 | Partitioning: logical isolation mandatory; physical partitions only with an operational design (§14A.4) | Open; not required without evidence (C-143) |
@@ -599,7 +605,7 @@ Verdict (reviewer's choice):
 - **Index architecture:** B2 / C / neither, with conditions. B1: rejection confirmed, or the variant to pursue.
 - **M2 interval and online sampling period:** acceptable / change required.
 
-Attestation: as FD-8 package §9, naming this package's commit and scope (TQ-1 to TQ-24, annexes A to E, the UF-25 document).
+Attestation: as FD-8 package §9, naming this package's commit and scope (TQ-1 to TQ-27, annexes A to E, the UF-25 document).
 
 ## 16. After the review
 
