@@ -1613,3 +1613,13 @@ R1 §E.3, §9 and §17.1 stay as approved. Any change follows the owner's decisi
 - PD-9 (no value-keyed index);
 - S1, quarantine, freshness, authorization-revision and deadline enforcement;
 - the 20 ms p95 gate (R-02), still FAIL.
+
+## 28. C-142 record
+
+- UF-25 is conditionally accepted, not closed.
+- **R-48 corrected:** Complete attestations journal `attesting_entry_derivation_version`. An entry older than that version is a forged downgrade and quarantines the index (query path, S-A, builder); only genuine legacy forms are upgraded.
+- **Q4:** the pin is completed once per decision path; the strict fitness test is restored.
+- **R-51:** the test is corrected.
+- **R-47:** delayed detection of an inflated count (omission only), within §17.10/OR-1.
+- **FD-5-ALT** (review package §14A.2) is the preferred Tier 2 maintenance model for the independent review; not implemented.
+- No seal-format change; R1 §E.3 unchanged since C-141.

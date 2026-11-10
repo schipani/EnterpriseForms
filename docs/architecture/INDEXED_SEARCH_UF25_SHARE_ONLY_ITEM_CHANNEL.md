@@ -323,3 +323,78 @@ Focused `-Class` runs, Benchmark trait excluded, on the security-test stack afte
   * every failure refuses with nothing released.
 - **Not claimed:** constant-time behaviour, query-time detection of an inflated count (R1), production readiness, or independent review.
 - **Open:** R-46 (until reviewed), R-47 to R-51, and TQ-24 for the reviewer.
+
+## 9. C-142: R-47, R-48, R-51 and the snapshot lifecycle
+
+The owner conditionally accepted the C-141 remediation; UF-25 is not yet closed. Everything below is the design author's analysis, not an independent review.
+
+### 9.1 R-47: integrity of the stored count
+
+**Who can change it.** A writer of the `authority_search` schema, for example a holder of the Authority runtime credential. The count is a column of the entry row; changing it means deleting and re-inserting the row (the runtime has no UPDATE grant). The seal does not cover the count directly, only the posting list it is derived from.
+
+| Effect | A raised count (above the true total) | A lowered count |
+|---|---|---|
+| Unauthorized results | **No:** the record looks partly readable and is excluded | **No:** at or below the readable items it makes a partly readable record evaluable, but every share-only match is re-checked on bound data (`MATCH_FIELD_ITEM_COUNT_MISMATCH`, quarantine) before anything is released. Below the readable items it is a finding (`SCOPE_READABLE_ITEMS_EXCEED_COUNT`). Proven exhaustively for n ≤ 4 (`R47NoStoredCountReleasesAPartlyReadableRecord`) and on the stack |
+| Omitted authorized results | **Yes**, until a sweep detects it | No (a match is quarantined, not omitted) |
+| Refusal | Not at query time | Yes, the quarantine (fail-closed availability cost) |
+| Failure to quarantine | **Delayed:** S-A (1 h deadline in production, enforced by suspending search when overdue) or S-B (keyed recount, 24 h) | Not at query time when the record does not match the predicate; the same sweeps then quarantine |
+| Timing | Changes which records are evaluated, so the candidate work changes. The change is chosen by the writer, not by hidden content, and tells the caller nothing about values they cannot read | As for a raised count |
+
+- **At query time versus periodic verification:**
+  * At query time the count can only be checked for records that are released (bound recount). For excluded records a check would need the hidden items, which is UF-25 itself.
+  * Periodic verification (S-A unkeyed recount, S-B keyed seal recount, S-C re-derivation) covers every entry.
+- **Threat model:** the approved Tier 1 design already accepts delayed detection of index damage that can only *omit* results. Examples are a deleted posting (§18.1.1, OR-1) and the no-grace §17.10 deadlines (C-123/C-124): search is suspended when a sweep is overdue. Completeness against a search-schema writer is not claimed (G06 open). The raised count is in that class.
+- **Conclusion:** no correction is required for confidentiality, and none is made. A correction that would detect inflation at query time requires either reading the hidden items (rejected) or a keyed per-entry count binding. The latter would be a seal-format change, which needs your approval; it would shorten detection of omission, not prevent disclosure. It is offered as an option, not recommended as required.
+
+### 9.2 R-48: version downgrade, and the authenticated boundary (corrected)
+
+- **The attack.** The derivation version is not in the seal message. A search-schema writer can re-insert a current (version 3) entry as version 2 with no counts. Under C-141 that was treated as a genuine pre-upgrade entry: 503 not ready, then the S-A upgrade returned the form to Building and the builder silently re-derived it, erasing the evidence (journaled, Medium alert only).
+- **The boundary.** The journal, not the entry row:
+  * Every Complete attestation now records `attesting_entry_derivation_version` (3) in its `SearchIndexCoverageAttested` event.
+  * Complete is attested only when every contentful record of the form is indexed at that version.
+  * The security journal is append-only for the runtime (no UPDATE or DELETE grant) and hash-chained (`previous_digest_hex`, digests in the S1 marker and the archive), so a search-schema writer cannot remove or alter that event.
+- **The rule.** Once a form has such an attestation, no legitimate entry of the form is older:
+  * **query time** (`RequireNoDerivationDowngradeAsync`, search and page): an older entry quarantines the index (`SCOPE_`/`PAGE_ENTRY_DERIVATION_DOWNGRADED`);
+  * **S-A:** `ENTRY_DERIVATION_DOWNGRADED`, quarantine, no upgrade, coverages not returned to Building;
+  * **builder backfill:** refuses to overwrite such an entry and quarantines.
+
+  The entry is left in place as evidence, and only a journaled `SearchProjectionRebuild` clears it.
+- **Genuine legacy entries.** Forms with no version 3 attestation (everything attested before this change) keep the C-141 upgrade path unchanged.
+- **Consequences:**
+  * Rolling back to a pre-C-141 image after a version 3 attestation, and returning, now quarantines the index on return (the older image writes version 2 entries); recovery is the journaled rebuild. This is intended: the system cannot tell that case from a forged downgrade.
+  * An *appended* forged attestation can only make genuine legacy entries look downgraded, which is fail closed. Raw SQL appends also break the hash chain.
+- **Architecture.** No seal-format or cryptographic change, and no new privilege: one field added to an existing journal event, read by existing roles.
+- **Tests:**
+  * unit `R48AForgedDowngradeInAnAttestedFormIsQuarantinedAndNotUpgradedByTheCheapPass`, `R48TheBuilderRefusesToOverwriteADowngradedEntryInAnAttestedForm`, `R48AGenuineLegacyFormHasNoVersion3AttestationAndIsStillUpgraded`;
+  * stack `R48AForgedDowngradeIsQuarantinedAndNeverRebuiltAsLegacy`. It includes one fixed 15 s observation window (longer than one S-A interval) to show that S-A never turns the forgery into an upgrade; this is the property under test, not a retry.
+
+### 9.3 R-51: the IX-79/IX-80 test
+
+- **Contract** (design §17.3 check 2, §18.4; test summary): expiry and idle timeout are enforced **at page time**, and the session change itself deletes no snapshot (no revoking transaction ran). Independently, the purge job deletes snapshots of expired or idle sessions every `PurgeIntervalSeconds` (5 s on this stack) in its own transaction. The page answer does not depend on the purge, because `PageAsync` checks the session before it looks up the snapshot.
+- **Root cause.** A test defect. The test changed the session in one `docker compose exec` and checked the snapshot in a second one, after the change had committed. If the purge ran in between, it legitimately deleted the snapshot and the assertion failed. The implementation is correct, and the interval has been 5 s since IX-3. The rate change (7/7 passes on 2026-11-08, frequent failures now) is not explained by any code change; it is consistent with timing variance in the race window.
+- **Correction (test only, assertion unchanged in strength).** The change and the check run in **one transaction**, with the number of changed sessions asserted (= 1, so the check cannot pass vacuously). Before that transaction commits, the purge cannot see the expired session, so the check is deterministic. No sleep, retry or weakened assertion. The page refusal (`SEARCH_SESSION_INVALID`) is asserted as before.
+- **Results:** §9.5.
+
+### 9.4 Snapshot lifecycle (the C-141 architecture-test change)
+
+- **What C-141 did.** The Q4 path called `verifier.CompleteAsync` on the pin inside `EvaluateShareOnlyAsync` and then threw. Each pin was still completed exactly once at run time: the throw skipped the method's normal completion, and `VerifiedProjectionSnapshot.RequireOpen` would refuse a second completion. But the code no longer had one completion point per pin, and the fitness function was relaxed to allow it.
+- **Corrected in C-142.**
+  * `EvaluateShareOnlyAsync` no longer completes anything. A SpiceDB denial raises a private `ProjectionContradictionException`, caught around the reader block.
+  * The method's single existing `CompleteAsync` runs. If S1 detects a mismatch, it quarantines the organization; if the state moved, the search answers 409.
+  * Only after that is the search index quarantined (`SHARE_CANDIDATE_DENIED_BY_PROJECTION`). The Q4 order is unchanged.
+  * `ProjectionIntegrityBoundaryTests.EveryDecisionPathPinsAndCompletes` is **restored to its strict form** (pins = completes; 2 = 2 in `IndexedSearchService`), and the Q4 stack test still passes.
+
+### 9.5 C-142 test results
+
+| Suite | Run | Result |
+|---|---|---|
+| Unit (Authority) | `c142-unit-20261110-100000` | 465/465 (new: R47 ×1, R48 ×3) |
+| Architecture (strict lifecycle restored) | `c142-EnterpriseForms.ArchitectureTests-20261110-095905` | 97/97 |
+| `IndexedSearchShareOnlyItemChannelTests` (rebuilt stack, Benchmark trait excluded) | `20261110-100304-98f9a3f5` | 5/5 |
+| `IndexedSearchShareOnlyItemChannelTests`, fresh stack (`-Fresh`) | `20261110-103241-ec02cc35` | 5/5 |
+| `IX79IX80…`, 10 isolated repetitions, existing stack | `c142-ix79-1…10` | **6 passed, 4 failed in setup** (form creation 503 `AwaitingArchive`, R-52; the assertion was not reached) |
+| `IX79IX80…`, 10 isolated repetitions, fresh stack | `c142-ix79-fresh-1…10` | **10/10 passed** |
+
+The corrected assertion has executed 16 times with 16 passes. The 4 setup failures are a separate environment finding:
+- **R-52:** the builder journals every attempt to attest forms that cannot complete; on the old stack data, after the C-141 upgrade demoted such forms, this created an archive backlog;
+- not fixed: owner decision.

@@ -403,6 +403,21 @@ B2 additionally assumes:
 
 The synchronous design remains an option **only** if the claim is restated as a bounded, measured cost with an owner-approved budget, and A3's savepoint and state rows are approved as a Tier 1 change. TQ-12 and TQ-23 are extended to this choice.
 
+**C-142: FD-5-ALT is the preferred architecture for the independent review** (owner direction; not approved for implementation, not implemented). Security design summary (design author; for the reviewer):
+
+| Concern | Specification |
+|---|---|
+| Change sources | Per organization, the Authority's existing hash-chained journal streams (`JournalChain`, `DynamicForms/SecurityJournal/v1`, each event carrying `stream_revision` and `previous_digest_hex`): the **authorization** stream, whose revision is `authorization_revision` (every security command that changes edges, ownership, shares, teams, roles or approvals), and the **content** stream, which tracks `content_integrity_revision` (every content commit and index-affecting content event). Tier 2 maintenance reads them in stream order. It never reads business data, and it writes nothing into any Tier 1 transaction |
+| Durable ordered checkpoints | One checkpoint row per (organization, stream): maintained-through revision and that event's digest. It is advanced only by compare-and-set from revision *n − 1* to *n*, in the **same transaction** as the Tier 2 rows derived from event *n*. The event is accepted only if its `previous_digest_hex` equals the checkpoint digest. Checkpoints are the maintainer's own state, owned and granted like the Tier 1 state tables |
+| Content and authorization consistency | Tier 2 may serve a query pinned at (A, C) only if, in the same reader snapshot: authorization checkpoint = A, content checkpoint = C, both checkpoint digests equal the organization's latest journal digests, Tier 2 is Active, Tier 1 is servable, and M1 holds. Any inequality means Tier 2 is not ready |
+| Recovery after process failure | Restart from the checkpoints. Re-processing an applied event is refused by the compare-and-set (idempotent). A missing or out-of-order event, a digest mismatch, or a checkpoint ahead of the organization state sets Tier 2 to **not maintained** (journaled, alert) until a rebuild from Tier 1's verified state and a full M2 succeed. Never skip or guess |
+| What invalidates readiness | **Every** authorization-stream and content-stream event, because readiness is exact revision equality. Events proven not to affect Tier 2 (decision 4, annex A §8, INV-T2-15) are consumed cheaply by advancing the checkpoint without row changes; they do not stay "ready" by exemption |
+| Quarantine | An S1 quarantine closes the organization gate first: no Tier 1 or Tier 2. A Tier 1 search-index quarantine means Tier 2 is unused. A Tier 2 divergence (M1/M2, a contradicted decision under Q4) quarantines Tier 2 only (after the S1 check); queries fall back to Tier 1 if Tier 1 is servable, otherwise they are refused |
+| Revocation | A revocation advances `authorization_revision`. Until Tier 2 has consumed it, its checkpoint is behind the pin, so Tier 2 is not ready and the query is served by Tier 1 at the pin. No stale grant can be served by Tier 2 |
+| Fallback | Immediate Tier 1 within its ceilings, or a typed refusal (`SEARCH_INDEX_NOT_READY`). **Never a wait** for Tier 2 to catch up (decision 5) |
+| Stale or incomplete replay | Defended by: compare-and-set on revisions; digest continuity; checkpoints bound to the journal head digests; idempotent derivation keyed by event revision; refusal of any event other than checkpoint + 1. After a restore of AuthorityDb or Tier 2 storage, the checkpoints disagree with the organization's revisions or digests, so Tier 2 is not ready until rebuilt. Authorization rollback protection stays with S1/G14 |
+| Fallback timing risk | Whether a query is served by Tier 2 or Tier 1 depends on organization-wide write activity (any command or commit closes the fence until consumed), and the two paths have different costs. A caller may therefore infer the organization's recent activity rate from latency. It does not reveal content or other callers' authorizations. This is TQ-23; the fallback rate and latency difference must be measured at IX-5a, and the reviewer must accept the residual or require mitigation (for example, serving every query of an organization from one engine for a period) |
+
 ### 14A.3 Copy cap (decision 2): 100 principals per record, evaluated, not enforced
 
 **How principals are counted (proposed):**
@@ -494,6 +509,22 @@ Annex A §13 (estimates):
 - online sampling scenarios S-23 to S-28 (annex B §7A).
 
 All are unmeasured. The 100K and 250K gates are unchanged.
+
+## 14B. C-142 owner-review checklist: mandatory decisions before any IX-5 implementation
+
+B2 remains the preferred architecture and C the comparison baseline. **The independent-review requirement is not satisfied: the package has not been submitted, and no review has occurred.**
+
+| # | Decision or evidence | Status |
+|---|---|---|
+| 1 | Independent security and architecture review of this package (TQ-1 to TQ-24, annexes A to E, the UF-25 document) | **Not started** |
+| 2 | FD-5: FD-5-ALT (§14A.2) accepted as the maintenance model, including its checkpoint design and the TQ-23 fallback-timing residual | Preferred for review (C-142); not approved |
+| 3 | Copy amplification: measured value-row and write bounds; no cap approved (§14A.3) | Open |
+| 4 | Partitioning: logical isolation mandatory; physical partitions only with an operational design (§14A.4) | Open |
+| 5 | Sweep composition and deadlines (§14A.6) | Proposal only |
+| 6 | SpiceDB evidence: `LookupSubjects` on the deployed version (E-6), PERF-01 | Missing |
+| 7 | UF-25 closure: R-46 (review), R-47 accepted delayed detection or a seal-bound count (owner), R-48 boundary, R-50, R-51 | R-48/R-51 corrected (C-142); others open |
+| 8 | Carried gates: R-02 (20 ms p95, FAIL), R-33, R-36 to R-45, R-43 (100K/250K datasets), G14, Managed HSM, signed checkpoints, Stage B release run, PB-14 | Open |
+| 9 | A separate owner implementation approval naming the reviewed design revision | Not given |
 
 ## 15. Findings, verdict and attestation
 

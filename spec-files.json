@@ -169,18 +169,18 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "c5f6d55124c61e9ca66587597d405cfac7a634abb4a16d74a80e12a34c846ccb",
-      "bytes": 75388
+      "sha256": "204025a71a9fc72ea4b10d4dfba0a3b482923e1c503dfbccfbf2b86960826812",
+      "bytes": 77734
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
-      "sha256": "16aa5f77948ca477e412073cfeacc812695b79112153dfd280562d7ff3c3ab7d",
-      "bytes": 15367
+      "sha256": "a4780026f901fc606d2cbc2b416f4368651d684bf23adef61bc42742b11f387c",
+      "bytes": 15761
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "e9659f739b99c4fe08fec6e1a18bf13ffe8fcf50cc9c755976cd7e7d84df9edd",
-      "bytes": 191813
+      "sha256": "3f105f5916f126a75545ae8b9b1ac66a0c77172884fa0120622160be7eeca98b",
+      "bytes": 192521
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
@@ -224,13 +224,13 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md",
-      "sha256": "300502a234ae89e7acb8630aea6a1514d6e418bc86720bcb9cb20c90f5495dbb",
-      "bytes": 57525
+      "sha256": "d52f7f1ff1cfc963a677aa696c62a8f3b95322ba9e10ec8afb7c3a8c2b200dfe",
+      "bytes": 63126
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md",
-      "sha256": "90da055b9ec295a92008b1fb388ce1f1601bce1ddcb945363fe568932ee8fec9",
-      "bytes": 35914
+      "sha256": "314e86a7a1dd15c1e684f4efb41795efde7eeda0bd4fa1917299e73ce8561a2b",
+      "bytes": 45305
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -424,8 +424,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "375ff22ac58241c2f67816be9d5c26278dfce1b077f6d3d696277468f53df524",
-      "bytes": 256697
+      "sha256": "a69705ee1be743c937cc430d4f1da1a9336b66b1a70e8d2cacd703a4140e429f",
+      "bytes": 259554
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
