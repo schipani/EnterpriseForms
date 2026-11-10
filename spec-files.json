@@ -169,13 +169,18 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "935f40017e5b5e124a3fa994695b695979050b7f9aa74530452b4a745b88bfa4",
-      "bytes": 78927
+      "sha256": "bd9723e6927b003d051bf5ca5421d18081b3318346092d2bdc3ef042ccc4ffe4",
+      "bytes": 80012
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5A_EVIDENCE.md",
+      "sha256": "5b911cff5841e21257f0aec0ba365b82c9afe49a5f1f4f43f39305800fd012e9",
+      "bytes": 16654
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_DESIGN_ACCEPTANCE_RECORD.md",
-      "sha256": "d6dd63fa7a8bc244fdac53c450920d98dd398766c7583ef3d62c612e94edbedf",
-      "bytes": 6653
+      "sha256": "f2a0c38882014f05cab0b276f6cf035e428f48a19bb472f63a97c63d1deff59a",
+      "bytes": 7178
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md",
@@ -439,8 +444,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "bbfe6a30f44ba5c597c35cd8b0631a14f9b23883afcee33d106aa777fcddd521",
-      "bytes": 264615
+      "sha256": "fdd94173c0533bc6da963ff254852038a7815d798c288f408d60c8993e71a2dd",
+      "bytes": 267179
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -494,8 +499,8 @@
     },
     {
       "path": "docs/governance/AMENDMENT_GA-IX5-1_OWNER_LED_SECURITY_REVIEW.md",
-      "sha256": "919ea05f065643963083f6738c6c36536f4a6cf472094cd5dc2c8d7bbb0e2e6c",
-      "bytes": 4426
+      "sha256": "56cd0a0205f9d0d754532c5ce28a6df159cc70993f232647970b72c2b55bfe77",
+      "bytes": 4619
     },
     {
       "path": "docs/governance/PB12_RELEASE_EVIDENCE_SCHEMA.json",

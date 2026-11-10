@@ -1,6 +1,6 @@
 # IX-5 security design acceptance record (owner-led)
 
-- **Status:** **DRAFT for owner signature (C-146).** This is an owner-led review record under GA-IX5-1. It is **not** an independent review, and no independent review has occurred.
+- **Status:** **Approved by the owner in C-147 (2026-11-10), for Development/Testing only.** An owner-led security approval under GA-IX5-1, **not** an independent security assessment; no independent review has occurred. Approved design baseline: `7ec5a79`. IX-5a only is authorized; IX-5b and IX-5c need separate owner approval.
 - **Design baseline:** signed commit `f5b1ca6`: [INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md](INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md) with annexes A to E and the UF-25 document. It also covers the C-146 evidence in [INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md](INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md) §R.
 - **Prepared by:** Claude (design author), for the owner. Positions in the tables below are **proposed**; they bind only once the owner signs them.
 
@@ -65,9 +65,9 @@ The table is grouped by subject. **Binds at** is the increment whose acceptance 
 
 | Item | Owner entry |
 |---|---|
-| Design A-1 to A-7 accepted (or the changes noted) | |
-| TQ positions (§2) accepted (or the changes noted) | |
-| Finding dispositions (§3) accepted (or the changes noted) | |
-| Acknowledgement: owner-led, not independent; no control waived | |
-| IX-5a implementation authorized | |
-| Date and decision-log reference | |
+| Design A-1 to A-7 accepted (or the changes noted) | Approved (C-147), Development/Testing only |
+| TQ positions (§2) accepted (or the changes noted) | Approved (C-147) |
+| Finding dispositions (§3) accepted (or the changes noted) | Approved (C-147) |
+| Acknowledgement: owner-led, not independent; no control waived | Acknowledged (C-147): residual risk of proceeding without an independent reviewer accepted for Development/Testing; external independent assessment remains unsatisfied and mandatory before production readiness |
+| IX-5a implementation authorized | IX-5a only (C-147); first gate TQ-6, then the journal-completeness gate |
+| Date and decision-log reference | 2026-11-10, C-147 |

@@ -1,6 +1,6 @@
 # Governance amendment GA-IX5-1: owner-led security review replaces the independent pre-implementation review for IX-5
 
-- **Status:** **DRAFT, awaiting owner confirmation (C-146).** Not in force until the owner confirms it in the decision log.
+- **Status:** **In force for Development/Testing: approved by the owner in C-147 (2026-11-10)** as an explicit owner-led security approval, not an independent security assessment. Drafted under C-146; design baseline `7ec5a79`.
 - **Decision kind:** 1 and 3 under [REVIEW_AND_AUTHORIZATION_WORKFLOW.md](REVIEW_AND_AUTHORIZATION_WORKFLOW.md) §1 (owner-led review and implementation authorization).
 - **Authority:** the project owner, who set the clauses amended here (C-121, C-122, C-138, C-139).
 
@@ -63,6 +63,6 @@ Enabling Tier 2 to serve searches needs a further, explicit owner approval after
 
 | Item | Owner entry |
 |---|---|
-| I confirm GA-IX5-1 as written (or with the changes noted) | |
-| Decision-log reference | |
-| Date | |
+| I confirm GA-IX5-1 as written (or with the changes noted) | Approved as written, for Development/Testing only (owner message C-147) |
+| Decision-log reference | C-147 |
+| Date | 2026-11-10 |
