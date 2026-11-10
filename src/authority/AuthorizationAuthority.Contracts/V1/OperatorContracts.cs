@@ -51,6 +51,9 @@ public static class FaultNames
 
     /// <summary>IX-1, testing only: terminate after the search index was derived and sealed inside the content-commit transaction, before it commits (atomicity proof).</summary>
     public const string CrashAfterSearchIndexDerivation = "CrashAfterSearchIndexDerivation";
+
+    /// <summary>IX-5a, testing only: terminate after the access projection applied a journal event and compared-and-set its checkpoint, before the transaction commits (crash-recovery proof).</summary>
+    public const string CrashBeforeAccessProjectionCommit = "CrashBeforeAccessProjectionCommit";
 }
 
 /// <summary>Testing only: state of the fault injector (armed fault and number of operations currently held at a pause point).</summary>

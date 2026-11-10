@@ -84,6 +84,9 @@ services:
       # vault-search-seal-init; its public key is pinned here (deployment configuration, never AuthorityDb). Short sweep intervals
       # for the tests; the C-124 enforcement deadlines (1 h / 24 h / 30 days) are unchanged.
       SearchIndex__Mode: Dark
+      # IX-5a (C-147): the dark Tier 2 access projection, maintained from the authorization journal; no search path reads it.
+      SearchIndex__Access__Mode: Dark
+      SearchIndex__Access__MaintenanceIntervalMilliseconds: "250"
       SearchIndex__CheapSweepIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
       # C-136 (R-33/R-36): entries per S-B transaction (organization lock released between transactions); the measurement recreates
       # the authority with other values.

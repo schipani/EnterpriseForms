@@ -61,7 +61,7 @@ public static class SpiceDbBulkCheckMapping
         return outcomes;
     }
 
-    /// <summary>The echoed request equals the issued check: resource type and id, permission, subject type and id, no subject relation.</summary>
+    /// <summary>The echoed request equals the issued check: resource type and id, permission, subject type and id, and the subject relation (empty unless the check names one; IX-5a).</summary>
     public static bool EchoMatches(SpiceDbCheck check, CheckBulkPermissionsRequestItem? echoed)
     {
         ArgumentNullException.ThrowIfNull(check);
@@ -71,7 +71,7 @@ public static class SpiceDbBulkCheckMapping
                && string.Equals(echoed.Permission, check.Permission, StringComparison.Ordinal)
                && string.Equals(echoed.Subject?.Object?.ObjectType, check.SubjectType, StringComparison.Ordinal)
                && string.Equals(echoed.Subject?.Object?.ObjectId, check.SubjectId, StringComparison.Ordinal)
-               && string.IsNullOrEmpty(echoed.Subject?.OptionalRelation);
+               && string.Equals(echoed.Subject?.OptionalRelation ?? string.Empty, check.SubjectRelation, StringComparison.Ordinal);
     }
 
     /// <summary>Splits the items into requests of at most <paramref name="maximumItems"/> (never truncates).</summary>

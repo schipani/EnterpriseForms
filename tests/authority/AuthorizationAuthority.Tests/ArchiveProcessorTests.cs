@@ -100,6 +100,8 @@ public sealed class ArchiveProcessorTests
     {
         public ISearchIndexStore SearchIndex => throw new NotSupportedException();
 
+        public ISearchAccessStore SearchAccess => throw new NotSupportedException();
+
         public OrganizationAuthorizationState State { get; } = new() { OrganizationId = organizationId };
 
         public List<SecurityJournalEntry> Entries { get; } = [];

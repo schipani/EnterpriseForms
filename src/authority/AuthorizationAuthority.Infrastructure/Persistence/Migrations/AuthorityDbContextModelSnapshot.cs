@@ -2887,6 +2887,247 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessCheckpoint", b =>
+                {
+                    b.Property<Guid>("SearchAccessCheckpointId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_access_checkpoint_id");
+
+                    b.Property<int>("AccessProjectionProtocolVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_projection_protocol_version");
+
+                    b.Property<string>("AccessProjectionStateName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("access_projection_state_name");
+
+                    b.Property<DateTimeOffset>("CheckpointModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checkpoint_modified_on");
+
+                    b.Property<long>("CheckpointRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("checkpoint_revision");
+
+                    b.Property<long>("ConsumedAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("consumed_authorization_revision");
+
+                    b.Property<byte[]>("ConsumedJournalDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("consumed_journal_digest");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("QuarantineReasonCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("quarantine_reason_code");
+
+                    b.HasKey("SearchAccessCheckpointId");
+
+                    b.HasIndex("OrganizationId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_access_checkpoint_org");
+
+                    b.ToTable("search_access_checkpoints", "authority_search_access", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_access_checkpoint_digest", "(consumed_authorization_revision = 0) = (consumed_journal_digest IS NULL) AND (consumed_journal_digest IS NULL OR octet_length(consumed_journal_digest) = 32)");
+
+                            t.HasCheckConstraint("ck_search_access_checkpoint_quarantine", "(access_projection_state_name = 'Quarantined') = (quarantine_reason_code IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_search_access_checkpoint_revision", "consumed_authorization_revision >= 0 AND checkpoint_revision >= 1 AND access_projection_protocol_version >= 1");
+
+                            t.HasCheckConstraint("ck_search_access_checkpoint_state", "access_projection_state_name IN ('Maintaining','Quarantined')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessEdge", b =>
+                {
+                    b.Property<Guid>("SearchAccessEdgeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_access_edge_id");
+
+                    b.Property<long>("MirroredAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("mirrored_authorization_revision");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("RelationshipName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("relationship_name");
+
+                    b.Property<Guid>("ResourceEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_entity_id");
+
+                    b.Property<string>("ResourceTypeName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("resource_type_name");
+
+                    b.Property<Guid>("SubjectEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_entity_id");
+
+                    b.Property<string>("SubjectRelationName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("subject_relation_name");
+
+                    b.Property<string>("SubjectTypeName")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("subject_type_name");
+
+                    b.HasKey("SearchAccessEdgeId");
+
+                    b.HasIndex("OrganizationId", "SubjectTypeName", "SubjectEntityId", "ResourceTypeName", "RelationshipName")
+                        .HasDatabaseName("ix_search_access_edges_subject");
+
+                    b.HasIndex("OrganizationId", "ResourceTypeName", "ResourceEntityId", "RelationshipName", "SubjectTypeName", "SubjectEntityId", "SubjectRelationName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_access_edge_tuple");
+
+                    b.ToTable("search_access_edges", "authority_search_access", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_access_edge_kind", "(resource_type_name, relationship_name) IN (('form_record','owner'),('form_record','parent'),('form_record','shared_via'),('record_share','reader'),('record_share','contributor'),('record_share','manager'),('field_item','shared_via'),('team','member')) AND mirrored_authorization_revision >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessFieldItemGrant", b =>
+                {
+                    b.Property<Guid>("SearchAccessFieldItemGrantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_access_field_item_grant_id");
+
+                    b.Property<Guid>("AccessPrincipalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("access_principal_entity_id");
+
+                    b.Property<string>("AccessPrincipalTypeName")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("access_principal_type_name");
+
+                    b.Property<long>("DerivedAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("derived_authorization_revision");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("RecordShareId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_share_id");
+
+                    b.Property<string>("ShareRoleName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("share_role_name");
+
+                    b.HasKey("SearchAccessFieldItemGrantId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId")
+                        .HasDatabaseName("ix_search_access_item_grants_record");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FormRecordId", "ManifestItemId")
+                        .HasDatabaseName("ix_search_access_item_grants_principal");
+
+                    b.ToTable("search_access_field_item_grants", "authority_search_access", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_access_item_grant_principal", "access_principal_type_name IN ('user','team')");
+
+                            t.HasCheckConstraint("ck_search_access_item_grant_role", "share_role_name IN ('reader','contributor','manager')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessRecordGrant", b =>
+                {
+                    b.Property<Guid>("SearchAccessRecordGrantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_access_record_grant_id");
+
+                    b.Property<string>("AccessKindName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("access_kind_name");
+
+                    b.Property<Guid>("AccessPrincipalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("access_principal_entity_id");
+
+                    b.Property<string>("AccessPrincipalTypeName")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("access_principal_type_name");
+
+                    b.Property<long>("DerivedAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("derived_authorization_revision");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid?>("RecordShareId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_share_id");
+
+                    b.Property<string>("ShareRoleName")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("share_role_name");
+
+                    b.HasKey("SearchAccessRecordGrantId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId")
+                        .HasDatabaseName("ix_search_access_record_grants_record");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FormRecordId")
+                        .HasDatabaseName("ix_search_access_record_grants_principal");
+
+                    b.ToTable("search_access_record_grants", "authority_search_access", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_access_record_grant_kind", "(access_kind_name = 'EffectiveOwner' AND record_share_id IS NULL AND share_role_name IS NULL) OR (access_kind_name = 'ShareRecipient' AND record_share_id IS NOT NULL AND share_role_name IN ('reader','contributor','manager'))");
+
+                            t.HasCheckConstraint("ck_search_access_record_grant_principal", "access_principal_type_name IN ('user','team')");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchBooleanPosting", b =>
                 {
                     b.Property<Guid>("SearchBooleanPostingId")
@@ -4725,6 +4966,50 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PlatformOperatorId")
                         .HasConstraintName("fk_platform_evidence_operator");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessCheckpoint", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_access_checkpoint_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessEdge", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_access_edge_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessFieldItemGrant", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_access_item_grant_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessRecordGrant", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_access_record_grant_org");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchBooleanPosting", b =>

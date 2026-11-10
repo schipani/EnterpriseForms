@@ -267,7 +267,7 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
                 {
                     Resource = new ObjectReference { ObjectType = check.ResourceType, ObjectId = check.ResourceId },
                     Permission = check.Permission,
-                    Subject = new SubjectReference { Object = new ObjectReference { ObjectType = check.SubjectType, ObjectId = check.SubjectId } },
+                    Subject = new SubjectReference { Object = new ObjectReference { ObjectType = check.SubjectType, ObjectId = check.SubjectId }, OptionalRelation = check.SubjectRelation },
                 });
             }
 

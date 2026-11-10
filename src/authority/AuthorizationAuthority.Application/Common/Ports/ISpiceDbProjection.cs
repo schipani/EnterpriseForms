@@ -3,7 +3,8 @@ using AuthorizationAuthority.Domain.Features.SecurityCommands;
 
 namespace AuthorizationAuthority.Application.Common.Ports;
 
-public sealed record SpiceDbCheck(string ResourceType, string ResourceId, string Permission, string SubjectType, string SubjectId);
+/// <param name="SubjectRelation">IX-5a: optional subject relation (for example <c>team#participant</c>); empty for a plain object subject.</param>
+public sealed record SpiceDbCheck(string ResourceType, string ResourceId, string Permission, string SubjectType, string SubjectId, string SubjectRelation = "");
 
 public enum SpiceDbCheckOutcome
 {

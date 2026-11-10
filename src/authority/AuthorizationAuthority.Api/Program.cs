@@ -56,6 +56,7 @@ public sealed class Program
         builder.Services.AddSigningProviderConfiguration(builder.Configuration, builder.Environment);
         // IX-1 (C-126): Authority-owned search index; Disabled unless configured, Dark (no query path) only in Development/Testing.
         builder.Services.AddSearchIndex(builder.Configuration, builder.Environment);
+        builder.Services.AddSearchAccessProjection(builder.Configuration, builder.Environment); // IX-5a: dark Tier 2 access projection
         // C-137 (R-37): optional phase-duration diagnostics; off unless configured, Development/Testing only.
         builder.Services.AddOperationTiming(builder.Configuration, builder.Environment);
         // Phase C5 (D10): field-scoped contributor writes; off unless the deployment sets exactly "true"; refused in Production.
@@ -119,6 +120,7 @@ public sealed class Program
         {
             app.MapTestStackIdentityEndpoints();
             AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchTestingEndpoints(app); // IX-3 plan-shape test
+            AuthorizationAuthority.Api.Features.SearchIndex.SearchAccessTestingEndpoints.MapSearchAccessTestingEndpoints(app); // IX-5a
         }
 
         app.MapAuthorizationEndpoints();

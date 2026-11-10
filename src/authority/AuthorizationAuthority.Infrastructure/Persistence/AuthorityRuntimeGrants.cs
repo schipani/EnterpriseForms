@@ -43,7 +43,7 @@ public static class AuthorityRuntimeGrants
     ];
 
     /// <summary>Every table the runtime role may touch; a model table missing here is a startup defect caught by the unit test, not in Docker.</summary>
-    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables, .. Configurations.SearchIndexSchema.ResultTables];
+    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables, .. Configurations.SearchIndexSchema.ResultTables, .. Configurations.SearchAccessSchema.AllTables];
 
     /// <param name="searchReaderLogin">IX-3: the LOGIN user of the indexed-search query path (created by the cluster bootstrap with its
     /// own credential, never by a migration); it is made a member of <see cref="SearchReaderRole"/> and gets the reader's role settings.
@@ -80,6 +80,7 @@ public static class AuthorityRuntimeGrants
 
         statements.Add($"GRANT SELECT ON {schema}.ef_migrations_history TO {runtimeRole}");
         statements.AddRange(SearchIndexStatements(runtimeRole));
+        statements.AddRange(SearchAccessStatements(runtimeRole));
         if (!string.IsNullOrEmpty(searchReaderLogin))
         {
             statements.AddRange(SearchReaderLoginStatements(searchReaderLogin));
@@ -90,6 +91,32 @@ public static class AuthorityRuntimeGrants
             context.Database.ExecuteSqlRaw(statement);
 #pragma warning restore EF1002
         }
+    }
+
+    /// <summary>
+    /// IX-5a (C-147): grants on schema authority_search_access. The runtime (the maintainer) inserts and deletes derived rows and
+    /// inserts and compare-and-set updates checkpoints; nothing is updated in place otherwise, and it holds no DDL. The search
+    /// reader gets nothing in this schema: no search path can read Tier 2 rows in IX-5a.
+    /// </summary>
+    public static IEnumerable<string> SearchAccessStatements(string runtimeRole)
+    {
+        var access = Configurations.SearchAccessSchema.Name;
+        yield return $"REVOKE ALL ON SCHEMA {access} FROM PUBLIC";
+        yield return $"GRANT USAGE ON SCHEMA {access} TO {runtimeRole}";
+        yield return $"REVOKE ALL ON ALL TABLES IN SCHEMA {access} FROM {runtimeRole}";
+        foreach (var table in Configurations.SearchAccessSchema.DerivedTables)
+        {
+            yield return $"GRANT SELECT, INSERT, DELETE ON {access}.{table} TO {runtimeRole}";
+        }
+
+        foreach (var table in Configurations.SearchAccessSchema.StateTables)
+        {
+            yield return $"GRANT SELECT, INSERT, UPDATE ON {access}.{table} TO {runtimeRole}";
+        }
+
+        yield return $"REVOKE ALL ON FUNCTION {access}.current_organization_id() FROM PUBLIC";
+        yield return $"GRANT EXECUTE ON FUNCTION {access}.current_organization_id() TO {runtimeRole}";
+        yield return $"DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{SearchReaderRole}') THEN EXECUTE 'REVOKE ALL ON SCHEMA {access} FROM {SearchReaderRole}'; EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA {access} FROM {SearchReaderRole}'; END IF; END $$";
     }
 
     /// <summary>

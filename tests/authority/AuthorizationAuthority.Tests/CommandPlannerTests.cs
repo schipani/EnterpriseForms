@@ -367,6 +367,8 @@ public sealed class CommandPlannerTests
     {
         public ISearchIndexStore SearchIndex => throw new NotSupportedException();
 
+        public ISearchAccessStore SearchAccess => throw new NotSupportedException();
+
         public List<AuthorityResource> Resources { get; } = [];
 
         public List<IdentityBinding> Bindings { get; } = [];

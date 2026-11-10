@@ -5,6 +5,7 @@ using AuthorizationAuthority.Domain.Features.Journal;
 using AuthorizationAuthority.Domain.Features.Keys;
 using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.PlatformOperators;
+using AuthorizationAuthority.Domain.Features.SearchAccess;
 using AuthorizationAuthority.Domain.Features.SearchIndex;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using AuthorizationAuthority.Domain.Features.Sessions;
@@ -123,6 +124,14 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<SearchResultSnapshot> SearchResultSnapshots => Set<SearchResultSnapshot>();
 
     public DbSet<SearchResultSnapshotEntry> SearchResultSnapshotEntries => Set<SearchResultSnapshotEntry>();
+
+    public DbSet<SearchAccessCheckpoint> SearchAccessCheckpoints => Set<SearchAccessCheckpoint>();
+
+    public DbSet<SearchAccessEdge> SearchAccessEdges => Set<SearchAccessEdge>();
+
+    public DbSet<SearchAccessRecordGrant> SearchAccessRecordGrants => Set<SearchAccessRecordGrant>();
+
+    public DbSet<SearchAccessFieldItemGrant> SearchAccessFieldItemGrants => Set<SearchAccessFieldItemGrant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -68,6 +68,10 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     private InMemorySearchIndexStore? searchIndex;
 
+    public InMemorySearchAccessStore SearchAccess => searchAccess ??= new InMemorySearchAccessStore();
+
+    private InMemorySearchAccessStore? searchAccess;
+
     public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
 
     /// <summary>Phase C8 AC-9: number of read-only snapshot scopes opened; such a scope refuses to commit.</summary>
@@ -86,6 +90,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     private sealed class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
     {
         public ISearchIndexStore SearchIndex => s.SearchIndex;
+
+        public ISearchAccessStore SearchAccess => s.SearchAccess;
 
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken) => Task.FromResult(s.Organizations.FirstOrDefault(o => o.OrganizationId == organizationId));
 

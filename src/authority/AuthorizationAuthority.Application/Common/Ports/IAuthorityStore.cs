@@ -34,6 +34,9 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>IX-1: the Authority-owned search index, in this scope's transaction.</summary>
     ISearchIndexStore SearchIndex { get; }
 
+    /// <summary>IX-5a: the Tier 2 access projection (schema authority_search_access), in this scope's transaction.</summary>
+    ISearchAccessStore SearchAccess { get; }
+
     /// <summary>SELECT ... FOR UPDATE on the organization state row: serializes every mutation of that organization (A6).</summary>
     Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid organizationId, CancellationToken cancellationToken);
 
