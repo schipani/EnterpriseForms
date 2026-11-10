@@ -1588,3 +1588,28 @@ The approved IX-5 specification (§16, §9 box, §17.1 status, IX-D13, R-B, FD-3
 **New finding UF-28:** a C-path overflow for records above the copy cap would make search work depend on unauthorized share counts; withdrawn.
 
 R1 §E.3, §9 and §17.1 stay as approved. Any change follows the owner's decision and, for Tier 2, the independent review.
+
+## 27. C-141 record: UF-25 correction (U-1b) implemented
+
+**Owner decisions (C-141, 2026-11-09; owner-led, not an independent assessment):**
+- UF-25 is a Tier 1 security defect. Correction U-1b is authorized as the permanent design, preserving the approved search semantics (including partly shared multi-selects). No Tier 2.
+- IX-5 directions:
+  * B2 remains preferred for review; C remains the baseline and fallback;
+  * no arbitrary principal-copy cap is approved;
+  * logical tenant isolation is mandatory; physical per-organization partitioning needs a justified operational design;
+  * no verification catch-up wait in search;
+  * FD-5 draft A1 to A6 is not approved as written (review package §14A.2).
+
+**Implemented** (UF-25 document §8; Development/Testing, not independently reviewed):
+- Tier 1 derivation version 3 adds `derived_field_item_counts` to each entry, written with it by W1 and backfill. It is verified by recount against the sealed postings (S-B and every served page record), by S-C and by S-A.
+- The share-only step reads its candidates from the caller's own grants, limits on them, confirms them with SpiceDB (Q4 on a denial), and decides by distinct-item count equality.
+- S-A performs the 2 → 3 upgrade.
+- Migration `AuthoritySearchIndexUf25FieldItemCounts` (forward-only).
+- R1 §E.3 carries the marked amendment.
+- The scope, and therefore the results, are unchanged (RQ-1, RQ-8).
+
+**Unchanged:**
+- seal format and keys;
+- PD-9 (no value-keyed index);
+- S1, quarantine, freshness, authorization-revision and deadline enforcement;
+- the 20 ms p95 gate (R-02), still FAIL.

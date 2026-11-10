@@ -470,6 +470,13 @@ Steps, all at the pinned snapshot:
 
 **Partial readers:** discover-only callers (a share with no field items) end up with an empty `S` contribution. Their results equal C7's, because `Evaluable` excludes them.
 
+**C-141 amendment (owner-authorized correction of UF-25, 2026-11-09; implemented, not independently reviewed).** Steps 4 and 5 and the limit on `k` above are superseded as follows; the scope they define, and therefore the results, are unchanged ([INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md](INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md) §8).
+- Step 4 enumerated every posting item, including items the caller cannot read, so the check set and the limit depended on unauthorized content (UF-25); "depends only on the caller's records and the predicate field ids" was imprecise.
+- **4′.** Candidates are read from the caller's own grants at the pinned authorization revision: the caller's team memberships, the shares whose reader/contributor/manager subject is the caller or one of those teams, those shares' records in `S`, and the field items shared through them, each joined **by item id** to a current posting of a predicate field. SpiceDB confirms every candidate (`field_item#read`). A candidate SpiceDB denies at a consistent pin is escalated by Q4 (design §17.2) and fails the search.
+- **5′.** r ∈ `S` is evaluable on field f iff the number of **distinct** confirmed items of f in r equals the accepted total count of f in r, `derived_field_item_counts` of r's entry (derivation version 3). The union over all paths is taken first. An empty field (0 = 0) is evaluable, as before.
+- **Limit.** `k` is the number of candidates, which are items the caller is permitted to read. The 20,000 default is unchanged.
+- **Fail closed.** Missing or malformed counts, more readable items than the total, or a candidate outside `S` or the predicate fields refuse the search; a version 2 entry is not ready (503). Every share-only match is re-checked on bound data: its bound postings must be exactly its count, all confirmed readable.
+
 ### E.4 Sort, count and pagination semantics
 
 - **Sort:** metadata only (`modifiedOn`, `createdOn`, `recordStatus`; `formName` is constant within one form), in SQL, with the total order `… , head_modified_on, form_record_id`. Field-value sort stays excluded (D6).

@@ -264,7 +264,12 @@ R-01 to R-29 are carried from the IX-3 report. Changes: R-22 closed for IX-3 dev
 | R-43 | 100K/250K benchmark dataset prerequisites (IX-5 exit gate) | **Designed, not seeded (C-138, annex C):** creation through the trusted path estimated at ≈ 30–60 h (100K) and ≈ 120–200 h (250K) serially without R-37 changes; Vault dev mode (in-memory) prevents a reusable snapshot, so a persistent-Vault benchmark overlay is needed; ≈ 40–60 GB (100K) and ≈ 100–150 GB (250K) disk estimated from measured 58 KB/record; P0 1,000-record pilot proposed | Owner approvals (pilot, overlay, sweep setting, R-37 options, multi-day runs) |
 | R-44 | Design-author findings for the Tier 2 reviewer (UF-14 to UF-21): affected-set table does not match the command catalogue; GIN not bounded by principal; option B value-copy integrity; `LookupSubjects` without limit, cursor or bulk; fence starvation and S-D grace; Vault dev mode; minimum-safe-version fencing for Tier 2; unspecified Tier 2 disabled state | **Open; recorded in the review package §9 (C-138)**; not independent findings; no remediation implemented. **C-139:** proposed resolutions recorded for UF-14 (per-command matrix, INV-T2-15), UF-15 (no GIN, `contains` strategy), UF-16 (INV-T2-14, M2-V) and UF-18 (fence rules F-1/F-2); **none closed or waived** | Independent review, then owner decisions |
 | R-45 | C-139 design-author findings (UF-22 to UF-27): planner statistics shared across principals and organizations; multi-path field-readability parity; correction of option B's approval-verification cost for the split design; **implemented Tier 1** share-only check set and `items` limit depend on unreadable items (UF-25); value-row amplification and fan-out cap; FD-5 boundary for B2 writes in Tier 1 writer transactions | **Open (C-139); C-140:** UF-28 added (C-path overflow channel; D-5 overflow withdrawn); UF-25 reproduced and moved to R-46; recorded in the review package §9; not independent findings; no code changed (UF-25 concerns implemented Tier 1 and needs a reviewer and owner decision) | Independent review, then owner decisions |
-| R-46 | **UF-25, implemented Tier 1:** the share-only check set and the `items` limit (R1 §E.3) depend on the presence and number of items the caller cannot read; results do not | **Open; reproduced (C-140, evidence §15):** for direct, team and overlapping shares, refusal 200 → 422 with a test-only limit of 2; check set 1 → 4; +42 ms p50 for 1,000 unauthorized items (informational, battery). Impact Low to Medium. Correction U-1 proposed with RQ-1 to RQ-8; **not implemented** (it changes approved R1 §E.3) | Owner review of the U-1 design and regression requirements, then implementation and tests; independent review (TQ-24) |
+| R-46 | **UF-25, Tier 1:** the share-only check set and the `items` limit (R1 §E.3) depended on the presence and number of items the caller cannot read; results did not | **Corrected (C-141, U-1b), not independently reviewed:** candidates from the caller's own grants, accepted per-field item counts (derivation version 3), limit on readable candidates, Q4 on a SpiceDB denial. RQ-1 to RQ-8 pass (evidence §16): checks 1 → 1 and 200 → 200 with hidden content where C-140 showed 1 → 4 and 200 → 422. Not closed: residuals R-47 to R-50 | Independent review (TQ-24); owner review of the C-141 evidence |
+| R-47 | C-141 residual: an inflated stored count is undetectable at query time (record omitted until S-A/S-B quarantine); a coordinated posting-delete-and-count-lower passes I-2 until the keyed page seal or S-B (existing OR-1 limitation) | **Open, accepted class (G06):** proven detected by S-A on the stack | Independent review |
+| R-48 | C-141 residual: a version 2 + NULL-counts entry is re-derived after a journaled Medium alert rather than quarantining the index (UF-25 doc §8.6 R4) | **Open, owner decision** | Owner |
+| R-49 | C-141 migration rebuilds the seven record probe indexes non-concurrently (blocks posting writes while it runs); not measured at 100K/250K | **Open** | Before any production deployment: maintenance window or concurrent-build plan, measured |
+| R-50 | Existing business-API defect seen in C-141 testing: after an expired delegated assertion (401), the audit insert violates `ck_audit_events_outcome` and the request surfaces as 503 `STORE_UNAVAILABLE` | **Open, not caused by C-141, not fixed** (out of scope) | Owner to schedule |
+| R-51 | `IndexedSearchQueryStackTests.IX79IX80SessionEndAndSessionTimeoutsRefuseThePage` (line 650) fails intermittently in C-141 runs (2 of 2 class runs, 1 of 2 isolated runs; 7 of 7 passes on 2026-11-08): the assertion that a snapshot survives an idle session races the 5-second snapshot purge | **Open:** probable pre-existing test race, rate change not fully explained; not counted as passing | Owner: investigate or stabilize the test (out of C-141 scope) |
 
 ## 8. French drafts for the PB-14 copy review (not approved; not in the application)
 
@@ -524,3 +529,28 @@ The diagnostics observe and never decide: no decision, ordering, transaction bou
 - **Correction U-1** proposed with RQ-1 to RQ-8 (`INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md`); **not implemented** (it changes approved R1 §E.3 behaviour).
 - **Not done:** no Tier 2 code, tables or migrations; no product code change; no large seeding or benchmarks; Stage B not run; no IX-6/IX-7; not submitted to a reviewer; no push, PR, merge or deploy.
 - **Register:** R-45 updated; R-46 added (UF-25 Tier 1 channel); nothing closed or waived.
+
+## 16. C-141: UF-25 correction (U-1b) implemented
+
+- **Owner authorization (C-141):** correct UF-25 with U-1b; preserve search semantics; no Tier 2; focused tests only; Stage B not run; no large benchmarks.
+- **Implementation and analysis:** `INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md` §8 (pre-implementation review of the count, changes, RQ-1 to RQ-8, measurements, residuals).
+- **Runs (focused, local Docker, synthetic; not Stage B):**
+  * unit `c141-unit-20261109-191737` (461/461);
+  * architecture `c141-arch-20261109-192932` (97/97);
+  * integrity (60/60) and API contract (575/575);
+  * stack `20261109-222430-39ae5268` (`IndexedSearchShareOnlyItemChannelTests`, 5/5, Benchmark trait excluded);
+  * existing Tier 1 stack classes as listed in the UF-25 document §8.4.
+
+  The first stack run, `20261109-192842-d7c0bf70`, was 3/5: one wrong expectation, and one failure caused by host sleep 00:32–03:19Z (R-50 observed afterwards).
+- **Results:**
+  * hidden statuses in three share-only records leave the probe at 1 check and the search at 200 (C-140: 1 → 4 items checked, 200 → 422), for direct, team and overlapping paths;
+  * the limit refuses on readable candidates only;
+  * lowered, raised and missing counts, version 2 entries and a SpiceDB denial all fail closed;
+  * the partially shared multi-select semantics are unchanged.
+- **Measurements (AC power, informational):**
+  * item checks with 1,000 hidden items: 1,001 (before) → 1 (after);
+  * p50 163.0 → 111.6 ms in the hidden-items phase;
+  * commit latency indexed p50/p95 40.88/54.20 → 37.86/51.90 ms, database commands 16 → 16;
+  * **R-02 remains FAIL.**
+- **Existing classes:** engine 5/5, foundation 9/9, builder 11/11, execution 13/13; query 20/21 twice (R-51).
+- **Register:** R-46 corrected (not closed); R-47 to R-51 added; nothing waived.

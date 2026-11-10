@@ -169,23 +169,23 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "b5fd1ba849da4b0144d2fb819f154112e84b186f9887e5eef5295b9cc63a1cbe",
-      "bytes": 72047
+      "sha256": "c5f6d55124c61e9ca66587597d405cfac7a634abb4a16d74a80e12a34c846ccb",
+      "bytes": 75388
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
-      "sha256": "5c0b638725b0916c35dc1f7c1baa12cc41ef73c840bfdb9236d12e94d8474c7d",
-      "bytes": 14977
+      "sha256": "16aa5f77948ca477e412073cfeacc812695b79112153dfd280562d7ff3c3ab7d",
+      "bytes": 15367
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
-      "sha256": "45899972e8ab0ba5a9466e4d8b5360d56b8e9ca2b31b1200d15ef7f4c3f9da98",
-      "bytes": 190207
+      "sha256": "e9659f739b99c4fe08fec6e1a18bf13ffe8fcf50cc9c755976cd7e7d84df9edd",
+      "bytes": 191813
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN_R1.md",
-      "sha256": "cf96e5108a3fb8e458e5145e8a1a68d633cbdbff25c316dd403c86b3fcfac7db",
-      "bytes": 58591
+      "sha256": "393ec381a2553071de2ff60cb26049408b62d5a1ed0a28ee51df0092195a8a72",
+      "bytes": 60436
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_TIER1_OWNER_REVIEW_EVIDENCE.md",
@@ -224,13 +224,13 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md",
-      "sha256": "dc33af7c34feef3b61c2eb7fb9206cd88b8895f020174eb5fb9c716ac27f2608",
-      "bytes": 51718
+      "sha256": "300502a234ae89e7acb8630aea6a1514d6e418bc86720bcb9cb20c90f5495dbb",
+      "bytes": 57525
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md",
-      "sha256": "2a3204f76f0cfcca56ae078ddd596ca676ad6a80bf5aa597ea1190dbb1839f2a",
-      "bytes": 16720
+      "sha256": "90da055b9ec295a92008b1fb388ce1f1601bce1ddcb945363fe568932ee8fec9",
+      "bytes": 35914
     },
     {
       "path": "docs/architecture/PB07_BROWSER_REQUEST_COORDINATOR_STANDARD.md",
@@ -424,8 +424,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "ed2945bcb1ada438645b0c67ca435aff8696ef3716166af960c876f9de7233ba",
-      "bytes": 253621
+      "sha256": "375ff22ac58241c2f67816be9d5c26278dfce1b077f6d3d696277468f53df524",
+      "bytes": 256697
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
