@@ -166,6 +166,19 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
         Task.FromResult<IReadOnlyList<(Guid, bool)>>(Entries.Where(e => e.OrganizationId == organizationId && e.EntryDerivationVersion < 3).GroupBy(e => e.FormDefinitionId).OrderBy(g => g.Key)
             .Select(g => (g.Key, g.Any(e => e.EntryDerivationVersion == 2 && e.DerivedFieldItemCounts is null))).ToList());
 
+    public Task<(Guid SecurityJournalEntryId, string EnvelopeJson)?> FindLatestFormJournalEventAsync(Guid organizationId, string eventKind, Guid formDefinitionId, CancellationToken cancellationToken)
+    {
+        var form = formDefinitionId.ToString("D");
+        var latest = s.Journal.Where(j => j.OrganizationId == organizationId && j.JournalEventKind == eventKind)
+            .Where(j =>
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(j.JournalEventBodyJson);
+                return doc.RootElement.TryGetProperty("body", out var body) && body.TryGetProperty("form_definition_id", out var f) && f.GetString() == form;
+            })
+            .OrderByDescending(j => j.JournalStreamRevision).FirstOrDefault();
+        return Task.FromResult<(Guid, string)?>(latest is null ? null : (latest.SecurityJournalEntryId, latest.JournalEventBodyJson));
+    }
+
     public Task<IReadOnlySet<Guid>> GetFormsAttestedAtDerivationVersionAsync(Guid organizationId, int minimumDerivationVersion, CancellationToken cancellationToken)
     {
         var forms = new HashSet<Guid>();

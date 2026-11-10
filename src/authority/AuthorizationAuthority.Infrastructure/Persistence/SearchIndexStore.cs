@@ -320,6 +320,33 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
         return rows.Select(r => (r.Form, r.Upgradable)).ToList();
     }
 
+    public async Task<(Guid SecurityJournalEntryId, string EnvelopeJson)?> FindLatestFormJournalEventAsync(Guid organizationId, string eventKind, Guid formDefinitionId, CancellationToken cancellationToken)
+    {
+        // The predicates repeat the partial index's expression exactly (migration AuthorityJournalSearchIndexFormEvents), so this is
+        // one index probe, not a scan of the organization's audit stream under the organization lock.
+        const string sql = """
+            SELECT j.security_journal_entry_id, j.journal_event_body_json
+            FROM authority.security_journal_entries j
+            WHERE j.organization_id = @organization_id AND j.journal_event_kind = @event_kind
+              AND j.journal_event_kind IN ('SearchIndexCoverageAttested', 'SearchIndexPopulationIssued')
+              AND (j.journal_event_body_json::jsonb -> 'body' ->> 'form_definition_id') = @form_text
+            ORDER BY j.journal_stream_revision DESC
+            LIMIT 1;
+            """;
+        await using var command = CreateCommand(sql);
+        AddParameter(command, "organization_id", organizationId);
+        var kind = command.CreateParameter();
+        kind.ParameterName = "event_kind";
+        kind.Value = eventKind;
+        command.Parameters.Add(kind);
+        var form = command.CreateParameter();
+        form.ParameterName = "form_text";
+        form.Value = formDefinitionId.ToString("D");
+        command.Parameters.Add(form);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ? (reader.GetGuid(0), reader.GetString(1)) : null;
+    }
+
     public async Task<IReadOnlySet<Guid>> GetFormsAttestedAtDerivationVersionAsync(Guid organizationId, int minimumDerivationVersion, CancellationToken cancellationToken)
     {
         // The journal is append-only for the runtime (no UPDATE or DELETE grant) and hash-chained; the body is read, never trusted

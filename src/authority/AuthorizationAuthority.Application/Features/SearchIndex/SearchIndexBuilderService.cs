@@ -89,8 +89,20 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
         if (request.AfterFormRecordId is null)
         {
             // The first page of a round is journaled (counts only), as the migration catalogue's issuance is (OD-1 pattern).
-            AuditJournal.Append(scope, state, "SearchIndexPopulationIssued", new { organization_id = state.OrganizationId, form_definition_id = request.FormDefinitionId, registered_records = population.Count, building_requirement = required.Count, workload_name = workloadName, correlation_id = correlationId }, clock);
-            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            // C-143 (R-52): a round that would issue exactly the population of the form's latest issuance event (same records, states,
+            // heads and coverage requirement) is not journaled again. The evidence of that issuance is already in the journal.
+            var populationHeads = population.Count == 0 ? [] : (await scope.GetContentHeadsAsync(state.OrganizationId, population.Select(r => r.ResourceEntityId).ToList(), cancellationToken).ConfigureAwait(false)).ToDictionary(h => h.FormRecordId);
+            var digest = StateDigest(
+                required.Order().Select(id => "requires|" + id.ToString("D")).Concat(population.Select(r =>
+                {
+                    var h = populationHeads.GetValueOrDefault(r.ResourceEntityId);
+                    return $"record|{r.ResourceEntityId:D}|{r.ResourceLifecycleState}|{h?.CommittedContentRevision ?? 0}|{h?.CommittedOperationId:D}|{h?.ContentHeadQuarantined == true}";
+                })));
+            if (!await UnchangedSinceLatestAsync(index, state.OrganizationId, PopulationEventKind, request.FormDefinitionId, "population_digest", digest, requireIncomplete: false, cancellationToken).ConfigureAwait(false))
+            {
+                AuditJournal.Append(scope, state, PopulationEventKind, new { organization_id = state.OrganizationId, form_definition_id = request.FormDefinitionId, registered_records = population.Count, building_requirement = required.Count, population_digest = digest, workload_name = workloadName, correlation_id = correlationId }, clock);
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
 
         return new SearchIndexPopulationPage(state.OrganizationId, request.FormDefinitionId, result, next, correlationId);
@@ -196,39 +208,64 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
         var heads = ids.Count == 0 ? [] : (await scope.GetContentHeadsAsync(state.OrganizationId, ids, cancellationToken).ConfigureAwait(false)).ToDictionary(h => h.FormRecordId);
         var entries = (await index.GetFormEntriesAsync(state.OrganizationId, request.FormDefinitionId, null, cancellationToken).ConfigureAwait(false)).ToDictionary(e => e.FormRecordId);
         int contentful = 0, indexed = 0, quarantined = 0, pending = 0;
+        var blocking = new List<string>(); // C-143 (R-52): what keeps the form from Complete, record by record
         foreach (var resource in population)
         {
             var head = heads.GetValueOrDefault(resource.ResourceEntityId);
             if (resource.ResourceLifecycleState == ResourceLifecycleStates.Quarantined || head?.ContentHeadQuarantined == true)
             {
                 quarantined++;
+                blocking.Add($"quarantined|{resource.ResourceEntityId:D}|{resource.ResourceLifecycleState}|{head?.CommittedOperationId:D}");
                 continue;
             }
 
             if (resource.ResourceLifecycleState == ResourceLifecycleStates.Registered || head is not { CommittedContentRevision: > 0, CommittedOperationId: not null })
             {
                 pending++; // no accepted content: its first commit derives inline (it can match nothing until then)
+                blocking.Add($"pending|{resource.ResourceEntityId:D}");
                 continue;
             }
 
             contentful++;
-            indexed += IsIndexedAtHead(entries.GetValueOrDefault(resource.ResourceEntityId), head, required) ? 1 : 0;
+            if (IsIndexedAtHead(entries.GetValueOrDefault(resource.ResourceEntityId), head, required))
+            {
+                indexed++;
+            }
+            else
+            {
+                blocking.Add($"missing|{resource.ResourceEntityId:D}|{head.CommittedOperationId:D}");
+            }
         }
 
         var missing = contentful - indexed;
         var reason = building.Count == 0 ? "NO_BUILDING_COVERAGE" : quarantined > 0 ? "RECORD_QUARANTINED" : missing > 0 ? "RECORDS_NOT_INDEXED" : null;
         var complete = building.Count > 0 && reason is null;
         Guid? attestedJournalEntryId = null;
-        if (building.Count > 0)
+        // C-143 (R-52): an incomplete result whose blocking state (reason, building coverages, counts and the blocking records with
+        // their heads) equals that of the form's latest attestation event, which was itself incomplete, is not journaled again: the
+        // first failure stays the evidence and its id is returned. The decision is made from the journal itself, under the
+        // organization lock, so concurrent builders, other Authority instances and restarts see the same latest event. Complete is
+        // never suppressed, and any change of the blocking state is journaled.
+        var blockingDigest = StateDigest(
+            new[] { "reason|" + reason, $"counts|{population.Count}|{contentful}|{indexed}|{quarantined}|{pending}" }
+                .Concat(building.Select(c => "coverage|" + c.SearchFieldCoverageId.ToString("D")).Order(StringComparer.Ordinal))
+                .Concat(blocking.Order(StringComparer.Ordinal)));
+        if (building.Count > 0 && !complete)
+        {
+            attestedJournalEntryId = await FindUnchangedIncompleteAsync(index, state.OrganizationId, request.FormDefinitionId, blockingDigest, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (building.Count > 0 && attestedJournalEntryId is null)
         {
             var now = clock.GetUtcNow();
-            var journal = AuditJournal.Append(scope, state, "SearchIndexCoverageAttested", new
+            var journal = AuditJournal.Append(scope, state, AttestationEventKind, new
             {
                 organization_id = state.OrganizationId, form_definition_id = request.FormDefinitionId, coverage_complete = complete, incomplete_reason_code = reason,
                 registered_records = population.Count, contentful_records = contentful, indexed_records = indexed, missing_records = missing, quarantined_records = quarantined, pending_records = pending,
                 building_coverages = building.Select(c => c.SearchFieldCoverageId).Order().ToList(), authorization_revision = state.AuthorizationRevision, content_integrity_revision = state.ContentIntegrityRevision,
                 // C-142 (R-48): the derivation boundary. Complete is attested only when every contentful record is indexed at this version.
                 attesting_entry_derivation_version = SearchPostingDerivationV1.CurrentEntryDerivationVersion,
+                blocking_state_digest = blockingDigest,
                 workload_name = workloadName, correlation_id = correlationId,
             }, clock);
             attestedJournalEntryId = journal.SecurityJournalEntryId;
@@ -446,6 +483,45 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
         (SearchOptionPosting p, EnterpriseForms.Integrity.Search.SearchSealValue.OptionValue v) => p.FieldOptionId == v.FieldOptionId,
         _ => false,
     };
+
+    public const string AttestationEventKind = "SearchIndexCoverageAttested";
+    public const string PopulationEventKind = "SearchIndexPopulationIssued";
+
+    /// <summary>C-143 (R-52): SHA-256 (hex) over the ordered, newline-joined state lines; identifiers and states only, no values.</summary>
+    public static string StateDigest(IEnumerable<string> lines) =>
+        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", lines))));
+
+    /// <summary>The id of the form's latest attestation event when it was incomplete with exactly this blocking state; otherwise null.</summary>
+    private static async Task<Guid?> FindUnchangedIncompleteAsync(ISearchIndexStore index, Guid organizationId, Guid formDefinitionId, string blockingDigest, CancellationToken cancellationToken)
+    {
+        var latest = await index.FindLatestFormJournalEventAsync(organizationId, AttestationEventKind, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        return latest is { } found && BodyHas(found.EnvelopeJson, "blocking_state_digest", blockingDigest, requireIncomplete: true) ? found.SecurityJournalEntryId : null;
+    }
+
+    private static async Task<bool> UnchangedSinceLatestAsync(ISearchIndexStore index, Guid organizationId, string eventKind, Guid formDefinitionId, string property, string digest, bool requireIncomplete, CancellationToken cancellationToken)
+    {
+        var latest = await index.FindLatestFormJournalEventAsync(organizationId, eventKind, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        return latest is { } found && BodyHas(found.EnvelopeJson, property, digest, requireIncomplete);
+    }
+
+    private static bool BodyHas(string envelopeJson, string property, string digest, bool requireIncomplete)
+    {
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(envelopeJson);
+            if (!document.RootElement.TryGetProperty("body", out var body) || !body.TryGetProperty(property, out var stored) || stored.ValueKind != System.Text.Json.JsonValueKind.String
+                || !string.Equals(stored.GetString(), digest, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return !requireIncomplete || (body.TryGetProperty("coverage_complete", out var complete) && complete.ValueKind == System.Text.Json.JsonValueKind.False);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false; // unreadable: journal again rather than suppress
+        }
+    }
 
     /// <summary>An entry counts as indexed when it is at the head and was derived under every required (non-withdrawn) coverage approval.</summary>
     public static bool IsIndexedAtHead(SearchRecordEntry? entry, RecordContentHead head, IReadOnlySet<Guid> requiredApprovalIds)

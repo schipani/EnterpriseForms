@@ -251,6 +251,116 @@ public sealed class SearchIndexBuilderStackTests(StageBFixture fixture)
         Assert.NotEmpty(Sql($"SELECT 1 FROM security_journal_entries WHERE organization_id = '{org:D}' AND journal_event_kind = 'IntegrityVerificationFailed' AND journal_event_body_json LIKE '%ix2-builder-harness%';"));
     }
 
+    /// <summary>
+    /// C-143 (R-52): a form that can never be attested Complete (a record quarantined by forged business bytes) journals its
+    /// failure once, not on every builder round. Measured over a 60 s window while the worker keeps polling, with 10 permission
+    /// changes timed in that window; then 8 concurrent attestation calls and an Authority restart add no event; a real state
+    /// change (a new record) is journaled. The coverage stays Building (no search), the index and organization are not
+    /// quarantined. The measurements are written to artifacts/ix-5/r52-journal.json before any assertion, so the same test
+    /// records the behaviour of an image without the correction.
+    /// </summary>
+    [Fact]
+    public async Task R52ABlockedFormJournalsItsFailureOnceAcrossBuildersAndRestarts()
+    {
+        const string attest = "SearchIndexCoverageAttested";
+        const string issue = "SearchIndexPopulationIssued";
+        var w = await WorkspaceAsync("r52-blocked");
+        var tampered = await CreateAsync(w, "Tampered original", 1);
+        var honest = await CreateAsync(w, "Honest", 2);
+        var org = w.S.OrganizationId;
+        fixture.Stack.AttackerSql($"UPDATE field_string_values SET string_value = 'Tampered by business DBA' WHERE form_record_id = '{tampered:D}';");
+        await ApproveAsync(w);
+        Assert.Equal("t", await WaitAsync(() => Scalar($"SELECT content_head_quarantined::text::char FROM record_content_heads WHERE organization_id = '{org:D}' AND form_record_id = '{tampered:D}';"), v => v == "t", 120));
+        Assert.Equal("1", await WaitAsync(() => Scalar($"SELECT count(*) FROM authority_search.search_record_entries WHERE organization_id = '{org:D}' AND form_record_id = '{honest:D}';"), v => v == "1", 120));
+        int Count(string kind) => int.Parse(Scalar($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{org:D}' AND journal_event_kind = '{kind}';"), CultureInfo.InvariantCulture);
+        Assert.NotEqual("0", await WaitAsync(() => Count(attest).ToString(CultureInfo.InvariantCulture), v => v != "0", 60));
+        await Task.Delay(TimeSpan.FromSeconds(10), Ct); // let the builder finish the round that observed the quarantine
+
+        // Window: 60 s of normal worker polling, with 10 timed permission changes (shares of the honest record to the Reader).
+        var (a0, p0) = (Count(attest), Count(issue));
+        var window = System.Diagnostics.Stopwatch.StartNew();
+        var latencies = new List<double>();
+        for (var i = 0; i < 10; i++)
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            for (var attempt = 0; ; attempt++)
+            {
+                var share = await fixture.Api.PostAsync($"/api/v1/form-records/{honest:D}/shares", w.S.Token(w.S.Clerk), new { recipientUserId = w.S.Reader.AuthorityUserId, recipientTeamId = (Guid?)null, recipientRole = "Reader", fieldKeys = new[] { "case_reference" } });
+                if (share.IsSuccess)
+                {
+                    break;
+                }
+
+                Assert.True(attempt < 60 && share.ErrorCode is "AUTHORITY_NOT_READY" or "COMMAND_PENDING" or "STALE_AUTHORIZATION_REVISION", "share failed: " + share.Body);
+                await Task.Delay(250, Ct);
+            }
+
+            latencies.Add(clock.Elapsed.TotalMilliseconds);
+        }
+
+        while (window.Elapsed < TimeSpan.FromSeconds(60))
+        {
+            await Task.Delay(1000, Ct);
+        }
+
+        var (a1, p1) = (Count(attest), Count(issue));
+        var parallel = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => BuilderAsync("attestation", new { organizationId = org, formDefinitionId = w.FormId })));
+        var a2 = Count(attest);
+        fixture.Stack.Compose("up -d --no-deps --force-recreate --wait authority", 300);
+        HttpResult restarted;
+        for (var attempt = 0; ; attempt++)
+        {
+            restarted = await BuilderAsync("attestation", new { organizationId = org, formDefinitionId = w.FormId });
+            if (restarted.IsSuccess || attempt >= 60)
+            {
+                break;
+            }
+
+            await Task.Delay(1000, Ct);
+        }
+
+        var a3 = Count(attest);
+        var sorted = latencies.Order().ToList();
+        var report = new
+        {
+            kind = "C-143 R-52: journal growth of one permanently blocked form and permission-change latency (focused, local Docker, synthetic)",
+            measured_on = DateTimeOffset.UtcNow,
+            git_commit = ComposeStack.GitCommit(),
+            window_seconds = Math.Round(window.Elapsed.TotalSeconds, 1),
+            attestation_events_in_window = a1 - a0,
+            population_events_in_window = p1 - p0,
+            attestation_events_from_8_concurrent_calls = a2 - a1,
+            attestation_events_after_authority_restart = a3 - a2,
+            share_latency_ms = new { n = sorted.Count, p50 = Math.Round(sorted[sorted.Count / 2], 1), max = Math.Round(sorted[^1], 1), all = sorted.Select(v => Math.Round(v, 1)) },
+        };
+        var directory = Path.Combine(ComposeStack.RepositoryRoot, "artifacts", "ix-5");
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(Path.Combine(directory, "r52-journal.json"), JsonSerializer.Serialize(report, Indented), Ct);
+        TestContext.Current.TestOutputHelper?.WriteLine(JsonSerializer.Serialize(report));
+
+        Assert.Equal(0, a1 - a0); // the unchanged blocked state was already journaled before the window
+        Assert.Equal(0, p1 - p0);
+        Assert.All(parallel, r => Assert.True(r.IsSuccess, r.Body));
+        Assert.All(parallel, r => Assert.False(r.Root.GetProperty("coverage_complete").GetBoolean()));
+        Assert.All(parallel, r => Assert.Equal("RECORD_QUARANTINED", r.Root.GetProperty("incomplete_reason_code").GetString()));
+        Assert.Single(parallel.Select(r => r.Root.GetProperty("attestation_journal_entry_id").GetString()).Distinct()); // the first failure is the evidence
+        Assert.Equal(0, a2 - a1);
+        Assert.True(restarted.IsSuccess, restarted.Body);
+        Assert.Equal(0, a3 - a2);
+        Assert.Equal("Building,Building", Coverages(org)); // never attested: no search on these fields
+        Assert.Equal("Active|", Projection(org));
+        Assert.Equal("f", Scalar($"SELECT integrity_quarantine_enabled::text::char FROM organization_authorization_states WHERE organization_id = '{org:D}';"));
+
+        // A genuine change of the blocking state (a new record) is journaled, then suppressed again.
+        await CreateAsync(w, "Added later", 3);
+        Assert.NotEqual(a3.ToString(CultureInfo.InvariantCulture), await WaitAsync(() => Count(attest).ToString(CultureInfo.InvariantCulture), v => v != a3.ToString(CultureInfo.InvariantCulture), 60));
+        Assert.Equal("1", await WaitAsync(() => Scalar($"SELECT count(*) FROM authority_search.search_record_entries e JOIN authority.authority_resources r ON r.resource_entity_id = e.form_record_id WHERE e.organization_id = '{org:D}' AND r.resource_type_name = 'form_record' AND e.form_record_id NOT IN ('{tampered:D}', '{honest:D}');"), v => v == "1", 60));
+        await Task.Delay(TimeSpan.FromSeconds(10), Ct); // the builder's next rounds after the new record was indexed
+        var settled = Count(attest);
+        await Task.Delay(TimeSpan.FromSeconds(15), Ct); // observation window: no further events for the unchanged state
+        Assert.Equal(settled, Count(attest));
+    }
+
     /// <summary>IX-18: an older operation of a record is refused at the head check whatever bytes accompany it (no verification, no quarantine).</summary>
     [Fact]
     public async Task IX18AReplayOfAnOlderOperationIsRefusedAtTheHeadCheck()

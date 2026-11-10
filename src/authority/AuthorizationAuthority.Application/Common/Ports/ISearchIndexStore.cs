@@ -149,6 +149,13 @@ public interface ISearchIndexStore
     Task<IReadOnlySet<Guid>> GetFormsAttestedAtDerivationVersionAsync(Guid organizationId, int minimumDerivationVersion, CancellationToken cancellationToken);
 
     /// <summary>
+    /// C-143 (R-52): the latest committed audit-journal event of <paramref name="eventKind"/> for the form (highest stream revision):
+    /// its id and the stored envelope JSON. Read from the append-only, hash-chained journal itself (never a writable pointer), through
+    /// the partial index <c>ix_journal_search_index_form_events</c>. Null when the form has no such event.
+    /// </summary>
+    Task<(Guid SecurityJournalEntryId, string EnvelopeJson)?> FindLatestFormJournalEventAsync(Guid organizationId, string eventKind, Guid formDefinitionId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// ReconciliationRequired only: deletes (with their postings and anomalies) the entries whose indexed operation is no longer
     /// the record's committed head operation; returns the forms affected. Nothing is re-derived (no bytes are held).
     /// </summary>
