@@ -134,11 +134,19 @@ public interface ISearchIndexStore
     Task<CheapSweepFindings> RunCheapChecksAsync(Guid organizationId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// C-141 (UF-25): forms of the organization with a Complete coverage and at least one entry written at derivation version 2
-    /// without item counts (an entry of the image before C-141). The S-A derivation upgrade returns their coverages to Building.
-    /// A version 2 entry that carries counts is not listed: S-A reports it as a finding.
+    /// C-141/C-142: forms of the organization with at least one entry below the current derivation version (3), and whether any of
+    /// them is a version 2 entry without item counts (an upgrade candidate). Whether such an entry is a genuine legacy entry or a
+    /// forged downgrade is decided against <see cref="GetFormsAttestedAtDerivationVersionAsync"/>, never from the entry row.
     /// </summary>
-    Task<IReadOnlyList<Guid>> GetFormsAwaitingDerivationUpgradeAsync(Guid organizationId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<(Guid FormDefinitionId, bool HasUpgradableEntry)>> GetFormsWithOutdatedEntriesAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// C-142 (R-48): the authenticated derivation boundary. Forms for which the append-only, hash-chained security journal holds a
+    /// <c>SearchIndexCoverageAttested</c> event with <c>coverage_complete = true</c> written by an image of at least
+    /// <paramref name="minimumDerivationVersion"/>. Once such an attestation exists, every legitimate entry of the form is of that
+    /// version or later, so an older entry there is a forged downgrade. The runtime cannot update or delete journal rows.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> GetFormsAttestedAtDerivationVersionAsync(Guid organizationId, int minimumDerivationVersion, CancellationToken cancellationToken);
 
     /// <summary>
     /// ReconciliationRequired only: deletes (with their postings and anomalies) the entries whose indexed operation is no longer

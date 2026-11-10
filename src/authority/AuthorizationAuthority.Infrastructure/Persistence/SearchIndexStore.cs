@@ -310,11 +310,42 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
         return new CheapSweepFindings(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7), reader.GetInt32(8));
     }
 
-    public async Task<IReadOnlyList<Guid>> GetFormsAwaitingDerivationUpgradeAsync(Guid organizationId, CancellationToken cancellationToken) =>
-        await context.SearchRecordEntries.AsNoTracking()
-            .Where(e => e.OrganizationId == organizationId && e.EntryDerivationVersion == 2 && e.DerivedFieldItemCounts == null
-                        && context.SearchFieldCoverages.Any(c => c.OrganizationId == organizationId && c.FormDefinitionId == e.FormDefinitionId && c.CoverageStateName == SearchCoverageStates.Complete))
-            .Select(e => e.FormDefinitionId).Distinct().OrderBy(f => f).ToListAsync(cancellationToken).ConfigureAwait(false);
+    public async Task<IReadOnlyList<(Guid FormDefinitionId, bool HasUpgradableEntry)>> GetFormsWithOutdatedEntriesAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        var rows = await context.SearchRecordEntries.AsNoTracking()
+            .Where(e => e.OrganizationId == organizationId && e.EntryDerivationVersion < 3)
+            .GroupBy(e => e.FormDefinitionId)
+            .Select(g => new { Form = g.Key, Upgradable = g.Any(e => e.EntryDerivationVersion == 2 && e.DerivedFieldItemCounts == null) })
+            .OrderBy(x => x.Form).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return rows.Select(r => (r.Form, r.Upgradable)).ToList();
+    }
+
+    public async Task<IReadOnlySet<Guid>> GetFormsAttestedAtDerivationVersionAsync(Guid organizationId, int minimumDerivationVersion, CancellationToken cancellationToken)
+    {
+        // The journal is append-only for the runtime (no UPDATE or DELETE grant) and hash-chained; the body is read, never trusted
+        // to grant anything: an appended forgery can only make legacy entries look downgraded, which quarantines (fail closed).
+        const string sql = """
+            SELECT DISTINCT (j.journal_event_body_json::jsonb -> 'body' ->> 'form_definition_id')::uuid
+            FROM authority.security_journal_entries j
+            WHERE j.organization_id = @organization_id AND j.journal_event_kind = 'SearchIndexCoverageAttested'
+              AND (j.journal_event_body_json::jsonb -> 'body' ->> 'coverage_complete') = 'true'
+              AND COALESCE((j.journal_event_body_json::jsonb -> 'body' ->> 'attesting_entry_derivation_version')::int, 0) >= @minimum_version;
+            """;
+        await using var command = CreateCommand(sql);
+        AddParameter(command, "organization_id", organizationId);
+        var minimum = command.CreateParameter();
+        minimum.ParameterName = "minimum_version";
+        minimum.Value = minimumDerivationVersion;
+        command.Parameters.Add(minimum);
+        var forms = new HashSet<Guid>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            forms.Add(reader.GetGuid(0));
+        }
+
+        return forms;
+    }
 
     public async Task<IReadOnlyList<Guid>> DeleteEntriesNotAtHeadAsync(Guid organizationId, CancellationToken cancellationToken)
     {

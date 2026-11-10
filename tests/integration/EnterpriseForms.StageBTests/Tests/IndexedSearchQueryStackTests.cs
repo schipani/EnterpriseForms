@@ -646,8 +646,14 @@ public sealed class IndexedSearchQueryStackTests(StageBFixture fixture)
             var n = Nonce();
             var id = SnapshotId(await IndexedAsync(w, session, n, query));
             var digestHex = Convert.ToHexStringLower(Convert.FromBase64String(session.Digest));
-            fixture.Stack.AuthorityAdministratorSql($"UPDATE authority.authenticated_sessions SET {column} WHERE session_secret_digest = '\\x{digestHex}'::bytea;");
-            Assert.Equal("1", Scalar($"SELECT count(*) FROM authority_search.search_result_snapshots WHERE search_result_snapshot_id = '{id:D}';")); // no revoking transaction ran
+            // C-142 (R-51): the contract (§17.3 check 2, §18.4) is that expiry and idle timeout are enforced at page time and that the
+            // session change itself deletes nothing (no revoking transaction ran); the purge job may remove the snapshot afterwards,
+            // in its own transaction, and that does not change the page's answer (the session is checked before the snapshot). The
+            // change and the existence check therefore run in ONE transaction: before it commits, the purge cannot see the expired
+            // session, so the check is deterministic. (Checked from a second command after the commit, it raced the 5 s purge.)
+            // Output: the number of sessions changed (must be 1), then the snapshots still present inside the transaction (must be 1).
+            var inTransaction = fixture.Stack.AuthorityAdministratorSql($"BEGIN; WITH changed AS (UPDATE authority.authenticated_sessions SET {column} WHERE session_secret_digest = '\\x{digestHex}'::bytea RETURNING 1) SELECT count(*) FROM changed; SELECT count(*) FROM authority_search.search_result_snapshots WHERE search_result_snapshot_id = '{id:D}'; COMMIT;");
+            Assert.Equal(["1", "1"], inTransaction.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); // the session changed; no revoking transaction ran
             AssertNoPage(await PageAsync(w, session, n, query, id, 10), "SEARCH_SESSION_INVALID");
         }
     }

@@ -512,40 +512,35 @@ public sealed class IndexedSearchShareOnlyItemChannelTests(StageBFixture fixture
     }
 
     /// <summary>
-    /// An entry of the image before C-141 (derivation version 2, no counts) in the Reader's share-only scope: the search is refused as
-    /// not ready (503, retryable), never answered without counts; S-A's derivation upgrade returns the form's coverages to Building
-    /// (journaled), the builder re-derives the entry from verified bytes at version 3, and the same search then returns the same
-    /// result.
+    /// C-142 (R-48): a forged downgrade. The form is attested Complete by this image (its journaled attestation carries the attesting
+    /// derivation version 3); a search-schema writer then rewrites a share-only record's entry as version 2 without counts. The search
+    /// is refused with the index quarantined (SEARCH_INDEX_INCONSISTENT, reason ...DERIVATION_DOWNGRADED), the organization is not
+    /// quarantined, no derivation upgrade is journaled, and the entry is left in place as evidence (never quietly re-derived).
+    /// The genuine-legacy upgrade path is covered by unit tests and by the C-141 deployment on this stack's older data.
     /// </summary>
     [Fact]
-    public async Task AnEntryWithoutCountsIsNotReadyUntilTheDerivationUpgradeReDerivesIt()
+    public async Task R48AForgedDowngradeIsQuarantinedAndNeverRebuiltAsLegacy()
     {
         var w = await WorkspaceAsync("direct");
         var r = await CreateAsync(w, new(StringComparer.Ordinal) { ["exhibit_count"] = "1", ["case_status"] = "open" });
         await ShareAsync(w, r, "exhibit_count", "case_status");
         await WaitCompleteAsync(w);
+        Assert.NotEqual("0", Scalar($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND journal_event_kind = 'SearchIndexCoverageAttested' AND (journal_event_body_json::jsonb -> 'body' ->> 'attesting_entry_derivation_version') = '3';"));
         var reader = await SessionAsync(w, w.S.Reader);
         var query = Query(w, Cond(w.Status, "is", w.Open));
         Assert.Equal([r], Ids((await IndexedAsync(w, reader, query)).Result));
 
         fixture.Stack.AuthorityAdministratorSql($"SELECT set_config('authority_search.organization_id', '{w.S.OrganizationId:D}', false); UPDATE authority_search.search_record_entries SET entry_derivation_version = 2, derived_field_item_counts = NULL WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{r:D}';");
         var (refused, _) = await IndexedAsync(w, reader, query);
-        AssertRefused(refused, "SEARCH_INDEX_NOT_READY"); // the share-only step (version 2) or, once S-A ran, the coverage
-
-        var deadline = DateTime.UtcNow.AddSeconds(120);
-        string Version() => Scalar($"SELECT entry_derivation_version FROM authority_search.search_record_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{r:D}';");
-        while (Scalar($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND journal_event_kind = 'SearchIndexDerivationUpgradeStarted';") == "0" || Version() != "3")
-        {
-            Assert.True(DateTime.UtcNow < deadline, "the derivation upgrade did not re-derive the entry (version " + Version() + ")");
-            await Task.Delay(1000, Ct);
-        }
-
-        await WaitCompleteAsync(w, seconds: 180);
-        Assert.Equal("3", Scalar($"SELECT entry_derivation_version FROM authority_search.search_record_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{r:D}';"));
-        Assert.Equal(1, StoredCount(w, r, w.Status));
-        Assert.NotEqual("0", Scalar($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND journal_event_kind = 'SearchIndexDerivationUpgradeStarted';"));
-        Assert.Equal([r], Ids((await IndexedAsync(w, await SessionAsync(w, w.S.Reader), query)).Result));
-        Assert.StartsWith("Active|", Projection(w.S.OrganizationId), StringComparison.Ordinal);
+        AssertRefused(refused, "SEARCH_INDEX_INCONSISTENT"); // the query path, or S-A if its pass came first
+        var state = Projection(w.S.OrganizationId);
+        Assert.StartsWith("Quarantined|", state, StringComparison.Ordinal);
+        Assert.Contains("ENTRY_DERIVATION_DOWNGRADED", state, StringComparison.Ordinal);
+        Assert.Equal("f", Scalar($"SELECT integrity_quarantine_enabled FROM organization_authorization_states WHERE organization_id = '{w.S.OrganizationId:D}';"));
+        await Task.Delay(TimeSpan.FromSeconds(15), Ct); // longer than one S-A interval (10 s on this stack): S-A must not turn it into an upgrade
+        Assert.Equal("0", Scalar($"SELECT count(*) FROM security_journal_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND journal_event_kind = 'SearchIndexDerivationUpgradeStarted';"));
+        Assert.Equal("2", Scalar($"SELECT entry_derivation_version FROM authority_search.search_record_entries WHERE organization_id = '{w.S.OrganizationId:D}' AND form_record_id = '{r:D}';"));
+        Assert.Equal("0", Scalar($"SELECT count(*) FROM authority_search.search_field_coverages WHERE organization_id = '{w.S.OrganizationId:D}' AND coverage_state_name = 'Building';"));
     }
 
     /// <summary>

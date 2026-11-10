@@ -94,79 +94,94 @@ public sealed class IndexedSearchService(
 
             var discoverableIds = Ids(discoverable);
             var ownedIds = Ids(owned).ToHashSet();
-            SearchQueryStateFacts facts;
-            List<(Guid Id, DerivedHeaderFacts Header, DateTimeOffset Created, DateTimeOffset Modified)> matches;
-            Dictionary<Guid, Guid> operations;
-            int scopeCount, withoutContent;
-            List<IndexedSearchItem> firstPage;
-            Guid[] approvalIds;
-            await using (var read = await reader.BeginAsync(organizationId, cancellationToken).ConfigureAwait(false))
+            // Assigned in the reader block; read only after it completed without a projection contradiction (which throws below).
+            SearchQueryStateFacts facts = null!;
+            List<(Guid Id, DerivedHeaderFacts Header, DateTimeOffset Created, DateTimeOffset Modified)> matches = [];
+            Dictionary<Guid, Guid> operations = [];
+            int scopeCount = 0, withoutContent = 0;
+            List<IndexedSearchItem> firstPage = [];
+            Guid[] approvalIds = [];
+            var contradiction = false;
+            try
             {
-                facts = await read.ReadStateAsync(query.FormDefinitionId, cancellationToken).ConfigureAwait(false);
-                await RequireConsistentStateAsync(organizationId, facts, state, cancellationToken).ConfigureAwait(false);
-                approvalIds = AuthorizePredicates(conditions, facts, mayQuery, policy?.PlaintextSearchPermitted ?? false);
-
-                var scopeFacts = await read.ReadScopeAsync(query.FormDefinitionId, discoverableIds, fields, cancellationToken).ConfigureAwait(false);
-                await GuardScopeAsync(organizationId, scopeFacts, cancellationToken).ConfigureAwait(false);
-                var contentful = scopeFacts.Where(r => r.CommittedContentRevision > 0).ToList();
-                scopeCount = scopeFacts.Count;
-                withoutContent = scopeFacts.Count - contentful.Count;
-
-                // R1 §E.3: the readable-for-predicate scope. Owned records: every item readable. Share-only records: every indexed item
-                // of every predicate field must be readable. C-141 (UF-25, U-1b): decided from the caller's own grants and the accepted
-                // per-field item counts, so no item the caller cannot read is enumerated, checked or counted against the limit.
-                var predicateFields = PredicateFields(conditions, approvalIds);
-                var approvalByField = ApprovalByField(predicateFields);
-                var shareOnly = contentful.Where(r => !ownedIds.Contains(r.FormRecordId)).ToList();
-                var shareDecision = await EvaluateShareOnlyAsync(read, pin, subject, bound.AuthorityUserId, organizationId, shareOnly, predicateFields, enforceLimit: true, "indexed-search", correlationId, cancellationToken).ConfigureAwait(false);
-                var readableScope = contentful.Where(r => ownedIds.Contains(r.FormRecordId) || shareDecision.Evaluable.Contains(r.FormRecordId)).Select(r => r.FormRecordId).ToList();
-                var filter = new SearchMetadataFilter(query.RecordStatus, query.IncludeChildren, query.IncludeArchived);
-                var candidates = await read.FindCandidatesAsync(query.FormDefinitionId, readableScope, conditions, filter, options.MaximumResults + 1, cancellationToken).ConfigureAwait(false);
-                if (candidates.Count > options.MaximumResults)
+                await using (var read = await reader.BeginAsync(organizationId, cancellationToken).ConfigureAwait(false))
                 {
-                    throw Limit("results");
-                }
+                    facts = await read.ReadStateAsync(query.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+                    await RequireConsistentStateAsync(organizationId, facts, state, cancellationToken).ConfigureAwait(false);
+                    approvalIds = AuthorizePredicates(conditions, facts, mayQuery, policy?.PlaintextSearchPermitted ?? false);
 
-                var valueTypes = conditions.GroupBy(c => c.FieldDefinitionId).ToDictionary(g => g.Key, g => g.First().ValueType);
-                var bindings = (await read.ReadBindingDataAsync(candidates, fields, cancellationToken).ConfigureAwait(false)).ToDictionary(b => b.Entry.FormRecordId);
-                var facts1 = scopeFacts.ToDictionary(r => r.FormRecordId);
-                operations = contentful.ToDictionary(r => r.FormRecordId, r => r.CommittedOperationId!.Value);
-                matches = new(candidates.Count);
-                foreach (var id in candidates)
-                {
-                    var verified = bindings.TryGetValue(id, out var binding) ? IndexedSearchBinding.VerifyMatch(binding, conditions, valueTypes) : new IndexedMatchVerification(false, "MATCH_BINDING_DATA_MISSING", null);
-                    if (!verified.Bound || !MetadataMatches(query, verified.Header!))
+                    var scopeFacts = await read.ReadScopeAsync(query.FormDefinitionId, discoverableIds, fields, cancellationToken).ConfigureAwait(false);
+                    await GuardScopeAsync(organizationId, scopeFacts, cancellationToken).ConfigureAwait(false);
+                    await RequireNoDerivationDowngradeAsync(scope, organizationId, query.FormDefinitionId, scopeFacts, "SCOPE_", cancellationToken).ConfigureAwait(false);
+                    var contentful = scopeFacts.Where(r => r.CommittedContentRevision > 0).ToList();
+                    scopeCount = scopeFacts.Count;
+                    withoutContent = scopeFacts.Count - contentful.Count;
+
+                    // R1 §E.3: the readable-for-predicate scope. Owned records: every item readable. Share-only records: every indexed item
+                    // of every predicate field must be readable. C-141 (UF-25, U-1b): decided from the caller's own grants and the accepted
+                    // per-field item counts, so no item the caller cannot read is enumerated, checked or counted against the limit.
+                    var predicateFields = PredicateFields(conditions, approvalIds);
+                    var approvalByField = ApprovalByField(predicateFields);
+                    var shareOnly = contentful.Where(r => !ownedIds.Contains(r.FormRecordId)).ToList();
+                    var shareDecision = await EvaluateShareOnlyAsync(read, pin, subject, bound.AuthorityUserId, organizationId, shareOnly, predicateFields, enforceLimit: true, "indexed-search", correlationId, cancellationToken).ConfigureAwait(false);
+                    var readableScope = contentful.Where(r => ownedIds.Contains(r.FormRecordId) || shareDecision.Evaluable.Contains(r.FormRecordId)).Select(r => r.FormRecordId).ToList();
+                    var filter = new SearchMetadataFilter(query.RecordStatus, query.IncludeChildren, query.IncludeArchived);
+                    var candidates = await read.FindCandidatesAsync(query.FormDefinitionId, readableScope, conditions, filter, options.MaximumResults + 1, cancellationToken).ConfigureAwait(false);
+                    if (candidates.Count > options.MaximumResults)
                     {
-                        throw await QuarantineIndexAsync(organizationId, verified.FindingCode ?? "MATCH_METADATA_MISMATCH", cancellationToken).ConfigureAwait(false);
+                        throw Limit("results");
                     }
 
-                    // C-141: a share-only match must have been decided on bound data: its bound predicate postings are exactly its stored
-                    // count and every one was confirmed readable. For an honest match these are readable items only.
-                    if (!ownedIds.Contains(id) && ShareOnlyReadability.VerifyBoundRecord(binding!, approvalByField, shareDecision.ConfirmedItemsByRecord.GetValueOrDefault(id)) is { } shareFinding)
+                    var valueTypes = conditions.GroupBy(c => c.FieldDefinitionId).ToDictionary(g => g.Key, g => g.First().ValueType);
+                    var bindings = (await read.ReadBindingDataAsync(candidates, fields, cancellationToken).ConfigureAwait(false)).ToDictionary(b => b.Entry.FormRecordId);
+                    var facts1 = scopeFacts.ToDictionary(r => r.FormRecordId);
+                    operations = contentful.ToDictionary(r => r.FormRecordId, r => r.CommittedOperationId!.Value);
+                    matches = new(candidates.Count);
+                    foreach (var id in candidates)
                     {
-                        throw await QuarantineIndexAsync(organizationId, shareFinding, cancellationToken).ConfigureAwait(false);
+                        var verified = bindings.TryGetValue(id, out var binding) ? IndexedSearchBinding.VerifyMatch(binding, conditions, valueTypes) : new IndexedMatchVerification(false, "MATCH_BINDING_DATA_MISSING", null);
+                        if (!verified.Bound || !MetadataMatches(query, verified.Header!))
+                        {
+                            throw await QuarantineIndexAsync(organizationId, verified.FindingCode ?? "MATCH_METADATA_MISMATCH", cancellationToken).ConfigureAwait(false);
+                        }
+
+                        // C-141: a share-only match must have been decided on bound data: its bound predicate postings are exactly its stored
+                        // count and every one was confirmed readable. For an honest match these are readable items only.
+                        if (!ownedIds.Contains(id) && ShareOnlyReadability.VerifyBoundRecord(binding!, approvalByField, shareDecision.ConfirmedItemsByRecord.GetValueOrDefault(id)) is { } shareFinding)
+                        {
+                            throw await QuarantineIndexAsync(organizationId, shareFinding, cancellationToken).ConfigureAwait(false);
+                        }
+
+                        var record = facts1[id];
+                        matches.Add((id, verified.Header!, record.RecordRegisteredOn, record.ContentHeadModifiedOn ?? record.RecordRegisteredOn));
                     }
 
-                    var record = facts1[id];
-                    matches.Add((id, verified.Header!, record.RecordRegisteredOn, record.ContentHeadModifiedOn ?? record.RecordRegisteredOn));
+                    matches = Sort(matches, query.SortBy, query.SortDirection);
+                    firstPage = await VerifyPageAsync(read, pin, subject, organizationId, matches.Take(query.PageSize).Select(m => m.Id).ToList(), conditions, valueTypes, facts.Approvals, cancellationToken).ConfigureAwait(false);
+                    var headers = matches.ToDictionary(m => m.Id);
+                    firstPage = firstPage.Select(item => item with
+                    {
+                        RecordStatusName = headers[item.FormRecordId].Header.RecordStatusName,
+                        ParentFormRecordId = headers[item.FormRecordId].Header.ParentFormRecordId,
+                        CreatedByBusinessUserId = headers[item.FormRecordId].Header.CreatedByUserId,
+                        RecordRegisteredOn = headers[item.FormRecordId].Created,
+                        ContentHeadModifiedOn = headers[item.FormRecordId].Modified,
+                    }).ToList();
                 }
-
-                matches = Sort(matches, query.SortBy, query.SortDirection);
-                firstPage = await VerifyPageAsync(read, pin, subject, organizationId, matches.Take(query.PageSize).Select(m => m.Id).ToList(), conditions, valueTypes, facts.Approvals, cancellationToken).ConfigureAwait(false);
-                var headers = matches.ToDictionary(m => m.Id);
-                firstPage = firstPage.Select(item => item with
-                {
-                    RecordStatusName = headers[item.FormRecordId].Header.RecordStatusName,
-                    ParentFormRecordId = headers[item.FormRecordId].Header.ParentFormRecordId,
-                    CreatedByBusinessUserId = headers[item.FormRecordId].Header.CreatedByUserId,
-                    RecordRegisteredOn = headers[item.FormRecordId].Created,
-                    ContentHeadModifiedOn = headers[item.FormRecordId].Modified,
-                }).ToList();
+            }
+            catch (ProjectionContradictionException)
+            {
+                contradiction = true; // C-142: classified only after this pin's single completion below (Q4)
             }
 
             if (!await verifier.CompleteAsync(pin, "indexed-search", cancellationToken).ConfigureAwait(false))
             {
                 throw Changed("authorization state moved during the search");
+            }
+
+            if (contradiction)
+            {
+                throw await QuarantineIndexAsync(organizationId, ProjectionContradictionException.FindingCode, cancellationToken).ConfigureAwait(false);
             }
 
             // Under the organization lock: nothing the result depends on may have moved; then the snapshot and its evidence.
@@ -249,7 +264,7 @@ public sealed class IndexedSearchService(
         }
 
         SearchResultSnapshot snapshot;
-        List<IndexedSearchItem> page;
+        List<IndexedSearchItem> page = [];
         Guid sessionId;
         await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -284,105 +299,119 @@ public sealed class IndexedSearchService(
             var mayQuery = (await verifier.CheckBulkStrictAsync(pin, [new SpiceDbCheck(ResourceTypeNames.FormDefinition, query.FormDefinitionId.ToString("D"), "query_fields", ResourceTypeNames.User, subject)], cancellationToken).ConfigureAwait(false))[0] == SpiceDbCheckOutcome.Allowed;
             var policy = await scope.FindProtectionPolicyAsync(organizationId, cancellationToken).ConfigureAwait(false);
             var positions = await scope.SearchIndex.GetResultSnapshotEntriesAsync(snapshot.SearchResultSnapshotId, request.Offset, query.PageSize, cancellationToken).ConfigureAwait(false);
-            await using (var read = await reader.BeginAsync(organizationId, cancellationToken).ConfigureAwait(false))
+            var contradiction = false;
+            try
             {
-                var facts = await read.ReadStateAsync(query.FormDefinitionId, cancellationToken).ConfigureAwait(false);
-                await RequireConsistentStateAsync(organizationId, facts, state, cancellationToken).ConfigureAwait(false);
-                // Check 5: searchability revalidated explicitly (approval ids still Active, operators, coverage, query_fields).
-                Guid[] approvals;
-                try
+                await using (var read = await reader.BeginAsync(organizationId, cancellationToken).ConfigureAwait(false))
                 {
-                    approvals = AuthorizePredicates(conditions, facts, mayQuery, policy?.PlaintextSearchPermitted ?? false);
-                }
-                catch (AuthorityException ex) when (ex.ErrorCode is IndexedSearchErrorCodes.FieldNotAllowed or IndexedSearchErrorCodes.OperatorNotSupported or IndexedSearchErrorCodes.IndexNotReady)
-                {
-                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("searchability changed since the search"), cancellationToken).ConfigureAwait(false);
-                }
-
-                if (!approvals.SequenceEqual(snapshot.PredicateFieldSearchApprovalIds) || !conditions.Select(c => c.Operator).SequenceEqual(snapshot.PredicateOperatorNames, StringComparer.Ordinal))
-                {
-                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("searchability changed since the search"), cancellationToken).ConfigureAwait(false);
-                }
-
-                // Check 6: projection revision and form state.
-                if (facts.FormContentRevision != snapshot.SnapshotFormContentRevision)
-                {
-                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("records of the form changed since the search"), cancellationToken).ConfigureAwait(false);
-                }
-
-                // Checks 7-9: fresh SpiceDB decisions, I-2 and the seal on the page's records, edit flags.
-                var ids = positions.Select(p => p.FormRecordId).ToList();
-                var valueTypes = conditions.GroupBy(c => c.FieldDefinitionId).ToDictionary(g => g.Key, g => g.First().ValueType);
-                IReadOnlyList<SpiceDbCheckOutcome> discover = ids.Count == 0 ? [] : await verifier.CheckBulkStrictAsync(pin, ids.Select(id => new SpiceDbCheck(ResourceTypeNames.FormRecord, id.ToString("D"), "discover", ResourceTypeNames.User, subject)).ToList(), cancellationToken).ConfigureAwait(false);
-                IReadOnlyList<SpiceDbCheckOutcome> readAll = ids.Count == 0 ? [] : await verifier.CheckBulkStrictAsync(pin, ids.Select(id => new SpiceDbCheck(ResourceTypeNames.FormRecord, id.ToString("D"), "read", ResourceTypeNames.User, subject)).ToList(), cancellationToken).ConfigureAwait(false);
-                if (discover.Any(o => o != SpiceDbCheckOutcome.Allowed))
-                {
-                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("access changed since the search"), cancellationToken).ConfigureAwait(false);
-                }
-
-                // C-141 (UF-25, U-1b): the page's share-only records are re-decided exactly as the search decided them, from the caller's
-                // own grants and the accepted item counts (the same rule; no limit on a page, as before).
-                var shareOnlyIds = ids.Where((_, i) => readAll[i] != SpiceDbCheckOutcome.Allowed).ToList();
-                var times = (await read.ReadScopeAsync(query.FormDefinitionId, ids, [], cancellationToken).ConfigureAwait(false)).ToDictionary(r => r.FormRecordId);
-                if (ids.Any(id => !times.ContainsKey(id)))
-                {
-                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("records of the form changed since the search"), cancellationToken).ConfigureAwait(false);
-                }
-
-                var predicateFields = PredicateFields(conditions, approvals);
-                var approvalByField = ApprovalByField(predicateFields);
-                ShareOnlyDecision pageDecision;
-                try
-                {
-                    pageDecision = await EvaluateShareOnlyAsync(read, pin, subject, bound.AuthorityUserId, organizationId, shareOnlyIds.Select(id => times[id]).ToList(), predicateFields, enforceLimit: false, "indexed-search-page", correlationId, cancellationToken).ConfigureAwait(false);
-                }
-                catch (AuthorityException ex) when (ex.ErrorCode == IndexedSearchErrorCodes.IndexNotReady)
-                {
-                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, ex, cancellationToken).ConfigureAwait(false);
-                }
-
-                if (shareOnlyIds.Any(id => !pageDecision.Evaluable.Contains(id)))
-                {
-                    throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("access changed since the search"), cancellationToken).ConfigureAwait(false);
-                }
-
-                var bindings = (await read.ReadBindingDataAsync(ids, valueTypes.Keys.ToList(), cancellationToken).ConfigureAwait(false)).ToDictionary(b => b.Entry.FormRecordId);
-                var headers = new Dictionary<Guid, DerivedHeaderFacts>();
-                foreach (var id in ids)
-                {
-                    if (bindings.GetValueOrDefault(id) is { HeadQuarantined: true })
+                    var facts = await read.ReadStateAsync(query.FormDefinitionId, cancellationToken).ConfigureAwait(false);
+                    await RequireConsistentStateAsync(organizationId, facts, state, cancellationToken).ConfigureAwait(false);
+                    // Check 5: searchability revalidated explicitly (approval ids still Active, operators, coverage, query_fields).
+                    Guid[] approvals;
+                    try
                     {
-                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, new AuthorityException(IndexedSearchErrorCodes.RecordQuarantined, 503, false, "a record on this page is quarantined"), cancellationToken).ConfigureAwait(false);
+                        approvals = AuthorizePredicates(conditions, facts, mayQuery, policy?.PlaintextSearchPermitted ?? false);
+                    }
+                    catch (AuthorityException ex) when (ex.ErrorCode is IndexedSearchErrorCodes.FieldNotAllowed or IndexedSearchErrorCodes.OperatorNotSupported or IndexedSearchErrorCodes.IndexNotReady)
+                    {
+                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("searchability changed since the search"), cancellationToken).ConfigureAwait(false);
                     }
 
-                    var verified = bindings.TryGetValue(id, out var binding) ? IndexedSearchBinding.VerifyMatch(binding, conditions, valueTypes) : new IndexedMatchVerification(false, "MATCH_BINDING_DATA_MISSING", null);
-                    if (!verified.Bound || !MetadataMatches(query, verified.Header!))
+                    if (!approvals.SequenceEqual(snapshot.PredicateFieldSearchApprovalIds) || !conditions.Select(c => c.Operator).SequenceEqual(snapshot.PredicateOperatorNames, StringComparer.Ordinal))
                     {
-                        throw await QuarantineIndexAsync(organizationId, verified.FindingCode ?? "MATCH_METADATA_MISMATCH", cancellationToken).ConfigureAwait(false);
+                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("searchability changed since the search"), cancellationToken).ConfigureAwait(false);
                     }
 
-                    if (shareOnlyIds.Contains(id) && ShareOnlyReadability.VerifyBoundRecord(binding!, approvalByField, pageDecision.ConfirmedItemsByRecord.GetValueOrDefault(id)) is { } shareFinding)
+                    // Check 6: projection revision and form state.
+                    if (facts.FormContentRevision != snapshot.SnapshotFormContentRevision)
                     {
-                        throw await QuarantineIndexAsync(organizationId, shareFinding, cancellationToken).ConfigureAwait(false);
+                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("records of the form changed since the search"), cancellationToken).ConfigureAwait(false);
                     }
 
-                    headers[id] = verified.Header!;
+                    // Checks 7-9: fresh SpiceDB decisions, I-2 and the seal on the page's records, edit flags.
+                    var ids = positions.Select(p => p.FormRecordId).ToList();
+                    var valueTypes = conditions.GroupBy(c => c.FieldDefinitionId).ToDictionary(g => g.Key, g => g.First().ValueType);
+                    IReadOnlyList<SpiceDbCheckOutcome> discover = ids.Count == 0 ? [] : await verifier.CheckBulkStrictAsync(pin, ids.Select(id => new SpiceDbCheck(ResourceTypeNames.FormRecord, id.ToString("D"), "discover", ResourceTypeNames.User, subject)).ToList(), cancellationToken).ConfigureAwait(false);
+                    IReadOnlyList<SpiceDbCheckOutcome> readAll = ids.Count == 0 ? [] : await verifier.CheckBulkStrictAsync(pin, ids.Select(id => new SpiceDbCheck(ResourceTypeNames.FormRecord, id.ToString("D"), "read", ResourceTypeNames.User, subject)).ToList(), cancellationToken).ConfigureAwait(false);
+                    if (discover.Any(o => o != SpiceDbCheckOutcome.Allowed))
+                    {
+                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("access changed since the search"), cancellationToken).ConfigureAwait(false);
+                    }
+
+                    // C-141 (UF-25, U-1b): the page's share-only records are re-decided exactly as the search decided them, from the caller's
+                    // own grants and the accepted item counts (the same rule; no limit on a page, as before).
+                    var shareOnlyIds = ids.Where((_, i) => readAll[i] != SpiceDbCheckOutcome.Allowed).ToList();
+                    var times = (await read.ReadScopeAsync(query.FormDefinitionId, ids, [], cancellationToken).ConfigureAwait(false)).ToDictionary(r => r.FormRecordId);
+                    if (ids.Any(id => !times.ContainsKey(id)))
+                    {
+                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("records of the form changed since the search"), cancellationToken).ConfigureAwait(false);
+                    }
+
+                    await RequireNoDerivationDowngradeAsync(scope, organizationId, query.FormDefinitionId, [.. times.Values], "PAGE_", cancellationToken).ConfigureAwait(false);
+                    var predicateFields = PredicateFields(conditions, approvals);
+                    var approvalByField = ApprovalByField(predicateFields);
+                    ShareOnlyDecision pageDecision;
+                    try
+                    {
+                        pageDecision = await EvaluateShareOnlyAsync(read, pin, subject, bound.AuthorityUserId, organizationId, shareOnlyIds.Select(id => times[id]).ToList(), predicateFields, enforceLimit: false, "indexed-search-page", correlationId, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (AuthorityException ex) when (ex.ErrorCode == IndexedSearchErrorCodes.IndexNotReady)
+                    {
+                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, ex, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    if (shareOnlyIds.Any(id => !pageDecision.Evaluable.Contains(id)))
+                    {
+                        throw await InvalidateAsync(snapshot.SearchResultSnapshotId, Changed("access changed since the search"), cancellationToken).ConfigureAwait(false);
+                    }
+
+                    var bindings = (await read.ReadBindingDataAsync(ids, valueTypes.Keys.ToList(), cancellationToken).ConfigureAwait(false)).ToDictionary(b => b.Entry.FormRecordId);
+                    var headers = new Dictionary<Guid, DerivedHeaderFacts>();
+                    foreach (var id in ids)
+                    {
+                        if (bindings.GetValueOrDefault(id) is { HeadQuarantined: true })
+                        {
+                            throw await InvalidateAsync(snapshot.SearchResultSnapshotId, new AuthorityException(IndexedSearchErrorCodes.RecordQuarantined, 503, false, "a record on this page is quarantined"), cancellationToken).ConfigureAwait(false);
+                        }
+
+                        var verified = bindings.TryGetValue(id, out var binding) ? IndexedSearchBinding.VerifyMatch(binding, conditions, valueTypes) : new IndexedMatchVerification(false, "MATCH_BINDING_DATA_MISSING", null);
+                        if (!verified.Bound || !MetadataMatches(query, verified.Header!))
+                        {
+                            throw await QuarantineIndexAsync(organizationId, verified.FindingCode ?? "MATCH_METADATA_MISMATCH", cancellationToken).ConfigureAwait(false);
+                        }
+
+                        if (shareOnlyIds.Contains(id) && ShareOnlyReadability.VerifyBoundRecord(binding!, approvalByField, pageDecision.ConfirmedItemsByRecord.GetValueOrDefault(id)) is { } shareFinding)
+                        {
+                            throw await QuarantineIndexAsync(organizationId, shareFinding, cancellationToken).ConfigureAwait(false);
+                        }
+
+                        headers[id] = verified.Header!;
+                    }
+
+                    page = await VerifyPageAsync(read, pin, subject, organizationId, ids, conditions, valueTypes, facts.Approvals, cancellationToken).ConfigureAwait(false);
+                    page = page.Select(item => item with
+                    {
+                        RecordStatusName = headers[item.FormRecordId].RecordStatusName,
+                        ParentFormRecordId = headers[item.FormRecordId].ParentFormRecordId,
+                        CreatedByBusinessUserId = headers[item.FormRecordId].CreatedByUserId,
+                        RecordRegisteredOn = times[item.FormRecordId].RecordRegisteredOn,
+                        ContentHeadModifiedOn = times[item.FormRecordId].ContentHeadModifiedOn ?? times[item.FormRecordId].RecordRegisteredOn,
+                    }).ToList();
                 }
-
-                page = await VerifyPageAsync(read, pin, subject, organizationId, ids, conditions, valueTypes, facts.Approvals, cancellationToken).ConfigureAwait(false);
-                page = page.Select(item => item with
-                {
-                    RecordStatusName = headers[item.FormRecordId].RecordStatusName,
-                    ParentFormRecordId = headers[item.FormRecordId].ParentFormRecordId,
-                    CreatedByBusinessUserId = headers[item.FormRecordId].CreatedByUserId,
-                    RecordRegisteredOn = times[item.FormRecordId].RecordRegisteredOn,
-                    ContentHeadModifiedOn = times[item.FormRecordId].ContentHeadModifiedOn ?? times[item.FormRecordId].RecordRegisteredOn,
-                }).ToList();
+            }
+            catch (ProjectionContradictionException)
+            {
+                contradiction = true; // C-142: classified only after this pin's single completion below (Q4)
             }
 
             if (!await verifier.CompleteAsync(pin, "indexed-search-page", cancellationToken).ConfigureAwait(false))
             {
                 throw Changed("authorization state moved during the page");
+            }
+
+            if (contradiction)
+            {
+                throw await QuarantineIndexAsync(organizationId, ProjectionContradictionException.FindingCode, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -532,13 +561,10 @@ public sealed class IndexedSearchService(
             if (outcomes.Any(o => o != SpiceDbCheckOutcome.Allowed))
             {
                 probe?.ShareOnlyStep(correlationId, new ShareOnlyProbeObservation(path, counts.Count, candidates.Count, checks, 0, "CANDIDATE_DENIED"));
-                // Q4 (§17.2, FD-4): a SpiceDB decision contradicts an access row of the same authorization revision.
-                if (!await verifier.CompleteAsync(pin, path + "-q4", cancellationToken).ConfigureAwait(false))
-                {
-                    throw Changed("authorization state moved during the search");
-                }
-
-                throw await QuarantineIndexAsync(organizationId, "SHARE_CANDIDATE_DENIED_BY_PROJECTION", cancellationToken).ConfigureAwait(false);
+                // Q4 (§17.2, FD-4): a SpiceDB decision contradicts an access row of the same authorization revision. The caller leaves the
+                // reader, runs this pin's one S1 verification (which quarantines the organization on a projection mismatch, or reports a
+                // move), and only then, with S1 consistent, quarantines the search index (C-142: one completion per pin).
+                throw new ProjectionContradictionException();
             }
         }
 
@@ -550,6 +576,37 @@ public sealed class IndexedSearchService(
         }
 
         return decision;
+    }
+
+    /// <summary>
+    /// C-142 (R-48): an entry older than the current derivation version in a form that the journal shows was already attested
+    /// Complete at the version with item counts cannot be legitimate (a forged downgrade): the index is quarantined, never answered
+    /// as "not ready" and never left for an ordinary re-derivation. Genuine legacy entries (no such attestation) continue to the
+    /// existing rules (version 1: I-1 finding; version 2: not ready for a share-only decision, upgraded by S-A).
+    /// </summary>
+    private async Task RequireNoDerivationDowngradeAsync(IAuthorityScope scope, Guid organizationId, Guid formDefinitionId, IReadOnlyList<SearchScopeRecordFacts> records, string prefix, CancellationToken cancellationToken)
+    {
+        if (!records.Any(r => r.EntryIndexedOperationId is not null && r.EntryDerivationVersion < SearchPostingDerivationV1.CurrentEntryDerivationVersion))
+        {
+            return;
+        }
+
+        var attested = await scope.SearchIndex.GetFormsAttestedAtDerivationVersionAsync(organizationId, SearchPostingDerivationV1.FieldItemCountEntryDerivationVersion, cancellationToken).ConfigureAwait(false);
+        if (attested.Contains(formDefinitionId))
+        {
+            throw await QuarantineIndexAsync(organizationId, prefix + SearchIndexSweepService.DowngradeFinding, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>C-142: raised inside a reader block when SpiceDB denies a granted candidate; classified after the pin's completion (Q4).</summary>
+    private sealed class ProjectionContradictionException : Exception
+    {
+        public const string FindingCode = "SHARE_CANDIDATE_DENIED_BY_PROJECTION";
+
+        public ProjectionContradictionException()
+            : base("a SpiceDB decision contradicts the Authority's access rows at the pinned revision")
+        {
+        }
     }
 
     /// <summary>The distinct predicate fields with their value type and the condition's current Active approval.</summary>

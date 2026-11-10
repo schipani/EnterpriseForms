@@ -41,6 +41,9 @@ public sealed record DeadlineEvaluationResult(bool Suspended, IReadOnlyList<stri
 public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWriter writer, SearchSealVerifier verifier, SearchIndexOptions options, TimeProvider clock, ISecurityAlertSink alerts)
 {
     public const string CheapSweep = "S-A";
+
+    /// <summary>C-142 (R-48): an entry older than the version its form was attested at.</summary>
+    public const string DowngradeFinding = "ENTRY_DERIVATION_DOWNGRADED";
     public const string SealSweep = "S-B";
     public const string DeepSweep = "S-C";
 
@@ -119,7 +122,26 @@ public sealed class SearchIndexSweepService(IAuthorityStore store, SearchIndexWr
         // fresh attestation re-establishes Complete. Until then indexed search answers 503 not ready for those fields. Nothing is
         // re-derived, re-signed or repaired here; the change is journaled and alerted. A version 2 entry that carries counts is not
         // an upgrade: the cheap checks below report it as a finding.
-        var upgrading = await index.GetFormsAwaitingDerivationUpgradeAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        // C-142 (R-48): the boundary between a genuine legacy entry and a forged downgrade is the journal, not the entry row. A form
+        // that already has a Complete attestation written at version 3 can hold no legitimate older entry: any is a downgrade, a
+        // Fail that quarantines the index (only a journaled SearchProjectionRebuild clears it); it is never quietly re-derived.
+        var outdated = await index.GetFormsWithOutdatedEntriesAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        var upgrading = new List<Guid>();
+        if (outdated.Count > 0)
+        {
+            var attested = await index.GetFormsAttestedAtDerivationVersionAsync(organizationId, SearchPostingDerivationV1.FieldItemCountEntryDerivationVersion, cancellationToken).ConfigureAwait(false);
+            if (outdated.Any(f => attested.Contains(f.FormDefinitionId)))
+            {
+                Quarantine(scope, state, projection, DowngradeFinding, now);
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                RaiseQuarantine(organizationId, DowngradeFinding);
+                return new SweepPassResult(CheapSweep, SweepUnitOutcome.Fail, 0, 0, DowngradeFinding);
+            }
+
+            var complete = (await index.GetCoveragesAsync(organizationId, null, cancellationToken).ConfigureAwait(false)).Where(c => c.CoverageStateName == SearchCoverageStates.Complete).Select(c => c.FormDefinitionId).ToHashSet();
+            upgrading.AddRange(outdated.Where(f => f.HasUpgradableEntry && complete.Contains(f.FormDefinitionId)).Select(f => f.FormDefinitionId));
+        }
+
         if (upgrading.Count > 0)
         {
             var returned = 0;

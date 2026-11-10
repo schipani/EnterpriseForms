@@ -162,10 +162,26 @@ internal sealed class InMemorySearchIndexStore(InMemoryAuthorityStore s) : ISear
         return Task.FromResult(new CheapSweepFindings(notAtHead, inactive, unbound, withdrawn, noCoverage, crossOrganization, unsealed, missing, countMismatch));
     }
 
-    public Task<IReadOnlyList<Guid>> GetFormsAwaitingDerivationUpgradeAsync(Guid organizationId, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<Guid>>(Entries.Where(e => e.OrganizationId == organizationId && e.EntryDerivationVersion == 2 && e.DerivedFieldItemCounts is null
-                                                               && Coverages.Any(c => c.OrganizationId == organizationId && c.FormDefinitionId == e.FormDefinitionId && c.CoverageStateName == SearchCoverageStates.Complete))
-            .Select(e => e.FormDefinitionId).Distinct().Order().ToList());
+    public Task<IReadOnlyList<(Guid FormDefinitionId, bool HasUpgradableEntry)>> GetFormsWithOutdatedEntriesAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<(Guid, bool)>>(Entries.Where(e => e.OrganizationId == organizationId && e.EntryDerivationVersion < 3).GroupBy(e => e.FormDefinitionId).OrderBy(g => g.Key)
+            .Select(g => (g.Key, g.Any(e => e.EntryDerivationVersion == 2 && e.DerivedFieldItemCounts is null))).ToList());
+
+    public Task<IReadOnlySet<Guid>> GetFormsAttestedAtDerivationVersionAsync(Guid organizationId, int minimumDerivationVersion, CancellationToken cancellationToken)
+    {
+        var forms = new HashSet<Guid>();
+        foreach (var entry in s.Journal.Where(j => j.OrganizationId == organizationId && j.JournalEventKind == "SearchIndexCoverageAttested"))
+        {
+            using var body = System.Text.Json.JsonDocument.Parse(entry.JournalEventBodyJson);
+            var root = body.RootElement.GetProperty("body"); // the hash-chained envelope (JournalChain) carries the event under "body"
+            if (root.TryGetProperty("coverage_complete", out var complete) && complete.ValueKind == System.Text.Json.JsonValueKind.True
+                && root.TryGetProperty("attesting_entry_derivation_version", out var version) && version.ValueKind == System.Text.Json.JsonValueKind.Number && version.GetInt32() >= minimumDerivationVersion)
+            {
+                forms.Add(root.GetProperty("form_definition_id").GetGuid());
+            }
+        }
+
+        return Task.FromResult<IReadOnlySet<Guid>>(forms);
+    }
 
     public async Task<IReadOnlyList<Guid>> DeleteEntriesNotAtHeadAsync(Guid organizationId, CancellationToken cancellationToken)
     {

@@ -114,6 +114,18 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
 
         var required = await RequiredApprovalIdsAsync(index, state.OrganizationId, request.FormDefinitionId, cancellationToken).ConfigureAwait(false);
         var existing = (await index.GetFormEntriesAsync(state.OrganizationId, request.FormDefinitionId, request.Records.Select(r => r.FormRecordId).ToList(), cancellationToken).ConfigureAwait(false)).ToDictionary(e => e.FormRecordId);
+        // C-142 (R-48): an older entry in a form already attested at version 3 is a forged downgrade. It is never overwritten by an
+        // ordinary re-derivation (which would erase the evidence): the index is quarantined, exactly as S-A would.
+        if (existing.Values.Any(e => e.EntryDerivationVersion < SearchPostingDerivationV1.CurrentEntryDerivationVersion)
+            && (await index.GetFormsAttestedAtDerivationVersionAsync(state.OrganizationId, SearchPostingDerivationV1.FieldItemCountEntryDerivationVersion, cancellationToken).ConfigureAwait(false)).Contains(request.FormDefinitionId))
+        {
+            var projection = await RequireServableProjectionAsync(index, state.OrganizationId, cancellationToken).ConfigureAwait(false);
+            SearchIndexStateTransitions.Quarantine(scope, state, projection, SearchIndexSweepService.DowngradeFinding, clock.GetUtcNow(), clock);
+            await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            SearchIndexStateTransitions.RaiseQuarantine(alerts, state.OrganizationId, SearchIndexSweepService.DowngradeFinding);
+            throw new AuthorityException(AuthorityErrorCodes.SearchIndexQuarantined, 409, false, "the search index is quarantined; a SearchProjectionRebuild is required");
+        }
+
         var context = new ContentService.WorkloadVerificationContext(workloadName, null, correlationId);
         var results = new List<SearchIndexBackfillResult>(request.Records.Count);
         var changed = false;
@@ -215,6 +227,8 @@ public sealed class SearchIndexBuilderService(IAuthorityStore store, ContentServ
                 organization_id = state.OrganizationId, form_definition_id = request.FormDefinitionId, coverage_complete = complete, incomplete_reason_code = reason,
                 registered_records = population.Count, contentful_records = contentful, indexed_records = indexed, missing_records = missing, quarantined_records = quarantined, pending_records = pending,
                 building_coverages = building.Select(c => c.SearchFieldCoverageId).Order().ToList(), authorization_revision = state.AuthorizationRevision, content_integrity_revision = state.ContentIntegrityRevision,
+                // C-142 (R-48): the derivation boundary. Complete is attested only when every contentful record is indexed at this version.
+                attesting_entry_derivation_version = SearchPostingDerivationV1.CurrentEntryDerivationVersion,
                 workload_name = workloadName, correlation_id = correlationId,
             }, clock);
             attestedJournalEntryId = journal.SecurityJournalEntryId;

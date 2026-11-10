@@ -109,6 +109,123 @@ public sealed class ShareOnlyReadabilityTests
         Assert.Equal((SweepUnitOutcome.Fail, "ENTRY_FIELD_ITEM_COUNT_MISMATCH"), (finding.Outcome, finding.FindingCode));
     }
 
+    // ---- C-142 R-48: authenticated derivation boundary ------------------------------------------------------------------------
+
+    private const string Workload = "search-index-builder";
+
+    /// <summary>A form attested Complete by this image: its attestation event carries the attesting derivation version 3.</summary>
+    private static async Task<Guid> AttestedRecordAsync(SearchIndexTests.Harness h)
+    {
+        await h.ApproveStandardFieldsAsync();
+        var record = h.Record();
+        await h.WriteAsync(record);
+        var attestation = await h.Builder.AttestAsync(Workload, new AuthorizationAuthority.Contracts.V1.SearchIndexAttestationRequest(h.Org, h.Form), Guid.CreateVersion7(), Ct);
+        Assert.True(attestation.CoverageComplete);
+        Assert.Contains(h.Store.Journal, j => j.JournalEventKind == "SearchIndexCoverageAttested" && j.JournalEventBodyJson.Contains("\"attesting_entry_derivation_version\":3", StringComparison.Ordinal));
+        Assert.Contains(h.Form, await h.Index.GetFormsAttestedAtDerivationVersionAsync(h.Org, 3, Ct));
+        return record;
+    }
+
+    [Fact]
+    public async Task R48AForgedDowngradeInAnAttestedFormIsQuarantinedAndNotUpgradedByTheCheapPass()
+    {
+        using var h = new SearchIndexTests.Harness();
+        var record = await AttestedRecordAsync(h);
+        var entry = h.Entry(record);
+        entry.EntryDerivationVersion = 2; // what a search-schema writer can do: the version and counts are not in the seal message
+        entry.DerivedFieldItemCounts = null;
+        var journal = h.Store.Journal.Count;
+
+        var pass = await h.Sweep.RunCheapPassAsync(h.Org, Ct);
+        Assert.Equal((SweepUnitOutcome.Fail, SearchIndexSweepService.DowngradeFinding), (pass.Outcome, pass.FindingCode));
+        Assert.Equal(SearchProjectionStatuses.Quarantined, h.Projection.ProjectionStatusName);
+        Assert.DoesNotContain(h.Store.Journal.Skip(journal), j => j.JournalEventKind == "SearchIndexDerivationUpgradeStarted");
+        Assert.All(h.Index.Coverages.Where(c => c.CoverageStateName != SearchCoverageStates.Withdrawn), c => Assert.Equal(SearchCoverageStates.Complete, c.CoverageStateName)); // not returned to Building
+        Assert.Equal(2, h.Entry(record).EntryDerivationVersion); // the evidence is left in place
+    }
+
+    [Fact]
+    public async Task R48TheBuilderRefusesToOverwriteADowngradedEntryInAnAttestedForm()
+    {
+        using var h = new SearchIndexTests.Harness();
+        var record = await AttestedRecordAsync(h);
+        var entry = h.Entry(record);
+        entry.EntryDerivationVersion = 2;
+        entry.DerivedFieldItemCounts = null;
+
+        var refused = await Assert.ThrowsAsync<AuthorizationAuthority.Application.Common.AuthorityException>(() => h.Builder.BackfillAsync(Workload,
+            new AuthorizationAuthority.Contracts.V1.SearchIndexBackfillRequest(h.Org, h.Form, [new AuthorizationAuthority.Contracts.V1.SearchIndexBackfillItem(record, h.Head(record).CommittedOperationId!.Value, h.Accepted[record])]), Guid.CreateVersion7(), Ct));
+        Assert.Equal(AuthorizationAuthority.Application.Common.AuthorityErrorCodes.SearchIndexQuarantined, refused.ErrorCode);
+        Assert.Equal(SearchProjectionStatuses.Quarantined, h.Projection.ProjectionStatusName);
+        Assert.Equal(SearchIndexSweepService.DowngradeFinding, h.Projection.ProjectionStatusReasonCode);
+        Assert.Equal(2, h.Entry(record).EntryDerivationVersion); // not re-derived
+    }
+
+    [Fact]
+    public async Task R48AGenuineLegacyFormHasNoVersion3AttestationAndIsStillUpgraded()
+    {
+        // The boundary is the journal: an attestation written before C-142 (no attesting version) does not mark the form.
+        using var h = new SearchIndexTests.Harness();
+        await h.ApproveStandardFieldsAsync();
+        var record = h.Record();
+        await h.WriteAsync(record);
+        h.Store.Journal.Add(new AuthorizationAuthority.Domain.Features.Journal.SecurityJournalEntry
+        {
+            SecurityJournalEntryId = Guid.CreateVersion7(), OrganizationId = h.Org, JournalStreamName = "audit", JournalEventKind = "SearchIndexCoverageAttested",
+            JournalEventBodyJson = $$$"""{"envelope_format":"DynamicForms/SecurityJournal/v1","event_kind":"SearchIndexCoverageAttested","body":{"organization_id":"{{{h.Org:D}}}","form_definition_id":"{{{h.Form:D}}}","coverage_complete":true}}""",
+        });
+        foreach (var coverage in h.Index.Coverages)
+        {
+            coverage.CoverageStateName = SearchCoverageStates.Complete;
+        }
+
+        var entry = h.Entry(record);
+        entry.EntryDerivationVersion = 2;
+        entry.DerivedFieldItemCounts = null;
+        Assert.DoesNotContain(h.Form, await h.Index.GetFormsAttestedAtDerivationVersionAsync(h.Org, 3, Ct));
+        var pass = await h.Sweep.RunCheapPassAsync(h.Org, Ct);
+        Assert.Equal(SweepUnitOutcome.Pass, pass.Outcome);
+        Assert.Contains(h.Store.Journal, j => j.JournalEventKind == "SearchIndexDerivationUpgradeStarted");
+        Assert.All(h.Index.Coverages, c => Assert.Equal(SearchCoverageStates.Building, c.CoverageStateName));
+    }
+
+    // ---- C-142 R-47: what a tampered count can and cannot do ---------------------------------------------------------------
+
+    /// <summary>
+    /// For a share-only record with n indexed items of the predicate field, r of them readable, and a stored count s: a count that
+    /// would make a partly readable record evaluable is always caught on bound data before release; a count below the readable
+    /// items is a finding; a count above the truth only excludes the record (an omission), and is then a recount mismatch for the
+    /// sweeps (S-A, S-B). No value of s releases a record whose predicate items are not all readable.
+    /// </summary>
+    [Fact]
+    public void R47NoStoredCountReleasesAPartlyReadableRecord()
+    {
+        Guid field = Guid.CreateVersion7(), approval = Guid.CreateVersion7(), record = Guid.CreateVersion7();
+        var predicate = new Dictionary<Guid, Guid> { [field] = approval };
+        for (var n = 0; n <= 4; n++)
+        {
+            for (var r = 0; r <= n; r++)
+            {
+                var items = Enumerable.Range(0, n).Select(_ => Guid.CreateVersion7()).ToList();
+                var readable = items.Take(r).ToHashSet();
+                for (var s = 0; s <= n + 2; s++)
+                {
+                    var counts = new ShareOnlyRecordCounts(record, 3, [approval], [s]);
+                    var decision = ShareOnlyReadability.Decide([counts], predicate, [.. readable.Select(i => new ShareReadableItem(record, field, i, approval))]);
+                    var bound = new SearchRecordBindingData(
+                        new SearchRecordEntry { FormRecordId = record, EntryDerivationVersion = 3, DerivedFieldSearchApprovalIds = [approval], DerivedFieldItemCounts = [s] },
+                        [.. items.Select(i => new SearchOptionPosting { FormRecordId = record, FieldDefinitionId = field, ManifestItemId = i, FieldSearchApprovalId = approval })], [], 1, null, [], false, null, null, null, []);
+                    var released = decision.Outcome == ShareOnlyOutcome.Decided && decision.Evaluable.Contains(record)
+                                   && ShareOnlyReadability.VerifyBoundRecord(bound, predicate, decision.ConfirmedItemsByRecord.GetValueOrDefault(record)) is null;
+                    Assert.True(!released || r == n, $"n={n} r={r} s={s}: a partly readable record was released");
+                    Assert.Equal(s == n && r == n, released); // the honest case, and only it
+                    var sweepsDetect = !SearchFieldItemCounts.MatchPostings(bound.Entry, items.Select(_ => approval));
+                    Assert.Equal(s != n, sweepsDetect);
+                }
+            }
+        }
+    }
+
     [Fact]
     public void TheCountHelpersAlignWithTheApprovalsAndRefuseAmbiguity()
     {
