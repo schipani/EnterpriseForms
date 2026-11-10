@@ -1,6 +1,6 @@
 # Indexed search Tier 2 (IX-5): independent security and architecture review package
 
-- **Status:** **prepared for a qualified independent reviewer (C-138 IX5-D1, review-first). NOT SUBMITTED. NOT REVIEWED. No review attestation exists.** This supplements the FD-8 package ([INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md](INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md)), whose question 5 (J-6) is the Tier 2 subject; it does not replace it. A reviewer receives both.
+- **Status:** **finalized for handoff to a qualified independent reviewer (C-143; C-138 IX5-D1, review-first). NOT SUBMITTED. NOT REVIEWED. No review attestation exists.** This supplements the FD-8 package ([INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md](INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md)), whose question 5 (J-6) is the Tier 2 subject; it does not replace it. A reviewer receives both.
 - **Independence notice:**
   * This package was written by the design agent (Claude, Opus) for the project owner.
   * Neither Claude nor the owner is independent.
@@ -29,7 +29,37 @@
     - no verification catch-up wait in search requests (§14A.5);
     - partially shared field semantics are unchanged.
   * **FD-5 draft A1 to A6 is not approved as written** (§14A.2: the inconsistency, and alternative FD-5-ALT for owner decision).
-- **Implementation still needs a separate owner approval after the review** (C-138 §2, C-139 §8, C-140, C-141).
+- **Implementation still needs a separate owner approval after the review** (C-138 §2, C-139 §8, C-140, C-141, C-143).
+- **C-143 (owner, 2026-11-10; owner-led, not an independent review):**
+  * C-142 accepted: R-48 and R-51 corrected, the snapshot-lifecycle invariant restored.
+  * R-47's delayed-detection model is accepted conditionally, subject to this review; no signature-format change.
+  * **FD-5-ALT is approved as the preferred IX-5 design for independent review**, not for implementation.
+  * B2 remains preferred, with C as the baseline.
+  * No arbitrary copy cap and no physical per-organization partitions without evidence.
+  * The existing sweep deadlines are retained until an approved replacement.
+  * UF-25 stays open pending this review.
+  * R-52 corrected (§14C).
+  * **This package is finalized for external handoff. It has not been sent, and no independent review has occurred.** Cover note: [INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md](INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md).
+
+## 0. Handoff index (where each review subject is)
+
+| Subject | Where |
+|---|---|
+| B2 access-scoped value indexing; Option C baseline; B1 rejection; A rejected | Annex A §6–§15 (B2 §10, C §7 and §14, recommendation §15); §4 |
+| SAFE-1 to SAFE-11 | Annex A §10.5; §14A.1 |
+| FD-5-ALT asynchronous journal maintenance | §14A.2 (the A1–A6 inconsistency, then the FD-5-ALT security specification) |
+| Authorization and content checkpoint consistency | §14A.2 FD-5-ALT table (checkpoints, consistency, recovery, replay) |
+| Timing leakage from fallback and organization activity | §14A.2 (fallback timing risk), §14A.5, TQ-23; UF-28 (§9, §14A.3) |
+| Multi-path field sharing | Annex A §10.3 and §11 (INV-T2-13), TQ-16; §14A.3a (the distinct-items rule implemented in Tier 1) |
+| Revocation correctness | §14A.2 FD-5-ALT (revocation row), §14A.5, §10 (failure scenarios), §8 |
+| Copy amplification | Annex A §13; §14A.3 (counting rules; no cap approved) |
+| `LookupSubjects` limitations | Annex E §1, §5, §5A; E-6 and E-10 (§14) missing |
+| Sweep and verification requirements | Annex D §2, §4A; §14A.6; design §17.10 (deadlines retained, C-143) |
+| UF-25 residual risks | UF-25 document §8.6 and §9; register R-46 to R-51 |
+| R-52 remediation evidence | §14C; evidence register R-52 |
+| Open production and performance gates | §14B |
+| Questions for the reviewer | §13 (TQ-1 to TQ-24) |
+
 
 ## 1. Documents
 
@@ -44,7 +74,8 @@
 | **Annex D** [INDEXED_SEARCH_TIER2_FULL_SWEEP_ASSESSMENT.md](INDEXED_SEARCH_TIER2_FULL_SWEEP_ASSESSMENT.md) | Seven-day full-sweep (M2) risk assessment |
 | **Annex E** [INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md](INDEXED_SEARCH_TIER2_LOOKUPSUBJECTS_ASSESSMENT.md) | `LookupSubjects` client interface and cost model |
 | [INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md](INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md) | C-140: UF-25 reproduction, impact assessment, correction U-1 and regression requirements; C-141: U-1b implementation, RQ-1 to RQ-8 results and residuals (§8) |
-| [INDEXED_SEARCH_IX4_EVIDENCE.md](INDEXED_SEARCH_IX4_EVIDENCE.md) §7, §10–§12 | The register (R-01 to R-44) and the measurements cited |
+| [INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md](INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md) | C-143: cover note, the decisions requiring independent assessment |
+| [INDEXED_SEARCH_IX4_EVIDENCE.md](INDEXED_SEARCH_IX4_EVIDENCE.md) §7, §10–§12, §15–§18 | The register (R-01 to R-52) and the measurements cited |
 | [RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md](RECORD_REGISTRATION_THROUGHPUT_R37_RECOMMENDATION.md) §7 | Ingestion findings (dataset feasibility) |
 | `src/authority/AuthorizationAuthority.Infrastructure/SpiceDb/authority.schema.zed` | The permission model the derivation must mirror |
 | `trust_authority/CROSS_SYSTEM_CONSISTENCY_PROTOCOL.md`, `docs/security/PROJECTION_INTEGRITY_S1_OPERATIONS.md` | Revision, projection and S1 rules Tier 2 depends on |
@@ -517,15 +548,48 @@ B2 remains the preferred architecture and C the comparison baseline. **The indep
 | # | Decision or evidence | Status |
 |---|---|---|
 | 1 | Independent security and architecture review of this package (TQ-1 to TQ-24, annexes A to E, the UF-25 document) | **Not started** |
-| 2 | FD-5: FD-5-ALT (§14A.2) accepted as the maintenance model, including its checkpoint design and the TQ-23 fallback-timing residual | Preferred for review (C-142); not approved |
-| 3 | Copy amplification: measured value-row and write bounds; no cap approved (§14A.3) | Open |
-| 4 | Partitioning: logical isolation mandatory; physical partitions only with an operational design (§14A.4) | Open |
-| 5 | Sweep composition and deadlines (§14A.6) | Proposal only |
+| 2 | FD-5: FD-5-ALT (§14A.2) accepted as the maintenance model, including its checkpoint design and the TQ-23 fallback-timing residual | **Approved as the preferred design for review (C-143)**; not approved for implementation |
+| 3 | Copy amplification: measured value-row and write bounds; no cap approved (§14A.3) | Open; no arbitrary cap without evidence (C-143) |
+| 4 | Partitioning: logical isolation mandatory; physical partitions only with an operational design (§14A.4) | Open; not required without evidence (C-143) |
+| 5 | Sweep composition and deadlines (§14A.6) | Existing deadlines retained until an approved replacement (C-143) |
 | 6 | SpiceDB evidence: `LookupSubjects` on the deployed version (E-6), PERF-01 | Missing |
-| 7 | UF-25 closure: R-46 (review), R-47 accepted delayed detection or a seal-bound count (owner), R-48 boundary, R-50, R-51 | R-48/R-51 corrected (C-142); others open |
+| 7 | UF-25 closure: R-46 (review), R-47 delayed detection, R-48 boundary, R-50, R-51, R-52 | R-47 conditionally accepted subject to this review (C-143); R-48, R-51 (C-142) and R-52 (C-143, §14C) corrected; R-46 and R-50 open; **UF-25 open** |
 | 8 | Carried gates: R-02 (20 ms p95, FAIL), R-33, R-36 to R-45, R-43 (100K/250K datasets), G14, Managed HSM, signed checkpoints, Stage B release run, PB-14 | Open |
 | 9 | A separate owner implementation approval naming the reviewed design revision | Not given |
 
+## 14C. R-52: builder journal amplification (corrected, C-143)
+
+- **Root cause.** The builder polls every Building form about every 3 s. On every round, the Authority journaled a `SearchIndexPopulationIssued` event (the first page) and a `SearchIndexCoverageAttested` event, even when the attestation was incomplete for exactly the same reason as last time. A form that can never complete (for example one holding a quarantined record) therefore grew the audit journal without bound. Each event must be archived, so new security commands waited behind the archive (`AUTHORITY_NOT_READY` / `AwaitingArchive`). The C-141 upgrade amplified this by returning such forms to Building.
+- **Correction (state-aware, durable; no rate limit, no new state):**
+  * every incomplete attestation journals a `blocking_state_digest`: SHA-256 over the reason, the counts, the building coverages and each blocking record with its state and head;
+  * every population issuance journals a `population_digest`: required approvals, plus each record's state and head;
+  * under the organization lock, the Authority reads the form's **latest** event of that kind from the append-only, hash-chained journal itself, and does not journal again when the state is unchanged. An unchanged incomplete attestation returns the original failure's journal id;
+  * the attestation is evaluated every time; Complete is never suppressed; any change of state (including A → B → A) is journaled;
+  * the only new persistence is a partial expression index on the journal, an access path (`ix_journal_search_index_form_events`).
+- **Why it is correct across builders, instances and restarts:** the decision reads committed journal state under the organization row lock, so concurrent callers serialize and see the same latest event. Nothing is held in memory.
+- **What it does not change:**
+  * nothing is ever marked attested without a Complete attestation;
+  * record, index and organization quarantines are untouched;
+  * the journal hash chain is untouched (only appends are skipped);
+  * operator rebuild (`SearchProjectionRebuild`) and builder outage recovery behave as before.
+- **Evidence (focused, local Docker; not Stage B).** One permanently blocked form under normal worker polling:
+
+| | Uncorrected image (`27ae7ca`) | Corrected |
+|---|---|---|
+| Attestation events in a ~70 s window | 17 | **0** (the first failure, journaled before the window, remains) |
+| Population events in the window | 17 | **0** |
+| Events from 8 concurrent attestation calls | 8 | **0**; all returned the same incomplete result and journal id |
+| Events after an Authority restart | 2 | **0** |
+| Share (permission change) latency, 10 commands, p50 / max | 358.7 / 367.1 ms | 375.0 / 402.6 ms (no measurable difference at this scale) |
+
+  * At the larger scale seen in C-142 (about 30 blocked forms, about 110 attestation events a minute), the archive backlog delayed permission changes until they failed. That source of events is now zero for unchanged states.
+  * Tests: unit `AttestationJournalSuppressionTests` (5); stack `SearchIndexBuilderStackTests` 12/12 including `R52ABlockedFormJournalsItsFailureOnceAcrossBuildersAndRestarts`; evidence register R-52.
+- **Limitations:**
+  * The builder still polls blocked forms every round: Authority reads under the organization lock, a few milliseconds per form, without journal writes.
+  * The first attestation of each distinct blocked state is still journaled, as required.
+  * A state that keeps changing (for example a large backfill in progress) is journaled at each change; that is bounded by real progress.
+  * The suppression trusts the journal body digest; an appended forgery could only cause extra journaling, never a suppressed new state.
+  * The index adds a small insert cost to the two builder event kinds only.
 ## 15. Findings, verdict and attestation
 
 Use the FD-8 package §8 template (ID, question, severity Critical/High/Medium/Low/Info, finding, evidence, recommendation, design response) with the TQ numbers. Per-question decisions: accept, accept with conditions, or reject with a required change.

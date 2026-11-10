@@ -169,13 +169,13 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "204025a71a9fc72ea4b10d4dfba0a3b482923e1c503dfbccfbf2b86960826812",
-      "bytes": 77734
+      "sha256": "935f40017e5b5e124a3fa994695b695979050b7f9aa74530452b4a745b88bfa4",
+      "bytes": 78927
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
-      "sha256": "a4780026f901fc606d2cbc2b416f4368651d684bf23adef61bc42742b11f387c",
-      "bytes": 15761
+      "sha256": "dbf95b574bd1d561391c3f54c13980c338d0aa36331b49d5cc857508c058db7e",
+      "bytes": 16016
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_PROJECTION_DESIGN.md",
@@ -223,9 +223,14 @@
       "bytes": 11034
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md",
+      "sha256": "737830dd43ce204f312436af4ecf24e30c0d3b78b18eaf4a6a00aafeebb2d9b2",
+      "bytes": 4206
+    },
+    {
       "path": "docs/architecture/INDEXED_SEARCH_TIER2_REVIEW_PACKAGE.md",
-      "sha256": "d52f7f1ff1cfc963a677aa696c62a8f3b95322ba9e10ec8afb7c3a8c2b200dfe",
-      "bytes": 63126
+      "sha256": "8db31e1141666f5d0bb4185986506e4dd1af5f665b04a92e3a6cca0f1e417de6",
+      "bytes": 69722
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_UF25_SHARE_ONLY_ITEM_CHANNEL.md",
@@ -424,8 +429,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "a69705ee1be743c937cc430d4f1da1a9336b66b1a70e8d2cacd703a4140e429f",
-      "bytes": 259554
+      "sha256": "6f2af27458e6a7b552cdc2a9a7f6d596fe959cc53e2efdb23ce7315cb7dab252",
+      "bytes": 261632
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",

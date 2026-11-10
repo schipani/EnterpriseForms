@@ -270,7 +270,7 @@ R-01 to R-29 are carried from the IX-3 report. Changes: R-22 closed for IX-3 dev
 | R-49 | C-141 migration rebuilds the seven record probe indexes non-concurrently (blocks posting writes while it runs); not measured at 100K/250K | **Open** | Before any production deployment: maintenance window or concurrent-build plan, measured |
 | R-50 | Existing business-API defect seen in C-141 testing: after an expired delegated assertion (401), the audit insert violates `ck_audit_events_outcome` and the request surfaces as 503 `STORE_UNAVAILABLE` | **Open, not caused by C-141, not fixed** (out of scope) | Owner to schedule |
 | R-51 | `IX79IX80SessionEndAndSessionTimeoutsRefuseThePage` (line 650) failed intermittently | **Corrected (C-142, `aaf8eef`), test defect:** the snapshot-existence check raced the 5 s purge job after the session change had committed. The change and the check now run in one transaction, with one changed session asserted; the page refusal is unchanged. Repetitions: UF-25 document section 9.5 | None beyond the repetition evidence |
-| R-52 | **New (C-142):** the builder journals every attestation and population attempt for a form that can never complete (for example a form with a quarantined record): about 18 attestations a minute on this stack before C-141, about 110 a minute after the C-141 upgrade returned such forms to Building. Each event needs archiving, so new security commands waited for the archive (`AUTHORITY_NOT_READY`, `AwaitingArchive`), which failed 4 setup steps in one repetition series | **Open:** pre-existing builder behaviour, amplified by the C-141 upgrade policy (it demotes forms that cannot re-attest). Not fixed (outside C-142 scope) | Owner: rate-limit or suppress repeated incomplete attestations, and/or skip the upgrade demotion for forms that cannot re-attest; decide before any deployment |
+| R-52 | The builder journaled every attestation and population attempt for a form that cannot complete (about 18 attestations a minute before C-141, about 110 a minute after the C-141 upgrade on the long-lived stack), so new security commands waited behind the archive (`AwaitingArchive`) | **Corrected (C-143), not independently reviewed:** state-aware suppression decided from the latest journal event of the form (`blocking_state_digest`, `population_digest`), under the organization lock, with a partial journal index as the only new persistence. One blocked form: 17 + 17 events in about 70 s, 8 from 8 concurrent calls and 2 after a restart before the correction; 0, 0, 0 and 0 after it. Section 18 | Independent review (review package section 14C) |
 
 ## 8. French drafts for the PB-14 copy review (not approved; not in the application)
 
@@ -570,3 +570,15 @@ The diagnostics observe and never decide: no decision, ordering, transaction bou
   * `IndexedSearchShareOnlyItemChannelTests` 5/5 twice (`20261110-100304-98f9a3f5`; fresh stack `20261110-103241-ec02cc35`);
   * IX79/IX80: 16 of 16 assertion executions passed, plus 4 setup failures caused by R-52.
 - **Register:** R-47 assessed; R-48 and R-51 corrected; R-52 added; nothing closed or waived. **R-02 remains FAIL.**
+
+## 18. C-143: R-52 corrected; review package finalized for handoff
+
+- **Code (signed local commit `b4e2088`):** `SearchIndexBuilderService` (attestation and population suppression); `ISearchIndexStore.FindLatestFormJournalEventAsync`; migration `AuthorityJournalSearchIndexFormEvents` (partial expression index on the journal).
+- **Runs (focused; not Stage B):**
+  * unit `c143-unit-20261110-111137` (470/470, five new);
+  * before-correction measurement `c143-r52-before-*` (expected assertion failure; numbers recorded);
+  * stack `SearchIndexBuilderStackTests` `20261110-111619-074b4d9f` (12/12);
+  * `SearchIndexFoundationTests` and `IndexedSearchShareOnlyItemChannelTests` (see the decision log).
+- **Measurements:** review package section 14C. Permission-change latency showed no measurable difference with one blocked form (p50 358.7 versus 375.0 ms); the backlog that delayed commands in C-142 needed many blocked forms.
+- **Review package:** finalized for handoff (section 0 handoff index, section 14B checklist, section 14C), with a cover note `INDEXED_SEARCH_TIER2_REVIEWER_COVER_NOTE.md`. **Not sent; no independent review has occurred.**
+- **Register:** R-52 corrected (not closed); nothing waived. R-02 remains FAIL.
