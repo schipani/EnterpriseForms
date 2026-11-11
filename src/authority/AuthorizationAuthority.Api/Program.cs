@@ -109,6 +109,10 @@ public sealed class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseRateLimiter();
+        if (app.Environment.IsEnvironment("Testing"))
+        {
+            AuthorizationAuthority.Api.Features.Health.SpiceDbCallCountingEndpoints.UseSpiceDbCallAttribution(app); // C-149 P-2 (when enabled)
+        }
 
         if (app.Environment.IsDevelopment())
         {
@@ -121,6 +125,7 @@ public sealed class Program
             app.MapTestStackIdentityEndpoints();
             AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchTestingEndpoints(app); // IX-3 plan-shape test
             AuthorizationAuthority.Api.Features.SearchIndex.SearchAccessTestingEndpoints.MapSearchAccessTestingEndpoints(app); // IX-5a
+            AuthorizationAuthority.Api.Features.Health.SpiceDbCallCountingEndpoints.MapSpiceDbCallCountingEndpoints(app); // C-149 P-2
         }
 
         app.MapAuthorizationEndpoints();

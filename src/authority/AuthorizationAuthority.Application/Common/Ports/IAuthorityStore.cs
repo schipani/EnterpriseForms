@@ -27,7 +27,21 @@ public interface IAuthorityStore
 
     /// <summary>C8 M4 S1: every registered organization (the startup marker transition and the periodic integrity check, outside a scope).</summary>
     Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// C-149 (R-55): every registered organization with its three committed journal revisions, in one read-only statement outside
+    /// a scope (no row lock). A background processor compares them with the revisions it last saw settled, to find organizations
+    /// whose state may have moved; the markers are never trusted as the state itself.
+    /// </summary>
+    Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// C-149 (R-55): an organization's committed authorization, content-integrity and audit journal revisions. Every security command,
+/// content commit and audited administrative change (including Tier 1 attestations, reconciliations, rebuilds and Tier 2
+/// rebuilds and quarantines) advances one of them in its own transaction.
+/// </summary>
+public sealed record OrganizationChangeMarker(Guid OrganizationId, long AuthorizationRevision, long ContentIntegrityRevision, long AuditJournalRevision);
 
 public interface IAuthorityScope : IAsyncDisposable
 {

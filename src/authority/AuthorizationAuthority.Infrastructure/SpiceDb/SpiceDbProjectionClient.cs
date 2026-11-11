@@ -5,6 +5,7 @@ using AuthorizationAuthority.Domain.Features.Organizations;
 using AuthorizationAuthority.Domain.Features.SecurityCommands;
 using Authzed.Api.V1;
 using Grpc.Core;
+using Grpc.Core.Interceptors;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Options;
 
@@ -50,7 +51,7 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
     private readonly int bulkCheckMaximumItems;
     private readonly string? configurationError;
 
-    public SpiceDbProjectionClient(IOptions<SpiceDbOptions> options)
+    public SpiceDbProjectionClient(IOptions<SpiceDbOptions> options, SpiceDbCallCounter? callCounter = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         var value = options.Value;
@@ -75,7 +76,9 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
             }
 
             var channel = GrpcChannel.ForAddress((value.UseTls ? "https://" : "http://") + value.Endpoint);
-            return (channel, new PermissionsService.PermissionsServiceClient(channel), new SchemaService.SchemaServiceClient(channel), new Metadata { { "authorization", "Bearer " + value.PresharedKey } });
+            // C-149 (P-2): the measurement-only call counter, when enabled (Development/Testing), sees every call; otherwise nothing.
+            var invoker = callCounter is { Enabled: true } ? channel.Intercept(new SpiceDbCountingInterceptor(callCounter)) : channel.CreateCallInvoker();
+            return (channel, new PermissionsService.PermissionsServiceClient(invoker), new SchemaService.SchemaServiceClient(invoker), new Metadata { { "authorization", "Bearer " + value.PresharedKey } });
         });
     }
 

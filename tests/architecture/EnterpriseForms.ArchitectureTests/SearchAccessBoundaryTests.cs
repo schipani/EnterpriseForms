@@ -52,6 +52,7 @@ public sealed partial class SearchAccessBoundaryTests
             "AuthorizationAuthority.Application/Common/Ports/ISearchAccessStore.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessDerivation.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessJournalVerifier.cs",
+            "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessMaintenanceSchedule.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessProjectionService.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessValueDerivation.cs",
             "AuthorizationAuthority.Domain/Features/SearchAccess/SearchAccessEntities.cs",

@@ -16,7 +16,7 @@ namespace EnterpriseForms.StageBTests.Tests;
 /// a focused development test class (C-131), not Stage B.
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
-public sealed class SearchAccessValueProjectionStackTests(StageBFixture fixture)
+public sealed partial class SearchAccessValueProjectionStackTests(StageBFixture fixture)
 {
     private const string Prefix = "/internal/v1/testing/search-access";
 
@@ -161,14 +161,17 @@ public sealed class SearchAccessValueProjectionStackTests(StageBFixture fixture)
         return new Ws(s, formId, count, statusId, notes, unapproved, options["open"], options["closed"], teamId);
     }
 
-    private async Task WaitCompleteAsync(Ws w)
+    private Task WaitCompleteAsync(Ws w) => WaitCompleteAsync(w.S.OrganizationId, "2/2");
+
+    /// <summary>Waits until the organization's non-withdrawn coverages report <paramref name="expected"/> (Complete/total).</summary>
+    private async Task WaitCompleteAsync(Guid organizationId, string expected)
     {
         var deadline = DateTime.UtcNow.AddSeconds(300);
         string last;
         do
         {
-            last = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FILTER (WHERE coverage_state_name = 'Complete') || '/' || count(*) FROM authority_search.search_field_coverages WHERE organization_id = '{w.S.OrganizationId:D}' AND coverage_state_name <> 'Withdrawn';").Trim().Split('\n')[0].Trim();
-            if (last == "2/2")
+            last = fixture.Stack.AuthorityObserverSql($"SELECT count(*) FILTER (WHERE coverage_state_name = 'Complete') || '/' || count(*) FROM authority_search.search_field_coverages WHERE organization_id = '{organizationId:D}' AND coverage_state_name <> 'Withdrawn';").Trim().Split('\n')[0].Trim();
+            if (last == expected)
             {
                 return;
             }

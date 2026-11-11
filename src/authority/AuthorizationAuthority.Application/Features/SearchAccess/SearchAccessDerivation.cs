@@ -13,6 +13,14 @@ public sealed class SearchAccessOptions
 
     public int MaintenanceIntervalMilliseconds { get; set; } = 500;
 
+    /// <summary>
+    /// C-149 (R-55): between full reconciliation passes the loop opens no transaction for an organization whose change markers equal
+    /// the ones it last saw settled. Every this many seconds (and after a restart) every organization is probed, which bounds the
+    /// catch-up of changes that advance no marker (a coverage withdrawn by the Tier 1 cheap sweep, out-of-band checkpoint damage).
+    /// Readiness never depends on it: it is computed from the live state on every read.
+    /// </summary>
+    public int ReconciliationIntervalSeconds { get; set; } = 60;
+
     /// <summary>Journal events consumed per organization per loop pass (one transaction each).</summary>
     public int EventsPerPass { get; set; } = 200;
 

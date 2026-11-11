@@ -14,7 +14,7 @@ namespace EnterpriseForms.StageBTests.Tests;
 /// rolled back with the head by a crash. Dark mode: no query path exists, and existing search is untouched. Synthetic data only.
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
-public sealed class SearchIndexFoundationTests(StageBFixture fixture)
+public sealed partial class SearchIndexFoundationTests(StageBFixture fixture)
 {
     private sealed record Ws(StageBScenario S, Guid FormId, Guid Reference, Guid Count, Guid Status, Guid Open, Guid Closed, Guid Note, Guid Unapproved, Dictionary<Guid, Guid> Approvals);
 

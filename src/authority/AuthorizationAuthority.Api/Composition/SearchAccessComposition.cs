@@ -20,7 +20,7 @@ public static class SearchAccessComposition
             throw new InvalidOperationException("SearchIndex:Access:Mode=Dark is permitted only in Development or Testing in IX-5a.");
         }
 
-        if (options.MaintenanceIntervalMilliseconds < 50 || options.EventsPerPass < 1 || options.VerificationSampleSize < 0 || options.MaximumParentDepth is < 1 or > 64)
+        if (options.MaintenanceIntervalMilliseconds < 50 || options.EventsPerPass < 1 || options.VerificationSampleSize < 0 || options.MaximumParentDepth is < 1 or > 64 || options.ReconciliationIntervalSeconds is < 1 or > 3600)
         {
             throw new InvalidOperationException("SearchIndex:Access options are out of range.");
         }
@@ -78,10 +78,15 @@ public sealed class SearchAccessMaintenanceSwitch : IDisposable
 }
 
 /// <summary>
-/// Consumes the authorization journal for every organization, asynchronously. An organization without a checkpoint is built once
-/// from the canonical edges; a quarantined organization is never rebuilt automatically.
+/// Consumes the authorization and content journals and the coverage set for every organization, asynchronously. An organization
+/// without a checkpoint is built once from the canonical edges; a quarantined organization is never rebuilt automatically.
+/// C-149 (R-55): change-aware. Each pass reads every organization's change markers in one statement; an organization whose markers
+/// equal those it was last settled at is skipped without a transaction, an organization whose markers moved is caught up, and on
+/// the first pass and every reconciliation interval every organization is probed (one read-only transaction, then the steps only if
+/// the probe finds work). The steps, their ordering, the checkpoint compare-and-set, the row-lock fencing and quarantine are
+/// unchanged; readiness is computed from the live state on every read and does not depend on this loop.
 /// </summary>
-public sealed partial class SearchAccessMaintenanceLoop(IAuthorityStore store, SearchAccessProjectionService projection, SearchAccessOptions options, SearchAccessMaintenanceSwitch maintenanceSwitch, ILogger<SearchAccessMaintenanceLoop> logger) : BackgroundService
+public sealed partial class SearchAccessMaintenanceLoop(IAuthorityStore store, SearchAccessProjectionService projection, SearchAccessOptions options, SearchAccessMaintenanceSwitch maintenanceSwitch, TimeProvider clock, ILogger<SearchAccessMaintenanceLoop> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -90,16 +95,24 @@ public sealed partial class SearchAccessMaintenanceLoop(IAuthorityStore store, S
             return;
         }
 
+        var schedule = new SearchAccessMaintenanceSchedule(options, clock);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 if (!maintenanceSwitch.Paused)
                 {
-                    foreach (var organization in await store.GetAllOrganizationIdsAsync(stoppingToken).ConfigureAwait(false))
+                    var (items, reconciliation, skipped) = schedule.Plan(await store.GetOrganizationChangeMarkersAsync(stoppingToken).ConfigureAwait(false));
+                    foreach (var item in items)
                     {
-                        // Checked per organization: a pause takes effect before the next organization, not after the whole pass.
-                        await maintenanceSwitch.RunUnlessPausedAsync(() => MaintainAsync(organization, stoppingToken), stoppingToken).ConfigureAwait(false);
+                        // Checked per organization: a pause takes effect before the next organization, not after the whole pass. A
+                        // skipped (paused) organization keeps its previous memo, so a moved marker still makes it due next pass.
+                        await maintenanceSwitch.RunUnlessPausedAsync(() => MaintainAsync(schedule, item, stoppingToken), stoppingToken).ConfigureAwait(false);
+                    }
+
+                    if (reconciliation)
+                    {
+                        LogReconciliation(logger, items.Count, skipped, schedule.SettledCount);
                     }
                 }
 
@@ -117,24 +130,15 @@ public sealed partial class SearchAccessMaintenanceLoop(IAuthorityStore store, S
         }
     }
 
-    private async Task MaintainAsync(Guid organization, CancellationToken stoppingToken)
+    private async Task MaintainAsync(SearchAccessMaintenanceSchedule schedule, SearchAccessMaintenanceItem item, CancellationToken stoppingToken)
     {
+        var organization = item.Marker.OrganizationId;
         try
         {
-            var (outcome, advanced) = await projection.CatchUpAsync(organization, options.EventsPerPass, stoppingToken).ConfigureAwait(false);
-            if (outcome == SearchAccessStepOutcome.NotBuilt)
+            var result = await projection.MaintainAsync(schedule, item, stoppingToken).ConfigureAwait(false);
+            if (!result.SettledByProbe && (result.Outcome == SearchAccessStepOutcome.Quarantined || result.Advanced > 0))
             {
-                await projection.RebuildAsync(organization, "INITIAL_BUILD", Guid.NewGuid(), stoppingToken).ConfigureAwait(false);
-            }
-            else if (outcome == SearchAccessStepOutcome.UpgradeRequired)
-            {
-                // Rows of an older derivation protocol (not an integrity failure): rebuilt once from the canonical state. A
-                // quarantined projection is never rebuilt here.
-                await projection.RebuildAsync(organization, "PROTOCOL_UPGRADE", Guid.NewGuid(), stoppingToken).ConfigureAwait(false);
-            }
-            else if (outcome == SearchAccessStepOutcome.Quarantined || advanced > 0)
-            {
-                LogPass(logger, organization, outcome, advanced);
+                LogPass(logger, organization, result.Outcome, result.Advanced);
             }
         }
         catch (AuthorityException ex)
@@ -155,4 +159,7 @@ public sealed partial class SearchAccessMaintenanceLoop(IAuthorityStore store, S
 
     [LoggerMessage(EventId = 5303, Level = LogLevel.Error, Message = "Search access projection pass failed: {ExceptionType}")]
     private static partial void LogFailure(ILogger logger, string exceptionType);
+
+    [LoggerMessage(EventId = 5304, Level = LogLevel.Debug, Message = "Search access reconciliation pass: processed={Processed} skipped={Skipped} settled={Settled}")]
+    private static partial void LogReconciliation(ILogger logger, int processed, int skipped, int settled);
 }

@@ -85,8 +85,11 @@ services:
       # for the tests; the C-124 enforcement deadlines (1 h / 24 h / 30 days) are unchanged.
       SearchIndex__Mode: Dark
       # IX-5a (C-147): the dark Tier 2 access projection, maintained from the authorization journal; no search path reads it.
-      SearchIndex__Access__Mode: Dark
+      # C-149 (R-55): IX5_ACCESS_MODE=Off recreates the authority without the maintainer for the bounded comparison only.
+      SearchIndex__Access__Mode: ${IX5_ACCESS_MODE:-Dark}
       SearchIndex__Access__MaintenanceIntervalMilliseconds: "250"
+      # C-149 (R-55): full reconciliation probe interval (code default 60 s); between passes unchanged organizations are skipped.
+      SearchIndex__Access__ReconciliationIntervalSeconds: ${IX5_ACCESS_RECONCILIATION_SECONDS:-15}
       SearchIndex__CheapSweepIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
       # C-136 (R-33/R-36): entries per S-B transaction (organization lock released between transactions); the measurement recreates
       # the authority with other values.
@@ -94,6 +97,8 @@ services:
       # C-137 (R-37): phase-duration diagnostics (durations and counts only) for bounded measurements; off unless a test recreates
       # the container with R37_OPERATION_TIMING=true (Development/Testing only; refused at startup elsewhere).
       Diagnostics__OperationTiming: ${R37_OPERATION_TIMING:-false}
+      # C-149 (P-2): measurement-only SpiceDB call counting (method names and counts); off unless a measurement recreates the authority.
+      Diagnostics__SpiceDbCallCounting: ${IX5_SPICEDB_CALL_COUNTING:-false}
       SearchIndex__DeadlineEvaluationIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
       SearchIndex__Seal__Provider: VaultTransit
       SearchIndex__Seal__SigningKeyName: search-entry-seal-v1

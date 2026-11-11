@@ -46,6 +46,14 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         return await context.OrganizationStates.AsNoTracking().OrderBy(o => o.OrganizationId).Select(o => o.OrganizationId).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await context.OrganizationStates.AsNoTracking().OrderBy(o => o.OrganizationId)
+            .Select(o => new OrganizationChangeMarker(o.OrganizationId, o.AuthorizationRevision, o.ContentIntegrityRevision, o.AuditJournalRevision))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction) : IAuthorityScope
     {
         private bool committed;

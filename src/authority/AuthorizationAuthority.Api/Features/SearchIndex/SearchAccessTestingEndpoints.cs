@@ -26,7 +26,8 @@ public static class SearchAccessTestingEndpoints
     public sealed record RecordRowsResponse(Guid FormRecordId, IReadOnlyList<PrincipalRow> RecordGrants, IReadOnlyList<ItemRow> FieldItemGrants);
 
     /// <summary>IX-5b: one value row (no values beyond what the test itself wrote; synthetic data only).</summary>
-    public sealed record ValueRow(string PrincipalTypeName, Guid PrincipalEntityId, Guid FieldDefinitionId, Guid ManifestItemId, string ValueTypeName, string? NormalizedStringValue, long? IntegerValue, Guid? FieldOptionId, bool? BooleanValue);
+    public sealed record ValueRow(string PrincipalTypeName, Guid PrincipalEntityId, Guid FieldDefinitionId, Guid ManifestItemId, string ValueTypeName, string? NormalizedStringValue, long? IntegerValue, Guid? FieldOptionId, bool? BooleanValue,
+        decimal? DecimalValue = null, DateOnly? DateValue = null, DateTimeOffset? DateTimeValue = null); // C-149: the remaining typed values
 
     public sealed record EvaluateRequest(Guid FormDefinitionId, Guid AuthorityUserId, IReadOnlyList<SearchAccessEvaluationCondition> Conditions);
 
@@ -71,7 +72,7 @@ public static class SearchAccessTestingEndpoints
             await using var scope = await store.BeginReadOnlySnapshotScopeAsync(cancellationToken).ConfigureAwait(false);
             await scope.SearchAccess.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
             var values = await scope.SearchAccess.GetValuePostingsAsync(organizationId, [formRecordId], cancellationToken).ConfigureAwait(false);
-            return TypedResults.Ok<IReadOnlyList<ValueRow>>(values.Select(v => new ValueRow(v.AccessPrincipalTypeName, v.AccessPrincipalEntityId, v.FieldDefinitionId, v.ManifestItemId, v.ValueTypeName, v.NormalizedStringValue, v.IntegerValue, v.FieldOptionId, v.BooleanValue)).ToList());
+            return TypedResults.Ok<IReadOnlyList<ValueRow>>(values.Select(v => new ValueRow(v.AccessPrincipalTypeName, v.AccessPrincipalEntityId, v.FieldDefinitionId, v.ManifestItemId, v.ValueTypeName, v.NormalizedStringValue, v.IntegerValue, v.FieldOptionId, v.BooleanValue, v.DecimalValue, v.DateValue, v.DateTimeValue)).ToList());
         });
 
         // IX-5b: internal multi-condition evaluation over the value rows (proof of correctness only; never a search path).

@@ -121,6 +121,8 @@ public sealed class ArchiveProcessorTests
 
         public Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([organizationId]);
 
+        public Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken ct) => throw new NotSupportedException();
+
         public Task<OrganizationAuthorizationState?> LockOrganizationAsync(Guid org, CancellationToken ct) => Task.FromResult<OrganizationAuthorizationState?>(org == organizationId ? State : null);
 
         public Task<List<SecurityJournalEntry>> GetPendingJournalEntriesAsync(Guid org, int limit, CancellationToken ct) => Task.FromResult(Entries.Where(e => e.OrganizationId == org && e.ArchiveDeliveryState == ArchiveDeliveryStates.Pending).Take(limit).ToList());

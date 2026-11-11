@@ -74,7 +74,14 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
 
     private InMemorySearchAccessStore? searchAccess;
 
-    public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken) => Task.FromResult<IAuthorityScope>(new Scope(this));
+    /// <summary>C-149: number of read-write scopes opened.</summary>
+    public int ScopeCount { get; private set; }
+
+    public Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
+    {
+        ScopeCount++;
+        return Task.FromResult<IAuthorityScope>(new Scope(this));
+    }
 
     /// <summary>Phase C8 AC-9: number of read-only snapshot scopes opened; such a scope refuses to commit.</summary>
     public int ReadOnlyScopeCount { get; private set; }
@@ -88,6 +95,14 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>([]);
 
     public Task<IReadOnlyList<Guid>> GetAllOrganizationIdsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Guid>>(Organizations.Select(o => o.OrganizationId).ToList());
+
+    public int ChangeMarkerReadCount { get; private set; }
+
+    public Task<IReadOnlyList<OrganizationChangeMarker>> GetOrganizationChangeMarkersAsync(CancellationToken cancellationToken)
+    {
+        ChangeMarkerReadCount++;
+        return Task.FromResult<IReadOnlyList<OrganizationChangeMarker>>(Organizations.OrderBy(o => o.OrganizationId).Select(o => new OrganizationChangeMarker(o.OrganizationId, o.AuthorizationRevision, o.ContentIntegrityRevision, o.AuditJournalRevision)).ToList());
+    }
 
     private sealed class Scope(InMemoryAuthorityStore s, bool readOnly = false) : IAuthorityScope
     {

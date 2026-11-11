@@ -36,6 +36,22 @@ public enum SearchAccessStepOutcome
     UpgradeRequired,
 }
 
+/// <summary>C-149 (R-55): the outcome of a read-only maintenance probe.</summary>
+public enum SearchAccessProbeOutcome
+{
+    /// <summary>The checkpoint equals the live authorization, content and coverage state: nothing to consume.</summary>
+    Settled,
+
+    /// <summary>Quarantined: nothing is consumed until a journaled rebuild.</summary>
+    Quarantined,
+
+    /// <summary>Anything else: the steps run (and verify) under the checkpoint row lock.</summary>
+    WorkPending,
+}
+
+/// <summary>C-149: the result of one organization's maintenance step (for logging and tests).</summary>
+public sealed record SearchAccessMaintenanceResult(SearchAccessStepOutcome Outcome, int Advanced, bool SettledByProbe);
+
 public sealed record SearchAccessVerification(string OutcomeCode, long VerifiedRevision, int MirrorEdges, int CanonicalEdges, int RecordGrants, int FieldItemGrants, int SampledRecords, int SpiceDbChecks, string? FindingDetail,
     int ValuePostings = 0, int SearchablePostings = 0, long VerifiedContentIntegrityRevision = 0)
 {
@@ -131,6 +147,100 @@ public sealed class SearchAccessProjectionService(
     public static bool ContentAtHead(SearchAccessCheckpoint checkpoint, long currentRevision, byte[]? currentDigest) =>
         checkpoint.ConsumedContentIntegrityRevision == currentRevision
         && (currentRevision == 0 ? checkpoint.ConsumedContentJournalDigest is null : checkpoint.ConsumedContentJournalDigest is { Length: 32 } d && currentDigest is not null && d.AsSpan().SequenceEqual(currentDigest));
+
+    /// <summary>
+    /// C-149 (R-55): one read-only snapshot transaction, without the checkpoint row lock or any write. <see cref="SearchAccessProbeOutcome.Settled"/>
+    /// only when the steps would all answer Idle: the checkpoint is Maintaining at the current protocol, at the authorization head
+    /// (revision and digest), at the content head (revision and digest), and its coverage digest equals the live Complete
+    /// Public/Internal coverage set. <see cref="SearchAccessProbeOutcome.Quarantined"/> when quarantined (only a rebuild leaves it).
+    /// Anything else (including a digest that differs at an equal revision, a checkpoint ahead, a missing checkpoint or an older
+    /// protocol) is <see cref="SearchAccessProbeOutcome.WorkPending"/>: the probe never decides an integrity failure; the steps verify
+    /// it under the row lock and quarantine. Nothing is changed here, and readiness is not derived from it.
+    /// </summary>
+    public async Task<SearchAccessProbeOutcome> ProbeAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        RequireEnabled();
+        await using var scope = await store.BeginReadOnlySnapshotScopeAsync(cancellationToken).ConfigureAwait(false);
+        var access = scope.SearchAccess;
+        await access.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        var checkpoint = await access.FindCheckpointAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        if (checkpoint is null)
+        {
+            return SearchAccessProbeOutcome.WorkPending;
+        }
+
+        if (checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Quarantined)
+        {
+            return SearchAccessProbeOutcome.Quarantined;
+        }
+
+        if (checkpoint.AccessProjectionStateName != SearchAccessProjectionStates.Maintaining || checkpoint.AccessProjectionProtocolVersion != SearchAccessDerivation.ProtocolVersion)
+        {
+            return SearchAccessProbeOutcome.WorkPending;
+        }
+
+        var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        if (state is null || !AuthorizationAtHead(checkpoint, state.AuthorizationRevision, state.LatestSecurityJournalDigest) || !ContentAtHead(checkpoint, state.ContentIntegrityRevision, state.LatestContentJournalDigest))
+        {
+            return SearchAccessProbeOutcome.WorkPending;
+        }
+
+        var coverage = SearchAccessValueDerivation.CoverageDigest(await access.GetSearchableCoveragesAsync(organizationId, cancellationToken).ConfigureAwait(false));
+        return SearchAccessValueDerivation.DigestsEqual(coverage, checkpoint.ConsumedCoverageDigest) ? SearchAccessProbeOutcome.Settled : SearchAccessProbeOutcome.WorkPending;
+    }
+
+    /// <summary>
+    /// C-149 (R-55): one organization's step of a maintenance pass. A probe item that finds nothing to do settles without any write
+    /// transaction; otherwise the journals are consumed (<see cref="CatchUpAsync"/>, unchanged) and the organization is settled at the
+    /// pass's markers only if the outcome leaves nothing to do. A missing checkpoint is built and an older protocol rebuilt, as
+    /// before. Any exception leaves the organization due again (and is rethrown to the loop).
+    /// </summary>
+    public async Task<SearchAccessMaintenanceResult> MaintainAsync(SearchAccessMaintenanceSchedule schedule, SearchAccessMaintenanceItem item, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(schedule);
+        ArgumentNullException.ThrowIfNull(item);
+        var organization = item.Marker.OrganizationId;
+        try
+        {
+            if (item.Action == SearchAccessMaintenanceAction.Probe)
+            {
+                var probe = await ProbeAsync(organization, cancellationToken).ConfigureAwait(false);
+                if (probe != SearchAccessProbeOutcome.WorkPending)
+                {
+                    schedule.Settle(item.Marker);
+                    return new(probe == SearchAccessProbeOutcome.Quarantined ? SearchAccessStepOutcome.Quarantined : SearchAccessStepOutcome.Idle, 0, SettledByProbe: true);
+                }
+            }
+
+            var (outcome, advanced) = await CatchUpAsync(organization, options.EventsPerPass, cancellationToken).ConfigureAwait(false);
+            if (SearchAccessMaintenanceSchedule.Settles(outcome))
+            {
+                schedule.Settle(item.Marker);
+            }
+            else
+            {
+                schedule.Unsettle(organization);
+            }
+
+            if (outcome == SearchAccessStepOutcome.NotBuilt)
+            {
+                await RebuildAsync(organization, "INITIAL_BUILD", Guid.NewGuid(), cancellationToken).ConfigureAwait(false);
+            }
+            else if (outcome == SearchAccessStepOutcome.UpgradeRequired)
+            {
+                // Rows of an older derivation protocol (not an integrity failure): rebuilt once from the canonical state. A
+                // quarantined projection is never rebuilt here.
+                await RebuildAsync(organization, "PROTOCOL_UPGRADE", Guid.NewGuid(), cancellationToken).ConfigureAwait(false);
+            }
+
+            return new(outcome, advanced, SettledByProbe: false);
+        }
+        catch
+        {
+            schedule.Unsettle(organization);
+            throw;
+        }
+    }
 
     /// <summary>
     /// Consumes up to <paramref name="maximumEvents"/> journal events, one transaction each: the authorization stream, then the

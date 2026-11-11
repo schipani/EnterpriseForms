@@ -41,6 +41,14 @@ public static class AuthorityInfrastructureRegistration
         services.AddSingleton<IAuthorityStore, AuthorityStore>();
 
         services.Configure<SpiceDbOptions>(configuration.GetSection(SpiceDbOptions.SectionName));
+        // C-149 (P-2): measurement-only SpiceDB call counting; off unless configured, refused outside Development/Testing.
+        var countSpiceDbCalls = configuration.GetValue<bool>(SpiceDbCallCounter.ConfigurationKey);
+        if (countSpiceDbCalls && !environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
+        {
+            throw new InvalidOperationException($"{SpiceDbCallCounter.ConfigurationKey} is a Development/Testing diagnostic and must not be set in the {environment.EnvironmentName} environment. Refusing to start.");
+        }
+
+        services.AddSingleton(new SpiceDbCallCounter(countSpiceDbCalls));
         services.AddSingleton<ISpiceDbProjection, SpiceDbProjectionClient>();
 
         services.Configure<ArchiveOptions>(configuration.GetSection(ArchiveOptions.SectionName));
