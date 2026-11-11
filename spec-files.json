@@ -148,6 +148,11 @@
       "bytes": 34654
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_C150_EVIDENCE.md",
+      "sha256": "53a180debe9e243850c1bd78abd1b6c1f14fbc520ed835138add72fa63f5cc1b",
+      "bytes": 30098
+    },
+    {
       "path": "docs/architecture/INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md",
       "sha256": "c9f5074447f3d057654982eb4ba04b64f3f8a37b8a6c935871f9239b7d830679",
       "bytes": 24672
@@ -164,8 +169,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX2_EVIDENCE.md",
-      "sha256": "6fa5eb3daf20c57f21a7afbc1b40a9a3f987e86f5852e544864f478e528b720f",
-      "bytes": 29582
+      "sha256": "7f69f38bf3ff07ba482c436f4b4d6d0208e40486a30e9506854f48e5c90cec5b",
+      "bytes": 29946
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX3_EVIDENCE.md",
@@ -174,8 +179,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "a9262b03843e2a43bb302b32275ed28b6b6172f9944bfac7bdc25d5974ec9ef2",
-      "bytes": 81993
+      "sha256": "d45a1be19115bd330831666d3ba2233d264ae346d9d6cb24cd3209113d3fb504",
+      "bytes": 82066
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5A_EVIDENCE.md",
@@ -454,8 +459,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "fac9e218ee2b6c39afef7322df0403ce53afcea97ed48b680937076eb36eb550",
-      "bytes": 271838
+      "sha256": "7aaee8540a1a637a3042fdbeac86b37a75dbeac50c2c4076310ba68539571033",
+      "bytes": 274697
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
