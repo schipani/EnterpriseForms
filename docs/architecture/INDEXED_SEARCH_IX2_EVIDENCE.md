@@ -149,7 +149,7 @@ Worker change after the Docker runs: the builder loop's catch clause was widened
 | # | Requirement | Source | Status | Assigned to |
 |---|---|---|---|---|
 | R-01 | Azure Managed HSM ES256 seal provider (and the Managed HSM HMAC provider) | D-IX1-13; C-126 | Not implemented; providers fail closed | **IX-7** (ST-PERF-1, ST-PERF-7); blocks production |
-| R-02 | 20 ms p95 incremental commit latency | IX-1 gate; C-128; C-129 | **FAIL**, carried | **IX-7** ST-PERF-1..7; failure blocks production readiness |
+| R-02 | 20 ms p95 incremental commit latency | IX-1 gate; C-128; C-129; C-149 | **FAIL**, carried. C-149 diagnostic (capped, deviating protocol): pooled Δp95 17.1 ms (15.3–19.3) over 5 × ≈900 pairs; the stopped full-size run gave 25.5 ms (18.1–31.5). Not a closure. The dominant derivation cost is the reads stage (`INDEXED_SEARCH_C149_EVIDENCE.md` §7) | **IX-7** ST-PERF-1..7; failure blocks production readiness |
 | R-03 | Cross-language cryptographic test vectors (seal, posting derivation) | IX-1 §4.2 item 4 | .NET-only vectors | Independent cryptographic review (package Q7), **before production**; owner to schedule |
 | R-04 | W3 and W4 integration coverage; IX-73 beyond W1 | IX-1 §4.2 item 5 | Unit-tested only | **Owner decision** (no stage assigns it); recommended before IX-3 exit, because the IX-3 guard depends on INV-R at every site |
 | R-05 | pgAudit and Azure diagnostic log inspection (IX-28 partial) | IX-1 §2.5 | Local logs only | **IX-7** staging |

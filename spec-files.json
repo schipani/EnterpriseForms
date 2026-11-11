@@ -143,6 +143,11 @@
       "bytes": 18890
     },
     {
+      "path": "docs/architecture/INDEXED_SEARCH_C149_EVIDENCE.md",
+      "sha256": "9f1b31dc6d71ba300bf463788c2e8ee4a97077e984d2818dd2c92d957b205b0c",
+      "bytes": 34654
+    },
+    {
       "path": "docs/architecture/INDEXED_SEARCH_INDEPENDENT_REVIEW_PACKAGE.md",
       "sha256": "c9f5074447f3d057654982eb4ba04b64f3f8a37b8a6c935871f9239b7d830679",
       "bytes": 24672
@@ -159,8 +164,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX2_EVIDENCE.md",
-      "sha256": "645ff824aa121566b50028f723afc37728fb9f416185b4dd084afa6b23e2f63b",
-      "bytes": 29311
+      "sha256": "6fa5eb3daf20c57f21a7afbc1b40a9a3f987e86f5852e544864f478e528b720f",
+      "bytes": 29582
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX3_EVIDENCE.md",
@@ -169,8 +174,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "c1de1ce6d8b04ea5b3f88d6341bf5c467d525496d2c06aaf84874c77aa976776",
-      "bytes": 80577
+      "sha256": "a9262b03843e2a43bb302b32275ed28b6b6172f9944bfac7bdc25d5974ec9ef2",
+      "bytes": 81993
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5A_EVIDENCE.md",
@@ -189,8 +194,8 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_EVIDENCE_PLANS.md",
-      "sha256": "8631cb226d371caeca1dca9dfe825a6ca3324d640a128f80af29999be8027957",
-      "bytes": 11395
+      "sha256": "a5c21281d799d305b53f394c5e6044c8402001a5a5dc1c275c3fd7138cb8d918",
+      "bytes": 11726
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_READINESS_ASSESSMENT.md",
@@ -449,8 +454,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "3e971078659e8717ba5f90ef055375e429bfe85ca61a1bd4bb8118ea75ea0058",
-      "bytes": 269259
+      "sha256": "fac9e218ee2b6c39afef7322df0403ce53afcea97ed48b680937076eb36eb550",
+      "bytes": 271838
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
@@ -881,6 +886,31 @@
       "path": "scripts/measurement/ix1/vault_sign_bench.py",
       "sha256": "32d3dfc5226a5505cb8ce92469d8ba7a8b40642ff9f81a433522a21ff34ff7eb",
       "bytes": 1775
+    },
+    {
+      "path": "scripts/measurement/ix5/authority_db_wait_sampler.sh",
+      "sha256": "4530443371e8eb2a7591c8c715a32b50618669376814e3b3a48ee331b9e2b1ff",
+      "bytes": 1512
+    },
+    {
+      "path": "scripts/measurement/ix5/p5_paired_pooled.py",
+      "sha256": "dd1d3304162a397e61d96084110da83347df3c8b66123c26fb5314c3b666dcbc",
+      "bytes": 4835
+    },
+    {
+      "path": "scripts/measurement/ix5/p5_reconstruct_partial.py",
+      "sha256": "1c84c862292b08ff68dfb4f407be41ebf2d17ee927d9c64f3b1c401d609f58c2",
+      "bytes": 2621
+    },
+    {
+      "path": "scripts/measurement/ix5/run_stageb_method.ps1",
+      "sha256": "64b8033e02aa4392c7128a70cac2f358cddb095ac991cdbbf2a02e29ad7e8633",
+      "bytes": 2790
+    },
+    {
+      "path": "scripts/measurement/ix5/summarize_wait_samples.py",
+      "sha256": "25df2745b9636372cb82e40ea3a78db1a15465524ac8cfaf8c023fb4fb657baf",
+      "bytes": 1776
     },
     {
       "path": "scripts/validate-specifications.py",

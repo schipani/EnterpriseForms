@@ -173,10 +173,10 @@ Consequences:
 
 | Plan | Why | Needed before |
 |---|---|---|
-| P-2 | Timing; host on battery. The probe mode `ix5-perf` is ready | IX-5c |
-| P-4 | Timing; needs a new focused stack test | IX-5c |
-| P-5 | Timing; host on battery | IX-5a acceptance (commit latency unchanged) |
-| P-6 | Timing; host on battery | IX-5c |
+| P-2 | Latency and throughput done at C-148; **call amplification done at C-149** (`INDEXED_SEARCH_C149_EVIDENCE.md` §5) | IX-5c |
+| P-4 | **Done at C-149**, bounded: 40 users, 90 records, 300 s (`INDEXED_SEARCH_C149_EVIDENCE.md` §6). The 5,000-record and 500-user size was not run | IX-5c |
+| P-5 | Measured on AC at C-148; the C-149 paired diagnostic (capped, deviating) is in `INDEXED_SEARCH_C149_EVIDENCE.md` §7. **R-02 FAIL** | IX-7 |
+| P-6 | **Done at C-148 and C-149** (Tier 2 on and off; long-lived, fresh and seeded stacks), `INDEXED_SEARCH_C149_EVIDENCE.md` §1.3 | IX-5c |
 
 **No result exposes a security defect or invalidates a design assumption.** TQ-6 (item identity stability) remains unverified; it is the first IX-5a deliverable.
 
