@@ -55,12 +55,52 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
 
     public async Task<List<FieldSearchApproval>> GetCoveredActiveApprovalsAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken)
     {
+        // C-150 (R-02): Testing-only timing split; the probe is null outside a measured commit and nothing below depends on it.
+        var probe = AuthorizationAuthority.Application.Features.SearchIndex.SearchDerivationReadProbe.Current;
+        var mark = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (probe is not null)
+        {
+            var detect = context.ChangeTracker.AutoDetectChangesEnabled;
+            context.ChangeTracker.AutoDetectChangesEnabled = false; // counting must not itself run a detection
+            probe.TrackedEntities = context.ChangeTracker.Entries().Count();
+            context.ChangeTracker.AutoDetectChangesEnabled = detect;
+            mark = System.Diagnostics.Stopwatch.GetTimestamp();
+        }
+
         // Unsaved coverage or approval changes for this form in the scope (never the case in a content commit) would not be seen
         // by the SQL predicate below: use the two reads that merge tracked state instead, so the result is the same in every case.
-        var pendingCoverage = context.ChangeTracker.Entries<SearchFieldCoverage>().Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
-            && e.Entity.OrganizationId == organizationId && e.Entity.FormDefinitionId == formDefinitionId);
-        var pendingApproval = context.ChangeTracker.Entries<FieldSearchApproval>().Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
-            && e.Entity.OrganizationId == organizationId && e.Entity.FormDefinitionId == formDefinitionId);
+        // C-150 (R-02): change detection runs once, explicitly; both inspections then read the detected states without detecting
+        // again. Previously each Entries<T>() call ran EF Core's automatic detection over every tracked entity (about 320 in a
+        // commit), and the second found nothing the first had not (nothing changes between them). Same states, one scan.
+        context.ChangeTracker.DetectChanges();
+        if (probe is not null)
+        {
+            probe.FirstScanMilliseconds = System.Diagnostics.Stopwatch.GetElapsedTime(mark).TotalMilliseconds;
+            mark = System.Diagnostics.Stopwatch.GetTimestamp();
+        }
+
+        bool pendingCoverage, pendingApproval;
+        var autoDetect = context.ChangeTracker.AutoDetectChangesEnabled;
+        context.ChangeTracker.AutoDetectChangesEnabled = false;
+        try
+        {
+            pendingCoverage = context.ChangeTracker.Entries<SearchFieldCoverage>().Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                && e.Entity.OrganizationId == organizationId && e.Entity.FormDefinitionId == formDefinitionId);
+            pendingApproval = context.ChangeTracker.Entries<FieldSearchApproval>().Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                && e.Entity.OrganizationId == organizationId && e.Entity.FormDefinitionId == formDefinitionId);
+        }
+        finally
+        {
+            context.ChangeTracker.AutoDetectChangesEnabled = autoDetect;
+        }
+
+        if (probe is not null)
+        {
+            probe.SecondScanMilliseconds = System.Diagnostics.Stopwatch.GetElapsedTime(mark).TotalMilliseconds;
+            probe.TrackedMergePath = pendingCoverage || pendingApproval;
+            mark = System.Diagnostics.Stopwatch.GetTimestamp();
+        }
+
         if (pendingCoverage || pendingApproval)
         {
             var coverages = (await GetCoveragesAsync(organizationId, formDefinitionId, cancellationToken).ConfigureAwait(false)).Where(c => c.CoverageStateName != SearchCoverageStates.Withdrawn).ToList();
@@ -69,12 +109,19 @@ internal sealed class SearchIndexStore(AuthorityDbContext context) : ISearchInde
             return approvals.Where(a => a.ApprovalStateName == FieldSearchApprovalStates.Active && coverages.Any(c => c.FieldSearchApprovalId == a.FieldSearchApprovalId)).ToList();
         }
 
-        return await context.FieldSearchApprovals.AsTracking()
+        var covered = await context.FieldSearchApprovals.AsTracking()
             .Where(a => a.OrganizationId == organizationId && a.FormDefinitionId == formDefinitionId && a.ApprovalStateName == FieldSearchApprovalStates.Active
                         && context.SearchFieldCoverages.Any(c => c.OrganizationId == organizationId && c.FormDefinitionId == formDefinitionId
                                                                  && c.FieldSearchApprovalId == a.FieldSearchApprovalId && c.CoverageStateName != SearchCoverageStates.Withdrawn))
             .OrderBy(a => a.FieldSearchApprovalId)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+        if (probe is not null)
+        {
+            probe.QueryMilliseconds = System.Diagnostics.Stopwatch.GetElapsedTime(mark).TotalMilliseconds;
+            probe.ApprovalRows = covered.Count;
+        }
+
+        return covered;
     }
 
     public async Task<int> ResetRecordIndexAsync(Guid organizationId, Guid formDefinitionId, Guid formRecordId, bool alwaysAdvanceFormState, DateTimeOffset now, CancellationToken cancellationToken)

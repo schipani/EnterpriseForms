@@ -38,6 +38,9 @@ public static class AuthorityInfrastructureRegistration
                 options.AddInterceptors(new AuthorityCommandCountingInterceptor()); // IX-1 measurement only (round-trip counts)
             }
         });
+        // C-150 R56-B: committed authorization changes wake the work loop (transactional NOTIFY + in-process signal); the poll stays the fallback.
+        services.AddSingleton(configuration.GetSection(AuthorityWorkOptions.SectionName).Get<AuthorityWorkOptions>() ?? new AuthorityWorkOptions());
+        services.AddSingleton<AuthorityWorkSignal>();
         services.AddSingleton<IAuthorityStore, AuthorityStore>();
 
         services.Configure<SpiceDbOptions>(configuration.GetSection(SpiceDbOptions.SectionName));

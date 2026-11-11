@@ -29,6 +29,18 @@ public sealed class SearchAccessOptions
 
     /// <summary>Upper bound of the effective-owner parent chain (the Authority refuses cycles; deeper is a defect).</summary>
     public int MaximumParentDepth { get; set; } = 16;
+
+    /// <summary>
+    /// C-150 IX-5c shadow preparation: compare each committed Tier 1 search with a Tier 2 evaluation at the same snapshot, off the search
+    /// path. Off by default; requires <see cref="SearchAccessMode.Dark"/> and is refused outside Development/Testing. It never serves.
+    /// </summary>
+    public bool ShadowComparisonEnabled { get; set; }
+
+    /// <summary>C-150: Tier 1 answers waiting for comparison; beyond it they are dropped and counted (1..1024).</summary>
+    public int ShadowQueueCapacity { get; set; } = 64;
+
+    /// <summary>C-150: time budget of one comparison (100..30000 ms); past it the comparison is Cancelled.</summary>
+    public int ShadowMaximumMilliseconds { get; set; } = 5000;
 }
 
 public enum SearchAccessMode

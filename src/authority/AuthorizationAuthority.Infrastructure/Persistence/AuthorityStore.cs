@@ -1,3 +1,4 @@
+using AuthorizationAuthority.Application.Common;
 using AuthorizationAuthority.Application.Common.Ports;
 using AuthorizationAuthority.Contracts.V1;
 using AuthorizationAuthority.Domain.Features.Catalogue;
@@ -14,14 +15,21 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace AuthorizationAuthority.Infrastructure.Persistence;
 
-/// <summary>EF Core implementation of the authority store port. One DbContext + one transaction per scope.</summary>
-public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory) : IAuthorityStore
+/// <summary>
+/// EF Core implementation of the authority store port. One DbContext + one transaction per scope.
+/// C-150 R56-B: a scope that appended to the authorization stream notifies <see cref="AuthorityWorkOptions.NotificationChannel"/> inside its
+/// transaction (PostgreSQL delivers it to every listening Authority instance only if the transaction commits) and signals this instance's
+/// work loop after the commit returned. Neither is a statement that work exists or completed; the loop reads durable state.
+/// </summary>
+public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> contextFactory, AuthorityWorkSignal? workSignal = null, AuthorityWorkOptions? workOptions = null) : IAuthorityStore
 {
+    private readonly AuthorityWorkSignal? wakeup = workOptions?.CommitWakeupEnabled == true ? workSignal : null;
+
     public async Task<IAuthorityScope> BeginScopeAsync(CancellationToken cancellationToken)
     {
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction);
+        return new AuthorityScope(context, transaction, wakeup);
     }
 
     public async Task<IAuthorityScope> BeginReadOnlySnapshotScopeAsync(CancellationToken cancellationToken)
@@ -29,7 +37,7 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken).ConfigureAwait(false);
         await context.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", cancellationToken).ConfigureAwait(false);
-        return new AuthorityScope(context, transaction);
+        return new AuthorityScope(context, transaction, null);
     }
 
     public async Task<IReadOnlyList<Guid>> GetOrganizationsWithPendingWorkAsync(CancellationToken cancellationToken)
@@ -54,9 +62,10 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
             .ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction) : IAuthorityScope
+    private sealed class AuthorityScope(AuthorityDbContext context, IDbContextTransaction transaction, AuthorityWorkSignal? wakeup) : IAuthorityScope
     {
         private bool committed;
+        private bool authorizationWorkAppended;
         private SearchIndexStore? searchIndex;
 
         /// <summary>IX-1: the search index on this scope's context and transaction.</summary>
@@ -157,7 +166,12 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<ProjectionOutboxEvent?> FindOutboxEventAsync(Guid organizationId, long targetAuthorizationRevision, CancellationToken cancellationToken) =>
             context.ProjectionOutbox.FirstOrDefaultAsync(e => e.OrganizationId == organizationId && e.TargetAuthorizationRevision == targetAuthorizationRevision, cancellationToken);
 
-        public void AddJournalEntry(SecurityJournalEntry entry) => context.JournalEntries.Add(entry);
+        public void AddJournalEntry(SecurityJournalEntry entry)
+        {
+            context.JournalEntries.Add(entry);
+            // C-150 R56-B: an authorization-stream entry is projection and archive work that keeps the organization gate closed until done.
+            authorizationWorkAppended |= string.Equals(entry.JournalStreamName, JournalStreamNames.Authorization, StringComparison.Ordinal);
+        }
 
         public Task<SecurityJournalEntry?> FindJournalEntryAsync(Guid organizationId, string streamName, long streamRevision, CancellationToken cancellationToken) =>
             context.JournalEntries.FirstOrDefaultAsync(j => j.OrganizationId == organizationId && j.JournalStreamName == streamName && j.JournalStreamRevision == streamRevision, cancellationToken);
@@ -616,8 +630,19 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public async Task CommitAsync(CancellationToken cancellationToken)
         {
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            var notify = wakeup is not null && authorizationWorkAppended;
+            if (notify)
+            {
+                // Transactional: queued now, delivered by PostgreSQL to every listener only when this transaction commits (never on rollback).
+                await context.Database.ExecuteSqlRawAsync("SELECT pg_notify('" + AuthorityWorkOptions.NotificationChannel + "', '')", cancellationToken).ConfigureAwait(false);
+            }
+
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             committed = true;
+            if (notify)
+            {
+                wakeup!.Signal(AuthorityWorkSignalSource.Commit); // after the commit returned: this instance looks at once
+            }
         }
 
         public async ValueTask DisposeAsync()

@@ -92,6 +92,10 @@ public sealed class Program
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.IFieldSearchShadowObserver, EnterpriseForms.Api.Features.Search.FieldSearchShadowLogging>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchShadowComparer>(); // IX-3 (inactive unless Engine=Shadow)
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.IFieldSearchEngineObserver, EnterpriseForms.Api.Features.Search.FieldSearchEngineLogging>();
+        // C-150 R56-A: bounded jittered backoff for transient Authority search refusals (shared by the handler and the indexed engine).
+        builder.Services.AddSingleton(sp => new EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchRetryPolicy(
+            sp.GetRequiredService<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchLimits>(), sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<EnterpriseForms.Application.Features.Search.FieldSearch.IFieldSearchEngineObserver>()));
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchIndexedEngine>(); // IX-4 (inactive unless Engine=Indexed)
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.FieldSearch.FieldSearchHandler>();
         builder.Services.AddSingleton<EnterpriseForms.Application.Features.Search.Verification.TrustedScopeVerifier>();

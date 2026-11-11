@@ -69,6 +69,12 @@ public interface ISearchAccessStore
     /// <summary>IX-5b: the accepted per-field item counts of the records' Tier 1 entries at head, by (record, approval).</summary>
     Task<Dictionary<(Guid FormRecordId, Guid FieldSearchApprovalId), int>> GetFieldItemCountsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
 
+    /// <summary>C-150 IX-5c: the form's Tier 1 content revision (0 when the form has no Tier 1 state), for the shadow snapshot equivalence.</summary>
+    Task<long> GetTier1FormContentRevisionAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken);
+
+    /// <summary>C-150 IX-5c: Tier 1's verified header facts (status, parent) of the records' entries, for Tier 1's metadata filter in the shadow comparison.</summary>
+    Task<List<Tier1RecordHeader>> GetTier1RecordHeadersAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
     Task DeleteValuePostingsOfRecordsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken);
 
     void AddValuePostings(IEnumerable<SearchAccessValuePosting> postings);
@@ -113,3 +119,6 @@ public sealed record SearchablePosting(
     Guid? FieldOptionId = null);
 
 public sealed record SearchableCoverage(Guid FieldSearchApprovalId, Guid FieldDefinitionId, Guid FormDefinitionId);
+
+/// <summary>C-150 IX-5c: the header facts Tier 1 decoded from a record's verified header leaf (no value, no payload).</summary>
+public sealed record Tier1RecordHeader(Guid FormRecordId, string RecordStatusName, Guid? ParentFormRecordId);

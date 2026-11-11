@@ -71,7 +71,7 @@ public sealed record SearchAccessEvaluationCondition(Guid FieldDefinitionId, str
 /// alerted, never repaired silently); only <see cref="RebuildAsync"/> leaves quarantine. Nothing here authorizes access: no
 /// search path reads these rows in IX-5a.
 /// </summary>
-public sealed class SearchAccessProjectionService(
+public sealed partial class SearchAccessProjectionService(
     IAuthorityStore store,
     ProjectionIntegrityVerifier integrity,
     SearchAccessOptions options,

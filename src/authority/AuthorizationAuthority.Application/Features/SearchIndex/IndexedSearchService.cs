@@ -41,7 +41,8 @@ public sealed class IndexedSearchService(
     IndexedSearchOptions options,
     ISecurityAlertSink alerts,
     TimeProvider clock,
-    IIndexedSearchProbe? probe = null)
+    IIndexedSearchProbe? probe = null,
+    IIndexedSearchShadowSink? shadow = null)
 {
     public const string Engine = "Indexed";
 
@@ -236,6 +237,10 @@ public sealed class IndexedSearchService(
             scope.SearchIndex.AddResultSnapshot(snapshot, entries);
             AuditJournal.Append(scope, locked, "FieldSearchExecuted", Evidence(snapshot.SearchResultSnapshotId, query.FormDefinitionId, bound.AuthorityUserId, conditions, "COMPLETED", scopeCount - withoutContent, matches.Count, started, locked.AuthorizationRevision, correlationId), clock);
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+            // C-150 IX-5c shadow preparation: after the commit, hand the committed answer to the off-path comparison (when enabled). It
+            // never changes this response, its status or any decision; a full queue or a failing sink is ignored.
+            OfferShadow(new IndexedSearchShadowObservation(organizationId, query.FormDefinitionId, bound.AuthorityUserId, conditions, approvalIds, query.RecordStatus, query.IncludeChildren, query.IncludeArchived,
+                matches.Select(m => m.Id).ToList(), locked.AuthorizationRevision, locked.ContentIntegrityRevision, facts.FormContentRevision, correlationId));
             return new IndexedSearchResponse(snapshot.SearchResultSnapshotId, query.FormDefinitionId, matches.Count, 0, query.PageSize, firstPage, scopeCount, withoutContent,
                 locked.AuthorizationRevision, locked.ContentIntegrityRevision, facts.FormContentRevision, snapshot.SnapshotExpiresOn, IndexedSearchErrorCodes.ResultBasisAuthorityAcceptedContent, correlationId);
         }
@@ -907,6 +912,24 @@ public sealed class IndexedSearchService(
             _ => descending ? matches.OrderByDescending(m => m.Modified) : matches.OrderBy(m => m.Modified),
         };
         return (descending ? ordered.ThenByDescending(m => m.Modified).ThenByDescending(m => m.Id) : ordered.ThenBy(m => m.Modified).ThenBy(m => m.Id)).ToList();
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "C-150: the shadow comparison must never affect a committed Tier 1 answer.")]
+    private void OfferShadow(IndexedSearchShadowObservation observation)
+    {
+        if (shadow is null)
+        {
+            return;
+        }
+
+        try
+        {
+            shadow.Offer(observation);
+        }
+        catch (Exception)
+        {
+            // Off-path by construction: the search already committed and its answer is returned unchanged.
+        }
     }
 
     private void RequireAvailable()

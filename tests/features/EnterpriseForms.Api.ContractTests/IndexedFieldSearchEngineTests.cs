@@ -96,14 +96,39 @@ public sealed class IndexedFieldSearchEngineTests
     {
         public List<(string Reason, string Outcome)> Fallbacks { get; } = [];
 
+        public List<(string Stage, string Code, int Retry, double DelayMs)> Retries { get; } = [];
+
         public void FallbackToVerifiedScan(string indexReason, string outcome) => Fallbacks.Add((indexReason, outcome));
+
+        public void Retrying(Guid correlationId, string stage, string code, int retryNumber, double delayMilliseconds) => Retries.Add((stage, code, retryNumber, delayMilliseconds));
+    }
+
+    /// <summary>C-150 R56-A: a capability check that first fails with the queued Authority refusals, then answers as the approving policy.</summary>
+    private sealed class FlakyPolicy(params AuthorityClientException[] failures) : IFieldSearchPolicyAuthority
+    {
+        private readonly Queue<AuthorityClientException> pending = new(failures);
+        private readonly PhaseC7FieldSearchTests.ApprovingPolicy inner = new() { Request = Request() };
+
+        public int Calls { get; private set; }
+
+        public Task<AuthorityFieldSearchCapabilities> GetFieldSearchCapabilitiesAsync(DelegatedUserContext user, FieldSearchCapabilitiesQuery query, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return pending.TryDequeue(out var failure) ? throw failure : inner.GetFieldSearchCapabilitiesAsync(user, query, cancellationToken);
+        }
+
+        public Task<AuthorityFieldSearchAdministration> GetFieldSearchAdministrationAsync(DelegatedUserContext user, FieldSearchAdministrationQuery query, CancellationToken cancellationToken) =>
+            inner.GetFieldSearchAdministrationAsync(user, query, cancellationToken);
+
+        public Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken) =>
+            inner.RecordSearchExecutionAsync(user, searchCatalogueSnapshotId, evidence, cancellationToken);
     }
 
     /// <summary>The V1 side: a stub Authority whose catalogue answers with <paramref name="catalogueFailure"/> (V1 is then the verified-scan failure).</summary>
     private static (FieldSearchHandler Handler, FakeIndexed Indexed, ReversibleCursors Cursors, EngineObserver Observer, List<string> V1Calls) Make(string engine = FieldSearchLimits.EngineIndexed,
-        AuthorityClientException? catalogueFailure = null, FakeIndexed? indexed = null)
+        AuthorityClientException? catalogueFailure = null, FakeIndexed? indexed = null, IFieldSearchPolicyAuthority? policy = null)
     {
-        var limits = new FieldSearchLimits { ExecutionEnabled = true, Engine = engine };
+        var limits = new FieldSearchLimits { ExecutionEnabled = true, Engine = engine, RetryInitialDelayMilliseconds = 10, RetryMaximumDelayMilliseconds = 20 };
         var v1Calls = new List<string>();
         var authority = DispatchProxy.Create<IAuthorizationAuthorityClient, PhaseC7ScopeVerificationTests.Stub<IAuthorizationAuthorityClient>>();
         ((PhaseC7ScopeVerificationTests.Stub<IAuthorizationAuthorityClient>)(object)authority).Handler = (method, _) =>
@@ -115,9 +140,10 @@ public sealed class IndexedFieldSearchEngineTests
         var fake = indexed ?? new FakeIndexed { Ids = Enumerable.Range(0, 23).Select(_ => Guid.CreateVersion7()).ToList() };
         var observer = new EngineObserver();
         var admission = new FieldSearchAdmission(limits);
-        var engineInstance = new FieldSearchIndexedEngine(limits, fake, admission, cursors, new Names(), TimeProvider.System);
-        var handler = new FieldSearchHandler(limits, new PhaseC7FieldSearchTests.ApprovingPolicy { Request = Request() }, new TrustedScopeVerifier(authority, new NoRecords(), limits, TimeProvider.System),
-            admission, authority, cursors, new Names(), TimeProvider.System, null, engineInstance, observer);
+        var retry = new FieldSearchRetryPolicy(limits, TimeProvider.System, observer);
+        var engineInstance = new FieldSearchIndexedEngine(limits, fake, admission, cursors, new Names(), TimeProvider.System, retry);
+        var handler = new FieldSearchHandler(limits, policy ?? new PhaseC7FieldSearchTests.ApprovingPolicy { Request = Request() }, new TrustedScopeVerifier(authority, new NoRecords(), limits, TimeProvider.System),
+            admission, authority, cursors, new Names(), TimeProvider.System, null, engineInstance, observer, retry);
         return (handler, fake, cursors, observer, v1Calls);
     }
 
@@ -259,20 +285,105 @@ public sealed class IndexedFieldSearchEngineTests
     }
 
     [Fact]
-    public async Task AChangedSnapshotIsRetriedOnceThenReported()
+    public async Task AChangedSnapshotIsRetriedWithBoundedBackoffThenReported()
     {
+        // C-150 R56-A: retried with a new nonce (a new Authority snapshot) each time, at most RetryMaximumAttempts (4) calls.
         var indexed = new FakeIndexed { Ids = [Guid.CreateVersion7()] };
         indexed.SearchErrors.Enqueue(new AuthorityClientException("SEARCH_SNAPSHOT_CHANGED", 409, true));
+        indexed.SearchErrors.Enqueue(new AuthorityClientException("AUTHORITY_NOT_READY", 503, true));
         var (handler, _, _, _, _) = Make(indexed: indexed);
         Assert.Equal(1, (await handler.SearchAsync(Context(), Request(), Ct)).TotalCount);
-        Assert.Equal(2, indexed.Calls.Count);
-        Assert.NotEqual(indexed.Calls[0].Nonce, indexed.Calls[1].Nonce); // a new snapshot, a new nonce
+        Assert.Equal(3, indexed.Calls.Count);
+        Assert.Equal(3, indexed.Calls.Select(c => c.Nonce).Distinct().Count()); // never a reused snapshot
 
-        var twice = new FakeIndexed();
-        twice.SearchErrors.Enqueue(new AuthorityClientException("SEARCH_SNAPSHOT_CHANGED", 409, true));
-        twice.SearchErrors.Enqueue(new AuthorityClientException("SEARCH_SNAPSHOT_CHANGED", 409, true));
-        var (again, _, _, _, _) = Make(indexed: twice);
+        var always = new FakeIndexed();
+        for (var i = 0; i < 6; i++)
+        {
+            always.SearchErrors.Enqueue(new AuthorityClientException("SEARCH_SNAPSHOT_CHANGED", 409, true));
+        }
+
+        var (again, _, _, _, _) = Make(indexed: always);
         Assert.Equal(SearchErrorCodes.SnapshotChanged, (await Assert.ThrowsAsync<SearchException>(() => again.SearchAsync(Context(), Request(), Ct))).ErrorCode);
+        Assert.Equal(4, always.Calls.Count);
+    }
+
+    [Fact]
+    public async Task AClosedGateAtTheCapabilityCheckIsRetriedAndSharesTheBudgetWithTheSearch()
+    {
+        // C-150 R56-A: the capability check's 503 AUTHORITY_NOT_READY is retried with backoff; its retries count against the same
+        // per-request budget as the search attempts (RetryMaximumAttempts = 4: at most 3 retries in all).
+        var policy = new FlakyPolicy(new AuthorityClientException("AUTHORITY_NOT_READY", 503, true));
+        var indexed = new FakeIndexed { Ids = [Guid.CreateVersion7()] };
+        var (handler, _, _, observer, _) = Make(indexed: indexed, policy: policy);
+        Assert.Equal(1, (await handler.SearchAsync(Context(), Request(), Ct)).TotalCount);
+        Assert.Equal((2, 1), (policy.Calls, indexed.Calls.Count));
+        Assert.Equal([("capabilities", "AUTHORITY_NOT_READY", 1)], observer.Retries.Select(r => (r.Stage, r.Code, r.Retry)).ToList());
+
+        var both = new FlakyPolicy(new AuthorityClientException("AUTHORITY_NOT_READY", 503, true), new AuthorityClientException("AUTHORITY_NOT_READY", 503, true));
+        var failing = new FakeIndexed();
+        for (var i = 0; i < 6; i++)
+        {
+            failing.SearchErrors.Enqueue(new AuthorityClientException("SEARCH_SNAPSHOT_CHANGED", 409, true));
+        }
+
+        var (shared, _, _, sharedObserver, _) = Make(indexed: failing, policy: both);
+        Assert.Equal(SearchErrorCodes.SnapshotChanged, (await Assert.ThrowsAsync<SearchException>(() => shared.SearchAsync(Context(), Request(), Ct))).ErrorCode);
+        Assert.Equal((3, 2), (both.Calls, failing.Calls.Count)); // two capability retries, then one search retry: 3 retries in all
+        Assert.Equal(["capabilities", "capabilities", "indexed-search"], sharedObserver.Retries.Select(r => r.Stage).ToList());
+    }
+
+    [Theory]
+    [InlineData("AUTHORITY_NOT_READY", 503, false)]
+    [InlineData("INTEGRITY_QUARANTINE", 423, false)]
+    [InlineData("SEARCH_FIELD_NOT_ALLOWED", 422, false)]
+    [InlineData("AUTHORITY_UNAVAILABLE", 503, true)]
+    [InlineData("SEARCH_CAPACITY_EXCEEDED", 503, true)]
+    public async Task OtherCapabilityRefusalsAreNeverRetried(string code, int status, bool retryable)
+    {
+        var policy = new FlakyPolicy(new AuthorityClientException(code, status, retryable));
+        var (handler, indexed, _, observer, _) = Make(policy: policy);
+        Assert.Equal(code, (await Assert.ThrowsAsync<AuthorityClientException>(() => handler.SearchAsync(Context(), Request(), Ct))).ErrorCode);
+        Assert.Equal(1, policy.Calls);
+        Assert.Empty(indexed.Calls);
+        Assert.Empty(observer.Retries);
+    }
+
+    [Theory]
+    [InlineData("INTEGRITY_QUARANTINE", 423, true)]
+    [InlineData("RECORD_QUARANTINED", 423, false)]
+    [InlineData("SEARCH_FIELD_NOT_ALLOWED", 422, false)]
+    [InlineData("SEARCH_VERIFICATION_LIMIT", 422, false)]
+    [InlineData("SEARCH_CAPACITY_EXCEEDED", 503, true)]
+    [InlineData("SEARCH_SESSION_INVALID", 401, false)]
+    [InlineData("SEARCH_SNAPSHOT_CHANGED", 409, false)]
+    [InlineData("SEARCH_SNAPSHOT_CHANGED", 503, true)]
+    [InlineData("AUTHORITY_NOT_READY", 409, true)]
+    public async Task OnlyExplicitlyRetryableNotReadyAndSnapshotChangedAreRetried(string code, int status, bool retryable)
+    {
+        var indexed = new FakeIndexed { Ids = [Guid.CreateVersion7()] };
+        indexed.SearchErrors.Enqueue(new AuthorityClientException(code, status, retryable));
+        var (handler, _, _, observer, _) = Make(indexed: indexed);
+        await Assert.ThrowsAsync<SearchException>(() => handler.SearchAsync(Context(), Request(), Ct));
+        Assert.Single(indexed.Calls);
+        Assert.Empty(observer.Retries);
+    }
+
+    [Fact]
+    public async Task ARetryWaitIsCancelledWithTheRequest()
+    {
+        var indexed = new FakeIndexed();
+        for (var i = 0; i < 6; i++)
+        {
+            indexed.SearchErrors.Enqueue(new AuthorityClientException("SEARCH_SNAPSHOT_CHANGED", 409, true));
+        }
+
+        var limits = new FieldSearchLimits { ExecutionEnabled = true, Engine = FieldSearchLimits.EngineIndexed, RetryInitialDelayMilliseconds = 1000, RetryMaximumDelayMilliseconds = 2000, RetryMaximumTotalMilliseconds = 5000 };
+        var engine = new FieldSearchIndexedEngine(limits, indexed, new FieldSearchAdmission(limits), new ReversibleCursors(), new Names(), TimeProvider.System);
+        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => engine.SearchAsync(Context(), Request(), cancel.Token));
+        Assert.True(clock.Elapsed < TimeSpan.FromMilliseconds(450), "the backoff wait must end with the request");
+        Assert.Single(indexed.Calls);
     }
 
     [Theory]
@@ -384,6 +495,7 @@ public sealed class IndexedFieldSearchEngineTests
     public void TheEngineReachesOnlyTheAuthorityIndexAndTheDisplayPort()
     {
         var parameters = typeof(FieldSearchIndexedEngine).GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ToList();
-        Assert.Equal([typeof(FieldSearchLimits), typeof(IIndexedSearchAuthority), typeof(FieldSearchAdmission), typeof(IOpaqueCursorProtector), typeof(IRecordDisplayDirectory), typeof(TimeProvider)], parameters);
+        Assert.Equal([typeof(FieldSearchLimits), typeof(IIndexedSearchAuthority), typeof(FieldSearchAdmission), typeof(IOpaqueCursorProtector), typeof(IRecordDisplayDirectory), typeof(TimeProvider),
+            typeof(FieldSearchRetryPolicy)], parameters); // C-150 R56-A: the retry policy depends only on limits, the clock and the observer
     }
 }

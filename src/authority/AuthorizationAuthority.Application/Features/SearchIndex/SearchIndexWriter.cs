@@ -65,13 +65,31 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
         ArgumentNullException.ThrowIfNull(input);
         var index = scope.SearchIndex;
         var started = System.Diagnostics.Stopwatch.GetTimestamp();
-        // IX-1 remediation: the registry row the commit already read is reused (the same Authority source, not a business input).
-        var formDefinitionId = input.RegisteredFormDefinitionId
+        // C-150 (R-02): Testing-only split of the reads stage, attributed only while this stage runs.
+        var probe = timingSink is null ? null : SearchDerivationReadProbe.Start();
+        Guid formDefinitionId;
+        List<FieldSearchApproval> activeApprovals;
+        try
+        {
+            // IX-1 remediation: the registry row the commit already read is reused (the same Authority source, not a business input).
+            formDefinitionId = input.RegisteredFormDefinitionId
                                ?? (await scope.FindResourceAsync(state.OrganizationId, ResourceTypeNames.FormRecord, input.FormRecordId, cancellationToken).ConfigureAwait(false))?.ParentResourceEntityId
                                ?? throw SearchPostingDerivationV1.Failure("the record has no registered form");
+            if (probe is not null)
+            {
+                probe.RegistryMilliseconds = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            }
 
-        // One read: the form's Active approvals that have a coverage other than Withdrawn (previously two reads).
-        var activeApprovals = await index.GetCoveredActiveApprovalsAsync(state.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false);
+            // One read: the form's Active approvals that have a coverage other than Withdrawn (previously two reads).
+            activeApprovals = await index.GetCoveredActiveApprovalsAsync(state.OrganizationId, formDefinitionId, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (probe is not null)
+            {
+                SearchDerivationReadProbe.Stop();
+            }
+        }
         if (activeApprovals.Count == 0)
         {
             // One command: organization binding, removal of any entry, form-state increment only if an entry was removed.
@@ -138,7 +156,10 @@ public sealed class SearchIndexWriter(SearchIndexOptions options, SearchSealSign
                 System.Diagnostics.Stopwatch.GetElapsedTime(started, readsDone).TotalMilliseconds,
                 System.Diagnostics.Stopwatch.GetElapsedTime(readsDone, derived).TotalMilliseconds,
                 System.Diagnostics.Stopwatch.GetElapsedTime(derived, signed).TotalMilliseconds,
-                System.Diagnostics.Stopwatch.GetElapsedTime(signed, written).TotalMilliseconds));
+                System.Diagnostics.Stopwatch.GetElapsedTime(signed, written).TotalMilliseconds)
+            {
+                ReadSplit = probe,
+            });
         }
 
         return true;
@@ -364,4 +385,8 @@ public static class SearchIndexValues
 /// call plus local verification against the pin; writes = index replacement and form-state upsert (statements queued or sent
 /// before the commit's final flush). Identifiers and durations only.
 /// </summary>
-public sealed record SearchDerivationStageTimings(double ReadsMilliseconds, double DeriveMilliseconds, double SignMilliseconds, double WritesMilliseconds);
+public sealed record SearchDerivationStageTimings(double ReadsMilliseconds, double DeriveMilliseconds, double SignMilliseconds, double WritesMilliseconds)
+{
+    /// <summary>C-150 (R-02): the split of the reads stage (Testing only).</summary>
+    public SearchDerivationReadProbe? ReadSplit { get; init; }
+}

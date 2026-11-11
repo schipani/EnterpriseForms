@@ -90,6 +90,8 @@ services:
       SearchIndex__Access__MaintenanceIntervalMilliseconds: "250"
       # C-149 (R-55): full reconciliation probe interval (code default 60 s); between passes unchanged organizations are skipped.
       SearchIndex__Access__ReconciliationIntervalSeconds: ${IX5_ACCESS_RECONCILIATION_SECONDS:-15}
+      # C-150 IX-5c shadow preparation: off by default; IX5C_SHADOW=true recreates the authority comparing Tier 1 answers with Tier 2 (never serving).
+      SearchIndex__Access__ShadowComparisonEnabled: ${IX5C_SHADOW:-false}
       SearchIndex__CheapSweepIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
       # C-136 (R-33/R-36): entries per S-B transaction (organization lock released between transactions); the measurement recreates
       # the authority with other values.
@@ -99,6 +101,8 @@ services:
       Diagnostics__OperationTiming: ${R37_OPERATION_TIMING:-false}
       # C-149 (P-2): measurement-only SpiceDB call counting (method names and counts); off unless a measurement recreates the authority.
       Diagnostics__SpiceDbCallCounting: ${IX5_SPICEDB_CALL_COUNTING:-false}
+      # C-150 R56-B: committed authorization changes wake the work loop (default on); R56_COMMIT_WAKEUP=false measures the poll alone.
+      AuthorityWork__CommitWakeupEnabled: ${R56_COMMIT_WAKEUP:-true}
       SearchIndex__DeadlineEvaluationIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
       SearchIndex__Seal__Provider: VaultTransit
       SearchIndex__Seal__SigningKeyName: search-entry-seal-v1
@@ -267,6 +271,8 @@ services:
       # for bearer callers without a session. The IX-3 shadow comparison stays available through the Testing endpoint.
       # FIELD_SEARCH_ENGINE=Shadow or VerifiedScan selects the IX-3 or V1 behaviour.
       FieldSearch__Engine: ${FIELD_SEARCH_ENGINE:-Indexed}
+      # C-150 R56-A: attempts per search for transient Authority refusals (default 4; R56_RETRY_ATTEMPTS=1 measures without retry).
+      FieldSearch__RetryMaximumAttempts: ${R56_RETRY_ATTEMPTS:-4}
       # C-137 (R-37): record-creation phase durations (see the authority service); off unless R37_OPERATION_TIMING=true.
       Diagnostics__OperationTiming: ${R37_OPERATION_TIMING:-false}
       Testing__StackIdentity: enterpriseforms-security-test

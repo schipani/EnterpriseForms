@@ -41,6 +41,12 @@ public sealed partial class FieldSearchEngineLogging(ILogger<FieldSearchEngineLo
 {
     public void FallbackToVerifiedScan(string indexReason, string outcome) => LogFallback(logger, indexReason, outcome);
 
+    public void Retrying(Guid correlationId, string stage, string code, int retryNumber, double delayMilliseconds) => LogRetry(logger, correlationId, stage, code, retryNumber, delayMilliseconds);
+
+    /// <summary>C-150 R56-A: one bounded retry of a transient Authority refusal (codes, the retry number, the delay and the request's correlation id only).</summary>
+    [LoggerMessage(EventId = 9334, Level = LogLevel.Information, Message = "R56-RETRY correlation={CorrelationId} stage={Stage} code={Code} retry={RetryNumber} delay_ms={DelayMilliseconds}")]
+    private static partial void LogRetry(ILogger logger, Guid correlationId, string stage, string code, int retryNumber, double delayMilliseconds);
+
     [LoggerMessage(EventId = 9333, Level = LogLevel.Information, Message = "IX4-ENGINE fallback index_reason={IndexReason} verified_scan_outcome={Outcome}")]
     private static partial void LogFallback(ILogger logger, string indexReason, string outcome);
 }

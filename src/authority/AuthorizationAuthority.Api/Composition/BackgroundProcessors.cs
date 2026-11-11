@@ -46,8 +46,11 @@ public sealed partial class SpiceDbSchemaInitializer(ISpiceDbProjection spiceDb,
 /// Single ordered projection + archive loop. One instance per authority process; the SpiceDB marker CAS fences any duplicate.
 /// C8 M4 S1: before any projection it runs the one-time projection-marker transition (v1 → history-bound v2), retried until
 /// SpiceDB answers; decisions and readiness wait for it.
+/// C-150 R56-B: between passes it waits for a wake-up (<see cref="AuthorityWorkSignal"/>: a committed authorization change on any
+/// instance) or its poll (250 ms idle, 50 ms after work), whichever comes first. A wake-up only starts the same durable scan sooner;
+/// the archive-before-projection order, the processors and the organization gate are unchanged.
 /// </summary>
-public sealed partial class AuthorityWorkLoop(IAuthorityStore store, ProjectionProcessor projection, ArchiveProcessor archive, AuthorizationAuthority.Application.Features.PlatformOperators.PlatformJournal platformJournal, SpiceDbSchemaInitializer schemaInitializer, ProjectionIntegrityMonitor integrityMonitor, ProjectionMarkerTransitionState transition, ILogger<AuthorityWorkLoop> logger) : BackgroundService
+public sealed partial class AuthorityWorkLoop(IAuthorityStore store, ProjectionProcessor projection, ArchiveProcessor archive, AuthorizationAuthority.Application.Features.PlatformOperators.PlatformJournal platformJournal, SpiceDbSchemaInitializer schemaInitializer, ProjectionIntegrityMonitor integrityMonitor, ProjectionMarkerTransitionState transition, AuthorityWorkSignal signal, ILogger<AuthorityWorkLoop> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -92,7 +95,14 @@ public sealed partial class AuthorityWorkLoop(IAuthorityStore store, ProjectionP
                 LogLoopError(logger, ex.GetType().Name, ex.Message);
             }
 
-            await Task.Delay(didWork ? TimeSpan.FromMilliseconds(50) : TimeSpan.FromMilliseconds(250), stoppingToken).ConfigureAwait(false);
+            try
+            {
+                await signal.WaitAsync(didWork ? TimeSpan.FromMilliseconds(50) : TimeSpan.FromMilliseconds(250), stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
         }
     }
 

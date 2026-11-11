@@ -177,6 +177,23 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
         return Task.FromResult(Tier1Status);
     }
 
+    /// <summary>C-150 IX-5c: the Tier 1 form content revision and record headers the test declares.</summary>
+    public long Tier1FormContentRevision { get; set; }
+
+    public List<Tier1RecordHeader> Tier1Headers { get; } = [];
+
+    public Task<long> GetTier1FormContentRevisionAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(Tier1FormContentRevision);
+    }
+
+    public Task<List<Tier1RecordHeader>> GetTier1RecordHeadersAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(Tier1Headers.Where(h => formRecordIds.Contains(h.FormRecordId)).ToList());
+    }
+
     public Task<Dictionary<(Guid FormRecordId, Guid FieldSearchApprovalId), int>> GetFieldItemCountsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken)
     {
         Require(organizationId);

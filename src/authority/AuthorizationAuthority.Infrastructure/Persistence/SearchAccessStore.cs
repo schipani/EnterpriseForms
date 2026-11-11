@@ -179,6 +179,16 @@ internal sealed class SearchAccessStore(AuthorityDbContext context) : ISearchAcc
     public Task<string?> GetTier1ProjectionStatusAsync(Guid organizationId, CancellationToken cancellationToken) =>
         context.SearchProjectionStates.AsNoTracking().Where(s => s.OrganizationId == organizationId).Select(s => (string?)s.ProjectionStatusName).SingleOrDefaultAsync(cancellationToken);
 
+    public async Task<long> GetTier1FormContentRevisionAsync(Guid organizationId, Guid formDefinitionId, CancellationToken cancellationToken) =>
+        await context.SearchFormStates.AsNoTracking().Where(f => f.OrganizationId == organizationId && f.FormDefinitionId == formDefinitionId).Select(f => (long?)f.FormContentRevision).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false) ?? 0;
+
+    public Task<List<Tier1RecordHeader>> GetTier1RecordHeadersAsync(Guid organizationId, Guid formDefinitionId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken)
+    {
+        var ids = formRecordIds.ToList();
+        return context.SearchRecordEntries.AsNoTracking().Where(e => e.OrganizationId == organizationId && e.FormDefinitionId == formDefinitionId && ids.Contains(e.FormRecordId))
+            .Select(e => new Tier1RecordHeader(e.FormRecordId, e.RecordStatusName, e.ParentFormRecordId)).ToListAsync(cancellationToken);
+    }
+
     public async Task<Dictionary<(Guid FormRecordId, Guid FieldSearchApprovalId), int>> GetFieldItemCountsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken)
     {
         var ids = formRecordIds.ToList();

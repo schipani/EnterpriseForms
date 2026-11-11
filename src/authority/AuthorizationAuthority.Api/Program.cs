@@ -97,6 +97,13 @@ public sealed class Program
         builder.Services.AddSingleton<SpiceDbSchemaInitializer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<SpiceDbSchemaInitializer>());
         builder.Services.AddHostedService<AuthorityWorkLoop>();
+        // C-150 R56-B: every instance listens for committed authorization changes (any instance's commit wakes all loops).
+        var authorityWork = builder.Configuration.GetSection(AuthorizationAuthority.Application.Common.AuthorityWorkOptions.SectionName).Get<AuthorizationAuthority.Application.Common.AuthorityWorkOptions>() ?? new AuthorizationAuthority.Application.Common.AuthorityWorkOptions();
+        if (authorityWork.CommitWakeupEnabled && builder.Configuration.GetConnectionString("AuthorityDb") is { Length: > 0 } workListenerConnection)
+        {
+            builder.Services.AddHostedService(sp => new AuthorityWorkNotificationListener(workListenerConnection, sp.GetRequiredService<AuthorizationAuthority.Application.Common.AuthorityWorkSignal>(),
+                sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<AuthorityWorkNotificationListener>>()));
+        }
         // C8 M4 S1 (S2): periodic projection-integrity check; it complements, never replaces, the decision-time protocol.
         builder.Services.AddSingleton(builder.Configuration.GetSection(ProjectionIntegrityOptions.SectionName).Get<ProjectionIntegrityOptions>() ?? new ProjectionIntegrityOptions());
         builder.Services.AddHostedService<ProjectionIntegrityMonitorLoop>();
@@ -126,6 +133,7 @@ public sealed class Program
             AuthorizationAuthority.Api.Features.SearchIndex.IndexedSearchEndpoints.MapIndexedSearchTestingEndpoints(app); // IX-3 plan-shape test
             AuthorizationAuthority.Api.Features.SearchIndex.SearchAccessTestingEndpoints.MapSearchAccessTestingEndpoints(app); // IX-5a
             AuthorizationAuthority.Api.Features.Health.SpiceDbCallCountingEndpoints.MapSpiceDbCallCountingEndpoints(app); // C-149 P-2
+            AuthorizationAuthority.Api.Features.Health.AuthorityWorkTestingEndpoints.MapAuthorityWorkTestingEndpoints(app); // C-150 R56-B
         }
 
         app.MapAuthorizationEndpoints();

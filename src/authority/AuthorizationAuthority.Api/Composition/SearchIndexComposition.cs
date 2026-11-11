@@ -47,7 +47,14 @@ public static class SearchIndexComposition
             if (emitStageTimings)
             {
                 var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("AuthorizationAuthority.Ix1CommitTiming");
-                sink = (record, t) => SearchIndexTimingLog.Stages(logger, record, t.ReadsMilliseconds, t.DeriveMilliseconds, t.SignMilliseconds, t.WritesMilliseconds);
+                sink = (record, t) =>
+                {
+                    SearchIndexTimingLog.Stages(logger, record, t.ReadsMilliseconds, t.DeriveMilliseconds, t.SignMilliseconds, t.WritesMilliseconds);
+                    if (t.ReadSplit is { } r)
+                    {
+                        SearchIndexTimingLog.ReadSplit(logger, record, r.RegistryMilliseconds, r.FirstScanMilliseconds, r.SecondScanMilliseconds, r.QueryMilliseconds, r.CommandExecuteMilliseconds, r.Commands, r.TrackedEntities, r.ApprovalRows, r.TrackedMergePath);
+                    }
+                };
             }
 
             return new SearchIndexWriter(options, options.Mode == SearchIndexMode.Dark ? sp.GetRequiredService<SearchSealSigningGate>() : null, sink);
@@ -244,6 +251,10 @@ internal static partial class SearchIndexTimingLog
 {
     [LoggerMessage(EventId = 9301, Level = LogLevel.Information, Message = "IX1-DERIVE-TIMING record={FormRecordId} reads_ms={Reads} derive_ms={Derive} sign_ms={Sign} writes_ms={Writes}")]
     public static partial void Stages(ILogger logger, Guid formRecordId, double reads, double derive, double sign, double writes);
+
+    /// <summary>C-150 (R-02): the reads-stage split (durations and counts only).</summary>
+    [LoggerMessage(EventId = 9302, Level = LogLevel.Information, Message = "IX1-READ-SPLIT record={FormRecordId} registry_ms={Registry} first_scan_ms={FirstScan} second_scan_ms={SecondScan} query_ms={Query} command_ms={Command} commands={Commands} tracked_entities={Tracked} approval_rows={Rows} tracked_merge={Merge}")]
+    public static partial void ReadSplit(ILogger logger, Guid formRecordId, double registry, double firstScan, double secondScan, double query, double command, int commands, int tracked, int rows, bool merge);
 }
 
 /// <summary>

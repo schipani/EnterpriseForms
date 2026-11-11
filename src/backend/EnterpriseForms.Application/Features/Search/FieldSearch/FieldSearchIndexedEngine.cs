@@ -23,6 +23,11 @@ public interface IFieldSearchEngineObserver
 {
     /// <summary>The index could not answer (<paramref name="indexReason"/>); the complete V1 path ran instead (<paramref name="outcome"/>).</summary>
     void FallbackToVerifiedScan(string indexReason, string outcome);
+
+    /// <summary>C-150 R56-A: a transient Authority refusal (<paramref name="code"/>) at <paramref name="stage"/> is retried after <paramref name="delayMilliseconds"/> (codes, counts and the request's correlation id only).</summary>
+    void Retrying(Guid correlationId, string stage, string code, int retryNumber, double delayMilliseconds)
+    {
+    }
 }
 
 /// <summary>IX-D8: the Authority's index cannot answer this search now; the caller may run the complete V1 path.</summary>
@@ -114,8 +119,11 @@ public sealed record IndexedFieldSearchCursor(Guid OrganizationId, Guid UserId, 
 /// (IX-D8); every other refusal (organization quarantine, quarantined record, limits, authorization) is final — the fallback
 /// never bypasses an S1 or record gate (Q2).
 /// </summary>
-public sealed class FieldSearchIndexedEngine(FieldSearchLimits limits, IIndexedSearchAuthority indexed, FieldSearchAdmission admission, IOpaqueCursorProtector cursors, IRecordDisplayDirectory directory, TimeProvider clock)
+public sealed class FieldSearchIndexedEngine(FieldSearchLimits limits, IIndexedSearchAuthority indexed, FieldSearchAdmission admission, IOpaqueCursorProtector cursors, IRecordDisplayDirectory directory, TimeProvider clock,
+    FieldSearchRetryPolicy? retryPolicy = null)
 {
+    private readonly FieldSearchRetryPolicy retry = retryPolicy ?? new FieldSearchRetryPolicy(limits, clock);
+
     /// <summary>The design §6.2 statement (IX-D3), shown with every indexed result.</summary>
     public const string AcceptedContentStatement = "Results reflect the content the Authorization Authority last accepted for each record, at one Authority snapshot. Each returned record's searched values were checked against that accepted content. The business database copy is not checked by search; it is fully verified when you open a record.";
 
@@ -124,8 +132,17 @@ public sealed class FieldSearchIndexedEngine(FieldSearchLimits limits, IIndexedS
 
     public bool Enabled => limits.Engine == FieldSearchLimits.EngineIndexed;
 
-    /// <summary>Runs the indexed search (one automatic retry on a changed snapshot, as V1). Throws <see cref="IndexedSearchUnavailableException"/> for the fallback, or the typed <see cref="SearchException"/>.</summary>
-    public async Task<FieldSearchResponse> SearchAsync(RequestContext context, FieldSearchRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Runs the indexed search. C-150 R56-A: a retryable 503 <c>AUTHORITY_NOT_READY</c> or 409 <c>SEARCH_SNAPSHOT_CHANGED</c> is retried with
+    /// bounded jittered backoff (<see cref="FieldSearchRetryPolicy"/>), each attempt a new call with a new nonce, so a new Authority snapshot;
+    /// only while this instance has a free search slot. Throws <see cref="IndexedSearchUnavailableException"/> for the fallback, or the typed
+    /// <see cref="SearchException"/> of the last refusal.
+    /// </summary>
+    public Task<FieldSearchResponse> SearchAsync(RequestContext context, FieldSearchRequest request, CancellationToken cancellationToken) =>
+        SearchAsync(context, request, null, cancellationToken);
+
+    /// <summary>The same, sharing the request's retry budget (<paramref name="budget"/>) with the handler's capability check.</summary>
+    public async Task<FieldSearchResponse> SearchAsync(RequestContext context, FieldSearchRequest request, FieldSearchRetryPolicy.Budget? budget, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
@@ -135,7 +152,8 @@ public sealed class FieldSearchIndexedEngine(FieldSearchLimits limits, IIndexedS
             request.RecordStatus, request.IncludeChildren, request.IncludeArchived, request.SortBy, request.SortDirection, request.PageSize);
         using var lease = await admission.AdmitAsync(context.LocalUserId, cancellationToken).ConfigureAwait(false);
         var user = context.ToDelegatedUser();
-        for (var attempt = 1; ; attempt++)
+        budget ??= retry.Begin();
+        while (true)
         {
             var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
             AuthorityIndexedSearchResult result;
@@ -147,9 +165,15 @@ public sealed class FieldSearchIndexedEngine(FieldSearchLimits limits, IIndexedS
             {
                 throw new IndexedSearchUnavailableException(ex.ErrorCode, ex.Retryable);
             }
-            catch (AuthorityClientException ex) when (attempt == 1 && ex.ErrorCode is "SEARCH_SNAPSHOT_CHANGED" or "AUTHORITY_NOT_READY" && admission.HasFreeSlot)
+            catch (AuthorityClientException ex) when (FieldSearchRetryPolicy.IsRetryable(ex))
             {
-                continue; // the business retries a changed snapshot once, as V1 does
+                // R56-A: never into an overloaded instance; the failed attempt's snapshot is never reused (the next call gets a new one).
+                if (admission.HasFreeSlot && await retry.WaitBeforeRetryAsync(budget, "indexed-search", ex.ErrorCode, context.CorrelationId, null, cancellationToken).ConfigureAwait(false))
+                {
+                    continue;
+                }
+
+                throw MapSearchFailure(ex);
             }
             catch (AuthorityClientException ex)
             {

@@ -60,6 +60,25 @@ internal sealed class AuthorityCommandCountingInterceptor : DbCommandInterceptor
         return result;
     }
 
+    // C-150 (R-02): command execution time as EF Core measures it, attributed to an active read-stage probe only.
+    public override DbDataReader ReaderExecuted(DbCommand command, CommandExecutedEventData eventData, DbDataReader result)
+    {
+        AuthorizationAuthority.Application.Features.SearchIndex.SearchDerivationReadProbe.Current?.CommandExecuted(eventData.Duration);
+        return result;
+    }
+
+    public override ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData, DbDataReader result, CancellationToken cancellationToken = default)
+    {
+        AuthorizationAuthority.Application.Features.SearchIndex.SearchDerivationReadProbe.Current?.CommandExecuted(eventData.Duration);
+        return ValueTask.FromResult(result);
+    }
+
+    public override ValueTask<int> NonQueryExecutedAsync(DbCommand command, CommandExecutedEventData eventData, int result, CancellationToken cancellationToken = default)
+    {
+        AuthorizationAuthority.Application.Features.SearchIndex.SearchDerivationReadProbe.Current?.CommandExecuted(eventData.Duration);
+        return ValueTask.FromResult(result);
+    }
+
     public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {
         AuthorityCommandCounter.CountEfCommand();

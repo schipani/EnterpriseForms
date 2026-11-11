@@ -79,6 +79,19 @@ public static class SearchAccessTestingEndpoints
         group.MapPost("/{organizationId:guid}/evaluate", static async Task<Ok<EvaluateResponse>> (Guid organizationId, EvaluateRequest request, SearchAccessProjectionService service, CancellationToken cancellationToken) =>
             TypedResults.Ok(new EvaluateResponse(await service.EvaluateForTestingAsync(organizationId, request.FormDefinitionId, request.AuthorityUserId, request.Conditions, cancellationToken).ConfigureAwait(false))));
 
+        // C-150 IX-5c: shadow comparison counters and recent results (counts and codes only); 404 when the comparison is not enabled.
+        group.MapGet("/shadow", static Results<Ok<SearchAccessShadowSnapshot>, NotFound> (IServiceProvider services) =>
+            services.GetService<SearchAccessShadowComparer>() is { } comparer ? TypedResults.Ok(comparer.Snapshot()) : TypedResults.NotFound());
+        group.MapPost("/shadow/reset", static Results<Ok<SearchAccessShadowSnapshot>, NotFound> (IServiceProvider services) =>
+        {
+            if (services.GetService<SearchAccessShadowComparer>() is not { } comparer)
+            {
+                return TypedResults.NotFound();
+            }
+
+            comparer.Reset();
+            return TypedResults.Ok(comparer.Snapshot());
+        });
         group.MapPost("/maintenance", static async Task<Ok<MaintenanceRequest>> (MaintenanceRequest request, SearchAccessMaintenanceSwitch maintenanceSwitch, CancellationToken cancellationToken) =>
         {
             await maintenanceSwitch.SetPausedAsync(request.Paused, cancellationToken).ConfigureAwait(false);

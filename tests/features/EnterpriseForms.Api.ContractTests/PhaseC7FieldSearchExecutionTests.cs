@@ -71,7 +71,7 @@ public sealed class PhaseC7FieldSearchExecutionTests
         public int Catalogues { get; private set; }
         public List<SearchExecutionEvidence> Evidence { get; } = [];
         public bool EvidenceFails { get; set; }
-        public FieldSearchLimits Limits { get; } = new() { ExecutionEnabled = true };
+        public FieldSearchLimits Limits { get; } = new() { ExecutionEnabled = true, RetryInitialDelayMilliseconds = 10, RetryMaximumDelayMilliseconds = 20 };
 
         public List<AuthoritySearchableField> Searchable { get; } =
         [
@@ -290,7 +290,7 @@ public sealed class PhaseC7FieldSearchExecutionTests
     }
 
     [Fact]
-    public async Task AChangedSnapshotIsRetriedAtMostOnceAndAPendingCreationNeverBlocks()
+    public async Task AChangedSnapshotIsRetriedWithinTheBoundedBudgetAndAPendingCreationNeverBlocks()
     {
         var world = new World();
         world.Records.Add(new Rec().Text(Name, "Jordan"));
@@ -301,12 +301,16 @@ public sealed class PhaseC7FieldSearchExecutionTests
         Assert.Contains("1 pending creation", result.ScopeStatement, StringComparison.Ordinal);
         Assert.Equal(2, world.Catalogues);
 
-        world.CatalogueFailures.Enqueue(new AuthorityClientException("AUTHORITY_NOT_READY", 503, true));
-        world.CatalogueFailures.Enqueue(new AuthorityClientException("AUTHORITY_NOT_READY", 503, true));
+        // C-150 R56-A: at most RetryMaximumAttempts (4) catalogue snapshots per search, then the same refusal as before.
+        for (var i = 0; i < 4; i++)
+        {
+            world.CatalogueFailures.Enqueue(new AuthorityClientException("AUTHORITY_NOT_READY", 503, true));
+        }
+
         var refusal = await Assert.ThrowsAsync<SearchException>(() => world.Handler().SearchAsync(Context, Request(new FieldSearchCondition(Name, "equals", "String", "Jordan")), Ct));
         Assert.Equal(SearchErrorCodes.SnapshotChanged, refusal.ErrorCode);
         Assert.True(refusal.Retryable);
-        Assert.Equal(4, world.Catalogues);
+        Assert.Equal(2 + 4, world.Catalogues);
     }
 
     [Fact]

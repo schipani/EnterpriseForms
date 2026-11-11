@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using EnterpriseForms.SecurityTests.Harness;
 using EnterpriseForms.StageBTests.Harness;
 using Xunit;
@@ -22,6 +23,13 @@ namespace EnterpriseForms.StageBTests.Tests;
 /// intervals and their durations, and the authorization revision rate. Correctness: every answered result is checked against
 /// the toggles' commit windows (a record definitely unshared over the whole search must be absent; definitely shared, present).
 /// Report: artifacts/ix-5/r56-search-availability.json, written before any assertion. Nothing is relaxed: the test only observes.
+/// <para>
+/// C-150 (R56-A, R56-B): every search carries its own correlation id, so the business API's bounded-retry log lines (event 9334,
+/// <c>R56-RETRY</c>) attribute retries to searches: a search is answered "on its first attempt" only when the business API made no retry.
+/// After each permission change the changer also polls the gate every 5 ms until Ready (the per-change reopen time). The client retry
+/// is off by default (<c>R56_CLIENT_RETRIES</c>, C-149 used 4) because the business API now retries itself. <c>R56_LABEL</c> names the
+/// report (e.g. the Authority's <c>R56_COMMIT_WAKEUP</c> setting under test).
+/// </para>
 /// </summary>
 [Collection(StageBStackCollectionDefinition.Name)]
 public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fixture)
@@ -40,7 +48,7 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
     /// <summary>A share state change of one record: the state before, the state after, and the window [Requested, Confirmed] in which it committed.</summary>
     private sealed record Toggle(Guid Record, bool SharedAfter, DateTimeOffset Requested, DateTimeOffset Confirmed);
 
-    private sealed record Attempt(int Status, string? Code, double Ms);
+    private sealed record Attempt(int Status, string? Code, double Ms, Guid Correlation);
 
     private sealed record SearchObservation(string Phase, DateTimeOffset Started, DateTimeOffset Ended, List<Attempt> Attempts, List<Guid>? Result);
 
@@ -53,6 +61,9 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
         var randomArrival = string.Equals(Environment.GetEnvironmentVariable("R56_ARRIVAL"), "random", StringComparison.OrdinalIgnoreCase);
         var arrivals = new Random(5601);
         var phaseSeconds = int.TryParse(Environment.GetEnvironmentVariable("R56_PHASE_SECONDS"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ps) ? ps : 120;
+        var clientRetries = int.TryParse(Environment.GetEnvironmentVariable("R56_CLIENT_RETRIES"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var cr) ? cr : 0;
+        var label = Environment.GetEnvironmentVariable("R56_LABEL") is { Length: > 0 } l ? l : null;
+        var reopenAfterChange = new ConcurrentBag<(string Phase, double Ms)>();
         var s = new StageBScenario(fixture, "r56-churn");
         await s.BootstrapAsync();
         var org = s.OrganizationId;
@@ -160,6 +171,8 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", s.Token(s.Reader));
             request.Headers.Add("X-Testing-Session-Digest", digest);
+            var correlation = Guid.CreateVersion7();
+            request.Headers.Add("X-Correlation-Id", correlation.ToString("D"));
             var clock = Stopwatch.StartNew();
             using var response = await http.SendAsync(request, CancellationToken.None);
             var body = await response.Content.ReadAsStringAsync(CancellationToken.None);
@@ -167,7 +180,7 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
             var root = doc.RootElement;
             var code = root.TryGetProperty("errorCode", out var e) && e.ValueKind == JsonValueKind.String ? e.GetString() : root.TryGetProperty("title", out var t) ? t.GetString() : null;
             var result = response.IsSuccessStatusCode ? root.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("formRecordId").GetGuid()).ToList() : null;
-            return (new Attempt((int)response.StatusCode, response.IsSuccessStatusCode ? null : code, clock.Elapsed.TotalMilliseconds), result);
+            return (new Attempt((int)response.StatusCode, response.IsSuccessStatusCode ? null : code, clock.Elapsed.TotalMilliseconds, correlation), result);
         }
 
         // Gate poller: closed intervals and authorization revisions over the whole measurement.
@@ -232,6 +245,14 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
                         }
 
                         Interlocked.Increment(ref changes);
+                        // C-150: the per-change reopen time (from the confirmed command to the gate's Ready), polled every 5 ms.
+                        var reopen = Stopwatch.StartNew();
+                        while (reopen.Elapsed < TimeSpan.FromSeconds(10) && (await fixture.Authority.GateAsync(org)).GetProperty("projection_gate_state").GetString() != "Ready")
+                        {
+                            await Task.Delay(5, CancellationToken.None);
+                        }
+
+                        reopenAfterChange.Add((name, reopen.Elapsed.TotalMilliseconds));
                     }
                 }, CancellationToken.None);
 
@@ -249,7 +270,7 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
                     var started = DateTimeOffset.UtcNow;
                     var attempts = new List<Attempt>();
                     List<Guid>? result = null;
-                    for (var attempt = 0; attempt < 5; attempt++)
+                    for (var attempt = 0; attempt < 1 + clientRetries; attempt++)
                     {
                         var (outcome, items) = await SearchOnceAsync();
                         attempts.Add(outcome);
@@ -337,6 +358,12 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
             }
         }
 
+        // C-150 (R56-A): the business API's retries, attributed to searches by correlation id (codes, stages and delays only).
+        var retryLine = new Regex(@"R56-RETRY correlation=(?<c>[0-9a-f-]{36}) stage=(?<s>[a-z-]+) code=(?<k>[A-Z_]+) retry=(?<n>\d+) delay_ms=(?<d>[0-9.,]+)", RegexOptions.CultureInvariant);
+        var retries = retryLine.Matches(fixture.Stack.Logs("api", 400_000)).Select(m => (Correlation: Guid.Parse(m.Groups["c"].Value), Stage: m.Groups["s"].Value, Code: m.Groups["k"].Value))
+            .GroupBy(r => r.Correlation).ToDictionary(g => g.Key, g => g.ToList());
+        int BusinessRetries(SearchObservation o) => o.Attempts.Sum(a => retries.TryGetValue(a.Correlation, out var list) ? list.Count : 0);
+
         var samples = gateSamples.ToList();
         object PhaseReport((string Name, DateTimeOffset Start, DateTimeOffset End, int Changes) w)
         {
@@ -382,6 +409,20 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
                 },
                 answered_attempt_ms = Stats(obs.SelectMany(o => o.Attempts).Where(x => x.Status == 200).Select(x => x.Ms)),
                 refused_attempt_ms = Stats(obs.SelectMany(o => o.Attempts).Where(x => x.Status != 200).Select(x => x.Ms)),
+                // C-150: the business API's own bounded retry (R56-A) and the per-change gate reopen time (R56-B).
+                business_retry = new
+                {
+                    answered_without_business_retry_fraction = obs.Count == 0 ? 0 : Math.Round(obs.Count(o => o.Attempts[0].Status == 200 && BusinessRetries(o) == 0) / (double)obs.Count, 3),
+                    first_response_answered_fraction = obs.Count == 0 ? 0 : Math.Round(obs.Count(o => o.Attempts[0].Status == 200) / (double)obs.Count, 3),
+                    searches_with_business_retries = obs.Count(o => BusinessRetries(o) > 0),
+                    business_retries_total = obs.Sum(BusinessRetries),
+                    business_retries_per_search = Stats(obs.Select(o => (double)BusinessRetries(o))),
+                    retried_codes_by_stage = obs.SelectMany(o => o.Attempts).SelectMany(a => retries.TryGetValue(a.Correlation, out var list) ? list : []).GroupBy(r => r.Stage + " " + r.Code).ToDictionary(g => g.Key, g => g.Count()),
+                    first_response_refusals = obs.Where(o => o.Attempts[0].Status != 200).GroupBy(o => $"{o.Attempts[0].Status} {o.Attempts[0].Code}").ToDictionary(g => g.Key, g => g.Count()),
+                    first_response_ms = Stats(obs.Select(o => o.Attempts[0].Ms)),
+                    first_response_answered_ms = Stats(obs.Where(o => o.Attempts[0].Status == 200).Select(o => o.Attempts[0].Ms)),
+                },
+                gate_reopen_after_change_ms = Stats(reopenAfterChange.Where(r => r.Phase == w.Name).Select(r => r.Ms)),
             };
         }
 
@@ -393,13 +434,16 @@ public sealed class SearchAvailabilityUnderPermissionChurnTests(StageBFixture fi
             stack = fixture.Stack.ImageFingerprint(),
             phase_seconds = phaseSeconds,
             search_arrival = randomArrival ? "uniform random offset within each one-second slot" : "aligned one-second slots (phase-locked with the changes)",
-            client_retry = "on 503 AUTHORITY_NOT_READY or 409 SEARCH_SNAPSHOT_CHANGED: 250 ms pause, at most 4 more attempts (test client only; the business API's own single immediate retry is unchanged)",
+            client_retry = clientRetries == 0 ? "none (C-150: the business API's bounded retry R56-A only)" : $"on 503 AUTHORITY_NOT_READY or 409 SEARCH_SNAPSHOT_CHANGED: 250 ms pause, at most {clientRetries} more attempts (test client), on top of the business API's retry",
+            label,
+            authority_work = await fixture.Authority.SendAsync(HttpMethod.Get, "/internal/v1/testing/authority-work", TestIdentity.WorkloadToken(), null) is { IsSuccess: true } work ? JsonSerializer.Deserialize<JsonElement>(work.Body) : (JsonElement?)null,
             phases = phaseWindows.Select(PhaseReport),
             correctness = new { answered_searches_checked = observations.Count(o => o.Result is not null), violations },
         };
         var directory = Path.Combine(ComposeStack.RepositoryRoot, "artifacts", "ix-5");
         Directory.CreateDirectory(directory);
-        await File.WriteAllTextAsync(Path.Combine(directory, (randomArrival ? "r56-search-availability-random-arrival.json" : "r56-search-availability.json")), JsonSerializer.Serialize(report, Indented), Ct);
+        var file = (randomArrival ? "r56-search-availability-random-arrival" : "r56-search-availability") + (label is null ? string.Empty : "-" + label) + ".json";
+        await File.WriteAllTextAsync(Path.Combine(directory, file), JsonSerializer.Serialize(report, Indented), Ct);
         Assert.True(violations.Count == 0, string.Join("; ", violations.Take(10)));
     }
 }

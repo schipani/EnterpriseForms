@@ -54,6 +54,8 @@ public sealed partial class SearchAccessBoundaryTests
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessJournalVerifier.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessMaintenanceSchedule.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessProjectionService.cs",
+            "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessProjectionService.Shadow.cs", // C-150 IX-5c (off-path comparison)
+            "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessShadowComparer.cs", // C-150 IX-5c
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessValueDerivation.cs",
             "AuthorizationAuthority.Domain/Features/SearchAccess/SearchAccessEntities.cs",
             "AuthorizationAuthority.Infrastructure/Persistence/AuthorityDbContext.cs",
