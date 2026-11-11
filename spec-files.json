@@ -169,13 +169,18 @@
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX4_EVIDENCE.md",
-      "sha256": "bd9723e6927b003d051bf5ca5421d18081b3318346092d2bdc3ef042ccc4ffe4",
-      "bytes": 80012
+      "sha256": "c1de1ce6d8b04ea5b3f88d6341bf5c467d525496d2c06aaf84874c77aa976776",
+      "bytes": 80577
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5A_EVIDENCE.md",
       "sha256": "5b911cff5841e21257f0aec0ba365b82c9afe49a5f1f4f43f39305800fd012e9",
       "bytes": 16654
+    },
+    {
+      "path": "docs/architecture/INDEXED_SEARCH_IX5B_EVIDENCE.md",
+      "sha256": "ee214237d22bb1b40cb1ec44d96f3c51975c6676dea2ce6dd4adafce9bf24965",
+      "bytes": 18293
     },
     {
       "path": "docs/architecture/INDEXED_SEARCH_IX5_DESIGN_ACCEPTANCE_RECORD.md",
@@ -444,8 +449,8 @@
     },
     {
       "path": "docs/decisions/PHASE_C_DECISION_LOG.md",
-      "sha256": "fdd94173c0533bc6da963ff254852038a7815d798c288f408d60c8993e71a2dd",
-      "bytes": 267179
+      "sha256": "3e971078659e8717ba5f90ef055375e429bfe85ca61a1bd4bb8118ea75ea0058",
+      "bytes": 269259
     },
     {
       "path": "docs/decisions/PREBUILD_DECISION_REGISTER.md",
