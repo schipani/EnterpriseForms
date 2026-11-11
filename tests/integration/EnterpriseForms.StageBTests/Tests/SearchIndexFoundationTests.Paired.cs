@@ -39,6 +39,10 @@ public sealed partial class SearchIndexFoundationTests
         var resamples = Setting("P5_BOOTSTRAP", 10_000);
         var seed = Setting("P5_SEED", 149);
         var label = Environment.GetEnvironmentVariable("P5_LABEL") is { Length: > 0 } l ? l : "run";
+        // C-149 continuation: a time cap for the creation loop (0 = none); a capped run is reported as partial, never as complete.
+        var maximumSeconds = Setting("P5_MAX_SECONDS", 0);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var capped = false;
         var indexed = await WorkspaceAsync("p5-paired-indexed");
         var plain = await WorkspaceAsync("p5-paired-plain", approve: false);
         var random = new Random(seed);
@@ -46,6 +50,12 @@ public sealed partial class SearchIndexFoundationTests
         var started = DateTimeOffset.UtcNow;
         for (var pair = 0; pair < warmup + pairs; pair++)
         {
+            if (maximumSeconds > 0 && stopwatch.Elapsed.TotalSeconds >= maximumSeconds)
+            {
+                capped = true;
+                break;
+            }
+
             var indexedFirst = random.Next(2) == 0;
             foreach (var (w, series, order) in indexedFirst ? new[] { (indexed, "indexed", 0), (plain, "plain", 1) } : new[] { (plain, "plain", 0), (indexed, "indexed", 1) })
             {
@@ -115,7 +125,10 @@ public sealed partial class SearchIndexFoundationTests
             delta_p95_ms = Math.Round(Nearest(indexedSorted, 0.95) - Nearest(plainSorted, 0.95), 2),
             delta_p99_ms = Math.Round(Nearest(indexedSorted, 0.99) - Nearest(plainSorted, 0.99), 2),
             delta_p95_bootstrap = new { resamples = deltas.Count, ci95_lower_ms = Math.Round(Nearest(deltas, 0.025), 2), ci95_upper_ms = Math.Round(Nearest(deltas, 0.975), 2) },
-            per_pair_difference_ms = new { p50 = Math.Round(Nearest(pairDeltas, 0.50), 2), p95 = Math.Round(Nearest(pairDeltas, 0.95), 2), note = "distribution of indexed minus plain within a pair (secondary)" },
+            per_pair_difference_ms = new { p50 = Math.Round(Nearest(pairDeltas, 0.50), 2), p95 = Math.Round(Nearest(pairDeltas, 0.95), 2), p99 = Math.Round(Nearest(pairDeltas, 0.99), 2), note = "percentiles of (indexed minus plain) within each pair; not the same statistic as delta_p95_ms, which is p95(indexed) minus p95(plain)" },
+            capped_by_time_limit = capped,
+            time_limit_seconds = maximumSeconds,
+            creation_seconds = Math.Round(stopwatch.Elapsed.TotalSeconds, 1),
             db_commands = new { indexed_median = measured.Select(p => p.IndexedCommands).Order().ElementAt(measured.Count / 2), plain_median = measured.Select(p => p.PlainCommands).Order().ElementAt(measured.Count / 2), indexed_max = measured.Max(p => p.IndexedCommands), plain_max = measured.Max(p => p.PlainCommands) },
             gate = new { p95_delta_ms = 20, pass_criterion = "section 6.5: pooled upper 95% bound at or under 20 ms and no run's interval entirely above 20 ms (computed across runs from the CSVs)" },
             missing_timing_lines = created.Count(c => !commits.ContainsKey(c.Record)),
@@ -124,6 +137,6 @@ public sealed partial class SearchIndexFoundationTests
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(Path.Combine(directory, $"p5-paired-{label}.csv"), csv.ToString(), Ct);
         await File.WriteAllTextAsync(Path.Combine(directory, $"p5-paired-{label}.json"), JsonSerializer.Serialize(report, Indented), Ct);
-        Assert.True(measured.Count >= pairs * 0.95, $"only {measured.Count} of {pairs} pairs had both timing lines");
+        Assert.True(capped || measured.Count >= pairs * 0.95, $"only {measured.Count} of {pairs} pairs had both timing lines");
     }
 }

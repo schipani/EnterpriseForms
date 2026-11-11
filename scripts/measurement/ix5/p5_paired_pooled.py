@@ -52,7 +52,8 @@ def main():
         runs.append({"csv": path, "pairs": len(pairs), "indexed_ms": summary([p[0] for p in pairs]), "plain_ms": summary([p[1] for p in pairs]),
                      "delta_p50_ms": round(nearest(sorted(p[0] for p in pairs), 0.5) - nearest(sorted(p[1] for p in pairs), 0.5), 2),
                      "delta_p95_ms": round(p95_delta(pairs), 2), "delta_p99_ms": round(nearest(sorted(p[0] for p in pairs), 0.99) - nearest(sorted(p[1] for p in pairs), 0.99), 2),
-                     "ci95_ms": [round(nearest(boot, 0.025), 2), round(nearest(boot, 0.975), 2)], "_pairs": pairs})
+                     "ci95_ms": [round(nearest(boot, 0.025), 2), round(nearest(boot, 0.975), 2)],
+                     "paired_difference_ms": summary([p[0] - p[1] for p in pairs]), "_pairs": pairs})
     pooled_pairs = [p for r in runs for p in r["_pairs"]]
     pooled_boot = sorted(p95_delta([q for r in runs for q in (r["_pairs"][rng.randrange(len(r["_pairs"]))] for _ in r["_pairs"])]) for _ in range(RESAMPLES))
     lower, upper = nearest(pooled_boot, 0.025), nearest(pooled_boot, 0.975)
@@ -69,7 +70,9 @@ def main():
         "kind": "C-149 R-02 pooled paired commit-latency analysis (section 6.5 criterion; local Docker; indicative, not staging)",
         "gate_p95_delta_ms": GATE_MS, "resamples": RESAMPLES, "runs": [{k: v for k, v in r.items() if k != "_pairs"} for r in runs],
         "pooled": {"pairs": len(pooled_pairs), "indexed_ms": summary([p[0] for p in pooled_pairs]), "plain_ms": summary([p[1] for p in pooled_pairs]),
-                   "delta_p95_ms": round(point, 2), "ci95_ms": [round(lower, 2), round(upper, 2)]},
+                   "delta_p95_ms": round(point, 2), "ci95_ms": [round(lower, 2), round(upper, 2)],
+                   "paired_difference_ms": summary([p[0] - p[1] for p in pooled_pairs]),
+                   "note": "delta_p95_ms is p95(indexed) - p95(plain), the gate statistic; paired_difference_ms gives percentiles of (indexed - plain) per pair"},
         "run_to_run_delta_p95_ms": {"mean": round(statistics.mean(deltas), 2), "stdev": round(statistics.stdev(deltas), 2) if len(deltas) > 1 else None, "min": min(deltas), "max": max(deltas)},
         "any_run_interval_entirely_above_gate": any_run_above,
         "verdict": verdict,
