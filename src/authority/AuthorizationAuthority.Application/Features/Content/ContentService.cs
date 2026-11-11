@@ -136,6 +136,12 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
         }
 
         var parsed = ParseCandidate(request, state.OrganizationId, key.CurrentSigningKeyVersion);
+
+        // R-53 (C-148): the complete current snapshot is proven equal to the accepted head on every write path, and the
+        // candidate's item identities are checked against it and against the permanent bindings (ContentItemIdentityRules).
+        var current = await BindAcceptedSnapshotAsync(scope, state, request, currentLeaves, head, key, bound, correlationId, cancellationToken).ConfigureAwait(false);
+        await ContentItemIdentityRules.EnforceAtPrepareAsync(scope, state.OrganizationId, request.FormRecordId,
+            current.Select(i => (i.Kind, i.ItemId, i.Document)).ToList(), parsed.Select(p => (p.Kind, p.ItemId, p.Document)).ToList(), cancellationToken).ConfigureAwait(false);
         Dictionary<string, string> mutations;
         if (reprotection is null)
         {
@@ -149,7 +155,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             {
                 // Phase C5 share editor: switch, scope, current-snapshot proof (D4) and column-class classification (D14/D15).
                 RequireShareEditor(graph, bound, request.FormRecordId);
-                mutations = await ClassifyShareScopedAsync(scope, state, request, parsed, currentLeaves, head, key, graph, bound, operationId, candidateRevision, correlationId, cancellationToken).ConfigureAwait(false);
+                mutations = ClassifyShareScoped(request, parsed, current, head, state.OrganizationId, graph, bound, operationId, candidateRevision);
             }
 
             AuthorizeMutations(graph, bound, request.FormRecordId, mutations);
@@ -360,6 +366,10 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw new AuthorityException(AuthorityErrorCodes.CandidateMismatch, 409, false, verified);
         }
 
+        // R-53 (C-148): every committed item matches its permanent identity binding; new items are bound in this transaction.
+        var stagedDocuments = request.StagedItems.Select(i => (i.ItemKind, i.ItemId, RowCanonicalDecoder.Decode(Convert.FromBase64String(i.CanonicalBytesBase64)))).ToList();
+        var newIdentities = await ContentItemIdentityRules.BindAtCommitAsync(scope, state.OrganizationId, request.FormRecordId, operationId, stagedDocuments, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
+
         if (shareEditorOperation)
         {
             // AC-2 at commit, on the verified staged header (equal to the accepted header except the operation binding, D15).
@@ -397,6 +407,7 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             ManifestCommittedOn = now,
         };
         scope.AddManifestCommit(commit);
+        scope.AddItemIdentities(newIdentities);
         scope.AddManifestLeaves(candidateLeaves.OrderBy(l => l.ManifestItemKey, UnsignedByteComparer.Instance).Select((l, position) => new RecordManifestLeaf
         {
             RecordManifestLeafId = Guid.CreateVersion7(),
@@ -1309,12 +1320,27 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
     /// digest); a mismatch journals a minimal integrity incident and signs nothing. Then every candidate item is classified
     /// by the column-class rules (D14/D15) against its bound current item.
     /// </summary>
-    private async Task<Dictionary<string, string>> ClassifyShareScopedAsync(IAuthorityScope scope, OrganizationAuthorizationState state, PrepareContentChangeRequest request, IReadOnlyList<ParsedCandidateItem> parsed,
-        IReadOnlyList<RecordManifestLeaf> currentLeaves, RecordContentHead head, IntegrityKeyRegistration key, DesiredStateGraph graph, BoundActor bound, Guid operationId, long candidateRevision, Guid correlationId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Decision D4, applied to every write since R-53 (C-148): for a record with accepted content, the request must carry the
+    /// complete current snapshot, proven equal to the accepted head (coverage, digests, bindings, root, leaf index). A mismatch
+    /// is journaled as an integrity incident and refused. A record without content has an empty current snapshot.
+    /// </summary>
+    private async Task<List<ContentDeltaRules.DecodedItem>> BindAcceptedSnapshotAsync(IAuthorityScope scope, OrganizationAuthorizationState state, PrepareContentChangeRequest request,
+        IReadOnlyList<RecordManifestLeaf> currentLeaves, RecordContentHead head, IntegrityKeyRegistration key, BoundActor bound, Guid correlationId, CancellationToken cancellationToken)
     {
+        if (head.CommittedContentRevision == 0 && head.CurrentRecordManifestCommitId is null)
+        {
+            if (request.CurrentItems is { Count: > 0 })
+            {
+                throw AuthorityException.Invalid("CURRENT_SNAPSHOT_UNEXPECTED: the record has no accepted content");
+            }
+
+            return [];
+        }
+
         if (request.CurrentItems is null || request.CurrentItems.Count == 0)
         {
-            throw AuthorityException.Invalid("CURRENT_SNAPSHOT_REQUIRED: a share-scoped write must carry the complete current snapshot");
+            throw AuthorityException.Invalid("CURRENT_SNAPSHOT_REQUIRED: a write to a record with accepted content must carry the complete current snapshot");
         }
 
         if (head.CommittedOperationId is not { } headOperation || head.CurrentRecordManifestCommitId is null || head.CommittedContentRevision == 0)
@@ -1346,11 +1372,22 @@ public sealed class ContentService(IAuthorityStore store, IIntegrityMacProvider 
             throw new AuthorityException(AuthorityErrorCodes.CurrentSnapshotMismatch, 409, false, failure);
         }
 
+        return current;
+    }
+
+    private static Dictionary<string, string> ClassifyShareScoped(PrepareContentChangeRequest request, IReadOnlyList<ParsedCandidateItem> parsed, List<ContentDeltaRules.DecodedItem> current,
+        RecordContentHead head, Guid organizationId, DesiredStateGraph graph, BoundActor bound, Guid operationId, long candidateRevision)
+    {
+        if (current.Count == 0 || head.CommittedOperationId is not { } headOperation)
+        {
+            throw AuthorityException.Invalid("record has no accepted content");
+        }
+
         // AC-2: the lifecycle lock, decided from the signed header of the accepted head (the snapshot was just bound to it).
         RequireShareEditableStatus(current.Where(i => i.Kind == ManifestItemKind.RecordHeader).Select(i => i.Document).SingleOrDefault(), "prepare");
 
         var candidate = parsed.Select(p => new ContentDeltaRules.DecodedItem(p.Kind, p.ItemId, p.Key, p.Document, p.Digest)).ToList();
-        var shareScope = new ContentDeltaRules.ShareScope(state.OrganizationId, request.FormRecordId, head.CommittedContentRevision, headOperation, candidateRevision, operationId,
+        var shareScope = new ContentDeltaRules.ShareScope(organizationId, request.FormRecordId, head.CommittedContentRevision, headOperation, candidateRevision, operationId,
             graph.EditableFieldItemsViaShares(bound.AuthorityUserId, request.FormRecordId));
         return ContentDeltaRules.ClassifyShareScoped(current, candidate, shareScope);
     }

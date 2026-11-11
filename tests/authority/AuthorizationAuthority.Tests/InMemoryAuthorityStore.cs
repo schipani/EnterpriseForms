@@ -28,6 +28,8 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
     public List<RecordContentHead> Heads { get; } = [];
     public List<RecordManifestCommit> Commits { get; } = [];
     public List<RecordManifestLeaf> ManifestLeaves { get; } = [];
+
+    public List<ContentItemIdentity> ItemIdentities { get; } = [];
     public List<SecurityJournalEntry> Journal { get; } = [];
     public List<ContentIntegrityCheckpoint> Checkpoints { get; } = [];
     public List<IntegrityKeyRegistration> Keys { get; } = [];
@@ -205,6 +207,25 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public void AddManifestCommit(RecordManifestCommit commit) => s.Commits.Add(commit);
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => s.ManifestLeaves.AddRange(leaves);
+
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ItemIdentities.Where(i => manifestItemIds.Contains(i.ManifestItemId)).ToList());
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities)
+        {
+            foreach (var identity in identities)
+            {
+                if (s.ItemIdentities.Any(i => i.ManifestItemId == identity.ManifestItemId))
+                {
+                    throw new InvalidOperationException("uq_content_item_identity_item");
+                }
+
+                s.ItemIdentities.Add(identity);
+            }
+        }
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) =>
+            Task.FromResult(s.ManifestLeaves.Where(l => manifestItemIds.Contains(l.ManifestItemId)).Select(l => l.ManifestItemId).Distinct().ToList());
 
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid recordManifestCommitId, CancellationToken cancellationToken) =>
             Task.FromResult(s.ManifestLeaves.Where(l => l.RecordManifestCommitId == recordManifestCommitId).OrderBy(l => l.ManifestLeafPosition).ToList());

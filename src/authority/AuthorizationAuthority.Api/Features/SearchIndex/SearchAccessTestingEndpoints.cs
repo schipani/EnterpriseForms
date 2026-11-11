@@ -25,6 +25,13 @@ public static class SearchAccessTestingEndpoints
 
     public sealed record RecordRowsResponse(Guid FormRecordId, IReadOnlyList<PrincipalRow> RecordGrants, IReadOnlyList<ItemRow> FieldItemGrants);
 
+    /// <summary>IX-5b: one value row (no values beyond what the test itself wrote; synthetic data only).</summary>
+    public sealed record ValueRow(string PrincipalTypeName, Guid PrincipalEntityId, Guid FieldDefinitionId, Guid ManifestItemId, string ValueTypeName, string? NormalizedStringValue, long? IntegerValue, Guid? FieldOptionId, bool? BooleanValue);
+
+    public sealed record EvaluateRequest(Guid FormDefinitionId, Guid AuthorityUserId, IReadOnlyList<SearchAccessEvaluationCondition> Conditions);
+
+    public sealed record EvaluateResponse(IReadOnlyList<Guid> FormRecordIds);
+
     public static IEndpointRouteBuilder MapSearchAccessTestingEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup(InternalApi.Prefix + "/testing/search-access").WithTags("SearchAccess").RequireAuthorization(InternalAuthentication.WorkloadPolicy);
@@ -59,9 +66,21 @@ public static class SearchAccessTestingEndpoints
                 items.Select(i => new ItemRow(i.AccessPrincipalTypeName, i.AccessPrincipalEntityId, i.ManifestItemId, i.RecordShareId, i.ShareRoleName)).ToList()));
         });
 
-        group.MapPost("/maintenance", static Ok<MaintenanceRequest> (MaintenanceRequest request, SearchAccessMaintenanceSwitch maintenanceSwitch) =>
+        group.MapGet("/{organizationId:guid}/records/{formRecordId:guid}/values", static async Task<Ok<IReadOnlyList<ValueRow>>> (Guid organizationId, Guid formRecordId, IAuthorityStore store, CancellationToken cancellationToken) =>
         {
-            maintenanceSwitch.Paused = request.Paused;
+            await using var scope = await store.BeginReadOnlySnapshotScopeAsync(cancellationToken).ConfigureAwait(false);
+            await scope.SearchAccess.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+            var values = await scope.SearchAccess.GetValuePostingsAsync(organizationId, [formRecordId], cancellationToken).ConfigureAwait(false);
+            return TypedResults.Ok<IReadOnlyList<ValueRow>>(values.Select(v => new ValueRow(v.AccessPrincipalTypeName, v.AccessPrincipalEntityId, v.FieldDefinitionId, v.ManifestItemId, v.ValueTypeName, v.NormalizedStringValue, v.IntegerValue, v.FieldOptionId, v.BooleanValue)).ToList());
+        });
+
+        // IX-5b: internal multi-condition evaluation over the value rows (proof of correctness only; never a search path).
+        group.MapPost("/{organizationId:guid}/evaluate", static async Task<Ok<EvaluateResponse>> (Guid organizationId, EvaluateRequest request, SearchAccessProjectionService service, CancellationToken cancellationToken) =>
+            TypedResults.Ok(new EvaluateResponse(await service.EvaluateForTestingAsync(organizationId, request.FormDefinitionId, request.AuthorityUserId, request.Conditions, cancellationToken).ConfigureAwait(false))));
+
+        group.MapPost("/maintenance", static async Task<Ok<MaintenanceRequest>> (MaintenanceRequest request, SearchAccessMaintenanceSwitch maintenanceSwitch, CancellationToken cancellationToken) =>
+        {
+            await maintenanceSwitch.SetPausedAsync(request.Paused, cancellationToken).ConfigureAwait(false);
             return TypedResults.Ok(new MaintenanceRequest(maintenanceSwitch.Paused));
         });
 

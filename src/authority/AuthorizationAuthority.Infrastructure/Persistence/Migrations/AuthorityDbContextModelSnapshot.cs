@@ -624,6 +624,70 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.ContentItemIdentity", b =>
+                {
+                    b.Property<Guid>("ContentItemIdentityId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("content_item_identity_id");
+
+                    b.Property<Guid?>("BoundFieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bound_field_definition_id");
+
+                    b.Property<Guid?>("BoundFormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bound_form_definition_id");
+
+                    b.Property<Guid?>("BoundFormRecordGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bound_form_record_group_id");
+
+                    b.Property<Guid?>("BoundGroupDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bound_group_definition_id");
+
+                    b.Property<Guid>("FirstCommittedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("first_committed_operation_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<DateTimeOffset>("IdentityBoundOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("identity_bound_on");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<byte>("ManifestItemKindCode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("manifest_item_kind_code");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("ContentItemIdentityId");
+
+                    b.HasIndex("ManifestItemId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_content_item_identity_item");
+
+                    b.HasIndex("OrganizationId", "FormRecordId")
+                        .HasDatabaseName("ix_content_item_identities_record");
+
+                    b.ToTable("content_item_identities", "authority", t =>
+                        {
+                            t.HasCheckConstraint("ck_content_item_identity_anchor", "(manifest_item_kind_code IN (3, 4, 5)) = (bound_field_definition_id IS NOT NULL) AND (manifest_item_kind_code = 2) = (bound_group_definition_id IS NOT NULL) AND (manifest_item_kind_code = 1) = (bound_form_definition_id IS NOT NULL) AND (bound_form_record_group_id IS NULL OR manifest_item_kind_code IN (3, 4))");
+
+                            t.HasCheckConstraint("ck_content_item_identity_kind", "manifest_item_kind_code BETWEEN 1 AND 6");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.RecordContentHead", b =>
                 {
                     b.Property<Guid>("RecordContentHeadId")
@@ -812,6 +876,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnName("row_signature");
 
                     b.HasKey("RecordManifestLeafId");
+
+                    b.HasIndex("ManifestItemId")
+                        .HasDatabaseName("ix_manifest_leaf_item");
 
                     b.HasIndex("RecordManifestCommitId", "ManifestItemKey")
                         .IsUnique()
@@ -2916,6 +2983,18 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("consumed_authorization_revision");
 
+                    b.Property<long>("ConsumedContentIntegrityRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("consumed_content_integrity_revision");
+
+                    b.Property<byte[]>("ConsumedContentJournalDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("consumed_content_journal_digest");
+
+                    b.Property<byte[]>("ConsumedCoverageDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("consumed_coverage_digest");
+
                     b.Property<byte[]>("ConsumedJournalDigest")
                         .HasColumnType("bytea")
                         .HasColumnName("consumed_journal_digest");
@@ -2937,6 +3016,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
 
                     b.ToTable("search_access_checkpoints", "authority_search_access", t =>
                         {
+                            t.HasCheckConstraint("ck_search_access_checkpoint_content_digest", "consumed_content_integrity_revision >= 0 AND (consumed_content_integrity_revision = 0) = (consumed_content_journal_digest IS NULL) AND (consumed_content_journal_digest IS NULL OR octet_length(consumed_content_journal_digest) = 32)");
+
+                            t.HasCheckConstraint("ck_search_access_checkpoint_coverage_digest", "consumed_coverage_digest IS NULL OR octet_length(consumed_coverage_digest) = 32");
+
                             t.HasCheckConstraint("ck_search_access_checkpoint_digest", "(consumed_authorization_revision = 0) = (consumed_journal_digest IS NULL) AND (consumed_journal_digest IS NULL OR octet_length(consumed_journal_digest) = 32)");
 
                             t.HasCheckConstraint("ck_search_access_checkpoint_quarantine", "(access_projection_state_name = 'Quarantined') = (quarantine_reason_code IS NOT NULL)");
@@ -3125,6 +3208,130 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_search_access_record_grant_kind", "(access_kind_name = 'EffectiveOwner' AND record_share_id IS NULL AND share_role_name IS NULL) OR (access_kind_name = 'ShareRecipient' AND record_share_id IS NOT NULL AND share_role_name IN ('reader','contributor','manager'))");
 
                             t.HasCheckConstraint("ck_search_access_record_grant_principal", "access_principal_type_name IN ('user','team')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessValuePosting", b =>
+                {
+                    b.Property<Guid>("SearchAccessValuePostingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_access_value_posting_id");
+
+                    b.Property<Guid>("AccessPrincipalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("access_principal_entity_id");
+
+                    b.Property<string>("AccessPrincipalTypeName")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("access_principal_type_name");
+
+                    b.Property<bool?>("BooleanValue")
+                        .HasColumnType("boolean")
+                        .HasColumnName("boolean_value");
+
+                    b.Property<DateTimeOffset?>("DateTimeValue")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("date_time_value");
+
+                    b.Property<DateOnly?>("DateValue")
+                        .HasColumnType("date")
+                        .HasColumnName("date_value");
+
+                    b.Property<decimal?>("DecimalValue")
+                        .HasColumnType("numeric")
+                        .HasColumnName("decimal_value");
+
+                    b.Property<long>("DerivedContentIntegrityRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("derived_content_integrity_revision");
+
+                    b.Property<Guid>("FieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_definition_id");
+
+                    b.Property<Guid?>("FieldOptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_option_id");
+
+                    b.Property<Guid>("FieldSearchApprovalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_search_approval_id");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_definition_id");
+
+                    b.Property<Guid>("FormRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("form_record_id");
+
+                    b.Property<Guid>("IndexedOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indexed_operation_id");
+
+                    b.Property<long?>("IntegerValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("integer_value");
+
+                    b.Property<Guid>("ManifestItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("manifest_item_id");
+
+                    b.Property<string>("NormalizedStringValue")
+                        .HasColumnType("text")
+                        .HasColumnName("normalized_string_value");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("ValueTypeName")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("value_type_name");
+
+                    b.HasKey("SearchAccessValuePostingId");
+
+                    b.HasIndex("OrganizationId", "FormRecordId")
+                        .HasDatabaseName("ix_search_access_value_postings_record");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FieldDefinitionId", "BooleanValue")
+                        .HasDatabaseName("ix_search_access_value_postings_boolean")
+                        .HasFilter("value_type_name = 'Boolean'");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FieldDefinitionId", "DateTimeValue")
+                        .HasDatabaseName("ix_search_access_value_postings_date_time")
+                        .HasFilter("value_type_name = 'DateTime'");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FieldDefinitionId", "DateValue")
+                        .HasDatabaseName("ix_search_access_value_postings_date")
+                        .HasFilter("value_type_name = 'Date'");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FieldDefinitionId", "DecimalValue")
+                        .HasDatabaseName("ix_search_access_value_postings_decimal")
+                        .HasFilter("value_type_name = 'Decimal'");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FieldDefinitionId", "FieldOptionId")
+                        .HasDatabaseName("ix_search_access_value_postings_option")
+                        .HasFilter("value_type_name = 'Option'");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FieldDefinitionId", "IntegerValue")
+                        .HasDatabaseName("ix_search_access_value_postings_integer")
+                        .HasFilter("value_type_name = 'Integer'");
+
+                    b.HasIndex("OrganizationId", "AccessPrincipalTypeName", "AccessPrincipalEntityId", "FieldDefinitionId", "NormalizedStringValue")
+                        .HasDatabaseName("ix_search_access_value_postings_string")
+                        .HasFilter("value_type_name = 'String'");
+
+                    b.ToTable("search_access_value_postings", "authority_search_access", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_access_value_posting_one_value", "(value_type_name = 'String') = (normalized_string_value IS NOT NULL) AND (value_type_name = 'Integer') = (integer_value IS NOT NULL) AND (value_type_name = 'Decimal') = (decimal_value IS NOT NULL) AND (value_type_name = 'Date') = (date_value IS NOT NULL) AND (value_type_name = 'DateTime') = (date_time_value IS NOT NULL) AND (value_type_name = 'Boolean') = (boolean_value IS NOT NULL) AND (value_type_name = 'Option') = (field_option_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_search_access_value_posting_principal", "access_principal_type_name IN ('user','team')");
                         });
                 });
 
@@ -4587,6 +4794,17 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_content_integrity_org");
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.ContentItemIdentity", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_content_item_identity_org");
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.Content.RecordContentHead", b =>
                 {
                     b.HasOne("AuthorizationAuthority.Domain.Features.Content.ContentChangeOperation", null)
@@ -5010,6 +5228,17 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_search_access_record_grant_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessValuePosting", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_access_value_posting_org");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchBooleanPosting", b =>

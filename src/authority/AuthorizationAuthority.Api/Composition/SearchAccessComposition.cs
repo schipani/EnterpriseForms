@@ -38,14 +38,42 @@ public static class SearchAccessComposition
 }
 
 /// <summary>Testing only: pauses the maintenance loop so a test can observe the not-ready state between a command and its consumption.</summary>
-public sealed class SearchAccessMaintenanceSwitch
+public sealed class SearchAccessMaintenanceSwitch : IDisposable
 {
+    private readonly SemaphoreSlim step = new(1, 1);
     private volatile bool paused;
 
-    public bool Paused
+    public bool Paused => paused;
+
+    public void Dispose() => step.Dispose();
+
+    /// <summary>Pauses and waits until no organization step of the loop is in flight, so a paused loop has truly stopped.</summary>
+    public async Task SetPausedAsync(bool value, CancellationToken cancellationToken)
     {
-        get => paused;
-        set => paused = value;
+        paused = value;
+        if (value)
+        {
+            await step.WaitAsync(cancellationToken).ConfigureAwait(false);
+            step.Release();
+        }
+    }
+
+    /// <summary>The loop runs each organization's step inside this, and skips it when paused.</summary>
+    public async Task RunUnlessPausedAsync(Func<Task> action, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        await step.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!paused)
+            {
+                await action().ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            step.Release();
+        }
     }
 }
 
@@ -70,7 +98,8 @@ public sealed partial class SearchAccessMaintenanceLoop(IAuthorityStore store, S
                 {
                     foreach (var organization in await store.GetAllOrganizationIdsAsync(stoppingToken).ConfigureAwait(false))
                     {
-                        await MaintainAsync(organization, stoppingToken).ConfigureAwait(false);
+                        // Checked per organization: a pause takes effect before the next organization, not after the whole pass.
+                        await maintenanceSwitch.RunUnlessPausedAsync(() => MaintainAsync(organization, stoppingToken), stoppingToken).ConfigureAwait(false);
                     }
                 }
 
@@ -96,6 +125,12 @@ public sealed partial class SearchAccessMaintenanceLoop(IAuthorityStore store, S
             if (outcome == SearchAccessStepOutcome.NotBuilt)
             {
                 await projection.RebuildAsync(organization, "INITIAL_BUILD", Guid.NewGuid(), stoppingToken).ConfigureAwait(false);
+            }
+            else if (outcome == SearchAccessStepOutcome.UpgradeRequired)
+            {
+                // Rows of an older derivation protocol (not an integrity failure): rebuilt once from the canonical state. A
+                // quarantined projection is never rebuilt here.
+                await projection.RebuildAsync(organization, "PROTOCOL_UPGRADE", Guid.NewGuid(), stoppingToken).ConfigureAwait(false);
             }
             else if (outcome == SearchAccessStepOutcome.Quarantined || advanced > 0)
             {

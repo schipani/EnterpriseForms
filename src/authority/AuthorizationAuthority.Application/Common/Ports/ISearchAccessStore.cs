@@ -23,7 +23,7 @@ public interface ISearchAccessStore
     /// Compare-and-set: updates the checkpoint only if its revision is still <paramref name="expectedCheckpointRevision"/>, and
     /// increments it. Returns false when another writer advanced it (nothing is changed).
     /// </summary>
-    Task<bool> TryUpdateCheckpointAsync(Guid organizationId, long expectedCheckpointRevision, long consumedAuthorizationRevision, byte[]? consumedJournalDigest, string stateName, string? quarantineReasonCode, int protocolVersion, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<bool> TryUpdateCheckpointAsync(Guid organizationId, long expectedCheckpointRevision, SearchAccessCheckpointValues values, DateTimeOffset now, CancellationToken cancellationToken);
 
     Task<List<SearchAccessEdge>> GetEdgesByResourceAsync(Guid organizationId, string resourceTypeName, IReadOnlyCollection<Guid> resourceEntityIds, CancellationToken cancellationToken);
 
@@ -52,4 +52,64 @@ public interface ISearchAccessStore
     Task<List<SearchAccessRecordGrant>> GetRecordGrantsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken);
 
     Task<List<SearchAccessFieldItemGrant>> GetFieldItemGrantsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// IX-5b: the searchable values of accepted content: Tier 1 postings of each record's entry at its accepted head (the entry's
+    /// operation equals the head's committed operation) under a Complete coverage of a Public or Internal field. Null records:
+    /// the whole organization. Nothing else is ever read: no business data, no encrypted content, no staged candidate.
+    /// </summary>
+    Task<List<SearchablePosting>> GetSearchablePostingsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken);
+
+    /// <summary>IX-5b: the organization's Complete Public/Internal coverages (the inputs of the coverage digest).</summary>
+    Task<List<SearchableCoverage>> GetSearchableCoveragesAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>IX-5b: the Tier 1 projection status (null when the organization has no search projection).</summary>
+    Task<string?> GetTier1ProjectionStatusAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>IX-5b: the accepted per-field item counts of the records' Tier 1 entries at head, by (record, approval).</summary>
+    Task<Dictionary<(Guid FormRecordId, Guid FieldSearchApprovalId), int>> GetFieldItemCountsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken);
+
+    Task DeleteValuePostingsOfRecordsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken);
+
+    void AddValuePostings(IEnumerable<SearchAccessValuePosting> postings);
+
+    Task<List<SearchAccessValuePosting>> GetValuePostingsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken);
 }
+
+/// <summary>Every checkpoint column the maintainer sets in one compare-and-set.</summary>
+public sealed record SearchAccessCheckpointValues(
+    long ConsumedAuthorizationRevision,
+    byte[]? ConsumedJournalDigest,
+    long ConsumedContentIntegrityRevision,
+    byte[]? ConsumedContentJournalDigest,
+    byte[]? ConsumedCoverageDigest,
+    string StateName,
+    string? QuarantineReasonCode,
+    int ProtocolVersion)
+{
+    public static SearchAccessCheckpointValues Of(SearchAccessCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        return new(checkpoint.ConsumedAuthorizationRevision, checkpoint.ConsumedJournalDigest, checkpoint.ConsumedContentIntegrityRevision, checkpoint.ConsumedContentJournalDigest,
+            checkpoint.ConsumedCoverageDigest, checkpoint.AccessProjectionStateName, checkpoint.QuarantineReasonCode, checkpoint.AccessProjectionProtocolVersion);
+    }
+}
+
+/// <summary>One searchable value of accepted content (a Tier 1 posting at the head under a Complete Public/Internal coverage).</summary>
+public sealed record SearchablePosting(
+    Guid FormDefinitionId,
+    Guid FieldDefinitionId,
+    Guid FieldSearchApprovalId,
+    Guid FormRecordId,
+    Guid ManifestItemId,
+    Guid IndexedOperationId,
+    string ValueTypeName,
+    string? StringValue = null,
+    long? IntegerValue = null,
+    decimal? DecimalValue = null,
+    DateOnly? DateValue = null,
+    DateTimeOffset? DateTimeValue = null,
+    bool? BooleanValue = null,
+    Guid? FieldOptionId = null);
+
+public sealed record SearchableCoverage(Guid FieldSearchApprovalId, Guid FieldDefinitionId, Guid FormDefinitionId);

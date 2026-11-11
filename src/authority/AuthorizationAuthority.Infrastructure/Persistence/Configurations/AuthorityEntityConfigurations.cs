@@ -302,6 +302,26 @@ public sealed class RecordManifestCommitConfiguration : IEntityTypeConfiguration
     }
 }
 
+/// <summary>R-53 (C-148): permanent item identity bindings; inserted at content commit, never updated or deleted.</summary>
+public sealed class ContentItemIdentityConfiguration : IEntityTypeConfiguration<ContentItemIdentity>
+{
+    public void Configure(EntityTypeBuilder<ContentItemIdentity> builder)
+    {
+        builder.MapSnakeCase("content_item_identities");
+        builder.HasKey(e => e.ContentItemIdentityId);
+        builder.HasIndex(e => e.ManifestItemId).IsUnique().HasDatabaseName("uq_content_item_identity_item");
+        builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId }).HasDatabaseName("ix_content_item_identities_record");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_content_item_identity_org").OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_content_item_identity_kind", "manifest_item_kind_code BETWEEN 1 AND 6");
+            t.HasCheckConstraint("ck_content_item_identity_anchor",
+                "(manifest_item_kind_code IN (3, 4, 5)) = (bound_field_definition_id IS NOT NULL) AND (manifest_item_kind_code = 2) = (bound_group_definition_id IS NOT NULL) "
+                + "AND (manifest_item_kind_code = 1) = (bound_form_definition_id IS NOT NULL) AND (bound_form_record_group_id IS NULL OR manifest_item_kind_code IN (3, 4))");
+        });
+    }
+}
+
 public sealed class RecordManifestLeafConfiguration : IEntityTypeConfiguration<RecordManifestLeaf>
 {
     public void Configure(EntityTypeBuilder<RecordManifestLeaf> builder)
@@ -310,6 +330,7 @@ public sealed class RecordManifestLeafConfiguration : IEntityTypeConfiguration<R
         builder.HasKey(e => e.RecordManifestLeafId);
         builder.HasIndex(e => new { e.RecordManifestCommitId, e.ManifestItemKey }).IsUnique().HasDatabaseName("uq_manifest_leaf_key");
         builder.HasIndex(e => new { e.RecordManifestCommitId, e.ManifestLeafPosition }).IsUnique().HasDatabaseName("uq_manifest_leaf_position");
+        builder.HasIndex(e => e.ManifestItemId).HasDatabaseName("ix_manifest_leaf_item"); // R-53: the "accepted before" reuse check
         builder.HasOne<RecordManifestCommit>().WithMany().HasForeignKey(e => e.RecordManifestCommitId).HasConstraintName("fk_manifest_leaf_commit");
         builder.ToTable(t =>
         {

@@ -190,7 +190,8 @@ public sealed class SearchIndexTests
 
         public List<Row> Rows(Guid record, string text = "  Case Ref ", long number = 42, Guid? groupOccurrence = null)
         {
-            var occurrence = groupOccurrence ?? Guid.CreateVersion7();
+            // R-53: a record keeps its group occurrence (an item never moves to another occurrence); tests may still pass one.
+            var occurrence = groupOccurrence ?? (occurrences.TryGetValue(record, out var known) ? known : occurrences[record] = Guid.CreateVersion7());
             return
             [
                 Header(Org, record, "Submitted"), Text(Org, record, StringField, Item(record, 1), text), Integer(Org, record, IntegerField, Item(record, 2), number),
@@ -200,6 +201,8 @@ public sealed class SearchIndexTests
         }
 
         private readonly Dictionary<(Guid, int), Guid> items = [];
+
+        private readonly Dictionary<Guid, Guid> occurrences = [];
 
         public Guid Item(Guid record, int slot) => items.TryGetValue((record, slot), out var item) ? item : items[(record, slot)] = Guid.CreateVersion7();
 

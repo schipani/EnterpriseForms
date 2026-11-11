@@ -61,6 +61,7 @@ public static class SearchAccessReasonCodes
     public const string CheckpointDigestMismatch = "ACCESS_CHECKPOINT_DIGEST_MISMATCH";
     public const string MirrorDiverged = "ACCESS_MIRROR_DIVERGED";
     public const string RowsDiverged = "ACCESS_ROWS_DIVERGED";
+    public const string ValuesDiverged = "ACCESS_VALUES_DIVERGED";
     public const string SpiceDbDiverged = "ACCESS_SPICEDB_DIVERGED";
     public const string CompareAndSetLost = "ACCESS_CHECKPOINT_CAS_LOST";
 }
@@ -176,7 +177,7 @@ public sealed record DerivedAccessRows(IReadOnlyList<SearchAccessRecordGrant> Re
 public static class SearchAccessDerivation
 {
     /// <summary>Version of this derivation (checkpoint fencing). Increment on any change of the rows it produces.</summary>
-    public const int ProtocolVersion = 1;
+    public const int ProtocolVersion = 2; // IX-5b: value rows added
 
     private static readonly string[] ShareRoles = ["reader", "contributor", "manager"];
 

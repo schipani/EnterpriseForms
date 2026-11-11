@@ -11,6 +11,12 @@ public static class AuthorityErrorCodes
     public const string AuthorityNotReady = "AUTHORITY_NOT_READY";
     public const string StaleAuthorizationRevision = "STALE_AUTHORIZATION_REVISION";
     public const string ContentRevisionConflict = "CONTENT_REVISION_CONFLICT";
+
+    /// <summary>R-53: a retained item id changed its identity anchor (field, group occurrence, group definition or form).</summary>
+    public const string ItemIdentityChanged = "ITEM_IDENTITY_CHANGED";
+
+    /// <summary>R-53: a new item names an id that is already bound or was accepted before (reintroduction or reuse).</summary>
+    public const string ItemIdentityReused = "ITEM_IDENTITY_REUSED";
     public const string IntegrityQuarantine = "INTEGRITY_QUARANTINE";
     public const string IntegrityVerificationFailed = "INTEGRITY_VERIFICATION_FAILED";
     public const string IdempotencyConflict = "IDEMPOTENCY_CONFLICT";

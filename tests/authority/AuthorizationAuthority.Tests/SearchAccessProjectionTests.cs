@@ -14,7 +14,7 @@ namespace AuthorizationAuthority.Tests;
 /// IX-5a (C-147) unit tests of the dark Tier 2 access projection: the derivation against the zed model, the journal verifier, and
 /// the maintainer's checkpoint, quarantine, rebuild and replay behaviour (in-memory store; the stack tests cover PostgreSQL).
 /// </summary>
-public sealed class SearchAccessProjectionTests
+public sealed partial class SearchAccessProjectionTests
 {
     private static readonly Guid Org = Guid.CreateVersion7();
 
@@ -75,6 +75,14 @@ public sealed class SearchAccessProjectionTests
             var body = new { security_command_id = command, command_kind = "Test", committed_authorization_revision = revision, relationship_delta = changes.Select(c => (c.Touch ? "touch " : "delete ") + c.Edge.Canonical).ToList() };
             Store.Journal.Add(JournalChain.Append(State, JournalStreamNames.Authorization, revision, "SecurityCommandCommitted", body, command, null, TimeProvider.System));
             State.AuthorizationRevision = revision;
+        }
+
+        /// <summary>IX-5b: one content-stream event naming a record (as ContentService journals a head commit).</summary>
+        public void CommitContent(Guid record, string kind = "ContentHeadCommitted")
+        {
+            var revision = State.ContentIntegrityRevision + 1;
+            typeof(OrganizationAuthorizationState).GetProperty(nameof(OrganizationAuthorizationState.ContentIntegrityRevision))!.SetValue(State, revision); // init-only in production (coordinator)
+            Store.Journal.Add(JournalChain.Append(State, JournalStreamNames.Content, revision, kind, new { form_record_id = record, committed_content_revision = revision }, null, Guid.CreateVersion7(), TimeProvider.System));
         }
 
         public void Touch(params AccessEdge[] edges) => Commit(edges.Select(e => (true, e)).ToArray());

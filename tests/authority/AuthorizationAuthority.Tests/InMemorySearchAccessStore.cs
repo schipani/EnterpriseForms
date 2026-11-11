@@ -19,6 +19,17 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
 
     public List<SearchAccessFieldItemGrant> FieldItemGrants { get; } = [];
 
+    public List<SearchAccessValuePosting> ValuePostings { get; } = [];
+
+    /// <summary>IX-5b: the accepted searchable values the test declares (stands in for Tier 1 postings at head).</summary>
+    public List<SearchablePosting> Searchable { get; } = [];
+
+    public List<SearchableCoverage> Coverages { get; } = [];
+
+    public string? Tier1Status { get; set; }
+
+    public Dictionary<(Guid, Guid), int> ItemCounts { get; } = [];
+
     /// <summary>Simulates a concurrent maintainer: the next compare-and-set fails.</summary>
     public bool LoseNextCompareAndSet { get; set; }
 
@@ -49,7 +60,7 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
         return Task.CompletedTask;
     }
 
-    public Task<bool> TryUpdateCheckpointAsync(Guid organizationId, long expectedCheckpointRevision, long consumedAuthorizationRevision, byte[]? consumedJournalDigest, string stateName, string? quarantineReasonCode, int protocolVersion, DateTimeOffset now, CancellationToken cancellationToken)
+    public Task<bool> TryUpdateCheckpointAsync(Guid organizationId, long expectedCheckpointRevision, SearchAccessCheckpointValues values, DateTimeOffset now, CancellationToken cancellationToken)
     {
         Require(organizationId);
         var stored = Checkpoints.SingleOrDefault(c => c.OrganizationId == organizationId && c.CheckpointRevision == expectedCheckpointRevision);
@@ -59,11 +70,14 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
             return Task.FromResult(false);
         }
 
-        stored.ConsumedAuthorizationRevision = consumedAuthorizationRevision;
-        stored.ConsumedJournalDigest = consumedJournalDigest;
-        stored.AccessProjectionStateName = stateName;
-        stored.QuarantineReasonCode = quarantineReasonCode;
-        stored.AccessProjectionProtocolVersion = protocolVersion;
+        stored.ConsumedAuthorizationRevision = values.ConsumedAuthorizationRevision;
+        stored.ConsumedJournalDigest = values.ConsumedJournalDigest;
+        stored.ConsumedContentIntegrityRevision = values.ConsumedContentIntegrityRevision;
+        stored.ConsumedContentJournalDigest = values.ConsumedContentJournalDigest;
+        stored.ConsumedCoverageDigest = values.ConsumedCoverageDigest;
+        stored.AccessProjectionStateName = values.StateName;
+        stored.QuarantineReasonCode = values.QuarantineReasonCode;
+        stored.AccessProjectionProtocolVersion = values.ProtocolVersion;
         stored.CheckpointModifiedOn = now;
         stored.CheckpointRevision = expectedCheckpointRevision + 1;
         return Task.FromResult(true);
@@ -120,6 +134,7 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
     {
         Require(organizationId);
         Edges.RemoveAll(e => e.OrganizationId == organizationId);
+        ValuePostings.RemoveAll(v => v.OrganizationId == organizationId);
         RecordGrants.RemoveAll(g => g.OrganizationId == organizationId);
         FieldItemGrants.RemoveAll(g => g.OrganizationId == organizationId);
         return Task.CompletedTask;
@@ -143,6 +158,46 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
         return Task.FromResult(FieldItemGrants.Where(g => g.OrganizationId == organizationId && (formRecordIds is null || formRecordIds.Contains(g.FormRecordId))).ToList());
     }
 
+    public Task<List<SearchablePosting>> GetSearchablePostingsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        var approved = Coverages.Select(c => c.FieldSearchApprovalId).ToHashSet();
+        return Task.FromResult(Searchable.Where(s => approved.Contains(s.FieldSearchApprovalId) && (formRecordIds is null || formRecordIds.Contains(s.FormRecordId))).ToList());
+    }
+
+    public Task<List<SearchableCoverage>> GetSearchableCoveragesAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(Coverages.ToList());
+    }
+
+    public Task<string?> GetTier1ProjectionStatusAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(Tier1Status);
+    }
+
+    public Task<Dictionary<(Guid FormRecordId, Guid FieldSearchApprovalId), int>> GetFieldItemCountsAsync(Guid organizationId, IReadOnlyCollection<Guid> formRecordIds, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(ItemCounts.Where(kv => formRecordIds.Contains(kv.Key.Item1)).ToDictionary(kv => (kv.Key.Item1, kv.Key.Item2), kv => kv.Value));
+    }
+
+    public Task DeleteValuePostingsOfRecordsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        ValuePostings.RemoveAll(v => v.OrganizationId == organizationId && (formRecordIds is null || formRecordIds.Contains(v.FormRecordId)));
+        return Task.CompletedTask;
+    }
+
+    public void AddValuePostings(IEnumerable<SearchAccessValuePosting> postings) => ValuePostings.AddRange(postings.Select(v => { Require(v.OrganizationId); return v; }));
+
+    public Task<List<SearchAccessValuePosting>> GetValuePostingsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(ValuePostings.Where(v => v.OrganizationId == organizationId && (formRecordIds is null || formRecordIds.Contains(v.FormRecordId))).ToList());
+    }
+
     private void Require(Guid organizationId)
     {
         if (bound != organizationId)
@@ -162,5 +217,8 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
         AccessProjectionProtocolVersion = c.AccessProjectionProtocolVersion,
         QuarantineReasonCode = c.QuarantineReasonCode,
         CheckpointModifiedOn = c.CheckpointModifiedOn,
+        ConsumedContentIntegrityRevision = c.ConsumedContentIntegrityRevision,
+        ConsumedContentJournalDigest = c.ConsumedContentJournalDigest,
+        ConsumedCoverageDigest = c.ConsumedCoverageDigest,
     };
 }

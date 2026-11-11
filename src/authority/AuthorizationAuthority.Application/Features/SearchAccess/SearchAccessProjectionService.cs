@@ -17,7 +17,11 @@ public static class SearchAccessStatusNames
     public const string Quarantined = "Quarantined";
 }
 
-public sealed record SearchAccessStatus(Guid OrganizationId, string StatusName, long ConsumedAuthorizationRevision, long CurrentAuthorizationRevision, long CheckpointRevision, int ProtocolVersion, string? QuarantineReasonCode);
+public sealed record SearchAccessStatus(Guid OrganizationId, string StatusName, long ConsumedAuthorizationRevision, long CurrentAuthorizationRevision, long CheckpointRevision, int ProtocolVersion, string? QuarantineReasonCode,
+    long ConsumedContentIntegrityRevision = 0, long CurrentContentIntegrityRevision = 0, bool CoverageCurrent = false, string? Tier1StatusName = null);
+
+/// <summary>IX-5b: the live authoritative state a checkpoint must equal exactly to be ready (A-3, C-148 Part 4).</summary>
+public sealed record SearchAccessReadinessInputs(long AuthorizationRevision, byte[]? AuthorizationDigest, long ContentIntegrityRevision, byte[]? ContentDigest, byte[]? CoverageDigest, string? Tier1StatusName);
 
 public enum SearchAccessStepOutcome
 {
@@ -27,14 +31,21 @@ public enum SearchAccessStepOutcome
     Quarantined,
     Contended,
     Fenced,
+
+    /// <summary>IX-5b: the rows were derived by an older protocol; a rebuild (not a repair) upgrades them.</summary>
+    UpgradeRequired,
 }
 
-public sealed record SearchAccessVerification(string OutcomeCode, long VerifiedRevision, int MirrorEdges, int CanonicalEdges, int RecordGrants, int FieldItemGrants, int SampledRecords, int SpiceDbChecks, string? FindingDetail)
+public sealed record SearchAccessVerification(string OutcomeCode, long VerifiedRevision, int MirrorEdges, int CanonicalEdges, int RecordGrants, int FieldItemGrants, int SampledRecords, int SpiceDbChecks, string? FindingDetail,
+    int ValuePostings = 0, int SearchablePostings = 0, long VerifiedContentIntegrityRevision = 0)
 {
     public bool Clean => OutcomeCode == "CLEAN";
 }
 
-public sealed record SearchAccessReplayCheck(string OutcomeCode, long RevisionsReplayed, long CurrentAuthorizationRevision, int ReplayedEdges, int CanonicalEdges, int MissingEdges, int ExtraEdges);
+public sealed record SearchAccessReplayCheck(string OutcomeCode, long RevisionsReplayed, long CurrentAuthorizationRevision, int ReplayedEdges, int CanonicalEdges, int MissingEdges, int ExtraEdges, long ContentRevisionsVerified = 0);
+
+/// <summary>IX-5b, Testing only: one equality (or integer range) condition of an internal value-projection evaluation.</summary>
+public sealed record SearchAccessEvaluationCondition(Guid FieldDefinitionId, string ValueTypeName, string? StringValue = null, long? MinimumInteger = null, long? MaximumInteger = null, Guid? FieldOptionId = null, bool? BooleanValue = null);
 
 /// <summary>
 /// IX-5a (C-147, FD-5-ALT): maintains the Tier 2 access projection asynchronously from the Authority's authorization journal,
@@ -63,53 +74,97 @@ public sealed class SearchAccessProjectionService(
                     ?? throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
         await scope.SearchAccess.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
         var checkpoint = await scope.SearchAccess.FindCheckpointAsync(organizationId, cancellationToken).ConfigureAwait(false);
-        return Status(state.OrganizationId, state.AuthorizationRevision, state.LatestSecurityJournalDigest, checkpoint);
+        return Status(state.OrganizationId, await ReadinessInputsAsync(scope.SearchAccess, state, cancellationToken).ConfigureAwait(false), checkpoint);
     }
 
-    internal SearchAccessStatus Status(Guid organizationId, long currentRevision, byte[]? currentDigest, SearchAccessCheckpoint? checkpoint)
+    /// <summary>The live authoritative state, read in the caller's snapshot.</summary>
+    internal static async Task<SearchAccessReadinessInputs> ReadinessInputsAsync(ISearchAccessStore access, Domain.Features.Organizations.OrganizationAuthorizationState state, CancellationToken cancellationToken)
     {
+        var coverages = await access.GetSearchableCoveragesAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
+        var tier1 = await access.GetTier1ProjectionStatusAsync(state.OrganizationId, cancellationToken).ConfigureAwait(false);
+        return new SearchAccessReadinessInputs(state.AuthorizationRevision, state.LatestSecurityJournalDigest, state.ContentIntegrityRevision, state.LatestContentJournalDigest, SearchAccessValueDerivation.CoverageDigest(coverages), tier1);
+    }
+
+    internal SearchAccessStatus Status(Guid organizationId, SearchAccessReadinessInputs inputs, SearchAccessCheckpoint? checkpoint)
+    {
+        var coverageCurrent = checkpoint is not null && SearchAccessValueDerivation.DigestsEqual(checkpoint.ConsumedCoverageDigest, inputs.CoverageDigest);
         if (options.Mode == SearchAccessMode.Off)
         {
-            return new SearchAccessStatus(organizationId, SearchAccessStatusNames.Disabled, checkpoint?.ConsumedAuthorizationRevision ?? 0, currentRevision, checkpoint?.CheckpointRevision ?? 0, checkpoint?.AccessProjectionProtocolVersion ?? 0, checkpoint?.QuarantineReasonCode);
+            return new SearchAccessStatus(organizationId, SearchAccessStatusNames.Disabled, checkpoint?.ConsumedAuthorizationRevision ?? 0, inputs.AuthorizationRevision, checkpoint?.CheckpointRevision ?? 0, checkpoint?.AccessProjectionProtocolVersion ?? 0, checkpoint?.QuarantineReasonCode,
+                checkpoint?.ConsumedContentIntegrityRevision ?? 0, inputs.ContentIntegrityRevision, coverageCurrent, inputs.Tier1StatusName);
         }
 
         if (checkpoint is null)
         {
-            return new SearchAccessStatus(organizationId, SearchAccessStatusNames.NotBuilt, 0, currentRevision, 0, 0, null);
+            return new SearchAccessStatus(organizationId, SearchAccessStatusNames.NotBuilt, 0, inputs.AuthorizationRevision, 0, 0, null, 0, inputs.ContentIntegrityRevision, false, inputs.Tier1StatusName);
         }
 
         var status = checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Quarantined ? SearchAccessStatusNames.Quarantined
-            : IsReady(checkpoint, currentRevision, currentDigest) ? SearchAccessStatusNames.Ready
+            : IsReady(checkpoint, inputs) ? SearchAccessStatusNames.Ready
             : SearchAccessStatusNames.Building;
-        return new SearchAccessStatus(organizationId, status, checkpoint.ConsumedAuthorizationRevision, currentRevision, checkpoint.CheckpointRevision, checkpoint.AccessProjectionProtocolVersion, checkpoint.QuarantineReasonCode);
+        return new SearchAccessStatus(organizationId, status, checkpoint.ConsumedAuthorizationRevision, inputs.AuthorizationRevision, checkpoint.CheckpointRevision, checkpoint.AccessProjectionProtocolVersion, checkpoint.QuarantineReasonCode,
+            checkpoint.ConsumedContentIntegrityRevision, inputs.ContentIntegrityRevision, coverageCurrent, inputs.Tier1StatusName);
     }
 
-    /// <summary>A-3: exact equality with the organization's authorization revision and journal head digest, at the current protocol.</summary>
-    public static bool IsReady(SearchAccessCheckpoint checkpoint, long currentRevision, byte[]? currentDigest)
+    /// <summary>
+    /// A-3 (IX-5b): ready only when the checkpoint equals the live state exactly: the authorization revision and journal head digest,
+    /// the content-integrity revision and content journal head digest, the Complete Public/Internal coverage set, at the current
+    /// protocol, with Tier 1 servable (Active) or absent. Any new command, commit or coverage change closes readiness at once,
+    /// before the maintainer runs: a revocation is never servable from the old rows.
+    /// </summary>
+    public static bool IsReady(SearchAccessCheckpoint checkpoint, SearchAccessReadinessInputs inputs)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
+        ArgumentNullException.ThrowIfNull(inputs);
         return checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Maintaining
                && checkpoint.AccessProjectionProtocolVersion == SearchAccessDerivation.ProtocolVersion
-               && checkpoint.ConsumedAuthorizationRevision == currentRevision
-               && (currentRevision == 0 ? checkpoint.ConsumedJournalDigest is null : checkpoint.ConsumedJournalDigest is { Length: 32 } d && currentDigest is not null && d.AsSpan().SequenceEqual(currentDigest));
+               && AuthorizationAtHead(checkpoint, inputs.AuthorizationRevision, inputs.AuthorizationDigest)
+               && ContentAtHead(checkpoint, inputs.ContentIntegrityRevision, inputs.ContentDigest)
+               && SearchAccessValueDerivation.DigestsEqual(checkpoint.ConsumedCoverageDigest, inputs.CoverageDigest)
+               && inputs.Tier1StatusName is null or Domain.Features.SearchIndex.SearchProjectionStatuses.Active;
     }
 
-    /// <summary>Consumes up to <paramref name="maximumEvents"/> journal events, one transaction each; stops at the first non-advance.</summary>
+    public static bool AuthorizationAtHead(SearchAccessCheckpoint checkpoint, long currentRevision, byte[]? currentDigest) =>
+        checkpoint.ConsumedAuthorizationRevision == currentRevision
+        && (currentRevision == 0 ? checkpoint.ConsumedJournalDigest is null : checkpoint.ConsumedJournalDigest is { Length: 32 } d && currentDigest is not null && d.AsSpan().SequenceEqual(currentDigest));
+
+    public static bool ContentAtHead(SearchAccessCheckpoint checkpoint, long currentRevision, byte[]? currentDigest) =>
+        checkpoint.ConsumedContentIntegrityRevision == currentRevision
+        && (currentRevision == 0 ? checkpoint.ConsumedContentJournalDigest is null : checkpoint.ConsumedContentJournalDigest is { Length: 32 } d && currentDigest is not null && d.AsSpan().SequenceEqual(currentDigest));
+
+    /// <summary>
+    /// Consumes up to <paramref name="maximumEvents"/> journal events, one transaction each: the authorization stream, then the
+    /// content stream, then the coverage set. Stops at the first non-advance that is not Idle.
+    /// </summary>
     public async Task<(SearchAccessStepOutcome Outcome, int Advanced)> CatchUpAsync(Guid organizationId, int maximumEvents, CancellationToken cancellationToken)
     {
         var advanced = 0;
-        while (advanced < maximumEvents)
+        foreach (var step in new Func<Guid, CancellationToken, Task<SearchAccessStepOutcome>>[] { StepAsync, StepContentAsync, CoverageStepAsync })
         {
-            var outcome = await StepAsync(organizationId, cancellationToken).ConfigureAwait(false);
-            if (outcome != SearchAccessStepOutcome.Advanced)
+            while (true)
             {
-                return (outcome, advanced);
-            }
+                if (advanced >= maximumEvents)
+                {
+                    return (SearchAccessStepOutcome.Advanced, advanced);
+                }
 
-            advanced++;
+                var outcome = await step(organizationId, cancellationToken).ConfigureAwait(false);
+                if (outcome == SearchAccessStepOutcome.Advanced)
+                {
+                    advanced++;
+                    continue;
+                }
+
+                if (outcome != SearchAccessStepOutcome.Idle)
+                {
+                    return (outcome, advanced);
+                }
+
+                break;
+            }
         }
 
-        return (SearchAccessStepOutcome.Advanced, advanced);
+        return (SearchAccessStepOutcome.Idle, advanced);
     }
 
     /// <summary>Applies the checkpoint's successor event, if there is one.</summary>
@@ -149,9 +204,14 @@ public sealed class SearchAccessProjectionService(
                     throw new SearchAccessIntegrityException(SearchAccessReasonCodes.CheckpointAhead, "the checkpoint is ahead of the organization (restore or rollback)");
                 }
 
+                if (checkpoint.AccessProjectionProtocolVersion < SearchAccessDerivation.ProtocolVersion)
+                {
+                    return SearchAccessStepOutcome.UpgradeRequired; // rows of an older derivation: only a rebuild upgrades them
+                }
+
                 if (checkpoint.ConsumedAuthorizationRevision == state.AuthorizationRevision)
                 {
-                    if (!IsReady(checkpoint, state.AuthorizationRevision, state.LatestSecurityJournalDigest) && checkpoint.AccessProjectionProtocolVersion == SearchAccessDerivation.ProtocolVersion)
+                    if (!AuthorizationAtHead(checkpoint, state.AuthorizationRevision, state.LatestSecurityJournalDigest))
                     {
                         throw new SearchAccessIntegrityException(SearchAccessReasonCodes.CheckpointDigestMismatch, "the checkpoint digest differs from the journal head at the same revision");
                     }
@@ -159,16 +219,12 @@ public sealed class SearchAccessProjectionService(
                     return SearchAccessStepOutcome.Idle;
                 }
 
-                if (checkpoint.AccessProjectionProtocolVersion < SearchAccessDerivation.ProtocolVersion)
-                {
-                    return SearchAccessStepOutcome.Fenced; // rows of an older derivation: only a rebuild upgrades them
-                }
-
                 var target = checkpoint.ConsumedAuthorizationRevision + 1;
                 var entry = await scope.FindJournalEntryAsync(organizationId, JournalStreamNames.Authorization, target, cancellationToken).ConfigureAwait(false);
                 var verified = SearchAccessJournalVerifier.Verify(entry, organizationId, target, checkpoint.ConsumedJournalDigest);
-                await ApplyEventAsync(access, organizationId, verified, cancellationToken).ConfigureAwait(false);
-                if (!await access.TryUpdateCheckpointAsync(organizationId, checkpoint.CheckpointRevision, target, verified.Digest, SearchAccessProjectionStates.Maintaining, null, SearchAccessDerivation.ProtocolVersion, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
+                await ApplyEventAsync(access, organizationId, verified, state.ContentIntegrityRevision, cancellationToken).ConfigureAwait(false);
+                var next = SearchAccessCheckpointValues.Of(checkpoint) with { ConsumedAuthorizationRevision = target, ConsumedJournalDigest = verified.Digest };
+                if (!await access.TryUpdateCheckpointAsync(organizationId, checkpoint.CheckpointRevision, next, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
                 {
                     return SearchAccessStepOutcome.Contended; // another writer advanced it: this transaction rolls back
                 }
@@ -186,6 +242,140 @@ public sealed class SearchAccessProjectionService(
 
         await QuarantineAsync(organizationId, observedCheckpointRevision, failure!, failureDetail, cancellationToken).ConfigureAwait(false);
         return SearchAccessStepOutcome.Quarantined;
+    }
+
+    /// <summary>
+    /// IX-5b: applies the content checkpoint's successor event. The event names a record; its value rows are re-derived from the
+    /// accepted head's searchable postings and the record's current access rows, and the content checkpoint is compared-and-set,
+    /// in one transaction. Values are never read from the event (it carries none).
+    /// </summary>
+    public async Task<SearchAccessStepOutcome> StepContentAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        RequireEnabled();
+        string? failure = null;
+        string failureDetail = string.Empty;
+        long observedCheckpointRevision;
+        await using (var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var access = scope.SearchAccess;
+            await access.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+            var checkpoint = await access.FindCheckpointForUpdateAsync(organizationId, cancellationToken).ConfigureAwait(false);
+            if (checkpoint is null)
+            {
+                return SearchAccessStepOutcome.NotBuilt;
+            }
+
+            if (checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Quarantined)
+            {
+                return SearchAccessStepOutcome.Quarantined;
+            }
+
+            if (checkpoint.AccessProjectionProtocolVersion != SearchAccessDerivation.ProtocolVersion)
+            {
+                return checkpoint.AccessProjectionProtocolVersion > SearchAccessDerivation.ProtocolVersion ? SearchAccessStepOutcome.Fenced : SearchAccessStepOutcome.UpgradeRequired;
+            }
+
+            observedCheckpointRevision = checkpoint.CheckpointRevision;
+            var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
+                        ?? throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+            try
+            {
+                if (checkpoint.ConsumedContentIntegrityRevision > state.ContentIntegrityRevision)
+                {
+                    throw new SearchAccessIntegrityException(SearchAccessReasonCodes.CheckpointAhead, "the content checkpoint is ahead of the organization (restore or rollback)");
+                }
+
+                if (checkpoint.ConsumedContentIntegrityRevision == state.ContentIntegrityRevision)
+                {
+                    if (!ContentAtHead(checkpoint, state.ContentIntegrityRevision, state.LatestContentJournalDigest))
+                    {
+                        throw new SearchAccessIntegrityException(SearchAccessReasonCodes.CheckpointDigestMismatch, "the content checkpoint digest differs from the content journal head at the same revision");
+                    }
+
+                    return SearchAccessStepOutcome.Idle;
+                }
+
+                var target = checkpoint.ConsumedContentIntegrityRevision + 1;
+                var entry = await scope.FindJournalEntryAsync(organizationId, JournalStreamNames.Content, target, cancellationToken).ConfigureAwait(false);
+                var verified = SearchAccessJournalVerifier.VerifyContent(entry, organizationId, target, checkpoint.ConsumedContentJournalDigest);
+                await RederiveValuesAsync(access, organizationId, [verified.FormRecordId], null, target, cancellationToken).ConfigureAwait(false);
+                var next = SearchAccessCheckpointValues.Of(checkpoint) with { ConsumedContentIntegrityRevision = target, ConsumedContentJournalDigest = verified.Digest };
+                if (!await access.TryUpdateCheckpointAsync(organizationId, checkpoint.CheckpointRevision, next, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
+                {
+                    return SearchAccessStepOutcome.Contended;
+                }
+
+                faultInjector.CrashIfArmed(FaultNames.CrashBeforeAccessProjectionCommit);
+                await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+                return SearchAccessStepOutcome.Advanced;
+            }
+            catch (SearchAccessIntegrityException ex)
+            {
+                failure = ex.ReasonCode;
+                failureDetail = ex.Message;
+            }
+        }
+
+        await QuarantineAsync(organizationId, observedCheckpointRevision, failure!, failureDetail, cancellationToken).ConfigureAwait(false);
+        return SearchAccessStepOutcome.Quarantined;
+    }
+
+    /// <summary>
+    /// IX-5b: a coverage change (a field becoming searchable, withdrawn, or a Tier 1 rebuild returning it to Building) changes which
+    /// values are searchable without a content event. When the Complete Public/Internal coverage set differs from the checkpoint's,
+    /// every value row of the organization is re-derived and the coverage digest compared-and-set, in one transaction.
+    /// </summary>
+    public async Task<SearchAccessStepOutcome> CoverageStepAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        RequireEnabled();
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        var access = scope.SearchAccess;
+        await access.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        var checkpoint = await access.FindCheckpointForUpdateAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        if (checkpoint is null)
+        {
+            return SearchAccessStepOutcome.NotBuilt;
+        }
+
+        if (checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Quarantined)
+        {
+            return SearchAccessStepOutcome.Quarantined;
+        }
+
+        if (checkpoint.AccessProjectionProtocolVersion != SearchAccessDerivation.ProtocolVersion)
+        {
+            return checkpoint.AccessProjectionProtocolVersion > SearchAccessDerivation.ProtocolVersion ? SearchAccessStepOutcome.Fenced : SearchAccessStepOutcome.UpgradeRequired;
+        }
+
+        var digest = SearchAccessValueDerivation.CoverageDigest(await access.GetSearchableCoveragesAsync(organizationId, cancellationToken).ConfigureAwait(false));
+        if (SearchAccessValueDerivation.DigestsEqual(digest, checkpoint.ConsumedCoverageDigest))
+        {
+            return SearchAccessStepOutcome.Idle;
+        }
+
+        var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+        await RederiveValuesAsync(access, organizationId, null, null, state.ContentIntegrityRevision, cancellationToken).ConfigureAwait(false);
+        if (!await access.TryUpdateCheckpointAsync(organizationId, checkpoint.CheckpointRevision, SearchAccessCheckpointValues.Of(checkpoint) with { ConsumedCoverageDigest = digest }, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
+        {
+            return SearchAccessStepOutcome.Contended;
+        }
+
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return SearchAccessStepOutcome.Advanced;
+    }
+
+    /// <summary>
+    /// Re-derives the value rows of <paramref name="records"/> (null: the whole organization) from the accepted heads' searchable
+    /// postings and the access rows: <paramref name="derived"/> when the caller just derived them, else the stored rows.
+    /// </summary>
+    private static async Task RederiveValuesAsync(ISearchAccessStore access, Guid organizationId, IReadOnlyCollection<Guid>? records, DerivedAccessRows? derived, long contentRevision, CancellationToken cancellationToken)
+    {
+        var recordGrants = derived?.RecordGrants ?? await access.GetRecordGrantsAsync(organizationId, records, cancellationToken).ConfigureAwait(false);
+        var itemGrants = derived?.FieldItemGrants ?? await access.GetFieldItemGrantsAsync(organizationId, records, cancellationToken).ConfigureAwait(false);
+        var postings = await access.GetSearchablePostingsAsync(organizationId, records, cancellationToken).ConfigureAwait(false);
+        await access.DeleteValuePostingsOfRecordsAsync(organizationId, records, cancellationToken).ConfigureAwait(false);
+        access.AddValuePostings(SearchAccessValueDerivation.Derive(organizationId, recordGrants, itemGrants, postings, contentRevision));
     }
 
     /// <summary>
@@ -213,7 +403,13 @@ public sealed class SearchAccessProjectionService(
         var derived = SearchAccessDerivation.Derive(organizationId, canonical, canonical.Edges.Where(e => e.ResourceType == "form_record").Select(e => e.ResourceId), revision, options.MaximumParentDepth);
         access.AddRecordGrants(derived.RecordGrants);
         access.AddFieldItemGrants(derived.FieldItemGrants);
+        var postings = await access.GetSearchablePostingsAsync(organizationId, null, cancellationToken).ConfigureAwait(false);
+        var values = SearchAccessValueDerivation.Derive(organizationId, derived.RecordGrants, derived.FieldItemGrants, postings, state.ContentIntegrityRevision);
+        access.AddValuePostings(values);
+        var coverageDigest = SearchAccessValueDerivation.CoverageDigest(await access.GetSearchableCoveragesAsync(organizationId, cancellationToken).ConfigureAwait(false));
+        var contentDigest = state.ContentIntegrityRevision == 0 ? null : state.LatestContentJournalDigest;
         var digest = revision == 0 ? null : state.LatestSecurityJournalDigest;
+        var rebuilt = new SearchAccessCheckpointValues(revision, digest, state.ContentIntegrityRevision, contentDigest, coverageDigest, SearchAccessProjectionStates.Maintaining, null, SearchAccessDerivation.ProtocolVersion);
         if (checkpoint is null)
         {
             await access.InsertCheckpointAsync(new SearchAccessCheckpoint
@@ -223,12 +419,15 @@ public sealed class SearchAccessProjectionService(
                 AccessProjectionStateName = SearchAccessProjectionStates.Maintaining,
                 ConsumedAuthorizationRevision = revision,
                 ConsumedJournalDigest = digest,
+                ConsumedContentIntegrityRevision = state.ContentIntegrityRevision,
+                ConsumedContentJournalDigest = contentDigest,
+                ConsumedCoverageDigest = coverageDigest,
                 CheckpointRevision = 1,
                 AccessProjectionProtocolVersion = SearchAccessDerivation.ProtocolVersion,
                 CheckpointModifiedOn = clock.GetUtcNow(),
             }, cancellationToken).ConfigureAwait(false);
         }
-        else if (!await access.TryUpdateCheckpointAsync(organizationId, checkpoint.CheckpointRevision, revision, digest, SearchAccessProjectionStates.Maintaining, null, SearchAccessDerivation.ProtocolVersion, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
+        else if (!await access.TryUpdateCheckpointAsync(organizationId, checkpoint.CheckpointRevision, rebuilt, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
         {
             throw new AuthorityException(AuthorityErrorCodes.ContentRevisionConflict, 409, true, "the access projection checkpoint changed during the rebuild");
         }
@@ -243,11 +442,15 @@ public sealed class SearchAccessProjectionService(
             mirror_edges = canonical.Edges.Count,
             record_grants = derived.RecordGrants.Count,
             field_item_grants = derived.FieldItemGrants.Count,
+            content_integrity_revision = state.ContentIntegrityRevision,
+            value_postings = values.Count,
+            searchable_postings = postings.Count,
             protocol_version = SearchAccessDerivation.ProtocolVersion,
             correlation_id = correlationId,
         }, clock);
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
-        return new SearchAccessStatus(organizationId, SearchAccessStatusNames.Ready, revision, revision, (checkpoint?.CheckpointRevision ?? 0) + 1, SearchAccessDerivation.ProtocolVersion, null);
+        return new SearchAccessStatus(organizationId, SearchAccessStatusNames.Ready, revision, revision, (checkpoint?.CheckpointRevision ?? 0) + 1, SearchAccessDerivation.ProtocolVersion, null,
+            state.ContentIntegrityRevision, state.ContentIntegrityRevision, true);
     }
 
     /// <summary>
@@ -267,6 +470,7 @@ public sealed class SearchAccessProjectionService(
         List<SearchAccessFieldItemGrant> storedItemGrants = [];
         long verifiedRevision;
         byte[]? verifiedDigest;
+        long verifiedContentRevision;
         await using (var scope = await store.BeginReadOnlySnapshotScopeAsync(cancellationToken).ConfigureAwait(false))
         {
             var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
@@ -274,7 +478,8 @@ public sealed class SearchAccessProjectionService(
             var access = scope.SearchAccess;
             await access.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
             var checkpoint = await access.FindCheckpointAsync(organizationId, cancellationToken).ConfigureAwait(false);
-            if (checkpoint is null || checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Quarantined || !IsReady(checkpoint, state.AuthorizationRevision, state.LatestSecurityJournalDigest))
+            var inputs = await ReadinessInputsAsync(access, state, cancellationToken).ConfigureAwait(false);
+            if (checkpoint is null || checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Quarantined || !IsReady(checkpoint, inputs))
             {
                 var code = checkpoint is null ? "NOT_BUILT" : checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Quarantined ? "QUARANTINED" : "NOT_AT_HEAD";
                 return new SearchAccessVerification(code, state.AuthorizationRevision, 0, 0, 0, 0, 0, 0, null);
@@ -283,12 +488,16 @@ public sealed class SearchAccessProjectionService(
             checkpointRevision = checkpoint.CheckpointRevision;
             verifiedRevision = state.AuthorizationRevision;
             verifiedDigest = state.LatestSecurityJournalDigest;
+            verifiedContentRevision = state.ContentIntegrityRevision;
             var canonical = await CanonicalAccessEdgesAsync(scope, organizationId, cancellationToken).ConfigureAwait(false);
             var mirror = (await access.GetAllEdgesAsync(organizationId, cancellationToken).ConfigureAwait(false)).Select(AccessEdge.Of).ToHashSet();
             var recordGrants = await access.GetRecordGrantsAsync(organizationId, null, cancellationToken).ConfigureAwait(false);
             var itemGrants = await access.GetFieldItemGrantsAsync(organizationId, null, cancellationToken).ConfigureAwait(false);
             var records = canonical.Edges.Where(e => e.ResourceType == "form_record").Select(e => e.ResourceId).Distinct().ToList();
             var expected = SearchAccessDerivation.Derive(organizationId, canonical, records, state.AuthorizationRevision, options.MaximumParentDepth);
+            var values = await access.GetValuePostingsAsync(organizationId, null, cancellationToken).ConfigureAwait(false);
+            var searchable = await access.GetSearchablePostingsAsync(organizationId, null, cancellationToken).ConfigureAwait(false);
+            var expectedValues = SearchAccessValueDerivation.Derive(organizationId, expected.RecordGrants, expected.FieldItemGrants, searchable, state.ContentIntegrityRevision);
             var checks = 0;
             var sampled = 0;
             if (!mirror.SetEquals(canonical.Edges))
@@ -302,6 +511,12 @@ public sealed class SearchAccessProjectionService(
                 finding = SearchAccessReasonCodes.RowsDiverged;
                 detail = $"record rows {recordGrants.Count} expected {expected.RecordGrants.Count}; item rows {itemGrants.Count} expected {expected.FieldItemGrants.Count}";
             }
+            else if (!SameMultiset(values.Select(SearchAccessValueDerivation.Key), expectedValues.Select(SearchAccessValueDerivation.Key)))
+            {
+                // IX-5b: the value rows must be exactly the accepted searchable values, each for exactly the principals that read it.
+                finding = SearchAccessReasonCodes.ValuesDiverged;
+                detail = $"value rows {values.Count} expected {expectedValues.Count}";
+            }
             else
             {
                 canonicalAtRevision = canonical;
@@ -309,7 +524,8 @@ public sealed class SearchAccessProjectionService(
                 storedItemGrants = itemGrants;
             }
 
-            result = new SearchAccessVerification(finding ?? "CLEAN", state.AuthorizationRevision, mirror.Count, canonical.Edges.Count, recordGrants.Count, itemGrants.Count, sampled, checks, finding is null ? null : detail);
+            result = new SearchAccessVerification(finding ?? "CLEAN", state.AuthorizationRevision, mirror.Count, canonical.Edges.Count, recordGrants.Count, itemGrants.Count, sampled, checks, finding is null ? null : detail,
+                values.Count, searchable.Count, state.ContentIntegrityRevision);
         }
 
         if (finding is null && canonicalAtRevision is not null)
@@ -319,7 +535,7 @@ public sealed class SearchAccessProjectionService(
             await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
             var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
                         ?? throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
-            if (state.AuthorizationRevision != verifiedRevision || !(verifiedDigest ?? []).AsSpan().SequenceEqual(state.LatestSecurityJournalDigest ?? []))
+            if (state.AuthorizationRevision != verifiedRevision || state.ContentIntegrityRevision != verifiedContentRevision || !(verifiedDigest ?? []).AsSpan().SequenceEqual(state.LatestSecurityJournalDigest ?? []))
             {
                 return result with { OutcomeCode = "MOVED" };
             }
@@ -392,14 +608,35 @@ public sealed class SearchAccessProjectionService(
             return new SearchAccessReplayCheck(ex.ReasonCode, revision - 1, state.AuthorizationRevision, replayed.Edges.Count, 0, 0, 0);
         }
 
+        // IX-5b: the content stream must also be complete and chained to its head (it names every record whose values change).
+        byte[]? previousContent = null;
+        long content = 0;
+        try
+        {
+            for (content = 1; content <= state.ContentIntegrityRevision; content++)
+            {
+                var entry = await scope.FindJournalEntryAsync(organizationId, JournalStreamNames.Content, content, cancellationToken).ConfigureAwait(false);
+                previousContent = SearchAccessJournalVerifier.VerifyContent(entry, organizationId, content, previousContent).Digest;
+            }
+
+            if (state.ContentIntegrityRevision > 0 && (state.LatestContentJournalDigest is null || !previousContent!.AsSpan().SequenceEqual(state.LatestContentJournalDigest)))
+            {
+                throw new SearchAccessIntegrityException(SearchAccessReasonCodes.CheckpointDigestMismatch, "the content chain does not end at the organization's content journal head");
+            }
+        }
+        catch (SearchAccessIntegrityException ex)
+        {
+            return new SearchAccessReplayCheck(ex.ReasonCode, state.AuthorizationRevision, state.AuthorizationRevision, replayed.Edges.Count, 0, 0, 0, content - 1);
+        }
+
         var canonical = await CanonicalAccessEdgesAsync(scope, organizationId, cancellationToken).ConfigureAwait(false);
         var replayedSet = replayed.Edges.ToHashSet();
         var missing = canonical.Edges.Count(e => !replayedSet.Contains(e));
         var extra = replayedSet.Count(e => !canonical.Edges.Contains(e));
-        return new SearchAccessReplayCheck(missing == 0 && extra == 0 ? "COMPLETE" : SearchAccessReasonCodes.MirrorDiverged, state.AuthorizationRevision, state.AuthorizationRevision, replayedSet.Count, canonical.Edges.Count, missing, extra);
+        return new SearchAccessReplayCheck(missing == 0 && extra == 0 ? "COMPLETE" : SearchAccessReasonCodes.MirrorDiverged, state.AuthorizationRevision, state.AuthorizationRevision, replayedSet.Count, canonical.Edges.Count, missing, extra, state.ContentIntegrityRevision);
     }
 
-    private async Task ApplyEventAsync(ISearchAccessStore access, Guid organizationId, VerifiedAccessEvent verified, CancellationToken cancellationToken)
+    private async Task ApplyEventAsync(ISearchAccessStore access, Guid organizationId, VerifiedAccessEvent verified, long contentRevision, CancellationToken cancellationToken)
     {
         var deltaEdges = new List<AccessEdge>();
         foreach (var change in verified.Delta.Where(d => d.Edge is not null))
@@ -444,6 +681,10 @@ public sealed class SearchAccessProjectionService(
         await access.DeleteGrantsOfRecordsAsync(organizationId, affected, cancellationToken).ConfigureAwait(false);
         access.AddRecordGrants(derived.RecordGrants);
         access.AddFieldItemGrants(derived.FieldItemGrants);
+
+        // IX-5b: the affected records' value rows follow their new access rows in the same transaction (no member expansion:
+        // a membership change affects no record and rewrites no value row).
+        await RederiveValuesAsync(access, organizationId, affected, derived, contentRevision, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -602,7 +843,7 @@ public sealed class SearchAccessProjectionService(
             return; // already quarantined, or the checkpoint moved since the failure was observed (re-evaluated next pass)
         }
 
-        if (!await access.TryUpdateCheckpointAsync(organizationId, checkpoint.CheckpointRevision, checkpoint.ConsumedAuthorizationRevision, checkpoint.ConsumedJournalDigest, SearchAccessProjectionStates.Quarantined, reasonCode, checkpoint.AccessProjectionProtocolVersion, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
+        if (!await access.TryUpdateCheckpointAsync(organizationId, checkpoint.CheckpointRevision, SearchAccessCheckpointValues.Of(checkpoint) with { StateName = SearchAccessProjectionStates.Quarantined, QuarantineReasonCode = reasonCode }, clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
         {
             return;
         }
@@ -617,6 +858,79 @@ public sealed class SearchAccessProjectionService(
         }, clock);
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         alerts.Raise(new SecurityAlert("SEARCH_ACCESS_PROJECTION_QUARANTINED", "High", organizationId, Guid.Empty, null, "Tier 2 access projection quarantined (" + reasonCode + "): " + detail, Guid.NewGuid()));
+    }
+
+    /// <summary>
+    /// IX-5b, Testing only: evaluates AND-ed conditions over the value rows for one user, internally, to prove multi-condition
+    /// correctness. Not a search path: no endpoint outside Testing calls it, nothing is disclosed, and it refuses unless Tier 2 is
+    /// ready. P = {user} ∪ the user's teams (canonical membership in the same snapshot). A record owned through P matches if any
+    /// readable value satisfies each condition; a share-only record additionally needs every item of each condition's field
+    /// readable through P (the accepted per-field item count, Tier 1's UF-25 rule).
+    /// </summary>
+    public async Task<IReadOnlyList<Guid>> EvaluateForTestingAsync(Guid organizationId, Guid formDefinitionId, Guid authorityUserId, IReadOnlyList<SearchAccessEvaluationCondition> conditions, CancellationToken cancellationToken)
+    {
+        RequireEnabled();
+        ArgumentNullException.ThrowIfNull(conditions);
+        if (conditions.Count == 0)
+        {
+            throw AuthorityException.Invalid("at least one condition is required");
+        }
+
+        await using var scope = await store.BeginReadOnlySnapshotScopeAsync(cancellationToken).ConfigureAwait(false);
+        var state = await scope.ReadOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new AuthorityException(AuthorityErrorCodes.NotFound, 404, false);
+        var access = scope.SearchAccess;
+        await access.BindOrganizationAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        var checkpoint = await access.FindCheckpointAsync(organizationId, cancellationToken).ConfigureAwait(false);
+        if (checkpoint is null || !IsReady(checkpoint, await ReadinessInputsAsync(access, state, cancellationToken).ConfigureAwait(false)))
+        {
+            throw AuthorityException.NotReady("SEARCH_INDEX_NOT_READY");
+        }
+
+        var canonical = await CanonicalAccessEdgesAsync(scope, organizationId, cancellationToken).ConfigureAwait(false);
+        var principals = canonical.WithSubject("user", authorityUserId, "team", "member").Where(e => e.SubjectRelation.Length == 0).Select(e => ("team", e.ResourceId)).Append(("user", authorityUserId)).ToHashSet();
+        var values = (await access.GetValuePostingsAsync(organizationId, null, cancellationToken).ConfigureAwait(false))
+            .Where(v => v.FormDefinitionId == formDefinitionId && principals.Contains((v.AccessPrincipalTypeName, v.AccessPrincipalEntityId))).ToList();
+        var owned = (await access.GetRecordGrantsAsync(organizationId, null, cancellationToken).ConfigureAwait(false))
+            .Where(g => g.AccessKindName == SearchAccessKinds.EffectiveOwner && principals.Contains((g.AccessPrincipalTypeName, g.AccessPrincipalEntityId))).Select(g => g.FormRecordId).ToHashSet();
+        var candidates = values.Select(v => v.FormRecordId).ToHashSet();
+        var counts = await access.GetFieldItemCountsAsync(organizationId, candidates, cancellationToken).ConfigureAwait(false);
+        var result = new List<Guid>();
+        foreach (var record in candidates.Order())
+        {
+            var rows = values.Where(v => v.FormRecordId == record).ToList();
+            var all = conditions.All(condition =>
+            {
+                var field = rows.Where(v => v.FieldDefinitionId == condition.FieldDefinitionId).ToList();
+                if (!field.Any(v => Matches(v, condition)))
+                {
+                    return false;
+                }
+
+                if (owned.Contains(record))
+                {
+                    return true;
+                }
+
+                var approval = field[0].FieldSearchApprovalId;
+                return counts.TryGetValue((record, approval), out var count) && field.Select(v => v.ManifestItemId).Distinct().Count() == count;
+            });
+            if (all)
+            {
+                result.Add(record);
+            }
+        }
+
+        return result;
+
+        static bool Matches(SearchAccessValuePosting v, SearchAccessEvaluationCondition c) => c.ValueTypeName == v.ValueTypeName && c.ValueTypeName switch
+        {
+            "String" => string.Equals(v.NormalizedStringValue, c.StringValue, StringComparison.Ordinal),
+            "Integer" => v.IntegerValue is { } i && (c.MinimumInteger is null || i >= c.MinimumInteger) && (c.MaximumInteger is null || i <= c.MaximumInteger),
+            "Option" => v.FieldOptionId == c.FieldOptionId,
+            "Boolean" => v.BooleanValue == c.BooleanValue,
+            _ => false,
+        };
     }
 
     private static async Task<AccessEdgeSet> CanonicalAccessEdgesAsync(IAuthorityScope scope, Guid organizationId, CancellationToken cancellationToken)

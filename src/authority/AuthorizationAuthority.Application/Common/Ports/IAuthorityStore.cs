@@ -87,6 +87,15 @@ public interface IAuthorityScope : IAsyncDisposable
     /// <summary>All currently active desired-state edges of the organization (normalized authoritative graph).</summary>
     Task<List<AuthorityRelationshipEdge>> GetActiveEdgesAsync(Guid organizationId, CancellationToken cancellationToken);
 
+    /// <summary>R-53: the permanent identity bindings of the given item ids, in every organization.</summary>
+    Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken);
+
+    /// <summary>R-53: inserts identity bindings (never updated or deleted; the unique item id refuses a second binding).</summary>
+    void AddItemIdentities(IEnumerable<ContentItemIdentity> identities);
+
+    /// <summary>R-53: the given item ids that appear in any accepted manifest of any organization (identities predating the bindings).</summary>
+    Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken);
+
     void AddEdge(AuthorityRelationshipEdge edge);
 
     /// <summary>Phase C8 AC-9: every desired-state edge (active and removed) of one exact relationship, read-only.</summary>

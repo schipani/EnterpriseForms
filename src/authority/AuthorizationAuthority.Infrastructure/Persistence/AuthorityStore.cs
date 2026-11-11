@@ -191,6 +191,20 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => context.ManifestLeaves.AddRange(leaves);
 
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken)
+        {
+            var ids = manifestItemIds.Distinct().ToList();
+            return context.ContentItemIdentities.AsNoTracking().Where(i => ids.Contains(i.ManifestItemId)).ToListAsync(cancellationToken);
+        }
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => context.ContentItemIdentities.AddRange(identities);
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken)
+        {
+            var ids = manifestItemIds.Distinct().ToList();
+            return context.ManifestLeaves.AsNoTracking().Where(l => ids.Contains(l.ManifestItemId)).Select(l => l.ManifestItemId).Distinct().ToListAsync(cancellationToken);
+        }
+
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid recordManifestCommitId, CancellationToken cancellationToken) =>
             context.ManifestLeaves.AsNoTracking().Where(l => l.RecordManifestCommitId == recordManifestCommitId).OrderBy(l => l.ManifestLeafPosition).ToListAsync(cancellationToken);
 

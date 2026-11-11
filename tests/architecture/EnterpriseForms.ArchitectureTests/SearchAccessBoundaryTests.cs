@@ -53,6 +53,7 @@ public sealed partial class SearchAccessBoundaryTests
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessDerivation.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessJournalVerifier.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessProjectionService.cs",
+            "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessValueDerivation.cs",
             "AuthorizationAuthority.Domain/Features/SearchAccess/SearchAccessEntities.cs",
             "AuthorizationAuthority.Infrastructure/Persistence/AuthorityDbContext.cs",
             "AuthorizationAuthority.Infrastructure/Persistence/AuthorityRuntimeGrants.cs",
@@ -107,7 +108,11 @@ public sealed partial class SearchAccessBoundaryTests
         var violations = ModelNamingValidator.Validate(context.Model).Where(v => tables.Any(t => v.ObjectName == t || v.ObjectName.StartsWith(t + ".", StringComparison.Ordinal))).ToList();
         Assert.True(violations.Count == 0, string.Join(Environment.NewLine, violations.Select(v => $"{v.ObjectName}: {v.RuleCode} ({v.Detail})")));
 
-        var migration = File.ReadAllText(Directory.EnumerateFiles(RepositoryPaths.Combine("src", "authority", "AuthorizationAuthority.Infrastructure", "Persistence", "Migrations"), "*_AuthoritySearchAccessIx5a.cs").Single());
+        var migrations = RepositoryPaths.Combine("src", "authority", "AuthorizationAuthority.Infrastructure", "Persistence", "Migrations");
+        var ix5b = File.ReadAllText(Directory.EnumerateFiles(migrations, "*_AuthoritySearchAccessIx5b.cs").Single());
+        Assert.Contains("ALTER TABLE authority_search_access.search_access_value_postings FORCE ROW LEVEL SECURITY;", ix5b, StringComparison.Ordinal);
+        Assert.Contains("CREATE POLICY rls_search_access_value_postings_organization", ix5b, StringComparison.Ordinal);
+        var migration = File.ReadAllText(Directory.EnumerateFiles(migrations, "*_AuthoritySearchAccessIx5a.cs").Single()) + ix5b;
         Assert.Contains("FORCE ROW LEVEL SECURITY", migration, StringComparison.Ordinal);
         Assert.Contains("CREATE POLICY rls_{table}_organization ON authority_search_access.{table}", migration, StringComparison.Ordinal);
         foreach (var table in SearchAccessSchema.AllTables)

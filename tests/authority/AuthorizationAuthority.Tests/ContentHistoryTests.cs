@@ -108,7 +108,7 @@ public sealed class ContentHistoryTests
             var operation = Guid.CreateVersion7();
             var candidate = Rows(value).Select(r => Encode(r, Org, operation, Head.CommittedContentRevision + 1)).ToList();
             var request = new PrepareContentChangeRequest(Org, Record, operation, State.AuthorizationRevision, Head.CommittedContentRevision, Convert.ToBase64String(Head.CommittedManifestRoot),
-                candidate.Select(c => new CandidateContentItem(c.Kind, c.ItemId, c.Base64)).ToList());
+                candidate.Select(c => new CandidateContentItem(c.Kind, c.ItemId, c.Base64)).ToList(), CurrentItems: Snapshots.GetValueOrDefault(Head.CommittedContentRevision));
             var prepared = await Service.PrepareAsync(Actor(Owner), request, "key-" + operation.ToString("N"), Guid.CreateVersion7(), CancellationToken.None);
             if (!commit)
             {

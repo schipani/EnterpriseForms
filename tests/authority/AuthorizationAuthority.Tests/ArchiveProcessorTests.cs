@@ -321,6 +321,12 @@ public sealed class ArchiveProcessorTests
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => throw new NotSupportedException();
 
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => throw new NotSupportedException();
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<List<RecordManifestLeaf>> GetManifestLeavesAsync(Guid commitId, CancellationToken ct) => throw new NotSupportedException();
 
         public Task<RecordManifestCommit?> FindManifestCommitByOperationAsync(Guid organizationId, Guid formRecordId, Guid committedOperationId, CancellationToken ct) => Task.FromResult<RecordManifestCommit?>(null);

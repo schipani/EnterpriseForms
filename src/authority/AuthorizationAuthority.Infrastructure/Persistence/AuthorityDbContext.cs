@@ -50,6 +50,8 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<RecordManifestLeaf> ManifestLeaves => Set<RecordManifestLeaf>();
 
+    public DbSet<ContentItemIdentity> ContentItemIdentities => Set<ContentItemIdentity>();
+
     public DbSet<ContentIntegrityCheckpoint> ContentCheckpoints => Set<ContentIntegrityCheckpoint>();
 
     public DbSet<IntegrityKeyRegistration> KeyRegistrations => Set<IntegrityKeyRegistration>();
@@ -132,6 +134,8 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
     public DbSet<SearchAccessRecordGrant> SearchAccessRecordGrants => Set<SearchAccessRecordGrant>();
 
     public DbSet<SearchAccessFieldItemGrant> SearchAccessFieldItemGrants => Set<SearchAccessFieldItemGrant>();
+
+    public DbSet<SearchAccessValuePosting> SearchAccessValuePostings => Set<SearchAccessValuePosting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -29,6 +29,18 @@ public sealed class SearchAccessCheckpoint
     public string? QuarantineReasonCode { get; set; }
 
     public DateTimeOffset CheckpointModifiedOn { get; set; }
+
+    /// <summary>IX-5b: the content-integrity revision whose content-stream event was consumed last (0 before any).</summary>
+    public long ConsumedContentIntegrityRevision { get; set; }
+
+    /// <summary>IX-5b: digest of the consumed content-stream event; null at revision 0.</summary>
+    public byte[]? ConsumedContentJournalDigest { get; set; }
+
+    /// <summary>
+    /// IX-5b: SHA-256 over the organization's Complete, Public/Internal coverages (approval and field) the value rows were derived
+    /// under. Coverage changes are not content events, so readiness also requires this to equal the current coverage set.
+    /// </summary>
+    public byte[]? ConsumedCoverageDigest { get; set; }
 }
 
 /// <summary>
@@ -105,6 +117,54 @@ public sealed class SearchAccessFieldItemGrant
     public string ShareRoleName { get; set; } = string.Empty;
 
     public long DerivedAuthorizationRevision { get; set; }
+}
+
+/// <summary>
+/// IX-5b (C-148, B2): one searchable value, scoped to one principal that can read its item. Copied from a sealed Tier 1 posting
+/// of the record's accepted head under a Complete Public/Internal coverage (never from business data, never from encrypted
+/// content). One row per (principal, posting): an owner principal reads every item, a share principal the items of its shares;
+/// teams are never expanded. Exactly one typed value column is set, as named by the value type.
+/// </summary>
+public sealed class SearchAccessValuePosting
+{
+    public Guid SearchAccessValuePostingId { get; set; }
+
+    public Guid OrganizationId { get; set; }
+
+    public string AccessPrincipalTypeName { get; set; } = string.Empty;
+
+    public Guid AccessPrincipalEntityId { get; set; }
+
+    public Guid FormDefinitionId { get; set; }
+
+    public Guid FieldDefinitionId { get; set; }
+
+    public Guid FieldSearchApprovalId { get; set; }
+
+    public Guid FormRecordId { get; set; }
+
+    public Guid ManifestItemId { get; set; }
+
+    public Guid IndexedOperationId { get; set; }
+
+    /// <summary>String, Integer, Decimal, Date, DateTime, Boolean or Option.</summary>
+    public string ValueTypeName { get; set; } = string.Empty;
+
+    public string? NormalizedStringValue { get; set; }
+
+    public long? IntegerValue { get; set; }
+
+    public decimal? DecimalValue { get; set; }
+
+    public DateOnly? DateValue { get; set; }
+
+    public DateTimeOffset? DateTimeValue { get; set; }
+
+    public bool? BooleanValue { get; set; }
+
+    public Guid? FieldOptionId { get; set; }
+
+    public long DerivedContentIntegrityRevision { get; set; }
 }
 
 public static class SearchAccessProjectionStates

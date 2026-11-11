@@ -14,7 +14,7 @@ public static class SearchAccessSchema
     public const string Name = "authority_search_access";
 
     /// <summary>Derived rows: inserted and deleted, never updated.</summary>
-    public static readonly string[] DerivedTables = ["search_access_edges", "search_access_record_grants", "search_access_field_item_grants"];
+    public static readonly string[] DerivedTables = ["search_access_edges", "search_access_record_grants", "search_access_field_item_grants", "search_access_value_postings"];
 
     /// <summary>Checkpoints: inserted and compare-and-set updated, never deleted.</summary>
     public static readonly string[] StateTables = ["search_access_checkpoints"];
@@ -39,6 +39,8 @@ public sealed class SearchAccessCheckpointConfiguration : IEntityTypeConfigurati
             t.HasCheckConstraint("ck_search_access_checkpoint_quarantine", "(access_projection_state_name = 'Quarantined') = (quarantine_reason_code IS NOT NULL)");
             t.HasCheckConstraint("ck_search_access_checkpoint_revision", "consumed_authorization_revision >= 0 AND checkpoint_revision >= 1 AND access_projection_protocol_version >= 1");
             t.HasCheckConstraint("ck_search_access_checkpoint_digest", "(consumed_authorization_revision = 0) = (consumed_journal_digest IS NULL) AND (consumed_journal_digest IS NULL OR octet_length(consumed_journal_digest) = 32)");
+            t.HasCheckConstraint("ck_search_access_checkpoint_content_digest", "consumed_content_integrity_revision >= 0 AND (consumed_content_integrity_revision = 0) = (consumed_content_journal_digest IS NULL) AND (consumed_content_journal_digest IS NULL OR octet_length(consumed_content_journal_digest) = 32)");
+            t.HasCheckConstraint("ck_search_access_checkpoint_coverage_digest", "consumed_coverage_digest IS NULL OR octet_length(consumed_coverage_digest) = 32");
         });
     }
 }
@@ -80,6 +82,46 @@ public sealed class SearchAccessRecordGrantConfiguration : IEntityTypeConfigurat
             t.HasCheckConstraint("ck_search_access_record_grant_principal", "access_principal_type_name IN ('user','team')");
             t.HasCheckConstraint("ck_search_access_record_grant_kind",
                 "(access_kind_name = 'EffectiveOwner' AND record_share_id IS NULL AND share_role_name IS NULL) OR (access_kind_name = 'ShareRecipient' AND record_share_id IS NOT NULL AND share_role_name IN ('reader','contributor','manager'))");
+        });
+    }
+}
+
+/// <summary>
+/// IX-5b: access-scoped value postings. Every index leads with (organization, principal type, principal, field): a statement over
+/// these rows is structurally bounded by the caller's principals (SAFE conditions); one partial index per value type.
+/// </summary>
+public sealed class SearchAccessValuePostingConfiguration : IEntityTypeConfiguration<SearchAccessValuePosting>
+{
+    public void Configure(EntityTypeBuilder<SearchAccessValuePosting> builder)
+    {
+        builder.MapSnakeCase("search_access_value_postings");
+        builder.ToTable("search_access_value_postings", SearchAccessSchema.Name);
+        builder.HasKey(e => e.SearchAccessValuePostingId);
+        builder.Property(e => e.AccessPrincipalTypeName).HasMaxLength(10);
+        builder.Property(e => e.ValueTypeName).HasMaxLength(10);
+        builder.Property(e => e.DateValue).HasColumnName("date_value").HasColumnType("date"); // as Tier 1 (DateOnly is not snake-cased by convention)
+        builder.Property(e => e.DecimalValue).HasColumnType("numeric"); // exactly Tier 1's type: copied values are never rounded
+        builder.HasIndex(e => new { e.OrganizationId, e.FormRecordId }).HasDatabaseName("ix_search_access_value_postings_record");
+        foreach (var (name, type, column) in new[]
+                 {
+                     ("string", "String", nameof(SearchAccessValuePosting.NormalizedStringValue)), ("integer", "Integer", nameof(SearchAccessValuePosting.IntegerValue)),
+                     ("decimal", "Decimal", nameof(SearchAccessValuePosting.DecimalValue)), ("date", "Date", nameof(SearchAccessValuePosting.DateValue)),
+                     ("date_time", "DateTime", nameof(SearchAccessValuePosting.DateTimeValue)), ("boolean", "Boolean", nameof(SearchAccessValuePosting.BooleanValue)),
+                     ("option", "Option", nameof(SearchAccessValuePosting.FieldOptionId)),
+                 })
+        {
+            builder.HasIndex(nameof(SearchAccessValuePosting.OrganizationId), nameof(SearchAccessValuePosting.AccessPrincipalTypeName), nameof(SearchAccessValuePosting.AccessPrincipalEntityId), nameof(SearchAccessValuePosting.FieldDefinitionId), column)
+                .HasDatabaseName($"ix_search_access_value_postings_{name}").HasFilter($"value_type_name = '{type}'");
+        }
+
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_search_access_value_posting_org").OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_search_access_value_posting_principal", "access_principal_type_name IN ('user','team')");
+            t.HasCheckConstraint("ck_search_access_value_posting_one_value",
+                "(value_type_name = 'String') = (normalized_string_value IS NOT NULL) AND (value_type_name = 'Integer') = (integer_value IS NOT NULL) AND (value_type_name = 'Decimal') = (decimal_value IS NOT NULL) "
+                + "AND (value_type_name = 'Date') = (date_value IS NOT NULL) AND (value_type_name = 'DateTime') = (date_time_value IS NOT NULL) AND (value_type_name = 'Boolean') = (boolean_value IS NOT NULL) "
+                + "AND (value_type_name = 'Option') = (field_option_id IS NOT NULL)");
         });
     }
 }

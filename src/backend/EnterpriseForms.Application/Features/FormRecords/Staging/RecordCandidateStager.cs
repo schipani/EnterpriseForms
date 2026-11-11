@@ -16,7 +16,7 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
 {
     public sealed record CandidateInput(FormRecordRevision Header, IReadOnlyList<ISignedContentRow> Rows);
 
-    /// <param name="currentItems">Share-scoped writes (Phase C5): the verified current snapshot, which the Authority binds to its accepted head.</param>
+    /// <param name="currentItems">The verified current snapshot, which the Authority binds to its accepted head (share-scoped writes pass it; otherwise it is read here, R-53).</param>
     /// <param name="preserveSchemaVersions">Share-scoped writes copy rows verbatim, so each keeps the signed schema version it was accepted under (D15).</param>
     public async Task<AcceptedContentRevision> StageAndCommitAsync(RequestContext context, AcceptedContentRevision head, CandidateInput candidate, string idempotencyKey, CancellationToken cancellationToken,
         IReadOnlyList<StagedContentItem>? currentItems = null, bool preserveSchemaVersions = false)
@@ -36,6 +36,14 @@ public sealed class RecordCandidateStager(IBusinessStore store, IAuthorizationAu
         if (head.CommittedOperationId == operationId)
         {
             return head; // idempotent replay: this exact operation is already the accepted head (A5, CONS-04)
+        }
+
+        // R-53 (C-148): every write to a record with accepted content carries the complete current snapshot (the accepted
+        // operation's staged rows). They prove nothing here: the Authority binds them to its accepted head and checks the
+        // candidate's item identities against them. Read before the candidate rows are re-bound to the new operation.
+        if (currentItems is null && head.CommittedContentRevision > 0 && head.CommittedOperationId is { } acceptedOperation)
+        {
+            currentItems = (await ReadStagedAsync(candidate.Header.FormRecordId, acceptedOperation, cancellationToken).ConfigureAwait(false)).Items;
         }
 
         var candidateRevision = head.CommittedContentRevision + 1;

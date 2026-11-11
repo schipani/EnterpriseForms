@@ -9,6 +9,9 @@ namespace AuthorizationAuthority.Infrastructure.Persistence;
 /// </summary>
 public static class AuthorityRuntimeGrants
 {
+    /// <summary>R-53 (C-148): tables the runtime may only read and insert (no UPDATE, no DELETE).</summary>
+    public static readonly string[] InsertOnlyTables = ["content_item_identities"];
+
     private static readonly string[] AppendOnlyTables =
     [
         "security_commands", "security_journal_entries", "authority_relationship_edges", "projection_outbox_events",
@@ -43,7 +46,7 @@ public static class AuthorityRuntimeGrants
     ];
 
     /// <summary>Every table the runtime role may touch; a model table missing here is a startup defect caught by the unit test, not in Docker.</summary>
-    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables, .. Configurations.SearchIndexSchema.ResultTables, .. Configurations.SearchAccessSchema.AllTables];
+    public static IReadOnlyCollection<string> GrantedTables => [.. AppendOnlyTables, .. InsertOnlyTables, .. MutableTables, .. Configurations.SearchIndexSchema.DerivedTables, .. Configurations.SearchIndexSchema.StateTables, .. Configurations.SearchIndexSchema.ResultTables, .. Configurations.SearchAccessSchema.AllTables];
 
     /// <param name="searchReaderLogin">IX-3: the LOGIN user of the indexed-search query path (created by the cluster bootstrap with its
     /// own credential, never by a migration); it is made a member of <see cref="SearchReaderRole"/> and gets the reader's role settings.
@@ -79,6 +82,10 @@ public static class AuthorityRuntimeGrants
         }
 
         statements.Add($"GRANT SELECT ON {schema}.ef_migrations_history TO {runtimeRole}");
+        foreach (var table in InsertOnlyTables)
+        {
+            statements.Add($"GRANT SELECT, INSERT ON {schema}.{table} TO {runtimeRole}"); // R-53: never updated or deleted
+        }
         statements.AddRange(SearchIndexStatements(runtimeRole));
         statements.AddRange(SearchAccessStatements(runtimeRole));
         if (!string.IsNullOrEmpty(searchReaderLogin))

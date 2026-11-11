@@ -480,6 +480,12 @@ public sealed class CommandPlannerTests
 
         public void AddManifestLeaves(IEnumerable<RecordManifestLeaf> leaves) => throw new NotSupportedException();
 
+        public Task<List<ContentItemIdentity>> FindItemIdentitiesAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void AddItemIdentities(IEnumerable<ContentItemIdentity> identities) => throw new NotSupportedException();
+
+        public Task<List<Guid>> FindAcceptedItemIdsAsync(IReadOnlyCollection<Guid> manifestItemIds, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public void AddContentCheckpoint(ContentIntegrityCheckpoint checkpoint) => throw new NotSupportedException();
 
         public Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid org, string purpose, CancellationToken ct) => throw new NotSupportedException();
