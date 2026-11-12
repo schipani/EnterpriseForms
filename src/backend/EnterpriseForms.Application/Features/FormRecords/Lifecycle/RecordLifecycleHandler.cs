@@ -159,7 +159,7 @@ public sealed class RecordLifecycleHandler(VerifiedRecordReader reader, IBusines
 
         var currentValues = verified.AllRows.OfType<FieldValueRowBase>().ToList();
         var groupInput = new CandidateBuilder.GroupInput(verified.Groups, verified.AllRows.OfType<FormRecordGroupRevision>().ToList(), null);
-        _ = CandidateBuilder.ApplyValuesDetailed(currentValues, new Dictionary<string, string>(), verified.Layout, verified.Fields, verified.Options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, encryption, groups: groupInput);
+        _ = await CandidateBuilder.ApplyValuesDetailedAsync(currentValues, new Dictionary<string, string>(), verified.Layout, verified.Fields, verified.Options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, encryption, cancellationToken, groups: groupInput).ConfigureAwait(false);
     }
 
     private async Task<int> CountInFlightAsync(RequestContext context, Guid formRecordId, DateTimeOffset now, CancellationToken cancellationToken)

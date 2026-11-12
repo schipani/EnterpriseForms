@@ -24,13 +24,13 @@ public sealed class AesGcmAuditorNoteSealer(IEncryptionKeyProvider keys) : IAudi
 
     public bool IsAvailable => keys.IsConfigured;
 
-    public AuditorReasonNoteEnvelope Seal(AuditorReasonNoteContext context, string normalizedNote)
+    public async Task<AuditorReasonNoteEnvelope> SealAsync(AuditorReasonNoteContext context, string normalizedNote, CancellationToken cancellationToken)
     {
         var dek = RandomNumberGenerator.GetBytes(32);
         var nonce = RandomNumberGenerator.GetBytes(NonceSize);
         try
         {
-            return Seal(context, normalizedNote, dek, nonce);
+            return await SealAsync(context, normalizedNote, dek, nonce, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -39,7 +39,7 @@ public sealed class AesGcmAuditorNoteSealer(IEncryptionKeyProvider keys) : IAudi
     }
 
     /// <summary>Deterministic core for the known-answer vector KAT-M1-01 (tests only through InternalsVisibleTo).</summary>
-    internal AuditorReasonNoteEnvelope Seal(AuditorReasonNoteContext context, string normalizedNote, byte[] dek, byte[] nonce)
+    internal async Task<AuditorReasonNoteEnvelope> SealAsync(AuditorReasonNoteContext context, string normalizedNote, byte[] dek, byte[] nonce, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(normalizedNote);
@@ -53,8 +53,8 @@ public sealed class AesGcmAuditorNoteSealer(IEncryptionKeyProvider keys) : IAudi
         var tag = new byte[TagSize];
         try
         {
-            var keyReference = keys.CurrentKeyReference;
-            var wrapped = keys.WrapDataKey(dek, keyReference);
+            // E1-2/E1-3: the organization's current AuditorReasonNote key (new notes); existing notes are untouched (seal only).
+            var wrapped = await keys.WrapDataKeyAsync(new DataKeyScope(context.OrganizationId, EncryptionKeyPurpose.AuditorReasonNote), dek, cancellationToken).ConfigureAwait(false);
             using (var aes = new AesGcm(dek, TagSize))
             {
                 aes.Encrypt(nonce, plaintext, ciphertext, tag, Aad(context));
@@ -64,12 +64,12 @@ public sealed class AesGcmAuditorNoteSealer(IEncryptionKeyProvider keys) : IAudi
                 AuditorReasonNoteFormat.EnvelopeFormat,
                 AuditorReasonNoteFormat.EnvelopeVersion,
                 AuditorReasonNoteFormat.AlgorithmName,
-                keyReference,
+                wrapped.KeyReference,
                 context.NoteId.ToString("D"),
                 Convert.ToBase64String(nonce),
                 Convert.ToBase64String(ciphertext),
                 Convert.ToBase64String(tag),
-                Convert.ToBase64String(wrapped));
+                Convert.ToBase64String(wrapped.WrappedKeyBytes));
         }
         finally
         {

@@ -27,18 +27,19 @@ public sealed class AesGcmFieldEncryptionService(IEncryptionKeyProvider keys) : 
 
     public bool IsAvailable => keys.IsConfigured;
 
-    public FieldEncryptedValue Encrypt(FieldEncryptionContext context, string canonicalPlaintext) =>
-        Encrypt(context, canonicalPlaintext, RandomNumberGenerator.GetBytes(DataKeySize), RandomNumberGenerator.GetBytes(NonceSize));
+    public Task<FieldEncryptedValue> EncryptAsync(FieldEncryptionContext context, string canonicalPlaintext, EncryptionKeyPurpose purpose, CancellationToken cancellationToken) =>
+        EncryptAsync(context, canonicalPlaintext, purpose, RandomNumberGenerator.GetBytes(DataKeySize), RandomNumberGenerator.GetBytes(NonceSize), cancellationToken);
 
     /// <summary>
     /// Deterministic core (the public overload supplies a random single-use DEK and nonce; tests reach this one for the
     /// known-answer vectors through InternalsVisibleTo). Takes ownership of <paramref name="dataKey"/>: it is zeroed on every exit path.
     /// </summary>
-    internal FieldEncryptedValue Encrypt(FieldEncryptionContext context, string canonicalPlaintext, byte[] dataKey, byte[] nonce)
+    internal async Task<FieldEncryptedValue> EncryptAsync(FieldEncryptionContext context, string canonicalPlaintext, EncryptionKeyPurpose purpose, byte[] dataKey, byte[] nonce, CancellationToken cancellationToken)
     {
         try
         {
             ArgumentNullException.ThrowIfNull(context);
+            RequireSupportedPurpose(purpose);
             ArgumentNullException.ThrowIfNull(canonicalPlaintext);
             ArgumentNullException.ThrowIfNull(dataKey);
             ArgumentNullException.ThrowIfNull(nonce);
@@ -52,8 +53,8 @@ public sealed class AesGcmFieldEncryptionService(IEncryptionKeyProvider keys) : 
                 throw new ArgumentException("a 256-bit data key and a 96-bit nonce are required");
             }
 
-            var keyReference = keys.CurrentKeyReference;
-            var wrapped = keys.WrapDataKey(dataKey, keyReference);
+            // E1-2/E1-3: the organization's current key of the requested purpose wraps the single-use DEK.
+            var wrapped = await keys.WrapDataKeyAsync(new DataKeyScope(context.TenantId, purpose), dataKey, cancellationToken).ConfigureAwait(false);
             var plaintext = Encoding.UTF8.GetBytes(canonicalPlaintext);
             var ciphertext = new byte[plaintext.Length];
             var tag = new byte[TagSize];
@@ -73,9 +74,9 @@ public sealed class AesGcmFieldEncryptionService(IEncryptionKeyProvider keys) : 
                 EncryptedValueBytes = ciphertext,
                 EncryptionNonceBytes = nonce,
                 EncryptionAuthTagBytes = tag,
-                WrappedDataKeyBytes = wrapped,
+                WrappedDataKeyBytes = wrapped.WrappedKeyBytes,
                 EncryptionAlgorithmName = AlgorithmName,
-                EncryptionKeyReference = keyReference,
+                EncryptionKeyReference = wrapped.KeyReference,
                 EncryptionEnvelopeVersion = EnvelopeVersion,
                 EncryptedLogicalType = context.LogicalType,
             };
@@ -86,9 +87,10 @@ public sealed class AesGcmFieldEncryptionService(IEncryptionKeyProvider keys) : 
         }
     }
 
-    public string Decrypt(FieldEncryptedValue value)
+    public async Task<string> DecryptAsync(FieldEncryptedValue value, EncryptionKeyPurpose purpose, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(value);
+        RequireSupportedPurpose(purpose);
         var stage = DecryptionStage.Envelope;
         try
         {
@@ -103,7 +105,7 @@ public sealed class AesGcmFieldEncryptionService(IEncryptionKeyProvider keys) : 
             }
 
             stage = DecryptionStage.KeyUnwrap;
-            var dek = keys.UnwrapDataKey(value.WrappedDataKeyBytes, value.EncryptionKeyReference);
+            var dek = await keys.UnwrapDataKeyAsync(new DataKeyScope(value.TenantId, purpose), value.EncryptionKeyReference, value.WrappedDataKeyBytes, cancellationToken).ConfigureAwait(false);
             stage = DecryptionStage.Payload;
             var plaintext = new byte[value.EncryptedValueBytes.Length];
             try
@@ -123,6 +125,16 @@ public sealed class AesGcmFieldEncryptionService(IEncryptionKeyProvider keys) : 
             // E0-4: identifiers and a reason only; the exception (type, message, fail-closed handling) is otherwise unchanged.
             DecryptionFailure.ForFieldValue(reason, value.TenantId, value.FormRecordId, value.FieldDefinitionId, value.FieldValueItemId).AttachTo(ex);
             throw;
+        }
+    }
+
+    /// <summary>This envelope seals field values and the idempotency fingerprint key; other purposes have their own services.</summary>
+    private static void RequireSupportedPurpose(EncryptionKeyPurpose purpose)
+    {
+        ArgumentNullException.ThrowIfNull(purpose);
+        if (!ReferenceEquals(purpose, EncryptionKeyPurpose.FieldValue) && !ReferenceEquals(purpose, EncryptionKeyPurpose.IdempotencyProtection))
+        {
+            throw new ArgumentException("the field-value envelope is used only for field values and idempotency protection", nameof(purpose));
         }
     }
 

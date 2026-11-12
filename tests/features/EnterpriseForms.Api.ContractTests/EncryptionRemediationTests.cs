@@ -99,7 +99,7 @@ public sealed class EncryptionRemediationTests
     }
 
     /// <summary>A valid v1 ciphertext of many short segments (the decryptor accepts any segment length up to the segment size).</summary>
-    private static (byte[] Ciphertext, byte[] Plaintext, FileEncryptionEnvelope Envelope) ManySegments(LocalDevelopmentKeyProvider keys, FileEncryptionContext context, int segments, int segmentLength)
+    private static async Task<(byte[] Ciphertext, byte[] Plaintext, FileEncryptionEnvelope Envelope)> ManySegmentsAsync(LocalDevelopmentKeyProvider keys, FileEncryptionContext context, int segments, int segmentLength)
     {
         var dek = RandomNumberGenerator.GetBytes(32);
         var prefix = RandomNumberGenerator.GetBytes(8);
@@ -121,7 +121,8 @@ public sealed class EncryptionRemediationTests
             output.Write(tag);
         }
 
-        return (output.ToArray(), plaintext, new FileEncryptionEnvelope("AES-256-GCM", 1, KeyReference, keys.WrapDataKey(dek, KeyReference), prefix, AesGcmFileEncryptionService.SegmentSize));
+        var wrapped = await keys.WrapDataKeyAsync(new DataKeyScope(context.TenantId, EncryptionKeyPurpose.Document), dek, TestContext.Current.CancellationToken);
+        return (output.ToArray(), plaintext, new FileEncryptionEnvelope("AES-256-GCM", 1, wrapped.KeyReference, wrapped.WrappedKeyBytes, prefix, AesGcmFileEncryptionService.SegmentSize));
     }
 
     [Fact]
@@ -130,7 +131,7 @@ public sealed class EncryptionRemediationTests
         var keys = Keys();
         var service = new AesGcmFileEncryptionService(keys);
         var context = DocumentContext();
-        var (ciphertext, plaintext, envelope) = ManySegments(keys, context, 300, 3);
+        var (ciphertext, plaintext, envelope) = await ManySegmentsAsync(keys, context, 300, 3);
         var source = new DepthRecordingStream(ciphertext);
         using var sink = new MemoryStream();
         await service.DecryptAsync(source, sink, envelope, context, TestContext.Current.CancellationToken);
@@ -197,11 +198,9 @@ public sealed class EncryptionRemediationTests
 
         public bool IsConfigured => true;
 
-        public string CurrentKeyReference => KeyReference;
+        public Task<WrappedDataKey> WrapDataKeyAsync(DataKeyScope scope, ReadOnlyMemory<byte> dataKey, CancellationToken cancellationToken) => throw new EncryptionUnavailableException("wrap refused (test)");
 
-        public byte[] WrapDataKey(ReadOnlySpan<byte> dataKey, string keyReference) => throw new EncryptionUnavailableException("wrap refused (test)");
-
-        public byte[] UnwrapDataKey(ReadOnlySpan<byte> wrappedDataKey, string keyReference) => throw new EncryptionUnavailableException("unwrap refused (test)");
+        public Task<byte[]> UnwrapDataKeyAsync(DataKeyScope scope, string keyReference, ReadOnlyMemory<byte> wrappedDataKey, CancellationToken cancellationToken) => throw new EncryptionUnavailableException("unwrap refused (test)");
     }
 
     [Fact]
@@ -236,10 +235,10 @@ public sealed class EncryptionRemediationTests
 
         // Field values: the single-use data key is zeroed too (unchanged behaviour, now also on the deterministic core).
         var fieldKey = Dek();
-        new AesGcmFieldEncryptionService(Keys()).Encrypt(new FieldEncryptionContext(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), "String"), "x", fieldKey, RandomNumberGenerator.GetBytes(12));
+        await new AesGcmFieldEncryptionService(Keys()).EncryptAsync(new FieldEncryptionContext(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), "String"), "x", EncryptionKeyPurpose.FieldValue, fieldKey, RandomNumberGenerator.GetBytes(12), ct);
         Assert.All(fieldKey, b => Assert.Equal(0, b));
         var fieldWrapFailure = Dek();
-        Assert.Throws<EncryptionUnavailableException>(() => new AesGcmFieldEncryptionService(new RefusingWrapProvider()).Encrypt(new FieldEncryptionContext(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), "String"), "x", fieldWrapFailure, RandomNumberGenerator.GetBytes(12)));
+        await Assert.ThrowsAsync<EncryptionUnavailableException>(() => new AesGcmFieldEncryptionService(new RefusingWrapProvider()).EncryptAsync(new FieldEncryptionContext(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), "String"), "x", EncryptionKeyPurpose.FieldValue, fieldWrapFailure, RandomNumberGenerator.GetBytes(12), ct));
         Assert.All(fieldWrapFailure, b => Assert.Equal(0, b));
     }
 
@@ -264,17 +263,17 @@ public sealed class EncryptionRemediationTests
     // ---------------------------------------------------------------- E0-4
 
     [Fact]
-    public void FieldDecryptionFailuresCarryTheirReasonAndIdentifiersWithoutChangingTheExceptionType()
+    public async Task FieldDecryptionFailuresCarryTheirReasonAndIdentifiersWithoutChangingTheExceptionType()
     {
         var keys = Keys();
         var service = new AesGcmFieldEncryptionService(keys);
         var context = new FieldEncryptionContext(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), "String");
-        var sealedRow = service.Encrypt(context, "Avery Synthetic");
+        var sealedRow = await service.EncryptAsync(context, "Avery Synthetic", EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken);
 
-        DecryptionFailure Expect<TException>(Func<string> decrypt, string reason)
+        async Task<DecryptionFailure> ExpectAsync<TException>(Func<Task<string>> decrypt, string reason)
             where TException : Exception
         {
-            var thrown = Assert.ThrowsAny<TException>(decrypt);
+            var thrown = await Assert.ThrowsAnyAsync<TException>(decrypt);
             var failure = DecryptionFailure.Find(thrown);
             Assert.NotNull(failure);
             Assert.Equal(reason, failure.ReasonCode);
@@ -285,25 +284,25 @@ public sealed class EncryptionRemediationTests
 
         var tampered = Clone(sealedRow);
         tampered.EncryptionAuthTagBytes[0] ^= 0x01;
-        Expect<CryptographicException>(() => service.Decrypt(tampered), DecryptionFailureReasons.AuthenticationFailed);
-        Expect<CryptographicException>(() => new AesGcmFieldEncryptionService(Keys()).Decrypt(sealedRow), DecryptionFailureReasons.KeyMismatch); // a different KEK under the same reference
+        await ExpectAsync<CryptographicException>(() => service.DecryptAsync(tampered, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken), DecryptionFailureReasons.AuthenticationFailed);
+        await ExpectAsync<CryptographicException>(() => new AesGcmFieldEncryptionService(Keys()).DecryptAsync(sealedRow, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken), DecryptionFailureReasons.KeyMismatch); // a different KEK under the same reference
         var unknownKey = Clone(sealedRow);
         unknownKey.EncryptionKeyReference = "rotated-kek-v2";
-        Expect<EncryptionUnavailableException>(() => service.Decrypt(unknownKey), DecryptionFailureReasons.KeyUnavailable);
-        Expect<EncryptionUnavailableException>(() => new AesGcmFieldEncryptionService(new UnavailableKeyProvider("test")).Decrypt(sealedRow), DecryptionFailureReasons.KeyUnavailable);
+        await ExpectAsync<EncryptionUnavailableException>(() => service.DecryptAsync(unknownKey, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken), DecryptionFailureReasons.KeyUnavailable);
+        await ExpectAsync<EncryptionUnavailableException>(() => new AesGcmFieldEncryptionService(new UnavailableKeyProvider("test")).DecryptAsync(sealedRow, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken), DecryptionFailureReasons.KeyUnavailable);
         var unsupported = Clone(sealedRow);
         unsupported.EncryptionEnvelopeVersion = 2;
-        Expect<CryptographicException>(() => service.Decrypt(unsupported), DecryptionFailureReasons.UnsupportedEnvelope);
+        await ExpectAsync<CryptographicException>(() => service.DecryptAsync(unsupported, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken), DecryptionFailureReasons.UnsupportedEnvelope);
 
         // The descriptor is identifiers and a code only.
-        var text = Expect<CryptographicException>(() => service.Decrypt(tampered), DecryptionFailureReasons.AuthenticationFailed).ToString();
-        Assert.DoesNotContain(KeyReference, text, StringComparison.Ordinal);
+        var text = (await ExpectAsync<CryptographicException>(() => service.DecryptAsync(tampered, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken), DecryptionFailureReasons.AuthenticationFailed)).ToString();
+        Assert.DoesNotContain(sealedRow.EncryptionKeyReference, text, StringComparison.Ordinal);
         Assert.DoesNotContain("Avery", text, StringComparison.Ordinal);
 
         // An encryption-side outage is not a decryption failure.
-        Assert.Null(DecryptionFailure.Find(Assert.Throws<EncryptionUnavailableException>(() => new AesGcmFieldEncryptionService(new UnavailableKeyProvider("test")).Encrypt(context, "x"))));
+        Assert.Null(DecryptionFailure.Find(await Assert.ThrowsAsync<EncryptionUnavailableException>(() => new AesGcmFieldEncryptionService(new UnavailableKeyProvider("test")).EncryptAsync(context, "x", EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken))));
         // The successful path is unchanged.
-        Assert.Equal("Avery Synthetic", service.Decrypt(sealedRow));
+        Assert.Equal("Avery Synthetic", await service.DecryptAsync(sealedRow, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -406,10 +405,10 @@ public sealed class EncryptionRemediationTests
         var service = new AesGcmFieldEncryptionService(keys);
         var tenant = Guid.CreateVersion7();
         var fieldContext = new FieldEncryptionContext(tenant, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), "String");
-        var sealedRow = service.Encrypt(fieldContext, "Avery Synthetic");
+        var sealedRow = await service.EncryptAsync(fieldContext, "Avery Synthetic", EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken);
         var tampered = Clone(sealedRow);
         tampered.EncryptedValueBytes[0] ^= 0x01;
-        var thrown = Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(tampered));
+        var thrown = await Assert.ThrowsAnyAsync<CryptographicException>(() => service.DecryptAsync(tampered, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
 
         var store = new CapturingStore();
         var recorder = Recorder(store);
@@ -428,7 +427,7 @@ public sealed class EncryptionRemediationTests
         var everything = recorded.EventDescription + recorded.EventMetadataJson;
         foreach (var secret in new[]
                  {
-                     "Avery", KeyReference,
+                     "Avery", KeyReference, sealedRow.EncryptionKeyReference,
                      Convert.ToBase64String(sealedRow.WrappedDataKeyBytes), Convert.ToHexStringLower(sealedRow.WrappedDataKeyBytes), Convert.ToHexString(sealedRow.WrappedDataKeyBytes),
                      Convert.ToBase64String(sealedRow.EncryptedValueBytes), Convert.ToHexStringLower(sealedRow.EncryptedValueBytes),
                      Convert.ToBase64String(sealedRow.EncryptionNonceBytes), Convert.ToBase64String(sealedRow.EncryptionAuthTagBytes),

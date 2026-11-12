@@ -93,7 +93,7 @@ public sealed class SecurityAuditorsHandlers(IBusinessStore store, IAuthorizatio
             try
             {
                 var direction = kind == SecurityCommandKind.GrantSystemRole ? AuditorReasonNoteFormat.Appoint : AuditorReasonNoteFormat.Remove;
-                sealedNote = sealer.Seal(new AuditorReasonNoteContext(context.OrganizationId, userId, RoleName, direction, Guid.CreateVersion7()), note);
+                sealedNote = await sealer.SealAsync(new AuditorReasonNoteContext(context.OrganizationId, userId, RoleName, direction, Guid.CreateVersion7()), note, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

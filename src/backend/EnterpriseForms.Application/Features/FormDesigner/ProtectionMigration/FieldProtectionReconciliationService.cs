@@ -236,7 +236,8 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
                 foreach (var sealedRow in staged.Rows.OfType<FieldEncryptedValue>().Where(v => v.FieldDefinitionId == field.FieldDefinitionId))
                 {
                     decryptChecked++;
-                    if (!DecryptsToTheFieldType(sealedRow, field, options, optionsById, out var authenticated))
+                    var (decryptsToType, authenticated) = await DecryptsToTheFieldTypeAsync(sealedRow, field, options, optionsById, cancellationToken).ConfigureAwait(false);
+                    if (!decryptsToType)
                     {
                         if (authenticated)
                         {
@@ -501,33 +502,31 @@ public sealed class FieldProtectionReconciliationService(IBusinessStore store, I
     /// The worker's own check of one target-form ciphertext row: authenticated decryption (AEAD tag; AAD binds tenant, record,
     /// field and item) and a logical type that the field accepts. The plaintext is discarded immediately and never logged.
     /// </summary>
-    private bool DecryptsToTheFieldType(FieldEncryptedValue sealedRow, FieldDefinition field, IReadOnlyList<FieldOption> options, IReadOnlyDictionary<Guid, FieldOption> optionsById, out bool authenticated)
+    private async Task<(bool DecryptsToType, bool Authenticated)> DecryptsToTheFieldTypeAsync(FieldEncryptedValue sealedRow, FieldDefinition field, IReadOnlyList<FieldOption> options, IReadOnlyDictionary<Guid, FieldOption> optionsById, CancellationToken cancellationToken)
     {
         string wire;
         try
         {
-            wire = FieldValueCodec.Format(sealedRow, optionsById, encryption);
+            wire = await FieldValueCodec.FormatAsync(sealedRow, optionsById, encryption, cancellationToken).ConfigureAwait(false);
         }
         catch (CryptographicException)
         {
-            authenticated = false;
-            return false;
+            return (false, false);
         }
 
-        authenticated = true;
         if (!string.Equals(sealedRow.EncryptedLogicalType, field.FieldDataType, StringComparison.Ordinal))
         {
-            return false;
+            return (false, true);
         }
 
         try
         {
             var typed = FieldValueCodec.CreateRow(field, null, options, wire, sealedRow.TenantId, sealedRow.FormRecordId, sealedRow.FieldValueItemId, sealedRow.CreatedOn, sealedRow.CreatedByUserId);
-            return typed is not FieldEncryptedValue && FieldValueCodec.Format(typed, optionsById) == wire;
+            return (typed is not FieldEncryptedValue && FieldValueCodec.Format(typed, optionsById) == wire, true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not EncryptionUnavailableException)
         {
-            return false;
+            return (false, true);
         }
     }
 

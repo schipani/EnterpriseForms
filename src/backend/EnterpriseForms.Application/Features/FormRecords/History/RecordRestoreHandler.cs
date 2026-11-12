@@ -63,7 +63,7 @@ public sealed class RecordRestoreHandler(VerifiedRecordReader reader, IBusinessS
             // Dry run of the exact write the restore would make (nothing is staged): current form rules, all-or-nothing.
             try
             {
-                Apply(context, formRecordId, current, plan);
+                await ApplyAsync(context, formRecordId, current, plan, cancellationToken).ConfigureAwait(false);
             }
             catch (BusinessException ex) when (ex.HttpStatusCode is 403 or 422)
             {
@@ -126,7 +126,7 @@ public sealed class RecordRestoreHandler(VerifiedRecordReader reader, IBusinessS
         CandidateBuilder.ApplyResult applied;
         try
         {
-            applied = Apply(context, formRecordId, current, plan);
+            applied = await ApplyAsync(context, formRecordId, current, plan, cancellationToken).ConfigureAwait(false);
         }
         catch (BusinessException ex) when (ex.HttpStatusCode is 403 or 422)
         {
@@ -224,16 +224,16 @@ public sealed class RecordRestoreHandler(VerifiedRecordReader reader, IBusinessS
             throw new BusinessException("INTEGRITY_VERIFICATION_FAILED", 423, "the verified version does not match the requested version; nothing was restored");
         }
 
-        var plan = RestorePlanner.Build(
+        var plan = await RestorePlanner.BuildAsync(
             new RestorePlanner.Snapshot(current.AllRows.OfType<FieldValueRowBase>().ToList(), current.Occurrences),
             new RestorePlanner.Snapshot(source.AllRows.OfType<FieldValueRowBase>().ToList(), source.Occurrences),
-            current.Layout, current.Fields, current.Groups, current.OptionsById, current.Encryption);
+            current.Layout, current.Fields, current.Groups, current.OptionsById, current.Encryption, cancellationToken).ConfigureAwait(false);
         return new Loaded(current, source, entry, plan);
     }
 
     /// <summary>The complete owner write of the restore (validates; protects every value under the current policy; never stages).</summary>
-    private CandidateBuilder.ApplyResult Apply(RequestContext context, Guid formRecordId, VerifiedRecord current, RestorePlanner.RestorePlan plan) =>
-        CandidateBuilder.ApplyValuesDetailed(current.AllRows.OfType<FieldValueRowBase>().ToList(), plan.Values, current.Layout, current.Fields, current.Options, null, context.OrganizationId, formRecordId, clock.GetUtcNow(), context.LocalUserId, current.OptionsById, current.Encryption,
+    private Task<CandidateBuilder.ApplyResult> ApplyAsync(RequestContext context, Guid formRecordId, VerifiedRecord current, RestorePlanner.RestorePlan plan, CancellationToken cancellationToken) =>
+        CandidateBuilder.ApplyValuesDetailedAsync(current.AllRows.OfType<FieldValueRowBase>().ToList(), plan.Values, current.Layout, current.Fields, current.Options, null, context.OrganizationId, formRecordId, clock.GetUtcNow(), context.LocalUserId, current.OptionsById, current.Encryption, cancellationToken,
             groups: new CandidateBuilder.GroupInput(current.Groups, current.Occurrences, plan.GroupWrites.Count == 0 ? null : plan.GroupWrites));
 
     private async Task<Dictionary<Guid, string>> NamesAsync(RequestContext context, CancellationToken cancellationToken)

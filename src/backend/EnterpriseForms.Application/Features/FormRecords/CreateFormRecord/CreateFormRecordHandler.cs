@@ -142,8 +142,8 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         var now = clock.GetUtcNow();
         var formRecordId = CreateFormDefinitionHandler.DeterministicId(idempotencyKey, "record");
         // Validate before any authority command so a bad request never registers a phantom resource.
-        var applied = CandidateBuilder.ApplyValuesDetailed([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption, creating: true,
-            groups: new CandidateBuilder.GroupInput(groups, [], RecordGroupWrites.From(groupValues)));
+        var applied = await CandidateBuilder.ApplyValuesDetailedAsync([], values, layout, fields, options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, options.ToDictionary(o => o.FieldOptionId), encryption, cancellationToken, creating: true,
+            groups: new CandidateBuilder.GroupInput(groups, [], RecordGroupWrites.From(groupValues))).ConfigureAwait(false);
         var candidateValues = applied.Rows;
         CandidateBuilder.EnsureWithinCeiling(candidateValues.Count + applied.Occurrences.Count + 1);
         timer.Mark("validate");
@@ -287,8 +287,9 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
 
         var fieldsById = fields.ToDictionary(f => f.FieldDefinitionId);
         var optionsById = options.ToDictionary(o => o.FieldOptionId);
+        var decrypted = await Values.DecryptedFieldValues.DecryptAsync(encryption, candidateValues, cancellationToken).ConfigureAwait(false); // E-1: the values this caller just submitted
         return new FormRecordResponse(formRecordId, context.OrganizationId, formDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true,
-            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
+            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, FieldValueCodec.Format(v, optionsById, decrypted), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
             "Committed(" + accepted.ArchiveState + ")",
             Projection.RecordGroupProjection.Build(groups, layout, applied.Occurrences));
     }
@@ -300,7 +301,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         var existing = await scope.FindCreationAttemptAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
-            var attempt = CreationRequestFingerprint.Create(encryption, context.OrganizationId, formRecordId, context.LocalUserId, now, canonicalRequest);
+            var attempt = await CreationRequestFingerprint.CreateAsync(encryption, context.OrganizationId, formRecordId, context.LocalUserId, now, canonicalRequest, cancellationToken).ConfigureAwait(false);
             if (await scope.TryAddCreationAttemptAsync(attempt, cancellationToken).ConfigureAwait(false))
             {
                 await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -310,7 +311,7 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
             existing = await scope.FindCreationAttemptAsync(context.OrganizationId, formRecordId, cancellationToken).ConfigureAwait(false); // an identical request raced this one
         }
 
-        if (existing is null || !CreationRequestFingerprint.Matches(encryption, existing, canonicalRequest))
+        if (existing is null || !await CreationRequestFingerprint.MatchesAsync(encryption, existing, canonicalRequest, cancellationToken).ConfigureAwait(false))
         {
             throw new BusinessException("IDEMPOTENCY_CONFLICT", 409, "this idempotency key was already used for a different record-creation request");
         }
@@ -383,6 +384,6 @@ public sealed class CreateFormRecordHandler(IBusinessStore store, IAuthorization
         }
 
         return new FormRecordResponse(formRecordId, context.OrganizationId, verified.Header.FormDefinitionId, verified.Header.RecordStatus, verified.Head.CommittedContentRevision, verified.Head.CommittedOperationId, verified.Head.AuthorizationRevision, verified.IsComplete,
-            verified.ToValueResponses(), "Committed(" + verified.Head.ArchiveState + ")", Projection.RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
+            await verified.ToValueResponsesAsync(cancellationToken).ConfigureAwait(false), "Committed(" + verified.Head.ArchiveState + ")", Projection.RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
     }
 }

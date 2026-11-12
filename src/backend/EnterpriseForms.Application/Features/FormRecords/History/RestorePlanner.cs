@@ -54,6 +54,45 @@ public static class RestorePlanner
         public bool HasChanges => Values.Count > 0 || GroupWrites.Count > 0;
     }
 
+    /// <summary>
+    /// E-1: decrypts the restorable rows of both verified snapshots (asynchronously; a key that cannot open a row refuses the
+    /// restore before anything is planned), then plans synchronously.
+    /// </summary>
+    public static async Task<RestorePlan> BuildAsync(
+        Snapshot current,
+        Snapshot source,
+        FormLayout layout,
+        IReadOnlyList<FieldDefinition> fields,
+        IReadOnlyList<GroupDefinition> groups,
+        IReadOnlyDictionary<Guid, FieldOption> optionsById,
+        Encryption.IFieldEncryptionService encryption,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(fields);
+        var restorable = fields.Where(f => f.FieldDataType != FieldDataTypes.File).Select(f => f.FieldDefinitionId).ToHashSet();
+        var currentDecrypted = await DecryptAsync(encryption, current.Values, restorable, fromSource: false, cancellationToken).ConfigureAwait(false);
+        var sourceDecrypted = await DecryptAsync(encryption, source.Values, restorable, fromSource: true, cancellationToken).ConfigureAwait(false);
+        return Build(current, source, layout, fields, groups, optionsById, currentDecrypted, sourceDecrypted);
+    }
+
+    private static async Task<DecryptedFieldValues> DecryptAsync(Encryption.IFieldEncryptionService encryption, IReadOnlyList<FieldValueRowBase> rows, HashSet<Guid> restorable, bool fromSource, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await DecryptedFieldValues.DecryptAsync(encryption, rows.Where(r => restorable.Contains(r.FieldDefinitionId)), cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is Documents.Ports.EncryptionUnavailableException or CryptographicException)
+        {
+            // The rows verified; an envelope that cannot be opened means its key is unavailable (no historic KEK retention yet, R-08).
+            var refused = new BusinessException(fromSource ? "HISTORIC_KEY_UNAVAILABLE" : "ENCRYPTION_UNAVAILABLE", 503, "a key needed to read this version is not available; nothing was restored");
+            Encryption.DecryptionFailure.CarryOver(ex, refused); // E0-4: the API boundary records the decryption failure once
+            throw refused;
+        }
+    }
+
+    /// <summary>Plans a restore from already-decrypted snapshots (<see cref="BuildAsync"/>); performs no key operation.</summary>
     public static RestorePlan Build(
         Snapshot current,
         Snapshot source,
@@ -61,7 +100,8 @@ public static class RestorePlanner
         IReadOnlyList<FieldDefinition> fields,
         IReadOnlyList<GroupDefinition> groups,
         IReadOnlyDictionary<Guid, FieldOption> optionsById,
-        Encryption.IFieldEncryptionService encryption)
+        DecryptedFieldValues currentDecrypted,
+        DecryptedFieldValues sourceDecrypted)
     {
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(source);
@@ -74,20 +114,8 @@ public static class RestorePlanner
         var groupById = groups.ToDictionary(g => g.GroupDefinitionId);
         var plan = new RestorePlan([], [], [], [], [], [], [], null);
 
-        string Wire(FieldDefinition field, IEnumerable<FieldValueRowBase> rows, bool fromSource)
-        {
-            try
-            {
-                return FieldValueCodec.FormatField(field, rows, optionsById, encryption);
-            }
-            catch (Exception ex) when (ex is Documents.Ports.EncryptionUnavailableException or CryptographicException)
-            {
-                // The rows verified; an envelope that cannot be opened means its key is unavailable (no historic KEK retention yet, R-08).
-                var refused = new BusinessException(fromSource ? "HISTORIC_KEY_UNAVAILABLE" : "ENCRYPTION_UNAVAILABLE", 503, "a key needed to read this version is not available; nothing was restored");
-                Encryption.DecryptionFailure.CarryOver(ex, refused); // E0-4: the API boundary records the decryption failure once
-                throw refused;
-            }
-        }
+        string Wire(FieldDefinition field, IEnumerable<FieldValueRowBase> rows, bool fromSource) =>
+            FieldValueCodec.FormatField(field, rows, optionsById, fromSource ? sourceDecrypted : currentDecrypted);
 
         bool Restorable(FieldDefinition field) => field.FieldDataType != FieldDataTypes.File;
 

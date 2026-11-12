@@ -58,7 +58,7 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var header = CandidateBuilder.CloneHeader(verified.Header);
         var currentValues = verified.AllRows.OfType<FieldValueRowBase>().ToList();
         var groupInput = new CandidateBuilder.GroupInput(verified.Groups, verified.AllRows.OfType<FormRecordGroupRevision>().ToList(), RecordGroupWrites.From(request.Groups));
-        var applied = CandidateBuilder.ApplyValuesDetailed(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption, groups: groupInput);
+        var applied = await CandidateBuilder.ApplyValuesDetailedAsync(currentValues, request.Values, verified.Layout, verified.Fields, verified.Options, null, context.OrganizationId, formRecordId, now, context.LocalUserId, verified.OptionsById, verified.Encryption, cancellationToken, groups: groupInput).ConfigureAwait(false);
         var candidateValues = applied.Rows;
         var rows = new List<ISignedContentRow>(candidateValues);
         rows.AddRange(applied.Occurrences);
@@ -71,8 +71,9 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
 
         var fieldsById = verified.FieldsById;
         var optionsById = verified.OptionsById;
+        var decrypted = await Values.DecryptedFieldValues.DecryptAsync(verified.Encryption, candidateValues, cancellationToken).ConfigureAwait(false); // E-1: the committed candidate (owner)
         return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true,
-            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, optionsById, verified.Encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
+            candidateValues.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, optionsById, decrypted), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue, FormRecordGroupId: v.FormRecordGroupId)).ToList(),
             "Committed(" + accepted.ArchiveState + ")",
             RecordGroupProjection.Build(verified.Groups, verified.Layout, applied.Occurrences));
     }
@@ -86,7 +87,7 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         }
 
         var now = clock.GetUtcNow();
-        var built = SharedFieldWriteBuilder.Build(verified, request.Values, request.Groups, context.OrganizationId, formRecordId, now, context.LocalUserId);
+        var built = await SharedFieldWriteBuilder.BuildAsync(verified, request.Values, request.Groups, context.OrganizationId, formRecordId, now, context.LocalUserId, cancellationToken).ConfigureAwait(false);
         AcceptedContentRevision accepted;
         try
         {
@@ -114,8 +115,9 @@ public sealed class UpdateFormRecordHandler(VerifiedRecordReader reader, IBusine
         var fieldsById = verified.FieldsById;
         var readableItems = SharedFieldWriteBuilder.ReadableRows(verified).Select(r => r.FieldValueItemId).ToHashSet();
         var released = built.Rows.OfType<FieldValueRowBase>().Where(v => v.FormRecordGroupId is null && readableItems.Contains(v.FieldValueItemId) && fieldsById.ContainsKey(v.FieldDefinitionId)).ToList();
+        var releasedDecrypted = await Values.DecryptedFieldValues.DecryptAsync(verified.Encryption, released, cancellationToken).ConfigureAwait(false); // E-1: only the released (readable) rows
         return new FormRecordResponse(formRecordId, context.OrganizationId, built.Header.FormDefinitionId, "(partial)", accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, false,
-            released.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, verified.OptionsById, verified.Encryption), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue)).ToList(),
+            released.OrderBy(v => fieldsById[v.FieldDefinitionId].FieldKey, StringComparer.Ordinal).Select(v => new FieldValueResponse(v.FieldDefinitionId, fieldsById[v.FieldDefinitionId].FieldKey, v.FieldValueItemId, Values.FieldValueCodec.Format(v, verified.OptionsById, releasedDecrypted), fieldsById[v.FieldDefinitionId].FieldDataType, ApplicationEncrypted: v is FieldEncryptedValue)).ToList(),
             "Committed(" + accepted.ArchiveState + ")",
             []);
     }

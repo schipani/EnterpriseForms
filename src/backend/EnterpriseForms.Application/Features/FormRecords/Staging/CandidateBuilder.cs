@@ -91,7 +91,7 @@ public static class CandidateBuilder
     /// Applies a values dictionary (field key → invariant wire value; empty string = clear) to the current typed rows.
     /// <paramref name="editableItems"/> null = owner (any mutation); otherwise only listed items may change and nothing may be added or removed.
     /// </summary>
-    public static List<FieldValueRowBase> ApplyValues(
+    public static async Task<List<FieldValueRowBase>> ApplyValuesAsync(
         IReadOnlyList<FieldValueRowBase> currentValues,
         IReadOnlyDictionary<string, string> values,
         FormLayout layout,
@@ -104,9 +104,10 @@ public static class CandidateBuilder
         Guid actorUserId,
         IReadOnlyDictionary<Guid, FieldOption> optionsById,
         Encryption.IFieldEncryptionService encryption,
+        CancellationToken cancellationToken,
         RecordWriteOrigin origin = RecordWriteOrigin.User,
         bool creating = false) =>
-        ApplyValuesDetailed(currentValues, values, layout, fields, options, editableItems, tenantId, formRecordId, now, actorUserId, optionsById, encryption, origin, creating).Rows;
+        (await ApplyValuesDetailedAsync(currentValues, values, layout, fields, options, editableItems, tenantId, formRecordId, now, actorUserId, optionsById, encryption, cancellationToken, origin, creating).ConfigureAwait(false)).Rows;
 
     /// <summary>
     /// Rows of the new candidate (values and occurrences), the keys of fields whose value a visibility rule cleared (explicit
@@ -144,8 +145,11 @@ public static class CandidateBuilder
     /// Rules, requiredness and dependencies are enforced for full-scope (owner) writes; a shared contributor writes only the
     /// items its share grants, cannot see the fields a rule may read, is never told anything about them, and cannot change
     /// repeating sections.
+    /// E-1: key operations are asynchronous. The current encrypted values are decrypted first (the rows this logic reads,
+    /// nothing else), the rules run synchronously on plaintext wires, and the surviving rows of encrypted fields are sealed
+    /// last; the outcome is the same as sealing each row as it is produced.
     /// </summary>
-    public static ApplyResult ApplyValuesDetailed(
+    public static async Task<ApplyResult> ApplyValuesDetailedAsync(
         IReadOnlyList<FieldValueRowBase> currentValues,
         IReadOnlyDictionary<string, string> values,
         FormLayout layout,
@@ -158,6 +162,7 @@ public static class CandidateBuilder
         Guid actorUserId,
         IReadOnlyDictionary<Guid, FieldOption> optionsById,
         Encryption.IFieldEncryptionService encryption,
+        CancellationToken cancellationToken,
         RecordWriteOrigin origin = RecordWriteOrigin.User,
         bool creating = false,
         GroupInput? groups = null)
@@ -170,7 +175,6 @@ public static class CandidateBuilder
         var fieldByKey = fields.ToDictionary(f => f.FieldKey, StringComparer.Ordinal);
         var fieldById = fields.ToDictionary(f => f.FieldDefinitionId);
         var elementByField = layout.Elements.Where(e => e.FieldDefinitionId is not null).ToDictionary(e => e.FieldDefinitionId!.Value);
-        var context = new ScopeContext(layout, fieldByKey, fieldById, elementByField, options, optionsById, encryption, editableItems, tenantId, formRecordId, now, actorUserId, origin);
 
         if (values.Values.Any(v => v is null || v.Length > 4000))
         {
@@ -194,6 +198,10 @@ public static class CandidateBuilder
         {
             throw new InvalidOperationException("the record has repeating-section values; the caller must pass its group state");
         }
+
+        // Every current value of a known field is read (carry-forward and change detection); a retired field's rows are not.
+        var decrypted = await DecryptedFieldValues.DecryptAsync(encryption, currentValues.Where(v => fieldById.ContainsKey(v.FieldDefinitionId)), cancellationToken).ConfigureAwait(false);
+        var context = new ScopeContext(layout, fieldByKey, fieldById, elementByField, options, optionsById, decrypted, editableItems, tenantId, formRecordId, now, actorUserId, origin);
 
         // ---- Top level ----
         var top = ApplyScope(context, currentValues.Where(v => v.FormRecordGroupId is null).ToList(), values, null, null, creating, "");
@@ -416,10 +424,13 @@ public static class CandidateBuilder
             }
         }
 
-        var rows = new List<FieldValueRowBase>(top.Rows);
-        foreach (var scope in scopes)
+        // Protection is applied to every surviving row, in order, after validation (so it cannot be skipped by a client).
+        var rows = new List<FieldValueRowBase>(top.Rows.Count);
+        foreach (var row in top.Rows.Concat(scopes.SelectMany(s => s.Result.Rows)))
         {
-            rows.AddRange(scope.Result.Rows);
+            var sealedRow = await FieldValueCodec.ProtectAsync(row, fieldById[row.FieldDefinitionId], optionsById, encryption, cancellationToken).ConfigureAwait(false);
+            sealedRow.FormRecordGroupId = row.FormRecordGroupId;
+            rows.Add(sealedRow);
         }
 
         return new ApplyResult(rows, cleared, occurrenceRows, groupChanges);
@@ -432,7 +443,7 @@ public static class CandidateBuilder
         IReadOnlyDictionary<Guid, LayoutElement> ElementByField,
         IReadOnlyList<FieldOption> Options,
         IReadOnlyDictionary<Guid, FieldOption> OptionsById,
-        Encryption.IFieldEncryptionService Encryption,
+        DecryptedFieldValues Decrypted,
         IReadOnlySet<Guid>? EditableItems,
         Guid TenantId,
         Guid FormRecordId,
@@ -488,12 +499,11 @@ public static class CandidateBuilder
         var wireParts = new Dictionary<Guid, List<string>>();
         var existingFieldIds = currentValues.Select(v => v.FieldDefinitionId).ToHashSet();
 
+        // Rows are emitted as validated typed plaintext; ApplyValuesDetailedAsync seals encrypted fields after the rules ran.
         void Emit(FieldDefinition field, FieldValueRowBase typed, string wire)
         {
             typed.FormRecordGroupId = groupId;
-            var row = FieldValueCodec.Protect(typed, field, c.OptionsById, c.Encryption);
-            row.FormRecordGroupId = groupId;
-            scope.Rows.Add(row);
+            scope.Rows.Add(typed);
             if (!wireParts.TryGetValue(field.FieldDefinitionId, out var parts))
             {
                 wireParts[field.FieldDefinitionId] = parts = [];
@@ -520,7 +530,7 @@ public static class CandidateBuilder
             var rows = group.ToList();
             // Carry-forward re-creates the row under the field's *current* protection: a field strengthened to encryption
             // since the last save rewrites its legacy plaintext as ciphertext here (the audited migration's backfill step).
-            var currentWires = rows.Select(r => FieldValueCodec.Format(r, c.OptionsById, c.Encryption)).ToList();
+            var currentWires = rows.Select(r => FieldValueCodec.Format(r, c.OptionsById, c.Decrypted)).ToList();
             var hasNew = values.TryGetValue(field.FieldKey, out var wire);
 
             if (FieldValueCodec.IsMultiSelect(field))

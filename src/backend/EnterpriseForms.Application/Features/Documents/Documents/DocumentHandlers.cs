@@ -184,7 +184,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true, verified.ToValueResponses(), "Committed(" + accepted.ArchiveState + ")", RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
+        return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true, await verified.ToValueResponsesAsync(cancellationToken).ConfigureAwait(false), "Committed(" + accepted.ArchiveState + ")", RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
     }
 
     private static DocumentSummaryResponse Summary(FileAttachmentVersion a, string lifecycle) =>

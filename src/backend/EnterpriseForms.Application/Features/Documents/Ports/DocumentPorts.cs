@@ -57,18 +57,86 @@ public interface IFileEncryptionService
     Task DecryptAsync(Stream ciphertext, Stream plaintextSink, FileEncryptionEnvelope envelope, FileEncryptionContext context, CancellationToken cancellationToken);
 }
 
-/// <summary>Key-encryption-key provider. Production: Azure Key Vault/Managed HSM (not implemented in Stage B); Development/Testing: local KEK from configuration, refused elsewhere.</summary>
+/// <summary>
+/// E1-3: the cryptographic purpose of a key-encryption key. A closed set: instances exist only as the static members below
+/// (no public constructor, no parsing from caller input), so a key can never be requested for an arbitrary string. Keys of
+/// different purposes are distinct keys and are not interchangeable.
+/// </summary>
+public sealed class EncryptionKeyPurpose
+{
+    /// <summary>Application-encrypted typed field values.</summary>
+    public static readonly EncryptionKeyPurpose FieldValue = new("FieldValue", "field-value");
+
+    /// <summary>Segmented document (attachment version) encryption.</summary>
+    public static readonly EncryptionKeyPurpose Document = new("Document", "document");
+
+    /// <summary>Security Auditor reason notes (seal only).</summary>
+    public static readonly EncryptionKeyPurpose AuditorReasonNote = new("AuditorReasonNote", "auditor-reason-note");
+
+    /// <summary>The sealed HMAC key of a record-creation idempotency fingerprint.</summary>
+    public static readonly EncryptionKeyPurpose IdempotencyProtection = new("IdempotencyProtection", "idempotency-protection");
+
+    private EncryptionKeyPurpose(string name, string token)
+    {
+        Name = name;
+        Token = token;
+    }
+
+    public static IReadOnlyList<EncryptionKeyPurpose> All { get; } = [FieldValue, Document, AuditorReasonNote, IdempotencyProtection];
+
+    /// <summary>Configuration and diagnostic name (for example "FieldValue").</summary>
+    public string Name { get; }
+
+    /// <summary>Stable token used inside key references and key-derivation contexts (for example "field-value").</summary>
+    public string Token { get; }
+
+    public override string ToString() => Name;
+}
+
+/// <summary>E1-2/E1-3: whose key, for what. Every wrap and unwrap names its organization and purpose; an empty organization is refused.</summary>
+public sealed record DataKeyScope
+{
+    public DataKeyScope(Guid organizationId, EncryptionKeyPurpose purpose)
+    {
+        if (organizationId == Guid.Empty)
+        {
+            throw new ArgumentException("an organization is required for every key operation", nameof(organizationId));
+        }
+
+        OrganizationId = organizationId;
+        Purpose = purpose ?? throw new ArgumentNullException(nameof(purpose));
+    }
+
+    public Guid OrganizationId { get; }
+
+    public EncryptionKeyPurpose Purpose { get; }
+}
+
+/// <summary>A data key wrapped under the current key version of a scope, with the opaque reference that names that exact key version.</summary>
+public sealed record WrappedDataKey(string KeyReference, byte[] WrappedKeyBytes);
+
+/// <summary>
+/// E-1 key-encryption-key provider (interface v2). Asynchronous and cancellable (remote-capable), organization-scoped,
+/// purpose-separated and versioned; provider-neutral (no SDK types). Wrapping always uses the scope's current key version and
+/// returns the reference it used; unwrapping resolves the reference to exactly one retained version of exactly that scope and
+/// fails closed otherwise — unknown, disabled or foreign versions are never substituted. Production providers (Azure Key
+/// Vault/Managed HSM) are not implemented; Development/Testing: the local keyring, refused elsewhere at startup.
+/// </summary>
 public interface IEncryptionKeyProvider
 {
     string ProviderName { get; }
 
+    /// <summary>Local, non-remote readiness: false when no permitted key material or a valid key-version table is configured.</summary>
     bool IsConfigured { get; }
 
-    string CurrentKeyReference { get; }
+    /// <summary>Wraps <paramref name="dataKey"/> under the current key version of <paramref name="scope"/>.</summary>
+    /// <exception cref="EncryptionUnavailableException">No usable key is configured for the scope.</exception>
+    Task<WrappedDataKey> WrapDataKeyAsync(DataKeyScope scope, ReadOnlyMemory<byte> dataKey, CancellationToken cancellationToken);
 
-    byte[] WrapDataKey(ReadOnlySpan<byte> dataKey, string keyReference);
-
-    byte[] UnwrapDataKey(ReadOnlySpan<byte> wrappedDataKey, string keyReference);
+    /// <summary>Unwraps a data key wrapped under <paramref name="keyReference"/>, which must name a retained version of <paramref name="scope"/>.</summary>
+    /// <exception cref="EncryptionUnavailableException">The reference is unknown, or names an unknown or disabled version.</exception>
+    /// <exception cref="System.Security.Cryptography.CryptographicException">The reference names another organization or purpose, or the wrapped key does not authenticate.</exception>
+    Task<byte[]> UnwrapDataKeyAsync(DataKeyScope scope, string keyReference, ReadOnlyMemory<byte> wrappedDataKey, CancellationToken cancellationToken);
 }
 
 public sealed class EncryptionUnavailableException(string detail) : Exception(detail);

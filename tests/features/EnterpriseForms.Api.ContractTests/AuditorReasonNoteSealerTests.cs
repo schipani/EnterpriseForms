@@ -37,9 +37,9 @@ public sealed class AuditorReasonNoteSealerTests
     /// <summary>Test-only decryption with every Design A §1.3 decoding rule; never part of the product.</summary>
     private static class TestOnlyOpener
     {
-        public static string Open(LocalDevelopmentKeyProvider keys, AuditorReasonNoteContext context, AuditorReasonNoteEnvelope envelope)
+        public static async Task<string> OpenAsync(LocalDevelopmentKeyProvider keys, AuditorReasonNoteContext context, AuditorReasonNoteEnvelope envelope)
         {
-            var dek = keys.UnwrapDataKey(Convert.FromBase64String(envelope.WrappedDataKeyB64), envelope.KeyReference);
+            var dek = await keys.UnwrapDataKeyAsync(new DataKeyScope(context.OrganizationId, EncryptionKeyPurpose.AuditorReasonNote), envelope.KeyReference, Convert.FromBase64String(envelope.WrappedDataKeyB64), TestContext.Current.CancellationToken);
             var ciphertext = Convert.FromBase64String(envelope.CiphertextB64);
             var plaintext = new byte[ciphertext.Length];
             using (var aes = new AesGcm(dek, 16))
@@ -73,9 +73,13 @@ public sealed class AuditorReasonNoteSealerTests
         }
     }
 
-    /// <summary>A-T01: KAT-M1-01 reproduced exactly (AAD, ciphertext, tag), and the key provider unwraps the vector's wrapped DEK.</summary>
+    /// <summary>
+    /// A-T01: KAT-M1-01 reproduced exactly (AAD, ciphertext, tag), and the key provider unwraps the vector's wrapped DEK. E-1: a
+    /// new note's DEK is wrapped under the organization's AuditorReasonNote key (scoped reference); the vector's legacy-wrapped
+    /// DEK still opens through the legacy reference (E1-5).
+    /// </summary>
     [Fact]
-    public void TheKnownAnswerVectorIsReproducedExactly()
+    public async Task TheKnownAnswerVectorIsReproducedExactly()
     {
         var kek = Seq(0x00, 32);
         var dek = Seq(0x20, 32);
@@ -88,44 +92,46 @@ public sealed class AuditorReasonNoteSealerTests
             Convert.ToHexStringLower(AesGcmAuditorNoteSealer.Aad(Context())));
         Assert.Equal("53e210f6271cb59265dc59875cd3b07859def1770cb3b0e0d26cdf7cc80c38a6", Convert.ToHexStringLower(SHA256.HashData(AuditorReasonNoteFormat.Pad(note))));
 
-        var envelope = new AesGcmAuditorNoteSealer(keys).Seal(Context(), note, dek, nonce);
+        var envelope = await new AesGcmAuditorNoteSealer(keys).SealAsync(Context(), note, (byte[])dek.Clone(), nonce, TestContext.Current.CancellationToken);
         Assert.Equal("d3df0ab93fbf1a159fb9df7debf956863bbdf9c7181390379989552871841d11", Convert.ToHexStringLower(SHA256.HashData(Convert.FromBase64String(envelope.CiphertextB64))));
         Assert.Equal("c88d22db2a5e2bb5434a1c52d30de413", Convert.ToHexStringLower(Convert.FromBase64String(envelope.TagB64)));
-        Assert.Equal(("DynamicForms/AuditorReasonNote", 1, "AES-256-GCM", "local-dev-kek-v1", NoteId.ToString("D")), (envelope.EnvelopeFormat, envelope.EnvelopeVersion, envelope.AlgorithmName, envelope.KeyReference, envelope.NoteId));
+        Assert.Equal(("DynamicForms/AuditorReasonNote", 1, "AES-256-GCM", "localdev:019a5b2c-1111-7000-8000-000000000001:auditor-reason-note:1", NoteId.ToString("D")), (envelope.EnvelopeFormat, envelope.EnvelopeVersion, envelope.AlgorithmName, envelope.KeyReference, envelope.NoteId));
+        var scope = new DataKeyScope(Org, EncryptionKeyPurpose.AuditorReasonNote);
+        Assert.Equal(dek, await keys.UnwrapDataKeyAsync(scope, envelope.KeyReference, Convert.FromBase64String(envelope.WrappedDataKeyB64), TestContext.Current.CancellationToken));
         var katWrapped = Convert.FromHexString("404142434445464748494a4bc2988c000219a124e5ed3d1db7493d7449f7606f830039144f7e74deab2ed3e405e2a68bd43d7c6116749b14f108ed35");
-        Assert.Equal(dek, keys.UnwrapDataKey(katWrapped, "local-dev-kek-v1")); // the vector's wrap is the provider's format
-        Assert.Equal(note, TestOnlyOpener.Open(keys, Context(), envelope));
+        Assert.Equal(dek, await keys.UnwrapDataKeyAsync(scope, "local-dev-kek-v1", katWrapped, TestContext.Current.CancellationToken)); // the vector's legacy wrap still opens (E1-5)
+        Assert.Equal(note, await TestOnlyOpener.OpenAsync(keys, Context(), envelope));
     }
 
     /// <summary>A-T02/A-T03: random round trip; every changed context value fails the tag.</summary>
     [Fact]
-    public void ANoteOpensOnlyUnderItsExactContext()
+    public async Task ANoteOpensOnlyUnderItsExactContext()
     {
         var keys = Keys();
         var sealer = new AesGcmAuditorNoteSealer(keys);
-        var envelope = sealer.Seal(Context(), "Covering the Q4 review");
+        var envelope = await sealer.SealAsync(Context(), "Covering the Q4 review", TestContext.Current.CancellationToken);
         Assert.Equal(2048, Convert.FromBase64String(envelope.CiphertextB64).Length); // length hidden
-        Assert.Equal("Covering the Q4 review", TestOnlyOpener.Open(keys, Context(), envelope));
+        Assert.Equal("Covering the Q4 review", await TestOnlyOpener.OpenAsync(keys, Context(), envelope));
         foreach (var other in new[]
                  {
                      Context(org: Guid.CreateVersion7()), Context(target: Guid.CreateVersion7()), Context(role: "system_administrator"),
                      Context(direction: AuditorReasonNoteFormat.Remove), Context(noteId: Guid.CreateVersion7()),
                  })
         {
-            Assert.ThrowsAny<CryptographicException>(() => TestOnlyOpener.Open(keys, other, envelope));
+            await Assert.ThrowsAnyAsync<CryptographicException>(() => TestOnlyOpener.OpenAsync(keys, other, envelope));
         }
 
-        var second = sealer.Seal(Context(), "Covering the Q4 review");
+        var second = await sealer.SealAsync(Context(), "Covering the Q4 review", TestContext.Current.CancellationToken);
         Assert.NotEqual(envelope.NonceB64, second.NonceB64);
         Assert.NotEqual(envelope.CiphertextB64, second.CiphertextB64);
     }
 
     /// <summary>A-T04: tampered ciphertext, tag, nonce or wrapped DEK, and truncation, all fail.</summary>
     [Fact]
-    public void TamperingFails()
+    public async Task TamperingFails()
     {
         var keys = Keys();
-        var envelope = new AesGcmAuditorNoteSealer(keys).Seal(Context(), "tamper target");
+        var envelope = await new AesGcmAuditorNoteSealer(keys).SealAsync(Context(), "tamper target", TestContext.Current.CancellationToken);
         static string Flip(string b64, int index = 0)
         {
             var bytes = Convert.FromBase64String(b64);
@@ -141,30 +147,30 @@ public sealed class AuditorReasonNoteSealerTests
                      envelope with { CiphertextB64 = Convert.ToBase64String(Convert.FromBase64String(envelope.CiphertextB64)[..2047]) },
                  })
         {
-            Assert.ThrowsAny<CryptographicException>(() => TestOnlyOpener.Open(keys, Context(), tampered));
+            await Assert.ThrowsAnyAsync<CryptographicException>(() => TestOnlyOpener.OpenAsync(keys, Context(), tampered));
         }
 
-        Assert.ThrowsAny<CryptographicException>(() => TestOnlyOpener.Open(keys, Context(), envelope with { WrappedDataKeyB64 = Flip(envelope.WrappedDataKeyB64, 20) }));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => TestOnlyOpener.OpenAsync(keys, Context(), envelope with { WrappedDataKeyB64 = Flip(envelope.WrappedDataKeyB64, 20) }));
     }
 
-    /// <summary>A-T05: field-value and note ciphertexts cannot be opened as one another (same KEK, identifiers mapped across).</summary>
+    /// <summary>A-T05: field-value and note ciphertexts cannot be opened as one another (same KEK, identifiers mapped across). E-1: their keys are also purpose-separated.</summary>
     [Fact]
-    public void FieldValueAndNoteDomainsAreSeparate()
+    public async Task FieldValueAndNoteDomainsAreSeparate()
     {
         var keys = Keys();
         var field = new AesGcmFieldEncryptionService(keys);
         var fieldContext = new FieldEncryptionContext(Org, Target, NoteId, Guid.Empty, "AuditorReasonNote:security_auditor:appoint");
-        var fieldValue = field.Encrypt(fieldContext, "Covering the Q4 review");
+        var fieldValue = await field.EncryptAsync(fieldContext, "Covering the Q4 review", EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken);
         var asNote = new AuditorReasonNoteEnvelope("DynamicForms/AuditorReasonNote", 1, "AES-256-GCM", fieldValue.EncryptionKeyReference, NoteId.ToString("D"),
             Convert.ToBase64String(fieldValue.EncryptionNonceBytes), Convert.ToBase64String(fieldValue.EncryptedValueBytes), Convert.ToBase64String(fieldValue.EncryptionAuthTagBytes), Convert.ToBase64String(fieldValue.WrappedDataKeyBytes));
-        Assert.ThrowsAny<CryptographicException>(() => TestOnlyOpener.Open(keys, Context(), asNote));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => TestOnlyOpener.OpenAsync(keys, Context(), asNote));
 
-        var note = new AesGcmAuditorNoteSealer(keys).Seal(Context(), "Covering the Q4 review");
+        var note = await new AesGcmAuditorNoteSealer(keys).SealAsync(Context(), "Covering the Q4 review", TestContext.Current.CancellationToken);
         fieldValue.EncryptedValueBytes = Convert.FromBase64String(note.CiphertextB64);
         fieldValue.EncryptionNonceBytes = Convert.FromBase64String(note.NonceB64);
         fieldValue.EncryptionAuthTagBytes = Convert.FromBase64String(note.TagB64);
         fieldValue.WrappedDataKeyBytes = Convert.FromBase64String(note.WrappedDataKeyB64);
-        Assert.ThrowsAny<CryptographicException>(() => field.Decrypt(fieldValue));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => field.DecryptAsync(fieldValue, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
     }
 
     /// <summary>A-T02 decoding rules and A-T06 validation rules.</summary>
@@ -202,18 +208,18 @@ public sealed class AuditorReasonNoteSealerTests
 
     /// <summary>B3: without a key provider a note cannot be sealed.</summary>
     [Fact]
-    public void WithoutAKeyProviderNothingIsSealed()
+    public async Task WithoutAKeyProviderNothingIsSealed()
     {
         var sealer = new AesGcmAuditorNoteSealer(new UnavailableKeyProvider("test: no provider"));
         Assert.False(sealer.IsAvailable);
-        Assert.Throws<EncryptionUnavailableException>(() => sealer.Seal(Context(), "note"));
+        await Assert.ThrowsAsync<EncryptionUnavailableException>(() => sealer.SealAsync(Context(), "note", TestContext.Current.CancellationToken));
     }
 
     /// <summary>A-T12: the port is seal-only and no product type opens a note.</summary>
     [Fact]
     public void ThereIsNoNoteDecryptionInTheProduct()
     {
-        Assert.Equal(["Seal", "get_IsAvailable"], typeof(IAuditorNoteSealer).GetMethods().Select(m => m.Name).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(["SealAsync", "get_IsAvailable"], typeof(IAuditorNoteSealer).GetMethods().Select(m => m.Name).Order(StringComparer.Ordinal).ToArray());
         foreach (var assembly in new[] { typeof(IAuditorNoteSealer).Assembly, typeof(AesGcmAuditorNoteSealer).Assembly })
         {
             foreach (var type in assembly.GetTypes().Where(t => t.Name.Contains("ReasonNote", StringComparison.Ordinal) || t.Name.Contains("NoteSealer", StringComparison.Ordinal)))

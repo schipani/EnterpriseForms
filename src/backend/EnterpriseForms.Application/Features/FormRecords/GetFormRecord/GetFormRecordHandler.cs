@@ -18,7 +18,7 @@ public sealed class GetFormRecordHandler(VerifiedRecordReader reader, IBusinessS
         ArgumentNullException.ThrowIfNull(context);
         var verified = await reader.ReadAsync(context, formRecordId, ProtectedAction.Read, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordAsync(store, context, clock, AuditCategories.Record, AuditActions.RecordViewed, "verified record read", formRecordId, "Success", new { complete = verified.IsComplete, contentRevision = verified.Head.CommittedContentRevision }, cancellationToken).ConfigureAwait(false);
-        return verified.ToRecordResponse(context.OrganizationId);
+        return await verified.ToRecordResponseAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false);
     }
 }
 
@@ -86,7 +86,7 @@ public sealed class GetRecordProjectionHandler(VerifiedRecordReader reader, IBus
 
         var version = verified.LayoutVersion;
         return new RecordProjectionResponse(
-            verified.ToRecordResponse(context.OrganizationId),
+            await verified.ToRecordResponseAsync(context.OrganizationId, cancellationToken).ConfigureAwait(false),
             verified.Definition.FormDefinitionName,
             new FormVersionResponse(version.FormVersionId, version.VersionNumber, version.LayoutSchemaVersion, verified.IsComplete ? version.LayoutJson : FormLayoutCodec.Serialize(layout), version.ChangeReason, version.RestoredFromFormVersionId, version.PublishedOn, version.PublishedByUserId),
             fields,

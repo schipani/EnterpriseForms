@@ -2,31 +2,16 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using EnterpriseForms.Application.Features.Documents.Ports;
 using EnterpriseForms.Application.Features.FormRecords.Encryption;
-using Microsoft.Extensions.Options;
 
 namespace EnterpriseForms.Infrastructure.Features.Documents;
-
-public sealed class EncryptionOptions
-{
-    public const string SectionName = "Encryption";
-
-    /// <summary>The configuration value that selects <see cref="LocalDevelopmentKeyProvider"/> (Development/Testing only, E0-1).</summary>
-    public const string LocalDevelopmentProviderName = "LocalDevelopment";
-
-    /// <summary>"LocalDevelopment" (KEK from configuration, Development/Testing only) or "Unconfigured" (fail closed). Azure Key Vault/Managed HSM providers are not implemented in Stage B.</summary>
-    public string KeyProvider { get; set; } = "Unconfigured";
-
-    public string? LocalDevelopmentKekBase64 { get; set; }
-
-    public string LocalDevelopmentKeyReference { get; set; } = "local-dev-kek-v1";
-}
 
 /// <summary>
 /// Segmented AES-256-GCM (CLAUDE.md §4C.3/§4C.4): a random 256-bit DEK per document version, wrapped by the KEK;
 /// each 1 MiB plaintext segment is sealed with nonce = prefix(8 random bytes) ‖ counter(4, big-endian) and AAD =
 /// envelope version ‖ tenant ‖ record ‖ attachment ‖ version ‖ segment index ‖ final-segment flag. Ciphertext layout:
 /// repeated [UInt32BE plaintext length][ciphertext][16-byte tag]. Truncation, reordering and transplanting are detected.
-/// The v1 format is pinned by known-answer vectors (E0-6, <c>EncryptionKnownAnswerTests</c>).
+/// The v1 format is pinned by known-answer vectors (E0-6, <c>EncryptionKnownAnswerTests</c>). E-1: the DEK is wrapped under the
+/// organization's Document key (organization- and purpose-scoped, versioned); the envelope stores the returned key reference.
 /// </summary>
 public sealed class AesGcmFileEncryptionService(IEncryptionKeyProvider keys) : IFileEncryptionService
 {
@@ -65,8 +50,8 @@ public sealed class AesGcmFileEncryptionService(IEncryptionKeyProvider keys) : I
                 throw new ArgumentException("a 256-bit data key and an 8-byte nonce prefix are required");
             }
 
-            var keyReference = keys.CurrentKeyReference;
-            var wrapped = keys.WrapDataKey(dataKey, keyReference);
+            // E1-2/E1-3: the organization's current Document key wraps the DEK; the reference returned names that exact key version.
+            var wrapped = await keys.WrapDataKeyAsync(new DataKeyScope(context.TenantId, EncryptionKeyPurpose.Document), dataKey, cancellationToken).ConfigureAwait(false);
             using var aes = new AesGcm(dataKey, TagSize);
             using var plainHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             using var cipherHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -111,7 +96,7 @@ public sealed class AesGcmFileEncryptionService(IEncryptionKeyProvider keys) : I
             }
 
             await ciphertextSink.FlushAsync(cancellationToken).ConfigureAwait(false);
-            return new EncryptionOutcome(new FileEncryptionEnvelope(AlgorithmName, EnvelopeVersion, keyReference, wrapped, noncePrefix, SegmentSize), plainTotal, plainHash.GetHashAndReset(), cipherTotal, cipherHash.GetHashAndReset());
+            return new EncryptionOutcome(new FileEncryptionEnvelope(AlgorithmName, EnvelopeVersion, wrapped.KeyReference, wrapped.WrappedKeyBytes, noncePrefix, SegmentSize), plainTotal, plainHash.GetHashAndReset(), cipherTotal, cipherHash.GetHashAndReset());
         }
         finally
         {
@@ -139,7 +124,7 @@ public sealed class AesGcmFileEncryptionService(IEncryptionKeyProvider keys) : I
             }
 
             stage = DecryptionStage.KeyUnwrap;
-            var dek = keys.UnwrapDataKey(envelope.WrappedDataKey, envelope.KeyReference);
+            var dek = await keys.UnwrapDataKeyAsync(new DataKeyScope(context.TenantId, EncryptionKeyPurpose.Document), envelope.KeyReference, envelope.WrappedDataKey, cancellationToken).ConfigureAwait(false);
             stage = DecryptionStage.Payload;
             try
             {
@@ -234,84 +219,4 @@ public sealed class AesGcmFileEncryptionService(IEncryptionKeyProvider keys) : I
 
         return total;
     }
-}
-
-/// <summary>Development/Testing KEK from configuration (32 bytes). Refused in Staging/Production by the startup guard; AES-GCM key wrap with a random nonce.</summary>
-public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
-{
-    private readonly byte[]? kek;
-    private readonly string reference;
-
-    public LocalDevelopmentKeyProvider(IOptions<EncryptionOptions> options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        var value = options.Value;
-        reference = value.LocalDevelopmentKeyReference;
-        if (!string.IsNullOrWhiteSpace(value.LocalDevelopmentKekBase64))
-        {
-            var bytes = Convert.FromBase64String(value.LocalDevelopmentKekBase64);
-            kek = bytes.Length == 32 ? bytes : null;
-        }
-    }
-
-    public string ProviderName => "LocalDevelopment";
-
-    public bool IsConfigured => kek is not null;
-
-    public string CurrentKeyReference => reference;
-
-    public byte[] WrapDataKey(ReadOnlySpan<byte> dataKey, string keyReference)
-    {
-        RequireKey(keyReference);
-        var nonce = RandomNumberGenerator.GetBytes(12);
-        var cipher = new byte[dataKey.Length];
-        var tag = new byte[16];
-        using var aes = new AesGcm(kek!, 16);
-        aes.Encrypt(nonce, dataKey, cipher, tag, System.Text.Encoding.ASCII.GetBytes("DynamicForms/DekWrap/v1:" + keyReference));
-        return [.. nonce, .. cipher, .. tag];
-    }
-
-    public byte[] UnwrapDataKey(ReadOnlySpan<byte> wrappedDataKey, string keyReference)
-    {
-        RequireKey(keyReference);
-        if (wrappedDataKey.Length < 12 + 16 + 1)
-        {
-            throw new CryptographicException("wrapped key too short");
-        }
-
-        var nonce = wrappedDataKey[..12];
-        var tag = wrappedDataKey[^16..];
-        var cipher = wrappedDataKey[12..^16];
-        var plain = new byte[cipher.Length];
-        using var aes = new AesGcm(kek!, 16);
-        aes.Decrypt(nonce, cipher, tag, plain, System.Text.Encoding.ASCII.GetBytes("DynamicForms/DekWrap/v1:" + keyReference));
-        return plain;
-    }
-
-    private void RequireKey(string keyReference)
-    {
-        if (kek is null)
-        {
-            throw new EncryptionUnavailableException("local development KEK is not configured");
-        }
-
-        if (keyReference != reference)
-        {
-            throw new EncryptionUnavailableException("unknown key reference " + keyReference);
-        }
-    }
-}
-
-/// <summary>Registered when no permitted key provider is configured: encryption and decryption fail closed.</summary>
-public sealed class UnavailableKeyProvider(string reason) : IEncryptionKeyProvider
-{
-    public string ProviderName => "Unavailable";
-
-    public bool IsConfigured => false;
-
-    public string CurrentKeyReference => string.Empty;
-
-    public byte[] WrapDataKey(ReadOnlySpan<byte> dataKey, string keyReference) => throw new EncryptionUnavailableException(reason);
-
-    public byte[] UnwrapDataKey(ReadOnlySpan<byte> wrappedDataKey, string keyReference) => throw new EncryptionUnavailableException(reason);
 }
