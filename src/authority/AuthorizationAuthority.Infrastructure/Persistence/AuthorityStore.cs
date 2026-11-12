@@ -248,6 +248,9 @@ public sealed class AuthorityStore(IDbContextFactory<AuthorityDbContext> context
         public Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken) =>
             context.KeyRegistrations.AsNoTracking().FirstOrDefaultAsync(k => k.OrganizationId == organizationId && k.KeyPurposeName == keyPurposeName, cancellationToken);
 
+        public Task<IntegrityKeyRegistration?> FindKeyRegistrationForUpdateAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken) =>
+            context.KeyRegistrations.AsTracking().FirstOrDefaultAsync(k => k.OrganizationId == organizationId && k.KeyPurposeName == keyPurposeName, cancellationToken);
+
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => context.KeyRegistrations.Add(registration);
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken) =>

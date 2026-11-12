@@ -259,6 +259,9 @@ internal sealed class InMemoryAuthorityStore : IAuthorityStore
         public Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken) =>
             Task.FromResult(s.Keys.FirstOrDefault(k => k.OrganizationId == organizationId && k.KeyPurposeName == keyPurposeName));
 
+        public Task<IntegrityKeyRegistration?> FindKeyRegistrationForUpdateAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken) =>
+            FindKeyRegistrationAsync(organizationId, keyPurposeName, cancellationToken);
+
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => s.Keys.Add(registration);
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid organizationId, CancellationToken cancellationToken) =>

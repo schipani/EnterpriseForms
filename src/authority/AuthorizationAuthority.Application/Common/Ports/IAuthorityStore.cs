@@ -175,6 +175,9 @@ public interface IAuthorityScope : IAsyncDisposable
 
     Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken);
 
+    /// <summary>E-5: the registration tracked for update (activation of a signing-key version); callers hold the organization lock.</summary>
+    Task<IntegrityKeyRegistration?> FindKeyRegistrationForUpdateAsync(Guid organizationId, string keyPurposeName, CancellationToken cancellationToken);
+
     void AddKeyRegistration(IntegrityKeyRegistration registration);
 
     /// <summary>Record IDs registered and active for the organization (authority-sourced discovery candidates).</summary>
