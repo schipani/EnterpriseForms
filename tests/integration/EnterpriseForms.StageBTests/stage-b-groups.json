@@ -11,27 +11,27 @@
     {
       "name": "authorization-security-onboarding",
       "title": "Authorization, Security, Onboarding and Recovery",
-      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAuditorTests", "AuthorizationRollbackTests", "ProjectionIntegrityRollbackTests", "SpiceDbBehaviourContractTests", "AuthorizationLatencyTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests"]
+      "classes": ["AuthorizationAndTamperTests", "SessionCsrfTests", "SessionRevocationTests", "SecurityIncidentTests", "SecurityAdministratorTests", "SecurityAuditorTests", "AuthorizationRollbackTests", "ProjectionIntegrityRollbackTests", "SpiceDbBehaviourContractTests", "AuthorizationLatencyTests", "SecurityAdministratorProvisioningTests", "FieldProtectionDowngradeTests", "ConsoleOperatorRegistrationTests", "OrganizationOnboardingStackTests", "OwnerRecoveryStackTests", "PlatformConsoleStackTests", "PlatformOperatorApprovalTests", "AuthorityWorkWakeupStackTests", "SearchAccessVerificationStackTests", "SearchAccessShadowStackTests", "Ix7SearchRecoveryRehearsalStackTests"]
     },
     {
       "name": "records-lifecycle",
       "title": "Records, Sharing and Lifecycle",
-      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests"]
+      "classes": ["RecordCreationIdempotencyTests", "RecordLifecycleTests", "RecordRestoreTests", "RecordHistoryTests", "RecordLookupTests", "RecordWorkspaceTests", "SharingTests", "ContributorWriteTests", "Ix6RecordListStackTests", "SharingWorkloadMeasurementTests"]
     },
     {
       "name": "administration-membership",
       "title": "Administration, Membership and Authority Commands",
-      "classes": ["TeamMembershipReconciliationTests", "PendingAuthorityCommandTests", "MembershipAdministrationTests", "MembershipRequestEditCancelTests", "OwnerTeamJoinStackTests", "AdministrationTests", "PeopleDirectoryTests", "PeopleProfilesPresenceTests"]
+      "classes": ["TeamMembershipReconciliationTests", "PendingAuthorityCommandTests", "MembershipAdministrationTests", "MembershipRequestEditCancelTests", "OwnerTeamJoinStackTests", "AdministrationTests", "PeopleDirectoryTests", "PeopleProfilesPresenceTests", "SyntheticOrganizationSeedTests"]
     },
     {
       "name": "search-catalogue",
       "title": "Field Search Catalogue and Approvals",
-      "classes": ["SearchCatalogueTests", "FieldSearchApprovalTests", "SearchIndexBuilderStackTests"]
+      "classes": ["SearchCatalogueTests", "FieldSearchApprovalTests", "SearchIndexBuilderStackTests", "SearchAccessItemIdentityTests", "SearchAccessProjectionStackTests", "SearchAccessValueProjectionStackTests", "IndexedCommitReadStageMeasurementTests"]
     },
     {
       "name": "search-execution",
       "title": "Field Search Execution and Benchmark",
-      "classes": ["FieldSearchExecutionTests", "SearchIndexFoundationTests", "IndexedSearchQueryStackTests", "IndexedFieldSearchEngineStackTests", "IndexedSearchLocalBenchmarkTests", "IndexedSearchTimeoutDiagnosticsTests", "SealSweepLockMeasurementTests", "RecordRegistrationThroughputMeasurementTests", "IndexedSearchShareOnlyItemChannelTests"]
+      "classes": ["FieldSearchExecutionTests", "SearchIndexFoundationTests", "IndexedSearchQueryStackTests", "IndexedFieldSearchEngineStackTests", "IndexedSearchLocalBenchmarkTests", "IndexedSearchTimeoutDiagnosticsTests", "SealSweepLockMeasurementTests", "RecordRegistrationThroughputMeasurementTests", "IndexedSearchShareOnlyItemChannelTests", "SearchAvailabilityUnderPermissionChurnTests"]
     },
     {
       "name": "protection-reconciliation",

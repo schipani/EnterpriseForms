@@ -180,7 +180,9 @@ class RealManifestTests(unittest.TestCase):
         assigned = Counter(c for g in manifest["groups"] for c in g["classes"])
         self.assertEqual([c for c, n in assigned.items() if n > 1], [])
         tests = sbg.DEFAULT_MANIFEST.parent / "Tests"
-        in_source = {p.stem for p in tests.glob("*.cs")}
+        # A partial class may span files named <Class>.<Part>.cs (for example SearchIndexFoundationTests.Paired.cs): the class is the
+        # part of the file name before the first dot.
+        in_source = {p.name.split(".")[0] for p in tests.glob("*.cs")}
         self.assertEqual(sorted(in_source - set(assigned)), [], "test class files that belong to no group")
         self.assertEqual(sorted(set(assigned) - in_source), [], "manifest classes with no source file")
 
