@@ -619,8 +619,8 @@
     },
     {
       "path": "docs/security/E6A_MANAGED_HSM_COMPATIBILITY_PROBE.md",
-      "sha256": "dfc891dea8cb2d36d8c56f59ca8c1a26127c4ec1ba3619fc8d8fdffd6f37b7bd",
-      "bytes": 28662
+      "sha256": "9193277ba655b7c4c8b779cbc691976fc50c78c92044f329c144196e685fe6a4",
+      "bytes": 30373
     },
     {
       "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",

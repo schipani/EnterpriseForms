@@ -251,6 +251,21 @@ Confirm before creation:
 - **Fake ≠ HSM.** Fake-based tests prove harness logic only. Nothing here establishes real Managed HSM compatibility.
 - **Small samples.** A pass at the tested lengths and inputs does not prove behaviour at other lengths. The probe reports per length and never generalizes.
 
+## 11A. Azure findings (E-6b run, owner-led; experimental, NOT approved for production)
+
+Recorded after the corrected probe was run against a temporary Azure Managed HSM, which has since been deleted and purged. The original E-6b evidence reports are unchanged and remain the primary record. This section is a summary only. All results are **[REAL-HSM]** and apply to the tested inputs only.
+
+- Raw-input HS256 HMAC-SHA256 matched the existing EnterpriseForms providers (`LocalHmacProvider`, `VaultTransitHmacProvider`) for the tested supported inputs.
+- Genuine signatures verified successfully.
+- Tampered signatures were rejected.
+- Cross-version verification correctly rejected signatures made under a different key version.
+- Empty (zero-length) raw input failed with HTTP 400.
+- A 65,536-byte raw input failed with HTTP 413.
+- The maximum supported raw-input size remains **undetermined**.
+- Raw-input signing is **not** established as a documented Azure API guarantee.
+- Azure reports a failed verification as HTTP 400, code `BadParameter`, with the token `RET_SIGNATURE_VERIFICATION_FAILED` in the message. The probe recognizes this only for verify calls, with a strict token boundary. The same error on any other operation is still a failure. An earlier probe revision matched the token as the error code and so reported correct negatives as failures; that was fail-safe and is corrected (148 local tests pass).
+- **E-6 is experimental and NOT approved for production.** No provider was implemented.
+
 ## 12. Risks for E-7 (or a later owner-authorized real-HSM step)
 
 - **Contract stability.** Even if Experiment B passes, raw-input HS256 is undocumented, so its behaviour could change without notice. Production use would need Microsoft confirmation or a standing real-HSM regression gate.
@@ -269,7 +284,8 @@ Confirm before creation:
 | `tools/experiments/e6a-managed-hsm-probe/ManagedHsmProbe/` (`ManagedHsmProbe.csproj`, `Program.cs`, `ProbeApplication.cs`, `ProbeConfiguration.cs`, `ManagedHsmUrls.cs`, `ManagedHsmRestClient.cs`, `SdkDigestSigner.cs`, `HsmExperiments.cs`, `LocalSelfChecks.cs`, `ReferenceVectors.cs`, `ProbeReport.cs`, `Codec.cs`) | new |
 | `tools/experiments/e6a-managed-hsm-probe/ManagedHsmProbe.Tests/` (`ManagedHsmProbe.Tests.csproj`, `FakeManagedHsm.cs`, `TestSetup.cs`, `ReferenceVectorTests.cs`, `ConfigurationTests.cs`, `ApplicationTests.cs`, `RestClientTests.cs`, `ExperimentTests.cs`, `SdkBehaviourTests.cs`) | new |
 | `tools/experiments/e6a-managed-hsm-probe/vectors/e6a-reference-vectors.json`, `verify_vectors.py` | new |
-| `docs/security/E6A_MANAGED_HSM_COMPATIBILITY_PROBE.md` | new (this report) |
+| `ManagedHsmProbe.Tests/VerificationTests.cs` and corrected verification handling in `ManagedHsmRestClient.cs`, `HsmExperiments.cs`, `FakeManagedHsm.cs` | E-6b follow-up |
+| `docs/security/E6A_MANAGED_HSM_COMPATIBILITY_PROBE.md` | new (this report), findings section 11A added |
 | `spec-files.json`, `SHA256SUMS.txt` | regenerated manifest entries for this report |
 
 The local commit hash is in `git log` on branch `e6/managed-hsm-hmac-provider` (on `cdade17`).

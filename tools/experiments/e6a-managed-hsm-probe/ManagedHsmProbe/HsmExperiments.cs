@@ -279,10 +279,23 @@ internal sealed class HsmExperiments(IManagedHsmClient client, IDigestSigner? sd
                 var pair = $"v{signed[i].Key.ToString(CultureInfo.InvariantCulture)}-v{signed[j].Key.ToString(CultureInfo.InvariantCulture)}";
                 report.Add("V-distinct-" + pair, Versions, signed[i].Value.AsSpan().SequenceEqual(signed[j].Value) ? Verdict.Fail : Verdict.Pass,
                     signed[i].Value.AsSpan().SequenceEqual(signed[j].Value) ? "two versions produced the same MAC (same key, or a version was ignored)" : "different versions give different MACs");
-                var cross = await client.VerifyAsync(configuration.ResolveVersionIdentifier(signed[i].Key), digest, signed[j].Value, cancellationToken).ConfigureAwait(false);
-                report.Add("V-cross-verify-" + pair, Versions,
-                    cross.Outcome != HsmOutcome.Success ? Classify(cross) : cross.Verified == false ? Verdict.Pass : Verdict.Fail,
-                    cross.Outcome != HsmOutcome.Success ? "cross-version verify: " + cross.Describe() : cross.Verified == false ? "a MAC of one version does not verify under another" : "a MAC verified under another version");
+                var idI = configuration.ResolveVersionIdentifier(signed[i].Key);
+                var idJ = configuration.ResolveVersionIdentifier(signed[j].Key);
+                var ownI = await client.VerifyAsync(idI, digest, signed[i].Value, cancellationToken).ConfigureAwait(false);
+                var ownJ = await client.VerifyAsync(idJ, digest, signed[j].Value, cancellationToken).ConfigureAwait(false);
+                var crossIJ = await client.VerifyAsync(idI, digest, signed[j].Value, cancellationToken).ConfigureAwait(false);
+                var crossJI = await client.VerifyAsync(idJ, digest, signed[i].Value, cancellationToken).ConfigureAwait(false);
+                // Positive controls: a service that rejects EVERYTHING must not look version-isolated.
+                var (controlI, detailI) = InterpretVerify(ownI, expectAccepted: true);
+                var (controlJ, detailJ) = InterpretVerify(ownJ, expectAccepted: true);
+                var (crossVerdictIJ, crossDetailIJ) = InterpretVerify(crossIJ, expectAccepted: false);
+                var (crossVerdictJI, crossDetailJI) = InterpretVerify(crossJI, expectAccepted: false);
+                report.Add("V-own-verify-" + pair, Versions, Worse(controlI, controlJ),
+                    $"genuine MAC under its own version: first {detailI}; second {detailJ}");
+                var controlsPass = controlI == Verdict.Pass && controlJ == Verdict.Pass;
+                var crossVerdict = Worse(crossVerdictIJ, crossVerdictJI);
+                report.Add("V-cross-verify-" + pair, Versions, controlsPass ? crossVerdict : Worse(crossVerdict, Verdict.Inconclusive),
+                    $"other version's MAC: {crossDetailIJ}; reverse: {crossDetailJI}{(controlsPass ? string.Empty : " (not conclusive: a genuine MAC was not accepted under its own version)")}");
             }
         }
 
@@ -351,24 +364,51 @@ internal sealed class HsmExperiments(IManagedHsmClient client, IDigestSigner? sd
         HsmOutcome.Success => Verdict.Pass,
         HsmOutcome.WrongKeyIdentifier => Verdict.Fail,
         HsmOutcome.Rejected or HsmOutcome.NotFound => Verdict.Fail,
+        // Outside InterpretVerify (which knows whether rejection was expected) a verification failure is never a pass.
+        HsmOutcome.VerificationFailed => Verdict.Fail,
         _ => Verdict.Inconclusive,
     };
 
+    /// <summary>
+    /// What a verify answer means when the experiment expects acceptance (a genuine MAC) or rejection (a tampered or other-version MAC).
+    /// A valid MAC that is not accepted is ALWAYS a Fail. A rejection is a pass only when the service said so specifically
+    /// (200 value=false, or HTTP 400 RET_SIGNATURE_VERIFICATION_FAILED) AND rejection was expected. Anything else is classified as before.
+    /// </summary>
+    internal static (Verdict Verdict, string Detail) InterpretVerify(HsmCallResult result, bool expectAccepted)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var accepted = result.Outcome == HsmOutcome.Success && result.Verified == true;
+        var rejected = result.Outcome == HsmOutcome.VerificationFailed || (result.Outcome == HsmOutcome.Success && result.Verified == false);
+        if (accepted)
+        {
+            return expectAccepted ? (Verdict.Pass, "accepted, as expected") : (Verdict.Fail, "a signature that must be rejected was ACCEPTED");
+        }
+
+        if (rejected)
+        {
+            var how = result.Outcome == HsmOutcome.VerificationFailed ? "HTTP 400 " + ManagedHsmRestClient.SignatureVerificationFailedCode : "value=false";
+            return expectAccepted
+                ? (Verdict.Fail, "a signature that must verify was REJECTED (" + how + ")")
+                : (Verdict.Pass, "rejected, as expected (" + how + ")");
+        }
+
+        return (Classify(result), "verify: " + result.Describe());
+    }
+
+    private static Verdict Worse(Verdict first, Verdict second) =>
+        first == Verdict.Fail || second == Verdict.Fail ? Verdict.Fail : first == Verdict.Inconclusive || second == Verdict.Inconclusive ? Verdict.Inconclusive : Verdict.Pass;
+
+    /// <summary>Verifies the genuine MAC (must be accepted) and a one-bit-tampered MAC (must be rejected); each is judged on its own.</summary>
     private async Task VerifyPairAsync(ProbeReport report, string experiment, string checkId, string identifier, byte[] digest, byte[] mac, CancellationToken cancellationToken)
     {
         var good = await client.VerifyAsync(identifier, digest, mac, cancellationToken).ConfigureAwait(false);
         var tampered = (byte[])mac.Clone();
         tampered[^1] ^= 0x01;
         var bad = await client.VerifyAsync(identifier, digest, tampered, cancellationToken).ConfigureAwait(false);
-        if (good.Outcome != HsmOutcome.Success || bad.Outcome != HsmOutcome.Success)
-        {
-            var failed = good.Outcome != HsmOutcome.Success ? good : bad;
-            report.Add(checkId, experiment, Classify(failed), "verify: " + failed.Describe());
-            return;
-        }
-
-        report.Add(checkId, experiment, good.Verified == true && bad.Verified == false ? Verdict.Pass : Verdict.Fail,
-            $"verify(expected)={good.Verified}, verify(tampered)={bad.Verified}");
+        var (goodVerdict, goodDetail) = InterpretVerify(good, expectAccepted: true);
+        var (badVerdict, badDetail) = InterpretVerify(bad, expectAccepted: false);
+        var note = goodVerdict == Verdict.Pass ? string.Empty : " (the tampered result is no evidence while the genuine MAC is not accepted)";
+        report.Add(checkId, experiment, Worse(goodVerdict, badVerdict), $"genuine: {goodDetail}; tampered: {badDetail}{note}");
     }
 
     private (int Version, string Identifier) Primary() => (configuration.PrimaryKeyVersion, configuration.ResolveVersionIdentifier(configuration.PrimaryKeyVersion));

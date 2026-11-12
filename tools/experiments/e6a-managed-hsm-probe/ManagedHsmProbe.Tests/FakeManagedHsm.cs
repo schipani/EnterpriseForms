@@ -22,6 +22,37 @@ internal enum FakeSemantics
     HashUnlessDigestLength,
 }
 
+/// <summary>How the fake reports a failed verification (the real service was observed to use HTTP 400 RET_SIGNATURE_VERIFICATION_FAILED).</summary>
+internal enum FakeVerifyStyle
+{
+    /// <summary>200 {"value":false} on mismatch (the documented KeyVerifyResult).</summary>
+    BooleanFalse,
+
+    /// <summary>HTTP 400 RET_SIGNATURE_VERIFICATION_FAILED on mismatch; 200 true on a match.</summary>
+    Http400OnMismatch,
+
+    /// <summary>HTTP 400 RET_SIGNATURE_VERIFICATION_FAILED even for a genuine signature (a service that cannot verify).</summary>
+    Http400Always,
+
+    /// <summary>HTTP 400 with a different error code.</summary>
+    OtherBadRequest,
+
+    /// <summary>The right code with the wrong status (409).</summary>
+    SameCodeWrongStatus,
+
+    /// <summary>The exact verification token under a different error code (not recognized).</summary>
+    TokenUnderWrongCode,
+
+    /// <summary>The token only as part of a longer identifier (not recognized).</summary>
+    TokenOnlyAsSubstring,
+
+    /// <summary>HTTP 500.</summary>
+    ServerError,
+
+    /// <summary>200 true for anything (a service that verifies nothing).</summary>
+    AcceptAll,
+}
+
 internal sealed record RecordedRequest(string Method, string PathAndQuery, string? Body, string? Authorization);
 
 /// <summary>
@@ -45,6 +76,12 @@ internal sealed class FakeManagedHsm : HttpMessageHandler
 
     public HttpStatusCode? ForcedStatus { get; set; }
 
+    /// <summary>Every authenticated request (sign, verify, get, import, ...) is answered with this exact error.</summary>
+    public (HttpStatusCode Status, string Code, string Message)? ForcedError { get; set; }
+
+    /// <summary>The error body the observed service sends for a failed verification: 400, code BadParameter, token in the message.</summary>
+    public const string VerificationFailedMessage = "Signature verification failed: RET_SIGNATURE_VERIFICATION_FAILED";
+
     public TimeSpan? Delay { get; set; }
 
     public bool MalformedBody { get; set; }
@@ -57,6 +94,15 @@ internal sealed class FakeManagedHsm : HttpMessageHandler
 
     /// <summary>Answer unauthenticated requests with a Key Vault style Bearer challenge (what the Azure SDK expects).</summary>
     public bool ChallengeUnauthenticated { get; set; } = true;
+
+    /// <summary>How a verify call reports a signature that does not match.</summary>
+    public FakeVerifyStyle VerifyStyle { get; set; } = FakeVerifyStyle.BooleanFalse;
+
+    /// <summary>Models the observed E-6b behaviour: zero-length raw input is refused with HTTP 400.</summary>
+    public bool RejectEmptyValue { get; set; }
+
+    /// <summary>Status used when <see cref="MaxValueBytes"/> is exceeded (the observed service answers 413).</summary>
+    public HttpStatusCode OversizeStatus { get; set; } = HttpStatusCode.BadRequest;
 
     public List<RecordedRequest> Requests { get; } = [];
 
@@ -96,6 +142,11 @@ internal sealed class FakeManagedHsm : HttpMessageHandler
             }
 
             return challenge;
+        }
+
+        if (ForcedError is { } forcedError)
+        {
+            return Error(forcedError.Status, forcedError.Code, forcedError.Message);
         }
 
         if (ForcedStatus is { } status)
@@ -174,6 +225,16 @@ internal sealed class FakeManagedHsm : HttpMessageHandler
 
             var key = IgnoreVersionUseLatest ? versions[^1].Key : version.Key;
             var input = FromBase64Url(root.GetProperty(segments[3] == "sign" ? "value" : "digest").GetString()!);
+            if (segments[3] == "sign" && RejectEmptyValue && input.Length == 0)
+            {
+                return Error(HttpStatusCode.BadRequest, "BadParameter", "empty value");
+            }
+
+            if (segments[3] == "sign" && MaxValueBytes is { } limit && input.Length > limit && OversizeStatus != HttpStatusCode.BadRequest)
+            {
+                return Error(OversizeStatus, "RequestEntityTooLarge", "value too large");
+            }
+
             var mac = Mac(key, input);
             if (mac is null)
             {
@@ -195,7 +256,27 @@ internal sealed class FakeManagedHsm : HttpMessageHandler
             }
 
             var signature = FromBase64Url(root.GetProperty("value").GetString()!);
-            return Json(w => w.WriteBoolean("value", CryptographicOperations.FixedTimeEquals(mac, signature)));
+            var matches = CryptographicOperations.FixedTimeEquals(mac, signature);
+            switch (VerifyStyle)
+            {
+                case FakeVerifyStyle.Http400OnMismatch when !matches:
+                case FakeVerifyStyle.Http400Always:
+                    return Error(HttpStatusCode.BadRequest, "BadParameter", VerificationFailedMessage);
+                case FakeVerifyStyle.OtherBadRequest:
+                    return Error(HttpStatusCode.BadRequest, "BadParameter", "digest length is wrong");
+                case FakeVerifyStyle.SameCodeWrongStatus when !matches:
+                    return Error(HttpStatusCode.Conflict, "BadParameter", VerificationFailedMessage);
+                case FakeVerifyStyle.TokenUnderWrongCode when !matches:
+                    return Error(HttpStatusCode.BadRequest, "Forbidden", VerificationFailedMessage);
+                case FakeVerifyStyle.TokenOnlyAsSubstring when !matches:
+                    return Error(HttpStatusCode.BadRequest, "BadParameter", "XRET_SIGNATURE_VERIFICATION_FAILED_2");
+                case FakeVerifyStyle.ServerError:
+                    return Error(HttpStatusCode.InternalServerError, "InternalError", "boom");
+                case FakeVerifyStyle.AcceptAll:
+                    return Json(w => w.WriteBoolean("value", true));
+                default:
+                    return Json(w => w.WriteBoolean("value", matches));
+            }
         }
 
         return Error(HttpStatusCode.MethodNotAllowed, "MethodNotAllowed", "unsupported");

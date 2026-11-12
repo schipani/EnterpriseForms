@@ -34,6 +34,13 @@ internal enum HsmOutcome
 
     /// <summary>The service answered for another key or version than the one requested.</summary>
     WrongKeyIdentifier,
+
+    /// <summary>
+    /// A verify call answered HTTP 400, code BadParameter, with the exact token <see cref="ManagedHsmRestClient.SignatureVerificationFailedCode"/> in the message:
+    /// the service says the signature does not verify. It is a negative VERIFICATION answer, not an infrastructure failure, and only an
+    /// experiment that expected rejection may count it as a pass. Any other 400 stays <see cref="Rejected"/>.
+    /// </summary>
+    VerificationFailed,
 }
 
 /// <summary>One HSM call. Never carries an access token or key material; error text is truncated.</summary>
@@ -192,7 +199,47 @@ internal sealed class ManagedHsmRestClient(HttpClient httpClient, TokenCredentia
                 : result with { Outcome = HsmOutcome.Malformed, ErrorMessage = "sign response has no base64url value" };
         }, cancellationToken);
 
-    public Task<HsmCallResult> VerifyAsync(string versionId, ReadOnlyMemory<byte> digest, ReadOnlyMemory<byte> signature, CancellationToken cancellationToken) =>
+    /// <summary>
+    /// The token Managed HSM puts in the MESSAGE of a verify refusal when the signature does not match. Observed in the E-6b retest:
+    /// HTTP 400, error code <c>BadParameter</c> (generic), message containing this token. It is not an error code.
+    /// </summary>
+    internal const string SignatureVerificationFailedCode = "RET_SIGNATURE_VERIFICATION_FAILED";
+
+    internal const string VerificationFailureErrorCode = "BadParameter";
+
+    /// <summary>True only for HTTP 400 + code BadParameter + the exact token delimited by non-identifier characters (or the text edges).</summary>
+    internal static bool IsSignatureVerificationFailure(int? httpStatus, string? errorCode, string? errorMessage)
+    {
+        if (httpStatus != 400 || !string.Equals(errorCode, VerificationFailureErrorCode, StringComparison.Ordinal) || errorMessage is null)
+        {
+            return false;
+        }
+
+        for (var start = errorMessage.IndexOf(SignatureVerificationFailedCode, StringComparison.Ordinal); start >= 0;
+             start = errorMessage.IndexOf(SignatureVerificationFailedCode, start + 1, StringComparison.Ordinal))
+        {
+            var end = start + SignatureVerificationFailedCode.Length;
+            if ((start == 0 || !IsIdentifierCharacter(errorMessage[start - 1])) && (end == errorMessage.Length || !IsIdentifierCharacter(errorMessage[end])))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsIdentifierCharacter(char c) => char.IsAsciiLetterOrDigit(c) || c == '_';
+
+    public async Task<HsmCallResult> VerifyAsync(string versionId, ReadOnlyMemory<byte> digest, ReadOnlyMemory<byte> signature, CancellationToken cancellationToken)
+    {
+        var result = await VerifyCoreAsync(versionId, digest, signature, cancellationToken).ConfigureAwait(false);
+        // Verify only: 400 + BadParameter + the exact token in the message. Every other refusal stays a plain refusal.
+        return result.Outcome == HsmOutcome.Rejected && IsSignatureVerificationFailure(result.HttpStatus, result.ErrorCode, result.ErrorMessage)
+            ? result with { Outcome = HsmOutcome.VerificationFailed, Verified = false }
+            : result;
+    }
+
+    private Task<HsmCallResult> VerifyCoreAsync(string versionId, ReadOnlyMemory<byte> digest, ReadOnlyMemory<byte> signature, CancellationToken cancellationToken) =>
         SendAsync(HttpMethod.Post, ManagedHsmUrls.Verify(endpoint, keyName, versionId, configuration.ApiVersion), Json(w =>
         {
             w.WriteString("alg", Algorithm);
