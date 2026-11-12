@@ -156,6 +156,22 @@ public sealed class ProjectionIntegrityVerifier(IAuthorityStore store, ISpiceDbP
         }
     }
 
+    /// <summary>IX-5 M1: <see cref="ISpiceDbProjection.LookupSubjectsAsync"/> at the snapshot's pin; a snapshot or datastore failure is a failed decision read (fail closed).</summary>
+    public async Task<IReadOnlyList<string>> LookupSubjectsAsync(VerifiedProjectionSnapshot snapshot, string resourceType, string resourceId, string permission, string subjectType, string subjectRelation, int maximumSubjects, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        snapshot.RequireOpen();
+        try
+        {
+            return await spiceDb.LookupSubjectsAsync(resourceType, resourceId, permission, subjectType, subjectRelation, snapshot, maximumSubjects, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is SpiceDbSnapshotException or SpiceDbSchemaMissingException or SpiceDbUnavailableException)
+        {
+            await DecisionReadFailedAsync(snapshot, ex, cancellationToken).ConfigureAwait(false);
+            throw; // unreachable
+        }
+    }
+
     /// <summary>
     /// M2 + R2. Returns true (snapshot Completed) when the head marker is still the expected marker after the decision and the
     /// Authority state did not move; false (snapshot Failed) when the state moved, so the caller retries or fails closed. A

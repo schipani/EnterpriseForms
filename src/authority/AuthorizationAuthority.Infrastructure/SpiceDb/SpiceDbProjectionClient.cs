@@ -361,6 +361,61 @@ public sealed class SpiceDbProjectionClient : ISpiceDbProjection, IDisposable
         }
     }
 
+    public async Task<IReadOnlyList<string>> LookupSubjectsAsync(string resourceType, string resourceId, string permission, string subjectType, string subjectRelation, VerifiedProjectionSnapshot snapshot, int maximumSubjects, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        snapshot.RequireOpen();
+        var request = new LookupSubjectsRequest
+        {
+            Consistency = new Consistency { AtExactSnapshot = new ZedToken { Token = snapshot.Pin } },
+            Resource = new ObjectReference { ObjectType = resourceType, ObjectId = resourceId },
+            Permission = permission,
+            SubjectObjectType = subjectType,
+            OptionalSubjectRelation = subjectRelation ?? string.Empty,
+            WildcardOption = LookupSubjectsRequest.Types.WildcardOption.ExcludeWildcards,
+        };
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            using var call = Permissions.LookupSubjects(request, Options(cancellationToken));
+            await foreach (var response in call.ResponseStream.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (!string.Equals(response.LookedUpAt?.Token, snapshot.Pin, StringComparison.Ordinal))
+                {
+                    throw new SpiceDbSnapshotException(SpiceDbSnapshotFailure.TokenMismatch, "looked_up_at differs from the pinned snapshot");
+                }
+
+                var subject = response.Subject;
+                if (subject is null || subject.SubjectObjectId == "*")
+                {
+                    throw new SpiceDbUnavailableException("LookupSubjects returned a wildcard or empty subject");
+                }
+
+                // A conditional (caveated) subject is not a subject: it cannot be compared and fails closed (the caller treats it as a difference).
+                if (subject.Permissionship != LookupPermissionship.HasPermission)
+                {
+                    throw new SpiceDbUnavailableException("LookupSubjects returned a conditional subject");
+                }
+
+                if (seen.Add(subject.SubjectObjectId))
+                {
+                    ids.Add(subject.SubjectObjectId);
+                    if (ids.Count > maximumSubjects)
+                    {
+                        throw new SpiceDbLookupLimitExceededException($"more than {maximumSubjects} {subjectType} subjects");
+                    }
+                }
+            }
+
+            return ids;
+        }
+        catch (RpcException ex)
+        {
+            throw Classify(ex, "LookupSubjects");
+        }
+    }
+
     public async Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken)
     {
         if (configurationError is not null)

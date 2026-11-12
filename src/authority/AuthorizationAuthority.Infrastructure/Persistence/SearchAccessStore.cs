@@ -45,6 +45,7 @@ internal sealed class SearchAccessStore(AuthorityDbContext context) : ISearchAcc
                 .SetProperty(c => c.AccessProjectionStateName, values.StateName)
                 .SetProperty(c => c.QuarantineReasonCode, values.QuarantineReasonCode)
                 .SetProperty(c => c.AccessProjectionProtocolVersion, values.ProtocolVersion)
+                .SetProperty(c => c.DerivedSchemaDigest, values.DerivedSchemaDigest)
                 .SetProperty(c => c.CheckpointModifiedOn, now)
                 .SetProperty(c => c.CheckpointRevision, expectedCheckpointRevision + 1), cancellationToken).ConfigureAwait(false) == 1;
     }
@@ -93,6 +94,43 @@ internal sealed class SearchAccessStore(AuthorityDbContext context) : ISearchAcc
         await context.SearchAccessRecordGrants.Where(g => g.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await context.SearchAccessEdges.Where(e => e.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    public Task<SearchAccessVerificationState?> FindVerificationStateAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        context.SearchAccessVerificationStates.AsNoTracking().SingleOrDefaultAsync(v => v.OrganizationId == organizationId, cancellationToken);
+
+    public async Task SaveVerificationStateAsync(SearchAccessVerificationState state, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var updated = await context.SearchAccessVerificationStates.Where(v => v.OrganizationId == state.OrganizationId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(v => v.AccessVerifiedRevision, state.AccessVerifiedRevision)
+                .SetProperty(v => v.AccessVerifiedJournalDigest, state.AccessVerifiedJournalDigest)
+                .SetProperty(v => v.FullVerificationCompletedOn, state.FullVerificationCompletedOn)
+                .SetProperty(v => v.FullVerificationAuthorizationRevision, state.FullVerificationAuthorizationRevision)
+                .SetProperty(v => v.SpiceDbSweepCursorRecordId, state.SpiceDbSweepCursorRecordId)
+                .SetProperty(v => v.SpiceDbSweepStartedOn, state.SpiceDbSweepStartedOn)
+                .SetProperty(v => v.SpiceDbSweepCompletedOn, state.SpiceDbSweepCompletedOn)
+                .SetProperty(v => v.SpiceDbSweepRecordsChecked, state.SpiceDbSweepRecordsChecked)
+                .SetProperty(v => v.LastVerificationOutcomeCode, state.LastVerificationOutcomeCode)
+                .SetProperty(v => v.VerificationStateModifiedOn, state.VerificationStateModifiedOn), cancellationToken).ConfigureAwait(false);
+        if (updated == 0)
+        {
+            context.SearchAccessVerificationStates.Add(state);
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            context.Entry(state).State = EntityState.Detached;
+        }
+    }
+
+    public Task DeleteVerificationStateAsync(Guid organizationId, CancellationToken cancellationToken) =>
+        context.SearchAccessVerificationStates.Where(v => v.OrganizationId == organizationId).ExecuteDeleteAsync(cancellationToken);
+
+    public void AddShadowSample(SearchAccessShadowSample sample) => context.SearchAccessShadowSamples.Add(sample);
+
+    public Task<List<SearchAccessShadowSample>> GetShadowSamplesAsync(Guid organizationId, DateTimeOffset comparedFrom, DateTimeOffset comparedBefore, CancellationToken cancellationToken) =>
+        context.SearchAccessShadowSamples.AsNoTracking().Where(s => s.OrganizationId == organizationId && s.SampleComparedOn >= comparedFrom && s.SampleComparedOn < comparedBefore).OrderBy(s => s.SampleComparedOn).ToListAsync(cancellationToken);
+
+    public Task<int> PurgeShadowSamplesAsync(Guid organizationId, DateTimeOffset before, CancellationToken cancellationToken) =>
+        context.SearchAccessShadowSamples.Where(s => s.OrganizationId == organizationId && s.SampleComparedOn < before).ExecuteDeleteAsync(cancellationToken);
 
     public Task<List<SearchAccessEdge>> GetAllEdgesAsync(Guid organizationId, CancellationToken cancellationToken) =>
         context.SearchAccessEdges.AsNoTracking().Where(e => e.OrganizationId == organizationId).ToListAsync(cancellationToken);

@@ -78,6 +78,16 @@ public interface ISpiceDbProjection
     /// </summary>
     Task<IReadOnlyList<string>> LookupResourcesAsync(string resourceType, string permission, string subjectType, string subjectId, VerifiedProjectionSnapshot snapshot, int maximumResults, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// IX-5 M1 (annex E, TQ-8): every subject of <paramref name="subjectType"/> (with <paramref name="subjectRelation"/>, e.g.
+    /// <c>team#participant</c>) holding the permission on one resource unconditionally, at exactly the snapshot's pin (IX5-CT-12),
+    /// wildcards excluded. SpiceDB v1.56 refuses a limit on this call (IX5-CT-08), so the stream is uncapped server-side and the client
+    /// enforces <paramref name="maximumSubjects"/> itself: more distinct subjects throw <see cref="SpiceDbLookupLimitExceededException"/>.
+    /// Subjects SpiceDB repeats are de-duplicated; a conditional or wildcard subject fails closed.
+    /// </summary>
+    Task<IReadOnlyList<string>> LookupSubjectsAsync(string resourceType, string resourceId, string permission, string subjectType, string subjectRelation, VerifiedProjectionSnapshot snapshot, int maximumSubjects, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("this SpiceDB projection does not implement LookupSubjects");
+
     Task<(bool Ready, string Detail)> ProbeAsync(CancellationToken cancellationToken);
 }
 

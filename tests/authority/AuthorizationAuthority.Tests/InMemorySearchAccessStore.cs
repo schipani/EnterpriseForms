@@ -78,6 +78,7 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
         stored.AccessProjectionStateName = values.StateName;
         stored.QuarantineReasonCode = values.QuarantineReasonCode;
         stored.AccessProjectionProtocolVersion = values.ProtocolVersion;
+        stored.DerivedSchemaDigest = values.DerivedSchemaDigest;
         stored.CheckpointModifiedOn = now;
         stored.CheckpointRevision = expectedCheckpointRevision + 1;
         return Task.FromResult(true);
@@ -215,6 +216,51 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
         return Task.FromResult(ValuePostings.Where(v => v.OrganizationId == organizationId && (formRecordIds is null || formRecordIds.Contains(v.FormRecordId))).ToList());
     }
 
+    public List<SearchAccessVerificationState> VerificationStates { get; } = [];
+
+    public List<SearchAccessShadowSample> ShadowSamples { get; } = [];
+
+    public Task<SearchAccessVerificationState?> FindVerificationStateAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(VerificationStates.SingleOrDefault(v => v.OrganizationId == organizationId));
+    }
+
+    public Task SaveVerificationStateAsync(SearchAccessVerificationState state, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        Require(state.OrganizationId);
+        VerificationStates.RemoveAll(v => v.OrganizationId == state.OrganizationId);
+        VerificationStates.Add(state);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteVerificationStateAsync(Guid organizationId, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        VerificationStates.RemoveAll(v => v.OrganizationId == organizationId);
+        return Task.CompletedTask;
+    }
+
+    public void AddShadowSample(SearchAccessShadowSample sample)
+    {
+        ArgumentNullException.ThrowIfNull(sample);
+        Require(sample.OrganizationId);
+        ShadowSamples.Add(sample);
+    }
+
+    public Task<List<SearchAccessShadowSample>> GetShadowSamplesAsync(Guid organizationId, DateTimeOffset comparedFrom, DateTimeOffset comparedBefore, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(ShadowSamples.Where(s => s.OrganizationId == organizationId && s.SampleComparedOn >= comparedFrom && s.SampleComparedOn < comparedBefore).OrderBy(s => s.SampleComparedOn).ToList());
+    }
+
+    public Task<int> PurgeShadowSamplesAsync(Guid organizationId, DateTimeOffset before, CancellationToken cancellationToken)
+    {
+        Require(organizationId);
+        return Task.FromResult(ShadowSamples.RemoveAll(s => s.OrganizationId == organizationId && s.SampleComparedOn < before));
+    }
+
     private void Require(Guid organizationId)
     {
         if (bound != organizationId)
@@ -237,5 +283,6 @@ internal sealed class InMemorySearchAccessStore : ISearchAccessStore
         ConsumedContentIntegrityRevision = c.ConsumedContentIntegrityRevision,
         ConsumedContentJournalDigest = c.ConsumedContentJournalDigest,
         ConsumedCoverageDigest = c.ConsumedCoverageDigest,
+        DerivedSchemaDigest = c.DerivedSchemaDigest,
     };
 }

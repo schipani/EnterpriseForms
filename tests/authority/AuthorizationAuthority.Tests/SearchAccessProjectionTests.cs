@@ -46,13 +46,16 @@ public sealed partial class SearchAccessProjectionTests
 
         public TestProjection.RecordingAlerts Alerts { get; } = new();
 
-        public World(int sampleSize = 0)
+        public World(int sampleSize = 0, Func<World, ISpiceDbProjection>? spiceDb = null, Action<SearchAccessOptions>? configure = null)
         {
             State = new OrganizationAuthorizationState { OrganizationId = Org };
             Store.Organizations.Add(State);
-            var options = new SearchAccessOptions { Mode = SearchAccessMode.Dark, VerificationSampleSize = sampleSize };
-            Service = new SearchAccessProjectionService(Store, TestProjection.Verifier(Store, new UnusedSpiceDb()), options, Alerts, new NoFaults(), TimeProvider.System);
+            Options = new SearchAccessOptions { Mode = SearchAccessMode.Dark, VerificationSampleSize = sampleSize };
+            configure?.Invoke(Options);
+            Service = new SearchAccessProjectionService(Store, TestProjection.Verifier(Store, spiceDb?.Invoke(this) ?? new UnusedSpiceDb()), Options, Alerts, new NoFaults(), TimeProvider.System);
         }
+
+        public SearchAccessOptions Options { get; }
 
         /// <summary>One security command: canonical edges and the hash-chained journal event, as SecurityCommandService.ApplyPlan writes them.</summary>
         public void Commit(params (bool Touch, AccessEdge Edge)[] changes)

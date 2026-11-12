@@ -12,7 +12,7 @@ public interface ISearchAccessShadowObserver
 }
 
 /// <summary>C-150 IX-5c: totals since start (or the last Testing reset) and the most recent results (counts and codes only).</summary>
-public sealed record SearchAccessShadowSnapshot(bool Enabled, long Offered, long Dropped, long Matched, long Mismatched, long NotComparable, long Cancelled, long Failed, IReadOnlyList<SearchAccessShadowResult> Recent);
+public sealed record SearchAccessShadowSnapshot(bool Enabled, long Offered, long Dropped, long Matched, long Mismatched, long NotComparable, long Cancelled, long Failed, IReadOnlyList<SearchAccessShadowResult> Recent, long EvidenceFailures = 0);
 
 /// <summary>
 /// C-150 IX-5c shadow preparation: receives committed Tier 1 answers (<see cref="IIndexedSearchShadowSink"/>) into a bounded in-memory
@@ -44,6 +44,7 @@ public sealed class SearchAccessShadowComparer(SearchAccessProjectionService ser
     private long notComparable;
     private long cancelled;
     private long failed;
+    private long evidenceFailures;
 
     public bool Offer(IndexedSearchShadowObservation observation)
     {
@@ -89,6 +90,15 @@ public sealed class SearchAccessShadowComparer(SearchAccessProjectionService ser
         }
 
         Record(result);
+        try
+        {
+            await service.RecordShadowSampleAsync(observation, result, stoppingToken).ConfigureAwait(false); // sampling evidence (§6)
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Interlocked.Increment(ref evidenceFailures); // evidence loss is counted, never hidden; the comparison stands
+        }
+
         if (result.Classification == SearchAccessShadowClassifications.Mismatch)
         {
             alerts.Raise(new SecurityAlert("SEARCH_ACCESS_SHADOW_MISMATCH", "High", observation.OrganizationId, Guid.Empty, null,
@@ -100,7 +110,7 @@ public sealed class SearchAccessShadowComparer(SearchAccessProjectionService ser
     }
 
     public SearchAccessShadowSnapshot Snapshot() => new(true, Interlocked.Read(ref offered), Interlocked.Read(ref dropped), Interlocked.Read(ref matched), Interlocked.Read(ref mismatched),
-        Interlocked.Read(ref notComparable), Interlocked.Read(ref cancelled), Interlocked.Read(ref failed), recent.ToArray());
+        Interlocked.Read(ref notComparable), Interlocked.Read(ref cancelled), Interlocked.Read(ref failed), recent.ToArray(), Interlocked.Read(ref evidenceFailures));
 
     /// <summary>Testing only: clears the counters and recent results (queued observations are still compared).</summary>
     public void Reset()
@@ -112,6 +122,7 @@ public sealed class SearchAccessShadowComparer(SearchAccessProjectionService ser
         Interlocked.Exchange(ref notComparable, 0);
         Interlocked.Exchange(ref cancelled, 0);
         Interlocked.Exchange(ref failed, 0);
+        Interlocked.Exchange(ref evidenceFailures, 0);
         recent.Clear();
     }
 

@@ -19,7 +19,13 @@ public static class SearchAccessSchema
     /// <summary>Checkpoints: inserted and compare-and-set updated, never deleted.</summary>
     public static readonly string[] StateTables = ["search_access_checkpoints"];
 
-    public static IEnumerable<string> AllTables => DerivedTables.Concat(StateTables);
+    /// <summary>IX-5 M1/M2 verification state: maintained by the verification sweep only; reset (deleted) by rebuild and quarantine.</summary>
+    public static readonly string[] VerificationTables = ["search_access_verification_states"];
+
+    /// <summary>IX-5c sampling evidence: inserted, read, and deleted only by the retention purge; never updated.</summary>
+    public static readonly string[] EvidenceTables = ["search_access_shadow_samples"];
+
+    public static IEnumerable<string> AllTables => DerivedTables.Concat(StateTables).Concat(VerificationTables).Concat(EvidenceTables);
 }
 
 public sealed class SearchAccessCheckpointConfiguration : IEntityTypeConfiguration<SearchAccessCheckpoint>
@@ -41,6 +47,46 @@ public sealed class SearchAccessCheckpointConfiguration : IEntityTypeConfigurati
             t.HasCheckConstraint("ck_search_access_checkpoint_digest", "(consumed_authorization_revision = 0) = (consumed_journal_digest IS NULL) AND (consumed_journal_digest IS NULL OR octet_length(consumed_journal_digest) = 32)");
             t.HasCheckConstraint("ck_search_access_checkpoint_content_digest", "consumed_content_integrity_revision >= 0 AND (consumed_content_integrity_revision = 0) = (consumed_content_journal_digest IS NULL) AND (consumed_content_journal_digest IS NULL OR octet_length(consumed_content_journal_digest) = 32)");
             t.HasCheckConstraint("ck_search_access_checkpoint_coverage_digest", "consumed_coverage_digest IS NULL OR octet_length(consumed_coverage_digest) = 32");
+            t.HasCheckConstraint("ck_search_access_checkpoint_schema_digest", "derived_schema_digest IS NULL OR octet_length(derived_schema_digest) = 32");
+        });
+    }
+}
+
+public sealed class SearchAccessVerificationStateConfiguration : IEntityTypeConfiguration<SearchAccessVerificationState>
+{
+    public void Configure(EntityTypeBuilder<SearchAccessVerificationState> builder)
+    {
+        builder.MapSnakeCase("search_access_verification_states");
+        builder.ToTable("search_access_verification_states", SearchAccessSchema.Name);
+        builder.HasKey(e => e.SearchAccessVerificationStateId);
+        builder.Property(e => e.LastVerificationOutcomeCode).HasMaxLength(64);
+        builder.HasIndex(e => e.OrganizationId).IsUnique().HasDatabaseName("uq_search_access_verification_state_org");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_search_access_verification_state_org").OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_search_access_verification_state_revisions", "access_verified_revision >= 0 AND full_verification_authorization_revision >= 0 AND spice_db_sweep_records_checked >= 0");
+            t.HasCheckConstraint("ck_search_access_verification_state_digest", "(access_verified_revision = 0) = (access_verified_journal_digest IS NULL) AND (access_verified_journal_digest IS NULL OR octet_length(access_verified_journal_digest) = 32)");
+        });
+    }
+}
+
+public sealed class SearchAccessShadowSampleConfiguration : IEntityTypeConfiguration<SearchAccessShadowSample>
+{
+    public void Configure(EntityTypeBuilder<SearchAccessShadowSample> builder)
+    {
+        builder.MapSnakeCase("search_access_shadow_samples");
+        builder.ToTable("search_access_shadow_samples", SearchAccessSchema.Name);
+        builder.HasKey(e => e.SearchAccessShadowSampleId);
+        builder.Property(e => e.SampleClassificationName).HasMaxLength(20);
+        builder.Property(e => e.SampleReasonCode).HasMaxLength(64);
+        builder.Property(e => e.PredicateShapeText).HasMaxLength(200);
+        builder.HasIndex(e => new { e.OrganizationId, e.SampleComparedOn }).HasDatabaseName("ix_search_access_shadow_samples_org_time");
+        builder.HasOne<OrganizationAuthorizationState>().WithMany().HasForeignKey(e => e.OrganizationId).HasPrincipalKey(o => o.OrganizationId).HasConstraintName("fk_search_access_shadow_sample_org").OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_search_access_shadow_sample_classification", "sample_classification_name IN ('Match','Mismatch','NotComparable','Cancelled','Failed')");
+            t.HasCheckConstraint("ck_search_access_shadow_sample_digests", "octet_length(tier1_result_digest) = 32 AND (tier2_result_digest IS NULL OR octet_length(tier2_result_digest) = 32) AND octet_length(derivation_schema_digest) = 32");
+            t.HasCheckConstraint("ck_search_access_shadow_sample_counts", "tier1_match_count >= 0 AND (tier2_match_count IS NULL OR tier2_match_count >= 0) AND only_in_tier1_count >= 0 AND only_in_tier2_count >= 0 AND excluded_by_metadata_count >= 0 AND condition_count >= 0");
         });
     }
 }

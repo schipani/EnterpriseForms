@@ -79,6 +79,19 @@ public static class SearchAccessTestingEndpoints
         group.MapPost("/{organizationId:guid}/evaluate", static async Task<Ok<EvaluateResponse>> (Guid organizationId, EvaluateRequest request, SearchAccessProjectionService service, CancellationToken cancellationToken) =>
             TypedResults.Ok(new EvaluateResponse(await service.EvaluateForTestingAsync(organizationId, request.FormDefinitionId, request.AuthorityUserId, request.Conditions, cancellationToken).ConfigureAwait(false))));
 
+        // IX-5 M1/M2: one verification step (the loop's unit of work) and the organization's verification status.
+        group.MapPost("/{organizationId:guid}/verify-step", static async Task<Ok<SearchAccessVerificationStep>> (Guid organizationId, bool? full, SearchAccessProjectionService service, CancellationToken cancellationToken) =>
+            TypedResults.Ok(await service.VerifyStepAsync(organizationId, Guid.NewGuid(), cancellationToken, full ?? false).ConfigureAwait(false)));
+        group.MapGet("/{organizationId:guid}/verification", static async Task<Ok<SearchAccessVerificationStatus>> (Guid organizationId, SearchAccessProjectionService service, CancellationToken cancellationToken) =>
+            TypedResults.Ok(await service.VerificationStatusAsync(organizationId, cancellationToken).ConfigureAwait(false)));
+
+        // IX-5c sampling evidence report (counts, codes and restart events only) over the last `hours` hours.
+        group.MapGet("/shadow/evidence", static async Task<Ok<ShadowEvidenceReport>> (int? hours, SearchAccessProjectionService service, TimeProvider clock, CancellationToken cancellationToken) =>
+        {
+            var now = clock.GetUtcNow();
+            return TypedResults.Ok(await service.ShadowEvidenceReportAsync(now.AddHours(-Math.Clamp(hours ?? 24, 1, 24 * 400)), now.AddMinutes(1), cancellationToken).ConfigureAwait(false));
+        });
+
         // C-150 IX-5c: shadow comparison counters and recent results (counts and codes only); 404 when the comparison is not enabled.
         group.MapGet("/shadow", static Results<Ok<SearchAccessShadowSnapshot>, NotFound> (IServiceProvider services) =>
             services.GetService<SearchAccessShadowComparer>() is { } comparer ? TypedResults.Ok(comparer.Snapshot()) : TypedResults.NotFound());

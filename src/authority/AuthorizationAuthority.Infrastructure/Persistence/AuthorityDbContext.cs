@@ -137,6 +137,10 @@ public sealed class AuthorityDbContext(DbContextOptions<AuthorityDbContext> opti
 
     public DbSet<SearchAccessValuePosting> SearchAccessValuePostings => Set<SearchAccessValuePosting>();
 
+    public DbSet<SearchAccessVerificationState> SearchAccessVerificationStates => Set<SearchAccessVerificationState>();
+
+    public DbSet<SearchAccessShadowSample> SearchAccessShadowSamples => Set<SearchAccessShadowSample>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

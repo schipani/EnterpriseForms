@@ -31,6 +31,7 @@ public static class SearchAccessShadowReasonCodes
 {
     public const string SnapshotMoved = "SNAPSHOT_MOVED";
     public const string Tier2NotReady = "TIER2_NOT_READY";
+    public const string Tier2NotVerified = "TIER2_NOT_VERIFIED";
     public const string GateClosed = "ORGANIZATION_GATE_CLOSED";
     public const string OrganizationNotFound = "ORGANIZATION_NOT_FOUND";
     public const string Disabled = "TIER2_DISABLED";
@@ -42,7 +43,15 @@ public static class SearchAccessShadowReasonCodes
 /// those only one side found, and Tier 2 candidates excluded by Tier 1's metadata filter (status, children, archived). Never ids or values.
 /// </summary>
 public sealed record SearchAccessShadowResult(string Classification, string? ReasonCode, int Tier1Count, int? Tier2Count, int OnlyInTier1Count, int OnlyInTier2Count, int ExcludedByMetadataCount,
-    int ConditionCount, Guid CorrelationId, double ElapsedMilliseconds, DateTimeOffset ComparedOn);
+    int ConditionCount, Guid CorrelationId, double ElapsedMilliseconds, DateTimeOffset ComparedOn)
+{
+    /// <summary>Evidence (sampling plan §6): SHA-256 of the sorted Tier 1 and Tier 2 result id lists; ids themselves are never kept.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public byte[]? Tier1ResultDigest { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public byte[]? Tier2ResultDigest { get; init; }
+}
 
 public sealed partial class SearchAccessProjectionService
 {
@@ -105,19 +114,30 @@ public sealed partial class SearchAccessProjectionService
             return Result(SearchAccessShadowClassifications.NotComparable, SearchAccessShadowReasonCodes.Tier2NotReady);
         }
 
+        // IX-5: rows are comparable (as they would be servable) only when verified: M1 fence closed, M2-E/V and M2-S current.
+        if (!VerificationStatus(await access.FindVerificationStateAsync(observation.OrganizationId, cancellationToken).ConfigureAwait(false), state.AuthorizationRevision, options, clock.GetUtcNow()).Verified)
+        {
+            return Result(SearchAccessShadowClassifications.NotComparable, SearchAccessShadowReasonCodes.Tier2NotVerified);
+        }
+
         var tier2 = await EvaluateTier2Async(scope, observation, cancellationToken).ConfigureAwait(false);
         var tier1 = observation.Tier1Matches.ToHashSet();
         var onlyTier1 = tier1.Count(id => !tier2.Contains(id));
         var extra = tier2.Where(id => !tier1.Contains(id)).ToList();
-        var excluded = 0;
+        var excludedIds = new HashSet<Guid>();
         if (extra.Count > 0)
         {
             var headers = (await access.GetTier1RecordHeadersAsync(observation.OrganizationId, observation.FormDefinitionId, extra, cancellationToken).ConfigureAwait(false)).ToDictionary(h => h.FormRecordId);
-            excluded = extra.Count(id => headers.TryGetValue(id, out var header) && !MetadataMatches(observation, header));
+            excludedIds.UnionWith(extra.Where(id => headers.TryGetValue(id, out var header) && !MetadataMatches(observation, header)));
         }
 
+        var excluded = excludedIds.Count;
         var onlyTier2 = extra.Count - excluded;
-        return Result(onlyTier1 == 0 && onlyTier2 == 0 ? SearchAccessShadowClassifications.Match : SearchAccessShadowClassifications.Mismatch, null, tier2.Count - excluded, onlyTier1, onlyTier2, excluded);
+        return Result(onlyTier1 == 0 && onlyTier2 == 0 ? SearchAccessShadowClassifications.Match : SearchAccessShadowClassifications.Mismatch, null, tier2.Count - excluded, onlyTier1, onlyTier2, excluded) with
+        {
+            Tier1ResultDigest = ResultDigest(observation.Tier1Matches),
+            Tier2ResultDigest = ResultDigest(tier2.Where(id => !excludedIds.Contains(id))), // Tier 2's answer after Tier 1's metadata filter
+        };
     }
 
     private static async Task<HashSet<Guid>> EvaluateTier2Async(Common.Ports.IAuthorityScope scope, IndexedSearchShadowObservation o, CancellationToken cancellationToken)
@@ -167,6 +187,75 @@ public sealed partial class SearchAccessProjectionService
         }
 
         return result;
+    }
+
+    /// <summary>SHA-256 over the sorted record ids (16 bytes each): evidence that identifies a result without listing it.</summary>
+    public static byte[] ResultDigest(IEnumerable<Guid> ids)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        var sorted = ids.Distinct().Order().ToList();
+        var bytes = new byte[sorted.Count * 16];
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            sorted[i].TryWriteBytes(bytes.AsSpan(i * 16, 16), bigEndian: true, out _);
+        }
+
+        return System.Security.Cryptography.SHA256.HashData(bytes);
+    }
+
+    /// <summary>
+    /// IX-5c sampling evidence: records one comparison (sampling plan §6) in the organization's RLS context: counts, codes, revisions,
+    /// result digests, the predicate shape (operators and value types, never values) and the derivation it ran under.
+    /// </summary>
+    public async Task RecordShadowSampleAsync(IndexedSearchShadowObservation observation, SearchAccessShadowResult result, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+        ArgumentNullException.ThrowIfNull(result);
+        if (options.Mode == SearchAccessMode.Off)
+        {
+            return;
+        }
+
+        await using var scope = await store.BeginScopeAsync(cancellationToken).ConfigureAwait(false);
+        if (await scope.ReadOrganizationAsync(observation.OrganizationId, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return;
+        }
+
+        var access = scope.SearchAccess;
+        await access.BindOrganizationAsync(observation.OrganizationId, cancellationToken).ConfigureAwait(false);
+        access.AddShadowSample(new SearchAccessShadowSample
+        {
+            SearchAccessShadowSampleId = Guid.CreateVersion7(),
+            OrganizationId = observation.OrganizationId,
+            SampleComparedOn = result.ComparedOn,
+            SampleClassificationName = result.Classification,
+            SampleReasonCode = result.ReasonCode,
+            Tier1MatchCount = result.Tier1Count,
+            Tier2MatchCount = result.Tier2Count,
+            OnlyInTier1Count = result.OnlyInTier1Count,
+            OnlyInTier2Count = result.OnlyInTier2Count,
+            ExcludedByMetadataCount = result.ExcludedByMetadataCount,
+            ConditionCount = result.ConditionCount,
+            PredicateShapeText = PredicateShape(observation),
+            Tier1ResultDigest = result.Tier1ResultDigest ?? ResultDigest(observation.Tier1Matches),
+            Tier2ResultDigest = result.Tier2ResultDigest,
+            SampleAuthorizationRevision = observation.AuthorizationRevision,
+            SampleContentIntegrityRevision = observation.ContentIntegrityRevision,
+            DerivationProtocolVersion = SearchAccessDerivation.ProtocolVersion,
+            DerivationSchemaDigest = SearchAccessSchemaCoupling.MirroredSchemaDigest,
+            IsCanaryOrganization = options.ShadowCanaryOrganizationIds.Contains(observation.OrganizationId),
+            ComparisonElapsedMilliseconds = result.ElapsedMilliseconds,
+        });
+        await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Sampling plan S-22: the predicate shape of a search (value types and operators, sorted; no values).</summary>
+    public static string PredicateShape(IndexedSearchShadowObservation observation)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+        var shape = string.Join("&", observation.Conditions.Select(c => c.ValueType + ":" + c.Operator).Order(StringComparer.Ordinal));
+        return shape.Length <= 200 ? shape : shape[..200];
     }
 
     /// <summary>Tier 1's metadata filter (IndexedSearchService.MetadataMatches) on Tier 1's verified header facts.</summary>

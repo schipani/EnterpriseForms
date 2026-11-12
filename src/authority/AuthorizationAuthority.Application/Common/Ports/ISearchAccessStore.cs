@@ -79,6 +79,23 @@ public interface ISearchAccessStore
 
     void AddValuePostings(IEnumerable<SearchAccessValuePosting> postings);
 
+    /// <summary>IX-5 M1/M2: the organization's verification state (null: nothing verified since the last build).</summary>
+    Task<SearchAccessVerificationState?> FindVerificationStateAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>IX-5 M1/M2: inserts or replaces the organization's verification state (the verification sweep only).</summary>
+    Task SaveVerificationStateAsync(SearchAccessVerificationState state, CancellationToken cancellationToken);
+
+    /// <summary>IX-5: resets verification (rebuild, quarantine): the rows are unverified until a complete M2 after this.</summary>
+    Task DeleteVerificationStateAsync(Guid organizationId, CancellationToken cancellationToken);
+
+    /// <summary>IX-5c: records one shadow comparison (evidence only; counts, codes and digests).</summary>
+    void AddShadowSample(SearchAccessShadowSample sample);
+
+    Task<List<SearchAccessShadowSample>> GetShadowSamplesAsync(Guid organizationId, DateTimeOffset comparedFrom, DateTimeOffset comparedBefore, CancellationToken cancellationToken);
+
+    /// <summary>IX-5c: the retention purge of shadow evidence older than <paramref name="before"/>.</summary>
+    Task<int> PurgeShadowSamplesAsync(Guid organizationId, DateTimeOffset before, CancellationToken cancellationToken);
+
     Task<List<SearchAccessValuePosting>> GetValuePostingsAsync(Guid organizationId, IReadOnlyCollection<Guid>? formRecordIds, CancellationToken cancellationToken);
 }
 
@@ -91,13 +108,14 @@ public sealed record SearchAccessCheckpointValues(
     byte[]? ConsumedCoverageDigest,
     string StateName,
     string? QuarantineReasonCode,
-    int ProtocolVersion)
+    int ProtocolVersion,
+    byte[]? DerivedSchemaDigest = null)
 {
     public static SearchAccessCheckpointValues Of(SearchAccessCheckpoint checkpoint)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         return new(checkpoint.ConsumedAuthorizationRevision, checkpoint.ConsumedJournalDigest, checkpoint.ConsumedContentIntegrityRevision, checkpoint.ConsumedContentJournalDigest,
-            checkpoint.ConsumedCoverageDigest, checkpoint.AccessProjectionStateName, checkpoint.QuarantineReasonCode, checkpoint.AccessProjectionProtocolVersion);
+            checkpoint.ConsumedCoverageDigest, checkpoint.AccessProjectionStateName, checkpoint.QuarantineReasonCode, checkpoint.AccessProjectionProtocolVersion, checkpoint.DerivedSchemaDigest);
     }
 }
 

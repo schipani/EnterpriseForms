@@ -41,6 +41,99 @@ public sealed class SearchAccessCheckpoint
     /// under. Coverage changes are not content events, so readiness also requires this to equal the current coverage set.
     /// </summary>
     public byte[]? ConsumedCoverageDigest { get; set; }
+
+    /// <summary>
+    /// IX-39 coupling guard: SHA-256 of the SpiceDB schema the rows were derived under (the derivation mirrors it relation by relation).
+    /// A different running digest makes the rows unusable until a rebuild, which a full M2 must then follow.
+    /// </summary>
+    public byte[]? DerivedSchemaDigest { get; set; }
+}
+
+/// <summary>
+/// IX-5 verification state of an organization's Tier 2 projection: the M1 fence and the M2 sweep (annex D §4A). Reset (deleted) by every
+/// rebuild and quarantine, so rows are never treated as verified before a complete M2 after they were (re)built. Maintained only by the
+/// verification sweep; never by a security-command, content or search transaction.
+/// </summary>
+public sealed class SearchAccessVerificationState
+{
+    public Guid SearchAccessVerificationStateId { get; set; }
+
+    public Guid OrganizationId { get; set; }
+
+    /// <summary>M1 fence: every record changed up to this authorization revision was compared with SpiceDB <c>LookupSubjects</c> at a pin.</summary>
+    public long AccessVerifiedRevision { get; set; }
+
+    /// <summary>The authorization journal digest at <see cref="AccessVerifiedRevision"/> (the chain link the next fenced event must name).</summary>
+    public byte[]? AccessVerifiedJournalDigest { get; set; }
+
+    /// <summary>M2-E and M2-V: the last complete equivalence check (mirror = canonical edges; rows and value rows = their derivation) that was clean.</summary>
+    public DateTimeOffset? FullVerificationCompletedOn { get; set; }
+
+    public long FullVerificationAuthorizationRevision { get; set; }
+
+    /// <summary>M2-S: the rolling SpiceDB comparison resumes after this record (null: a new pass starts).</summary>
+    public Guid? SpiceDbSweepCursorRecordId { get; set; }
+
+    public DateTimeOffset? SpiceDbSweepStartedOn { get; set; }
+
+    /// <summary>M2-S: when the last complete pass over every record ended (every record compared within one pass).</summary>
+    public DateTimeOffset? SpiceDbSweepCompletedOn { get; set; }
+
+    public long SpiceDbSweepRecordsChecked { get; set; }
+
+    public string? LastVerificationOutcomeCode { get; set; }
+
+    public DateTimeOffset VerificationStateModifiedOn { get; set; }
+}
+
+/// <summary>
+/// IX-5c online sampling evidence (sampling plan §6): one shadow comparison. Counts, codes, revisions and SHA-256 digests of the sorted
+/// id lists only: never record ids, user ids, field values or predicates.
+/// </summary>
+public sealed class SearchAccessShadowSample
+{
+    public Guid SearchAccessShadowSampleId { get; set; }
+
+    public Guid OrganizationId { get; set; }
+
+    public DateTimeOffset SampleComparedOn { get; set; }
+
+    public string SampleClassificationName { get; set; } = string.Empty;
+
+    public string? SampleReasonCode { get; set; }
+
+    public int Tier1MatchCount { get; set; }
+
+    public int? Tier2MatchCount { get; set; }
+
+    public int OnlyInTier1Count { get; set; }
+
+    public int OnlyInTier2Count { get; set; }
+
+    public int ExcludedByMetadataCount { get; set; }
+
+    public int ConditionCount { get; set; }
+
+    /// <summary>Predicate shape (sampling plan S-22): the operators, sorted and joined (no values).</summary>
+    public string PredicateShapeText { get; set; } = string.Empty;
+
+    public byte[] Tier1ResultDigest { get; set; } = [];
+
+    public byte[]? Tier2ResultDigest { get; set; }
+
+    public long SampleAuthorizationRevision { get; set; }
+
+    public long SampleContentIntegrityRevision { get; set; }
+
+    /// <summary>Restart rule inputs (§3): the derivation protocol and schema digest the comparison ran under.</summary>
+    public int DerivationProtocolVersion { get; set; }
+
+    public byte[] DerivationSchemaDigest { get; set; } = [];
+
+    /// <summary>A sample in a configured canary organization (positive controls, §4.3): never counted toward the clean period.</summary>
+    public bool IsCanaryOrganization { get; set; }
+
+    public double ComparisonElapsedMilliseconds { get; set; }
 }
 
 /// <summary>

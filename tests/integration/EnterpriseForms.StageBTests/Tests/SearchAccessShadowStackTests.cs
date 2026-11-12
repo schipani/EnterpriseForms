@@ -52,6 +52,28 @@ public sealed class SearchAccessShadowStackTests(StageBFixture fixture)
         Assert.Fail("Tier 2 not ready: " + last);
     }
 
+    /// <summary>IX-5: waits until the verification loop reports the organization verified (comparisons count only then).</summary>
+    private async Task WaitVerifiedAsync(Guid organizationId)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(180);
+        string? last = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            var status = await fixture.Authority.SendAsync(HttpMethod.Get, Prefix + $"/{organizationId:D}/verification", TestIdentity.WorkloadToken(), null);
+            last = status.Body;
+            if (status.IsSuccess && status.Root.GetProperty("verified").GetBoolean())
+            {
+                return;
+            }
+
+            await Task.Delay(500, Ct);
+        }
+
+        Assert.Fail("Tier 2 not verified: " + last);
+    }
+
+    private Task<HttpResult> PauseAsync(bool paused) => fixture.Authority.SendAsync(HttpMethod.Post, Prefix + "/maintenance", TestIdentity.WorkloadToken(), new { paused });
+
     /// <summary>Waits until every offered observation has been compared (or dropped); returns the snapshot.</summary>
     private async Task<JsonElement> SettledShadowAsync(long expectedOffered)
     {
@@ -119,6 +141,8 @@ public sealed class SearchAccessShadowStackTests(StageBFixture fixture)
             await a.S.WaitGateReadyAsync(TimeSpan.FromSeconds(60));
             await WaitTier2ReadyAsync(a.S.OrganizationId);
             await WaitTier2ReadyAsync(b.S.OrganizationId);
+            await WaitVerifiedAsync(a.S.OrganizationId);
+            await WaitVerifiedAsync(b.S.OrganizationId);
             Assert.True((await ShadowAsync("/reset", HttpMethod.Post)).IsSuccess);
 
             // 1. Tier 1 is unchanged with the comparison on, and every comparison of the stable organization is a Match.
@@ -164,9 +188,19 @@ public sealed class SearchAccessShadowStackTests(StageBFixture fixture)
                 Assert.DoesNotContain(outcomes, o => o.Ids is not null && o.Started > revoked.Confirmed && o.Ended < reshared && o.Ids.Contains(revoked.Record));
             }
 
-            // 3. Out-of-band damage of a Tier 2 row: Tier 1 is unchanged, the comparison reports a Mismatch with counts only.
+            // The evidence report so far: samples stored, no unexplained difference, no restart event (counts and codes only).
+            var evidence = await fixture.Authority.SendAsync(HttpMethod.Get, Prefix + "/shadow/evidence?hours=2", TestIdentity.WorkloadToken(), null);
+            Assert.True(evidence.IsSuccess, evidence.Body);
+            Assert.True(evidence.Root.GetProperty("samples").GetInt32() >= on.Count(r => r.Status == 200));
+            Assert.Equal(0, evidence.Root.GetProperty("non_canary_mismatches").GetInt32());
+            Assert.DoesNotContain(a.Records[1].ToString("D"), evidence.Body, StringComparison.OrdinalIgnoreCase);
+
+            // 3. Out-of-band damage of a Tier 2 row: Tier 1 is unchanged, the comparison reports a Mismatch with counts only. The
+            // maintenance and verification loops are paused, so M2 does not quarantine the damage before the comparison sees it.
             await a.S.WaitGateReadyAsync();
             await WaitTier2ReadyAsync(a.S.OrganizationId);
+            await WaitVerifiedAsync(a.S.OrganizationId);
+            Assert.True((await PauseAsync(true)).IsSuccess);
             var sharedNow = a.Records.First(a.IsShared);
             var deleted = fixture.Stack.AuthorityAdministratorSql($"WITH d AS (DELETE FROM authority_search_access.search_access_value_postings WHERE organization_id = '{a.S.OrganizationId:D}' AND access_principal_entity_id = '{a.S.Reader.AuthorityUserId:D}' AND form_record_id = '{sharedNow:D}' RETURNING 1) SELECT count(*) FROM d;").Trim();
             Assert.Equal("1", deleted);
@@ -179,6 +213,9 @@ public sealed class SearchAccessShadowStackTests(StageBFixture fixture)
             var mismatch = damaged.GetProperty("recent").EnumerateArray().Single(r => r.GetProperty("classification").GetString() == "Mismatch");
             Assert.Equal(1, mismatch.GetProperty("only_in_tier1_count").GetInt32());
             Assert.DoesNotContain(sharedNow.ToString("D"), damaged.GetRawText(), StringComparison.OrdinalIgnoreCase); // counts only
+            var restarted = await fixture.Authority.SendAsync(HttpMethod.Get, Prefix + "/shadow/evidence?hours=2", TestIdentity.WorkloadToken(), null);
+            Assert.Contains(restarted.Root.GetProperty("restart_events").EnumerateArray(), e => e.GetProperty("reason_code").GetString() == "NON_CANARY_MISMATCH");
+            Assert.True((await PauseAsync(false)).IsSuccess);
 
             // 4. Organization-bound: organization B's comparisons are unaffected by A's damaged rows.
             var bReader = await b.SessionAsync(b.S.Reader);
@@ -190,6 +227,7 @@ public sealed class SearchAccessShadowStackTests(StageBFixture fixture)
         }
         finally
         {
+            await PauseAsync(false);
             RecreateAuthority(shadow: false);
             await fixture.Authority.WaitReadyAsync(TimeSpan.FromSeconds(90));
         }

@@ -55,6 +55,9 @@ public sealed partial class SearchAccessBoundaryTests
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessMaintenanceSchedule.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessProjectionService.cs",
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessProjectionService.Shadow.cs", // C-150 IX-5c (off-path comparison)
+            "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessProjectionService.ShadowEvidence.cs", // IX-5c sampling evidence
+            "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessProjectionService.Verification.cs", // IX-5 M1 fence and M2 sweep
+            "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessSchemaCoupling.cs", // IX-39 coupling guard
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessShadowComparer.cs", // C-150 IX-5c
             "AuthorizationAuthority.Application/Features/SearchAccess/SearchAccessValueDerivation.cs",
             "AuthorizationAuthority.Domain/Features/SearchAccess/SearchAccessEntities.cs",
@@ -115,7 +118,10 @@ public sealed partial class SearchAccessBoundaryTests
         var ix5b = File.ReadAllText(Directory.EnumerateFiles(migrations, "*_AuthoritySearchAccessIx5b.cs").Single());
         Assert.Contains("ALTER TABLE authority_search_access.search_access_value_postings FORCE ROW LEVEL SECURITY;", ix5b, StringComparison.Ordinal);
         Assert.Contains("CREATE POLICY rls_search_access_value_postings_organization", ix5b, StringComparison.Ordinal);
-        var migration = File.ReadAllText(Directory.EnumerateFiles(migrations, "*_AuthoritySearchAccessIx5a.cs").Single()) + ix5b;
+        var ix5Verification = File.ReadAllText(Directory.EnumerateFiles(migrations, "*_AuthoritySearchAccessIx5Verification.cs").Single());
+        Assert.Contains("FORCE ROW LEVEL SECURITY", ix5Verification, StringComparison.Ordinal);
+        Assert.Contains("CREATE POLICY rls_{table}_organization ON authority_search_access.{table}", ix5Verification, StringComparison.Ordinal);
+        var migration = File.ReadAllText(Directory.EnumerateFiles(migrations, "*_AuthoritySearchAccessIx5a.cs").Single()) + ix5b + ix5Verification;
         Assert.Contains("FORCE ROW LEVEL SECURITY", migration, StringComparison.Ordinal);
         Assert.Contains("CREATE POLICY rls_{table}_organization ON authority_search_access.{table}", migration, StringComparison.Ordinal);
         foreach (var table in SearchAccessSchema.AllTables)
@@ -133,7 +139,11 @@ public sealed partial class SearchAccessBoundaryTests
             Assert.Contains($"GRANT SELECT, INSERT, DELETE ON authority_search_access.{table} TO runtime_role", statements);
         }
 
-        Assert.Equal(["GRANT SELECT, INSERT, UPDATE ON authority_search_access.search_access_checkpoints TO runtime_role"], statements.Where(s => s.Contains("UPDATE", StringComparison.Ordinal) && s.StartsWith("GRANT", StringComparison.Ordinal)).ToList());
+        // IX-5: besides the checkpoints, only the verification state is updated in place (by the verification sweep); shadow evidence is
+        // append-and-purge only. Derived rows are never updated.
+        Assert.Equal(["GRANT SELECT, INSERT, UPDATE ON authority_search_access.search_access_checkpoints TO runtime_role", "GRANT SELECT, INSERT, UPDATE, DELETE ON authority_search_access.search_access_verification_states TO runtime_role"],
+            statements.Where(s => s.Contains("UPDATE", StringComparison.Ordinal) && s.StartsWith("GRANT", StringComparison.Ordinal)).ToList());
+        Assert.Contains("GRANT SELECT, INSERT, DELETE ON authority_search_access.search_access_shadow_samples TO runtime_role", statements);
         Assert.DoesNotContain(statements, s => s.StartsWith("GRANT", StringComparison.Ordinal) && s.Contains(AuthorityRuntimeGrants.SearchReaderRole, StringComparison.Ordinal));
         Assert.Contains(statements, s => s.Contains($"REVOKE ALL ON SCHEMA authority_search_access FROM {AuthorityRuntimeGrants.SearchReaderRole}", StringComparison.Ordinal));
         // The Tier 1 reader's blanket grant is on authority_search only.

@@ -41,6 +41,39 @@ public sealed class SearchAccessOptions
 
     /// <summary>C-150: time budget of one comparison (100..30000 ms); past it the comparison is Cancelled.</summary>
     public int ShadowMaximumMilliseconds { get; set; } = 5000;
+
+    /// <summary>IX-5c sampling evidence: how long shadow samples are kept (1..400 days); older samples are purged by the verification loop.</summary>
+    public int ShadowEvidenceRetentionDays { get; set; } = 30;
+
+    /// <summary>IX-5c positive controls (sampling plan §4.3): canary organizations; their samples never count toward the clean period.</summary>
+    public List<Guid> ShadowCanaryOrganizationIds { get; set; } = [];
+
+    /// <summary>IX-5 verification loop: how often each organization is looked at (1..3600 s); idle organizations open no transaction.</summary>
+    public int VerificationIntervalSeconds { get; set; } = 60;
+
+    /// <summary>M2-E/M2-V: how often the full equivalence check runs per organization (10..86400 s).</summary>
+    public int FullVerificationIntervalSeconds { get; set; } = 3600;
+
+    /// <summary>M2-E/M2-V deadline (annex D: 24 h): older than this, the rows are unverified (no grace).</summary>
+    public int FullVerificationDeadlineSeconds { get; set; } = 86_400;
+
+    /// <summary>M2-S: records compared with SpiceDB per verification step (1..10000).</summary>
+    public int SpiceDbSweepBatchSize { get; set; } = 100;
+
+    /// <summary>M2-S: a completed pass restarts after this (10..604800 s).</summary>
+    public int SpiceDbSweepIntervalSeconds { get; set; } = 86_400;
+
+    /// <summary>M2-S deadline (review package: 7 days): a complete pass must have ended within this, or the rows are unverified (no grace).</summary>
+    public int SpiceDbSweepDeadlineSeconds { get; set; } = 604_800;
+
+    /// <summary>M1: at most this many affected records are verified in one step; more fail closed (a complete new pass is required).</summary>
+    public int FenceMaximumRecords { get; set; } = 2_000;
+
+    /// <summary>M1/M2-S: the client's own maximum of distinct subjects per lookup (IX5-CT-08: the server refuses limits); above it fails closed.</summary>
+    public int MaximumLookupSubjects { get; set; } = 10_000;
+
+    /// <summary>Set by the host, never by configuration: why Tier 2 was disabled at startup (the IX-39 coupling guard).</summary>
+    public string? DisabledReasonCode { get; set; }
 }
 
 public enum SearchAccessMode

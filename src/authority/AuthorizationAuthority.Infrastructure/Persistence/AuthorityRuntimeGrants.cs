@@ -121,6 +121,18 @@ public static class AuthorityRuntimeGrants
             yield return $"GRANT SELECT, INSERT, UPDATE ON {access}.{table} TO {runtimeRole}";
         }
 
+        // IX-5 M1/M2: the verification state is replaced in place by the sweep and deleted by rebuild and quarantine.
+        foreach (var table in Configurations.SearchAccessSchema.VerificationTables)
+        {
+            yield return $"GRANT SELECT, INSERT, UPDATE, DELETE ON {access}.{table} TO {runtimeRole}";
+        }
+
+        // IX-5c sampling evidence: appended and purged by retention; never updated.
+        foreach (var table in Configurations.SearchAccessSchema.EvidenceTables)
+        {
+            yield return $"GRANT SELECT, INSERT, DELETE ON {access}.{table} TO {runtimeRole}";
+        }
+
         yield return $"REVOKE ALL ON FUNCTION {access}.current_organization_id() FROM PUBLIC";
         yield return $"GRANT EXECUTE ON FUNCTION {access}.current_organization_id() TO {runtimeRole}";
         yield return $"DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{SearchReaderRole}') THEN EXECUTE 'REVOKE ALL ON SCHEMA {access} FROM {SearchReaderRole}'; EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA {access} FROM {SearchReaderRole}'; END IF; END $$";

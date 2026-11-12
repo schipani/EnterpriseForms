@@ -21,9 +21,23 @@ public static class SearchAccessComposition
         }
 
         if (options.MaintenanceIntervalMilliseconds < 50 || options.EventsPerPass < 1 || options.VerificationSampleSize < 0 || options.MaximumParentDepth is < 1 or > 64 || options.ReconciliationIntervalSeconds is < 1 or > 3600
-            || options.ShadowQueueCapacity is < 1 or > 1024 || options.ShadowMaximumMilliseconds is < 100 or > 30_000)
+            || options.ShadowQueueCapacity is < 1 or > 1024 || options.ShadowMaximumMilliseconds is < 100 or > 30_000 || options.ShadowEvidenceRetentionDays is < 1 or > 400
+            || options.VerificationIntervalSeconds is < 1 or > 3600 || options.FullVerificationIntervalSeconds is < 10 or > 86_400 || options.FullVerificationDeadlineSeconds < options.FullVerificationIntervalSeconds
+            || options.FullVerificationDeadlineSeconds > 86_400 || options.SpiceDbSweepBatchSize is < 1 or > 10_000 || options.SpiceDbSweepIntervalSeconds is < 10 or > 604_800
+            || options.SpiceDbSweepDeadlineSeconds < options.SpiceDbSweepIntervalSeconds || options.SpiceDbSweepDeadlineSeconds > 604_800 || options.FenceMaximumRecords is < 1 or > 100_000
+            || options.MaximumLookupSubjects is < 1 or > 1_000_000)
         {
             throw new InvalidOperationException("SearchIndex:Access options are out of range.");
+        }
+
+        // IX-39 coupling guard (startup): the derivation mirrors one exact SpiceDB schema; any other schema disables Tier 2 (rows are then
+        // never maintained, verified or compared). The reason is set by the host only, never taken from configuration.
+        options.DisabledReasonCode = null;
+        if (options.Mode == SearchAccessMode.Dark && !SearchAccessSchemaCoupling.Coupled(AuthorizationAuthority.Infrastructure.SpiceDb.SpiceDbProjectionClient.EmbeddedSchema()))
+        {
+            options.Mode = SearchAccessMode.Off;
+            options.ShadowComparisonEnabled = false;
+            options.DisabledReasonCode = "SCHEMA_COUPLING_BROKEN";
         }
 
         // C-150 IX-5c shadow preparation: off by default; only with the maintained dark projection, only in Development/Testing.
@@ -38,6 +52,7 @@ public static class SearchAccessComposition
         if (options.Mode == SearchAccessMode.Dark)
         {
             services.AddHostedService<SearchAccessMaintenanceLoop>();
+            services.AddHostedService<SearchAccessVerificationLoop>(); // IX-5 M1 fence and M2 sweep
         }
 
         if (options.ShadowComparisonEnabled)
@@ -222,4 +237,102 @@ public sealed partial class SearchAccessShadowLogging(ILogger<SearchAccessShadow
 
     [LoggerMessage(EventId = 5321, Level = LogLevel.Information, Message = "IX5C-SHADOW {Classification} reason={Reason} correlation={CorrelationId} tier1={Tier1Count} tier2={Tier2Count} excluded_by_metadata={Excluded} elapsed_ms={Elapsed}")]
     private static partial void LogCompared(ILogger logger, string classification, string reason, Guid correlationId, int tier1Count, int tier2Count, int excluded, double elapsed);
+}
+
+/// <summary>
+/// IX-5 M1/M2 verification loop. Every <see cref="SearchAccessOptions.VerificationIntervalSeconds"/> it reads the organizations' change
+/// markers in one statement and runs <see cref="SearchAccessProjectionService.VerifyStepAsync"/> only for an organization whose
+/// authorization revision moved since it was last verified, whose M2 work is due, or that it has not seen since start; an idle verified
+/// organization opens no transaction (the R-55 lesson). It also purges shadow evidence beyond the retention period. It never serves.
+/// </summary>
+public sealed partial class SearchAccessVerificationLoop(IAuthorityStore store, SearchAccessProjectionService projection, SearchAccessOptions options, SearchAccessMaintenanceSwitch maintenanceSwitch, TimeProvider clock, ILogger<SearchAccessVerificationLoop> logger) : BackgroundService
+{
+    private readonly Dictionary<Guid, (long Revision, DateTimeOffset Due, int Misses)> memo = [];
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (HostExecutionMode.IsOpenApiDocumentGeneration)
+        {
+            return;
+        }
+
+        var lastPurge = DateTimeOffset.MinValue;
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (!maintenanceSwitch.Paused)
+                {
+                    var now = clock.GetUtcNow();
+                    foreach (var marker in await store.GetOrganizationChangeMarkersAsync(stoppingToken).ConfigureAwait(false))
+                    {
+                        if (memo.TryGetValue(marker.OrganizationId, out var seen) && seen.Revision == marker.AuthorizationRevision && now < seen.Due)
+                        {
+                            continue;
+                        }
+
+                        await maintenanceSwitch.RunUnlessPausedAsync(() => VerifyAsync(marker, now, stoppingToken), stoppingToken).ConfigureAwait(false);
+                    }
+
+                    if (now - lastPurge > TimeSpan.FromHours(1))
+                    {
+                        lastPurge = now;
+                        await projection.PurgeShadowEvidenceAsync(stoppingToken).ConfigureAwait(false);
+                    }
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(options.VerificationIntervalSeconds), clock, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                LogVerificationFailure(logger, Guid.Empty, ex.GetType().Name);
+                await Task.Delay(TimeSpan.FromSeconds(options.VerificationIntervalSeconds), clock, stoppingToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task VerifyAsync(Application.Common.Ports.OrganizationChangeMarker marker, DateTimeOffset now, CancellationToken stoppingToken)
+    {
+        try
+        {
+            var step = await projection.VerifyStepAsync(marker.OrganizationId, Guid.NewGuid(), stoppingToken).ConfigureAwait(false);
+            if (step.OutcomeCode is SearchAccessVerificationOutcomes.Diverged or SearchAccessVerificationOutcomes.FenceLimit or SearchAccessVerificationOutcomes.LookupLimit)
+            {
+                LogVerificationFinding(logger, marker.OrganizationId, step.OutcomeCode);
+            }
+
+            // Verified and nothing due before the next full check or pass: skip until the revision moves or the work falls due. A pass in
+            // progress, an initialization or any non-final outcome is looked at again next interval.
+            var settled = step.OutcomeCode == SearchAccessVerificationOutcomes.Verified && step.Verified && (step.SweptRecords == 0 || step.SweepCompleted);
+            // A pass in progress continues next interval. An organization that is not at the head, not built, quarantined, or whose SpiceDB
+            // projection lags is backed off exponentially (capped at the full-check interval) until its marker moves: an idle organization
+            // that cannot be verified must not cost a transaction every interval (the R-55 lesson).
+            var inProgress = step.OutcomeCode is SearchAccessVerificationOutcomes.Verified or SearchAccessVerificationOutcomes.Initialized;
+            var misses = settled || inProgress ? 0 : (memo.TryGetValue(marker.OrganizationId, out var previous) && previous.Revision == marker.AuthorizationRevision ? previous.Misses + 1 : 1);
+            var due = settled ? now + TimeSpan.FromSeconds(Math.Min(options.FullVerificationIntervalSeconds, options.SpiceDbSweepIntervalSeconds))
+                : inProgress ? now
+                : now + TimeSpan.FromSeconds(Math.Min(options.FullVerificationIntervalSeconds, options.VerificationIntervalSeconds * Math.Pow(2, Math.Min(misses, 10))));
+            memo[marker.OrganizationId] = (marker.AuthorizationRevision, due, misses);
+        }
+        catch (AuthorityException ex)
+        {
+            memo.Remove(marker.OrganizationId);
+            LogVerificationFailure(logger, marker.OrganizationId, ex.ErrorCode);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            memo.Remove(marker.OrganizationId);
+            LogVerificationFailure(logger, marker.OrganizationId, ex.GetType().Name);
+        }
+    }
+
+    [LoggerMessage(EventId = 5322, Level = LogLevel.Warning, Message = "Search access verification organization={Organization} outcome={Outcome}")]
+    private static partial void LogVerificationFinding(ILogger logger, Guid organization, string outcome);
+
+    [LoggerMessage(EventId = 5323, Level = LogLevel.Warning, Message = "Search access verification organization={Organization} failed={Reason}")]
+    private static partial void LogVerificationFailure(ILogger logger, Guid organization, string reason);
 }

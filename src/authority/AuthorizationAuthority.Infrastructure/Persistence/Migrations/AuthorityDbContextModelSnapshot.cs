@@ -2999,6 +2999,10 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("consumed_journal_digest");
 
+                    b.Property<byte[]>("DerivedSchemaDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("derived_schema_digest");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
@@ -3025,6 +3029,8 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_search_access_checkpoint_quarantine", "(access_projection_state_name = 'Quarantined') = (quarantine_reason_code IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_search_access_checkpoint_revision", "consumed_authorization_revision >= 0 AND checkpoint_revision >= 1 AND access_projection_protocol_version >= 1");
+
+                            t.HasCheckConstraint("ck_search_access_checkpoint_schema_digest", "derived_schema_digest IS NULL OR octet_length(derived_schema_digest) = 32");
 
                             t.HasCheckConstraint("ck_search_access_checkpoint_state", "access_projection_state_name IN ('Maintaining','Quarantined')");
                         });
@@ -3211,6 +3217,111 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessShadowSample", b =>
+                {
+                    b.Property<Guid>("SearchAccessShadowSampleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_access_shadow_sample_id");
+
+                    b.Property<double>("ComparisonElapsedMilliseconds")
+                        .HasColumnType("double precision")
+                        .HasColumnName("comparison_elapsed_milliseconds");
+
+                    b.Property<int>("ConditionCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("condition_count");
+
+                    b.Property<int>("DerivationProtocolVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("derivation_protocol_version");
+
+                    b.Property<byte[]>("DerivationSchemaDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("derivation_schema_digest");
+
+                    b.Property<int>("ExcludedByMetadataCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("excluded_by_metadata_count");
+
+                    b.Property<bool>("IsCanaryOrganization")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_canary_organization");
+
+                    b.Property<int>("OnlyInTier1Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("only_in_tier1_count");
+
+                    b.Property<int>("OnlyInTier2Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("only_in_tier2_count");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("PredicateShapeText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("predicate_shape_text");
+
+                    b.Property<long>("SampleAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sample_authorization_revision");
+
+                    b.Property<string>("SampleClassificationName")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("sample_classification_name");
+
+                    b.Property<DateTimeOffset>("SampleComparedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sample_compared_on");
+
+                    b.Property<long>("SampleContentIntegrityRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sample_content_integrity_revision");
+
+                    b.Property<string>("SampleReasonCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sample_reason_code");
+
+                    b.Property<int>("Tier1MatchCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("tier1_match_count");
+
+                    b.Property<byte[]>("Tier1ResultDigest")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("tier1_result_digest");
+
+                    b.Property<int?>("Tier2MatchCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("tier2_match_count");
+
+                    b.Property<byte[]>("Tier2ResultDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("tier2_result_digest");
+
+                    b.HasKey("SearchAccessShadowSampleId");
+
+                    b.HasIndex("OrganizationId", "SampleComparedOn")
+                        .HasDatabaseName("ix_search_access_shadow_samples_org_time");
+
+                    b.ToTable("search_access_shadow_samples", "authority_search_access", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_access_shadow_sample_classification", "sample_classification_name IN ('Match','Mismatch','NotComparable','Cancelled','Failed')");
+
+                            t.HasCheckConstraint("ck_search_access_shadow_sample_counts", "tier1_match_count >= 0 AND (tier2_match_count IS NULL OR tier2_match_count >= 0) AND only_in_tier1_count >= 0 AND only_in_tier2_count >= 0 AND excluded_by_metadata_count >= 0 AND condition_count >= 0");
+
+                            t.HasCheckConstraint("ck_search_access_shadow_sample_digests", "octet_length(tier1_result_digest) = 32 AND (tier2_result_digest IS NULL OR octet_length(tier2_result_digest) = 32) AND octet_length(derivation_schema_digest) = 32");
+                        });
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessValuePosting", b =>
                 {
                     b.Property<Guid>("SearchAccessValuePostingId")
@@ -3332,6 +3443,72 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_search_access_value_posting_one_value", "(value_type_name = 'String') = (normalized_string_value IS NOT NULL) AND (value_type_name = 'Integer') = (integer_value IS NOT NULL) AND (value_type_name = 'Decimal') = (decimal_value IS NOT NULL) AND (value_type_name = 'Date') = (date_value IS NOT NULL) AND (value_type_name = 'DateTime') = (date_time_value IS NOT NULL) AND (value_type_name = 'Boolean') = (boolean_value IS NOT NULL) AND (value_type_name = 'Option') = (field_option_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_search_access_value_posting_principal", "access_principal_type_name IN ('user','team')");
+                        });
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessVerificationState", b =>
+                {
+                    b.Property<Guid>("SearchAccessVerificationStateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("search_access_verification_state_id");
+
+                    b.Property<byte[]>("AccessVerifiedJournalDigest")
+                        .HasColumnType("bytea")
+                        .HasColumnName("access_verified_journal_digest");
+
+                    b.Property<long>("AccessVerifiedRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("access_verified_revision");
+
+                    b.Property<long>("FullVerificationAuthorizationRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("full_verification_authorization_revision");
+
+                    b.Property<DateTimeOffset?>("FullVerificationCompletedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("full_verification_completed_on");
+
+                    b.Property<string>("LastVerificationOutcomeCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("last_verification_outcome_code");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset?>("SpiceDbSweepCompletedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("spice_db_sweep_completed_on");
+
+                    b.Property<Guid?>("SpiceDbSweepCursorRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("spice_db_sweep_cursor_record_id");
+
+                    b.Property<long>("SpiceDbSweepRecordsChecked")
+                        .HasColumnType("bigint")
+                        .HasColumnName("spice_db_sweep_records_checked");
+
+                    b.Property<DateTimeOffset?>("SpiceDbSweepStartedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("spice_db_sweep_started_on");
+
+                    b.Property<DateTimeOffset>("VerificationStateModifiedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("verification_state_modified_on");
+
+                    b.HasKey("SearchAccessVerificationStateId");
+
+                    b.HasIndex("OrganizationId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_search_access_verification_state_org");
+
+                    b.ToTable("search_access_verification_states", "authority_search_access", t =>
+                        {
+                            t.HasCheckConstraint("ck_search_access_verification_state_digest", "(access_verified_revision = 0) = (access_verified_journal_digest IS NULL) AND (access_verified_journal_digest IS NULL OR octet_length(access_verified_journal_digest) = 32)");
+
+                            t.HasCheckConstraint("ck_search_access_verification_state_revisions", "access_verified_revision >= 0 AND full_verification_authorization_revision >= 0 AND spice_db_sweep_records_checked >= 0");
                         });
                 });
 
@@ -5230,6 +5407,17 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_search_access_record_grant_org");
                 });
 
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessShadowSample", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_access_shadow_sample_org");
+                });
+
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessValuePosting", b =>
                 {
                     b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
@@ -5239,6 +5427,17 @@ namespace AuthorizationAuthority.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_search_access_value_posting_org");
+                });
+
+            modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchAccess.SearchAccessVerificationState", b =>
+                {
+                    b.HasOne("AuthorizationAuthority.Domain.Features.Organizations.OrganizationAuthorizationState", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .HasPrincipalKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_search_access_verification_state_org");
                 });
 
             modelBuilder.Entity("AuthorizationAuthority.Domain.Features.SearchIndex.SearchBooleanPosting", b =>

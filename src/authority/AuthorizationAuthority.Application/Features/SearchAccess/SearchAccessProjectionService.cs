@@ -133,7 +133,7 @@ public sealed partial class SearchAccessProjectionService(
         ArgumentNullException.ThrowIfNull(checkpoint);
         ArgumentNullException.ThrowIfNull(inputs);
         return checkpoint.AccessProjectionStateName == SearchAccessProjectionStates.Maintaining
-               && checkpoint.AccessProjectionProtocolVersion == SearchAccessDerivation.ProtocolVersion
+               && SearchAccessSchemaCoupling.CurrentDerivation(checkpoint)
                && AuthorizationAtHead(checkpoint, inputs.AuthorizationRevision, inputs.AuthorizationDigest)
                && ContentAtHead(checkpoint, inputs.ContentIntegrityRevision, inputs.ContentDigest)
                && SearchAccessValueDerivation.DigestsEqual(checkpoint.ConsumedCoverageDigest, inputs.CoverageDigest)
@@ -174,7 +174,7 @@ public sealed partial class SearchAccessProjectionService(
             return SearchAccessProbeOutcome.Quarantined;
         }
 
-        if (checkpoint.AccessProjectionStateName != SearchAccessProjectionStates.Maintaining || checkpoint.AccessProjectionProtocolVersion != SearchAccessDerivation.ProtocolVersion)
+        if (checkpoint.AccessProjectionStateName != SearchAccessProjectionStates.Maintaining || !SearchAccessSchemaCoupling.CurrentDerivation(checkpoint))
         {
             return SearchAccessProbeOutcome.WorkPending;
         }
@@ -314,7 +314,7 @@ public sealed partial class SearchAccessProjectionService(
                     throw new SearchAccessIntegrityException(SearchAccessReasonCodes.CheckpointAhead, "the checkpoint is ahead of the organization (restore or rollback)");
                 }
 
-                if (checkpoint.AccessProjectionProtocolVersion < SearchAccessDerivation.ProtocolVersion)
+                if (checkpoint.AccessProjectionProtocolVersion < SearchAccessDerivation.ProtocolVersion || !SearchAccessSchemaCoupling.SchemaCoupled(checkpoint))
                 {
                     return SearchAccessStepOutcome.UpgradeRequired; // rows of an older derivation: only a rebuild upgrades them
                 }
@@ -380,7 +380,7 @@ public sealed partial class SearchAccessProjectionService(
                 return SearchAccessStepOutcome.Quarantined;
             }
 
-            if (checkpoint.AccessProjectionProtocolVersion != SearchAccessDerivation.ProtocolVersion)
+            if (!SearchAccessSchemaCoupling.CurrentDerivation(checkpoint))
             {
                 return checkpoint.AccessProjectionProtocolVersion > SearchAccessDerivation.ProtocolVersion ? SearchAccessStepOutcome.Fenced : SearchAccessStepOutcome.UpgradeRequired;
             }
@@ -452,7 +452,7 @@ public sealed partial class SearchAccessProjectionService(
             return SearchAccessStepOutcome.Quarantined;
         }
 
-        if (checkpoint.AccessProjectionProtocolVersion != SearchAccessDerivation.ProtocolVersion)
+        if (!SearchAccessSchemaCoupling.CurrentDerivation(checkpoint))
         {
             return checkpoint.AccessProjectionProtocolVersion > SearchAccessDerivation.ProtocolVersion ? SearchAccessStepOutcome.Fenced : SearchAccessStepOutcome.UpgradeRequired;
         }
@@ -519,7 +519,10 @@ public sealed partial class SearchAccessProjectionService(
         var coverageDigest = SearchAccessValueDerivation.CoverageDigest(await access.GetSearchableCoveragesAsync(organizationId, cancellationToken).ConfigureAwait(false));
         var contentDigest = state.ContentIntegrityRevision == 0 ? null : state.LatestContentJournalDigest;
         var digest = revision == 0 ? null : state.LatestSecurityJournalDigest;
-        var rebuilt = new SearchAccessCheckpointValues(revision, digest, state.ContentIntegrityRevision, contentDigest, coverageDigest, SearchAccessProjectionStates.Maintaining, null, SearchAccessDerivation.ProtocolVersion);
+        var rebuilt = new SearchAccessCheckpointValues(revision, digest, state.ContentIntegrityRevision, contentDigest, coverageDigest, SearchAccessProjectionStates.Maintaining, null, SearchAccessDerivation.ProtocolVersion,
+            SearchAccessSchemaCoupling.MirroredSchemaDigest);
+        // IX-5 M2: rebuilt rows are unverified until a complete M2 (M1 fence, M2-E/V, M2-S) runs after this rebuild.
+        await access.DeleteVerificationStateAsync(organizationId, cancellationToken).ConfigureAwait(false);
         if (checkpoint is null)
         {
             await access.InsertCheckpointAsync(new SearchAccessCheckpoint
@@ -534,6 +537,7 @@ public sealed partial class SearchAccessProjectionService(
                 ConsumedCoverageDigest = coverageDigest,
                 CheckpointRevision = 1,
                 AccessProjectionProtocolVersion = SearchAccessDerivation.ProtocolVersion,
+                DerivedSchemaDigest = SearchAccessSchemaCoupling.MirroredSchemaDigest,
                 CheckpointModifiedOn = clock.GetUtcNow(),
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -556,6 +560,7 @@ public sealed partial class SearchAccessProjectionService(
             value_postings = values.Count,
             searchable_postings = postings.Count,
             protocol_version = SearchAccessDerivation.ProtocolVersion,
+            derived_schema_digest = Convert.ToHexStringLower(SearchAccessSchemaCoupling.MirroredSchemaDigest),
             correlation_id = correlationId,
         }, clock);
         await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -957,6 +962,8 @@ public sealed partial class SearchAccessProjectionService(
         {
             return;
         }
+
+        await access.DeleteVerificationStateAsync(organizationId, cancellationToken).ConfigureAwait(false); // IX-5: nothing stays verified
 
         AuditJournal.Append(scope, state, QuarantineEventKind, new
         {

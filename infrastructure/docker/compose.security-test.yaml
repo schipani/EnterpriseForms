@@ -92,6 +92,12 @@ services:
       SearchIndex__Access__ReconciliationIntervalSeconds: ${IX5_ACCESS_RECONCILIATION_SECONDS:-15}
       # C-150 IX-5c shadow preparation: off by default; IX5C_SHADOW=true recreates the authority comparing Tier 1 answers with Tier 2 (never serving).
       SearchIndex__Access__ShadowComparisonEnabled: ${IX5C_SHADOW:-false}
+      # IX-5 M1 fence and M2 sweep (verification loop), shortened for the test stack: the defaults are 60 s, 1 h (full check) and 24 h
+      # (SpiceDB pass restart) with 24 h and 7 d deadlines. IX5C_CANARY_ORGANIZATION names one positive-control organization (optional).
+      SearchIndex__Access__VerificationIntervalSeconds: ${IX5_VERIFICATION_SECONDS:-5}
+      SearchIndex__Access__FullVerificationIntervalSeconds: ${IX5_FULL_VERIFICATION_SECONDS:-300}
+      SearchIndex__Access__SpiceDbSweepIntervalSeconds: ${IX5_SWEEP_INTERVAL_SECONDS:-600}
+      SearchIndex__Access__ShadowCanaryOrganizationIds__0: ${IX5C_CANARY_ORGANIZATION:-00000000-0000-0000-0000-000000000000}
       SearchIndex__CheapSweepIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
       # C-136 (R-33/R-36): entries per S-B transaction (organization lock released between transactions); the measurement recreates
       # the authority with other values.

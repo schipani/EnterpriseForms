@@ -28,7 +28,25 @@ public sealed partial class SearchAccessProjectionTests
         f.W.State.ProjectionZedToken = "zed";
         f.W.Store.SearchAccess.Tier1Headers.Add(new Tier1RecordHeader(f.Record, recordStatus, null));
         f.W.Store.SearchAccess.Tier1FormContentRevision = 3;
+        MarkVerified(f);
         return f;
+    }
+
+    /// <summary>The M2 state of a completed verification at the current revision (the stack tests run the real M1/M2 against SpiceDB).</summary>
+    private static void MarkVerified(Fixture f)
+    {
+        f.W.Store.SearchAccess.VerificationStates.RemoveAll(v => v.OrganizationId == Org);
+        f.W.Store.SearchAccess.VerificationStates.Add(new Domain.Features.SearchAccess.SearchAccessVerificationState
+        {
+            SearchAccessVerificationStateId = Guid.CreateVersion7(),
+            OrganizationId = Org,
+            AccessVerifiedRevision = f.W.State.AuthorizationRevision,
+            AccessVerifiedJournalDigest = f.W.State.LatestSecurityJournalDigest,
+            FullVerificationCompletedOn = DateTimeOffset.UtcNow,
+            FullVerificationAuthorizationRevision = f.W.State.AuthorizationRevision,
+            SpiceDbSweepCompletedOn = DateTimeOffset.UtcNow,
+            VerificationStateModifiedOn = DateTimeOffset.UtcNow,
+        });
     }
 
     private static IndexedSearchShadowObservation Observed(Fixture f, Guid user, IReadOnlyList<Guid> tier1, params PreparedIndexedCondition[] conditions) =>
@@ -79,6 +97,19 @@ public sealed partial class SearchAccessProjectionTests
         }
 
         Assert.Null(await Reason(current));
+
+        // IX-5: rows that are ready but not verified (M1 fence open, or M2 overdue) are never compared.
+        var verified = f.W.Store.SearchAccess.VerificationStates.Single();
+        verified.AccessVerifiedRevision -= 1;
+        Assert.Equal(SearchAccessShadowReasonCodes.Tier2NotVerified, await Reason(current));
+        verified.AccessVerifiedRevision += 1;
+        verified.FullVerificationCompletedOn = DateTimeOffset.UtcNow.AddDays(-2);
+        Assert.Equal(SearchAccessShadowReasonCodes.Tier2NotVerified, await Reason(current));
+        verified.FullVerificationCompletedOn = DateTimeOffset.UtcNow;
+        verified.SpiceDbSweepCompletedOn = DateTimeOffset.UtcNow.AddDays(-8);
+        Assert.Equal(SearchAccessShadowReasonCodes.Tier2NotVerified, await Reason(current));
+        verified.SpiceDbSweepCompletedOn = DateTimeOffset.UtcNow;
+        Assert.Null(await Reason(current));
         Assert.Equal(SearchAccessShadowReasonCodes.SnapshotMoved, await Reason(current with { AuthorizationRevision = current.AuthorizationRevision - 1 }));
         Assert.Equal(SearchAccessShadowReasonCodes.SnapshotMoved, await Reason(current with { ContentIntegrityRevision = current.ContentIntegrityRevision + 1 }));
         Assert.Equal(SearchAccessShadowReasonCodes.SnapshotMoved, await Reason(current with { FormContentRevision = 2 }));
@@ -105,6 +136,7 @@ public sealed partial class SearchAccessProjectionTests
         f.W.Delete(Reader(f.Share, f.Bob));
         await f.W.Service.CatchUpAsync(Org, 1000, Ct);
         f.W.State.ProjectionAppliedRevision = f.W.State.AuthorizationRevision;
+        MarkVerified(f); // the M1 fence closed at the new revision
         var result = await f.W.Service.CompareShadowAsync(beforeRevocation, Ct);
         Assert.Equal((SearchAccessShadowClassifications.NotComparable, SearchAccessShadowReasonCodes.SnapshotMoved), (result.Classification, result.ReasonCode));
         Assert.Null(result.Tier2Count); // nothing was evaluated at the new snapshot
