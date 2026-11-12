@@ -32,6 +32,16 @@ public static class IndexedSearchEndpoints
             .WithName("IndexedFieldSearchPage")
             .WithSummary("IX-3: another page of the caller's own snapshot, re-authorized completely (§17.3 checks 1-9: snapshot, user, session and query digest; gate and S1; authorization revision; approvals, operators, coverage and query_fields; projection and form state; a fresh SpiceDB decision for every page record; I-2 and the seal; edit flags; S1 verify). Any failure returns no page; non-retryable failures delete the snapshot.");
 
+        // IX-6: My Records from verified index entries (same plane, same delegated assertion; off unless RecordListEnabled).
+        endpoints.MapPost(InternalApi.Prefix + "/search/indexed-records", static async Task<Ok<IndexedRecordListResponse>> (IndexedRecordListRequest request, HttpContext context, IndexedSearchService service, DelegatedUserAssertionValidator validator, CancellationToken cancellationToken) =>
+            {
+                var actor = InternalAuthentication.RequireActor(context, validator);
+                return TypedResults.Ok(await service.ListRecordsAsync(actor, request, InternalAuthentication.Correlation(context), cancellationToken).ConfigureAwait(false));
+            })
+            .WithTags("SearchIndex").RequireAuthorization(InternalAuthentication.WorkloadPolicy)
+            .WithName("IndexedRecordList")
+            .WithSummary("IX-6: one page of the caller's My Records from verified index entries, at one S1 pin: the discoverable set from SpiceDB; every contentful record must have a current entry with verified header facts (else 503 RECORD_LIST_INDEX_INCOMPLETE and the business listing answers); filters and sort on those facts; every listed record bound to its accepted manifest (I-2); the page's seals verified and its edit decisions taken at the pin. 409 SEARCH_SNAPSHOT_CHANGED when authorization moved since the first page; 423 INTEGRITY_QUARANTINE (organization); 503 SEARCH_INDEX_NOT_READY / SEARCH_INDEX_INCONSISTENT / SEARCH_INDEX_VERIFICATION_OVERDUE.");
+
         return endpoints;
     }
 

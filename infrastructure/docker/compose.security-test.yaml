@@ -109,6 +109,9 @@ services:
       Diagnostics__SpiceDbCallCounting: ${IX5_SPICEDB_CALL_COUNTING:-false}
       # C-150 R56-B: committed authorization changes wake the work loop (default on); R56_COMMIT_WAKEUP=false measures the poll alone.
       AuthorityWork__CommitWakeupEnabled: ${R56_COMMIT_WAKEUP:-true}
+      # R-02 statement-preparation investigation: an optional Npgsql connection-string suffix for the runtime connection (empty by default),
+      # e.g. ";Max Auto Prepare=50;Auto Prepare Min Usages=2". Test stack only; no production configuration is changed.
+      ConnectionStrings__AuthorityDb: Host=authority-db;Database=${AUTHORITY_DB_NAME};Username=${AUTHORITY_RUNTIME_USER};Password=${AUTHORITY_RUNTIME_PASSWORD}${AUTHORITY_DB_CONNECTION_EXTRA:-}
       SearchIndex__DeadlineEvaluationIntervalSeconds: ${IX1_SEARCH_SWEEP_INTERVAL_SECONDS:-10}
       SearchIndex__Seal__Provider: VaultTransit
       SearchIndex__Seal__SigningKeyName: search-entry-seal-v1
@@ -119,6 +122,8 @@ services:
       # IX-3: the Tier 1 query path (Testing only), on its own SELECT-only reader credential (never the runtime one). A test may
       # recreate the authority with a shorter snapshot lifetime (default 300 s) to exercise expiry.
       SearchIndex__Query__QueryEnabled: "true"
+      # IX-6: the indexed My Records endpoint (the business API uses it only with RecordList:Engine=Indexed or the Testing header).
+      SearchIndex__Query__RecordListEnabled: ${IX6_RECORD_LIST_ENABLED:-true}
       SearchIndex__Query__SnapshotLifetimeSeconds: ${IX3_SNAPSHOT_LIFETIME_SECONDS:-300}
       SearchIndex__Query__PurgeIntervalSeconds: "5"
       # C-140 UF-25: the share-only items limit (code default 20,000, unchanged here). Only the focused UF-25 test recreates the
@@ -277,6 +282,9 @@ services:
       # for bearer callers without a session. The IX-3 shadow comparison stays available through the Testing endpoint.
       # FIELD_SEARCH_ENGINE=Shadow or VerifiedScan selects the IX-3 or V1 behaviour.
       FieldSearch__Engine: ${FIELD_SEARCH_ENGINE:-Indexed}
+      # IX-6: My Records stays on the C-29 listing by default; RECORD_LIST_ENGINE=Indexed answers from verified index entries (the
+      # Testing header X-Testing-Record-List-Engine selects the engine per request for the IX-6 stack tests).
+      RecordList__Engine: ${RECORD_LIST_ENGINE:-VerifiedScan}
       # C-150 R56-A: attempts per search for transient Authority refusals (default 4; R56_RETRY_ATTEMPTS=1 measures without retry).
       FieldSearch__RetryMaximumAttempts: ${R56_RETRY_ATTEMPTS:-4}
       # C-137 (R-37): record-creation phase durations (see the authority service); off unless R37_OPERATION_TIMING=true.

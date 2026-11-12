@@ -377,12 +377,14 @@ public sealed class IndexedFieldSearchEngineTests
             indexed.SearchErrors.Enqueue(new AuthorityClientException("SEARCH_SNAPSHOT_CHANGED", 409, true));
         }
 
-        var limits = new FieldSearchLimits { ExecutionEnabled = true, Engine = FieldSearchLimits.EngineIndexed, RetryInitialDelayMilliseconds = 1000, RetryMaximumDelayMilliseconds = 2000, RetryMaximumTotalMilliseconds = 5000 };
+        var limits = new FieldSearchLimits { ExecutionEnabled = true, Engine = FieldSearchLimits.EngineIndexed, RetryInitialDelayMilliseconds = 4000, RetryMaximumDelayMilliseconds = 8000, RetryMaximumTotalMilliseconds = 20000 };
         var engine = new FieldSearchIndexedEngine(limits, indexed, new FieldSearchAdmission(limits), new ReversibleCursors(), new Names(), TimeProvider.System);
         using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
         var clock = System.Diagnostics.Stopwatch.StartNew();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => engine.SearchAsync(Context(), Request(), cancel.Token));
-        Assert.True(clock.Elapsed < TimeSpan.FromMilliseconds(450), "the backoff wait must end with the request");
+        // The jittered wait is at least 2000 ms (half the 4000 ms step); 1500 ms leaves headroom for a loaded test host (it was 450 ms
+        // against a 500 ms minimum and failed once under the full parallel suite).
+        Assert.True(clock.Elapsed < TimeSpan.FromMilliseconds(1500), "the backoff wait must end with the request");
         Assert.Single(indexed.Calls);
     }
 

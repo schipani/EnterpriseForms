@@ -32,7 +32,10 @@ public static class FormRecordEndpoints
         records.MapGet("/", static async Task<Ok<RecordListResponse>> (Guid? formDefinitionId, string? recordStatus, bool? includeChildren, bool? includeArchived, string? q, string? sortBy, string? sortDirection, int? pageSize, string? continuationToken, HttpContext http, ListRecordsHandler handler, CancellationToken cancellationToken) =>
             {
                 var query = RecordListQuery.Create(formDefinitionId, recordStatus, includeChildren ?? false, sortBy, sortDirection, pageSize ?? 25, includeArchived ?? false, q);
-                return TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), query, continuationToken, cancellationToken).ConfigureAwait(false));
+                // IX-6: Testing only, the integration harness may select the engine per request (X-Testing-Record-List-Engine); ignored elsewhere.
+                var engine = http.RequestServices.GetRequiredService<IHostEnvironment>().IsEnvironment("Testing")
+                    && http.Request.Headers["X-Testing-Record-List-Engine"].ToString() is RecordListOptions.EngineIndexed or RecordListOptions.EngineVerifiedScan ? http.Request.Headers["X-Testing-Record-List-Engine"].ToString() : null;
+                return TypedResults.Ok(await handler.HandleAsync(BusinessAuthentication.RequireContext(http), query, continuationToken, cancellationToken, engine).ConfigureAwait(false));
             })
             .WithName("ListFormRecords")
             .WithSummary("My Records: every authority-discoverable record of the caller (all discover pages at one authorization revision), filtered (form, status, child records), sorted (modifiedOn, createdOn, formName, recordStatus; record id tie-break) and paged with opaque cursors bound to caller, filters, search, sort and authorization revision. q (optional) narrows the list to an exact record id or short reference REC-XXXXXXXX decided from the same complete authorized set (never a field-value search; anything else is 422 LOOKUP_INVALID); an exact search also finds archived and related records, and the Form and Status filters still apply. Rows carry unverified local metadata only; open a record for the verified projection.");

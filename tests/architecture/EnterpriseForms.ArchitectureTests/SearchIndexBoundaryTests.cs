@@ -102,6 +102,7 @@ public sealed partial class SearchIndexBoundaryTests
                 "AuthorizationAuthority.Api/Composition/SearchIndexComposition.cs",
                 "AuthorizationAuthority.Application/Common/Ports/ISearchSealSigner.cs",
                 "AuthorizationAuthority.Application/Features/SearchIndex/SearchSealVerifier.cs",
+                "AuthorizationAuthority.Infrastructure/Signing/ManagedHsmSearchSealSigner.cs", // IX-7: the Managed HSM provider (an implementation)
                 "AuthorizationAuthority.Infrastructure/Signing/SearchSealSigners.cs",
             ],
             Matching(SignerUse()));

@@ -34,6 +34,8 @@ public sealed class Program
             return migrateExitCode;
         }
 
+        // IX-7 ST-PERF-7: the seal-throughput harness runs on the fully composed host (same signer, policy and pin), then exits.
+        var measureSeal = SealThroughputCommand.Requested(args, out var sealCount, out var sealConcurrency, out args);
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.ConfigureHttpJsonOptions(options => AuthorityJson.Configure(options.SerializerOptions));
@@ -109,6 +111,11 @@ public sealed class Program
         builder.Services.AddHostedService<ProjectionIntegrityMonitorLoop>();
 
         var app = builder.Build();
+        if (measureSeal)
+        {
+            return SealThroughputCommand.Run(app.Services, app.Environment, sealCount, sealConcurrency);
+        }
+
 
         app.UseMiddleware<ReconcilerLookupRefusalMiddleware>(); // outermost: observes the final status of AC-9 refusals
         app.UseExceptionHandler();

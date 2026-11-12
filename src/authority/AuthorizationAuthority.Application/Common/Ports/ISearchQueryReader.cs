@@ -53,10 +53,20 @@ public interface ISearchQuerySession : IAsyncDisposable
     /// Binding data for I-2 and the seal check: entry, postings (of <paramref name="fieldIds"/>, or every field when null),
     /// anomalies, head, manifest commit and all its leaves.
     /// </summary>
+    /// <summary>
+    /// IX-6: the listing scope: every discoverable record registered as a form record (Active or pending, any form), with its form, its
+    /// accepted head and its index entry (the same facts as <see cref="ReadScopeAsync"/>, without a form or predicate fields).
+    /// </summary>
+    Task<IReadOnlyList<SearchListingRecordFacts>> ReadListingScopeAsync(IReadOnlyCollection<Guid> discoverableRecordIds, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("this reader does not implement the IX-6 listing scope");
+
     Task<IReadOnlyList<SearchRecordBindingData>> ReadBindingDataAsync(IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<Guid>? fieldIds, CancellationToken cancellationToken);
 }
 
 /// <summary>Metadata filters of Advanced Field Search on verified header facts (as the V1 handler applies them).</summary>
+/// <summary>IX-6: one record of the listing scope and its form.</summary>
+public sealed record SearchListingRecordFacts(Guid FormDefinitionId, SearchScopeRecordFacts Record);
+
 public sealed record SearchMetadataFilter(string? RecordStatus, bool IncludeChildren, bool IncludeArchived);
 
 public sealed record SearchQueryStateFacts(

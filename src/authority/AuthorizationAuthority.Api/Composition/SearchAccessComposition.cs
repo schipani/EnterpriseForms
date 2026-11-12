@@ -247,7 +247,9 @@ public sealed partial class SearchAccessShadowLogging(ILogger<SearchAccessShadow
 /// </summary>
 public sealed partial class SearchAccessVerificationLoop(IAuthorityStore store, SearchAccessProjectionService projection, SearchAccessOptions options, SearchAccessMaintenanceSwitch maintenanceSwitch, TimeProvider clock, ILogger<SearchAccessVerificationLoop> logger) : BackgroundService
 {
-    private readonly Dictionary<Guid, (long Revision, DateTimeOffset Due, int Misses)> memo = [];
+    // Keyed on the whole change marker: a Tier 2 rebuild or quarantine appends an audit-journal event, so it re-arms verification at
+    // once on every instance (C-151: keyed on the authorization revision alone, a rebuild waited out the backoff, up to the full interval).
+    private readonly Dictionary<Guid, (Application.Common.Ports.OrganizationChangeMarker Marker, DateTimeOffset Due, int Misses)> memo = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -266,7 +268,7 @@ public sealed partial class SearchAccessVerificationLoop(IAuthorityStore store, 
                     var now = clock.GetUtcNow();
                     foreach (var marker in await store.GetOrganizationChangeMarkersAsync(stoppingToken).ConfigureAwait(false))
                     {
-                        if (memo.TryGetValue(marker.OrganizationId, out var seen) && seen.Revision == marker.AuthorizationRevision && now < seen.Due)
+                        if (memo.TryGetValue(marker.OrganizationId, out var seen) && seen.Marker == marker && now < seen.Due)
                         {
                             continue;
                         }
@@ -312,11 +314,11 @@ public sealed partial class SearchAccessVerificationLoop(IAuthorityStore store, 
             // projection lags is backed off exponentially (capped at the full-check interval) until its marker moves: an idle organization
             // that cannot be verified must not cost a transaction every interval (the R-55 lesson).
             var inProgress = step.OutcomeCode is SearchAccessVerificationOutcomes.Verified or SearchAccessVerificationOutcomes.Initialized;
-            var misses = settled || inProgress ? 0 : (memo.TryGetValue(marker.OrganizationId, out var previous) && previous.Revision == marker.AuthorizationRevision ? previous.Misses + 1 : 1);
+            var misses = settled || inProgress ? 0 : (memo.TryGetValue(marker.OrganizationId, out var previous) && previous.Marker == marker ? previous.Misses + 1 : 1);
             var due = settled ? now + TimeSpan.FromSeconds(Math.Min(options.FullVerificationIntervalSeconds, options.SpiceDbSweepIntervalSeconds))
                 : inProgress ? now
                 : now + TimeSpan.FromSeconds(Math.Min(options.FullVerificationIntervalSeconds, options.VerificationIntervalSeconds * Math.Pow(2, Math.Min(misses, 10))));
-            memo[marker.OrganizationId] = (marker.AuthorizationRevision, due, misses);
+            memo[marker.OrganizationId] = (marker, due, misses);
         }
         catch (AuthorityException ex)
         {

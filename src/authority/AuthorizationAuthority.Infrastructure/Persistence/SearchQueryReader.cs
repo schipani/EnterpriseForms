@@ -113,6 +113,36 @@ public sealed class SearchQueryReader(string? readerConnectionString, IndexedSea
                 x.EntryOperation, x.EntryVersion, x.EntryStatus, x.EntryParent, x.EntryCreator, x.Encrypted, x.EntryApprovals, x.EntryCounts)).ToList();
         }).ConfigureAwait(false);
 
+        public async Task<IReadOnlyList<SearchListingRecordFacts>> ReadListingScopeAsync(IReadOnlyCollection<Guid> discoverableRecordIds, CancellationToken cancellationToken) => await Guard(async () =>
+        {
+            var discoverable = discoverableRecordIds.ToArray();
+            var rows = await (
+                from r in context.Resources.AsNoTracking()
+                where r.OrganizationId == organizationId && r.ResourceTypeName == ResourceTypeNames.FormRecord && ScopeStates.Contains(r.ResourceLifecycleState) && discoverable.Contains(r.ResourceEntityId)
+                join h in context.ContentHeads.AsNoTracking().Where(h => h.OrganizationId == organizationId) on r.ResourceEntityId equals h.FormRecordId into heads
+                from h in heads.DefaultIfEmpty()
+                join e in context.SearchRecordEntries.AsNoTracking().Where(e => e.OrganizationId == organizationId) on r.ResourceEntityId equals e.FormRecordId into entries
+                from e in entries.DefaultIfEmpty()
+                select new
+                {
+                    r.ResourceEntityId,
+                    Form = r.ParentResourceEntityId,
+                    r.ResourceLifecycleState,
+                    r.ResourceRegisteredOn,
+                    Revision = h == null ? 0 : h.CommittedContentRevision,
+                    Operation = h == null ? null : h.CommittedOperationId,
+                    Quarantined = h != null && h.ContentHeadQuarantined,
+                    Modified = h == null ? (DateTimeOffset?)null : h.ContentHeadModifiedOn,
+                    EntryOperation = e == null ? (Guid?)null : e.IndexedOperationId,
+                    EntryVersion = e == null ? (int?)null : e.EntryDerivationVersion,
+                    EntryStatus = e == null ? null : e.RecordStatusName,
+                    EntryParent = e == null ? null : e.ParentFormRecordId,
+                    EntryCreator = e == null ? null : e.CreatedByBusinessUserId,
+                }).ToListAsync(cancellationToken).ConfigureAwait(false);
+            return rows.Where(x => x.Form is not null).Select(x => new SearchListingRecordFacts(x.Form!.Value, new SearchScopeRecordFacts(x.ResourceEntityId, x.ResourceLifecycleState, x.ResourceRegisteredOn, x.Revision, x.Operation,
+                x.Quarantined, x.Modified, x.EntryOperation, x.EntryVersion, x.EntryStatus, x.EntryParent, x.EntryCreator, false))).ToList();
+        }).ConfigureAwait(false);
+
         public async Task<IReadOnlyList<ShareReadableItem>> ReadShareReadableItemsAsync(Guid authorityUserId, IReadOnlyCollection<Guid> formRecordIds, IReadOnlyCollection<PredicateFieldApproval> predicateFields, int limit, CancellationToken cancellationToken) => await Guard(async () =>
         {
             var ids = formRecordIds.ToArray();

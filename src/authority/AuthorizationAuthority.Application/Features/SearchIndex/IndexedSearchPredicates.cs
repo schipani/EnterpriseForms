@@ -14,6 +14,9 @@ public sealed class IndexedSearchOptions
     /// <summary>Off by default; Development/Testing only, and only with the index maintained (Dark) and a reader connection.</summary>
     public bool QueryEnabled { get; set; }
 
+    /// <summary>IX-6: My Records from verified index entries (requires <see cref="QueryEnabled"/>). Off by default; Development/Testing only.</summary>
+    public bool RecordListEnabled { get; set; }
+
     public int MaximumConditions { get; set; } = 5;
 
     public int MaximumTextValueLength { get; set; } = 200;

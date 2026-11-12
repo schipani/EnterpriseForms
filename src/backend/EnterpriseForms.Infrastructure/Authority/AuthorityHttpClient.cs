@@ -34,7 +34,7 @@ public sealed class AuthorityClientOptions
 /// independently. Every non-2xx response maps to <see cref="AuthorityClientException"/>; transport failures map to
 /// AUTHORITY_UNAVAILABLE (fail closed). There is no method that can request an arbitrary signature.
 /// </summary>
-public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority, ISearchIndexAdministrationAuthority, IIndexedSearchAuthority
+public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IOptions<AuthorityClientOptions> options, TimeProvider clock) : IAuthorizationAuthorityClient, IBrowserSessionStateAuthority, IFieldSearchPolicyAuthority, ISecurityAdministratorAuthority, IOrganizationRosterAuthority, IOwnerRecoveryNoticeAuthority, ITestStackIdentityAuthority, ISearchIndexAdministrationAuthority, IIndexedSearchAuthority, IIndexedRecordListAuthority
 {
     public const string HttpClientName = "trust-authority";
 
@@ -142,6 +142,15 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     {
         ArgumentNullException.ThrowIfNull(user);
         return SendAsync<AuthorityIndexedSearchResult>(HttpMethod.Post, $"internal/v1/search/indexed-query/{searchResultSnapshotId:D}/page", user, new IndexedSearchPageBody(user.OrganizationId, sessionDigestBase64, queryNonceBase64, query, offset), null, cancellationToken);
+    }
+
+    public Task<AuthorityIndexedRecordListResult> ListRecordsAsync(DelegatedUserContext user, AuthorityIndexedRecordListQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(query);
+        return SendAsync<AuthorityIndexedRecordListResult>(HttpMethod.Post, "internal/v1/search/indexed-records", user,
+            new IndexedRecordListBody(user.OrganizationId, query.FormDefinitionId, query.RecordStatus, query.IncludeChildren, query.IncludeArchived, query.SortBy, query.SortDirection, query.Offset, query.PageSize,
+                query.ExpectedAuthorizationRevision), null, cancellationToken);
     }
 
     public Task RecordSearchExecutionAsync(DelegatedUserContext user, Guid searchCatalogueSnapshotId, SearchExecutionEvidence evidence, CancellationToken cancellationToken) =>
@@ -264,6 +273,9 @@ public sealed class AuthorityHttpClient(IHttpClientFactory httpClientFactory, IO
     private sealed record SessionDigestBody(Guid OrganizationId, string SessionDigestBase64);
 
     private sealed record IndexedSearchBody(Guid OrganizationId, string SessionDigestBase64, string QueryNonceBase64, AuthorityIndexedSearchQuery Query);
+
+    private sealed record IndexedRecordListBody(Guid OrganizationId, Guid? FormDefinitionId, string? RecordStatus, bool IncludeChildren, bool IncludeArchived, string? SortBy, string SortDirection, int Offset, int PageSize,
+        long? ExpectedAuthorizationRevision);
 
     private sealed record IndexedSearchPageBody(Guid OrganizationId, string SessionDigestBase64, string QueryNonceBase64, AuthorityIndexedSearchQuery Query, int Offset);
 

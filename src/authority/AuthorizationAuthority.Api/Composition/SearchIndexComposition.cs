@@ -8,8 +8,10 @@ namespace AuthorizationAuthority.Api.Composition;
 /// <summary>
 /// IX-1 (C-126): the Authority-owned search index. Off by default (Disabled). Dark mode (derivation, seals, sweeps; no query
 /// path) is refused outside Development/Testing in IX-1. The seal provider is chosen from deployment configuration only:
-/// LocalDevelopment (Development/Testing), VaultTransit (not Staging/Production) or AzureManagedHsm (not implemented in IX-1,
-/// fails closed). Pinned verification keys come from configuration only.
+/// LocalDevelopment (Development/Testing), VaultTransit (not Staging/Production) or AzureManagedHsm (IX-7: the Managed HSM REST
+/// provider with the Authority's managed identity; unit-tested against a fake endpoint only, never against a real Managed HSM).
+/// Pinned verification keys come from configuration only; the startup pin check compares the HSM public key with the pin.
+/// Dark mode itself stays refused outside Development/Testing, so the Managed HSM provider is not activated anywhere by this change.
 /// </summary>
 public static class SearchIndexComposition
 {
@@ -33,8 +35,19 @@ public static class SearchIndexComposition
             case SearchSealProviderKind.VaultTransit when !environment.IsProduction() && !environment.IsStaging():
                 services.AddSingleton<ISearchSealSigner, VaultTransitSearchSealSigner>();
                 break;
+            case SearchSealProviderKind.AzureManagedHsm:
+                var hsm = configuration.GetSection(ManagedHsmSealOptions.SectionName).Get<ManagedHsmSealOptions>() ?? new ManagedHsmSealOptions();
+                hsm.Validate(seal);
+                services.AddSingleton(hsm);
+                services.AddHttpClient(ManagedHsmSearchSealSigner.HttpClientName);
+                // Managed identity only (system-assigned, or the configured user-assigned client id); no secret is ever configured.
+                services.AddSingleton<Azure.Core.TokenCredential>(_ => string.IsNullOrWhiteSpace(hsm.ManagedIdentityClientId)
+                    ? new Azure.Identity.ManagedIdentityCredential(Azure.Identity.ManagedIdentityId.SystemAssigned)
+                    : new Azure.Identity.ManagedIdentityCredential(Azure.Identity.ManagedIdentityId.FromUserAssignedClientId(hsm.ManagedIdentityClientId)));
+                services.AddSingleton<ISearchSealSigner>(sp => new ManagedHsmSearchSealSigner(sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<Azure.Core.TokenCredential>(), hsm, seal));
+                break;
             default:
-                services.AddSingleton<ISearchSealSigner>(_ => new UnavailableSearchSealSigner(seal.Provider == SearchSealProviderKind.AzureManagedHsm ? "AzureManagedHsmSealProviderNotImplemented" : "SearchSealProviderUnconfigured", seal));
+                services.AddSingleton<ISearchSealSigner>(_ => new UnavailableSearchSealSigner("SearchSealProviderUnconfigured", seal));
                 break;
         }
 
@@ -72,6 +85,11 @@ public static class SearchIndexComposition
         var query = configuration.GetSection(IndexedSearchOptions.SectionName).Get<IndexedSearchOptions>() ?? new IndexedSearchOptions();
         IndexedSearchOptions.Validate(query);
         var readerConnection = configuration.GetConnectionString("AuthoritySearchReader");
+        if (query.RecordListEnabled && !query.QueryEnabled)
+        {
+            throw new InvalidOperationException("SearchIndex:Query:RecordListEnabled (IX-6) requires SearchIndex:Query:QueryEnabled.");
+        }
+
         if (query.QueryEnabled)
         {
             if (!developmentOrTesting)

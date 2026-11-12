@@ -31,7 +31,7 @@ namespace AuthorizationAuthority.Application.Features.SearchIndex;
 /// Values are never stored, logged or journaled. A search-side integrity failure quarantines the search index only (IX-D7),
 /// never the organization; authorization damage is S1's (Q4, raised by the S1 verifier itself).
 /// </summary>
-public sealed class IndexedSearchService(
+public sealed partial class IndexedSearchService(
     IAuthorityStore store,
     ISearchQueryReader reader,
     ProjectionIntegrityVerifier verifier,

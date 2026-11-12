@@ -100,4 +100,27 @@ public static class IndexedSearchErrorCodes
     public const string SnapshotNotFound = "SEARCH_SNAPSHOT_NOT_FOUND";
 
     public const string ResultBasisAuthorityAcceptedContent = "AuthorityAcceptedContent";
+
+    /// <summary>IX-6, 503 retryable: not every listed record has a current verified index entry; the business listing answers instead.</summary>
+    public const string RecordListIndexIncomplete = "RECORD_LIST_INDEX_INCOMPLETE";
 }
+
+/// <summary>
+/// IX-6 (IX-D12, R1 §E.6): one page of the caller's My Records from verified index entries. Filters: form, status (Draft, Submitted,
+/// Archived), children, archived. Sort: <c>modifiedOn</c>, <c>createdOn</c> or <c>recordStatus</c>. <c>ExpectedAuthorizationRevision</c>
+/// (later pages): the listing is refused with 409 when authorization moved since the first page.
+/// </summary>
+public sealed record IndexedRecordListRequest(Guid OrganizationId, Guid? FormDefinitionId, string? RecordStatus, bool IncludeChildren, bool IncludeArchived, string? SortBy, string SortDirection,
+    int Offset, int PageSize, long? ExpectedAuthorizationRevision);
+
+/// <summary>A listed record: verified index header facts (status, parent, creator), Authority-held times, and the edit decision at the pin.</summary>
+public sealed record IndexedRecordListItem(Guid FormRecordId, Guid FormDefinitionId, string RecordStatusName, Guid? ParentFormRecordId, Guid CreatedByBusinessUserId, DateTimeOffset RecordRegisteredOn,
+    DateTimeOffset ContentHeadModifiedOn, bool Editable);
+
+/// <summary>
+/// The page and the exact count of the caller's listed records at <c>AuthorizationRevision</c>; the forms in scope; the records registered
+/// without accepted content (not listed: they have no header facts), counted and the first 50 named. <c>ResultBasis</c> is
+/// <c>AuthorityVerifiedEntries</c>.
+/// </summary>
+public sealed record IndexedRecordListResponse(long AuthorizationRevision, int TotalCount, int Offset, int PageSize, IReadOnlyList<IndexedRecordListItem> Items, IReadOnlyList<Guid> AvailableFormDefinitionIds,
+    int WithoutContentCount, IReadOnlyList<Guid> WithoutContentRecordIds, string ResultBasis, Guid CorrelationId);
