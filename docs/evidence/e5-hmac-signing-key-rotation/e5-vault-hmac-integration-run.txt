@@ -1,0 +1,17 @@
+# E-5 local Docker Vault integration run, 2026-11-12 11:08 local; commit base c9a9a90 + working tree (E-5); hashicorp/vault:1.20.4 dev server (throwaway container, random tokens not recorded)
+# command: powershell -File scripts\dev\e5-vault-hmac-integration.ps1   exit code: 0
+provisioned: org-019a5b2ce500700080000000000000e5-row-integrity-v1 version 2 (NOT active).
+activate explicitly: dotnet AuthorizationAuthority.Api.dll --activate-integrity-key-version --organization 019a5b2c-e500-7000-8000-0000000000e5 --expected-current-version <current> --signing-key-version 2 --reason "<text>"
+  refused as expected: refusing: org-019a5b2ce500700080000000000000e5-row-integrity-v1 latest version is 2, not the expected 1 (nothing changed)
+  refused as expected: refusing: org-3fe10503d89b4613b5a11f46fbc8fc8c-row-integrity-v1 does not exist (key custody provisions the key; this script never creates one)
+  refused as expected: refusing: ORGANIZATION_ID is not a UUID
+  refused as expected: refusing: EXPECTED_LATEST_VERSION is not a positive integer
+  refused as expected: Error writing data to transit/keys/org-019a5b2ce501700080000000000000e5-row-integrity-v1/rotate: Error making API request. URL: PUT http://127.0.0.1:8200/v1/transit/keys/org-019a5b2ce501700080000000000000e5-row-integrity-v1/rotate Code: 403. Errors: * 1 error occurred: 	* permission denied
+version provisioning script: provisioned v2 once; 5 refusals as expected; the single-version key is unchanged
+
+Test run summary: Passed! - C:\Users\tsch\Documents\Visual Studio Code\EnterpriseForms\tests\authority\AuthorizationAuthority.Tests\bin\Debug\net10.0\AuthorizationAuthority.Tests.dll (net10.0|x64)
+  total: 4
+  failed: 0
+  succeeded: 4
+  skipped: 0
+  duration: 766ms

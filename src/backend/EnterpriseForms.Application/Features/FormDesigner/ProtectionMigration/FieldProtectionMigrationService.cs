@@ -199,7 +199,7 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
                 string wire;
                 try
                 {
-                    wire = FieldValueCodec.Format(value, optionsById, encryption);
+                    wire = await FieldValueCodec.FormatAsync(value, optionsById, encryption, cancellationToken).ConfigureAwait(false);
                 }
                 catch (System.Security.Cryptography.CryptographicException)
                 {
@@ -216,8 +216,8 @@ public sealed class FieldProtectionMigrationService(IBusinessStore store, IAutho
             }
             else
             {
-                converted = FieldValueCodec.Protect(value, field, optionsById, encryption);
-                if (converted is not FieldEncryptedValue || FieldValueCodec.Format(converted, optionsById, encryption) != FieldValueCodec.Format(value, optionsById))
+                converted = await FieldValueCodec.ProtectAsync(value, field, optionsById, encryption, cancellationToken).ConfigureAwait(false);
+                if (converted is not FieldEncryptedValue || await FieldValueCodec.FormatAsync(converted, optionsById, encryption, cancellationToken).ConfigureAwait(false) != FieldValueCodec.Format(value, optionsById))
                 {
                     return Failure(item, "REPROTECT_SELF_CHECK_FAILED");
                 }

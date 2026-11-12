@@ -175,20 +175,20 @@ public sealed class StageBUnitTests
     }
 
     [Fact]
-    public void FieldEncryptionSealsCanonicalValuesBindsIdentityAndFailsClosed()
+    public async Task FieldEncryptionSealsCanonicalValuesBindsIdentityAndFailsClosed()
     {
         var keys = new LocalDevelopmentKeyProvider(Options.Create(new EncryptionOptions { KeyProvider = "LocalDevelopment", LocalDevelopmentKekBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }));
         var service = new AesGcmFieldEncryptionService(keys);
         var context = new FieldEncryptionContext(Tenant, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), "String");
-        var sealedRow = service.Encrypt(context, "Avery Synthetic");
+        var sealedRow = await service.EncryptAsync(context, "Avery Synthetic", EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken);
         Assert.Equal("AES-256-GCM", sealedRow.EncryptionAlgorithmName);
         Assert.Equal(12, sealedRow.EncryptionNonceBytes.Length);
         Assert.Equal(16, sealedRow.EncryptionAuthTagBytes.Length);
         Assert.DoesNotContain("Avery", System.Text.Encoding.Latin1.GetString(sealedRow.EncryptedValueBytes), StringComparison.Ordinal);
-        Assert.Equal("Avery Synthetic", service.Decrypt(sealedRow));
+        Assert.Equal("Avery Synthetic", await service.DecryptAsync(sealedRow, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
 
         // Two seals of the same plaintext never share nonce or ciphertext (per-value DEK, random nonce).
-        var again = service.Encrypt(context, "Avery Synthetic");
+        var again = await service.EncryptAsync(context, "Avery Synthetic", EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken);
         Assert.NotEqual(sealedRow.EncryptionNonceBytes, again.EncryptionNonceBytes);
         Assert.NotEqual(sealedRow.EncryptedValueBytes, again.EncryptedValueBytes);
 
@@ -197,28 +197,28 @@ public sealed class StageBUnitTests
         {
             var transplanted = Clone(sealedRow);
             mutate(transplanted);
-            Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(transplanted));
+            await Assert.ThrowsAnyAsync<CryptographicException>(() => service.DecryptAsync(transplanted, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
         }
 
         // Hostile byte flips in ciphertext, tag or wrapped key fail closed.
         var tampered = Clone(sealedRow);
         tampered.EncryptedValueBytes[0] ^= 0x01;
-        Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(tampered));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => service.DecryptAsync(tampered, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
         var tagged = Clone(sealedRow);
         tagged.EncryptionAuthTagBytes[3] ^= 0x01;
-        Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(tagged));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => service.DecryptAsync(tagged, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
         var rekeyed = Clone(sealedRow);
         rekeyed.WrappedDataKeyBytes[^1] ^= 0x01;
-        Assert.ThrowsAny<CryptographicException>(() => service.Decrypt(rekeyed));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => service.DecryptAsync(rekeyed, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
 
         // Unknown key reference and a missing/unconfigured provider fail closed (never a silent plaintext fallback).
         var unknownKey = Clone(sealedRow);
         unknownKey.EncryptionKeyReference = "some-other-kek";
-        Assert.Throws<EncryptionUnavailableException>(() => service.Decrypt(unknownKey));
+        await Assert.ThrowsAsync<EncryptionUnavailableException>(() => service.DecryptAsync(unknownKey, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
         var unavailable = new AesGcmFieldEncryptionService(new UnavailableKeyProvider("test: no provider"));
         Assert.False(unavailable.IsAvailable);
-        Assert.Throws<EncryptionUnavailableException>(() => unavailable.Encrypt(context, "x"));
-        Assert.Throws<EncryptionUnavailableException>(() => unavailable.Decrypt(sealedRow));
+        await Assert.ThrowsAsync<EncryptionUnavailableException>(() => unavailable.EncryptAsync(context, "x", EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<EncryptionUnavailableException>(() => unavailable.DecryptAsync(sealedRow, EncryptionKeyPurpose.FieldValue, TestContext.Current.CancellationToken));
 
         // The signed schema binds the exact envelope (row-integrity-format §3.7).
         sealedRow.RowRevision = 1;
@@ -230,7 +230,7 @@ public sealed class StageBUnitTests
 
         // Plaintext formatting paths refuse encrypted rows unless the encryption service is supplied.
         Assert.Throws<InvalidOperationException>(() => FieldValueCodec.Format(sealedRow, new Dictionary<Guid, FieldOption>()));
-        Assert.Throws<InvalidOperationException>(() => FieldValueCodec.Format(sealedRow, new Dictionary<Guid, FieldOption>(), null));
+        Assert.Throws<InvalidOperationException>(() => FieldValueCodec.Format(sealedRow, new Dictionary<Guid, FieldOption>(), DecryptedFieldValues.None));
 
         static FieldEncryptedValue Clone(FieldEncryptedValue v) => new()
         {

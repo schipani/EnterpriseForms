@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using EnterpriseForms.Application.Common;
+using EnterpriseForms.Application.Features.Documents.Ports;
 using EnterpriseForms.Application.Features.FormRecords.Encryption;
 using EnterpriseForms.Contracts.Features;
 using EnterpriseForms.Domain.Features.FormRecords;
@@ -49,14 +50,15 @@ public static class CreationRequestFingerprint
         return JsonSerializer.SerializeToUtf8Bytes(canonical, Json);
     }
 
-    public static FormRecordCreationAttempt Create(IFieldEncryptionService encryption, Guid tenantId, Guid formRecordId, Guid actorUserId, DateTimeOffset now, byte[] canonicalRequest)
+    /// <summary>E-1: the key is sealed under the tenant's IdempotencyProtection key (purpose-separated from field values).</summary>
+    public static async Task<FormRecordCreationAttempt> CreateAsync(IFieldEncryptionService encryption, Guid tenantId, Guid formRecordId, Guid actorUserId, DateTimeOffset now, byte[] canonicalRequest, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(encryption);
         var attemptId = Guid.CreateVersion7();
         var key = RandomNumberGenerator.GetBytes(32);
         try
         {
-            var sealedKey = encryption.Encrypt(new FieldEncryptionContext(tenantId, formRecordId, SealPurposeId, attemptId, SealLogicalType), Convert.ToBase64String(key));
+            var sealedKey = await encryption.EncryptAsync(new FieldEncryptionContext(tenantId, formRecordId, SealPurposeId, attemptId, SealLogicalType), Convert.ToBase64String(key), EncryptionKeyPurpose.IdempotencyProtection, cancellationToken).ConfigureAwait(false);
             return new FormRecordCreationAttempt
             {
                 FormRecordCreationAttemptId = attemptId,
@@ -74,8 +76,11 @@ public static class CreationRequestFingerprint
         }
     }
 
-    /// <summary>True only when the stored envelope opens for this tenant/record/attempt and the MAC of <paramref name="canonicalRequest"/> matches.</summary>
-    public static bool Matches(IFieldEncryptionService encryption, FormRecordCreationAttempt attempt, byte[] canonicalRequest)
+    /// <summary>
+    /// True only when the stored envelope opens for this tenant/record/attempt and the MAC of <paramref name="canonicalRequest"/> matches.
+    /// E-1: opens with the tenant's IdempotencyProtection key, or the legacy development key for attempts sealed before E-1.
+    /// </summary>
+    public static async Task<bool> MatchesAsync(IFieldEncryptionService encryption, FormRecordCreationAttempt attempt, byte[] canonicalRequest, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(encryption);
         ArgumentNullException.ThrowIfNull(attempt);
@@ -83,7 +88,7 @@ public static class CreationRequestFingerprint
         try
         {
             var envelope = JsonSerializer.Deserialize<Envelope>(attempt.FingerprintKeyEnvelopeJson, Json) ?? throw new JsonException("empty envelope");
-            key = Convert.FromBase64String(encryption.Decrypt(envelope.ToValue(attempt)));
+            key = Convert.FromBase64String(await encryption.DecryptAsync(envelope.ToValue(attempt), EncryptionKeyPurpose.IdempotencyProtection, cancellationToken).ConfigureAwait(false));
         }
         catch (Exception ex) when (ex is CryptographicException or JsonException or FormatException or ArgumentException)
         {

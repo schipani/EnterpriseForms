@@ -29,17 +29,17 @@ public sealed class RecordCreationIdempotencyUnitTests
     private static byte[] Canonical(CreationRequestFingerprint.Request request) => CreationRequestFingerprint.Canonicalize(request);
 
     [Fact]
-    public void TheSameRequestMatchesIncludingADifferentKeyOrder()
+    public async Task TheSameRequestMatchesIncludingADifferentKeyOrder()
     {
-        var attempt = CreationRequestFingerprint.Create(encryption, Tenant, Record, Guid.CreateVersion7(), DateTimeOffset.UtcNow, Canonical(Request()));
+        var attempt = await CreationRequestFingerprint.CreateAsync(encryption, Tenant, Record, Guid.CreateVersion7(), DateTimeOffset.UtcNow, Canonical(Request()), TestContext.Current.CancellationToken);
         var reordered = Request(new Dictionary<string, string> { ["family_name"] = "Synthetic", ["given_name"] = "Avery" });
-        Assert.True(CreationRequestFingerprint.Matches(encryption, attempt, Canonical(reordered)));
+        Assert.True(await CreationRequestFingerprint.MatchesAsync(encryption, attempt, Canonical(reordered), TestContext.Current.CancellationToken));
     }
 
     [Fact]
-    public void AnyDifferenceInTheRequestIsAConflict()
+    public async Task AnyDifferenceInTheRequestIsAConflict()
     {
-        var attempt = CreationRequestFingerprint.Create(encryption, Tenant, Record, Guid.CreateVersion7(), DateTimeOffset.UtcNow, Canonical(Request()));
+        var attempt = await CreationRequestFingerprint.CreateAsync(encryption, Tenant, Record, Guid.CreateVersion7(), DateTimeOffset.UtcNow, Canonical(Request()), TestContext.Current.CancellationToken);
         var group = new RecordGroupValuesRequest("witnesses", [new RecordOccurrenceValuesRequest(null, new Dictionary<string, string> { ["witness_name"] = "A" })]);
         var variants = new[]
         {
@@ -51,33 +51,36 @@ public sealed class RecordCreationIdempotencyUnitTests
             Request(ownerTeam: Guid.CreateVersion7()),
             Request(form: Guid.CreateVersion7()),
         };
-        Assert.All(variants, v => Assert.False(CreationRequestFingerprint.Matches(encryption, attempt, Canonical(v))));
+        foreach (var v in variants)
+        {
+            Assert.False(await CreationRequestFingerprint.MatchesAsync(encryption, attempt, Canonical(v), TestContext.Current.CancellationToken));
+        }
 
         // Repeating entries keep their order: the same entries in another order are a different request.
         var two = new RecordGroupValuesRequest("witnesses", [new RecordOccurrenceValuesRequest(null, new Dictionary<string, string> { ["witness_name"] = "A" }), new RecordOccurrenceValuesRequest(null, new Dictionary<string, string> { ["witness_name"] = "B" })]);
         var swapped = new RecordGroupValuesRequest("witnesses", [two.Occurrences[1], two.Occurrences[0]]);
-        var withGroups = CreationRequestFingerprint.Create(encryption, Tenant, Record, Guid.CreateVersion7(), DateTimeOffset.UtcNow, Canonical(Request(groups: [two])));
-        Assert.True(CreationRequestFingerprint.Matches(encryption, withGroups, Canonical(Request(groups: [two]))));
-        Assert.False(CreationRequestFingerprint.Matches(encryption, withGroups, Canonical(Request(groups: [swapped]))));
+        var withGroups = await CreationRequestFingerprint.CreateAsync(encryption, Tenant, Record, Guid.CreateVersion7(), DateTimeOffset.UtcNow, Canonical(Request(groups: [two])), TestContext.Current.CancellationToken);
+        Assert.True(await CreationRequestFingerprint.MatchesAsync(encryption, withGroups, Canonical(Request(groups: [two])), TestContext.Current.CancellationToken));
+        Assert.False(await CreationRequestFingerprint.MatchesAsync(encryption, withGroups, Canonical(Request(groups: [swapped])), TestContext.Current.CancellationToken));
     }
 
     [Fact]
-    public void TheStoredRowRevealsNoValueAndTamperingOrMovingItFailsClosed()
+    public async Task TheStoredRowRevealsNoValueAndTamperingOrMovingItFailsClosed()
     {
         var canonical = Canonical(Request());
-        var attempt = CreationRequestFingerprint.Create(encryption, Tenant, Record, Guid.CreateVersion7(), DateTimeOffset.UtcNow, canonical);
+        var attempt = await CreationRequestFingerprint.CreateAsync(encryption, Tenant, Record, Guid.CreateVersion7(), DateTimeOffset.UtcNow, canonical, TestContext.Current.CancellationToken);
         Assert.DoesNotContain("Avery", attempt.FingerprintKeyEnvelopeJson, StringComparison.Ordinal);
         Assert.NotEqual(SHA256.HashData(canonical), attempt.CreationRequestFingerprint); // keyed, not a plain digest a reader could test guesses against
         Assert.Equal(32, attempt.CreationRequestFingerprint.Length);
 
         var flipped = attempt.CreationRequestFingerprint.ToArray();
         flipped[0] ^= 1;
-        Assert.False(CreationRequestFingerprint.Matches(encryption, Clone(attempt, fingerprint: flipped), canonical));
-        Assert.False(CreationRequestFingerprint.Matches(encryption, Clone(attempt, record: Guid.CreateVersion7()), canonical)); // moved to another record: the envelope does not open
-        Assert.False(CreationRequestFingerprint.Matches(encryption, Clone(attempt, envelope: attempt.FingerprintKeyEnvelopeJson.Replace("\"Nonce\":\"", "\"Nonce\":\"AA", StringComparison.Ordinal)), canonical));
-        Assert.False(CreationRequestFingerprint.Matches(encryption, Clone(attempt, envelope: "not json"), canonical));
+        Assert.False(await CreationRequestFingerprint.MatchesAsync(encryption, Clone(attempt, fingerprint: flipped), canonical, TestContext.Current.CancellationToken));
+        Assert.False(await CreationRequestFingerprint.MatchesAsync(encryption, Clone(attempt, record: Guid.CreateVersion7()), canonical, TestContext.Current.CancellationToken)); // moved to another record: the envelope does not open
+        Assert.False(await CreationRequestFingerprint.MatchesAsync(encryption, Clone(attempt, envelope: attempt.FingerprintKeyEnvelopeJson.Replace("\"Nonce\":\"", "\"Nonce\":\"AA", StringComparison.Ordinal)), canonical, TestContext.Current.CancellationToken));
+        Assert.False(await CreationRequestFingerprint.MatchesAsync(encryption, Clone(attempt, envelope: "not json"), canonical, TestContext.Current.CancellationToken));
         var otherKek = new AesGcmFieldEncryptionService(new LocalDevelopmentKeyProvider(Options.Create(new EncryptionOptions { KeyProvider = "LocalDevelopment", LocalDevelopmentKekBase64 = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) })));
-        Assert.False(CreationRequestFingerprint.Matches(otherKek, attempt, canonical));
+        Assert.False(await CreationRequestFingerprint.MatchesAsync(otherKek, attempt, canonical, TestContext.Current.CancellationToken));
     }
 
     [Fact]

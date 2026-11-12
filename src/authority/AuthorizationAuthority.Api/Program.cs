@@ -36,6 +36,8 @@ public sealed class Program
 
         // IX-7 ST-PERF-7: the seal-throughput harness runs on the fully composed host (same signer, policy and pin), then exits.
         var measureSeal = SealThroughputCommand.Requested(args, out var sealCount, out var sealConcurrency, out args);
+        // E-5: Development/Testing operator command, run on the composed host (same store and signing provider), then exits.
+        var activateKey = IntegrityKeyActivationCommand.Requested(args, out var activation, out args);
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.ConfigureHttpJsonOptions(options => AuthorityJson.Configure(options.SerializerOptions));
@@ -114,6 +116,11 @@ public sealed class Program
         if (measureSeal)
         {
             return SealThroughputCommand.Run(app.Services, app.Environment, sealCount, sealConcurrency);
+        }
+
+        if (activateKey)
+        {
+            return IntegrityKeyActivationCommand.Run(app.Services, app.Environment, activation);
         }
 
 

@@ -1,3 +1,4 @@
+using EnterpriseForms.Application.Features.Documents.Ports;
 using EnterpriseForms.Domain.Features.FormRecords;
 
 namespace EnterpriseForms.Application.Features.FormRecords.Encryption;
@@ -10,6 +11,9 @@ public sealed record FieldEncryptionContext(Guid TenantId, Guid FormRecordId, Gu
 /// invariant wire string; the ciphertext envelope (ciphertext, nonce, tag, wrapped per-value DEK, algorithm, key
 /// reference, envelope version, logical type) is what the row HMAC and the Merkle manifest bind. Keys never leave the
 /// key provider; decryption succeeds only for the exact tenant/record/field/item it was sealed for.
+/// E-1: asynchronous and cancellable (the key provider is remote-capable); every call names its key purpose — field values
+/// use <see cref="EncryptionKeyPurpose.FieldValue"/>, the creation-idempotency fingerprint key
+/// <see cref="EncryptionKeyPurpose.IdempotencyProtection"/> — and the organization is the value's tenant.
 /// </summary>
 public interface IFieldEncryptionService
 {
@@ -17,9 +21,9 @@ public interface IFieldEncryptionService
 
     bool IsAvailable { get; }
 
-    /// <summary>Encrypts <paramref name="canonicalPlaintext"/> into a fresh envelope. Throws <see cref="Documents.Ports.EncryptionUnavailableException"/> when no permitted key provider is configured.</summary>
-    FieldEncryptedValue Encrypt(FieldEncryptionContext context, string canonicalPlaintext);
+    /// <summary>Encrypts <paramref name="canonicalPlaintext"/> into a fresh envelope under the tenant's current key of <paramref name="purpose"/>. Throws <see cref="EncryptionUnavailableException"/> when no permitted key provider is configured.</summary>
+    Task<FieldEncryptedValue> EncryptAsync(FieldEncryptionContext context, string canonicalPlaintext, EncryptionKeyPurpose purpose, CancellationToken cancellationToken);
 
-    /// <summary>Decrypts and authenticates an envelope; a tag mismatch, foreign AAD or unknown key is a <see cref="System.Security.Cryptography.CryptographicException"/> (fail closed, nothing released).</summary>
-    string Decrypt(FieldEncryptedValue value);
+    /// <summary>Decrypts and authenticates an envelope with a key of the value's tenant and <paramref name="purpose"/>; a tag mismatch, foreign AAD, foreign or unknown key is an exception (fail closed, nothing released).</summary>
+    Task<string> DecryptAsync(FieldEncryptedValue value, EncryptionKeyPurpose purpose, CancellationToken cancellationToken);
 }

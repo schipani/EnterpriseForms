@@ -26,7 +26,7 @@ public interface IAuditorNoteSealer
 {
     bool IsAvailable { get; }
 
-    AuditorReasonNoteEnvelope Seal(AuditorReasonNoteContext context, string normalizedNote);
+    Task<AuditorReasonNoteEnvelope> SealAsync(AuditorReasonNoteContext context, string normalizedNote, CancellationToken cancellationToken);
 }
 
 /// <summary>Design A §1.2–§1.3, §1.6 B2: constants, note validation and the fixed, authenticated padded plaintext encoding.</summary>

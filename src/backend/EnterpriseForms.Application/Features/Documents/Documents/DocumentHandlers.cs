@@ -16,7 +16,7 @@ using EnterpriseForms.Domain.Features.SecurityOperations;
 namespace EnterpriseForms.Application.Features.Documents.Documents;
 
 /// <summary>Authorized document projection, version history, download (server-side decrypt) and removal (new content revision without the leaf).</summary>
-public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock, ISecurityIncidentRecorder incidents)
+public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider storage, IFileEncryptionService encryption, VerifiedRecordReader reader, RecordCandidateStager stager, IAuthorizationAuthorityClient authority, TimeProvider clock, ISecurityIncidentRecorder incidents, IDecryptionFailureRecorder decryptionFailures)
 {
     public async Task<IReadOnlyList<DocumentSummaryResponse>> ListAsync(RequestContext context, Guid formRecordId, CancellationToken cancellationToken)
     {
@@ -73,7 +73,17 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
         return new DownloadContent(captured.OriginalFileName, captured.DetectedContentType, captured.PlaintextSizeBytes, async (output, ct) =>
         {
             await using var ciphertext = await storage.OpenReadAsync(StorageArea.Documents, captured.StorageObjectKey, ct).ConfigureAwait(false);
-            await encryption.DecryptAsync(ciphertext, output, envelope, aad, ct).ConfigureAwait(false);
+            try
+            {
+                await encryption.DecryptAsync(ciphertext, output, envelope, aad, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (FormRecords.Encryption.DecryptionFailure.Find(ex) is not null)
+            {
+                // E0-4: the response may already be streaming, so this is the boundary that records the failure (once); the
+                // exception is rethrown unchanged and the download still fails closed.
+                await decryptionFailures.RecordOnceAsync(context, ex).ConfigureAwait(false);
+                throw;
+            }
         });
     }
 
@@ -174,7 +184,7 @@ public sealed class DocumentHandlers(IBusinessStore store, IFileStorageProvider 
             await scope.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true, verified.ToValueResponses(), "Committed(" + accepted.ArchiveState + ")", RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
+        return new FormRecordResponse(formRecordId, context.OrganizationId, header.FormDefinitionId, header.RecordStatus, accepted.CommittedContentRevision, accepted.CommittedOperationId, accepted.AuthorizationRevision, true, await verified.ToValueResponsesAsync(cancellationToken).ConfigureAwait(false), "Committed(" + accepted.ArchiveState + ")", RecordGroupProjection.Build(verified.Groups, verified.Layout, verified.Occurrences));
     }
 
     private static DocumentSummaryResponse Summary(FileAttachmentVersion a, string lifecycle) =>

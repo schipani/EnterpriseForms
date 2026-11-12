@@ -593,6 +593,36 @@
       "bytes": 13412
     },
     {
+      "path": "docs/security/E0_ENCRYPTION_REMEDIATION.md",
+      "sha256": "5819cba8c69f44fb31fb7cc8d5c431ea2416df77a15d463fc425ee9aa607546e",
+      "bytes": 6652
+    },
+    {
+      "path": "docs/security/E1_KEY_PROVIDER_INTERFACE_V2.md",
+      "sha256": "b0ae490a2cab981a216ceeb20fa67c442114a1f46b35948946f17627902fd7f0",
+      "bytes": 7714
+    },
+    {
+      "path": "docs/security/E2_VAULT_TRANSIT_PROVIDER.md",
+      "sha256": "3d1c414441f0041df797759daa8947813fa7796f31aec695a59e9bc29a2a9564",
+      "bytes": 14290
+    },
+    {
+      "path": "docs/security/E4_CONTROLLED_KEY_ACTIVATION.md",
+      "sha256": "6ca9e57084fb7c8dadd03b88e90032a94c1c4ebe7921ba1c579710d1c0595fc6",
+      "bytes": 12677
+    },
+    {
+      "path": "docs/security/E5_HMAC_SIGNING_KEY_ROTATION.md",
+      "sha256": "e856bd9c294f1da42e8d1432b1f807e883002dbedd9f3269ffe6f2a3776bccad",
+      "bytes": 13620
+    },
+    {
+      "path": "docs/security/E6A_MANAGED_HSM_COMPATIBILITY_PROBE.md",
+      "sha256": "9193277ba655b7c4c8b779cbc691976fc50c78c92044f329c144196e685fe6a4",
+      "bytes": 30373
+    },
+    {
       "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
       "sha256": "f1249e4c9c0c43056345a250188bea7d18be0547978afe47187ee59ee15c67e7",
       "bytes": 29934
@@ -826,6 +856,16 @@
       "path": "scripts/ci/test_test_results.py",
       "sha256": "c63cede5ac611a8899f3936452d556db07533dfc537e3bf39dfaee650a2aaa48",
       "bytes": 4364
+    },
+    {
+      "path": "scripts/dev/e2-vault-integration.ps1",
+      "sha256": "afef9404f4390b6a6443293b85ec4cdd53c451ce013400f0f763e77d4ecc1a13",
+      "bytes": 6489
+    },
+    {
+      "path": "scripts/dev/e5-vault-hmac-integration.ps1",
+      "sha256": "bca0403deea56f23f22a2b449c00916357a66eb22c7615978e9744bcd0586762",
+      "bytes": 6703
     },
     {
       "path": "scripts/dev/stage-b.ps1",

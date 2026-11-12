@@ -343,6 +343,8 @@ public sealed class ArchiveProcessorTests
 
         public Task<IntegrityKeyRegistration?> FindKeyRegistrationAsync(Guid org, string purpose, CancellationToken ct) => throw new NotSupportedException();
 
+        public Task<IntegrityKeyRegistration?> FindKeyRegistrationForUpdateAsync(Guid org, string purpose, CancellationToken ct) => throw new NotSupportedException();
+
         public void AddKeyRegistration(IntegrityKeyRegistration registration) => throw new NotSupportedException();
 
         public Task<List<Guid>> GetActiveRecordIdsAsync(Guid org, CancellationToken ct) => throw new NotSupportedException();

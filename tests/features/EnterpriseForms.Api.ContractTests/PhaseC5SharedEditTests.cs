@@ -43,12 +43,13 @@ public sealed class PhaseC5SharedEditTests
 
         public bool IsAvailable => inner.IsAvailable;
 
-        public FieldEncryptedValue Encrypt(FieldEncryptionContext context, string canonicalPlaintext) => inner.Encrypt(context, canonicalPlaintext);
+        public Task<FieldEncryptedValue> EncryptAsync(FieldEncryptionContext context, string canonicalPlaintext, EnterpriseForms.Application.Features.Documents.Ports.EncryptionKeyPurpose purpose, CancellationToken cancellationToken) =>
+            inner.EncryptAsync(context, canonicalPlaintext, purpose, cancellationToken);
 
-        public string Decrypt(FieldEncryptedValue value)
+        public Task<string> DecryptAsync(FieldEncryptedValue value, EnterpriseForms.Application.Features.Documents.Ports.EncryptionKeyPurpose purpose, CancellationToken cancellationToken)
         {
             DecryptedItems.Add(value.FieldValueItemId);
-            return inner.Decrypt(value);
+            return inner.DecryptAsync(value, purpose, cancellationToken);
         }
     }
 
@@ -88,7 +89,7 @@ public sealed class PhaseC5SharedEditTests
             }
 
             var typed = FieldValueCodec.CreateRow(field, element, Options, wire, Tenant, Record, Guid.CreateVersion7(), Now, Owner);
-            var row = FieldValueCodec.Protect(typed, field, Options.ToDictionary(o => o.FieldOptionId), Encryption);
+            var row = InProcessCompletion.Completed(FieldValueCodec.ProtectAsync(typed, field, Options.ToDictionary(o => o.FieldOptionId), Encryption, CancellationToken.None));
             Stamp(row);
             Rows.Add(row);
             if (readable)
@@ -138,7 +139,7 @@ public sealed class PhaseC5SharedEditTests
     }
 
     private static BusinessException Refusal(VerifiedRecord verified, Dictionary<string, string> values, IReadOnlyList<RecordGroupValuesRequest>? groups = null) =>
-        Assert.Throws<BusinessException>(() => SharedFieldWriteBuilder.Build(verified, values, groups, Tenant, Record, Now, Editor));
+        Assert.Throws<BusinessException>(() => InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(verified, values, groups, Tenant, Record, Now, Editor, CancellationToken.None)));
 
     private static FileAttachmentVersion Attachment()
     {
@@ -170,7 +171,7 @@ public sealed class PhaseC5SharedEditTests
         var verified = f.Build();
         f.Encryption.DecryptedItems.Clear();
 
-        var result = SharedFieldWriteBuilder.Build(verified, new Dictionary<string, string> { ["note"] = "after" }, null, Tenant, Record, Now, Editor);
+        var result = InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(verified, new Dictionary<string, string> { ["note"] = "after" }, null, Tenant, Record, Now, Editor, CancellationToken.None));
 
         Assert.Equal(["note"], result.EditedFieldKeys);
         Assert.DoesNotContain(secret.FieldValueItemId, f.Encryption.DecryptedItems);
@@ -210,13 +211,13 @@ public sealed class PhaseC5SharedEditTests
         var f = new Fixture();
         var sealedField = Field("secret_note", protection: "ApplicationEncrypted", classification: "Confidential");
         var current = (FieldEncryptedValue)f.Add(sealedField, "old", readable: true, editable: true);
-        var result = SharedFieldWriteBuilder.Build(f.Build(), new Dictionary<string, string> { ["secret_note"] = "new" }, null, Tenant, Record, Now, Editor);
+        var result = InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(f.Build(), new Dictionary<string, string> { ["secret_note"] = "new" }, null, Tenant, Record, Now, Editor, CancellationToken.None));
         var edited = Assert.IsType<FieldEncryptedValue>(Assert.Single(result.EditedRows));
         Assert.Equal(current.FieldValueItemId, edited.FieldValueItemId);
         Assert.Equal(sealedField.FieldDefinitionId, edited.FieldDefinitionId);
         Assert.False(edited.EncryptionNonceBytes.AsSpan().SequenceEqual(current.EncryptionNonceBytes));
         Assert.False(edited.WrappedDataKeyBytes.AsSpan().SequenceEqual(current.WrappedDataKeyBytes));
-        Assert.Equal("new", f.Encryption.Decrypt(edited));
+        Assert.Equal("new", InProcessCompletion.Completed(f.Encryption.DecryptAsync(edited, EnterpriseForms.Application.Features.Documents.Ports.EncryptionKeyPurpose.FieldValue, CancellationToken.None)));
     }
 
     [Fact]
@@ -330,10 +331,10 @@ public sealed class PhaseC5SharedEditTests
         f.Add(status, "open", readable: true, editable: true);
         var verified = f.Build();
 
-        var changed = SharedFieldWriteBuilder.Build(verified, new Dictionary<string, string> { ["status"] = "closed" }, null, Tenant, Record, Now, Editor);
+        var changed = InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(verified, new Dictionary<string, string> { ["status"] = "closed" }, null, Tenant, Record, Now, Editor, CancellationToken.None));
         Assert.Equal(options[1].FieldOptionId, Assert.IsType<FieldOptionValue>(Assert.Single(changed.EditedRows)).FieldOptionId);
-        Assert.Throws<BusinessException>(() => SharedFieldWriteBuilder.Build(verified, new Dictionary<string, string> { ["status"] = "retired" }, null, Tenant, Record, Now, Editor));
-        Assert.Throws<BusinessException>(() => SharedFieldWriteBuilder.Build(verified, new Dictionary<string, string> { ["status"] = "forged" }, null, Tenant, Record, Now, Editor));
+        Assert.Throws<BusinessException>(() => InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(verified, new Dictionary<string, string> { ["status"] = "retired" }, null, Tenant, Record, Now, Editor, CancellationToken.None)));
+        Assert.Throws<BusinessException>(() => InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(verified, new Dictionary<string, string> { ["status"] = "forged" }, null, Tenant, Record, Now, Editor, CancellationToken.None)));
     }
 
     [Fact]
@@ -341,7 +342,7 @@ public sealed class PhaseC5SharedEditTests
     {
         var f = new Fixture { HeaderSchemaVersion = 2 };
         f.Add(Field("note"), "x", readable: true, editable: true);
-        var result = SharedFieldWriteBuilder.Build(f.Build(), new Dictionary<string, string> { ["note"] = "y" }, null, Tenant, Record, Now, Editor);
+        var result = InProcessCompletion.Completed(SharedFieldWriteBuilder.BuildAsync(f.Build(), new Dictionary<string, string> { ["note"] = "y" }, null, Tenant, Record, Now, Editor, CancellationToken.None));
         Assert.Equal(2, result.Header.RowSignatureSchemaVersion);
     }
 }

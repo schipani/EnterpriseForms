@@ -106,6 +106,7 @@ public static class BusinessInfrastructureRegistration
         services.AddSingleton<TeamDirectoryHandlers>();
         services.AddSingleton<DashboardHandler>();
         services.AddSingleton<ISecurityIncidentRecorder, SecurityIncidentRecorder>();
+        services.AddSingleton<IDecryptionFailureRecorder, EnterpriseForms.Infrastructure.Features.Audit.DecryptionFailureRecorder>(); // E0-4
         services.AddSingleton<UploadSessionHandlers>();
         services.AddSingleton<DocumentHandlers>();
         services.AddSingleton<DocumentProcessingService>();
@@ -142,10 +143,19 @@ public static class BusinessInfrastructureRegistration
             services.AddSingleton<IFileMalwareScanner>(new UnavailableMalwareScanner("malware scanner is not configured (MalwareScanner:Provider); documents stay ScanPending"));
         }
 
-        var keyProvider = configuration[$"{EncryptionOptions.SectionName}:KeyProvider"] ?? "Unconfigured";
-        if (keyProvider == "LocalDevelopment")
+        // E0-1: EncryptionProviderEnvironmentPolicy (applied at startup by the API and the Worker) refuses this provider outside Development/Testing.
+        var keyProvider = EncryptionProviderEnvironmentPolicy.ConfiguredKeyProvider(configuration);
+        if (keyProvider == EncryptionOptions.LocalDevelopmentProviderName)
         {
             services.AddSingleton<IEncryptionKeyProvider, LocalDevelopmentKeyProvider>();
+        }
+        else if (keyProvider == EncryptionOptions.VaultTransitProviderName)
+        {
+            // E-2: exactly one provider is registered; the local keyring is never registered alongside it (no fallback). Redirects are
+            // not followed, so the Vault token is never sent to another address.
+            services.AddHttpClient(VaultTransitKeyProvider.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler { AllowAutoRedirect = false });
+            services.AddSingleton<IEncryptionKeyProvider, VaultTransitKeyProvider>();
         }
         else
         {

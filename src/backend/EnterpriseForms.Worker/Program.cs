@@ -18,6 +18,8 @@ public sealed class Program
         builder.Services.AddOptions<WorkerStartupOptions>()
             .Bind(builder.Configuration.GetSection(WorkerStartupOptions.SectionName));
         builder.Services.AddHostedService<StartupConfigurationGuard>();
+        // E0-1: same key-provider environment rule as the Business API; registered before every processing service (hosted services start in order).
+        builder.Services.AddHostedService<EncryptionProviderStartupGuard>();
         builder.Services.AddBusinessInfrastructure(builder.Configuration);
         builder.Services.AddHostedService<DocumentProcessingWorker>();
         builder.Services.AddHostedService<EnterpriseForms.Worker.Features.FormDesigner.FieldProtectionMigrationWorker>();
