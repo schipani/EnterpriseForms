@@ -8,7 +8,8 @@ namespace EnterpriseForms.Infrastructure.Features.Documents;
 /// local KEK provider and (E-2) the local Docker Vault Transit provider are accepted only in the Development and Testing
 /// environments (case-insensitive, as <c>IHostEnvironment.IsDevelopment</c>/<c>IsEnvironment</c>). Anywhere else the host refuses
 /// to start; no other provider is substituted. A selected Vault Transit provider with incomplete or invalid settings is refused
-/// too (E2-5). The comparison of the configured value is exact, matching the registration in
+/// too (E2-5), as is a selected local keyring whose key-version tables are invalid, including an activated but unprovisioned version
+/// (E-4). The comparison of the configured value is exact, matching the registration in
 /// <see cref="BusinessInfrastructureRegistration"/>, which is what actually selects the provider.
 /// </summary>
 public static class EncryptionProviderEnvironmentPolicy
@@ -35,6 +36,16 @@ public static class EncryptionProviderEnvironmentPolicy
         if (!IsPermitted(keyProvider, environmentName))
         {
             throw new InvalidOperationException($"Encryption:KeyProvider '{keyProvider}' is forbidden in {environmentName}. Azure Key Vault/Managed HSM providers are required (not implemented in Stage B). Refusing to start.");
+        }
+
+        if (keyProvider == EncryptionOptions.LocalDevelopmentProviderName)
+        {
+            // E-4: an invalid key-version table, including activation of an unprovisioned version, stops the host (fail closed early).
+            var keyring = configuration.GetSection($"{EncryptionOptions.SectionName}:{nameof(EncryptionOptions.LocalDevelopmentKeyring)}").Get<LocalDevelopmentKeyringOptions>();
+            if (LocalDevelopmentKeyProvider.KeyVersionProblem(keyring) is { } problem)
+            {
+                throw new InvalidOperationException($"Encryption:KeyProvider 'LocalDevelopment' is selected but its key versions are invalid: {problem}. Refusing to start.");
+            }
         }
 
         if (keyProvider == EncryptionOptions.VaultTransitProviderName)

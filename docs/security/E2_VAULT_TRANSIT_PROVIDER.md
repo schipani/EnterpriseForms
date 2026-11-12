@@ -93,7 +93,7 @@ Until an organization's keys are provisioned, its protected writes fail closed w
   - a version Vault does not have, or one Vault itself retired (`min_decryption_version`), fails closed as unavailable.
 - Historical ciphertext stays readable while its version is retained in configuration and still decryptable in Vault.
 
-Adding a Vault key version (`.../rotate`) is an operator action, used by the integration test's setup only. No rotation workflow is implemented.
+Adding a Vault key version (`.../rotate`) is an operator action, used by the integration test's setup only. No rotation workflow is implemented. E-4 adds the guarded operator script `provision-business-encryption-key-version.sh` and the explicit activation procedure (`E4_CONTROLLED_KEY_ACTIVATION.md`). There is still no automatic rotation.
 
 ## Failure handling (E2-6)
 

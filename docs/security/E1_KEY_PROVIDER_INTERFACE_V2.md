@@ -47,6 +47,7 @@ Authority authorization boundaries and fail-closed behaviour are unchanged. The 
 
 **Versions:** `LocalDevelopmentKeyring:Purposes:{Purpose}` sets `CurrentVersion`, `RetainedVersions` and `DisabledVersions`. Optional `LocalDevelopmentKeyring:Organizations:{organization id}:{Purpose}` tables replace the purpose table for one organization. With no configuration, every organization and purpose has current version 1.
 - Only configured versions resolve; there is no automatic deletion and no on-demand derivation of unlisted versions.
+- E-4: current and retained versions must also be listed in `ProvisionedVersions` (absent: version 1 only). See `E4_CONTROLLED_KEY_ACTIVATION.md`.
 - An invalid table (current version disabled, overlap, unknown purpose, bad organization key, wrong-size or invalid root) makes the provider unavailable for every operation.
 - Exceptions never contain key material.
 

@@ -599,13 +599,18 @@
     },
     {
       "path": "docs/security/E1_KEY_PROVIDER_INTERFACE_V2.md",
-      "sha256": "54c1796d8e2d2d91d70aea8544138d1c0207509c08124ba8564714553500e775",
-      "bytes": 7567
+      "sha256": "b0ae490a2cab981a216ceeb20fa67c442114a1f46b35948946f17627902fd7f0",
+      "bytes": 7714
     },
     {
       "path": "docs/security/E2_VAULT_TRANSIT_PROVIDER.md",
-      "sha256": "eca35d2c58371eae610cb2833ee5bec243405b44366fe97c49b968433ae9d3f1",
-      "bytes": 14093
+      "sha256": "3d1c414441f0041df797759daa8947813fa7796f31aec695a59e9bc29a2a9564",
+      "bytes": 14290
+    },
+    {
+      "path": "docs/security/E4_CONTROLLED_KEY_ACTIVATION.md",
+      "sha256": "6ca9e57084fb7c8dadd03b88e90032a94c1c4ebe7921ba1c579710d1c0595fc6",
+      "bytes": 12677
     },
     {
       "path": "docs/security/FIELD_PROTECTION_RECONCILIATION.md",
@@ -844,8 +849,8 @@
     },
     {
       "path": "scripts/dev/e2-vault-integration.ps1",
-      "sha256": "e623ae8622009d45eab9e845fca95b23cf1f0ff6d0c0aa4ebc18f47cb9749863",
-      "bytes": 4148
+      "sha256": "afef9404f4390b6a6443293b85ec4cdd53c451ce013400f0f763e77d4ecc1a13",
+      "bytes": 6489
     },
     {
       "path": "scripts/dev/stage-b.ps1",

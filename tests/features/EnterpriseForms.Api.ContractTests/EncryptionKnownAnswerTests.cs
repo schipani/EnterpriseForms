@@ -283,7 +283,7 @@ public sealed class EncryptionKnownAnswerTests
             var options = new EncryptionOptions { KeyProvider = EncryptionOptions.LocalDevelopmentProviderName, LocalDevelopmentKekBase64 = Convert.ToBase64String(Seq(0x00, 32)), LocalDevelopmentKeyReference = KeyReference };
             if (v.Version == 2)
             {
-                options.LocalDevelopmentKeyring.Purposes["FieldValue"] = new LocalKeyVersionOptions { CurrentVersion = 2, RetainedVersions = [1] };
+                options.LocalDevelopmentKeyring.Purposes["FieldValue"] = new LocalKeyVersionOptions { ProvisionedVersions = [1, 2], CurrentVersion = 2, RetainedVersions = [1] };
             }
 
             var keys = new LocalDevelopmentKeyProvider(Options.Create(options));

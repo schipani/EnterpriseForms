@@ -162,8 +162,8 @@ public sealed class KeyProviderInterfaceV2Tests
     {
         var keys = Keys(o =>
         {
-            o.LocalDevelopmentKeyring.Purposes["FieldValue"] = new LocalKeyVersionOptions { CurrentVersion = 3, RetainedVersions = [1, 2] };
-            o.LocalDevelopmentKeyring.Organizations[OrgB.ToString("D")] = new() { ["FieldValue"] = new LocalKeyVersionOptions { CurrentVersion = 5 } };
+            o.LocalDevelopmentKeyring.Purposes["FieldValue"] = new LocalKeyVersionOptions { ProvisionedVersions = [1, 2, 3], CurrentVersion = 3, RetainedVersions = [1, 2] };
+            o.LocalDevelopmentKeyring.Organizations[OrgB.ToString("D")] = new() { ["FieldValue"] = new LocalKeyVersionOptions { ProvisionedVersions = [5], CurrentVersion = 5 } };
         });
         Assert.EndsWith(":field-value:3", (await keys.WrapDataKeyAsync(Scope(OrgA, EncryptionKeyPurpose.FieldValue), Dek(), Ct)).KeyReference, StringComparison.Ordinal);
         Assert.EndsWith(":field-value:5", (await keys.WrapDataKeyAsync(Scope(OrgB, EncryptionKeyPurpose.FieldValue), Dek(), Ct)).KeyReference, StringComparison.Ordinal);
@@ -182,7 +182,7 @@ public sealed class KeyProviderInterfaceV2Tests
         var v1 = await new AesGcmFieldEncryptionService(Keys()).EncryptAsync(context, "written under v1", EncryptionKeyPurpose.FieldValue, Ct);
         Assert.EndsWith(":field-value:1", v1.EncryptionKeyReference, StringComparison.Ordinal);
 
-        var later = new AesGcmFieldEncryptionService(Keys(o => o.LocalDevelopmentKeyring.Purposes["FieldValue"] = new LocalKeyVersionOptions { CurrentVersion = 2, RetainedVersions = [1] }));
+        var later = new AesGcmFieldEncryptionService(Keys(o => o.LocalDevelopmentKeyring.Purposes["FieldValue"] = new LocalKeyVersionOptions { ProvisionedVersions = [1, 2], CurrentVersion = 2, RetainedVersions = [1] }));
         Assert.Equal("written under v1", await later.DecryptAsync(v1, EncryptionKeyPurpose.FieldValue, Ct)); // historical version, not rewritten
         var v2 = await later.EncryptAsync(context, "written under v2", EncryptionKeyPurpose.FieldValue, Ct);
         Assert.EndsWith(":field-value:2", v2.EncryptionKeyReference, StringComparison.Ordinal);
@@ -199,10 +199,10 @@ public sealed class KeyProviderInterfaceV2Tests
         var scope = Scope(OrgA, EncryptionKeyPurpose.Document);
 
         // v1 no longer retained: unknown. The current v2 key is never tried in its place.
-        var notRetained = Keys(o => o.LocalDevelopmentKeyring.Purposes["Document"] = new LocalKeyVersionOptions { CurrentVersion = 2 });
+        var notRetained = Keys(o => o.LocalDevelopmentKeyring.Purposes["Document"] = new LocalKeyVersionOptions { ProvisionedVersions = [1, 2], CurrentVersion = 2 });
         var unknown = await Assert.ThrowsAsync<EncryptionUnavailableException>(() => notRetained.UnwrapDataKeyAsync(scope, v1.KeyReference, v1.WrappedKeyBytes, Ct));
         Assert.Equal("the key version is not retained", unknown.Message);
-        var disabled = Keys(o => o.LocalDevelopmentKeyring.Purposes["Document"] = new LocalKeyVersionOptions { CurrentVersion = 2, DisabledVersions = [1] });
+        var disabled = Keys(o => o.LocalDevelopmentKeyring.Purposes["Document"] = new LocalKeyVersionOptions { ProvisionedVersions = [1, 2], CurrentVersion = 2, DisabledVersions = [1] });
         Assert.Equal("the key version is disabled", (await Assert.ThrowsAsync<EncryptionUnavailableException>(() => disabled.UnwrapDataKeyAsync(scope, v1.KeyReference, v1.WrappedKeyBytes, Ct))).Message);
         // A version above the current one is unknown too (no key is derived or generated on demand).
         await Assert.ThrowsAsync<EncryptionUnavailableException>(() => Keys().UnwrapDataKeyAsync(scope, "localdev:" + OrgA.ToString("D") + ":document:7", v1.WrappedKeyBytes, Ct));

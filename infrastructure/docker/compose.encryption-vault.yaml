@@ -50,6 +50,24 @@ services:
     networks: [authority-net]
     restart: "no"
 
+  vault-encryption-provision-version:
+    # E-4 operator action, never started by `up`: adds ONE version to ONE existing key (root token, this container only). The new
+    # version is NOT active until Encryption:VaultTransit configuration names it (docs/security/E4_CONTROLLED_KEY_ACTIVATION.md).
+    #   docker compose -f compose.yaml -f compose.encryption-vault.yaml run --rm -e ORGANIZATION_ID=<uuid> -e KEY_PURPOSE=field-value -e EXPECTED_LATEST_VERSION=1 vault-encryption-provision-version
+    image: hashicorp/vault:1.20.4
+    profiles: [encryption-provisioning]
+    entrypoint: ["sh", "/vault-config/provision-business-encryption-key-version.sh"]
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:?set in .env}
+      ORGANIZATION_ID: ${ORGANIZATION_ID:-}
+      KEY_PURPOSE: ${KEY_PURPOSE:-}
+      EXPECTED_LATEST_VERSION: ${EXPECTED_LATEST_VERSION:-}
+    volumes:
+      - ./vault/provision-business-encryption-key-version.sh:/vault-config/provision-business-encryption-key-version.sh:ro
+    networks: [authority-net]
+    restart: "no"
+
   api:
     environment:
       Encryption__KeyProvider: VaultTransit

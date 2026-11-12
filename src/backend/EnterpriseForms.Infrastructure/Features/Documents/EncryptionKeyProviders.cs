@@ -63,8 +63,21 @@ public class KeyVersionOptions
     public List<int> DisabledVersions { get; set; } = [];
 }
 
-/// <summary>The local keyring's version table (E1-6); the same shape as <see cref="KeyVersionOptions"/>.</summary>
-public sealed class LocalKeyVersionOptions : KeyVersionOptions;
+/// <summary>
+/// The local keyring's version table (E1-6): the shape of <see cref="KeyVersionOptions"/> plus, since E-4, the explicit set of
+/// provisioned versions. A local key version is derived from the keyring root, so nothing outside this configuration says that a
+/// version "exists"; <see cref="ProvisionedVersions"/> is that statement, made separately from activation, as a Vault key version
+/// exists in Vault before configuration makes it current.
+/// </summary>
+public sealed class LocalKeyVersionOptions : KeyVersionOptions
+{
+    /// <summary>
+    /// E4-5: the versions provisioned for this scope (absent: version 1 only). Provisioning a version makes it available but never
+    /// current: <see cref="KeyVersionOptions.CurrentVersion"/> and every <see cref="KeyVersionOptions.RetainedVersions"/> entry must be
+    /// provisioned, or the keyring is invalid and every operation fails closed (and the API and Worker refuse to start).
+    /// </summary>
+    public List<int>? ProvisionedVersions { get; set; }
+}
 
 /// <summary>
 /// E-1 Development/Testing key provider (refused outside Development/Testing at startup, E0-1). Two kinds of reference:
@@ -114,11 +127,7 @@ public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
                 throw new KeyConfigurationException("the legacy key reference must be set and must not use the scoped reference form");
             }
 
-            var keyring = value.LocalDevelopmentKeyring ?? new LocalDevelopmentKeyringOptions();
-            tables.Load(
-                keyring.Purposes.ToDictionary(p => p.Key, KeyVersionOptions (p) => p.Value, StringComparer.Ordinal),
-                keyring.Organizations.ToDictionary(o => o.Key, o => o.Value.ToDictionary(p => p.Key, KeyVersionOptions (p) => p.Value, StringComparer.Ordinal), StringComparer.OrdinalIgnoreCase),
-                "keyring");
+            LoadKeyring(value.LocalDevelopmentKeyring ?? new LocalDevelopmentKeyringOptions(), tables);
         }
         catch (KeyConfigurationException ex)
         {
@@ -259,6 +268,64 @@ public sealed class LocalDevelopmentKeyProvider : IEncryptionKeyProvider
     }
 
     internal static byte[] ScopedWrapAad(DataKeyScope scope, int version) => KeyScopeEncoding.Context(WrapDomain, scope, version);
+
+    /// <summary>
+    /// E-4: the first problem of the keyring's version configuration (tables and provisioning), or null when it is valid. Never
+    /// mentions key material (the keyring options hold none). Used by the API and Worker startup rule, so that an activation of an
+    /// unprovisioned version, or any other invalid table, stops the host instead of starting a provider that refuses every operation.
+    /// </summary>
+    public static string? KeyVersionProblem(LocalDevelopmentKeyringOptions? keyring)
+    {
+        try
+        {
+            LoadKeyring(keyring ?? new LocalDevelopmentKeyringOptions(), new KeyVersionTables());
+            return null;
+        }
+        catch (KeyConfigurationException ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    private static void LoadKeyring(LocalDevelopmentKeyringOptions keyring, KeyVersionTables into)
+    {
+        var purposes = keyring.Purposes ?? [];
+        var organizations = keyring.Organizations ?? [];
+        into.Load(
+            purposes.ToDictionary(p => p.Key, KeyVersionOptions (p) => p.Value, StringComparer.Ordinal),
+            organizations.ToDictionary(o => o.Key, o => o.Value.ToDictionary(p => p.Key, KeyVersionOptions (p) => p.Value, StringComparer.Ordinal), StringComparer.OrdinalIgnoreCase),
+            "keyring");
+
+        // E4-5: a version is current or retained only once it has been provisioned (absent list: version 1 only, the E-1 default).
+        foreach (var (purposeName, table) in purposes.Concat(organizations.SelectMany(o => o.Value)))
+        {
+            RequireProvisioned(table, purposeName);
+        }
+    }
+
+    private static void RequireProvisioned(LocalKeyVersionOptions? table, string purposeName)
+    {
+        if (table is null)
+        {
+            return;
+        }
+
+        var provisioned = (table.ProvisionedVersions ?? [1]).ToHashSet();
+        if (provisioned.Any(v => v < 1))
+        {
+            throw new KeyConfigurationException("provisioned key versions of " + purposeName + " must be positive");
+        }
+
+        if (!provisioned.Contains(table.CurrentVersion))
+        {
+            throw new KeyConfigurationException("the current key version of " + purposeName + " is not provisioned");
+        }
+
+        if ((table.RetainedVersions ?? []).Any(v => !provisioned.Contains(v)))
+        {
+            throw new KeyConfigurationException("a retained key version of " + purposeName + " is not provisioned");
+        }
+    }
 
     private static byte[] Open(byte[] kek, ReadOnlySpan<byte> wrapped, byte[] aad)
     {
